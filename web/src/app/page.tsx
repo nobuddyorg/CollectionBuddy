@@ -59,19 +59,19 @@ function GoogleSignInButton({
   };
 
   return (
-    <>
-      <button
-        onClick={handleClick}
-        disabled={loading}
-        aria-label="Mit Google anmelden"
-        className="relative flex items-center rounded-md border border-[#747775] dark:border-neutral-500 
-                   bg-white hover:bg-[#f8f9fa] active:bg-[#f1f3f4]
-                   dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:active:bg-neutral-600
-                   px-4 h-12 shadow-sm hover:shadow-md transition-all duration-200
-                   disabled:opacity-60 disabled:cursor-not-allowed"
-        style={{ fontFamily: "Roboto, sans-serif", fontWeight: 500 }}
-      >
-        {!loading && (
+    <button
+      onClick={handleClick}
+      disabled={loading}
+      aria-label="Mit Google anmelden"
+      className="relative flex items-center justify-center rounded-md border border-[#747775] dark:border-neutral-500 
+                 bg-white hover:bg-[#f8f9fa] active:bg-[#f1f3f4]
+                 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:active:bg-neutral-600
+                 px-4 h-12 shadow-sm hover:shadow-md transition-all duration-200
+                 disabled:opacity-60 disabled:cursor-not-allowed"
+      style={{ fontFamily: "Roboto, sans-serif", fontWeight: 500 }}
+    >
+      {!loading && (
+        <>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 48 48"
@@ -94,21 +94,21 @@ function GoogleSignInButton({
               d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
             />
           </svg>
-        )}
-        <span className="text-[#3c4043] dark:text-neutral-100 text-sm">
-          {loading ? "Wird geladen..." : "Mit Google anmelden"}
-        </span>
-      </button>
+          <span className="text-[#3c4043] dark:text-neutral-100 text-sm">
+            Mit Google anmelden
+          </span>
+        </>
+      )}
 
       {loading && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm">
-          <div className="animate-spin h-8 w-8 rounded-full border-2 border-white/80 border-t-transparent mb-4" />
-          <span className="text-white text-lg font-medium">
+        <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/10 dark:bg-white/10 rounded-md">
+          <div className="animate-spin h-5 w-5 rounded-full border-2 border-current border-t-transparent text-[#3c4043] dark:text-neutral-100" />
+          <span className="text-[#3c4043] dark:text-neutral-100 text-sm">
             Wird geladen...
           </span>
         </div>
       )}
-    </>
+    </button>
   );
 }
 
