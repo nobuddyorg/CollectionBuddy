@@ -130,7 +130,7 @@ function Collectible({ delay, color, emoji, x, y }: CollectibleProps) {
 
 function Coin({ text, cta }: { text: string; cta: React.ReactNode }) {
   return (
-    <div className="relative z-20 w-[340px] h-[340px] sm:w-[380px] sm:h-[380px]">
+    <div className="relative w-[340px] h-[340px] sm:w-[380px] sm:h-[380px]">
       <svg viewBox="0 0 380 380" className="w-full h-full">
         <defs>
           <path
@@ -172,7 +172,7 @@ function Coin({ text, cta }: { text: string; cta: React.ReactNode }) {
         </text>
 
         <g
-          transform="translate(190,140) scale(0.75)"
+          transform="translate(190,135) scale(0.65,0.85)"
           fill="none"
           strokeLinejoin="round"
           strokeLinecap="round"

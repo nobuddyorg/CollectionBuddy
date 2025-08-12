@@ -89,6 +89,7 @@ body {
     animation: float-in 6s ease-in-out infinite;
     animation-delay: var(--delay, 0s);
     will-change: transform, opacity;
+    z-index: 19;
   }
 
   .collectible-bob {
