@@ -64,14 +64,18 @@ function GoogleSignInButton({
         onClick={handleClick}
         disabled={loading}
         aria-label="Mit Google anmelden"
-        className="relative flex items-center rounded-md bg-white border border-[#747775] hover:bg-[#f8f9fa] active:bg-[#f1f3f4] px-4 h-12 shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed dark:border-neutral-500"
+        className="relative flex items-center rounded-md border border-[#747775] dark:border-neutral-500 
+                   bg-white hover:bg-[#f8f9fa] active:bg-[#f1f3f4]
+                   dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:active:bg-neutral-600
+                   px-4 h-12 shadow-sm hover:shadow-md transition-all duration-200
+                   disabled:opacity-60 disabled:cursor-not-allowed"
         style={{ fontFamily: "Roboto, sans-serif", fontWeight: 500 }}
       >
         {!loading && (
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 48 48"
-            className="w-5 h-5 mr-3"
+            className="w-5 h-5 mr-3 flex-shrink-0"
           >
             <path
               fill="#EA4335"
@@ -91,14 +95,14 @@ function GoogleSignInButton({
             />
           </svg>
         )}
-        <span className="text-[#3c4043] text-sm">
+        <span className="text-[#3c4043] dark:text-neutral-100 text-sm">
           {loading ? "Wird geladen..." : "Mit Google anmelden"}
         </span>
       </button>
 
       {loading && (
-        <div className="loading-overlay">
-          <div className="spinner text-white mb-4" />
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm">
+          <div className="animate-spin h-8 w-8 rounded-full border-2 border-white/80 border-t-transparent mb-4" />
           <span className="text-white text-lg font-medium">
             Wird geladen...
           </span>
@@ -250,7 +254,7 @@ export default function Page() {
 
   if (!user) {
     return (
-      <main className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4 bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+      <main className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden px-4 bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] overscroll-y-contain">
         {POS.map((p, i) => (
           <Collectible
             key={i}
@@ -261,18 +265,18 @@ export default function Page() {
             y={p.y}
           />
         ))}
-        <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight mb-4">
+        <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight mb-2 sm:mb-4">
           <span className="text-neutral-900 dark:text-neutral-100">
             Collection
           </span>
           <span className="text-neutral-500 dark:text-neutral-400">Buddy</span>
         </h1>
-        <div className="h-[3px] w-36 bg-gradient-to-r from-neutral-900 to-neutral-500 dark:from-neutral-100 dark:to-neutral-400 rounded-full mb-6" />
+        <div className="h-[3px] w-36 bg-gradient-to-r from-neutral-900 to-neutral-500 dark:from-neutral-100 dark:to-neutral-400 rounded-full mb-4 sm:mb-6" />
         <Coin
           text={CIRCLE_TEXT.repeat(2)}
           cta={<GoogleSignInButton onClick={signIn} />}
         />
-        <p className="fade-up mt-6 text-base sm:text-lg text-neutral-600 dark:text-neutral-300 text-center max-w-xl">
+        <p className="fade-up mt-4 sm:mt-6 text-base sm:text-lg text-neutral-600 dark:text-neutral-300 text-center max-w-xl">
           Dein digitales Sammelalbum für Münzen, Plüschtiere, Briefmarken und
           alles, was dir am Herzen liegt.
         </p>
@@ -281,7 +285,7 @@ export default function Page() {
   }
 
   return (
-    <main className="min-h-screen p-8 flex flex-col gap-8 max-w-2xl mx-auto bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+    <main className="min-h-[100dvh] p-8 flex flex-col gap-8 max-w-2xl mx-auto bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] overscroll-y-contain">
       <div className="flex justify-between items-center">
         <span className="text-sm opacity-70">{user.email}</span>
         <button
