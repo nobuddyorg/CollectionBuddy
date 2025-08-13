@@ -57,7 +57,7 @@ export default function LoginPage() {
     supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH}/`,
       },
     });
 
