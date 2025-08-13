@@ -1,33 +1,35 @@
-create or replace function public.set_user_id_items()
-returns trigger language plpgsql as $$
+-- Enforce user_id = auth.uid() at the DB layer (defense in depth)
+create or replace function public.enforce_user_id()
+returns trigger
+language plpgsql
+security definer
+as $$
 begin
-  if new.user_id is null then
+  if (tg_op = 'INSERT') then
     new.user_id := auth.uid();
+    return new;
+  elsif (tg_op = 'UPDATE') then
+    -- prevent moving rows between users
+    if new.user_id <> old.user_id then
+      new.user_id := old.user_id;
+    end if;
+    return new;
   end if;
   return new;
-end; $$;
+end;
+$$;
 
-drop trigger if exists trg_set_user_id_items on public.items;
-create trigger trg_set_user_id_items
-before insert on public.items
-for each row execute function public.set_user_id_items();
+drop trigger if exists t_categories_enforce_uid on public.categories;
+create trigger t_categories_enforce_uid
+before insert or update on public.categories
+for each row execute function public.enforce_user_id();
 
-create or replace function public.set_user_id_item_categories()
-returns trigger language plpgsql as $$
-begin
-  if new.user_id is null then
-    new.user_id := auth.uid();
-  end if;
-  return new;
-end; $$;
+drop trigger if exists t_items_enforce_uid on public.items;
+create trigger t_items_enforce_uid
+before insert or update on public.items
+for each row execute function public.enforce_user_id();
 
-drop trigger if exists trg_set_user_id_item_categories on public.item_categories;
-create trigger trg_set_user_id_item_categories
-before insert on public.item_categories
-for each row execute function public.set_user_id_item_categories();
-
-create index if not exists idx_items_created_at on public.items (created_at desc);
-create index if not exists idx_item_categories_category on public.item_categories (category_id);
-create index if not exists idx_item_categories_item on public.item_categories (item_id);
-
-select pg_notify('pgrst','reload schema');
+drop trigger if exists t_item_categories_enforce_uid on public.item_categories;
+create trigger t_item_categories_enforce_uid
+before insert or update on public.item_categories
+for each row execute function public.enforce_user_id();

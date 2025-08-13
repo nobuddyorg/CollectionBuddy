@@ -1,18 +1,53 @@
-insert into storage.buckets (id, name, public) values ('item-images','item-images',false)
+-- supabase/migrations/0002_storage.sql
+
+-- Bucket
+insert into storage.buckets (id, name, public)
+values ('item-images', 'item-images', false)
 on conflict (id) do nothing;
 
-create policy "list own"
-on storage.objects for select
-using (bucket_id = 'item-images' and (auth.uid()::text || '/') = left(name, 37));
+-- Policies: allow only paths starting with "<uid>/..."
+-- Avoid ALTER TABLE here; you’re not the table owner.
 
-create policy "upload own"
-on storage.objects for insert
-with check (bucket_id = 'item-images' and (auth.uid()::text || '/') = left(name, 37));
+drop policy if exists "read own signed objects" on storage.objects;
+create policy "read own signed objects"
+on storage.objects
+for select
+to authenticated
+using (
+  bucket_id = 'item-images'
+  and split_part(name, '/', 1) = auth.uid()::text
+);
 
-create policy "update own"
-on storage.objects for update
-using (bucket_id = 'item-images' and (auth.uid()::text || '/') = left(name, 37));
+drop policy if exists "upload own objects" on storage.objects;
+create policy "upload own objects"
+on storage.objects
+for insert
+to authenticated
+with check (
+  bucket_id = 'item-images'
+  and split_part(name, '/', 1) = auth.uid()::text
+);
 
-create policy "delete own"
-on storage.objects for delete
-using (bucket_id = 'item-images' and (auth.uid()::text || '/') = left(name, 37));
+drop policy if exists "update own objects" on storage.objects;
+create policy "update own objects"
+on storage.objects
+for update
+to authenticated
+using (
+  bucket_id = 'item-images'
+  and split_part(name, '/', 1) = auth.uid()::text
+)
+with check (
+  bucket_id = 'item-images'
+  and split_part(name, '/', 1) = auth.uid()::text
+);
+
+drop policy if exists "delete own objects" on storage.objects;
+create policy "delete own objects"
+on storage.objects
+for delete
+to authenticated
+using (
+  bucket_id = 'item-images'
+  and split_part(name, '/', 1) = auth.uid()::text
+);

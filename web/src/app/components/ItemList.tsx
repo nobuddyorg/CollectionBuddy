@@ -4,21 +4,23 @@ import Image from "next/image";
 import { supabase } from "../lib/supabase";
 import { Item } from "../types";
 
-type Props = {
-  categoryId: string;
-};
+type PropsList = { categoryId: string };
 
 type ItemRow = {
   id: string;
   title: string;
   description: string | null;
+  place: string | null;
+  tags: string[] | null;
   item_categories: { category_id: string }[];
 };
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 6;
 
-export default function ItemList({ categoryId }: Props) {
-  const [items, setItems] = useState<Item[]>([]);
+export default function ItemList({ categoryId }: PropsList) {
+  const [items, setItems] = useState<
+    (Item & { place?: string | null; tags?: string[] | null })[]
+  >([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
@@ -43,9 +45,10 @@ export default function ItemList({ categoryId }: Props) {
 
     const { data, error, count } = await supabase
       .from("items")
-      .select("id,title,description,item_categories!inner(category_id)", {
-        count: "exact",
-      })
+      .select(
+        "id,title,description,place,tags,item_categories!inner(category_id)",
+        { count: "exact" }
+      )
       .eq("item_categories.category_id", categoryId)
       .order("created_at", { ascending: false })
       .range(from, to)
@@ -59,6 +62,8 @@ export default function ItemList({ categoryId }: Props) {
         id: d.id,
         title: d.title,
         description: d.description,
+        place: d.place ?? null,
+        tags: d.tags ?? [],
       }))
     );
     setTotal(count || 0);
@@ -127,17 +132,14 @@ export default function ItemList({ categoryId }: Props) {
     async (itemId: string, file: File) => {
       try {
         setBusy(itemId);
-
         const { data: u } = await supabase.auth.getUser();
         const uid = u.user?.id;
         if (!uid) throw new Error("Keine Benutzersitzung");
-
         const path = `${uid}/${itemId}/${crypto.randomUUID()}-${file.name}`;
         const { error: upErr } = await supabase.storage
           .from("item-images")
           .upload(path, file);
         if (upErr) throw upErr;
-
         await refreshItemImages(itemId);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -153,39 +155,81 @@ export default function ItemList({ categoryId }: Props) {
 
   return (
     <div className="space-y-4">
-      <ul className="space-y-3">
+      <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {items.map((it) => (
-          <li key={it.id} className="border rounded p-3 space-y-3">
-            <div className="flex justify-between items-center">
-              <div className="font-medium">{it.title}</div>
+          <li
+            key={it.id}
+            className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur p-3 shadow-sm space-y-3"
+          >
+            <div className="flex justify-between items-center gap-3">
+              <div className="font-medium truncate">{it.title}</div>
               <button
                 onClick={() => deleteItem(it.id)}
-                className="px-2 py-1 rounded border border-red-500 text-red-500"
+                className="rounded-lg border px-2 py-1 text-red-600 border-red-500/40 hover:bg-red-50 dark:hover:bg-red-950/30"
               >
                 Löschen
               </button>
             </div>
 
             {it.description && (
-              <div className="text-sm opacity-80">{it.description}</div>
+              <div className="text-sm opacity-80 line-clamp-3">
+                {it.description}
+              </div>
             )}
 
-            <div className="flex gap-3 items-center">
-              <input
-                type="file"
-                accept="image/*"
-                disabled={!userId || busy === it.id}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  setImages((prev) => ({
-                    ...prev,
-                    [it.id]: [URL.createObjectURL(f), ...(prev[it.id] || [])],
-                  }));
-                  void uploadImage(it.id, f);
-                }}
-              />
-              {busy === it.id && <span className="text-sm">Lade hoch…</span>}
+            {it.place && (
+              <div className="flex items-center gap-2 text-sm opacity-80">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-4 h-4 shrink-0 opacity-80"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
+                  <circle cx="12" cy="10" r="2" fill="currentColor" />
+                </svg>
+                <span className="truncate">{it.place}</span>
+              </div>
+            )}
+
+            {Array.isArray(it.tags) && it.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {it.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 bg-neutral-200/80 dark:bg-neutral-700/70 rounded-full px-2 py-0.5 text-xs"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <label className="inline-flex cursor-pointer items-center rounded-xl border px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 transition">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={!userId || busy === it.id}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setImages((prev) => ({
+                      ...prev,
+                      [it.id]: [URL.createObjectURL(f), ...(prev[it.id] || [])],
+                    }));
+                    void uploadImage(it.id, f);
+                  }}
+                />
+                <span className="text-sm">
+                  {busy === it.id ? "Lade hoch…" : "Bild hinzufügen"}
+                </span>
+              </label>
             </div>
 
             {images[it.id]?.length ? (
@@ -198,7 +242,7 @@ export default function ItemList({ categoryId }: Props) {
                     width={160}
                     height={160}
                     unoptimized
-                    className="h-20 w-full object-cover rounded"
+                    className="h-20 w-full object-cover rounded-xl"
                   />
                 ))}
               </div>
@@ -212,21 +256,32 @@ export default function ItemList({ categoryId }: Props) {
       </ul>
 
       {totalPages > 1 && (
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center justify-center">
           <button
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
-            className="px-2 py-1 rounded border disabled:opacity-50"
+            className="rounded-xl border px-3 py-1 disabled:opacity-50"
           >
             Zurück
           </button>
-          <span className="text-sm">
-            Seite {page} / {totalPages}
-          </span>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+            <button
+              key={n}
+              onClick={() => setPage(n)}
+              className={
+                "rounded-xl border px-3 py-1 min-w-9 " +
+                (n === page
+                  ? "bg-black text-white"
+                  : "hover:bg-neutral-50 dark:hover:bg-neutral-800/60")
+              }
+            >
+              {n}
+            </button>
+          ))}
           <button
             disabled={page === totalPages}
             onClick={() => setPage((p) => p + 1)}
-            className="px-2 py-1 rounded border disabled:opacity-50"
+            className="rounded-xl border px-3 py-1 disabled:opacity-50"
           >
             Weiter
           </button>

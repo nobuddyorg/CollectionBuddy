@@ -1,92 +1,70 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { supabase } from "./lib/supabase";
-import { User } from "./types";
+import { useSession } from "./hooks/useSession";
+import LoadingOverlay from "./components/LoadingOverlay";
 import CategorySelect from "./components/CategorySelect";
 import ItemCreate from "./components/ItemCreate";
 import ItemList from "./components/ItemList";
-import LoadingOverlay from "./components/LoadingOverlay";
-import type {
-  AuthChangeEvent,
-  Session,
-  User as SupabaseUser,
-} from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
-
-function asUser(u: SupabaseUser | null): User | null {
-  return u as unknown as User | null;
-}
+import Header from "./components/Header";
 
 export default function Page() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading } = useSession();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     null
   );
   const [refreshToken, setRefreshToken] = useState(0);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-
-    const handleSession = (session: Session | null) => {
-      if (!active) return;
-      const nextUser = asUser(session?.user ?? null);
-      setUser(nextUser);
-      setLoading(false);
-      if (!nextUser) router.replace("/login");
-    };
-
-    supabase.auth.getSession().then(({ data }) => handleSession(data.session));
-
-    const { data: sub } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, session: Session | null) =>
-        handleSession(session)
-    );
-
-    return () => {
-      active = false;
-      sub.subscription.unsubscribe();
-    };
-  }, [router]);
-
-  const signOut = useCallback(() => {
-    void supabase.auth.signOut();
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
   }, []);
 
-  const content = useMemo(() => {
-    if (loading) return <LoadingOverlay />;
-    if (!user) return null;
+  if (loading) return <LoadingOverlay />;
+  if (!user) return null;
 
-    return (
-      <main className="min-h-[100dvh] p-8 flex flex-col gap-8 max-w-2xl mx-auto bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] overscroll-y-contain">
-        <div className="flex justify-between items-center">
-          <span className="text-sm opacity-70">{user.email}</span>
-          <button
-            onClick={signOut}
-            className="px-3 py-1 rounded border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-900"
-          >
-            Sign out
-          </button>
-        </div>
+  return (
+    <div className="min-h-[100dvh] bg-gradient-to-b from-amber-50 via-white to-stone-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 text-neutral-900 dark:text-neutral-100">
+      <Header user={user} onSignOut={signOut} />
 
+      <main className="mx-auto max-w-3xl px-4 py-6 sm:py-8 space-y-6">
         <CategorySelect
           selectedCat={selectedCategoryId}
           onSelect={setSelectedCategoryId}
         />
 
-        {selectedCategoryId && (
+        {selectedCategoryId ? (
           <>
             <ItemCreate
               categoryId={selectedCategoryId}
               onCreated={() => setRefreshToken((k) => k + 1)}
             />
-            <ItemList key={refreshToken} categoryId={selectedCategoryId} />
+
+            <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 sm:p-5">
+              <h2 className="text-base font-semibold mb-3">Einträge</h2>
+              <ItemList key={refreshToken} categoryId={selectedCategoryId} />
+            </section>
           </>
+        ) : (
+          <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-10 grid place-items-center text-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="h-16 w-16 rounded-full bg-amber-500/90 ring-8 ring-amber-200/40 dark:ring-amber-900/20 grid place-items-center text-3xl">
+                🧺
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold">Kategorie wählen</h3>
+                <p className="text-sm opacity-70">
+                  Dann kannst du neue Sammlerstücke hinzufügen und Bilder
+                  hochladen.
+                </p>
+              </div>
+            </div>
+          </section>
         )}
       </main>
-    );
-  }, [loading, user, signOut, selectedCategoryId, refreshToken]);
 
-  return content;
+      <footer className="px-4 py-8 text-center text-xs opacity-60">
+        Sammeln • Ordnen • Behalten
+      </footer>
+    </div>
+  );
 }

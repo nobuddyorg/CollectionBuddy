@@ -9,10 +9,11 @@ interface Props {
 }
 
 const STRINGS = {
-  selectPlaceholder: "— Kategorie wählen —",
-  delete: "Löschen",
+  title: "Kategorie",
+  selectPlaceholder: "Kategorie wählen oder erstellen",
   newCategory: "Neue Kategorie",
   add: "Hinzufügen",
+  delete: "Kategorie löschen",
   confirmDelete: "Diese Kategorie wirklich löschen?",
   loadError: "Kategorien konnten nicht geladen werden.",
   createError: "Kategorie konnte nicht erstellt werden.",
@@ -24,7 +25,12 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [expanded, setExpanded] = useState(!selectedCat);
+
+  useEffect(() => {
+    setExpanded(!selectedCat);
+  }, [selectedCat]);
 
   const sortedCats = useMemo(
     () =>
@@ -32,6 +38,11 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
         a.name.localeCompare(b.name, "de", { sensitivity: "base" })
       ),
     [cats]
+  );
+
+  const selected = useMemo(
+    () => (selectedCat ? cats.find((c) => c.id === selectedCat) ?? null : null),
+    [cats, selectedCat]
   );
 
   const loadCats = useCallback(async () => {
@@ -56,18 +67,21 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
 
   const createCategory = async () => {
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed || isCreating) return;
     setIsCreating(true);
     try {
       const { data, error } = await supabase
         .from("categories")
         .insert({ name: trimmed })
-        .select("id")
+        .select("id,name")
         .single();
       if (error) throw error;
       setName("");
       await loadCats();
-      if (data?.id) onSelect(data.id);
+      if (data?.id) {
+        onSelect(data.id);
+        setExpanded(false);
+      }
     } catch (e) {
       console.error(e);
       alert(STRINGS.createError);
@@ -76,30 +90,97 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
     }
   };
 
-  const deleteCategory = async (id: string) => {
+  const deleteSelected = async () => {
+    if (!selectedCat || isDeleting) return;
     if (!confirm(STRINGS.confirmDelete)) return;
-    setDeletingId(id);
+    setIsDeleting(true);
     try {
-      const { error } = await supabase.from("categories").delete().eq("id", id);
+      const { error } = await supabase
+        .from("categories")
+        .delete()
+        .eq("id", selectedCat);
       if (error) throw error;
-      if (selectedCat === id) onSelect(null);
+      onSelect(null);
       await loadCats();
+      setExpanded(true);
     } catch (e) {
       console.error(e);
       alert(STRINGS.deleteError);
     } finally {
-      setDeletingId(null);
+      setIsDeleting(false);
     }
   };
 
+  if (!expanded && selected) {
+    return (
+      <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 sm:p-5 flex items-center justify-between">
+        <div className="truncate">
+          <h2 className="text-base font-semibold mb-1">{STRINGS.title}</h2>
+          <div className="font-medium truncate">{selected.name}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={deleteSelected}
+            disabled={isDeleting}
+            className="rounded-full w-9 h-9 flex items-center justify-center border text-red-600 border-red-500/40 bg-white/60 dark:bg-neutral-800/70 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
+            aria-label={STRINGS.delete}
+            title={STRINGS.delete}
+          >
+            {/* trash icon */}
+            <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
+              <path
+                d="M3 6h18"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+              />
+              <path
+                d="M10 11v6M14 11v6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={() => setExpanded(true)}
+            className="rounded-full w-9 h-9 flex items-center justify-center border bg-white/60 dark:bg-neutral-800/70 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+            aria-label="Kategorie öffnen"
+            title="Kategorie öffnen"
+          >
+            +
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
+    <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 sm:p-5 space-y-3">
+      <h2 className="text-base font-semibold">{STRINGS.title}</h2>
+
+      <div className="relative">
         <select
           value={selectedCat ?? ""}
-          onChange={(e) => onSelect(e.target.value || null)}
+          onChange={(e) => {
+            const v = e.target.value || null;
+            onSelect(v);
+            if (v) setExpanded(false);
+          }}
           disabled={isLoading}
-          className="border rounded px-2 py-1 flex-1 bg-white dark:bg-neutral-800"
+          className="w-full appearance-none rounded-xl border px-3 py-2 pr-10 bg-white/60 dark:bg-neutral-800/70 outline-none ring-0 focus:border-neutral-400 dark:focus:border-neutral-600 transition"
           aria-label="Kategorie wählen"
         >
           <option value="">{STRINGS.selectPlaceholder}</option>
@@ -109,16 +190,9 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
             </option>
           ))}
         </select>
-
-        {selectedCat && (
-          <button
-            onClick={() => deleteCategory(selectedCat)}
-            disabled={!!deletingId}
-            className="px-3 py-1 rounded border border-red-500 text-red-600 disabled:opacity-60"
-          >
-            {deletingId ? "…" : STRINGS.delete}
-          </button>
-        )}
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm opacity-70">
+          ▾
+        </span>
       </div>
 
       <div className="flex gap-2">
@@ -126,16 +200,32 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={STRINGS.newCategory}
-          className="border rounded px-2 py-1 flex-1 bg-white dark:bg-neutral-800"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") createCategory();
+            if (e.key === "Escape") setExpanded(false);
+          }}
+          className="flex-1 rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
         />
         <button
           onClick={createCategory}
           disabled={isCreating || !name.trim()}
-          className="px-3 py-1 rounded bg-black text-white disabled:opacity-60"
+          className="rounded-xl px-4 py-2 bg-black text-white hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
         >
           {isCreating ? "…" : STRINGS.add}
         </button>
       </div>
-    </div>
+
+      {selectedCat && (
+        <div className="pt-1">
+          <button
+            onClick={deleteSelected}
+            disabled={isDeleting}
+            className="rounded-xl border px-3 py-2 text-red-600 border-red-500/40 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
+          >
+            {isDeleting ? "…" : STRINGS.delete}
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
