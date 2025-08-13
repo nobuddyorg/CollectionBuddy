@@ -15,7 +15,13 @@ export type CollectibleProps = {
   y: string;
 };
 
-export default function Collectible({ delay, color, emoji, x, y }: CollectibleProps) {
+export default function Collectible({
+  delay,
+  color,
+  emoji,
+  x,
+  y,
+}: CollectibleProps) {
   const style: CSSVarStyle = {
     width: "32px",
     height: "32px",

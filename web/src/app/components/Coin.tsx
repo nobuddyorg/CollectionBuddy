@@ -1,7 +1,13 @@
 "use client";
 import React from "react";
 
-export default function Coin({ text, cta }: { text: string; cta: React.ReactNode }) {
+export default function Coin({
+  text,
+  cta,
+}: {
+  text: string;
+  cta: React.ReactNode;
+}) {
   return (
     <div className="relative w-[340px] h-[340px] sm:w-[380px] sm:h-[380px]">
       <svg viewBox="0 0 380 380" className="w-full h-full">

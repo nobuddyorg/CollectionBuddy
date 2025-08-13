@@ -1,13 +1,11 @@
 "use client";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import Collectible from "../components/Collectible";
 import Coin from "../components/Coin";
-import type {
-  AuthChangeEvent,
-  Session,
-} from "@supabase/supabase-js";
+import LoadingOverlay from "../components/LoadingOverlay";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 
 const EMOJIS = [
@@ -30,7 +28,6 @@ function rng(seed: number) {
   let s = seed >>> 0;
   return () => (s = (1664525 * s + 1013904223) >>> 0) / 2 ** 32;
 }
-
 function makePositions(n: number, seed = 1337) {
   const r = rng(seed);
   return Array.from({ length: n }, () => ({
@@ -41,27 +38,32 @@ function makePositions(n: number, seed = 1337) {
 
 export default function LoginPage() {
   const router = useRouter();
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, session: Session | null) => {
-        if (session) {
-          router.push("/");
-        }
-      }
-    );
-    return () => authListener.subscription.unsubscribe();
+    const handle = (_: AuthChangeEvent, session: Session | null) => {
+      if (session) router.replace("/");
+    };
+    const { data } = supabase.auth.onAuthStateChange(handle);
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) router.replace("/");
+      else setChecking(false);
+    });
+    return () => data.subscription.unsubscribe();
   }, [router]);
 
-  const signIn = () =>
-    supabase.auth.signInWithOAuth({
+  const signIn = useCallback(() => {
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+    const url = new URL(basePath || "/", window.location.origin);
+    void supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH}/`,
-      },
+      options: { redirectTo: url.toString() },
     });
+  }, []);
 
-  const POS = useMemo(() => makePositions(16), []);
+  const positions = useMemo(() => makePositions(16), []);
+
+  if (checking) return <LoadingOverlay label="Anmeldung wird geprüft…" />;
 
   return (
     <main className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden px-4 bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] overscroll-y-contain">
@@ -76,7 +78,7 @@ export default function LoginPage() {
         text={CIRCLE_TEXT.repeat(2)}
         cta={<GoogleSignInButton onClick={signIn} />}
       />
-      {POS.map((p, i) => (
+      {positions.map((p, i) => (
         <Collectible
           key={i}
           delay={i * 0.35}

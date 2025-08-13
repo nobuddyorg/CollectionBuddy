@@ -29,56 +29,55 @@ body {
   @keyframes float-in {
     0% {
       transform: translate(var(--x), var(--y)) scale(0.9);
-      opacity: 0
+      opacity: 0;
     }
 
     35% {
-      opacity: 1
+      opacity: 1;
     }
 
     100% {
       transform: translate(0, 0) scale(0.5);
-      opacity: 0
+      opacity: 0;
     }
   }
 
   @keyframes spin-slow {
     from {
-      transform: rotate(0deg)
+      transform: rotate(0deg);
     }
 
     to {
-      transform: rotate(360deg)
+      transform: rotate(360deg);
     }
   }
 
   @keyframes fade-up {
     0% {
       opacity: 0;
-      transform: translateY(6px)
+      transform: translateY(6px);
     }
 
     100% {
       opacity: 1;
-      transform: translateY(0)
+      transform: translateY(0);
     }
   }
 
   @keyframes fling {
     to {
-      transform: translate(var(--x, 0), var(--y, 0))
+      transform: translate(var(--x, 0), var(--y, 0));
     }
   }
 
   @keyframes bob {
-
     0%,
     100% {
-      translate: 0 0
+      translate: 0 0;
     }
 
     50% {
-      translate: 0 -6px
+      translate: 0 -6px;
     }
   }
 
@@ -96,23 +95,23 @@ body {
     position: absolute;
     left: calc(50% - 16px);
     top: calc(50% - 16px);
-    animation:
-      fling 900ms cubic-bezier(.22, .61, .36, 1) var(--delay, 0s) forwards,
+    animation: fling 900ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--delay, 0s)
+        forwards,
       bob 4.2s ease-in-out infinite 1s;
     will-change: transform;
   }
 
   .spin-slow {
-    animation: spin-slow 28s linear infinite
+    animation: spin-slow 28s linear infinite;
   }
 
   .fade-up {
-    animation: fade-up 500ms ease-out both
+    animation: fade-up 500ms ease-out both;
   }
 
   @keyframes spin {
     to {
-      transform: rotate(360deg)
+      transform: rotate(360deg);
     }
   }
 
@@ -139,11 +138,10 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-
   .collectible,
   .collectible-bob,
   .spin-slow,
   .fade-up {
-    animation: none
+    animation: none;
   }
 }
