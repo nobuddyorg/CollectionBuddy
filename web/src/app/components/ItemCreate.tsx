@@ -8,12 +8,13 @@ type PropsCreate = {
   onCreated: () => void;
 };
 
-type NominatimHit = {
-  place_id: number;
-  display_name: string;
-  lat: string;
-  lon: string;
-  address?: {
+type PhotonFeature = {
+  properties: {
+    osm_id: number;
+    osm_type: string;
+    osm_key: string;
+    osm_value: string;
+    name?: string;
     city?: string;
     town?: string;
     village?: string;
@@ -21,7 +22,12 @@ type NominatimHit = {
     county?: string;
     state?: string;
     country?: string;
-    country_code?: string;
+    countrycode?: string;
+    postcode?: string;
+  };
+  geometry: {
+    type: 'Point';
+    coordinates: [number, number];
   };
 };
 
@@ -31,7 +37,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
 
   const [place, setPlace] = useState('');
   const [placeFocus, setPlaceFocus] = useState(false);
-  const [placeResults, setPlaceResults] = useState<NominatimHit[]>([]);
+  const [placeResults, setPlaceResults] = useState<PhotonFeature[]>([]);
   const [placeLoading, setPlaceLoading] = useState(false);
   const [placeIdx, setPlaceIdx] = useState(-1);
   const abortRef = useRef<AbortController | null>(null);
@@ -77,35 +83,18 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
         abortRef.current = ctl;
         setPlaceLoading(true);
 
-        const url = new URL('https://nominatim.openstreetmap.org/search');
+        const url = new URL('https://photon.komoot.io/api/');
         url.searchParams.set('q', q);
-        url.searchParams.set('format', 'json');
-        url.searchParams.set('addressdetails', '1');
-        url.searchParams.set('limit', '20');
-        url.searchParams.set('accept-language', 'de');
-        url.searchParams.set('countrycodes', 'de,at,ch,lu');
-        url.searchParams.set('dedupe', '1');
+        url.searchParams.set('limit', '5');
+        url.searchParams.set('lang', 'de');
 
         const res = await fetch(url.toString(), {
           signal: ctl.signal,
-          headers: { 'Accept-Language': 'de' },
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data: NominatimHit[] = await res.json();
+        const data: { features: PhotonFeature[] } = await res.json();
 
-        const filtered = data.filter((d) => {
-          const a = d.address ?? {};
-          return (
-            a.city ||
-            a.town ||
-            a.village ||
-            a.municipality ||
-            a.county ||
-            a.state
-          );
-        });
-
-        setPlaceResults(filtered.slice(0, 5));
+        setPlaceResults(data.features);
         setPlaceIdx(-1);
       } catch {
         setPlaceResults([]);
@@ -133,12 +122,11 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
-  const choosePlace = (hit: NominatimHit) => {
-    const a = hit.address || {};
-    const city =
-      a.city || a.town || a.village || a.municipality || hit.display_name;
-    const label = a.country ? `${city}, ${a.country}` : city;
-    setPlace(label);
+  const choosePlace = (hit: PhotonFeature) => {
+    const p = hit.properties;
+    const city = p.city || p.town || p.village || p.municipality || p.name;
+    const label = p.country ? `${city}, ${p.country}` : city;
+    setPlace(label || '');
     setPlaceResults([]);
     setPlaceIdx(-1);
     setPlaceFocus(false);
@@ -246,7 +234,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
             autoComplete="off"
           />
           {placeFocus && (placeLoading || placeResults.length > 0) && (
-            <div className="absolute z-50 mt-1 w-full rounded-xl border bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
+            <div className="absolute z-[9999] mt-1 w-full rounded-xl border bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
               {placeLoading && (
                 <div className="px-3 py-2 text-sm opacity-70">
                   {t('item_create.searching')}
@@ -254,17 +242,13 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
               )}
               {!placeLoading &&
                 placeResults.map((hit, i) => {
-                  const a = hit.address || {};
+                  const p = hit.properties;
                   const city =
-                    a.city ||
-                    a.town ||
-                    a.village ||
-                    a.municipality ||
-                    hit.display_name;
-                  const line2 = [a.state, a.country].filter(Boolean).join(', ');
+                    p.city || p.town || p.village || p.municipality || p.name;
+                  const line2 = [p.state, p.country].filter(Boolean).join(', ');
                   return (
                     <button
-                      key={hit.place_id}
+                      key={p.osm_id}
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => choosePlace(hit)}
