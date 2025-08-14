@@ -1,8 +1,8 @@
--- Core extensions you actually use
-create extension if not exists pgcrypto; -- gen_random_uuid
-create extension if not exists pg_trgm;  -- fast LIKE/ILIKE on 'place'
 
--- ========== AUTH-BOUND PROFILE ==========
+create extension if not exists pgcrypto;
+create extension if not exists pg_trgm;
+
+
 create table public.profiles (
   id uuid primary key default auth.uid(),
   created_at timestamptz not null default now()
@@ -15,7 +15,7 @@ on public.profiles
 for select
 using (id = auth.uid());
 
--- ========== CATEGORIES ==========
+
 create table public.categories (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid(),
@@ -46,7 +46,7 @@ on public.categories
 for delete
 using (user_id = auth.uid());
 
--- ========== ITEMS (no PostGIS; place + tags[]) ==========
+
 create table public.items (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid(),
@@ -79,11 +79,11 @@ on public.items
 for delete
 using (user_id = auth.uid());
 
--- Helpful indexes
+
 create index if not exists idx_items_place_trgm on public.items using gin (place gin_trgm_ops);
 create index if not exists idx_items_tags_gin  on public.items using gin (tags);
 
--- ========== ITEM <-> CATEGORY LINK ==========
+
 create table public.item_categories (
   item_id uuid references public.items(id) on delete cascade,
   category_id uuid references public.categories(id) on delete cascade,

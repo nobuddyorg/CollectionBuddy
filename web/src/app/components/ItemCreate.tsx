@@ -217,7 +217,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {/* Ort with autocomplete dropdown */}
+
         <div className="relative" ref={dropdownRef}>
           <input
             ref={inputRef}
@@ -273,7 +273,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
           )}
         </div>
 
-        {/* Chip tags */}
+
         <div className="rounded-xl border bg-white/60 dark:bg-neutral-800/70 px-2 py-1 flex flex-wrap items-center gap-1 focus-within:border-neutral-400 dark:focus-within:border-neutral-600">
           {tags.map((tag) => (
             <span

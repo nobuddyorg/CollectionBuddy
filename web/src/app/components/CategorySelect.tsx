@@ -118,7 +118,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
             aria-label={t("category_select.delete")}
             title={t("category_select.delete")}
           >
-            {/* trash icon */}
+
             <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
               <path
                 d="M3 6h18"

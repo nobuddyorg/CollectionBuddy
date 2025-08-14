@@ -35,7 +35,7 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   const t = useCallback(
     (key: string) => {
       const keys = key.split(".");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       let value: any = translations[lang];
       for (const k of keys) {
         if (value && typeof value === "object" && k in value) {
