@@ -363,6 +363,12 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
         />
 
         <div className="flex items-center gap-2 pt-1">
+          <DeleteButton
+            onClick={deleteSelected}
+            disabled={isDeleting}
+            label={t('category_select.delete')}
+          />
+
           {name.trim() === '' ? (
             <SetButton
               onClick={() => {
