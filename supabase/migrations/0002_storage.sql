@@ -1,12 +1,6 @@
-
-
-
 insert into storage.buckets (id, name, public)
 values ('item-images', 'item-images', false)
 on conflict (id) do nothing;
-
-
-
 
 drop policy if exists "read own signed objects" on storage.objects;
 create policy "read own signed objects"

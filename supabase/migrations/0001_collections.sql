@@ -1,7 +1,5 @@
-
 create extension if not exists pgcrypto;
 create extension if not exists pg_trgm;
-
 
 create table public.profiles (
   id uuid primary key default auth.uid(),
@@ -14,7 +12,6 @@ create policy "own profile"
 on public.profiles
 for select
 using (id = auth.uid());
-
 
 create table public.categories (
   id uuid primary key default gen_random_uuid(),
@@ -45,7 +42,6 @@ create policy "delete own categories"
 on public.categories
 for delete
 using (user_id = auth.uid());
-
 
 create table public.items (
   id uuid primary key default gen_random_uuid(),
@@ -79,10 +75,8 @@ on public.items
 for delete
 using (user_id = auth.uid());
 
-
 create index if not exists idx_items_place_trgm on public.items using gin (place gin_trgm_ops);
 create index if not exists idx_items_tags_gin  on public.items using gin (tags);
-
 
 create table public.item_categories (
   item_id uuid references public.items(id) on delete cascade,

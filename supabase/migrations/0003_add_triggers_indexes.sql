@@ -1,4 +1,3 @@
-
 create or replace function public.enforce_user_id()
 returns trigger
 language plpgsql
