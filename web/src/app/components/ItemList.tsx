@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { supabase } from '../lib/supabase';
 import { Item } from '../types';
 import { useI18n } from '../hooks/useI18n';
+import imageCompression from 'browser-image-compression';
 
 type PropsList = { categoryId: string };
 
@@ -29,6 +30,7 @@ export default function ItemList({ categoryId }: PropsList) {
   const [images, setImages] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
   const { t } = useI18n();
+  const [modalImage, setModalImage] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth
@@ -134,13 +136,24 @@ export default function ItemList({ categoryId }: PropsList) {
     async (itemId: string, file: File) => {
       try {
         setBusy(itemId);
+
         const { data: u } = await supabase.auth.getUser();
         const uid = u.user?.id;
         if (!uid) throw new Error(t('item_list.no_user_session'));
-        const path = `${uid}/${itemId}/${crypto.randomUUID()}-${file.name}`;
+
+        // Compress and convert to WebP
+        const compressedFile = await imageCompression(file, {
+          maxWidthOrHeight: 500,
+          initialQuality: 0.8,
+          fileType: 'image/webp',
+          useWebWorker: true,
+        });
+
+        const path = `${uid}/${itemId}/${crypto.randomUUID()}-${compressedFile.name}`;
         const { error: upErr } = await supabase.storage
           .from('item-images')
-          .upload(path, file);
+          .upload(path, compressedFile);
+
         if (upErr) throw upErr;
         await refreshItemImages(itemId);
       } catch (err) {
@@ -282,7 +295,8 @@ export default function ItemList({ categoryId }: PropsList) {
                     width={160}
                     height={160}
                     unoptimized
-                    className="h-20 w-full object-cover rounded-xl"
+                    className="h-20 w-full object-cover rounded-xl cursor-pointer"
+                    onClick={() => setModalImage(url)}
                   />
                 ))}
               </div>
@@ -325,6 +339,21 @@ export default function ItemList({ categoryId }: PropsList) {
           >
             {t('item_list.next')}
           </button>
+        </div>
+      )}
+      {modalImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center"
+          onClick={() => setModalImage(null)}
+        >
+          <Image
+            src={modalImage}
+            alt="Full size"
+            width={1000}
+            height={1000}
+            unoptimized
+            className="max-w-full max-h-full rounded-xl shadow-lg"
+          />
         </div>
       )}
     </div>
