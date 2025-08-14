@@ -104,7 +104,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
 
   if (!expanded && selected) {
     return (
-      <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 sm:p-5 flex items-center justify-between">
+      <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 flex items-center justify-between">
         <div className="truncate">
           <h2 className="text-base font-semibold mb-1">
             {t('category_select.title')}
@@ -115,7 +115,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
           <button
             onClick={deleteSelected}
             disabled={isDeleting}
-            className="rounded-full w-9 h-9 flex items-center justify-center border text-red-600 border-red-500/40 bg-white/60 dark:bg-neutral-800/70 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
+            className="rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center border text-red-600 border-red-500/40 bg-white/60 dark:bg-neutral-800/70 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
             aria-label={t('category_select.delete')}
             title={t('category_select.delete')}
           >
@@ -148,7 +148,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
           </button>
           <button
             onClick={() => setExpanded(true)}
-            className="rounded-full w-9 h-9 flex items-center justify-center border bg-white/60 dark:bg-neutral-800/70 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+            className="rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center border bg-white/60 dark:bg-neutral-800/70 hover:bg-neutral-100 dark:hover:bg-neutral-700"
             aria-label={t('category_select.open_category')}
             title={t('category_select.open_category')}
           >
@@ -160,7 +160,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
   }
 
   return (
-    <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 sm:p-5 space-y-3">
+    <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 space-y-3">
       <h2 className="text-base font-semibold">{t('category_select.title')}</h2>
 
       <div className="relative">
@@ -201,7 +201,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
         <button
           onClick={createCategory}
           disabled={isCreating || !name.trim()}
-          className="rounded-xl px-4 py-2 bg-black text-white hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
+          className="rounded-xl px-3 sm:px-4 py-2 bg-black text-white hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
         >
           {isCreating ? '…' : t('category_select.add')}
         </button>
@@ -212,7 +212,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
           <button
             onClick={deleteSelected}
             disabled={isDeleting}
-            className="rounded-xl border px-3 py-2 text-red-600 border-red-500/40 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
+            className="rounded-xl border px-3 sm:px-4 py-2 text-red-600 border-red-500/40 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
           >
             {isDeleting ? '…' : t('category_select.delete')}
           </button>
