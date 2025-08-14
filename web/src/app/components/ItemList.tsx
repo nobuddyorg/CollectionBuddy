@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { supabase } from "../lib/supabase";
 import { Item } from "../types";
+import { useI18n } from "../hooks/useI18n";
 
 type PropsList = { categoryId: string };
 
@@ -27,6 +28,7 @@ export default function ItemList({ categoryId }: PropsList) {
   const [busy, setBusy] = useState<string | null>(null);
   const [images, setImages] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     supabase.auth
@@ -121,11 +123,11 @@ export default function ItemList({ categoryId }: PropsList) {
 
   const deleteItem = useCallback(
     async (id: string) => {
-      if (!confirm("Diesen Gegenstand löschen?")) return;
+      if (!confirm(t("item_list.confirm_delete"))) return;
       await supabase.from("items").delete().eq("id", id);
       await loadItems();
     },
-    [loadItems]
+    [loadItems, t]
   );
 
   const uploadImage = useCallback(
@@ -134,7 +136,7 @@ export default function ItemList({ categoryId }: PropsList) {
         setBusy(itemId);
         const { data: u } = await supabase.auth.getUser();
         const uid = u.user?.id;
-        if (!uid) throw new Error("Keine Benutzersitzung");
+        if (!uid) throw new Error(t("item_list.no_user_session"));
         const path = `${uid}/${itemId}/${crypto.randomUUID()}-${file.name}`;
         const { error: upErr } = await supabase.storage
           .from("item-images")
@@ -148,7 +150,7 @@ export default function ItemList({ categoryId }: PropsList) {
         setBusy(null);
       }
     },
-    [refreshItemImages]
+    [refreshItemImages, t]
   );
 
   const totalPages = useMemo(() => Math.ceil(total / PAGE_SIZE), [total]);
@@ -167,7 +169,7 @@ export default function ItemList({ categoryId }: PropsList) {
                 onClick={() => deleteItem(it.id)}
                 className="rounded-lg border px-2 py-1 text-red-600 border-red-500/40 hover:bg-red-50 dark:hover:bg-red-950/30"
               >
-                Löschen
+                {t("item_list.delete")}
               </button>
             </div>
 
@@ -227,7 +229,9 @@ export default function ItemList({ categoryId }: PropsList) {
                   }}
                 />
                 <span className="text-sm">
-                  {busy === it.id ? "Lade hoch…" : "Bild hinzufügen"}
+                  {busy === it.id
+                    ? t("item_list.uploading")
+                    : t("item_list.add_image")}
                 </span>
               </label>
             </div>
@@ -238,7 +242,7 @@ export default function ItemList({ categoryId }: PropsList) {
                   <Image
                     key={idx}
                     src={url}
-                    alt={`Bild ${idx + 1}`}
+                    alt={t("item_list.image_alt").replace("{idx}", `${idx + 1}`)}
                     width={160}
                     height={160}
                     unoptimized
@@ -248,7 +252,7 @@ export default function ItemList({ categoryId }: PropsList) {
               </div>
             ) : (
               <div className="text-sm opacity-60">
-                {loading ? "Lade…" : "Keine Bilder"}
+                {loading ? t("item_list.loading") : t("item_list.no_images")}
               </div>
             )}
           </li>
@@ -262,7 +266,7 @@ export default function ItemList({ categoryId }: PropsList) {
             onClick={() => setPage((p) => p - 1)}
             className="rounded-xl border px-3 py-1 disabled:opacity-50"
           >
-            Zurück
+            {t("item_list.previous")}
           </button>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
             <button
@@ -283,7 +287,7 @@ export default function ItemList({ categoryId }: PropsList) {
             onClick={() => setPage((p) => p + 1)}
             className="rounded-xl border px-3 py-1 disabled:opacity-50"
           >
-            Weiter
+            {t("item_list.next")}
           </button>
         </div>
       )}

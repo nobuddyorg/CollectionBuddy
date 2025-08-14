@@ -2,25 +2,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { Category } from "../types";
+import { useI18n } from "../hooks/useI18n";
 
 interface Props {
   selectedCat: string | null;
   onSelect: (id: string | null) => void;
 }
 
-const STRINGS = {
-  title: "Kategorie",
-  selectPlaceholder: "Kategorie wählen oder erstellen",
-  newCategory: "Neue Kategorie",
-  add: "Hinzufügen",
-  delete: "Kategorie löschen",
-  confirmDelete: "Diese Kategorie wirklich löschen?",
-  loadError: "Kategorien konnten nicht geladen werden.",
-  createError: "Kategorie konnte nicht erstellt werden.",
-  deleteError: "Kategorie konnte nicht gelöscht werden.",
-};
-
 export default function CategorySelect({ selectedCat, onSelect }: Props) {
+  const { t } = useI18n();
   const [cats, setCats] = useState<Category[]>([]);
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -55,11 +45,11 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
       setCats((data as Category[]) ?? []);
     } catch (e) {
       console.error(e);
-      alert(STRINGS.loadError);
+      alert(t("category_select.loadError"));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadCats();
@@ -84,7 +74,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
       }
     } catch (e) {
       console.error(e);
-      alert(STRINGS.createError);
+      alert(t("category_select.createError"));
     } finally {
       setIsCreating(false);
     }
@@ -92,7 +82,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
 
   const deleteSelected = async () => {
     if (!selectedCat || isDeleting) return;
-    if (!confirm(STRINGS.confirmDelete)) return;
+    if (!confirm(t("category_select.confirmDelete"))) return;
     setIsDeleting(true);
     try {
       const { error } = await supabase
@@ -105,7 +95,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
       setExpanded(true);
     } catch (e) {
       console.error(e);
-      alert(STRINGS.deleteError);
+      alert(t("category_select.deleteError"));
     } finally {
       setIsDeleting(false);
     }
@@ -115,7 +105,9 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
     return (
       <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 sm:p-5 flex items-center justify-between">
         <div className="truncate">
-          <h2 className="text-base font-semibold mb-1">{STRINGS.title}</h2>
+          <h2 className="text-base font-semibold mb-1">
+            {t("category_select.title")}
+          </h2>
           <div className="font-medium truncate">{selected.name}</div>
         </div>
         <div className="flex items-center gap-2">
@@ -123,8 +115,8 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
             onClick={deleteSelected}
             disabled={isDeleting}
             className="rounded-full w-9 h-9 flex items-center justify-center border text-red-600 border-red-500/40 bg-white/60 dark:bg-neutral-800/70 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
-            aria-label={STRINGS.delete}
-            title={STRINGS.delete}
+            aria-label={t("category_select.delete")}
+            title={t("category_select.delete")}
           >
             {/* trash icon */}
             <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
@@ -157,8 +149,8 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
           <button
             onClick={() => setExpanded(true)}
             className="rounded-full w-9 h-9 flex items-center justify-center border bg-white/60 dark:bg-neutral-800/70 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-            aria-label="Kategorie öffnen"
-            title="Kategorie öffnen"
+            aria-label={t("category_select.open_category")}
+            title={t("category_select.open_category")}
           >
             +
           </button>
@@ -169,7 +161,9 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
 
   return (
     <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 sm:p-5 space-y-3">
-      <h2 className="text-base font-semibold">{STRINGS.title}</h2>
+      <h2 className="text-base font-semibold">
+        {t("category_select.title")}
+      </h2>
 
       <div className="relative">
         <select
@@ -181,9 +175,9 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
           }}
           disabled={isLoading}
           className="w-full appearance-none rounded-xl border px-3 py-2 pr-10 bg-white/60 dark:bg-neutral-800/70 outline-none ring-0 focus:border-neutral-400 dark:focus:border-neutral-600 transition"
-          aria-label="Kategorie wählen"
+          aria-label={t("category_select.select_placeholder")}
         >
-          <option value="">{STRINGS.selectPlaceholder}</option>
+          <option value="">{t("category_select.select_placeholder")}</option>
           {sortedCats.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -199,7 +193,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder={STRINGS.newCategory}
+          placeholder={t("category_select.new_category")}
           onKeyDown={(e) => {
             if (e.key === "Enter") createCategory();
             if (e.key === "Escape") setExpanded(false);
@@ -211,7 +205,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
           disabled={isCreating || !name.trim()}
           className="rounded-xl px-4 py-2 bg-black text-white hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
         >
-          {isCreating ? "…" : STRINGS.add}
+          {isCreating ? "…" : t("category_select.add")}
         </button>
       </div>
 
@@ -222,7 +216,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
             disabled={isDeleting}
             className="rounded-xl border px-3 py-2 text-red-600 border-red-500/40 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
           >
-            {isDeleting ? "…" : STRINGS.delete}
+            {isDeleting ? "…" : t("category_select.delete")}
           </button>
         </div>
       )}

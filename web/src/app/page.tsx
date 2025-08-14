@@ -7,6 +7,7 @@ import CategorySelect from "./components/CategorySelect";
 import ItemCreate from "./components/ItemCreate";
 import ItemList from "./components/ItemList";
 import Header from "./components/Header";
+import { useI18n } from "./hooks/useI18n";
 
 export default function Page() {
   const { user, loading } = useSession();
@@ -14,6 +15,7 @@ export default function Page() {
     null
   );
   const [refreshToken, setRefreshToken] = useState(0);
+  const { t } = useI18n();
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
@@ -40,7 +42,9 @@ export default function Page() {
             />
 
             <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 sm:p-5">
-              <h2 className="text-base font-semibold mb-3">Einträge</h2>
+              <h2 className="text-base font-semibold mb-3">
+                {t("page.entries")}
+              </h2>
               <ItemList key={refreshToken} categoryId={selectedCategoryId} />
             </section>
           </>
@@ -51,10 +55,11 @@ export default function Page() {
                 🧺
               </div>
               <div className="space-y-1">
-                <h3 className="text-lg font-semibold">Kategorie wählen</h3>
+                <h3 className="text-lg font-semibold">
+                  {t("page.choose_category")}
+                </h3>
                 <p className="text-sm opacity-70">
-                  Dann kannst du neue Sammlerstücke hinzufügen und Bilder
-                  hochladen.
+                  {t("page.add_collectibles")}
                 </p>
               </div>
             </div>
@@ -63,7 +68,7 @@ export default function Page() {
       </main>
 
       <footer className="px-4 py-8 text-center text-xs opacity-60">
-        Sammeln • Ordnen • Behalten
+        {t("page.footer")}
       </footer>
     </div>
   );
