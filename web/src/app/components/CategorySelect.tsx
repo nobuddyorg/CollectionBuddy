@@ -363,7 +363,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
             />
           )}
 
-          {(!selectedCat || selectedCat === '') && (
+          {(!selectedCat || name.trim() !== '') && (
             <AddButton
               onClick={createCategory}
               disabled={name.trim() === '' || isCreating}
