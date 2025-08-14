@@ -1,6 +1,7 @@
 "use client";
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { supabase } from "../lib/supabase";
+import { useI18n } from "../hooks/useI18n";
 
 type PropsCreate = {
   categoryId: string;
@@ -41,6 +42,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
   const [tagInput, setTagInput] = useState("");
 
   const [isCreating, setIsCreating] = useState(false);
+  const { t } = useI18n();
 
   const addTag = () => {
     const t = tagInput.trim();
@@ -191,23 +193,25 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
 
   return (
     <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur p-4 sm:p-5 shadow-sm space-y-3">
-      <h2 className="text-base font-semibold mb-1">Neuer Eintrag</h2>
+      <h2 className="text-base font-semibold mb-1">
+        {t("item_create.new_entry")}
+      </h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <input
-          aria-label="Titel"
+          aria-label={t("item_create.title")}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && createItem()}
-          placeholder="Titel"
+          placeholder={t("item_create.title")}
           className="rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
         />
         <input
-          aria-label="Beschreibung"
+          aria-label={t("item_create.description")}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && createItem()}
-          placeholder="Beschreibung"
+          placeholder={t("item_create.description")}
           className="rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
         />
       </div>
@@ -217,19 +221,21 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
         <div className="relative" ref={dropdownRef}>
           <input
             ref={inputRef}
-            aria-label="Ort"
+            aria-label={t("item_create.place_placeholder")}
             value={place}
             onChange={(e) => setPlace(e.target.value)}
             onFocus={() => setPlaceFocus(true)}
             onKeyDown={onPlaceKeyDown}
-            placeholder="Ort (z. B. Köln)"
+            placeholder={t("item_create.place_placeholder")}
             className="w-full rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
             autoComplete="off"
           />
           {placeFocus && (placeLoading || placeResults.length > 0) && (
             <div className="absolute z-50 mt-1 w-full rounded-xl border bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
               {placeLoading && (
-                <div className="px-3 py-2 text-sm opacity-70">Suche…</div>
+                <div className="px-3 py-2 text-sm opacity-70">
+                  {t("item_create.searching")}
+                </div>
               )}
               {!placeLoading &&
                 placeResults.map((hit, i) => {
@@ -260,7 +266,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
                 })}
               {!placeLoading && placeResults.length === 0 && (
                 <div className="px-3 py-2 text-sm opacity-70">
-                  Keine Treffer
+                  {t("item_create.no_results")}
                 </div>
               )}
             </div>
@@ -279,7 +285,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
                 type="button"
                 onClick={() => removeTag(tag)}
                 className="text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
-                aria-label={`Tag ${tag} entfernen`}
+                aria-label={t("item_create.remove_tag").replace("{tag}", tag)}
               >
                 ×
               </button>
@@ -290,7 +296,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={handleTagKeyDown}
             placeholder={
-              tags.length === 0 ? "Tags eingeben… (Enter/Komma)" : ""
+              tags.length === 0 ? t("item_create.tags_placeholder") : ""
             }
             className="flex-1 min-w-[100px] bg-transparent outline-none py-1 text-sm"
           />
@@ -303,7 +309,9 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
           disabled={isCreating || !canSubmit}
           className="rounded-xl px-4 py-2 bg-black text-white hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
         >
-          {isCreating ? "Füge hinzu…" : "Hinzufügen"}
+          {isCreating
+            ? t("item_create.adding")
+            : t("item_create.add")}
         </button>
       </div>
     </section>

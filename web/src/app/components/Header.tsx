@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import Image from "next/image";
 import type { User } from "../types";
 import { initialsFromEmail } from "../utils/initials";
+import { useI18n } from "../hooks/useI18n";
 
 type Props = {
   user: User;
@@ -12,6 +13,7 @@ type Props = {
 export default function Header({ user, onSignOut }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const initials = useMemo(() => initialsFromEmail(user?.email ?? ""), [user]);
+  const { t } = useI18n();
 
   return (
     <header
@@ -24,13 +26,15 @@ export default function Header({ user, onSignOut }: Props) {
         <div className="flex items-center gap-2">
           <Image
             src="/logo.png"
-            alt="CollectionBuddy"
+            alt={t("header.title")}
             width={28}
             height={28}
             className="object-contain"
             priority
           />
-          <span className="font-semibold tracking-tight">CollectionBuddy</span>
+          <span className="font-semibold tracking-tight">
+            {t("header.title")}
+          </span>
         </div>
 
         <div className="relative">
@@ -73,7 +77,7 @@ export default function Header({ user, onSignOut }: Props) {
                 className="w-full text-left px-3 py-2 rounded-lg
                   hover:bg-stone-100 dark:hover:bg-neutral-800 text-sm"
               >
-                Sign out
+                {t("header.sign_out")}
               </button>
             </div>
           )}
