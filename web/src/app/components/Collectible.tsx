@@ -1,10 +1,10 @@
-"use client";
-import React from "react";
+'use client';
+import React from 'react';
 
 type CSSVarStyle = React.CSSProperties & {
-  ["--x"]?: string;
-  ["--y"]?: string;
-  ["--delay"]?: string;
+  ['--x']?: string;
+  ['--y']?: string;
+  ['--delay']?: string;
 };
 
 export type CollectibleProps = {
@@ -23,12 +23,12 @@ export default function Collectible({
   y,
 }: CollectibleProps) {
   const style: CSSVarStyle = {
-    width: "32px",
-    height: "32px",
+    width: '32px',
+    height: '32px',
     backgroundColor: color,
-    ["--delay"]: `${delay}s`,
-    ["--x"]: x,
-    ["--y"]: y,
+    ['--delay']: `${delay}s`,
+    ['--x']: x,
+    ['--y']: y,
   };
   return (
     <div

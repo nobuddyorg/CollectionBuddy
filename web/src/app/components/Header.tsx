@@ -1,9 +1,9 @@
-"use client";
-import { useState } from "react";
-import Image from "next/image";
-import type { User } from "../types";
-import { useI18n } from "../hooks/useI18n";
-import { withBasePath } from "../utils/path";
+'use client';
+import { useState } from 'react';
+import Image from 'next/image';
+import type { User } from '../types';
+import { useI18n } from '../hooks/useI18n';
+import { withBasePath } from '../utils/path';
 
 type Props = {
   user: User;
@@ -24,15 +24,15 @@ export default function Header({ user, onSignOut }: Props) {
       <div className="mx-auto max-w-3xl px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Image
-            src={withBasePath("/logo.png")}
-            alt={t("header.title")}
+            src={withBasePath('/logo.png')}
+            alt={t('header.title')}
             width={28}
             height={28}
             className="object-contain"
             priority
           />
           <span className="font-semibold tracking-tight">
-            {t("header.title")}
+            {t('header.title')}
           </span>
         </div>
 
@@ -90,7 +90,7 @@ export default function Header({ user, onSignOut }: Props) {
                 className="w-full text-left px-3 py-2 rounded-lg
                   hover:bg-stone-100 dark:hover:bg-neutral-800 text-sm"
               >
-                {t("header.sign_out")}
+                {t('header.sign_out')}
               </button>
             </div>
           )}
