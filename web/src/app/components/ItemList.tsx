@@ -244,11 +244,28 @@ export default function ItemList({ categoryId }: PropsList) {
                     void uploadImage(it.id, f);
                   }}
                 />
-                <span className="text-sm">
-                  {busy === it.id
-                    ? t('item_list.uploading')
-                    : t('item_list.add_image')}
-                </span>
+                {busy === it.id ? (
+                  <span className="text-sm">{t('item_list.uploading')}</span>
+                ) : (
+                  <>
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-5 h-5 sm:hidden"
+                      aria-hidden="true"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M4 4h16v16H4z" />
+                      <path d="M12 8v8M8 12h8" />
+                    </svg>
+                    <span className="hidden sm:inline text-sm">
+                      {t('item_list.add_image')}
+                    </span>
+                  </>
+                )}
               </label>
             </div>
 
