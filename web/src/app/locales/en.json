@@ -27,7 +27,7 @@
     "new_entry": "New entry",
     "title": "Title",
     "description": "Description",
-    "place_placeholder": "Place (e.g. Cologne)",
+    "place_placeholder": "City (e.g. Cologne)",
     "searching": "Searching…",
     "no_results": "No results",
     "remove_tag": "Remove tag {tag}",
