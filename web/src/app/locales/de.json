@@ -1,0 +1,61 @@
+{
+  "page": {
+    "entries": "Einträge",
+    "choose_category": "Kategorie wählen",
+    "add_collectibles": "Dann kannst du neue Sammlerstücke hinzufügen und Bilder hochladen.",
+    "footer": "Sammeln • Ordnen • Behalten"
+  },
+  "header": {
+    "title": "CollectionBuddy",
+    "sign_out": "Abmelden"
+  },
+  "category_select": {
+    "title": "Kategorie",
+    "select_placeholder": "Kategorie wählen oder erstellen",
+    "new_category": "Neue Kategorie",
+    "add": "Hinzufügen",
+    "delete": "Kategorie löschen",
+    "confirm_delete": "Diese Kategorie wirklich löschen?",
+    "load_error": "Kategorien konnten nicht geladen werden.",
+    "create_error": "Kategorie konnte nicht erstellt werden.",
+    "delete_error": "Kategorie konnte nicht gelöscht werden.",
+    "open_category": "Kategorie öffnen"
+  },
+  "item_create": {
+    "new_entry": "Neuer Eintrag",
+    "title": "Titel",
+    "description": "Beschreibung",
+    "place_placeholder": "Ort (z. B. Köln)",
+    "searching": "Suche…",
+    "no_results": "Keine Treffer",
+    "remove_tag": "Tag {tag} entfernen",
+    "tags_placeholder": "Tags eingeben… (Enter/Komma)",
+    "adding": "Füge hinzu…",
+    "add": "Hinzufügen"
+  },
+  "item_list": {
+    "confirm_delete": "Diesen Gegenstand löschen?",
+    "delete": "Löschen",
+    "no_user_session": "Keine Benutzersitzung",
+    "uploading": "Lade hoch…",
+    "add_image": "Bild hinzufügen",
+    "image_alt": "Bild {idx}",
+    "loading": "Lade…",
+    "no_images": "Keine Bilder",
+    "previous": "Zurück",
+    "next": "Weiter"
+  },
+  "google_sign_in_button": {
+    "sign_in_with_google": "Mit Google anmelden"
+  },
+  "login_page": {
+    "circle_text": "CollectionBuddy • Sammeln • Ordnen • Behalten • Deine Schätze im Blick • ",
+    "checking_login": "Anmeldung wird geprüft…",
+    "title_collection": "Collection",
+    "title_buddy": "Buddy",
+    "subtitle": "Dein digitales Sammelalbum für Münzen, Plüschtiere, Briefmarken und alles, was dir am Herzen liegt."
+  },
+  "layout": {
+    "description": "Sammeln • Ordnen • Behalten"
+  }
+}
