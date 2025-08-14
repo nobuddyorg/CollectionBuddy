@@ -63,7 +63,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
   };
 
   useEffect(() => {
-    if (!placeFocus || place.trim().length < 2) {
+    if (!placeFocus || place.trim().length < 3) {
       setPlaceResults([]);
       setPlaceIdx(-1);
       return;
@@ -81,9 +81,10 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
         url.searchParams.set('q', q);
         url.searchParams.set('format', 'json');
         url.searchParams.set('addressdetails', '1');
-        url.searchParams.set('limit', '8');
+        url.searchParams.set('limit', '20');
         url.searchParams.set('accept-language', 'de');
         url.searchParams.set('countrycodes', 'de,at,ch,lu');
+        url.searchParams.set('dedupe', '1');
 
         const res = await fetch(url.toString(), {
           signal: ctl.signal,
@@ -93,8 +94,15 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
         const data: NominatimHit[] = await res.json();
 
         const filtered = data.filter((d) => {
-          const a = d.address || {};
-          return a.city || a.town || a.village || a.municipality;
+          const a = d.address ?? {};
+          return (
+            a.city ||
+            a.town ||
+            a.village ||
+            a.municipality ||
+            a.county ||
+            a.state
+          );
         });
 
         setPlaceResults(filtered.slice(0, 5));
@@ -222,7 +230,15 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
             ref={inputRef}
             aria-label={t('item_create.place_placeholder')}
             value={place}
-            onChange={(e) => setPlace(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setPlace(val);
+              if (val.trim() === '') {
+                setPlaceResults([]);
+                setPlaceIdx(-1);
+                setPlaceFocus(true);
+              }
+            }}
             onFocus={() => setPlaceFocus(true)}
             onKeyDown={onPlaceKeyDown}
             placeholder={t('item_create.place_placeholder')}
