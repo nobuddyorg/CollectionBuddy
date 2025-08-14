@@ -210,34 +210,80 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
           className="w-full rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
         />
         <div className="flex items-center gap-2 pt-1">
-          <button
-            onClick={createCategory}
-            disabled={isCreating || !name.trim()}
-            className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center bg-black text-white hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
-          >
-            {isCreating ? (
-              '…'
-            ) : (
-              <>
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-5 h-5 sm:hidden"
-                  aria-hidden="true"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                <span className="hidden sm:inline">
-                  {t('category_select.add')}
-                </span>
-              </>
-            )}
-          </button>
+          {!name.trim() ? (
+            <button
+              onClick={() => setExpanded(false)}
+              className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center border bg-white/60 dark:bg-neutral-800/70 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+            >
+              {selectedCat ? (
+                <>
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-5 h-5 sm:hidden"
+                    aria-hidden="true"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                  <span className="hidden sm:inline">
+                    {t('category_select.set')}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-5 h-5 sm:hidden"
+                    aria-hidden="true"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                  <span className="hidden sm:inline">
+                    {t('category_select.cancel')}
+                  </span>
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={createCategory}
+              disabled={isCreating}
+              className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center bg-black text-white hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
+            >
+              {isCreating ? (
+                '…'
+              ) : (
+                <>
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-5 h-5 sm:hidden"
+                    aria-hidden="true"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  <span className="hidden sm:inline">
+                    {t('category_select.add')}
+                  </span>
+                </>
+              )}
+            </button>
+          )}
           {selectedCat && (
             <button
               onClick={deleteSelected}
