@@ -1,9 +1,9 @@
-"use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
-import Image from "next/image";
-import { supabase } from "../lib/supabase";
-import { Item } from "../types";
-import { useI18n } from "../hooks/useI18n";
+'use client';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import Image from 'next/image';
+import { supabase } from '../lib/supabase';
+import { Item } from '../types';
+import { useI18n } from '../hooks/useI18n';
 
 type PropsList = { categoryId: string };
 
@@ -46,13 +46,13 @@ export default function ItemList({ categoryId }: PropsList) {
     const to = from + PAGE_SIZE - 1;
 
     const { data, error, count } = await supabase
-      .from("items")
+      .from('items')
       .select(
-        "id,title,description,place,tags,item_categories!inner(category_id)",
-        { count: "exact" }
+        'id,title,description,place,tags,item_categories!inner(category_id)',
+        { count: 'exact' },
       )
-      .eq("item_categories.category_id", categoryId)
-      .order("created_at", { ascending: false })
+      .eq('item_categories.category_id', categoryId)
+      .order('created_at', { ascending: false })
       .range(from, to)
       .returns<ItemRow[]>();
 
@@ -66,7 +66,7 @@ export default function ItemList({ categoryId }: PropsList) {
         description: d.description,
         place: d.place ?? null,
         tags: d.tags ?? [],
-      }))
+      })),
     );
     setTotal(count || 0);
   }, [categoryId, page]);
@@ -82,10 +82,10 @@ export default function ItemList({ categoryId }: PropsList) {
 
     const prefix = `${uid}/${itemId}`;
     const { data, error } = await supabase.storage
-      .from("item-images")
+      .from('item-images')
       .list(prefix, {
         limit: 12,
-        sortBy: { column: "created_at", order: "desc" },
+        sortBy: { column: 'created_at', order: 'desc' },
       });
 
     if (error) return;
@@ -99,11 +99,11 @@ export default function ItemList({ categoryId }: PropsList) {
     const signed = await Promise.all(
       paths.map(async (p) => {
         const { data: s, error: se } = await supabase.storage
-          .from("item-images")
+          .from('item-images')
           .createSignedUrl(p, 3600);
-        if (se) return "";
-        return s?.signedUrl || "";
-      })
+        if (se) return '';
+        return s?.signedUrl || '';
+      }),
     );
 
     setImages((prev) => ({ ...prev, [itemId]: signed.filter(Boolean) }));
@@ -113,7 +113,7 @@ export default function ItemList({ categoryId }: PropsList) {
     async (itemIds: string[]) => {
       await Promise.all(itemIds.map((id) => refreshItemImages(id)));
     },
-    [refreshItemImages]
+    [refreshItemImages],
   );
 
   useEffect(() => {
@@ -123,11 +123,11 @@ export default function ItemList({ categoryId }: PropsList) {
 
   const deleteItem = useCallback(
     async (id: string) => {
-      if (!confirm(t("item_list.confirm_delete"))) return;
-      await supabase.from("items").delete().eq("id", id);
+      if (!confirm(t('item_list.confirm_delete'))) return;
+      await supabase.from('items').delete().eq('id', id);
       await loadItems();
     },
-    [loadItems, t]
+    [loadItems, t],
   );
 
   const uploadImage = useCallback(
@@ -136,10 +136,10 @@ export default function ItemList({ categoryId }: PropsList) {
         setBusy(itemId);
         const { data: u } = await supabase.auth.getUser();
         const uid = u.user?.id;
-        if (!uid) throw new Error(t("item_list.no_user_session"));
+        if (!uid) throw new Error(t('item_list.no_user_session'));
         const path = `${uid}/${itemId}/${crypto.randomUUID()}-${file.name}`;
         const { error: upErr } = await supabase.storage
-          .from("item-images")
+          .from('item-images')
           .upload(path, file);
         if (upErr) throw upErr;
         await refreshItemImages(itemId);
@@ -150,7 +150,7 @@ export default function ItemList({ categoryId }: PropsList) {
         setBusy(null);
       }
     },
-    [refreshItemImages, t]
+    [refreshItemImages, t],
   );
 
   const totalPages = useMemo(() => Math.ceil(total / PAGE_SIZE), [total]);
@@ -169,7 +169,7 @@ export default function ItemList({ categoryId }: PropsList) {
                 onClick={() => deleteItem(it.id)}
                 className="rounded-lg border px-2 py-1 text-red-600 border-red-500/40 hover:bg-red-50 dark:hover:bg-red-950/30"
               >
-                {t("item_list.delete")}
+                {t('item_list.delete')}
               </button>
             </div>
 
@@ -230,8 +230,8 @@ export default function ItemList({ categoryId }: PropsList) {
                 />
                 <span className="text-sm">
                   {busy === it.id
-                    ? t("item_list.uploading")
-                    : t("item_list.add_image")}
+                    ? t('item_list.uploading')
+                    : t('item_list.add_image')}
                 </span>
               </label>
             </div>
@@ -242,7 +242,10 @@ export default function ItemList({ categoryId }: PropsList) {
                   <Image
                     key={idx}
                     src={url}
-                    alt={t("item_list.image_alt").replace("{idx}", `${idx + 1}`)}
+                    alt={t('item_list.image_alt').replace(
+                      '{idx}',
+                      `${idx + 1}`,
+                    )}
                     width={160}
                     height={160}
                     unoptimized
@@ -252,7 +255,7 @@ export default function ItemList({ categoryId }: PropsList) {
               </div>
             ) : (
               <div className="text-sm opacity-60">
-                {loading ? t("item_list.loading") : t("item_list.no_images")}
+                {loading ? t('item_list.loading') : t('item_list.no_images')}
               </div>
             )}
           </li>
@@ -266,17 +269,17 @@ export default function ItemList({ categoryId }: PropsList) {
             onClick={() => setPage((p) => p - 1)}
             className="rounded-xl border px-3 py-1 disabled:opacity-50"
           >
-            {t("item_list.previous")}
+            {t('item_list.previous')}
           </button>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
             <button
               key={n}
               onClick={() => setPage(n)}
               className={
-                "rounded-xl border px-3 py-1 min-w-9 " +
+                'rounded-xl border px-3 py-1 min-w-9 ' +
                 (n === page
-                  ? "bg-black text-white"
-                  : "hover:bg-neutral-50 dark:hover:bg-neutral-800/60")
+                  ? 'bg-black text-white'
+                  : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/60')
               }
             >
               {n}
@@ -287,7 +290,7 @@ export default function ItemList({ categoryId }: PropsList) {
             onClick={() => setPage((p) => p + 1)}
             className="rounded-xl border px-3 py-1 disabled:opacity-50"
           >
-            {t("item_list.next")}
+            {t('item_list.next')}
           </button>
         </div>
       )}

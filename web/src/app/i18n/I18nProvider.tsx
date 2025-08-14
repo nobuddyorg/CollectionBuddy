@@ -1,16 +1,11 @@
-"use client";
-import {
-  createContext,
-  useEffect,
-  useState,
-  useCallback,
-} from "react";
-import de from "../locales/de.json";
-import en from "../locales/en.json";
+'use client';
+import { createContext, useEffect, useState, useCallback } from 'react';
+import de from '../locales/de.json';
+import en from '../locales/en.json';
 
 const translations = { de, en };
 
-type Language = "de" | "en";
+type Language = 'de' | 'en';
 
 type TranslationValue = string | { [key: string]: TranslationValue };
 
@@ -21,14 +16,14 @@ type I18nContextType = {
 };
 
 export const I18nContext = createContext<I18nContextType | undefined>(
-  undefined
+  undefined,
 );
 
 export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
-  const [lang, setLang] = useState<Language>("de");
+  const [lang, setLang] = useState<Language>('de');
 
   useEffect(() => {
-    const browserLang = navigator.language.split("-")[0];
+    const browserLang = navigator.language.split('-')[0];
     if (browserLang in translations) {
       setLang(browserLang as Language);
     }
@@ -36,14 +31,14 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
 
   const t = useCallback(
     (key: string) => {
-      const keys = key.split(".");
+      const keys = key.split('.');
       let value: TranslationValue = translations[lang];
       for (const k of keys) {
-        if (typeof value === "object" && value !== null && k in value) {
+        if (typeof value === 'object' && value !== null && k in value) {
           const newValue: TranslationValue = value[k];
-          if (typeof newValue === "string") {
+          if (typeof newValue === 'string') {
             value = newValue;
-          } else if (typeof newValue === "object" && newValue !== null) {
+          } else if (typeof newValue === 'object' && newValue !== null) {
             value = newValue;
           } else {
             return key;
@@ -52,9 +47,9 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
           return key;
         }
       }
-      return typeof value === "string" ? value : key;
+      return typeof value === 'string' ? value : key;
     },
-    [lang]
+    [lang],
   );
 
   return (

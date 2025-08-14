@@ -1,7 +1,7 @@
-"use client";
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { supabase } from "../lib/supabase";
-import { useI18n } from "../hooks/useI18n";
+'use client';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { supabase } from '../lib/supabase';
+import { useI18n } from '../hooks/useI18n';
 
 type PropsCreate = {
   categoryId: string;
@@ -26,10 +26,10 @@ type NominatimHit = {
 };
 
 export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
 
-  const [place, setPlace] = useState("");
+  const [place, setPlace] = useState('');
   const [placeFocus, setPlaceFocus] = useState(false);
   const [placeResults, setPlaceResults] = useState<NominatimHit[]>([]);
   const [placeLoading, setPlaceLoading] = useState(false);
@@ -39,7 +39,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState("");
+  const [tagInput, setTagInput] = useState('');
 
   const [isCreating, setIsCreating] = useState(false);
   const { t } = useI18n();
@@ -48,16 +48,16 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
     const t = tagInput.trim();
     if (!t || tags.includes(t)) return;
     setTags((prev) => [...prev, t]);
-    setTagInput("");
+    setTagInput('');
   };
   const removeTag = (t: string) =>
     setTags((prev) => prev.filter((x) => x !== t));
 
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") {
+    if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
       addTag();
-    } else if (e.key === "Backspace" && !tagInput && tags.length > 0) {
+    } else if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
       removeTag(tags[tags.length - 1]);
     }
   };
@@ -77,17 +77,17 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
         abortRef.current = ctl;
         setPlaceLoading(true);
 
-        const url = new URL("https://nominatim.openstreetmap.org/search");
-        url.searchParams.set("q", q);
-        url.searchParams.set("format", "json");
-        url.searchParams.set("addressdetails", "1");
-        url.searchParams.set("limit", "8");
-        url.searchParams.set("accept-language", "de");
-        url.searchParams.set("countrycodes", "de,at,ch,lu");
+        const url = new URL('https://nominatim.openstreetmap.org/search');
+        url.searchParams.set('q', q);
+        url.searchParams.set('format', 'json');
+        url.searchParams.set('addressdetails', '1');
+        url.searchParams.set('limit', '8');
+        url.searchParams.set('accept-language', 'de');
+        url.searchParams.set('countrycodes', 'de,at,ch,lu');
 
         const res = await fetch(url.toString(), {
           signal: ctl.signal,
-          headers: { "Accept-Language": "de" },
+          headers: { 'Accept-Language': 'de' },
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: NominatimHit[] = await res.json();
@@ -121,8 +121,8 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
         setPlaceFocus(false);
       }
     };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
   const choosePlace = (hit: NominatimHit) => {
@@ -138,17 +138,17 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
 
   const onPlaceKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!placeResults.length) return;
-    if (e.key === "ArrowDown") {
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
       setPlaceIdx((i) => (i + 1) % placeResults.length);
-    } else if (e.key === "ArrowUp") {
+    } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setPlaceIdx((i) => (i <= 0 ? placeResults.length - 1 : i - 1));
-    } else if (e.key === "Enter") {
+    } else if (e.key === 'Enter') {
       e.preventDefault();
       const sel = placeIdx >= 0 ? placeResults[placeIdx] : placeResults[0];
       if (sel) choosePlace(sel);
-    } else if (e.key === "Escape") {
+    } else if (e.key === 'Escape') {
       setPlaceResults([]);
       setPlaceIdx(-1);
       setPlaceFocus(false);
@@ -162,27 +162,27 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
     setIsCreating(true);
     try {
       const { data, error } = await supabase
-        .from("items")
+        .from('items')
         .insert({
           title: name,
           description: description.trim() || null,
           place: place.trim() || null,
           tags,
         })
-        .select("id")
+        .select('id')
         .single<{ id: string }>();
       if (error || !data) return;
 
       const { error: linkError } = await supabase
-        .from("item_categories")
+        .from('item_categories')
         .insert({ item_id: data.id, category_id: categoryId });
       if (linkError) return;
 
-      setTitle("");
-      setDescription("");
-      setPlace("");
+      setTitle('');
+      setDescription('');
+      setPlace('');
       setTags([]);
-      setTagInput("");
+      setTagInput('');
       onCreated();
     } finally {
       setIsCreating(false);
@@ -194,39 +194,38 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
   return (
     <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur p-4 sm:p-5 shadow-sm space-y-3">
       <h2 className="text-base font-semibold mb-1">
-        {t("item_create.new_entry")}
+        {t('item_create.new_entry')}
       </h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <input
-          aria-label={t("item_create.title")}
+          aria-label={t('item_create.title')}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && createItem()}
-          placeholder={t("item_create.title")}
+          onKeyDown={(e) => e.key === 'Enter' && createItem()}
+          placeholder={t('item_create.title')}
           className="rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
         />
         <input
-          aria-label={t("item_create.description")}
+          aria-label={t('item_create.description')}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && createItem()}
-          placeholder={t("item_create.description")}
+          onKeyDown={(e) => e.key === 'Enter' && createItem()}
+          placeholder={t('item_create.description')}
           className="rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
         />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-
         <div className="relative" ref={dropdownRef}>
           <input
             ref={inputRef}
-            aria-label={t("item_create.place_placeholder")}
+            aria-label={t('item_create.place_placeholder')}
             value={place}
             onChange={(e) => setPlace(e.target.value)}
             onFocus={() => setPlaceFocus(true)}
             onKeyDown={onPlaceKeyDown}
-            placeholder={t("item_create.place_placeholder")}
+            placeholder={t('item_create.place_placeholder')}
             className="w-full rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
             autoComplete="off"
           />
@@ -234,7 +233,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
             <div className="absolute z-50 mt-1 w-full rounded-xl border bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
               {placeLoading && (
                 <div className="px-3 py-2 text-sm opacity-70">
-                  {t("item_create.searching")}
+                  {t('item_create.searching')}
                 </div>
               )}
               {!placeLoading &&
@@ -246,7 +245,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
                     a.village ||
                     a.municipality ||
                     hit.display_name;
-                  const line2 = [a.state, a.country].filter(Boolean).join(", ");
+                  const line2 = [a.state, a.country].filter(Boolean).join(', ');
                   return (
                     <button
                       key={hit.place_id}
@@ -255,8 +254,8 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
                       onClick={() => choosePlace(hit)}
                       className={`block w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 ${
                         i === placeIdx
-                          ? "bg-neutral-100 dark:bg-neutral-800"
-                          : ""
+                          ? 'bg-neutral-100 dark:bg-neutral-800'
+                          : ''
                       }`}
                     >
                       <div className="font-medium">{city}</div>
@@ -266,13 +265,12 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
                 })}
               {!placeLoading && placeResults.length === 0 && (
                 <div className="px-3 py-2 text-sm opacity-70">
-                  {t("item_create.no_results")}
+                  {t('item_create.no_results')}
                 </div>
               )}
             </div>
           )}
         </div>
-
 
         <div className="rounded-xl border bg-white/60 dark:bg-neutral-800/70 px-2 py-1 flex flex-wrap items-center gap-1 focus-within:border-neutral-400 dark:focus-within:border-neutral-600">
           {tags.map((tag) => (
@@ -285,7 +283,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
                 type="button"
                 onClick={() => removeTag(tag)}
                 className="text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
-                aria-label={t("item_create.remove_tag").replace("{tag}", tag)}
+                aria-label={t('item_create.remove_tag').replace('{tag}', tag)}
               >
                 ×
               </button>
@@ -296,7 +294,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={handleTagKeyDown}
             placeholder={
-              tags.length === 0 ? t("item_create.tags_placeholder") : ""
+              tags.length === 0 ? t('item_create.tags_placeholder') : ''
             }
             className="flex-1 min-w-[100px] bg-transparent outline-none py-1 text-sm"
           />
@@ -309,9 +307,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
           disabled={isCreating || !canSubmit}
           className="rounded-xl px-4 py-2 bg-black text-white hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
         >
-          {isCreating
-            ? t("item_create.adding")
-            : t("item_create.add")}
+          {isCreating ? t('item_create.adding') : t('item_create.add')}
         </button>
       </div>
     </section>

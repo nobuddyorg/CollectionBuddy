@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --background: #ffffff;
@@ -95,8 +95,8 @@ body {
     position: absolute;
     left: calc(50% - 16px);
     top: calc(50% - 16px);
-    animation: fling 900ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--delay, 0s)
-        forwards,
+    animation:
+      fling 900ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--delay, 0s) forwards,
       bob 4.2s ease-in-out infinite 1s;
     will-change: transform;
   }
