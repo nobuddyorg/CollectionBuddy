@@ -19,7 +19,9 @@
     "load_error": "Could not load categories.",
     "create_error": "Could not create category.",
     "delete_error": "Could not delete category.",
-    "open_category": "Open category"
+    "open_category": "Open category",
+    "set": "Set",
+    "cancel": "Cancel"
   },
   "item_create": {
     "new_entry": "New entry",

@@ -19,7 +19,9 @@
     "load_error": "Kategorien konnten nicht geladen werden.",
     "create_error": "Kategorie konnte nicht erstellt werden.",
     "delete_error": "Kategorie konnte nicht gelöscht werden.",
-    "open_category": "Kategorie öffnen"
+    "open_category": "Kategorie öffnen",
+    "set": "Festlegen",
+    "cancel": "Abbrechen"
   },
   "item_create": {
     "new_entry": "Neuer Eintrag",
