@@ -1,8 +1,7 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import type { User } from "../types";
-import { initialsFromEmail } from "../utils/initials";
 import { useI18n } from "../hooks/useI18n";
 import { withBasePath } from "../utils/path";
 
@@ -13,7 +12,6 @@ type Props = {
 
 export default function Header({ user, onSignOut }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const initials = useMemo(() => initialsFromEmail(user?.email ?? ""), [user]);
   const { t } = useI18n();
 
   return (

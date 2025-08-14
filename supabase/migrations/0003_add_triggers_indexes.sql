@@ -1,4 +1,4 @@
--- Enforce user_id = auth.uid() at the DB layer (defense in depth)
+
 create or replace function public.enforce_user_id()
 returns trigger
 language plpgsql
@@ -9,7 +9,7 @@ begin
     new.user_id := auth.uid();
     return new;
   elsif (tg_op = 'UPDATE') then
-    -- prevent moving rows between users
+
     if new.user_id <> old.user_id then
       new.user_id := old.user_id;
     end if;

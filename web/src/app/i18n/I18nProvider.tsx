@@ -12,6 +12,8 @@ const translations = { de, en };
 
 type Language = "de" | "en";
 
+type TranslationValue = string | { [key: string]: TranslationValue };
+
 type I18nContextType = {
   lang: Language;
   setLang: (lang: Language) => void;
@@ -35,16 +37,22 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   const t = useCallback(
     (key: string) => {
       const keys = key.split(".");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let value: any = translations[lang];
+      let value: TranslationValue = translations[lang];
       for (const k of keys) {
-        if (value && typeof value === "object" && k in value) {
-          value = value[k];
+        if (typeof value === "object" && value !== null && k in value) {
+          const newValue: TranslationValue = value[k];
+          if (typeof newValue === "string") {
+            value = newValue;
+          } else if (typeof newValue === "object" && newValue !== null) {
+            value = newValue;
+          } else {
+            return key;
+          }
         } else {
           return key;
         }
       }
-      return value;
+      return typeof value === "string" ? value : key;
     },
     [lang]
   );

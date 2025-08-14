@@ -1,12 +1,12 @@
--- supabase/migrations/0002_storage.sql
 
--- Bucket
+
+
 insert into storage.buckets (id, name, public)
 values ('item-images', 'item-images', false)
 on conflict (id) do nothing;
 
--- Policies: allow only paths starting with "<uid>/..."
--- Avoid ALTER TABLE here; you’re not the table owner.
+
+
 
 drop policy if exists "read own signed objects" on storage.objects;
 create policy "read own signed objects"
