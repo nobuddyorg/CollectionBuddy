@@ -4,6 +4,7 @@ import Image from "next/image";
 import type { User } from "../types";
 import { initialsFromEmail } from "../utils/initials";
 import { useI18n } from "../hooks/useI18n";
+import { withBasePath } from "../utils/path";
 
 type Props = {
   user: User;
@@ -25,7 +26,7 @@ export default function Header({ user, onSignOut }: Props) {
       <div className="mx-auto max-w-3xl px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Image
-            src="/logo.png"
+            src={withBasePath("/logo.png")}
             alt={t("header.title")}
             width={28}
             height={28}
