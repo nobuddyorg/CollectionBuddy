@@ -167,9 +167,25 @@ export default function ItemList({ categoryId }: PropsList) {
               <div className="font-medium truncate">{it.title}</div>
               <button
                 onClick={() => deleteItem(it.id)}
-                className="rounded-lg border px-2 py-1 text-red-600 border-red-500/40 hover:bg-red-50 dark:hover:bg-red-950/30"
+                className="rounded-lg border px-2 py-1 text-red-600 border-red-500/40 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center gap-2"
               >
-                {t('item_list.delete')}
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5 sm:hidden"
+                  aria-hidden="true"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeLinecap="round"
+                >
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
+                  <path d="M10 11v6M14 11v6" />
+                </svg>
+                <span className="hidden sm:inline">
+                  {t('item_list.delete')}
+                </span>
               </button>
             </div>
 
