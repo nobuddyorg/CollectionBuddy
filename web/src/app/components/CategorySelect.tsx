@@ -152,7 +152,18 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
             aria-label={t('category_select.open_category')}
             title={t('category_select.open_category')}
           >
-            +
+            <svg
+              viewBox="0 0 24 24"
+              className="w-5 h-5"
+              aria-hidden="true"
+              stroke="currentColor"
+              strokeWidth="2"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+            </svg>
           </button>
         </div>
       </section>
@@ -187,7 +198,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
         </span>
       </div>
 
-      <div className="flex gap-2">
+      <div className="space-y-2">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -196,28 +207,86 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
             if (e.key === 'Enter') createCategory();
             if (e.key === 'Escape') setExpanded(false);
           }}
-          className="flex-1 rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
+          className="w-full rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
         />
-        <button
-          onClick={createCategory}
-          disabled={isCreating || !name.trim()}
-          className="rounded-xl px-3 sm:px-4 py-2 bg-black text-white hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
-        >
-          {isCreating ? '…' : t('category_select.add')}
-        </button>
-      </div>
-
-      {selectedCat && (
-        <div className="pt-1">
+        <div className="flex items-center gap-2 pt-1">
           <button
-            onClick={deleteSelected}
-            disabled={isDeleting}
-            className="rounded-xl border px-3 sm:px-4 py-2 text-red-600 border-red-500/40 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
+            onClick={createCategory}
+            disabled={isCreating || !name.trim()}
+            className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center bg-black text-white hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
           >
-            {isDeleting ? '…' : t('category_select.delete')}
+            {isCreating ? (
+              '…'
+            ) : (
+              <>
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5 sm:hidden"
+                  aria-hidden="true"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                <span className="hidden sm:inline">
+                  {t('category_select.add')}
+                </span>
+              </>
+            )}
           </button>
+          {selectedCat && (
+            <button
+              onClick={deleteSelected}
+              disabled={isDeleting}
+              className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center border text-red-600 border-red-500/40 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
+            >
+              {isDeleting ? (
+                '…'
+              ) : (
+                <>
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-5 h-5 sm:hidden"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M3 6h18"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      fill="none"
+                    />
+                    <path
+                      d="M10 11v6M14 11v6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <span className="hidden sm:inline">
+                    {t('category_select.delete')}
+                  </span>
+                </>
+              )}
+            </button>
+          )}
         </div>
-      )}
+      </div>
     </section>
   );
 }
