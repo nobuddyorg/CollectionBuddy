@@ -151,7 +151,7 @@ function CategoryText({ title, name }: { title: string; name: string }) {
   );
 }
 
-function DeleteButton({
+function DeleteButtonWithLabel({
   onClick,
   disabled,
   label,
@@ -164,36 +164,23 @@ function DeleteButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center border text-red-600 border-red-500/40 bg-white/60 dark:bg-neutral-800/70 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
-      aria-label={label}
-      title={label}
+      className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center border text-red-600 border-red-500/40 bg-white/60 dark:bg-neutral-800/70 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
     >
-      <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
-        <path
-          d="M3 6h18"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        <path
-          d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        <path
-          d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-        />
-        <path
-          d="M10 11v6M14 11v6"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
+      <svg
+        viewBox="0 0 24 24"
+        className="w-5 h-5 sm:hidden"
+        aria-hidden="true"
+        stroke="currentColor"
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+      >
+        <path d="M3 6h18" />
+        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
+        <path d="M10 11v6M14 11v6" />
       </svg>
+      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }
@@ -326,11 +313,6 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
       <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 flex items-center justify-between">
         <CategoryText title={t('category_select.title')} name={selected.name} />
         <div className="flex items-center gap-2">
-          <DeleteButton
-            onClick={deleteSelected}
-            disabled={isDeleting}
-            label={t('category_select.delete')}
-          />
           <ExpandButton
             onClick={() => setExpanded(true)}
             label={t('category_select.open_category')}
@@ -363,24 +345,28 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
         />
 
         <div className="flex items-center gap-2 pt-1">
-          <DeleteButton
-            onClick={deleteSelected}
-            disabled={isDeleting}
-            label={t('category_select.delete')}
-          />
+          {selectedCat && selectedCat !== '' && (
+            <DeleteButtonWithLabel
+              onClick={deleteSelected}
+              disabled={isDeleting}
+              label={t('category_select.delete')}
+            />
+          )}
 
-          {name.trim() === '' ? (
+          {selectedCat && selectedCat !== '' && name.trim() === '' && (
             <SetButton
               onClick={() => {
                 setExpanded(false);
-                if (selectedCat) onSelect(selectedCat);
+                onSelect(selectedCat);
               }}
               label={t('category_select.set')}
             />
-          ) : (
+          )}
+
+          {(!selectedCat || selectedCat === '') && (
             <AddButton
               onClick={createCategory}
-              disabled={isCreating}
+              disabled={name.trim() === '' || isCreating}
               isCreating={isCreating}
               label={t('category_select.add')}
             />
