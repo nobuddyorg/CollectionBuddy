@@ -34,6 +34,7 @@ export default function ItemList({ categoryId }: PropsList) {
   const [loading, setLoading] = useState(false);
   const { t } = useI18n();
   const [modalImage, setModalImage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // edit modal
   const [editOpen, setEditOpen] = useState(false);
@@ -189,26 +190,31 @@ export default function ItemList({ categoryId }: PropsList) {
   };
 
   const saveEdit = async (values: ItemFormValues) => {
-    if (!editing) return;
-    const payload = {
-      title: values.title.trim(),
-      description: values.description.trim() || null,
-      place: values.place.trim() || null,
-      tags: values.tags,
-    };
-    const { error } = await supabase
-      .from('items')
-      .update(payload)
-      .eq('id', editing.id);
-    if (error) {
-      alert(error.message);
-      return;
+    if (!editing || isSaving) return;
+    setIsSaving(true);
+    try {
+      const payload = {
+        title: values.title.trim(),
+        description: values.description.trim() || null,
+        place: values.place.trim() || null,
+        tags: values.tags,
+      };
+      const { error } = await supabase
+        .from('items')
+        .update(payload)
+        .eq('id', editing.id);
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      setItems((prev) =>
+        prev.map((it) => (it.id === editing.id ? { ...it, ...payload } : it)),
+      );
+      setEditOpen(false);
+      setEditing(null);
+    } finally {
+      setIsSaving(false);
     }
-    setItems((prev) =>
-      prev.map((it) => (it.id === editing.id ? { ...it, ...payload } : it)),
-    );
-    setEditOpen(false);
-    setEditing(null);
   };
 
   return (
@@ -472,6 +478,7 @@ export default function ItemList({ categoryId }: PropsList) {
         {/* inner section to mirror ItemCreate’s section */}
         <section className="relative z-50">
           <ItemForm
+            key={editing?.id}
             initial={
               editing?.values ?? {
                 title: '',
@@ -481,7 +488,7 @@ export default function ItemList({ categoryId }: PropsList) {
               }
             }
             submitLabel={t('common.save')}
-            submitting={false}
+            submitting={isSaving}
             onSubmit={saveEdit}
             onCancel={() => {
               setEditOpen(false);
