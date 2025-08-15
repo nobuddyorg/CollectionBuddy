@@ -105,6 +105,8 @@ function AddButton({
   );
 }
 
+import Icon, { IconType } from './Icon';
+
 function SetButton({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button
@@ -112,8 +114,8 @@ function SetButton({ onClick, label }: { onClick: () => void; label: string }) {
       className="w-8 h-8 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110"
       title={label}
     >
-      <svg
-        viewBox="0 0 24 24"
+      <Icon
+        icon={IconType.Check}
         className="w-5 h-5"
         aria-hidden="true"
         stroke="currentColor"
@@ -121,9 +123,7 @@ function SetButton({ onClick, label }: { onClick: () => void; label: string }) {
         fill="none"
         strokeLinecap="round"
         strokeLinejoin="round"
-      >
-        <path d="M20 6L9 17l-5-5" />
-      </svg>
+      />
     </button>
   );
 }
@@ -153,20 +153,15 @@ function DeleteButtonWithLabel({
       className="w-8 h-8 flex items-center justify-center rounded-xl bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
       title={label}
     >
-      <svg
-        viewBox="0 0 24 24"
+      <Icon
+        icon={IconType.Trash}
         className="w-5 h-5"
         aria-hidden="true"
         stroke="currentColor"
         strokeWidth="2"
         fill="none"
         strokeLinecap="round"
-      >
-        <path d="M3 6h18" />
-        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-        <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
-        <path d="M10 11v6M14 11v6" />
-      </svg>
+      />
     </button>
   );
 }
@@ -185,18 +180,15 @@ function ExpandButton({
       aria-label={label}
       title={label}
     >
-      <svg
-        viewBox="0 0 24 24"
+      <Icon
+        icon={IconType.Edit}
         className="w-5 h-5"
         aria-hidden="true"
         stroke="currentColor"
         strokeWidth="2"
         fill="none"
         strokeLinecap="round"
-      >
-        <path d="M12 20h9" />
-        <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-      </svg>
+      />
     </button>
   );
 }
