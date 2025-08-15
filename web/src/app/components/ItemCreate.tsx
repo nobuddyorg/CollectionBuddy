@@ -1,5 +1,6 @@
 'use client';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useI18n } from '../hooks/useI18n';
 
@@ -31,7 +32,15 @@ type PhotonFeature = {
   };
 };
 
+type DisplayParts = {
+  city: string;
+  line2: string;
+  key: string;
+};
+
 export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
+  const { t, locale } = useI18n() as unknown as { t: (k: string) => string; locale?: string };
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
@@ -43,21 +52,52 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
   const abortRef = useRef<AbortController | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
 
   const [isCreating, setIsCreating] = useState(false);
-  const { t } = useI18n();
+
+  const resolvedLocale = useMemo(() => {
+    if (locale && typeof locale === 'string') return locale;
+    if (typeof navigator !== 'undefined' && navigator.language) return navigator.language;
+    return 'en';
+  }, [locale]);
+
+  const photonLang = useMemo(() => {
+    const parts = resolvedLocale.split('-');
+    const region = (parts[1] || '').toUpperCase();
+    const germanRegions = new Set(['DE', 'AT', 'CH', 'LI', 'LU']);
+    return germanRegions.has(region) ? 'de' : 'en';
+  }, [resolvedLocale]);
+
+  const regionNames = useMemo(() => {
+    const DN = (Intl as any).DisplayNames;
+    return DN ? (new DN([photonLang], { type: 'region' }) as Intl.DisplayNames) : null;
+  }, [photonLang]);
+
+  const formatDisplay = useCallback(
+    (p: PhotonFeature['properties']): DisplayParts => {
+      const city = p.city || p.town || p.village || p.municipality || p.name || '';
+      const country =
+        p.country ||
+        (p.countrycode && regionNames ? (regionNames as any).of(p.countrycode.toUpperCase()) : undefined);
+      const line2 = [p.state, country].filter(Boolean).join(', ');
+      const key = `${city}|||${line2}`.toLowerCase().replace(/\s+/g, ' ').trim();
+      return { city, line2, key };
+    },
+    [regionNames],
+  );
 
   const addTag = () => {
-    const t = tagInput.trim();
-    if (!t || tags.includes(t)) return;
-    setTags((prev) => [...prev, t]);
+    const v = tagInput.trim();
+    if (!v || tags.includes(v)) return;
+    setTags((prev) => [...prev, v]);
     setTagInput('');
   };
-  const removeTag = (t: string) =>
-    setTags((prev) => prev.filter((x) => x !== t));
+
+  const removeTag = (v: string) => setTags((prev) => prev.filter((x) => x !== v));
 
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
@@ -75,32 +115,29 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
       return;
     }
     const q = place.trim();
-
     const timer = setTimeout(async () => {
       try {
         abortRef.current?.abort();
         const ctl = new AbortController();
         abortRef.current = ctl;
         setPlaceLoading(true);
-
         const url = new URL('https://photon.komoot.io/api/');
         url.searchParams.set('q', q);
         url.searchParams.set('limit', '5');
-        url.searchParams.set('lang', 'de');
-
-        const res = await fetch(url.toString(), {
-          signal: ctl.signal,
-        });
+        url.searchParams.set('lang', photonLang);
+        const res = await fetch(url.toString(), { signal: ctl.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
         const data: { features: PhotonFeature[] } = await res.json();
-
-        const uniqueFeatures = Array.from(
-          new Map(data.features.map((f) => [f.properties.osm_id, f])).values(),
-        );
-
-        setPlaceResults(uniqueFeatures);
-
+        const uniqueByOsm = Array.from(new Map(data.features.map((f) => [f.properties.osm_id, f])).values());
+        const seen = new Set<string>();
+        const deduped: PhotonFeature[] = [];
+        for (const f of uniqueByOsm) {
+          const { key } = formatDisplay(f.properties);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          deduped.push(f);
+        }
+        setPlaceResults(deduped);
         setPlaceIdx(-1);
       } catch {
         setPlaceResults([]);
@@ -109,18 +146,16 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
         setPlaceLoading(false);
       }
     }, 300);
-
     return () => clearTimeout(timer);
-  }, [place, placeFocus]);
+  }, [place, placeFocus, photonLang, formatDisplay]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(e.target as Node)
-      ) {
+      const target = e.target as Node;
+      const insideInput = inputRef.current?.contains(target);
+      const insideAnchor = dropdownRef.current?.contains(target);
+      const insideMenu = menuRef.current?.contains(target);
+      if (!insideInput && !insideAnchor && !insideMenu) {
         setPlaceFocus(false);
       }
     };
@@ -129,10 +164,10 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
   }, []);
 
   const choosePlace = (hit: PhotonFeature) => {
-    const p = hit.properties;
-    const city = p.city || p.town || p.village || p.municipality || p.name;
-    const label = p.country ? `${city}, ${p.country}` : city;
-    setPlace(label || '');
+    const { city, line2 } = formatDisplay(hit.properties);
+    const countryOnly = line2.split(', ').pop() || '';
+    const label = countryOnly ? `${city}, ${countryOnly}` : city;
+    setPlace(label);
     setPlaceResults([]);
     setPlaceIdx(-1);
     setPlaceFocus(false);
@@ -160,7 +195,6 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
   const createItem = useCallback(async () => {
     const name = title.trim();
     if (!name || isCreating) return;
-
     setIsCreating(true);
     try {
       const { data, error } = await supabase
@@ -174,12 +208,10 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
         .select('id')
         .single<{ id: string }>();
       if (error || !data) return;
-
       const { error: linkError } = await supabase
         .from('item_categories')
         .insert({ item_id: data.id, category_id: categoryId });
       if (linkError) return;
-
       setTitle('');
       setDescription('');
       setPlace('');
@@ -195,9 +227,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
 
   return (
     <section className="rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur p-4 sm:p-5 shadow-sm space-y-3 z-70 relative">
-      <h2 className="text-base font-semibold mb-1">
-        {t('item_create.new_entry')}
-      </h2>
+      <h2 className="text-base font-semibold mb-1">{t('item_create.new_entry')}</h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <input
@@ -239,41 +269,55 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
             className="w-full rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 outline-none focus:border-primary dark:focus:border-primary"
             autoComplete="off"
           />
-          {placeFocus && (placeLoading || placeResults.length > 0) && (
-            <div className="absolute mt-1 w-full rounded-xl border bg-card dark:bg-card shadow-lg overflow-hidden">
-              {placeLoading && (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                  {t('item_create.searching')}
-                </div>
-              )}
-              {!placeLoading &&
-                placeResults.map((hit, i) => {
-                  const p = hit.properties;
-                  const city =
-                    p.city || p.town || p.village || p.municipality || p.name;
-                  const line2 = [p.state, p.country].filter(Boolean).join(', ');
-                  return (
-                    <button
-                      key={p.osm_id}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => choosePlace(hit)}
-                      className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 dark:hover:bg-primary/10 ${
-                        i === placeIdx ? 'bg-primary/10 dark:bg-primary/10' : ''
-                      }`}
-                    >
-                      <div className="font-medium">{city}</div>
-                      <div className="opacity-70">{line2}</div>
-                    </button>
-                  );
-                })}
-              {!placeLoading && placeResults.length === 0 && (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                  {t('item_create.no_results')}
-                </div>
-              )}
-            </div>
-          )}
+          {placeFocus && (placeLoading || placeResults.length > 0) &&
+            ReactDOM.createPortal(
+              (() => {
+                const r = inputRef.current?.getBoundingClientRect();
+                if (!r) return null;
+                return (
+                  <div
+                    ref={menuRef}
+                    className="fixed rounded-xl border bg-card dark:bg-card shadow-lg overflow-hidden z-[2000]"
+                    style={{
+                      top: r.bottom,
+                      left: r.left,
+                      width: r.width,
+                    }}
+                  >
+                    {placeLoading && (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        {t('item_create.searching')}
+                      </div>
+                    )}
+                    {!placeLoading && placeResults.map((hit, i) => {
+                      const p = hit.properties;
+                      const city = p.city || p.town || p.village || p.municipality || p.name;
+                      const line2 = [p.state, p.country].filter(Boolean).join(', ');
+                      return (
+                        <button
+                          key={p.osm_id}
+                          type="button"
+                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                          onClick={() => choosePlace(hit)}
+                          className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 dark:hover:bg-primary/10 ${
+                            i === placeIdx ? 'bg-primary/10 dark:bg-primary/10' : ''
+                          }`}
+                        >
+                          <div className="font-medium">{city}</div>
+                          <div className="opacity-70">{line2}</div>
+                        </button>
+                      );
+                    })}
+                    {!placeLoading && placeResults.length === 0 && (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        {t('item_create.no_results')}
+                      </div>
+                    )}
+                  </div>
+                );
+              })(),
+              document.body
+            )}
         </div>
 
         <div className="rounded-xl border bg-card/60 dark:bg-card/70 px-2 py-1 flex flex-wrap items-center gap-1 focus-within:border-primary dark:focus-within:border-primary">
@@ -305,9 +349,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={handleTagKeyDown}
-            placeholder={
-              tags.length === 0 ? t('item_create.tags_placeholder') : ''
-            }
+            placeholder={tags.length === 0 ? t('item_create.tags_placeholder') : ''}
             className="flex-1 min-w-[100px] bg-transparent outline-none py-1 text-sm"
           />
         </div>
