@@ -333,7 +333,7 @@ export default function ItemList({ categoryId }: PropsList) {
               >
                 {/* Mobile close (hidden ≥ sm) */}
                 <button
-                  className="sm:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-muted text-foreground shadow"
+                  className="sm:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-card border text-foreground shadow"
                   onClick={() => closeActions(it.id)}
                   aria-label={t('common.close') ?? 'Close'}
                 >
