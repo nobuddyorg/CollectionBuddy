@@ -171,11 +171,11 @@ export default function ItemList({ categoryId }: PropsList) {
 
   return (
     <div className="space-y-4">
-      <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <ul className="grid sm:grid-cols-2 lg:grid-cols-2 gap-3">
         {items.map((it) => (
           <li
             key={it.id}
-            className="rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur p-3 shadow-sm space-y-3"
+            className="rounded-2xl border bg-card/70 dark:bg-card/60 bg-neutral-100/50 dark:bg-neutral-800/50 backdrop-blur p-3 shadow-sm space-y-3"
           >
             <div className="flex justify-between items-center gap-3">
               <div className="font-medium truncate">{it.title}</div>
@@ -284,7 +284,7 @@ export default function ItemList({ categoryId }: PropsList) {
             </div>
 
             {images[it.id]?.length ? (
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {images[it.id].map((url, idx) => (
                   <Image
                     key={idx}
@@ -346,7 +346,7 @@ export default function ItemList({ categoryId }: PropsList) {
       {modalImage &&
         createPortal(
           <div
-            className="fixed inset-0 z-90 flex flex-col items-center justify-center bg-background/90"
+            className="fixed inset-0 z-90 flex flex-col items-center justify-center bg-background/90 backdrop-blur"
             onClick={() => setModalImage(null)}
           >
             <Image
