@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { supabase } from '../lib/supabase';
+import Icon from './Icon';
+import { IconType } from './IconType';
 import { Item } from '../types';
 import { useI18n } from '../hooks/useI18n';
 import imageCompression from 'browser-image-compression';
@@ -307,16 +309,12 @@ export default function ItemList({ categoryId }: PropsList) {
                 onClick={() => toggleActions(it.id)}
                 aria-label={t('item_list.more_actions') ?? 'More actions'}
               >
-                <svg
-                  viewBox="0 0 24 24"
+                <Icon
+                  icon={IconType.More}
                   className="w-5 h-5"
                   fill="currentColor"
                   aria-hidden="true"
-                >
-                  <circle cx="5" cy="12" r="2" />
-                  <circle cx="12" cy="12" r="2" />
-                  <circle cx="19" cy="12" r="2" />
-                </svg>
+                />
               </button>
 
               {/* Actions bar:
@@ -337,16 +335,14 @@ export default function ItemList({ categoryId }: PropsList) {
                   onClick={() => closeActions(it.id)}
                   aria-label={t('common.close') ?? 'Close'}
                 >
-                  <svg
-                    viewBox="0 0 24 24"
+                  <Icon
+                    icon={IconType.Close}
                     className="w-5 h-5"
                     stroke="currentColor"
                     strokeWidth="2"
                     fill="none"
                     aria-hidden="true"
-                  >
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
+                  />
                 </button>
 
                 <label
@@ -368,8 +364,8 @@ export default function ItemList({ categoryId }: PropsList) {
                   {busy === it.id ? (
                     <div className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />
                   ) : (
-                    <svg
-                      viewBox="0 0 24 24"
+                    <Icon
+                      icon={IconType.Add}
                       className="w-5 h-5"
                       aria-hidden="true"
                       stroke="currentColor"
@@ -377,10 +373,7 @@ export default function ItemList({ categoryId }: PropsList) {
                       fill="none"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                    >
-                      <path d="M4 4h16v16H4z" />
-                      <path d="M12 8v8M8 12h8" />
-                    </svg>
+                    />
                   )}
                 </label>
 
@@ -392,18 +385,15 @@ export default function ItemList({ categoryId }: PropsList) {
                   className="w-9 h-9 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 flex items-center justify-center"
                   title={t('item_list.edit')}
                 >
-                  <svg
-                    viewBox="0 0 24 24"
+                  <Icon
+                    icon={IconType.Edit}
                     className="w-5 h-5"
                     aria-hidden="true"
                     stroke="currentColor"
                     strokeWidth="2"
                     fill="none"
                     strokeLinecap="round"
-                  >
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                  </svg>
+                  />
                 </button>
 
                 <button
@@ -414,20 +404,15 @@ export default function ItemList({ categoryId }: PropsList) {
                   className="w-9 h-9 rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600 flex items-center justify-center"
                   title={t('item_list.delete')}
                 >
-                  <svg
-                    viewBox="0 0 24 24"
+                  <Icon
+                    icon={IconType.Trash}
                     className="w-5 h-5"
                     aria-hidden="true"
                     stroke="currentColor"
                     strokeWidth="2"
                     fill="none"
                     strokeLinecap="round"
-                  >
-                    <path d="M3 6h18" />
-                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
-                    <path d="M10 11v6M14 11v6" />
-                  </svg>
+                  />
                 </button>
               </div>
 
@@ -439,19 +424,11 @@ export default function ItemList({ categoryId }: PropsList) {
 
               {it.place && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <svg
-                    viewBox="0 0 24 24"
+                  <Icon
+                    icon={IconType.Pin}
                     className="w-4 h-4 shrink-0 opacity-80"
                     aria-hidden="true"
-                  >
-                    <path
-                      d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    />
-                    <circle cx="12" cy="10" r="2" fill="currentColor" />
-                  </svg>
+                  />
                   <span className="truncate">{it.place}</span>
                 </div>
               )}
@@ -509,18 +486,13 @@ export default function ItemList({ categoryId }: PropsList) {
                         {deletingPath === img.path ? (
                           <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                         ) : (
-                          <svg
-                            viewBox="0 0 24 24"
+                          <Icon
+                            icon={IconType.Trash}
                             className="w-4 h-4"
                             stroke="currentColor"
                             strokeWidth="2"
                             fill="none"
-                          >
-                            <path d="M3 6h18" />
-                            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                            <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
-                            <path d="M10 11v6M14 11v6" />
-                          </svg>
+                          />
                         )}
                       </button>
                     </div>
@@ -544,15 +516,13 @@ export default function ItemList({ categoryId }: PropsList) {
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
             title={t('item_list.previous')}
           >
-            <svg
-              viewBox="0 0 24 24"
+            <Icon
+              icon={IconType.ChevronLeft}
               className="w-5 h-5"
               stroke="currentColor"
               strokeWidth="2"
               fill="none"
-            >
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
+            />
           </button>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
             <button
@@ -574,15 +544,13 @@ export default function ItemList({ categoryId }: PropsList) {
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
             title={t('item_list.next')}
           >
-            <svg
-              viewBox="0 0 24 24"
+            <Icon
+              icon={IconType.ChevronRight}
               className="w-5 h-5"
               stroke="currentColor"
               strokeWidth="2"
               fill="none"
-            >
-              <path d="M9 18l6-6-6-6" />
-            </svg>
+            />
           </button>
         </div>
       )}
@@ -607,15 +575,13 @@ export default function ItemList({ categoryId }: PropsList) {
               className="mt-4 w-10 h-10 flex items-center justify-center rounded-xl bg-card text-card-foreground hover:bg-card/80 transition"
               title={t('item_list.close_modal')}
             >
-              <svg
-                viewBox="0 0 24 24"
+              <Icon
+                icon={IconType.Close}
                 className="w-5 h-5"
                 stroke="currentColor"
                 strokeWidth="2"
                 fill="none"
-              >
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
+              />
             </button>
           </div>,
           document.body,
