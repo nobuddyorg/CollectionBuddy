@@ -39,8 +39,12 @@ export default function ItemList({ categoryId }: PropsList) {
   const [isSaving, setIsSaving] = useState(false);
   const [deletingPath, setDeletingPath] = useState<string | null>(null);
 
+  // mobile-only tap-to-reveal per item
+  const [actionsOpen, setActionsOpen] = useState<Record<string, boolean>>({});
+
   const reqSeq = useRef(0);
 
+  // edit modal
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<null | {
     id: string;
@@ -267,10 +271,16 @@ export default function ItemList({ categoryId }: PropsList) {
       );
       setEditOpen(false);
       setEditing(null);
+      setActionsOpen((m) => ({ ...m, [editing.id]: false }));
     } finally {
       setIsSaving(false);
     }
   };
+
+  const toggleActions = (id: string) =>
+    setActionsOpen((m) => ({ ...m, [id]: !m[id] }));
+  const closeActions = (id: string) =>
+    setActionsOpen((m) => ({ ...m, [id]: false }));
 
   return (
     <div className="space-y-4">
@@ -282,32 +292,106 @@ export default function ItemList({ categoryId }: PropsList) {
       />
 
       <ul className="grid sm:grid-cols-2 lg:grid-cols-2 gap-3">
-        {items.map((it) => (
-          <li
-            key={it.id}
-            className="group relative rounded-2xl border bg-card/70 dark:bg-card/60 bg-neutral-100/50 dark:bg-neutral-800/50 backdrop-blur p-3 shadow-sm space-y-3"
-          >
-            <div className="font-medium pr-16 truncate">{it.title}</div>
+        {items.map((it) => {
+          const isOpen = !!actionsOpen[it.id];
+          return (
+            <li
+              key={it.id}
+              className="group relative rounded-2xl border bg-card/70 dark:bg-card/60 bg-neutral-100/50 dark:bg-neutral-800/50 backdrop-blur p-3 shadow-sm space-y-3"
+            >
+              <div className="font-medium pr-16 truncate">{it.title}</div>
 
-            <div className="absolute top-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto transition-opacity">
-              <label
-                className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 transition cursor-pointer"
-                title={t('item_list.add_image')}
+              {/* Mobile "..." opener (hidden ≥ sm) */}
+              <button
+                className={`absolute top-3 right-3 sm:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-muted text-foreground shadow ${isOpen ? 'hidden' : ''}`}
+                onClick={() => toggleActions(it.id)}
+                aria-label={t('item_list.more_actions') ?? 'More actions'}
               >
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={!userId || busy === it.id}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    void uploadImage(it.id, f);
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <circle cx="5" cy="12" r="2" />
+                  <circle cx="12" cy="12" r="2" />
+                  <circle cx="19" cy="12" r="2" />
+                </svg>
+              </button>
+
+              {/* Actions bar:
+                  - < sm: toggled by isOpen (tap-to-reveal)
+                  - ≥ sm: hover/focus reveal via group-hover */}
+              <div
+                className={[
+                  'absolute top-3 right-3 flex items-center gap-2 transition-opacity',
+                  isOpen
+                    ? 'opacity-100 pointer-events-auto'
+                    : 'opacity-0 pointer-events-none',
+                  'sm:opacity-0 sm:pointer-events-none sm:group-hover:opacity-100 sm:group-hover:pointer-events-auto',
+                ].join(' ')}
+              >
+                {/* Mobile close (hidden ≥ sm) */}
+                <button
+                  className="sm:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-muted text-foreground shadow"
+                  onClick={() => closeActions(it.id)}
+                  aria-label={t('common.close') ?? 'Close'}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-5 h-5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+
+                <label
+                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 transition cursor-pointer"
+                  title={t('item_list.add_image')}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={!userId || busy === it.id}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      void uploadImage(it.id, f);
+                      closeActions(it.id);
+                    }}
+                  />
+                  {busy === it.id ? (
+                    <div className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />
+                  ) : (
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-5 h-5"
+                      aria-hidden="true"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M4 4h16v16H4z" />
+                      <path d="M12 8v8M8 12h8" />
+                    </svg>
+                  )}
+                </label>
+
+                <button
+                  onClick={() => {
+                    openEdit(it);
+                    closeActions(it.id);
                   }}
-                />
-                {busy === it.id ? (
-                  <div className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />
-                ) : (
+                  className="w-9 h-9 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 flex items-center justify-center"
+                  title={t('item_list.edit')}
+                >
                   <svg
                     viewBox="0 0 24 24"
                     className="w-5 h-5"
@@ -316,151 +400,140 @@ export default function ItemList({ categoryId }: PropsList) {
                     strokeWidth="2"
                     fill="none"
                     strokeLinecap="round"
-                    strokeLinejoin="round"
                   >
-                    <path d="M4 4h16v16H4z" />
-                    <path d="M12 8v8M8 12h8" />
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
                   </svg>
-                )}
-              </label>
+                </button>
 
-              <button
-                onClick={() => openEdit(it)}
-                className="w-9 h-9 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 flex items-center justify-center"
-                title={t('item_list.edit')}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-5 h-5"
-                  aria-hidden="true"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  fill="none"
-                  strokeLinecap="round"
+                <button
+                  onClick={() => {
+                    void deleteItem(it.id);
+                    closeActions(it.id);
+                  }}
+                  className="w-9 h-9 rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600 flex items-center justify-center"
+                  title={t('item_list.delete')}
                 >
-                  <path d="M12 20h9" />
-                  <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                </svg>
-              </button>
-
-              <button
-                onClick={() => deleteItem(it.id)}
-                className="w-9 h-9 rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600 flex items-center justify-center"
-                title={t('item_list.delete')}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-5 h-5"
-                  aria-hidden="true"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  fill="none"
-                  strokeLinecap="round"
-                >
-                  <path d="M3 6h18" />
-                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
-                  <path d="M10 11v6M14 11v6" />
-                </svg>
-              </button>
-            </div>
-
-            {it.description && (
-              <div className="text-sm text-muted-foreground line-clamp-3">
-                {it.description}
-              </div>
-            )}
-
-            {it.place && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-4 h-4 shrink-0 opacity-80"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"
-                    fill="none"
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-5 h-5"
+                    aria-hidden="true"
                     stroke="currentColor"
                     strokeWidth="2"
-                  />
-                  <circle cx="12" cy="10" r="2" fill="currentColor" />
-                </svg>
-                <span className="truncate">{it.place}</span>
-              </div>
-            )}
-
-            {Array.isArray(it.tags) && it.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {it.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 bg-primary/10 dark:bg-primary/20 text-primary rounded-full px-2 py-0.5 text-xs"
+                    fill="none"
+                    strokeLinecap="round"
                   >
-                    {tag}
-                  </span>
-                ))}
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
+                    <path d="M10 11v6M14 11v6" />
+                  </svg>
+                </button>
               </div>
-            )}
 
-            {images[it.id]?.length ? (
-              <div className="grid grid-cols-2 gap-2">
-                {images[it.id].map((img) => (
-                  <div
-                    key={img.path}
-                    className="relative group"
-                    onClick={() => setModalImage(img.url)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ')
-                        setModalImage(img.url);
-                    }}
+              {it.description && (
+                <div className="text-sm text-muted-foreground line-clamp-3">
+                  {it.description}
+                </div>
+              )}
+
+              {it.place && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-4 h-4 shrink-0 opacity-80"
+                    aria-hidden="true"
                   >
-                    <Image
-                      src={img.url}
-                      alt={t('item_list.image_alt').replace('{idx}', '')}
-                      width={160}
-                      height={160}
-                      unoptimized
-                      className="h-20 w-full object-cover rounded-xl cursor-pointer"
+                    <path
+                      d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
                     />
-                    <button
-                      title={t('item_list.delete')}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void deleteImage(it.id, img.path);
-                      }}
-                      disabled={deletingPath === img.path || busy === it.id}
-                      className="absolute top-1 right-1 w-7 h-7 flex items-center justify-center rounded-lg bg-red-600 text-white shadow opacity-0 group-hover:opacity-100 disabled:opacity-60 transition"
+                    <circle cx="12" cy="10" r="2" fill="currentColor" />
+                  </svg>
+                  <span className="truncate">{it.place}</span>
+                </div>
+              )}
+
+              {Array.isArray(it.tags) && it.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {it.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 bg-primary/10 dark:bg-primary/20 text-primary rounded-full px-2 py-0.5 text-xs"
                     >
-                      {deletingPath === img.path ? (
-                        <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="w-4 h-4"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          fill="none"
-                        >
-                          <path d="M3 6h18" />
-                          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
-                          <path d="M10 11v6M14 11v6" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                {loading ? t('item_list.loading') : t('item_list.no_images')}
-              </div>
-            )}
-          </li>
-        ))}
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {images[it.id]?.length ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {images[it.id].map((img) => (
+                    <div
+                      key={img.path}
+                      className="relative group"
+                      onClick={() => setModalImage(img.url)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ')
+                          setModalImage(img.url);
+                      }}
+                    >
+                      <Image
+                        src={img.url}
+                        alt={t('item_list.image_alt').replace('{idx}', '')}
+                        width={160}
+                        height={160}
+                        unoptimized
+                        className="h-20 w-full object-cover rounded-xl cursor-pointer"
+                      />
+                      <button
+                        title={t('item_list.delete')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void deleteImage(it.id, img.path);
+                        }}
+                        disabled={deletingPath === img.path || busy === it.id}
+                        className={[
+                          // base (mobile): show when actions panel is open
+                          isOpen ? 'opacity-100' : 'opacity-0',
+                          // ≥ sm: hide until hover
+                          'sm:opacity-0 sm:group-hover:opacity-100',
+                          'absolute top-1 right-1 w-7 h-7 flex items-center justify-center rounded-lg bg-red-600 text-white shadow disabled:opacity-60 transition',
+                        ].join(' ')}
+                      >
+                        {deletingPath === img.path ? (
+                          <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="w-4 h-4"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            fill="none"
+                          >
+                            <path d="M3 6h18" />
+                            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
+                            <path d="M10 11v6M14 11v6" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  {loading ? t('item_list.loading') : t('item_list.no_images')}
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
 
       {totalPages > 1 && (
