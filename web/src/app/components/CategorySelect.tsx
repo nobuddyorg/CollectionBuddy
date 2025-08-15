@@ -99,7 +99,7 @@ function AddButton({
       {isCreating ? (
         <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
       ) : (
-        "+"
+        '+'
       )}
     </button>
   );
@@ -186,17 +186,17 @@ function ExpandButton({
       title={label}
     >
       <svg
-                    viewBox="0 0 24 24"
-                    className="w-5 h-5"
-                    aria-hidden="true"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    fill="none"
-                    strokeLinecap="round"
-                  >
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                  </svg>
+        viewBox="0 0 24 24"
+        className="w-5 h-5"
+        aria-hidden="true"
+        stroke="currentColor"
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+      >
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+      </svg>
     </button>
   );
 }

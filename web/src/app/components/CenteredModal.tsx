@@ -21,14 +21,14 @@ export default function CenteredModal({
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-[80] bg-black/40 backdrop-blur-sm transition-opacity ${
+        className={`fixed inset-0 z-500 bg-black/40 backdrop-blur-sm transition-opacity ${
           open ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={() => onOpenChange(false)}
       />
       {/* Modal */}
       <div
-        className={`fixed inset-0 z-[81] flex items-center justify-center p-4 transition-opacity ${
+        className={`fixed inset-0 z-600 flex items-center justify-center p-4 transition-opacity ${
           open ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >
@@ -47,6 +47,6 @@ export default function CenteredModal({
         </div>
       </div>
     </>,
-    document.body
+    document.body,
   );
 }

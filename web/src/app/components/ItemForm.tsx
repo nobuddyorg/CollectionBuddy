@@ -48,7 +48,10 @@ export default function ItemForm({
   onCancel,
   showIconSubmit = false,
 }: Props) {
-  const { t, locale } = useI18n() as unknown as { t: (k: string) => string; locale?: string };
+  const { t, locale } = useI18n() as unknown as {
+    t: (k: string) => string;
+    locale?: string;
+  };
 
   const [title, setTitle] = useState(initial.title);
   const [description, setDescription] = useState(initial.description);
@@ -69,7 +72,8 @@ export default function ItemForm({
 
   const resolvedLocale = useMemo(() => {
     if (locale && typeof locale === 'string') return locale;
-    if (typeof navigator !== 'undefined' && navigator.language) return navigator.language;
+    if (typeof navigator !== 'undefined' && navigator.language)
+      return navigator.language;
     return 'en';
   }, [locale]);
 
@@ -81,21 +85,32 @@ export default function ItemForm({
   }, [resolvedLocale]);
 
   const regionNames = useMemo(() => {
-    const DN = (Intl as any).DisplayNames;
-    return DN ? (new DN([photonLang], { type: 'region' }) as Intl.DisplayNames) : null;
+    // Check if DisplayNames is available in the current environment
+    const DNConstructor = (
+      Intl as typeof Intl & { DisplayNames?: typeof Intl.DisplayNames }
+    ).DisplayNames;
+    return DNConstructor
+      ? new DNConstructor([photonLang], { type: 'region' })
+      : null;
   }, [photonLang]);
 
   const formatDisplay = useCallback(
     (p: PhotonFeature['properties']) => {
-      const city = p.city || p.town || p.village || p.municipality || p.name || '';
+      const city =
+        p.city || p.town || p.village || p.municipality || p.name || '';
       const country =
         p.country ||
-        (p.countrycode && regionNames ? (regionNames as any).of(p.countrycode.toUpperCase()) : undefined);
+        (p.countrycode && regionNames
+          ? regionNames.of(p.countrycode.toUpperCase())
+          : undefined);
       const line2 = [p.state, country].filter(Boolean).join(', ');
-      const key = `${city}|||${line2}`.toLowerCase().replace(/\s+/g, ' ').trim();
+      const key = `${city}|||${line2}`
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
       return { city, line2, key };
     },
-    [regionNames]
+    [regionNames],
   );
 
   useEffect(() => {
@@ -119,7 +134,9 @@ export default function ItemForm({
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: { features: PhotonFeature[] } = await res.json();
 
-        const uniqueByOsm = Array.from(new Map(data.features.map((f) => [f.properties.osm_id, f])).values());
+        const uniqueByOsm = Array.from(
+          new Map(data.features.map((f) => [f.properties.osm_id, f])).values(),
+        );
         const seen = new Set<string>();
         const deduped: PhotonFeature[] = [];
         for (const f of uniqueByOsm) {
@@ -188,7 +205,8 @@ export default function ItemForm({
     setTagInput('');
   };
 
-  const removeTag = (v: string) => setTags((prev) => prev.filter((x) => x !== v));
+  const removeTag = (v: string) =>
+    setTags((prev) => prev.filter((x) => x !== v));
 
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
@@ -238,7 +256,11 @@ export default function ItemForm({
           aria-label={t('item_create.title')}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && canSubmit && onSubmit({ title, description, place, tags })}
+          onKeyDown={(e) =>
+            e.key === 'Enter' &&
+            canSubmit &&
+            onSubmit({ title, description, place, tags })
+          }
           placeholder={t('item_create.title')}
           className="rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 outline-none focus:border-primary dark:focus:border-primary"
         />
@@ -246,7 +268,11 @@ export default function ItemForm({
           aria-label={t('item_create.description')}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && canSubmit && onSubmit({ title, description, place, tags })}
+          onKeyDown={(e) =>
+            e.key === 'Enter' &&
+            canSubmit &&
+            onSubmit({ title, description, place, tags })
+          }
           placeholder={t('item_create.description')}
           className="rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 outline-none focus:border-primary dark:focus:border-primary"
         />
@@ -286,13 +312,22 @@ export default function ItemForm({
                     style={{ top: r.bottom, left: r.left, width: r.width }}
                   >
                     {placeLoading && (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">{t('item_create.searching')}</div>
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        {t('item_create.searching')}
+                      </div>
                     )}
                     {!placeLoading &&
                       placeResults.map((hit, i) => {
                         const p = hit.properties;
-                        const city = p.city || p.town || p.village || p.municipality || p.name;
-                        const line2 = [p.state, p.country].filter(Boolean).join(', ');
+                        const city =
+                          p.city ||
+                          p.town ||
+                          p.village ||
+                          p.municipality ||
+                          p.name;
+                        const line2 = [p.state, p.country]
+                          .filter(Boolean)
+                          .join(', ');
                         return (
                           <button
                             key={p.osm_id}
@@ -303,7 +338,9 @@ export default function ItemForm({
                             }}
                             onClick={() => choosePlace(hit)}
                             className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 dark:hover:bg-primary/10 ${
-                              i === placeIdx ? 'bg-primary/10 dark:bg-primary/10' : ''
+                              i === placeIdx
+                                ? 'bg-primary/10 dark:bg-primary/10'
+                                : ''
                             }`}
                           >
                             <div className="font-medium">{city}</div>
@@ -312,12 +349,14 @@ export default function ItemForm({
                         );
                       })}
                     {!placeLoading && placeResults.length === 0 && (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">{t('item_create.no_results')}</div>
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        {t('item_create.no_results')}
+                      </div>
                     )}
                   </div>
                 );
               })(),
-              document.body
+              document.body,
             )}
         </div>
 
@@ -334,7 +373,13 @@ export default function ItemForm({
                 className="w-4 h-4 flex items-center justify-center rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600"
                 title={t('item_create.remove_tag').replace('{tag}', tag)}
               >
-                <svg viewBox="0 0 24 24" className="w-3 h-3" stroke="currentColor" strokeWidth="3" fill="none">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-3 h-3"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  fill="none"
+                >
                   <path d="M18 6L6 18M6 6l12 12" />
                 </svg>
               </button>
@@ -344,7 +389,9 @@ export default function ItemForm({
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={handleTagKeyDown}
-            placeholder={tags.length === 0 ? t('item_create.tags_placeholder') : ''}
+            placeholder={
+              tags.length === 0 ? t('item_create.tags_placeholder') : ''
+            }
             className="flex-1 min-w-[100px] bg-transparent outline-none py-1 text-sm"
           />
         </div>
@@ -365,7 +412,9 @@ export default function ItemForm({
           <button
             type="button"
             disabled={submitting || !canSubmit}
-            onClick={() => canSubmit && onSubmit({ title, description, place, tags })}
+            onClick={() =>
+              canSubmit && onSubmit({ title, description, place, tags })
+            }
             className="w-10 h-10 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 active:scale-[0.99] disabled:opacity-60 flex items-center justify-center"
             title={submitLabel}
           >
@@ -379,7 +428,9 @@ export default function ItemForm({
           <button
             type="button"
             disabled={submitting || !canSubmit}
-            onClick={() => canSubmit && onSubmit({ title, description, place, tags })}
+            onClick={() =>
+              canSubmit && onSubmit({ title, description, place, tags })
+            }
             className="h-9 px-3 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-60"
           >
             {submitLabel}
