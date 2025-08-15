@@ -142,7 +142,6 @@ export default function ItemList({ categoryId }: PropsList) {
         const uid = u.user?.id;
         if (!uid) throw new Error(t('item_list.no_user_session'));
 
-        // Compress and convert to WebP
         const compressedFile = await imageCompression(file, {
           maxWidthOrHeight: 500,
           initialQuality: 0.8,
@@ -181,11 +180,12 @@ export default function ItemList({ categoryId }: PropsList) {
               <div className="font-medium truncate">{it.title}</div>
               <button
                 onClick={() => deleteItem(it.id)}
-                className="rounded-lg border px-2 py-1 text-destructive border-destructive/40 hover:bg-destructive/10 dark:hover:bg-destructive/10 flex items-center justify-center gap-2"
+                className="w-8 h-8 rounded-full text-destructive border border-destructive/40 hover:bg-destructive/10 dark:hover:bg-destructive/10 flex items-center justify-center"
+                title={t('item_list.delete')}
               >
                 <svg
                   viewBox="0 0 24 24"
-                  className="w-5 h-5 sm:hidden"
+                  className="w-5 h-5"
                   aria-hidden="true"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -197,9 +197,6 @@ export default function ItemList({ categoryId }: PropsList) {
                   <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
                   <path d="M10 11v6M14 11v6" />
                 </svg>
-                <span className="hidden sm:inline">
-                  {t('item_list.delete')}
-                </span>
               </button>
             </div>
 
@@ -242,7 +239,10 @@ export default function ItemList({ categoryId }: PropsList) {
             )}
 
             <div className="flex items-center gap-2">
-              <label className="inline-flex cursor-pointer items-center rounded-xl border px-3 py-2 hover:bg-primary/10 dark:hover:bg-primary/10 transition">
+              <label
+                className="w-8 h-8 flex items-center justify-center rounded-full border hover:bg-primary/10 dark:hover:bg-primary/10 transition"
+                title={t('item_list.add_image')}
+              >
                 <input
                   type="file"
                   accept="image/*"
@@ -259,26 +259,21 @@ export default function ItemList({ categoryId }: PropsList) {
                   }}
                 />
                 {busy === it.id ? (
-                  <span className="text-sm">{t('item_list.uploading')}</span>
+                  <div className="w-4 h-4 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
                 ) : (
-                  <>
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="w-5 h-5 sm:hidden"
-                      aria-hidden="true"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      fill="none"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M4 4h16v16H4z" />
-                      <path d="M12 8v8M8 12h8" />
-                    </svg>
-                    <span className="hidden sm:inline text-sm">
-                      {t('item_list.add_image')}
-                    </span>
-                  </>
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-5 h-5"
+                    aria-hidden="true"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M4 4h16v16H4z" />
+                    <path d="M12 8v8M8 12h8" />
+                  </svg>
                 )}
               </label>
             </div>
@@ -315,16 +310,25 @@ export default function ItemList({ categoryId }: PropsList) {
           <button
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
-            className="rounded-xl border px-3 py-1 disabled:opacity-50"
+            className="w-8 h-8 flex items-center justify-center rounded-full border disabled:opacity-50"
+            title={t('item_list.previous')}
           >
-            {t('item_list.previous')}
+            <svg
+              viewBox="0 0 24 24"
+              className="w-5 h-5"
+              stroke="currentColor"
+              strokeWidth="2"
+              fill="none"
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
           </button>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
             <button
               key={n}
               onClick={() => setPage(n)}
               className={
-                'rounded-xl border px-3 py-1 min-w-9 ' +
+                'w-8 h-8 flex items-center justify-center rounded-full border ' +
                 (n === page
                   ? 'bg-primary text-primary-foreground'
                   : 'hover:bg-primary/10 dark:hover:bg-primary/10')
@@ -336,9 +340,18 @@ export default function ItemList({ categoryId }: PropsList) {
           <button
             disabled={page === totalPages}
             onClick={() => setPage((p) => p + 1)}
-            className="rounded-xl border px-3 py-1 disabled:opacity-50"
+            className="w-8 h-8 flex items-center justify-center rounded-full border disabled:opacity-50"
+            title={t('item_list.next')}
           >
-            {t('item_list.next')}
+            <svg
+              viewBox="0 0 24 24"
+              className="w-5 h-5"
+              stroke="currentColor"
+              strokeWidth="2"
+              fill="none"
+            >
+              <path d="M9 18l6-6-6-6" />
+            </svg>
           </button>
         </div>
       )}
@@ -351,7 +364,7 @@ export default function ItemList({ categoryId }: PropsList) {
           >
             <Image
               src={modalImage}
-              alt="Full size"
+              alt={t('item_list.full_size_image_alt')}
               unoptimized
               width={0}
               height={0}
@@ -361,8 +374,17 @@ export default function ItemList({ categoryId }: PropsList) {
             <button
               onClick={() => setModalImage(null)}
               className="mt-4 w-10 h-10 flex items-center justify-center rounded-full bg-card text-card-foreground hover:bg-card/80 transition"
+              title={t('item_list.close_modal')}
             >
-              ✕
+              <svg
+                viewBox="0 0 24 24"
+                className="w-5 h-5"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+              >
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
             </button>
           </div>,
           document.body,
