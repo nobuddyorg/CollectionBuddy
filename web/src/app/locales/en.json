@@ -40,7 +40,8 @@
     "edit": "Edit",
     "delete": "Delete",
     "add_image": "Add image",
-    "search_placeholder": "Search by title, description, city, tags…"
+    "search_placeholder": "Search by title, description, city, tags…",
+    "edit_item": "Edit entry"
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Sign in with Google"
