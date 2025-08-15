@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
 export const metadata: Metadata = {
-  title: 'CollectionBuddy 🪙',
+  title: 'CollectionBuddy',
   description: 'Sammeln • Ordnen • Behalten',
   icons: {
     icon: [
