@@ -13,10 +13,6 @@
     "title": "Kategorie",
     "select_placeholder": "Kategorie wählen oder erstellen",
     "new_category": "Neue Kategorie",
-    "confirm_delete": "Diese Kategorie wirklich löschen?",
-    "load_error": "Kategorien konnten nicht geladen werden.",
-    "create_error": "Kategorie konnte nicht erstellt werden.",
-    "delete_error": "Kategorie konnte nicht gelöscht werden.",
     "open_category": "Kategorie öffnen"
   },
   "item_create": {
@@ -47,8 +43,5 @@
     "title_collection": "Collection",
     "title_buddy": "Buddy",
     "subtitle": "Dein digitales Sammelalbum für Münzen, Plüschtiere, Briefmarken und alles, was dir am Herzen liegt."
-  },
-  "layout": {
-    "description": "Sammeln • Ordnen • Behalten"
   }
 }
