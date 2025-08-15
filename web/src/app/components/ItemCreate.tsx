@@ -12,6 +12,7 @@ type PropsCreate = {
 export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
   const { t } = useI18n();
   const [isCreating, setIsCreating] = useState(false);
+  const [formKey, setFormKey] = useState(0);
 
   const handleCreate = useCallback(
     async (values: ItemFormValues) => {
@@ -36,6 +37,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
         if (linkError) return;
 
         onCreated();
+        setFormKey((k) => k + 1);
       } finally {
         setIsCreating(false);
       }
@@ -46,6 +48,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
   return (
     <section className="p-4 sm:p-5 space-y-3 z-70 relative">
       <ItemForm
+        key={formKey}
         initial={{ title: '', description: '', place: '', tags: [] }}
         submitting={isCreating}
         submitLabel={t('item_create.add')}
