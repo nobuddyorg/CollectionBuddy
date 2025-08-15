@@ -235,14 +235,20 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
         .from('categories')
         .select('id,name');
       if (error) throw error;
-      setCats((data as Category[]) ?? []);
+      const catsData = (data as Category[]) ?? [];
+      setCats(catsData);
+
+      if (catsData.length === 1) {
+        onSelect(catsData[0].id);
+        setExpanded(false);
+      }
     } catch (e) {
       console.error(e);
       alert(t('category_select.loadError'));
     } finally {
       setIsLoading(false);
     }
-  }, [t]);
+  }, [t, onSelect]);
 
   useEffect(() => {
     loadCats();

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { supabase } from '../lib/supabase';
 import { Item } from '../types';
@@ -36,12 +36,22 @@ export default function ItemList({ categoryId }: PropsList) {
   const [modalImage, setModalImage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const reqSeq = useRef(0);
+
   // edit modal
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<null | {
     id: string;
     values: ItemFormValues;
   }>(null);
+
+  const [q, setQ] = useState('');
+  const [qDebounced, setQDebounced] = useState('');
+  useEffect(() => {
+    const id = setTimeout(() => setQDebounced(q.trim()), 200);
+    return () => clearTimeout(id);
+  }, [q]);
+  useEffect(() => setPage(1), [categoryId, qDebounced]);
 
   useEffect(() => {
     supabase.auth
@@ -52,20 +62,38 @@ export default function ItemList({ categoryId }: PropsList) {
   useEffect(() => setPage(1), [categoryId]);
 
   const loadItems = useCallback(async () => {
-    setLoading(true);
+    const mySeq = ++reqSeq.current;
+    if (mySeq === reqSeq.current) setLoading(true);
+
     const from = (page - 1) * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
+    const needle = qDebounced.trim();
 
-    const { data, error, count } = await supabase
+    // build base query first (no order/range yet)
+    let query = supabase
       .from('items')
       .select(
         'id,title,description,place,tags,item_categories!inner(category_id)',
         { count: 'exact' },
       )
-      .eq('item_categories.category_id', categoryId)
+      .eq('item_categories.category_id', categoryId);
+
+    if (needle) {
+      // optional: escape % and _ so users can't inject wildcards
+      const esc = needle.replace(/[%_]/g, '\\$&');
+      const like = `%${esc}%`;
+      query = query.or(
+        `title.ilike.${like},description.ilike.${like},place.ilike.${like},tags_text.ilike.${like}`,
+      );
+    }
+
+    const { data, error, count } = await query
       .order('created_at', { ascending: false })
       .range(from, to)
       .returns<ItemRow[]>();
+
+    // ignore stale responses
+    if (mySeq !== reqSeq.current) return;
 
     setLoading(false);
     if (error) return;
@@ -80,7 +108,7 @@ export default function ItemList({ categoryId }: PropsList) {
       })),
     );
     setTotal(count || 0);
-  }, [categoryId, page]);
+  }, [categoryId, page, qDebounced]);
 
   useEffect(() => {
     void loadItems();
@@ -219,6 +247,13 @@ export default function ItemList({ categoryId }: PropsList) {
 
   return (
     <div className="space-y-4">
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder={t('item_list.search_placeholder')}
+        className="w-full rounded-xl border bg-background px-3 py-2 shadow-sm"
+      />
+
       <ul className="grid sm:grid-cols-2 lg:grid-cols-2 gap-3">
         {items.map((it) => (
           <li
