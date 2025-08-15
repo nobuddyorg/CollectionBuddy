@@ -329,7 +329,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
               <button
                 type="button"
                 onClick={() => removeTag(tag)}
-                className="w-4 h-4 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:brightness-110"
+                className="w-4 h-4 flex items-center justify-center rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600"
                 title={t('item_create.remove_tag').replace('{tag}', tag)}
               >
                 <svg
@@ -358,7 +358,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
         <button
           onClick={createItem}
           disabled={isCreating || !canSubmit}
-          className="w-10 h-10 rounded-full bg-primary text-primary-foreground hover:brightness-110 active:scale-[0.99] disabled:opacity-60 flex items-center justify-center"
+          className="w-10 h-10 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 active:scale-[0.99] disabled:opacity-60 flex items-center justify-center"
           title={t('item_create.add')}
         >
           {isCreating ? (

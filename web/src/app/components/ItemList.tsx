@@ -178,26 +178,66 @@ export default function ItemList({ categoryId }: PropsList) {
           >
             <div className="flex justify-between items-center gap-3">
               <div className="font-medium truncate">{it.title}</div>
-              <button
-                onClick={() => deleteItem(it.id)}
-                className="w-8 h-8 rounded-full bg-destructive text-destructive-foreground hover:brightness-110 flex items-center justify-center"
-                title={t('item_list.delete')}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-5 h-5"
-                  aria-hidden="true"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  fill="none"
-                  strokeLinecap="round"
+              <div className="flex items-center gap-2">
+                <label
+                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 transition cursor-pointer"
+                  title={t('item_list.add_image')}
                 >
-                  <path d="M3 6h18" />
-                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
-                  <path d="M10 11v6M14 11v6" />
-                </svg>
-              </button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={!userId || busy === it.id}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      setImages((prev) => ({
+                        ...prev,
+                        [it.id]: [URL.createObjectURL(f), ...(prev[it.id] || [])],
+                      }));
+                      void uploadImage(it.id, f);
+                    }}
+                  />
+                  {busy === it.id ? (
+                    <div className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />
+                  ) : (
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-5 h-5"
+                      aria-hidden="true"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M4 4h16v16H4z" />
+                      <path d="M12 8v8M8 12h8" />
+                    </svg>
+                  )}
+                </label>
+
+                <button
+                  onClick={() => deleteItem(it.id)}
+                  className="w-9 h-9 rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600 flex items-center justify-center"
+                  title={t('item_list.delete')}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-5 h-5"
+                    aria-hidden="true"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    fill="none"
+                    strokeLinecap="round"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
+                    <path d="M10 11v6M14 11v6" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {it.description && (
@@ -238,46 +278,6 @@ export default function ItemList({ categoryId }: PropsList) {
               </div>
             )}
 
-            <div className="flex items-center gap-2">
-              <label
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:brightness-110 transition"
-                title={t('item_list.add_image')}
-              >
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={!userId || busy === it.id}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    setImages((prev) => ({
-                      ...prev,
-                      [it.id]: [URL.createObjectURL(f), ...(prev[it.id] || [])],
-                    }));
-                    void uploadImage(it.id, f);
-                  }}
-                />
-                {busy === it.id ? (
-                  <div className="w-4 h-4 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
-                ) : (
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="w-5 h-5"
-                    aria-hidden="true"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M4 4h16v16H4z" />
-                    <path d="M12 8v8M8 12h8" />
-                  </svg>
-                )}
-              </label>
-            </div>
-
             {images[it.id]?.length ? (
               <div className="grid grid-cols-2 gap-2">
                 {images[it.id].map((url, idx) => (
@@ -310,7 +310,7 @@ export default function ItemList({ categoryId }: PropsList) {
           <button
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:brightness-110 disabled:opacity-50"
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
             title={t('item_list.previous')}
           >
             <svg
@@ -328,10 +328,10 @@ export default function ItemList({ categoryId }: PropsList) {
               key={n}
               onClick={() => setPage(n)}
               className={
-                'w-8 h-8 flex items-center justify-center rounded-full ' +
+                'min-w-9 h-9 px-2 flex items-center justify-center rounded-xl shadow-sm ' +
                 (n === page
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-primary/50 text-primary-foreground hover:bg-primary')
+                  : 'bg-primary/60 text-primary-foreground hover:bg-primary')
               }
             >
               {n}
@@ -340,7 +340,7 @@ export default function ItemList({ categoryId }: PropsList) {
           <button
             disabled={page === totalPages}
             onClick={() => setPage((p) => p + 1)}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:brightness-110 disabled:opacity-50"
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
             title={t('item_list.next')}
           >
             <svg
@@ -373,7 +373,7 @@ export default function ItemList({ categoryId }: PropsList) {
             />
             <button
               onClick={() => setModalImage(null)}
-              className="mt-4 w-10 h-10 flex items-center justify-center rounded-full bg-card text-card-foreground hover:bg-card/80 transition"
+              className="mt-4 w-10 h-10 flex items-center justify-center rounded-xl bg-card text-card-foreground hover:bg-card/80 transition"
               title={t('item_list.close_modal')}
             >
               <svg

@@ -148,7 +148,7 @@ export default function Page() {
             <h2 className="text-base font-semibold">{t('page.entries')}</h2>
             <button
               onClick={() => setOpen(true)}
-              className="rounded-lg px-3 py-1.5 bg-primary text-primary-foreground shadow-sm hover:brightness-110"
+              className="rounded-xl px-3 py-1.5 bg-primary text-primary-foreground shadow-sm hover:brightness-110"
             >
               +
             </button>
