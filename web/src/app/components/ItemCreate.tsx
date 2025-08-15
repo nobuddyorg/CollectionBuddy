@@ -194,7 +194,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
   const canSubmit = useMemo(() => !!title.trim(), [title]);
 
   return (
-    <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur p-4 sm:p-5 shadow-sm space-y-3 z-70 relative">
+    <section className="rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur p-4 sm:p-5 shadow-sm space-y-3 z-70 relative">
       <h2 className="text-base font-semibold mb-1">
         {t('item_create.new_entry')}
       </h2>
@@ -206,7 +206,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && createItem()}
           placeholder={t('item_create.title')}
-          className="rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
+          className="rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 outline-none focus:border-primary dark:focus:border-primary"
         />
         <input
           aria-label={t('item_create.description')}
@@ -214,7 +214,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
           onChange={(e) => setDescription(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && createItem()}
           placeholder={t('item_create.description')}
-          className="rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
+          className="rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 outline-none focus:border-primary dark:focus:border-primary"
         />
       </div>
 
@@ -236,13 +236,13 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
             onFocus={() => setPlaceFocus(true)}
             onKeyDown={onPlaceKeyDown}
             placeholder={t('item_create.place_placeholder')}
-            className="w-full rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
+            className="w-full rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 outline-none focus:border-primary dark:focus:border-primary"
             autoComplete="off"
           />
           {placeFocus && (placeLoading || placeResults.length > 0) && (
-            <div className="absolute mt-1 w-full rounded-xl border bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
+            <div className="absolute mt-1 w-full rounded-xl border bg-card dark:bg-card shadow-lg overflow-hidden">
               {placeLoading && (
-                <div className="px-3 py-2 text-sm opacity-70">
+                <div className="px-3 py-2 text-sm text-muted-foreground">
                   {t('item_create.searching')}
                 </div>
               )}
@@ -258,9 +258,9 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => choosePlace(hit)}
-                      className={`block w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 ${
+                      className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 dark:hover:bg-primary/10 ${
                         i === placeIdx
-                          ? 'bg-neutral-100 dark:bg-neutral-800'
+                          ? 'bg-primary/10 dark:bg-primary/10'
                           : ''
                       }`}
                     >
@@ -270,7 +270,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
                   );
                 })}
               {!placeLoading && placeResults.length === 0 && (
-                <div className="px-3 py-2 text-sm opacity-70">
+                <div className="px-3 py-2 text-sm text-muted-foreground">
                   {t('item_create.no_results')}
                 </div>
               )}
@@ -278,17 +278,17 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
           )}
         </div>
 
-        <div className="rounded-xl border bg-white/60 dark:bg-neutral-800/70 px-2 py-1 flex flex-wrap items-center gap-1 focus-within:border-neutral-400 dark:focus-within:border-neutral-600">
+        <div className="rounded-xl border bg-card/60 dark:bg-card/70 px-2 py-1 flex flex-wrap items-center gap-1 focus-within:border-primary dark:focus-within:border-primary">
           {tags.map((tag) => (
             <span
               key={tag}
-              className="flex items-center gap-1 bg-neutral-200 dark:bg-neutral-700 rounded-full px-2 py-0.5 text-sm"
+              className="flex items-center gap-1 bg-primary/10 dark:bg-primary/20 text-primary rounded-full px-2 py-0.5 text-sm"
             >
               {tag}
               <button
                 type="button"
                 onClick={() => removeTag(tag)}
-                className="text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
+                className="text-muted-foreground hover:text-foreground"
                 aria-label={t('item_create.remove_tag').replace('{tag}', tag)}
               >
                 ×
@@ -311,7 +311,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
         <button
           onClick={createItem}
           disabled={isCreating || !canSubmit}
-          className="rounded-xl px-4 py-2 bg-black text-white hover:brightness-110 active:scale-[0.99] disabled:opacity-60 flex items-center justify-center gap-2"
+          className="rounded-xl px-4 py-2 bg-primary text-primary-foreground hover:brightness-110 active:scale-[0.99] disabled:opacity-60 flex items-center justify-center gap-2"
         >
           {isCreating ? (
             t('item_create.adding')

@@ -175,13 +175,13 @@ export default function ItemList({ categoryId }: PropsList) {
         {items.map((it) => (
           <li
             key={it.id}
-            className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur p-3 shadow-sm space-y-3"
+            className="rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur p-3 shadow-sm space-y-3"
           >
             <div className="flex justify-between items-center gap-3">
               <div className="font-medium truncate">{it.title}</div>
               <button
                 onClick={() => deleteItem(it.id)}
-                className="rounded-lg border px-2 py-1 text-red-600 border-red-500/40 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center gap-2"
+                className="rounded-lg border px-2 py-1 text-destructive border-destructive/40 hover:bg-destructive/10 dark:hover:bg-destructive/10 flex items-center justify-center gap-2"
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -204,13 +204,13 @@ export default function ItemList({ categoryId }: PropsList) {
             </div>
 
             {it.description && (
-              <div className="text-sm opacity-80 line-clamp-3">
+              <div className="text-sm text-muted-foreground line-clamp-3">
                 {it.description}
               </div>
             )}
 
             {it.place && (
-              <div className="flex items-center gap-2 text-sm opacity-80">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <svg
                   viewBox="0 0 24 24"
                   className="w-4 h-4 shrink-0 opacity-80"
@@ -233,7 +233,7 @@ export default function ItemList({ categoryId }: PropsList) {
                 {it.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 bg-neutral-200/80 dark:bg-neutral-700/70 rounded-full px-2 py-0.5 text-xs"
+                    className="inline-flex items-center gap-1 bg-primary/10 dark:bg-primary/20 text-primary rounded-full px-2 py-0.5 text-xs"
                   >
                     {tag}
                   </span>
@@ -242,7 +242,7 @@ export default function ItemList({ categoryId }: PropsList) {
             )}
 
             <div className="flex items-center gap-2">
-              <label className="inline-flex cursor-pointer items-center rounded-xl border px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 transition">
+              <label className="inline-flex cursor-pointer items-center rounded-xl border px-3 py-2 hover:bg-primary/10 dark:hover:bg-primary/10 transition">
                 <input
                   type="file"
                   accept="image/*"
@@ -302,7 +302,7 @@ export default function ItemList({ categoryId }: PropsList) {
                 ))}
               </div>
             ) : (
-              <div className="text-sm opacity-60">
+              <div className="text-sm text-muted-foreground">
                 {loading ? t('item_list.loading') : t('item_list.no_images')}
               </div>
             )}
@@ -326,8 +326,8 @@ export default function ItemList({ categoryId }: PropsList) {
               className={
                 'rounded-xl border px-3 py-1 min-w-9 ' +
                 (n === page
-                  ? 'bg-black text-white'
-                  : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/60')
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-primary/10 dark:hover:bg-primary/10')
               }
             >
               {n}
@@ -346,7 +346,7 @@ export default function ItemList({ categoryId }: PropsList) {
       {modalImage &&
         createPortal(
           <div
-            className="fixed inset-0 z-90 flex flex-col items-center justify-center bg-white dark:bg-black bg-opacity-90"
+            className="fixed inset-0 z-90 flex flex-col items-center justify-center bg-background/90"
             onClick={() => setModalImage(null)}
           >
             <Image
@@ -360,7 +360,7 @@ export default function ItemList({ categoryId }: PropsList) {
             />
             <button
               onClick={() => setModalImage(null)}
-              className="mt-4 w-10 h-10 flex items-center justify-center rounded-full bg-neutral-300 dark:bg-neutral-700 text-black dark:text-white hover:bg-neutral-400 dark:hover:bg-neutral-600 transition"
+              className="mt-4 w-10 h-10 flex items-center justify-center rounded-full bg-card text-card-foreground hover:bg-card/80 transition"
             >
               ✕
             </button>

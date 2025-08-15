@@ -34,7 +34,7 @@ function CategorySelectDropdown({
           if (v) setExpanded(false);
         }}
         disabled={isLoading}
-        className="w-full appearance-none rounded-xl border px-3 py-2 pr-10 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600 transition"
+        className="w-full appearance-none rounded-xl border px-3 py-2 pr-10 bg-card/60 dark:bg-card/70 outline-none focus:border-primary dark:focus:border-primary transition"
         aria-label={t('category_select.select_placeholder')}
       >
         <option value="">{t('category_select.select_placeholder')}</option>
@@ -73,7 +73,7 @@ function CategoryInput({
         if (e.key === 'Enter') createCategory();
         if (e.key === 'Escape') setExpanded(false);
       }}
-      className="w-full rounded-xl border px-3 py-2 bg-white/60 dark:bg-neutral-800/70 outline-none focus:border-neutral-400 dark:focus:border-neutral-600"
+      className="w-full rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 outline-none focus:border-primary dark:focus:border-primary"
     />
   );
 }
@@ -93,7 +93,7 @@ function AddButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center bg-black text-white hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
+      className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center bg-primary text-primary-foreground hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
     >
       {isCreating ? (
         '…'
@@ -123,7 +123,7 @@ function SetButton({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button
       onClick={onClick}
-      className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center border bg-white/60 dark:bg-neutral-800/70 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+      className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center border bg-card/60 dark:bg-card/70 hover:bg-primary/10 dark:hover:bg-primary/10"
     >
       <svg
         viewBox="0 0 24 24"
@@ -164,7 +164,7 @@ function DeleteButtonWithLabel({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center border text-red-600 border-red-500/40 bg-white/60 dark:bg-neutral-800/70 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
+      className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center border text-destructive border-destructive/40 bg-card/60 dark:bg-card/70 hover:bg-destructive/10 dark:hover:bg-destructive/10 disabled:opacity-60"
     >
       <svg
         viewBox="0 0 24 24"
@@ -195,7 +195,7 @@ function ExpandButton({
   return (
     <button
       onClick={onClick}
-      className="rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center border bg-white/60 dark:bg-neutral-800/70 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+      className="rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center border bg-card/60 dark:bg-card/70 hover:bg-primary/10 dark:hover:bg-primary/10"
       aria-label={label}
       title={label}
     >
@@ -310,7 +310,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
 
   if (!expanded && selected) {
     return (
-      <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 flex items-center justify-between">
+      <section className="rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur shadow-sm p-4 flex items-center justify-between">
         <CategoryText title={t('category_select.title')} name={selected.name} />
         <div className="flex items-center gap-2">
           <ExpandButton
@@ -323,7 +323,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
   }
 
   return (
-    <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 space-y-3">
+    <section className="rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur shadow-sm p-4 space-y-3">
       <h2 className="text-base font-semibold">{t('category_select.title')}</h2>
 
       <CategorySelectDropdown
