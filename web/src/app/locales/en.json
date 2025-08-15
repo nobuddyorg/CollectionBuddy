@@ -13,10 +13,6 @@
     "title": "Category",
     "select_placeholder": "Select or create category",
     "new_category": "New category",
-    "confirm_delete": "Really delete this category?",
-    "load_error": "Could not load categories.",
-    "create_error": "Could not create category.",
-    "delete_error": "Could not delete category.",
     "open_category": "Open category"
   },
   "item_create": {
@@ -47,8 +43,5 @@
     "title_collection": "Collection",
     "title_buddy": "Buddy",
     "subtitle": "Your digital scrapbook for coins, stuffed animals, stamps and everything you love."
-  },
-  "layout": {
-    "description": "Collect • Organize • Keep"
   }
 }
