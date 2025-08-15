@@ -8,6 +8,7 @@ import ItemCreate from './components/ItemCreate';
 import ItemList from './components/ItemList';
 import Header from './components/Header';
 import { useI18n } from './hooks/useI18n';
+import { useRouter } from 'next/navigation';
 
 export default function Page() {
   const { user, loading } = useSession();
@@ -16,10 +17,23 @@ export default function Page() {
   );
   const [refreshToken, setRefreshToken] = useState(0);
   const { t } = useI18n();
+  const router = useRouter();
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
-  }, []);
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) {
+        console.error('Sign-out failed:', error.message);
+      }
+
+      setTimeout(() => {
+        router.replace('/login');
+      }, 100);
+    } catch (err) {
+      console.error('Unexpected error during sign-out:', err);
+      router.replace('/login');
+    }
+  }, [router]);
 
   if (loading) return <LoadingOverlay />;
   if (!user) return null;

@@ -23,13 +23,28 @@ export function useSession() {
 
     const handleSession = (session: Session | null) => {
       if (!active) return;
+
       const nextUser = asUser(session?.user ?? null);
       setUser(nextUser);
       setLoading(false);
-      if (!nextUser) router.replace('/login');
     };
 
-    supabase.auth.getSession().then(({ data }) => handleSession(data.session));
+    const fetchSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error fetching session:', error.message);
+          handleSession(null);
+        } else {
+          handleSession(data.session);
+        }
+      } catch (err) {
+        console.error('Unexpected error fetching session:', err);
+        handleSession(null);
+      }
+    };
+
+    fetchSession();
 
     const { data: sub } = supabase.auth.onAuthStateChange(
       (_e: AuthChangeEvent, s: Session | null) => handleSession(s),
@@ -39,7 +54,14 @@ export function useSession() {
       active = false;
       sub.subscription.unsubscribe();
     };
-  }, [router]);
+  }, []);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      console.warn('Session invalid or expired. Redirecting to login.');
+      router.replace('/login');
+    }
+  }, [user, loading, router]);
 
   return { user, loading };
 }
