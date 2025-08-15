@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import LoadingOverlay from './LoadingOverlay';
 import { useI18n } from '../hooks/useI18n';
+import { Button } from './Button';
 
 export default function GoogleSignInButton({
   onClick,
@@ -22,11 +23,12 @@ export default function GoogleSignInButton({
 
   return (
     <>
-      <button
+      <Button
+        variant="neutral"
         onClick={handleClick}
         disabled={loading}
         aria-label={t('google_sign_in_button.sign_in_with_google')}
-        className="relative flex items-center justify-center rounded-md border border-[#747775] dark:border-neutral-500 bg-white hover:bg-[#f8f9fa] active:bg-[#f1f3f4] dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:active:bg-neutral-600 px-4 h-12 shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+        className="relative flex items-center justify-center border border-[#747775] dark:border-neutral-500 bg-white hover:bg-[#f8f9fa] active:bg-[#f1f3f4] dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:active:bg-neutral-600 px-4 h-12 shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
         style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
       >
         {!loading && (
@@ -58,7 +60,7 @@ export default function GoogleSignInButton({
             </span>
           </>
         )}
-      </button>
+      </Button>
 
       {loading && <LoadingOverlay />}
     </>

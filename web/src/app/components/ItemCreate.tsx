@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useI18n } from '../hooks/useI18n';
+import { Button } from './Button';
 
 type PropsCreate = {
   categoryId: string;
@@ -293,18 +294,19 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
                       const city = p.city || p.town || p.village || p.municipality || p.name;
                       const line2 = [p.state, p.country].filter(Boolean).join(', ');
                       return (
-                        <button
+                        <Button
                           key={p.osm_id}
+                          variant="neutral"
                           type="button"
                           onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                           onClick={() => choosePlace(hit)}
-                          className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 dark:hover:bg-primary/10 ${
+                          className={`w-full text-left justify-start px-3 py-2 text-sm ${
                             i === placeIdx ? 'bg-primary/10 dark:bg-primary/10' : ''
                           }`}
                         >
                           <div className="font-medium">{city}</div>
                           <div className="opacity-70">{line2}</div>
-                        </button>
+                        </Button>
                       );
                     })}
                     {!placeLoading && placeResults.length === 0 && (
@@ -326,10 +328,12 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
               className="flex items-center gap-1 bg-primary/10 dark:bg-primary/20 text-primary rounded-full px-2 py-0.5 text-sm"
             >
               {tag}
-              <button
+              <Button
                 type="button"
+                variant="destructive"
+                size="icon"
                 onClick={() => removeTag(tag)}
-                className="w-4 h-4 flex items-center justify-center rounded-full bg-black/10 dark:bg-white/10 text-muted-foreground hover:text-foreground"
+                className="w-4 h-4"
                 title={t('item_create.remove_tag').replace('{tag}', tag)}
               >
                 <svg
@@ -341,7 +345,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
                 >
                   <path d="M18 6L6 18M6 6l12 12" />
                 </svg>
-              </button>
+              </Button>
             </span>
           ))}
           <input
@@ -355,10 +359,10 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
       </div>
 
       <div className="flex justify-end">
-        <button
+        <Button
           onClick={createItem}
           disabled={isCreating || !canSubmit}
-          className="w-10 h-10 rounded-full bg-primary text-primary-foreground hover:brightness-110 active:scale-[0.99] disabled:opacity-60 flex items-center justify-center"
+          size="icon"
           title={t('item_create.add')}
         >
           {isCreating ? (
@@ -378,7 +382,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           )}
-        </button>
+        </Button>
       </div>
     </section>
   );
