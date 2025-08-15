@@ -150,7 +150,7 @@ export default function Page() {
               onClick={() => setOpen(true)}
               className="rounded-lg px-3 py-1.5 bg-primary text-primary-foreground shadow-sm hover:brightness-110"
             >
-              + {t('item_create.new_entry')}
+              +
             </button>
           </div>
 
@@ -177,7 +177,7 @@ export default function Page() {
   open={open}
   onOpenChange={setOpen}
   title={t('item_create.new_entry')}
-  closeLabel={t('category_select.cancel')}
+  closeLabel='X'
 >
   <ItemCreate categoryId={selectedCategoryId} onCreated={handleCreated} />
 </CenteredModal>

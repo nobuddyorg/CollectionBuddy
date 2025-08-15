@@ -226,8 +226,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
   const canSubmit = useMemo(() => !!title.trim(), [title]);
 
   return (
-    <section className="rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur p-4 sm:p-5 shadow-sm space-y-3 z-70 relative">
-      <h2 className="text-base font-semibold mb-1">{t('item_create.new_entry')}</h2>
+    <section className="p-4 sm:p-5 space-y-3 z-70 relative">
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <input
