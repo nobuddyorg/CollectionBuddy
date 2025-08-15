@@ -92,9 +92,15 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
           signal: ctl.signal,
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
         const data: { features: PhotonFeature[] } = await res.json();
 
-        setPlaceResults(data.features);
+        const uniqueFeatures = Array.from(
+          new Map(data.features.map((f) => [f.properties.osm_id, f])).values(),
+        );
+
+        setPlaceResults(uniqueFeatures);
+
         setPlaceIdx(-1);
       } catch {
         setPlaceResults([]);
@@ -234,7 +240,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
             autoComplete="off"
           />
           {placeFocus && (placeLoading || placeResults.length > 0) && (
-            <div className="absolute z-[9999] mt-1 w-full rounded-xl border bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
+            <div className="absolute mt-1 w-full rounded-xl border bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
               {placeLoading && (
                 <div className="px-3 py-2 text-sm opacity-70">
                   {t('item_create.searching')}

@@ -349,10 +349,10 @@ export default function ItemList({ categoryId }: PropsList) {
           <Image
             src={modalImage}
             alt="Full size"
-            width={1000}
-            height={1000}
+            fill
+            sizes="100vw"
             unoptimized
-            className="max-w-full max-h-full rounded-xl shadow-lg"
+            className="w-full h-auto rounded-xl shadow-lg object-contain"
           />
         </div>
       )}
