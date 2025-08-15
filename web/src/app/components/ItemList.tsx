@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { Item } from '../types';
 import { useI18n } from '../hooks/useI18n';
 import imageCompression from 'browser-image-compression';
+import { createPortal } from 'react-dom';
 
 type PropsList = { categoryId: string };
 
@@ -341,21 +342,31 @@ export default function ItemList({ categoryId }: PropsList) {
           </button>
         </div>
       )}
-      {modalImage && (
-        <div
-          className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center"
-          onClick={() => setModalImage(null)}
-        >
-          <Image
-            src={modalImage}
-            alt="Full size"
-            width={1000}
-            height={1000}
-            unoptimized
-            className="max-w-full max-h-full rounded-xl shadow-lg"
-          />
-        </div>
-      )}
+
+      {modalImage &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-90 flex flex-col items-center justify-center bg-white dark:bg-black bg-opacity-90"
+            onClick={() => setModalImage(null)}
+          >
+            <Image
+              src={modalImage}
+              alt="Full size"
+              unoptimized
+              width={0}
+              height={0}
+              sizes="100vw"
+              className="max-w-[500px] max-h-[500px] w-auto h-auto object-contain rounded-xl shadow-lg"
+            />
+            <button
+              onClick={() => setModalImage(null)}
+              className="mt-4 w-10 h-10 flex items-center justify-center rounded-full bg-neutral-300 dark:bg-neutral-700 text-black dark:text-white hover:bg-neutral-400 dark:hover:bg-neutral-600 transition"
+            >
+              ✕
+            </button>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

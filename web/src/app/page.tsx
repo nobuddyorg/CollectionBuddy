@@ -41,7 +41,7 @@ export default function Page() {
               onCreated={() => setRefreshToken((k) => k + 1)}
             />
 
-            <section className="relative z-[99999] rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 sm:p-5">
+            <section className="relative z-60 rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 sm:p-5">
               <h2 className="text-base font-semibold mb-3">
                 {t('page.entries')}
               </h2>
