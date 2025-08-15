@@ -259,9 +259,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => choosePlace(hit)}
                       className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 dark:hover:bg-primary/10 ${
-                        i === placeIdx
-                          ? 'bg-primary/10 dark:bg-primary/10'
-                          : ''
+                        i === placeIdx ? 'bg-primary/10 dark:bg-primary/10' : ''
                       }`}
                     >
                       <div className="font-medium">{city}</div>
