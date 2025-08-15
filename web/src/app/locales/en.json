@@ -13,15 +13,11 @@
     "title": "Category",
     "select_placeholder": "Select or create category",
     "new_category": "New category",
-    "add": "Add",
-    "delete": "Delete category",
     "confirm_delete": "Really delete this category?",
     "load_error": "Could not load categories.",
     "create_error": "Could not create category.",
     "delete_error": "Could not delete category.",
-    "open_category": "Open category",
-    "set": "Set",
-    "cancel": "Cancel"
+    "open_category": "Open category"
   },
   "item_create": {
     "new_entry": "New entry",
@@ -31,21 +27,16 @@
     "searching": "Searching…",
     "no_results": "No results",
     "remove_tag": "Remove tag {tag}",
-    "tags_placeholder": "Enter tags… (Enter/Comma)",
-    "adding": "Adding…",
-    "add": "Add"
+    "tags_placeholder": "Enter tags… (Enter/Comma)"
   },
   "item_list": {
     "confirm_delete": "Delete this item?",
-    "delete": "Delete",
     "no_user_session": "No user session",
-    "uploading": "Uploading…",
-    "add_image": "Add image",
     "image_alt": "Image {idx}",
+    "full_size_image_alt": "Full size image",
+    "close_modal": "Close",
     "loading": "Loading…",
-    "no_images": "No images",
-    "previous": "Previous",
-    "next": "Next"
+    "no_images": "No images"
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Sign in with Google"

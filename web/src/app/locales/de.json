@@ -13,15 +13,11 @@
     "title": "Kategorie",
     "select_placeholder": "Kategorie wählen oder erstellen",
     "new_category": "Neue Kategorie",
-    "add": "Hinzufügen",
-    "delete": "Kategorie löschen",
     "confirm_delete": "Diese Kategorie wirklich löschen?",
     "load_error": "Kategorien konnten nicht geladen werden.",
     "create_error": "Kategorie konnte nicht erstellt werden.",
     "delete_error": "Kategorie konnte nicht gelöscht werden.",
-    "open_category": "Kategorie öffnen",
-    "set": "Festlegen",
-    "cancel": "Abbrechen"
+    "open_category": "Kategorie öffnen"
   },
   "item_create": {
     "new_entry": "Neuer Eintrag",
@@ -31,21 +27,16 @@
     "searching": "Suche…",
     "no_results": "Keine Treffer",
     "remove_tag": "Tag {tag} entfernen",
-    "tags_placeholder": "Tags eingeben… (Enter/Komma)",
-    "adding": "Füge hinzu…",
-    "add": "Hinzufügen"
+    "tags_placeholder": "Tags eingeben… (Enter/Komma)"
   },
   "item_list": {
     "confirm_delete": "Diesen Gegenstand löschen?",
-    "delete": "Löschen",
     "no_user_session": "Keine Benutzersitzung",
-    "uploading": "Lade hoch…",
-    "add_image": "Bild hinzufügen",
     "image_alt": "Bild {idx}",
+    "full_size_image_alt": "Vollbild",
+    "close_modal": "Schließen",
     "loading": "Wird geladen…",
-    "no_images": "Keine Bilder",
-    "previous": "Zurück",
-    "next": "Weiter"
+    "no_images": "Keine Bilder"
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Mit Google anmelden"

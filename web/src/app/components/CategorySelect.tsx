@@ -93,27 +93,25 @@ function AddButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center bg-primary text-primary-foreground hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
+      className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
+      title={label}
     >
       {isCreating ? (
-        '…'
+        <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
       ) : (
-        <>
-          <svg
-            viewBox="0 0 24 24"
-            className="w-5 h-5 sm:hidden"
-            aria-hidden="true"
-            stroke="currentColor"
-            strokeWidth="2"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          <span className="hidden sm:inline">{label}</span>
-        </>
+        <svg
+          viewBox="0 0 24 24"
+          className="w-5 h-5"
+          aria-hidden="true"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
       )}
     </button>
   );
@@ -123,11 +121,12 @@ function SetButton({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button
       onClick={onClick}
-      className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center border bg-card/60 dark:bg-card/70 hover:bg-primary/10 dark:hover:bg-primary/10"
+      className="w-8 h-8 flex items-center justify-center rounded-full border bg-card/60 dark:bg-card/70 hover:bg-primary/10 dark:hover:bg-primary/10"
+      title={label}
     >
       <svg
         viewBox="0 0 24 24"
-        className="w-5 h-5 sm:hidden"
+        className="w-5 h-5"
         aria-hidden="true"
         stroke="currentColor"
         strokeWidth="2"
@@ -137,7 +136,6 @@ function SetButton({ onClick, label }: { onClick: () => void; label: string }) {
       >
         <path d="M20 6L9 17l-5-5" />
       </svg>
-      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }
@@ -164,11 +162,12 @@ function DeleteButtonWithLabel({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="rounded-xl w-10 h-10 sm:w-auto sm:px-4 sm:py-2 flex items-center justify-center border text-destructive border-destructive/40 bg-card/60 dark:bg-card/70 hover:bg-destructive/10 dark:hover:bg-destructive/10 disabled:opacity-60"
+      className="w-8 h-8 flex items-center justify-center rounded-full border text-destructive border-destructive/40 bg-card/60 dark:bg-card/70 hover:bg-destructive/10 dark:hover:bg-destructive/10 disabled:opacity-60"
+      title={label}
     >
       <svg
         viewBox="0 0 24 24"
-        className="w-5 h-5 sm:hidden"
+        className="w-5 h-5"
         aria-hidden="true"
         stroke="currentColor"
         strokeWidth="2"
@@ -180,7 +179,6 @@ function DeleteButtonWithLabel({
         <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
         <path d="M10 11v6M14 11v6" />
       </svg>
-      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }
