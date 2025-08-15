@@ -5,7 +5,9 @@ import { supabase } from '../lib/supabase';
 import { Item } from '../types';
 import { useI18n } from '../hooks/useI18n';
 import imageCompression from 'browser-image-compression';
-import { createPortal } from 'react-dom';
+import ItemForm, { ItemFormValues } from '../components/ItemForm';
+import CenteredModal from '../components/CenteredModal';
+import ReactDOM from 'react-dom';
 
 type PropsList = { categoryId: string };
 
@@ -21,9 +23,7 @@ type ItemRow = {
 const PAGE_SIZE = 6;
 
 export default function ItemList({ categoryId }: PropsList) {
-  const [items, setItems] = useState<
-    (Item & { place?: string | null; tags?: string[] | null })[]
-  >([]);
+  const [items, setItems] = useState<(Item & { place?: string | null; tags?: string[] | null })[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
@@ -33,15 +33,15 @@ export default function ItemList({ categoryId }: PropsList) {
   const { t } = useI18n();
   const [modalImage, setModalImage] = useState<string | null>(null);
 
-  useEffect(() => {
-    supabase.auth
-      .getUser()
-      .then(({ data }) => setUserId(data.user?.id ?? null));
-  }, []);
+  // edit modal
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState<null | { id: string; values: ItemFormValues }>(null);
 
   useEffect(() => {
-    setPage(1);
-  }, [categoryId]);
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+  }, []);
+
+  useEffect(() => setPage(1), [categoryId]);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -50,10 +50,7 @@ export default function ItemList({ categoryId }: PropsList) {
 
     const { data, error, count } = await supabase
       .from('items')
-      .select(
-        'id,title,description,place,tags,item_categories!inner(category_id)',
-        { count: 'exact' },
-      )
+      .select('id,title,description,place,tags,item_categories!inner(category_id)', { count: 'exact' })
       .eq('item_categories.category_id', categoryId)
       .order('created_at', { ascending: false })
       .range(from, to)
@@ -74,9 +71,7 @@ export default function ItemList({ categoryId }: PropsList) {
     setTotal(count || 0);
   }, [categoryId, page]);
 
-  useEffect(() => {
-    void loadItems();
-  }, [loadItems]);
+  useEffect(() => { void loadItems(); }, [loadItems]);
 
   const refreshItemImages = useCallback(async (itemId: string) => {
     const { data: u } = await supabase.auth.getUser();
@@ -84,13 +79,9 @@ export default function ItemList({ categoryId }: PropsList) {
     if (!uid) return;
 
     const prefix = `${uid}/${itemId}`;
-    const { data, error } = await supabase.storage
-      .from('item-images')
-      .list(prefix, {
-        limit: 12,
-        sortBy: { column: 'created_at', order: 'desc' },
-      });
-
+    const { data, error } = await supabase.storage.from('item-images').list(prefix, {
+      limit: 12, sortBy: { column: 'created_at', order: 'desc' },
+    });
     if (error) return;
 
     if (!data?.length) {
@@ -99,74 +90,86 @@ export default function ItemList({ categoryId }: PropsList) {
     }
 
     const paths = data.map((o) => `${prefix}/${o.name}`);
-    const signed = await Promise.all(
-      paths.map(async (p) => {
-        const { data: s, error: se } = await supabase.storage
-          .from('item-images')
-          .createSignedUrl(p, 3600);
-        if (se) return '';
-        return s?.signedUrl || '';
-      }),
-    );
+    const signed = await Promise.all(paths.map(async (p) => {
+      const { data: s, error: se } = await supabase.storage.from('item-images').createSignedUrl(p, 3600);
+      if (se) return '';
+      return s?.signedUrl || '';
+    }));
 
     setImages((prev) => ({ ...prev, [itemId]: signed.filter(Boolean) }));
   }, []);
 
-  const refreshAllImages = useCallback(
-    async (itemIds: string[]) => {
-      await Promise.all(itemIds.map((id) => refreshItemImages(id)));
-    },
-    [refreshItemImages],
-  );
+  const refreshAllImages = useCallback(async (itemIds: string[]) => {
+    await Promise.all(itemIds.map((id) => refreshItemImages(id)));
+  }, [refreshItemImages]);
 
   useEffect(() => {
     if (!items.length || !userId) return;
     void refreshAllImages(items.map((i) => i.id));
   }, [items, userId, refreshAllImages]);
 
-  const deleteItem = useCallback(
-    async (id: string) => {
-      if (!confirm(t('item_list.confirm_delete'))) return;
-      await supabase.from('items').delete().eq('id', id);
-      await loadItems();
-    },
-    [loadItems, t],
-  );
+  const deleteItem = useCallback(async (id: string) => {
+    if (!confirm(t('item_list.confirm_delete'))) return;
+    await supabase.from('items').delete().eq('id', id);
+    await loadItems();
+  }, [loadItems, t]);
 
-  const uploadImage = useCallback(
-    async (itemId: string, file: File) => {
-      try {
-        setBusy(itemId);
+  const uploadImage = useCallback(async (itemId: string, file: File) => {
+    try {
+      setBusy(itemId);
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id;
+      if (!uid) throw new Error(t('item_list.no_user_session'));
 
-        const { data: u } = await supabase.auth.getUser();
-        const uid = u.user?.id;
-        if (!uid) throw new Error(t('item_list.no_user_session'));
+      const compressedFile = await imageCompression(file, {
+        maxWidthOrHeight: 500, initialQuality: 0.8, fileType: 'image/webp', useWebWorker: true,
+      });
 
-        const compressedFile = await imageCompression(file, {
-          maxWidthOrHeight: 500,
-          initialQuality: 0.8,
-          fileType: 'image/webp',
-          useWebWorker: true,
-        });
+      const path = `${uid}/${itemId}/${crypto.randomUUID()}-${compressedFile.name}`;
+      const { error: upErr } = await supabase.storage.from('item-images').upload(path, compressedFile);
+      if (upErr) throw upErr;
 
-        const path = `${uid}/${itemId}/${crypto.randomUUID()}-${compressedFile.name}`;
-        const { error: upErr } = await supabase.storage
-          .from('item-images')
-          .upload(path, compressedFile);
-
-        if (upErr) throw upErr;
-        await refreshItemImages(itemId);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        alert(msg);
-      } finally {
-        setBusy(null);
-      }
-    },
-    [refreshItemImages, t],
-  );
+      await refreshItemImages(itemId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(msg);
+    } finally {
+      setBusy(null);
+    }
+  }, [refreshItemImages, t]);
 
   const totalPages = useMemo(() => Math.ceil(total / PAGE_SIZE), [total]);
+
+  const openEdit = (it: Item & { place?: string | null; tags?: string[] | null }) => {
+    setEditing({
+      id: it.id,
+      values: {
+        title: it.title,
+        description: it.description ?? '',
+        place: it.place ?? '',
+        tags: Array.isArray(it.tags) ? it.tags : [],
+      },
+    });
+    setEditOpen(true);
+  };
+
+  const saveEdit = async (values: ItemFormValues) => {
+    if (!editing) return;
+    const payload = {
+      title: values.title.trim(),
+      description: values.description.trim() || null,
+      place: values.place.trim() || null,
+      tags: values.tags,
+    };
+    const { error } = await supabase.from('items').update(payload).eq('id', editing.id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setItems((prev) => prev.map((it) => (it.id === editing.id ? { ...it, ...payload } : it)));
+    setEditOpen(false);
+    setEditing(null);
+  };
 
   return (
     <div className="space-y-4">
@@ -179,6 +182,7 @@ export default function ItemList({ categoryId }: PropsList) {
             <div className="flex justify-between items-center gap-3">
               <div className="font-medium truncate">{it.title}</div>
               <div className="flex items-center gap-2">
+                {/* Add image */}
                 <label
                   className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 transition cursor-pointer"
                   title={t('item_list.add_image')}
@@ -217,6 +221,27 @@ export default function ItemList({ categoryId }: PropsList) {
                   )}
                 </label>
 
+                {/* Edit */}
+                <button
+                  onClick={() => openEdit(it)}
+                  className="w-9 h-9 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 flex items-center justify-center"
+                  title={t('item_list.edit')}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-5 h-5"
+                    aria-hidden="true"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    fill="none"
+                    strokeLinecap="round"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                  </svg>
+                </button>
+
+                {/* Delete */}
                 <button
                   onClick={() => deleteItem(it.id)}
                   className="w-9 h-9 rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600 flex items-center justify-center"
@@ -284,10 +309,7 @@ export default function ItemList({ categoryId }: PropsList) {
                   <Image
                     key={idx}
                     src={url}
-                    alt={t('item_list.image_alt').replace(
-                      '{idx}',
-                      `${idx + 1}`,
-                    )}
+                    alt={t('item_list.image_alt').replace('{idx}', `${idx + 1}`)}
                     width={160}
                     height={160}
                     unoptimized
@@ -313,13 +335,7 @@ export default function ItemList({ categoryId }: PropsList) {
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
             title={t('item_list.previous')}
           >
-            <svg
-              viewBox="0 0 24 24"
-              className="w-5 h-5"
-              stroke="currentColor"
-              strokeWidth="2"
-              fill="none"
-            >
+            <svg viewBox="0 0 24 24" className="w-5 h-5" stroke="currentColor" strokeWidth="2" fill="none">
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
@@ -343,13 +359,7 @@ export default function ItemList({ categoryId }: PropsList) {
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
             title={t('item_list.next')}
           >
-            <svg
-              viewBox="0 0 24 24"
-              className="w-5 h-5"
-              stroke="currentColor"
-              strokeWidth="2"
-              fill="none"
-            >
+            <svg viewBox="0 0 24 24" className="w-5 h-5" stroke="currentColor" strokeWidth="2" fill="none">
               <path d="M9 18l6-6-6-6" />
             </svg>
           </button>
@@ -357,38 +367,41 @@ export default function ItemList({ categoryId }: PropsList) {
       )}
 
       {modalImage &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-90 flex flex-col items-center justify-center bg-background/90 backdrop-blur"
-            onClick={() => setModalImage(null)}
-          >
-            <Image
-              src={modalImage}
-              alt={t('item_list.full_size_image_alt')}
-              unoptimized
-              width={0}
-              height={0}
-              sizes="100vw"
-              className="max-w-[500px] max-h-[500px] w-auto h-auto object-contain rounded-xl shadow-lg"
-            />
-            <button
-              onClick={() => setModalImage(null)}
-              className="mt-4 w-10 h-10 flex items-center justify-center rounded-xl bg-card text-card-foreground hover:bg-card/80 transition"
-              title={t('item_list.close_modal')}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="w-5 h-5"
-                stroke="currentColor"
-                strokeWidth="2"
-                fill="none"
-              >
+        // keep your simple image viewer as-is
+        (typeof document !== 'undefined') &&
+        (ReactDOM.createPortal(
+          <div className="fixed inset-0 z-90 flex flex-col items-center justify-center bg-background/90 backdrop-blur" onClick={() => setModalImage(null)}>
+            <Image src={modalImage} alt={t('item_list.full_size_image_alt')} unoptimized width={0} height={0} sizes="100vw" className="max-w-[500px] max-h-[500px] w-auto h-auto object-contain rounded-xl shadow-lg" />
+            <button className="mt-4 w-10 h-10 flex items-center justify-center rounded-xl bg-card text-card-foreground hover:bg-card/80 transition" title={t('item_list.close_modal')}>
+              <svg viewBox="0 0 24 24" className="w-5 h-5" stroke="currentColor" strokeWidth="2" fill="none">
                 <path d="M18 6L6 18M6 6l12 12" />
               </svg>
             </button>
           </div>,
-          document.body,
-        )}
+          document.body
+        ))}
+
+      {/* EDIT modal uses the SAME wrapper as CREATE */}
+      <CenteredModal
+        open={editOpen}
+        onOpenChange={(v) => {
+          setEditOpen(v);
+          if (!v) setEditing(null);
+        }}
+        title={t('item_list.edit_item')}
+        closeLabel="X"
+      >
+        {/* inner section to mirror ItemCreate’s section */}
+        <section className="relative z-50">
+          <ItemForm
+            initial={editing?.values ?? { title: '', description: '', place: '', tags: [] }}
+            submitLabel={t('common.save')}
+            submitting={false}
+            onSubmit={saveEdit}
+            onCancel={() => { setEditOpen(false); setEditing(null); }}
+          />
+        </section>
+      </CenteredModal>
     </div>
   );
 }
