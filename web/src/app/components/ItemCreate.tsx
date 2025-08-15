@@ -329,7 +329,7 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
               <button
                 type="button"
                 onClick={() => removeTag(tag)}
-                className="w-4 h-4 flex items-center justify-center rounded-full bg-black/10 dark:bg-white/10 text-muted-foreground hover:text-foreground"
+                className="w-4 h-4 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:brightness-110"
                 title={t('item_create.remove_tag').replace('{tag}', tag)}
               >
                 <svg
