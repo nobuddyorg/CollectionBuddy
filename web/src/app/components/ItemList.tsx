@@ -394,12 +394,14 @@ export default function ItemList({ categoryId }: PropsList) {
         {/* inner section to mirror ItemCreate’s section */}
         <section className="relative z-50">
           <ItemForm
-            initial={editing?.values ?? { title: '', description: '', place: '', tags: [] }}
-            submitLabel={t('common.save')}
-            submitting={false}
-            onSubmit={saveEdit}
-            onCancel={() => { setEditOpen(false); setEditing(null); }}
-          />
+  initial={editing?.values ?? { title: '', description: '', place: '', tags: [] }}
+  submitLabel={t('common.save')}
+  submitting={false}
+  onSubmit={saveEdit}
+  onCancel={() => { setEditOpen(false); setEditing(null); }}
+  showIconSubmit
+/>
+
         </section>
       </CenteredModal>
     </div>

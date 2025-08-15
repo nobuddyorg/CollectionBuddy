@@ -1,4 +1,5 @@
 'use client';
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { useI18n } from '../hooks/useI18n';
@@ -33,10 +34,10 @@ export type ItemFormValues = {
 type Props = {
   initial: ItemFormValues;
   submitting?: boolean;
-  submitLabel: string;       // e.g. t('item_create.add') or t('common.save')
+  submitLabel: string;
   onSubmit: (values: ItemFormValues) => void;
-  onCancel?: () => void;     // if provided, a Cancel button appears
-  showIconSubmit?: boolean;  // for the “+” circular vs. text button; default false (text button)
+  onCancel?: () => void;
+  showIconSubmit?: boolean;
 };
 
 export default function ItemForm({
@@ -44,25 +45,26 @@ export default function ItemForm({
   submitting = false,
   submitLabel,
   onSubmit,
+  onCancel,
   showIconSubmit = false,
 }: Props) {
   const { t, locale } = useI18n() as unknown as { t: (k: string) => string; locale?: string };
+
   const [title, setTitle] = useState(initial.title);
   const [description, setDescription] = useState(initial.description);
   const [place, setPlace] = useState(initial.place);
   const [tags, setTags] = useState<string[]>(initial.tags);
 
-  // place autocomplete state
   const [placeFocus, setPlaceFocus] = useState(false);
   const [placeResults, setPlaceResults] = useState<PhotonFeature[]>([]);
   const [placeLoading, setPlaceLoading] = useState(false);
   const [placeIdx, setPlaceIdx] = useState(-1);
+
   const abortRef = useRef<AbortController | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  // tag input
   const [tagInput, setTagInput] = useState('');
 
   const resolvedLocale = useMemo(() => {
@@ -83,17 +85,19 @@ export default function ItemForm({
     return DN ? (new DN([photonLang], { type: 'region' }) as Intl.DisplayNames) : null;
   }, [photonLang]);
 
-  const formatDisplay = useCallback((p: PhotonFeature['properties']) => {
-    const city = p.city || p.town || p.village || p.municipality || p.name || '';
-    const country =
-      p.country ||
-      (p.countrycode && regionNames ? (regionNames as any).of(p.countrycode.toUpperCase()) : undefined);
-    const line2 = [p.state, country].filter(Boolean).join(', ');
-    const key = `${city}|||${line2}`.toLowerCase().replace(/\s+/g, ' ').trim();
-    return { city, line2, key };
-  }, [regionNames]);
+  const formatDisplay = useCallback(
+    (p: PhotonFeature['properties']) => {
+      const city = p.city || p.town || p.village || p.municipality || p.name || '';
+      const country =
+        p.country ||
+        (p.countrycode && regionNames ? (regionNames as any).of(p.countrycode.toUpperCase()) : undefined);
+      const line2 = [p.state, country].filter(Boolean).join(', ');
+      const key = `${city}|||${line2}`.toLowerCase().replace(/\s+/g, ' ').trim();
+      return { city, line2, key };
+    },
+    [regionNames]
+  );
 
-  // fetch places
   useEffect(() => {
     if (!placeFocus || place.trim().length < 3) {
       setPlaceResults([]);
@@ -114,6 +118,7 @@ export default function ItemForm({
         const res = await fetch(url.toString(), { signal: ctl.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: { features: PhotonFeature[] } = await res.json();
+
         const uniqueByOsm = Array.from(new Map(data.features.map((f) => [f.properties.osm_id, f])).values());
         const seen = new Set<string>();
         const deduped: PhotonFeature[] = [];
@@ -135,16 +140,13 @@ export default function ItemForm({
     return () => clearTimeout(timer);
   }, [place, placeFocus, photonLang, formatDisplay]);
 
-  // click-outside to close the dropdown
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
       const target = e.target as Node;
       const insideInput = inputRef.current?.contains(target);
       const insideAnchor = dropdownRef.current?.contains(target);
       const insideMenu = menuRef.current?.contains(target);
-      if (!insideInput && !insideAnchor && !insideMenu) {
-        setPlaceFocus(false);
-      }
+      if (!insideInput && !insideAnchor && !insideMenu) setPlaceFocus(false);
     };
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
@@ -179,14 +181,15 @@ export default function ItemForm({
     }
   };
 
-  // tags
   const addTag = () => {
     const v = tagInput.trim();
     if (!v || tags.includes(v)) return;
     setTags((prev) => [...prev, v]);
     setTagInput('');
   };
+
   const removeTag = (v: string) => setTags((prev) => prev.filter((x) => x !== v));
+
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
@@ -197,8 +200,38 @@ export default function ItemForm({
   };
 
   const canSubmit = !!title.trim();
+  const isEditMode = typeof onCancel === 'function';
 
-  const body = (
+  const renderIcon = () =>
+    isEditMode ? (
+      <svg
+        viewBox="0 0 24 24"
+        className="w-5 h-5"
+        aria-hidden="true"
+        stroke="currentColor"
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M20 6L9 17l-5-5" />
+      </svg>
+    ) : (
+      <svg
+        viewBox="0 0 24 24"
+        className="w-6 h-6"
+        stroke="currentColor"
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+    );
+
+  return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <input
@@ -240,7 +273,8 @@ export default function ItemForm({
             className="w-full rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 outline-none focus:border-primary dark:focus:border-primary"
             autoComplete="off"
           />
-          {placeFocus && (placeLoading || placeResults.length > 0) &&
+          {placeFocus &&
+            (placeLoading || placeResults.length > 0) &&
             ReactDOM.createPortal(
               (() => {
                 const r = inputRef.current?.getBoundingClientRect();
@@ -252,33 +286,33 @@ export default function ItemForm({
                     style={{ top: r.bottom, left: r.left, width: r.width }}
                   >
                     {placeLoading && (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">
-                        {t('item_create.searching')}
-                      </div>
+                      <div className="px-3 py-2 text-sm text-muted-foreground">{t('item_create.searching')}</div>
                     )}
-                    {!placeLoading && placeResults.map((hit, i) => {
-                      const p = hit.properties;
-                      const city = p.city || p.town || p.village || p.municipality || p.name;
-                      const line2 = [p.state, p.country].filter(Boolean).join(', ');
-                      return (
-                        <button
-                          key={p.osm_id}
-                          type="button"
-                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                          onClick={() => choosePlace(hit)}
-                          className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 dark:hover:bg-primary/10 ${
-                            i === placeIdx ? 'bg-primary/10 dark:bg-primary/10' : ''
-                          }`}
-                        >
-                          <div className="font-medium">{city}</div>
-                          <div className="opacity-70">{line2}</div>
-                        </button>
-                      );
-                    })}
+                    {!placeLoading &&
+                      placeResults.map((hit, i) => {
+                        const p = hit.properties;
+                        const city = p.city || p.town || p.village || p.municipality || p.name;
+                        const line2 = [p.state, p.country].filter(Boolean).join(', ');
+                        return (
+                          <button
+                            key={p.osm_id}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onClick={() => choosePlace(hit)}
+                            className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 dark:hover:bg-primary/10 ${
+                              i === placeIdx ? 'bg-primary/10 dark:bg-primary/10' : ''
+                            }`}
+                          >
+                            <div className="font-medium">{city}</div>
+                            <div className="opacity-70">{line2}</div>
+                          </button>
+                        );
+                      })}
                     {!placeLoading && placeResults.length === 0 && (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">
-                        {t('item_create.no_results')}
-                      </div>
+                      <div className="px-3 py-2 text-sm text-muted-foreground">{t('item_create.no_results')}</div>
                     )}
                   </div>
                 );
@@ -317,6 +351,16 @@ export default function ItemForm({
       </div>
 
       <div className="flex justify-end gap-2">
+        {onCancel && !showIconSubmit && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="h-9 px-3 rounded-xl border shadow-sm hover:bg-muted/50"
+          >
+            {t('common.cancel')}
+          </button>
+        )}
+
         {showIconSubmit ? (
           <button
             type="button"
@@ -328,10 +372,7 @@ export default function ItemForm({
             {submitting ? (
               <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
             ) : (
-              <svg viewBox="0 0 24 24" className="w-6 h-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
+              renderIcon()
             )}
           </button>
         ) : (
@@ -347,6 +388,4 @@ export default function ItemForm({
       </div>
     </div>
   );
-
-  return body;
 }

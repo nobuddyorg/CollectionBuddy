@@ -43,12 +43,13 @@ export default function ItemCreate({ categoryId, onCreated }: PropsCreate) {
   return (
     <section className="p-4 sm:p-5 space-y-3 z-70 relative">
       <ItemForm
-        initial={{ title: '', description: '', place: '', tags: [] }}
-        submitting={isCreating}
-        submitLabel={t('item_create.add')}
-        onSubmit={handleCreate}
-        showIconSubmit
-      />
+  initial={{ title: '', description: '', place: '', tags: [] }}
+  submitting={isCreating}
+  submitLabel={t('item_create.add')}
+  onSubmit={handleCreate}
+  showIconSubmit
+/>
+
     </section>
   );
 }
