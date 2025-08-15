@@ -20,6 +20,8 @@ type ItemRow = {
   item_categories: { category_id: string }[];
 };
 
+type ImgEntry = { path: string; url: string };
+
 const PAGE_SIZE = 6;
 
 export default function ItemList({ categoryId }: PropsList) {
@@ -30,15 +32,15 @@ export default function ItemList({ categoryId }: PropsList) {
   const [total, setTotal] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [images, setImages] = useState<Record<string, string[]>>({});
+  const [images, setImages] = useState<Record<string, ImgEntry[]>>({});
   const [loading, setLoading] = useState(false);
   const { t } = useI18n();
   const [modalImage, setModalImage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingPath, setDeletingPath] = useState<string | null>(null);
 
   const reqSeq = useRef(0);
 
-  // edit modal
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<null | {
     id: string;
@@ -69,7 +71,6 @@ export default function ItemList({ categoryId }: PropsList) {
     const to = from + PAGE_SIZE - 1;
     const needle = qDebounced.trim();
 
-    // build base query first (no order/range yet)
     let query = supabase
       .from('items')
       .select(
@@ -79,7 +80,6 @@ export default function ItemList({ categoryId }: PropsList) {
       .eq('item_categories.category_id', categoryId);
 
     if (needle) {
-      // optional: escape % and _ so users can't inject wildcards
       const esc = needle.replace(/[%_]/g, '\\$&');
       const like = `%${esc}%`;
       query = query.or(
@@ -92,7 +92,6 @@ export default function ItemList({ categoryId }: PropsList) {
       .range(from, to)
       .returns<ItemRow[]>();
 
-    // ignore stale responses
     if (mySeq !== reqSeq.current) return;
 
     setLoading(false);
@@ -123,7 +122,7 @@ export default function ItemList({ categoryId }: PropsList) {
     const { data, error } = await supabase.storage
       .from('item-images')
       .list(prefix, {
-        limit: 12,
+        limit: 24,
         sortBy: { column: 'created_at', order: 'desc' },
       });
     if (error) return;
@@ -133,18 +132,15 @@ export default function ItemList({ categoryId }: PropsList) {
       return;
     }
 
-    const paths = data.map((o) => `${prefix}/${o.name}`);
-    const signed = await Promise.all(
-      paths.map(async (p) => {
-        const { data: s, error: se } = await supabase.storage
-          .from('item-images')
-          .createSignedUrl(p, 3600);
-        if (se) return '';
-        return s?.signedUrl || '';
-      }),
-    );
-
-    setImages((prev) => ({ ...prev, [itemId]: signed.filter(Boolean) }));
+    const entries: ImgEntry[] = [];
+    for (const o of data) {
+      const path = `${prefix}/${o.name}`;
+      const { data: s } = await supabase.storage
+        .from('item-images')
+        .createSignedUrl(path, 3600);
+      if (s?.signedUrl) entries.push({ path, url: s.signedUrl });
+    }
+    setImages((prev) => ({ ...prev, [itemId]: entries }));
   }, []);
 
   const refreshAllImages = useCallback(
@@ -198,6 +194,37 @@ export default function ItemList({ categoryId }: PropsList) {
       }
     },
     [refreshItemImages, t],
+  );
+
+  const deleteImage = useCallback(
+    async (itemId: string, path: string) => {
+      if (!confirm(t('item_list.confirm_delete'))) return;
+      try {
+        setDeletingPath(path);
+        const { error } = await supabase.storage
+          .from('item-images')
+          .remove([path]);
+        if (error) {
+          alert(error.message);
+          return;
+        }
+        setImages((prev) => ({
+          ...prev,
+          [itemId]: (prev[itemId] || []).filter((e) => e.path !== path),
+        }));
+        if (
+          modalImage &&
+          (images[itemId] || []).some(
+            (e) => e.path === path && e.url === modalImage,
+          )
+        ) {
+          setModalImage(null);
+        }
+      } finally {
+        setDeletingPath(null);
+      }
+    },
+    [t, modalImage, images],
   );
 
   const totalPages = useMemo(() => Math.ceil(total / PAGE_SIZE), [total]);
@@ -258,59 +285,29 @@ export default function ItemList({ categoryId }: PropsList) {
         {items.map((it) => (
           <li
             key={it.id}
-            className="rounded-2xl border bg-card/70 dark:bg-card/60 bg-neutral-100/50 dark:bg-neutral-800/50 backdrop-blur p-3 shadow-sm space-y-3"
+            className="group relative rounded-2xl border bg-card/70 dark:bg-card/60 bg-neutral-100/50 dark:bg-neutral-800/50 backdrop-blur p-3 shadow-sm space-y-3"
           >
-            <div className="flex justify-between items-center gap-3">
-              <div className="font-medium truncate">{it.title}</div>
-              <div className="flex items-center gap-2">
-                {/* Add image */}
-                <label
-                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 transition cursor-pointer"
-                  title={t('item_list.add_image')}
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={!userId || busy === it.id}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (!f) return;
-                      setImages((prev) => ({
-                        ...prev,
-                        [it.id]: [
-                          URL.createObjectURL(f),
-                          ...(prev[it.id] || []),
-                        ],
-                      }));
-                      void uploadImage(it.id, f);
-                    }}
-                  />
-                  {busy === it.id ? (
-                    <div className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />
-                  ) : (
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="w-5 h-5"
-                      aria-hidden="true"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      fill="none"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M4 4h16v16H4z" />
-                      <path d="M12 8v8M8 12h8" />
-                    </svg>
-                  )}
-                </label>
+            <div className="font-medium pr-16 truncate">{it.title}</div>
 
-                {/* Edit */}
-                <button
-                  onClick={() => openEdit(it)}
-                  className="w-9 h-9 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 flex items-center justify-center"
-                  title={t('item_list.edit')}
-                >
+            <div className="absolute top-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto transition-opacity">
+              <label
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 transition cursor-pointer"
+                title={t('item_list.add_image')}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={!userId || busy === it.id}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    void uploadImage(it.id, f);
+                  }}
+                />
+                {busy === it.id ? (
+                  <div className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />
+                ) : (
                   <svg
                     viewBox="0 0 24 24"
                     className="w-5 h-5"
@@ -319,34 +316,53 @@ export default function ItemList({ categoryId }: PropsList) {
                     strokeWidth="2"
                     fill="none"
                     strokeLinecap="round"
+                    strokeLinejoin="round"
                   >
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                    <path d="M4 4h16v16H4z" />
+                    <path d="M12 8v8M8 12h8" />
                   </svg>
-                </button>
+                )}
+              </label>
 
-                {/* Delete */}
-                <button
-                  onClick={() => deleteItem(it.id)}
-                  className="w-9 h-9 rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600 flex items-center justify-center"
-                  title={t('item_list.delete')}
+              <button
+                onClick={() => openEdit(it)}
+                className="w-9 h-9 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 flex items-center justify-center"
+                title={t('item_list.edit')}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5"
+                  aria-hidden="true"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeLinecap="round"
                 >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="w-5 h-5"
-                    aria-hidden="true"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    fill="none"
-                    strokeLinecap="round"
-                  >
-                    <path d="M3 6h18" />
-                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
-                    <path d="M10 11v6M14 11v6" />
-                  </svg>
-                </button>
-              </div>
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                </svg>
+              </button>
+
+              <button
+                onClick={() => deleteItem(it.id)}
+                className="w-9 h-9 rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600 flex items-center justify-center"
+                title={t('item_list.delete')}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5"
+                  aria-hidden="true"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeLinecap="round"
+                >
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
+                  <path d="M10 11v6M14 11v6" />
+                </svg>
+              </button>
             </div>
 
             {it.description && (
@@ -389,20 +405,53 @@ export default function ItemList({ categoryId }: PropsList) {
 
             {images[it.id]?.length ? (
               <div className="grid grid-cols-2 gap-2">
-                {images[it.id].map((url, idx) => (
-                  <Image
-                    key={idx}
-                    src={url}
-                    alt={t('item_list.image_alt').replace(
-                      '{idx}',
-                      `${idx + 1}`,
-                    )}
-                    width={160}
-                    height={160}
-                    unoptimized
-                    className="h-20 w-full object-cover rounded-xl cursor-pointer"
-                    onClick={() => setModalImage(url)}
-                  />
+                {images[it.id].map((img) => (
+                  <div
+                    key={img.path}
+                    className="relative group"
+                    onClick={() => setModalImage(img.url)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ')
+                        setModalImage(img.url);
+                    }}
+                  >
+                    <Image
+                      src={img.url}
+                      alt={t('item_list.image_alt').replace('{idx}', '')}
+                      width={160}
+                      height={160}
+                      unoptimized
+                      className="h-20 w-full object-cover rounded-xl cursor-pointer"
+                    />
+                    <button
+                      title={t('item_list.delete')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void deleteImage(it.id, img.path);
+                      }}
+                      disabled={deletingPath === img.path || busy === it.id}
+                      className="absolute top-1 right-1 w-7 h-7 flex items-center justify-center rounded-lg bg-red-600 text-white shadow opacity-0 group-hover:opacity-100 disabled:opacity-60 transition"
+                    >
+                      {deletingPath === img.path ? (
+                        <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="w-4 h-4"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          fill="none"
+                        >
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
+                          <path d="M10 11v6M14 11v6" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -466,7 +515,6 @@ export default function ItemList({ categoryId }: PropsList) {
       )}
 
       {modalImage &&
-        // keep your simple image viewer as-is
         typeof document !== 'undefined' &&
         ReactDOM.createPortal(
           <div
@@ -500,7 +548,6 @@ export default function ItemList({ categoryId }: PropsList) {
           document.body,
         )}
 
-      {/* EDIT modal uses the SAME wrapper as CREATE */}
       <CenteredModal
         open={editOpen}
         onOpenChange={(v) => {
@@ -510,7 +557,6 @@ export default function ItemList({ categoryId }: PropsList) {
         title={t('item_list.edit_item')}
         closeLabel="X"
       >
-        {/* inner section to mirror ItemCreate’s section */}
         <section className="relative z-50">
           <ItemForm
             key={editing?.id}
