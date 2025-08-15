@@ -180,7 +180,7 @@ export default function ItemList({ categoryId }: PropsList) {
               <div className="font-medium truncate">{it.title}</div>
               <button
                 onClick={() => deleteItem(it.id)}
-                className="w-8 h-8 rounded-full text-destructive border border-destructive/40 hover:bg-destructive/10 dark:hover:bg-destructive/10 flex items-center justify-center"
+                className="w-8 h-8 rounded-full bg-destructive text-destructive-foreground hover:brightness-110 flex items-center justify-center"
                 title={t('item_list.delete')}
               >
                 <svg
@@ -240,7 +240,7 @@ export default function ItemList({ categoryId }: PropsList) {
 
             <div className="flex items-center gap-2">
               <label
-                className="w-8 h-8 flex items-center justify-center rounded-full border hover:bg-primary/10 dark:hover:bg-primary/10 transition"
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:brightness-110 transition"
                 title={t('item_list.add_image')}
               >
                 <input
@@ -310,7 +310,7 @@ export default function ItemList({ categoryId }: PropsList) {
           <button
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
-            className="w-8 h-8 flex items-center justify-center rounded-full border disabled:opacity-50"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:brightness-110 disabled:opacity-50"
             title={t('item_list.previous')}
           >
             <svg
@@ -328,10 +328,10 @@ export default function ItemList({ categoryId }: PropsList) {
               key={n}
               onClick={() => setPage(n)}
               className={
-                'w-8 h-8 flex items-center justify-center rounded-full border ' +
+                'w-8 h-8 flex items-center justify-center rounded-full ' +
                 (n === page
                   ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-primary/10 dark:hover:bg-primary/10')
+                  : 'bg-primary/50 text-primary-foreground hover:bg-primary')
               }
             >
               {n}
@@ -340,7 +340,7 @@ export default function ItemList({ categoryId }: PropsList) {
           <button
             disabled={page === totalPages}
             onClick={() => setPage((p) => p + 1)}
-            className="w-8 h-8 flex items-center justify-center rounded-full border disabled:opacity-50"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:brightness-110 disabled:opacity-50"
             title={t('item_list.next')}
           >
             <svg
