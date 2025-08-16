@@ -16,7 +16,8 @@
     "open_category": "Kategorie öffnen",
     "add": "Hinzufügen",
     "delete": "Löschen",
-    "set": "Setzen"
+    "set": "Setzen",
+    "confirmDelete": "Löschen bestätigen"
   },
   "item_create": {
     "new_entry": "Neuer Eintrag",

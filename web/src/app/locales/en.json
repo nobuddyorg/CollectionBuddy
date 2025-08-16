@@ -16,7 +16,8 @@
     "open_category": "Open category",
     "add": "Add",
     "delete": "Delete",
-    "set": "Set"
+    "set": "Set",
+    "confirmDelete": "Confirm deletion"
   },
   "item_create": {
     "new_entry": "New entry",
