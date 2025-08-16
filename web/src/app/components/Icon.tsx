@@ -19,15 +19,11 @@ interface IconProps extends React.SVGProps<SVGSVGElement> {
   icon: IconType;
 }
 
-const Icon: React.FC<IconProps> = ({ icon, ...props }) => {
+export const Icon: React.FC<IconProps> = ({ icon, ...props }) => {
   switch (icon) {
     case IconType.Google:
       return (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 48 48"
-          {...props}
-        >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" {...props}>
           <path
             fill="#EA4335"
             d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
@@ -61,201 +57,194 @@ const Icon: React.FC<IconProps> = ({ icon, ...props }) => {
         </svg>
       );
     case IconType.Trash:
-        return (
-            <svg
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
-                fill="none"
-                strokeLinecap="round"
-                {...props}
-            >
-                <path d="M3 6h18" />
-                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
-                <path d="M10 11v6M14 11v6" />
-            </svg>
-        );
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          {...props}
+        >
+          <path d="M3 6h18" />
+          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
+          <path d="M10 11v6M14 11v6" />
+        </svg>
+      );
     case IconType.Edit:
-        return (
-            <svg
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
-                fill="none"
-                strokeLinecap="round"
-                {...props}
-            >
-                <path d="M12 20h9" />
-                <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-            </svg>
-        );
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          {...props}
+        >
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+        </svg>
+      );
     case IconType.Coin:
-        return (
-            <svg
-                viewBox="0 0 380 380"
-                {...props}
-            >
-                <defs>
-                <path
-                    id="rimTextPath"
-                    d="M190,190 m-160,0 a160,160 0 1,1 320,0 a160,160 0 1,1 -320,0"
-                />
-                </defs>
+      return (
+        <svg viewBox="0 0 380 380" {...props}>
+          <defs>
+            <path
+              id="rimTextPath"
+              d="M190,190 m-160,0 a160,160 0 1,1 320,0 a160,160 0 1,1 -320,0"
+            />
+          </defs>
 
-                <circle
-                cx="190"
-                cy="190"
-                r="180"
-                fill="none"
-                className="stroke-neutral-300 dark:stroke-neutral-700"
-                strokeWidth="3"
-                strokeDasharray="6 4"
-                opacity="0.85"
-                />
-                <circle
-                cx="190"
-                cy="190"
-                r="153"
-                fill="none"
-                className="stroke-neutral-300 dark:stroke-neutral-700"
-                strokeWidth="1.5"
-                strokeDasharray="3 3"
-                opacity="0.6"
-                />
+          <circle
+            cx="190"
+            cy="190"
+            r="180"
+            fill="none"
+            className="stroke-neutral-300 dark:stroke-neutral-700"
+            strokeWidth="3"
+            strokeDasharray="6 4"
+            opacity="0.85"
+          />
+          <circle
+            cx="190"
+            cy="190"
+            r="153"
+            fill="none"
+            className="stroke-neutral-300 dark:stroke-neutral-700"
+            strokeWidth="1.5"
+            strokeDasharray="3 3"
+            opacity="0.6"
+          />
 
-                <text
-                fontSize="16"
-                className="fill-neutral-400 dark:fill-neutral-500"
-                style={{ letterSpacing: 4, fontFamily: "'Courier New', monospace" }}
-                opacity="0.9"
-                >
-                <textPath href="#rimTextPath" startOffset="50%" textAnchor="middle">
-                </textPath>
-                </text>
+          <text
+            fontSize="16"
+            className="fill-neutral-400 dark:fill-neutral-500"
+            style={{ letterSpacing: 4, fontFamily: "'Courier New', monospace" }}
+            opacity="0.9"
+          >
+            <textPath
+              href="#rimTextPath"
+              startOffset="50%"
+              textAnchor="middle"
+            ></textPath>
+          </text>
 
-                <g
-                transform="translate(190,135) scale(0.65,0.85)"
-                fill="none"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-                opacity="0.9"
-                className="stroke-neutral-300 dark:stroke-neutral-700"
-                >
-                <path d="M-128 0 L0 -64 L128 0 Z" />
-                <line x1="-140" y1="0" x2="140" y2="0" />
-                <line x1="-140" y1="10" x2="140" y2="10" />
-                <rect x="-90" y="10" width="36" height="120" rx="4" />
-                <rect x="-18" y="10" width="36" height="120" rx="4" />
-                <rect x="54" y="10" width="36" height="120" rx="4" />
-                <line x1="-82" y1="20" x2="-82" y2="122" opacity=".5" />
-                <line x1="-72" y1="20" x2="-72" y2="122" opacity=".5" />
-                <line x1="-62" y1="20" x2="-62" y2="122" opacity=".5" />
-                <line x1="-10" y1="20" x2="-10" y2="122" opacity=".5" />
-                <line x1="0" y1="20" x2="0" y2="122" opacity=".5" />
-                <line x1="10" y1="20" x2="10" y2="122" opacity=".5" />
-                <line x1="62" y1="20" x2="62" y2="122" opacity=".5" />
-                <line x1="72" y1="20" x2="72" y2="122" opacity=".5" />
-                <line x1="82" y1="20" x2="82" y2="122" opacity=".5" />
-                <rect x="-150" y="132" width="300" height="22" />
-                <rect x="-160" y="154" width="320" height="14" />
-                <line x1="-170" y1="168" x2="170" y2="168" />
-                </g>
-            </svg>
-        );
+          <g
+            transform="translate(190,135) scale(0.65,0.85)"
+            fill="none"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            opacity="0.9"
+            className="stroke-neutral-300 dark:stroke-neutral-700"
+          >
+            <path d="M-128 0 L0 -64 L128 0 Z" />
+            <line x1="-140" y1="0" x2="140" y2="0" />
+            <line x1="-140" y1="10" x2="140" y2="10" />
+            <rect x="-90" y="10" width="36" height="120" rx="4" />
+            <rect x="-18" y="10" width="36" height="120" rx="4" />
+            <rect x="54" y="10" width="36" height="120" rx="4" />
+            <line x1="-82" y1="20" x2="-82" y2="122" opacity=".5" />
+            <line x1="-72" y1="20" x2="-72" y2="122" opacity=".5" />
+            <line x1="-62" y1="20" x2="-62" y2="122" opacity=".5" />
+            <line x1="-10" y1="20" x2="-10" y2="122" opacity=".5" />
+            <line x1="0" y1="20" x2="0" y2="122" opacity=".5" />
+            <line x1="10" y1="20" x2="10" y2="122" opacity=".5" />
+            <line x1="62" y1="20" x2="62" y2="122" opacity=".5" />
+            <line x1="72" y1="20" x2="72" y2="122" opacity=".5" />
+            <line x1="82" y1="20" x2="82" y2="122" opacity=".5" />
+            <rect x="-150" y="132" width="300" height="22" />
+            <rect x="-160" y="154" width="320" height="14" />
+            <line x1="-170" y1="168" x2="170" y2="168" />
+          </g>
+        </svg>
+      );
     case IconType.More:
-        return (
-            <svg
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                {...props}
-            >
-                <circle cx="5" cy="12" r="2" />
-                <circle cx="12" cy="12" r="2" />
-                <circle cx="19" cy="12" r="2" />
-            </svg>
-        );
+      return (
+        <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+          <circle cx="5" cy="12" r="2" />
+          <circle cx="12" cy="12" r="2" />
+          <circle cx="19" cy="12" r="2" />
+        </svg>
+      );
     case IconType.Close:
-        return (
-            <svg
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
-                fill="none"
-                {...props}
-            >
-                <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-        );
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          {...props}
+        >
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      );
     case IconType.Add:
-        return (
-            <svg
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                {...props}
-            >
-                <path d="M4 4h16v16H4z" />
-                <path d="M12 8v8M8 12h8" />
-            </svg>
-        );
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          {...props}
+        >
+          <path d="M4 4h16v16H4z" />
+          <path d="M12 8v8M8 12h8" />
+        </svg>
+      );
     case IconType.Pin:
-        return (
-            <svg
-                viewBox="0 0 24 24"
-                {...props}
-            >
-                <path
-                d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                />
-                <circle cx="12" cy="10" r="2" fill="currentColor" />
-            </svg>
-        );
+      return (
+        <svg viewBox="0 0 24 24" {...props}>
+          <path
+            d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+          <circle cx="12" cy="10" r="2" fill="currentColor" />
+        </svg>
+      );
     case IconType.ChevronLeft:
-        return (
-            <svg
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
-                fill="none"
-                {...props}
-            >
-                <path d="M15 18l-6-6 6-6" />
-            </svg>
-        );
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          {...props}
+        >
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      );
     case IconType.ChevronRight:
-        return (
-            <svg
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
-                fill="none"
-                {...props}
-            >
-                <path d="M9 18l6-6-6-6" />
-            </svg>
-        );
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          {...props}
+        >
+          <path d="M9 18l6-6-6-6" />
+        </svg>
+      );
     case IconType.Plus:
-        return (
-            <svg
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                {...props}
-            >
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-        );
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          {...props}
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      );
     default:
       return null;
   }

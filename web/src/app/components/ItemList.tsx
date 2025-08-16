@@ -2,8 +2,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { supabase } from '../lib/supabase';
-import Icon from './Icon';
-import { IconType } from './IconType';
+import { Icon, IconType } from './Icon';
 import { Item } from '../types';
 import { useI18n } from '../hooks/useI18n';
 import imageCompression from 'browser-image-compression';
