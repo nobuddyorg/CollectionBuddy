@@ -21,7 +21,12 @@ type ItemRow = {
   item_categories: { category_id: string }[];
 };
 
-type ImgEntry = { path: string; url: string };
+type ImgEntry = {
+  pathFull: string;
+  urlFull: string;
+  pathThumb?: string;
+  urlThumb?: string;
+};
 
 const PAGE_SIZE = 6;
 
@@ -40,12 +45,9 @@ export default function ItemList({ categoryId }: PropsList) {
   const [isSaving, setIsSaving] = useState(false);
   const [deletingPath, setDeletingPath] = useState<string | null>(null);
 
-  // mobile-only tap-to-reveal per item
   const [actionsOpen, setActionsOpen] = useState<Record<string, boolean>>({});
-
   const reqSeq = useRef(0);
 
-  // edit modal
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<null | {
     id: string;
@@ -127,7 +129,7 @@ export default function ItemList({ categoryId }: PropsList) {
     const { data, error } = await supabase.storage
       .from('item-images')
       .list(prefix, {
-        limit: 24,
+        limit: 48,
         sortBy: { column: 'created_at', order: 'desc' },
       });
     if (error) return;
@@ -137,14 +139,56 @@ export default function ItemList({ categoryId }: PropsList) {
       return;
     }
 
-    const entries: ImgEntry[] = [];
+    // Pair full + thumb; fall back gracefully if only one exists
+    const pairs = new Map<
+      string,
+      { full?: { name: string }; thumb?: { name: string } }
+    >();
+
     for (const o of data) {
-      const path = `${prefix}/${o.name}`;
-      const { data: s } = await supabase.storage
-        .from('item-images')
-        .createSignedUrl(path, 3600);
-      if (s?.signedUrl) entries.push({ path, url: s.signedUrl });
+      const name = o.name;
+      const base = name.endsWith('.thumb.webp')
+        ? name.replace(/\.thumb\.webp$/, '')
+        : name.replace(/\.webp$/, '');
+
+      const slot = pairs.get(base) ?? {};
+      if (name.endsWith('.thumb.webp')) slot.thumb = { name };
+      else if (name.endsWith('.webp')) slot.full = { name };
+      else slot.full = { name }; // legacy: any other ext treated as "full"
+
+      pairs.set(base, slot);
     }
+
+    const entries: ImgEntry[] = [];
+    for (const [, { full, thumb }] of pairs) {
+      // We only show entries that have at least a full image
+      if (!full) continue;
+
+      const pathFull = `${prefix}/${full.name}`;
+      const { data: sFull } = await supabase.storage
+        .from('item-images')
+        .createSignedUrl(pathFull, 3600);
+
+      const urlFull = sFull?.signedUrl ?? '';
+      let pathThumb: string | undefined;
+      let urlThumb: string | undefined;
+
+      if (thumb) {
+        pathThumb = `${prefix}/${thumb.name}`;
+        const { data: sThumb } = await supabase.storage
+          .from('item-images')
+          .createSignedUrl(pathThumb, 3600);
+        urlThumb = sThumb?.signedUrl ?? undefined;
+      }
+
+      entries.push({
+        pathFull,
+        urlFull,
+        pathThumb,
+        urlThumb,
+      });
+    }
+
     setImages((prev) => ({ ...prev, [itemId]: entries }));
   }, []);
 
@@ -177,18 +221,40 @@ export default function ItemList({ categoryId }: PropsList) {
         const uid = u.user?.id;
         if (!uid) throw new Error(t('item_list.no_user_session'));
 
-        const compressedFile = await imageCompression(file, {
-          maxWidthOrHeight: 500,
+        // Generate two variants:
+        // - full: 500px, ~80% quality WebP (as before)
+        // - thumb: 250px, 75% quality WebP
+        const fullFile = await imageCompression(file, {
+          maxWidthOrHeight: 1000,
           initialQuality: 0.8,
           fileType: 'image/webp',
           useWebWorker: true,
         });
+        const thumbFile = await imageCompression(file, {
+          maxWidthOrHeight: 250,
+          initialQuality: 0.75,
+          fileType: 'image/webp',
+          useWebWorker: true,
+        });
 
-        const path = `${uid}/${itemId}/${crypto.randomUUID()}-${compressedFile.name}`;
-        const { error: upErr } = await supabase.storage
+        // Use a neutral base name so pairing is trivial
+        const base = crypto.randomUUID();
+        const pathBase = `${uid}/${itemId}/${base}`;
+        const pathFull = `${pathBase}.webp`;
+        const pathThumb = `${pathBase}.thumb.webp`;
+
+        const upFull = await supabase.storage
           .from('item-images')
-          .upload(path, compressedFile);
-        if (upErr) throw upErr;
+          .upload(pathFull, fullFile);
+        if (upFull.error) throw upFull.error;
+
+        const upThumb = await supabase.storage
+          .from('item-images')
+          .upload(pathThumb, thumbFile);
+        if (upThumb.error) {
+          // If thumb fails, we still proceed with the full image but log/show error
+          console.warn('Thumbnail upload failed:', upThumb.error);
+        }
 
         await refreshItemImages(itemId);
       } catch (err) {
@@ -202,34 +268,30 @@ export default function ItemList({ categoryId }: PropsList) {
   );
 
   const deleteImage = useCallback(
-    async (itemId: string, path: string) => {
+    async (itemId: string, img: ImgEntry) => {
       if (!confirm(t('item_list.confirm_delete'))) return;
       try {
-        setDeletingPath(path);
+        setDeletingPath(img.pathFull);
+        const paths = [img.pathFull, ...(img.pathThumb ? [img.pathThumb] : [])];
         const { error } = await supabase.storage
           .from('item-images')
-          .remove([path]);
+          .remove(paths);
         if (error) {
           alert(error.message);
           return;
         }
         setImages((prev) => ({
           ...prev,
-          [itemId]: (prev[itemId] || []).filter((e) => e.path !== path),
+          [itemId]: (prev[itemId] || []).filter(
+            (e) => e.pathFull !== img.pathFull,
+          ),
         }));
-        if (
-          modalImage &&
-          (images[itemId] || []).some(
-            (e) => e.path === path && e.url === modalImage,
-          )
-        ) {
-          setModalImage(null);
-        }
+        if (modalImage === img.urlFull) setModalImage(null);
       } finally {
         setDeletingPath(null);
       }
     },
-    [t, modalImage, images],
+    [t, modalImage],
   );
 
   const totalPages = useMemo(() => Math.ceil(total / PAGE_SIZE), [total]);
@@ -302,7 +364,6 @@ export default function ItemList({ categoryId }: PropsList) {
             >
               <div className="font-medium pr-16 truncate">{it.title}</div>
 
-              {/* Mobile "..." opener (hidden ≥ sm) */}
               <button
                 className={`absolute top-3 right-3 sm:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-muted text-foreground shadow ${isOpen ? 'hidden' : ''}`}
                 onClick={() => toggleActions(it.id)}
@@ -316,9 +377,6 @@ export default function ItemList({ categoryId }: PropsList) {
                 />
               </button>
 
-              {/* Actions bar:
-                  - < sm: toggled by isOpen (tap-to-reveal)
-                  - ≥ sm: hover/focus reveal via group-hover */}
               <div
                 className={[
                   'absolute top-3 right-3 flex items-center gap-2 transition-opacity',
@@ -328,7 +386,6 @@ export default function ItemList({ categoryId }: PropsList) {
                   'sm:opacity-0 sm:pointer-events-none sm:group-hover:opacity-100 sm:group-hover:pointer-events-auto',
                 ].join(' ')}
               >
-                {/* Mobile close (hidden ≥ sm) */}
                 <button
                   className="sm:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-card border text-foreground shadow"
                   onClick={() => closeActions(it.id)}
@@ -449,18 +506,18 @@ export default function ItemList({ categoryId }: PropsList) {
                 <div className="grid grid-cols-2 gap-2">
                   {images[it.id].map((img) => (
                     <div
-                      key={img.path}
+                      key={img.pathFull}
                       className="relative group"
-                      onClick={() => setModalImage(img.url)}
+                      onClick={() => setModalImage(img.urlFull)}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ')
-                          setModalImage(img.url);
+                          setModalImage(img.urlFull);
                       }}
                     >
                       <Image
-                        src={img.url}
+                        src={img.urlThumb || img.urlFull}
                         alt={t('item_list.image_alt').replace('{idx}', '')}
                         width={160}
                         height={160}
@@ -471,18 +528,18 @@ export default function ItemList({ categoryId }: PropsList) {
                         title={t('item_list.delete')}
                         onClick={(e) => {
                           e.stopPropagation();
-                          void deleteImage(it.id, img.path);
+                          void deleteImage(it.id, img);
                         }}
-                        disabled={deletingPath === img.path || busy === it.id}
+                        disabled={
+                          deletingPath === img.pathFull || busy === it.id
+                        }
                         className={[
-                          // base (mobile): show when actions panel is open
                           isOpen ? 'opacity-100' : 'opacity-0',
-                          // ≥ sm: hide until hover
                           'sm:opacity-0 sm:group-hover:opacity-100',
                           'absolute top-1 right-1 w-7 h-7 flex items-center justify-center rounded-lg bg-red-600 text-white shadow disabled:opacity-60 transition',
                         ].join(' ')}
                       >
-                        {deletingPath === img.path ? (
+                        {deletingPath === img.pathFull ? (
                           <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                         ) : (
                           <Icon
@@ -568,7 +625,7 @@ export default function ItemList({ categoryId }: PropsList) {
               width={0}
               height={0}
               sizes="100vw"
-              className="max-w-[500px] max-h-[500px] w-auto h-auto object-contain rounded-xl shadow-lg"
+              className="w-auto h-auto max-w-full max-h-full object-contain rounded-xl shadow-lg"
             />
             <button
               className="mt-4 w-10 h-10 flex items-center justify-center rounded-xl bg-card text-card-foreground hover:bg-card/80 transition"

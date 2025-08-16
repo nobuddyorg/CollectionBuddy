@@ -71,6 +71,13 @@ export default function ItemForm({
 
   const [tagInput, setTagInput] = useState('');
 
+  useEffect(() => {
+    setTitle(initial.title);
+    setDescription(initial.description);
+    setPlace(initial.place);
+    setTags(initial.tags);
+  }, [initial]);
+
   const resolvedLocale = useMemo(() => {
     if (locale && typeof locale === 'string') return locale;
     if (typeof navigator !== 'undefined' && navigator.language)
