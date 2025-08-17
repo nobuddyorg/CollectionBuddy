@@ -40,12 +40,11 @@ export function useCreateItem(categoryId: string) {
 
         return true;
       } catch (e) {
-        // Compensate orphan item if linking failed after insert
         if (itemId) {
           await supabase.from('items').delete().eq('id', itemId);
         }
         console.error(e);
-        alert(t('item_list.no_user_session')); // reuse an existing key or add a specific one like 'item_create.createError'
+        alert(t('item_list.no_user_session'));
         return false;
       } finally {
         setIsCreating(false);
