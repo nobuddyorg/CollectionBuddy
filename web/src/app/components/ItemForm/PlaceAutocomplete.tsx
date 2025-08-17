@@ -31,11 +31,9 @@ export function PlaceAutocomplete({
     onKeyDown,
   } = usePhotonSearch(locale);
 
-  // keep hook query in sync with controlled value
   useEffect(() => {
     setQuery(value);
-    if (value.trim().length >= MIN_Q) setFocus(true);
-  }, [value, setQuery, setFocus]);
+  }, [value, setQuery]);
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -47,11 +45,7 @@ export function PlaceAutocomplete({
           const v = e.target.value;
           onChange(v);
           const len = v.trim().length;
-          if (len === 0) {
-            // reset interaction
-            setFocus(true);
-          } else if (len < MIN_Q) {
-            // hide / clear when too short
+          if (len < MIN_Q) {
             setFocus(false);
           } else {
             setFocus(true);
@@ -62,7 +56,10 @@ export function PlaceAutocomplete({
         }}
         onKeyDown={(e) => {
           const maybeLabel = onKeyDown(e);
-          if (typeof maybeLabel === 'string') onChange(maybeLabel);
+          if (typeof maybeLabel === 'string') {
+            onChange(maybeLabel);
+            setFocus(false);
+          }
         }}
         placeholder={t('item_create.place_placeholder')}
         className="w-full rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 outline-none focus:border-primary dark:focus:border-primary"
@@ -103,7 +100,10 @@ export function PlaceAutocomplete({
                           e.preventDefault();
                           e.stopPropagation();
                         }}
-                        onClick={() => onChange(choose(hit))}
+                        onClick={() => {
+                          onChange(choose(hit));
+                          setFocus(false);
+                        }}
                         className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 dark:hover:bg-primary/10 ${
                           i === activeIdx
                             ? 'bg-primary/10 dark:bg-primary/10'

@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
@@ -21,16 +20,16 @@ export default function ItemForm({
 }: ItemFormProps) {
   const { t } = useI18n();
 
-  const [title, setTitle] = useState(initial.title);
-  const [description, setDescription] = useState(initial.description);
-  const [place, setPlace] = useState(initial.place);
-  const [tags, setTags] = useState<string[]>(initial.tags);
+  const [title, setTitle] = useState(initial.title ?? '');
+  const [description, setDescription] = useState(initial.description ?? '');
+  const [place, setPlace] = useState(initial.place ?? '');
+  const [tags, setTags] = useState<string[]>(initial.tags ?? []);
 
   useEffect(() => {
-    setTitle(initial.title);
-    setDescription(initial.description);
-    setPlace(initial.place);
-    setTags(initial.tags);
+    setTitle(initial.title ?? '');
+    setDescription(initial.description ?? '');
+    setPlace(initial.place ?? '');
+    setTags(initial.tags ?? []);
   }, [initial]);
 
   const canSubmit = useMemo(() => !!title.trim(), [title]);
@@ -94,7 +93,6 @@ export default function ItemForm({
             onClick={onCancel}
             className="h-9 px-3 rounded-xl border shadow-sm hover:bg-muted/50"
           >
-            {/* Use an existing key; if you have 'common.cancel', replace below */}
             {t('item_list.close_modal')}
           </button>
         )}
