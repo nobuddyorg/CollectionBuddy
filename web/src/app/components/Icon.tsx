@@ -17,9 +17,11 @@ export enum IconType {
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   icon: IconType;
+  children?: React.ReactNode;
+  rimId?: string;
 }
 
-export const Icon: React.FC<IconProps> = ({ icon, ...props }) => {
+export const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
   switch (icon) {
     case IconType.Google:
       return (
@@ -91,7 +93,7 @@ export const Icon: React.FC<IconProps> = ({ icon, ...props }) => {
         <svg viewBox="0 0 380 380" {...props}>
           <defs>
             <path
-              id="rimTextPath"
+              id={rimId ?? 'rimTextPath'}
               d="M190,190 m-160,0 a160,160 0 1,1 320,0 a160,160 0 1,1 -320,0"
             />
           </defs>
@@ -116,19 +118,6 @@ export const Icon: React.FC<IconProps> = ({ icon, ...props }) => {
             strokeDasharray="3 3"
             opacity="0.6"
           />
-
-          <text
-            fontSize="16"
-            className="fill-neutral-400 dark:fill-neutral-500"
-            style={{ letterSpacing: 4, fontFamily: "'Courier New', monospace" }}
-            opacity="0.9"
-          >
-            <textPath
-              href="#rimTextPath"
-              startOffset="50%"
-              textAnchor="middle"
-            ></textPath>
-          </text>
 
           <g
             transform="translate(190,135) scale(0.65,0.85)"
@@ -157,6 +146,8 @@ export const Icon: React.FC<IconProps> = ({ icon, ...props }) => {
             <rect x="-160" y="154" width="320" height="14" />
             <line x1="-170" y1="168" x2="170" y2="168" />
           </g>
+
+          {children}
         </svg>
       );
     case IconType.More:
