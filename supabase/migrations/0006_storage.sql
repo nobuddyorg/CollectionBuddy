@@ -1,7 +1,11 @@
+-- Bucket + object-level RLS scoped by user-id prefix.
+begin;
+
 insert into storage.buckets (id, name, public)
 values ('item-images', 'item-images', false)
 on conflict (id) do nothing;
 
+-- Read
 drop policy if exists "read own signed objects" on storage.objects;
 create policy "read own signed objects"
 on storage.objects
@@ -12,6 +16,7 @@ using (
   and split_part(name, '/', 1) = auth.uid()::text
 );
 
+-- Upload
 drop policy if exists "upload own objects" on storage.objects;
 create policy "upload own objects"
 on storage.objects
@@ -22,6 +27,7 @@ with check (
   and split_part(name, '/', 1) = auth.uid()::text
 );
 
+-- Update
 drop policy if exists "update own objects" on storage.objects;
 create policy "update own objects"
 on storage.objects
@@ -36,6 +42,7 @@ with check (
   and split_part(name, '/', 1) = auth.uid()::text
 );
 
+-- Delete
 drop policy if exists "delete own objects" on storage.objects;
 create policy "delete own objects"
 on storage.objects
@@ -45,3 +52,5 @@ using (
   bucket_id = 'item-images'
   and split_part(name, '/', 1) = auth.uid()::text
 );
+
+commit;
