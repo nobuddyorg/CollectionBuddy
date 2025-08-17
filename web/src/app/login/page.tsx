@@ -1,13 +1,13 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../supabase';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import Collectible from '../components/Collectible';
 import Coin from '../components/Coin';
 import LoadingOverlay from '../components/LoadingOverlay';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
-import { useI18n } from '../hooks/useI18n';
+import { useI18n } from '../i18n/useI18n';
 
 const EMOJIS = [
   '🧸',

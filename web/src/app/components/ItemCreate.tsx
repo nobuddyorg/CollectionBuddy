@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { useI18n } from '../hooks/useI18n';
+import { supabase } from '../supabase';
+import { useI18n } from '../i18n/useI18n';
 import ItemForm, { ItemFormValues } from '../components/ItemForm';
 
 type PropsCreate = {

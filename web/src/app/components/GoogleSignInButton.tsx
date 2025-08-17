@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import LoadingOverlay from './LoadingOverlay';
-import { useI18n } from '../hooks/useI18n';
+import { useI18n } from '../i18n/useI18n';
 import Icon, { IconType } from './Icon';
 
 export default function GoogleSignInButton({

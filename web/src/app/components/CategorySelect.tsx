@@ -1,8 +1,8 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { Category } from '../types';
-import { useI18n } from '../hooks/useI18n';
+import { supabase } from '../supabase';
+import { Category } from '../types/types';
+import { useI18n } from '../i18n/useI18n';
 
 interface Props {
   selectedCat: string | null;

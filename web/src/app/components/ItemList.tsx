@@ -1,10 +1,10 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Image from 'next/image';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../supabase';
 import { Icon, IconType } from './Icon';
-import { Item } from '../types';
-import { useI18n } from '../hooks/useI18n';
+import { Item } from '../types/types';
+import { useI18n } from '../i18n/useI18n';
 import imageCompression from 'browser-image-compression';
 import ItemForm, { ItemFormValues } from '../components/ItemForm';
 import CenteredModal from '../components/CenteredModal';

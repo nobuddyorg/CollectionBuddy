@@ -1,13 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../lib/supabase';
+import { supabase } from './supabase';
 import type {
   Session,
   User as SupabaseUser,
   AuthChangeEvent,
 } from '@supabase/supabase-js';
-import type { User } from '../types';
+import type { User } from './types/types';
 
 function asUser(u: SupabaseUser | null): User | null {
   return u as unknown as User | null;

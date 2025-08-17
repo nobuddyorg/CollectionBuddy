@@ -1,13 +1,13 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from './lib/supabase';
-import { useSession } from './hooks/useSession';
+import { supabase } from './supabase';
+import { useSession } from './useSession';
 import LoadingOverlay from './components/LoadingOverlay';
 import CategorySelect from './components/CategorySelect';
 import ItemCreate from './components/ItemCreate';
 import ItemList from './components/ItemList';
 import Header from './components/Header';
-import { useI18n } from './hooks/useI18n';
+import { useI18n } from './i18n/useI18n';
 import { useRouter } from 'next/navigation';
 import CenteredModal from './components/CenteredModal';
 

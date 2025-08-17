@@ -1,14 +1,20 @@
 'use client';
 import { useState } from 'react';
 import Image from 'next/image';
-import type { User } from '../types';
-import { useI18n } from '../hooks/useI18n';
-import { withBasePath } from '../utils/path';
+import type { User } from '../types/types';
+import { useI18n } from '../i18n/useI18n';
 import Icon, { IconType } from './Icon';
 
 type Props = {
   user: User;
   onSignOut: () => Promise<void> | void;
+};
+
+const withBasePath = (path: string): string => {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${basePath}${normalizedPath}`;
 };
 
 export default function Header({ user, onSignOut }: Props) {

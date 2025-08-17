@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { useI18n } from '../hooks/useI18n';
+import { useI18n } from '../i18n/useI18n';
 import Icon, { IconType } from './Icon';
 
 type PhotonFeature = {

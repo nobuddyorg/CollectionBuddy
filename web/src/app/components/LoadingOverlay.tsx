@@ -1,5 +1,5 @@
 'use client';
-import { useI18n } from '../hooks/useI18n';
+import { useI18n } from '../i18n/useI18n';
 
 export default function LoadingOverlay({ label }: { label?: string }) {
   const { t } = useI18n();

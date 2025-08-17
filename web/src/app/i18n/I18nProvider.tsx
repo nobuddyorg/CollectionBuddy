@@ -1,7 +1,7 @@
 'use client';
 import { createContext, useEffect, useState, useCallback } from 'react';
-import de from '../locales/de.json';
-import en from '../locales/en.json';
+import de from './de.json';
+import en from './en.json';
 
 const translations = { de, en };
 
