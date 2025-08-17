@@ -19,7 +19,6 @@ export default function Coin({
 }: CoinProps) {
   const rimId = useId();
 
-  // Responsive clamp: small screens fall back to ~340px like your original
   const style = useMemo<React.CSSProperties>(() => {
     const clamped = `clamp(340px, ${size}px, ${size}px)`;
     return { width: clamped, height: clamped };

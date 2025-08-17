@@ -32,7 +32,6 @@ export default function GoogleSignInButton({
     try {
       await onClick();
       if (mode === 'inline') setLoading(false);
-      // mode 'oauth': keep loading until navigation replaces the page
     } catch (err) {
       setLoading(false);
       onError?.(err);

@@ -15,7 +15,6 @@ import type { ImgEntry } from './types';
 export default function ItemList({ categoryId }: { categoryId: string }) {
   const { t } = useI18n();
 
-  // search / pagination
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
   useEffect(() => {
@@ -27,7 +26,6 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     qDebounced,
   );
 
-  // images
   const {
     images,
     refreshAllImages,
@@ -42,7 +40,6 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     void refreshAllImages(items.map((i) => i.id));
   }, [items, refreshAllImages]);
 
-  // edit modal
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<null | {
     id: string;

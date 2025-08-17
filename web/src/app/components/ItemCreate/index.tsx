@@ -21,7 +21,7 @@ export default function ItemCreate({ categoryId, onCreated }: Props) {
       const ok = await create(values);
       if (!ok) return;
       onCreated();
-      setFormKey((k) => k + 1); // reset form
+      setFormKey((k) => k + 1);
     },
     [create, onCreated],
   );

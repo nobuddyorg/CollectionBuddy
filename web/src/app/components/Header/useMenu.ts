@@ -10,7 +10,6 @@ export function useMenu() {
   const close = useCallback(() => setOpen(false), []);
   const toggle = useCallback(() => setOpen((v) => !v), []);
 
-  // Close on click outside
   useEffect(() => {
     if (!open) return;
     const onDocClick = (e: MouseEvent) => {
@@ -23,7 +22,6 @@ export function useMenu() {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [open]);
 
-  // Close on Escape
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -33,7 +31,6 @@ export function useMenu() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  // Focus return when closing
   useEffect(() => {
     if (!open && anchorRef.current) anchorRef.current.focus();
   }, [open]);

@@ -41,7 +41,6 @@ function CollectibleComponent({
     <div
       className={cx(
         'absolute flex items-center justify-center rounded-full text-lg text-white/95 shadow z-0 select-none',
-        // pointer-events-none prevents accidental interactions over the login page
         'pointer-events-none',
         variantClass,
         className,

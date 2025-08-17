@@ -157,7 +157,6 @@ export function usePhotonSearch(locale?: string) {
   );
 
   return {
-    // state exposed
     query,
     setQuery,
     focus,
@@ -166,11 +165,9 @@ export function usePhotonSearch(locale?: string) {
     loading,
     activeIdx,
     setActiveIdx,
-    // refs
     dropdownRef,
     inputRef,
     menuRef,
-    // helpers
     choose,
     onKeyDown,
     formatDisplay,
