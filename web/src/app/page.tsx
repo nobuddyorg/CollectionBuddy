@@ -1,67 +1,55 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from './supabase';
-import { useSession } from './useSession';
-import LoadingOverlay from './components/LoadingOverlay';
-import CategorySelect from './components/CategorySelect';
-import ItemCreate from './components/ItemCreate';
-import ItemList from './components/ItemList';
-import Header from './components/Header';
-import { useI18n } from './i18n/useI18n';
-import { useRouter } from 'next/navigation';
-import CenteredModal from './components/CenteredModal';
 
-function usePref(key: string, initial: boolean) {
-  const [v, setV] = useState<boolean>(initial);
-  useEffect(() => {
-    try {
-      const s = localStorage.getItem(key);
-      if (s === '1') setV(true);
-      if (s === '0') setV(false);
-    } catch {}
-  }, [key]);
-  useEffect(() => {
-    try {
-      localStorage.setItem(key, v ? '1' : '0');
-    } catch {}
-  }, [key, v]);
-  return [v, setV] as const;
-}
+import { useCallback, useState } from 'react';
+
+import { useRouter } from 'next/navigation';
+
+import CategorySelect from './components/CategorySelect/index';
+import CenteredModal from './components/CenteredModal/index';
+import Header from './components/Header/index';
+import ItemCreate from './components/ItemCreate/index';
+import ItemList from './components/ItemList/index';
+import LoadingOverlay from './components/LoadingOverlay/index';
+import { useI18n } from './i18n/useI18n';
+import { supabase } from './supabase';
+import { usePref } from './usePref';
+import { useSession } from './useSession';
 
 export default function Page() {
   const { user, loading } = useSession();
+  const router = useRouter();
+  const { t } = useI18n();
+
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     null,
   );
   const [refreshToken, setRefreshToken] = useState(0);
-  const { t } = useI18n();
-  const router = useRouter();
 
-  const prefKey = useMemo(
-    () =>
-      selectedCategoryId ? `cb_open_${selectedCategoryId}` : 'cb_open_none',
-    [selectedCategoryId],
-  );
-  const [open, setOpen] = usePref(prefKey, false);
+  const prefKey = selectedCategoryId
+    ? `cb_open_${selectedCategoryId}`
+    : 'cb_open_none';
+  const [isDialogOpen, setDialogOpen] = usePref(prefKey, false);
 
   const signOut = useCallback(async () => {
     try {
       const { error } = await supabase.auth.signOut({ scope: 'local' });
       if (error) console.error('Sign-out failed:', error.message);
-      setTimeout(() => router.replace('/login'), 100);
     } catch (err) {
       console.error('Unexpected error during sign-out:', err);
+    } finally {
       router.replace('/login');
     }
   }, [router]);
 
   const handleCreated = useCallback(() => {
-    setOpen(false);
+    setDialogOpen(false);
     setRefreshToken((k) => k + 1);
-  }, [setOpen]);
+  }, [setDialogOpen]);
 
-  if (loading) return <LoadingOverlay />;
+  if (loading) return <LoadingOverlay label={t('item_list.loading')} />;
   if (!user) return null;
+
+  const hasCategory = !!selectedCategoryId;
 
   return (
     <div className="min-h-[100dvh] bg-gradient-to-b from-amber-50 via-white to-stone-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 text-neutral-900 dark:text-neutral-100">
@@ -73,19 +61,19 @@ export default function Page() {
           onSelect={setSelectedCategoryId}
         />
 
-        {selectedCategoryId ? (
+        {hasCategory ? (
           <section className="relative z-50 rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 sm:p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold">{t('page.entries')}</h2>
               <button
-                onClick={() => setOpen(true)}
+                onClick={() => setDialogOpen(true)}
                 className="rounded-xl px-3 py-1.5 bg-primary text-primary-foreground shadow-sm hover:brightness-110"
+                aria-label={t('item_create.new_entry')}
               >
                 +
               </button>
             </div>
-
-            <ItemList key={refreshToken} categoryId={selectedCategoryId} />
+            <ItemList key={refreshToken} categoryId={selectedCategoryId!} />
           </section>
         ) : (
           <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-10 grid place-items-center text-center">
@@ -106,16 +94,15 @@ export default function Page() {
         )}
       </main>
 
-      {/* Modal for adding new entry — works on both desktop and mobile */}
-      {selectedCategoryId && (
+      {hasCategory && (
         <CenteredModal
-          open={open}
-          onOpenChange={setOpen}
+          open={isDialogOpen}
+          onOpenChange={setDialogOpen}
           title={t('item_create.new_entry')}
           closeLabel="X"
         >
           <ItemCreate
-            categoryId={selectedCategoryId}
+            categoryId={selectedCategoryId!}
             onCreated={handleCreated}
           />
         </CenteredModal>

@@ -1,0 +1,82 @@
+============================================================
+PRIVACY POLICY (ENGLISH)
+============================================================
+
+CollectionBuddy ("we", "our", "us") operated by nobuddy.org,  
+responsible person: Matthias Eggert, values your privacy.  
+This Privacy Policy explains how we collect, use, and protect your information when you use our application.
+
+1. Information We Collect
+- Account Information: When you sign in with Google, we receive your name, email address, and profile picture from Google.
+- Application Data: We may collect information such as categories, items, and tags you create in the app.
+- Technical Data: We may collect non-personal data such as device type, operating system, and usage statistics.
+
+2. How We Use Information
+- To authenticate your account via Google Sign-In.
+- To store and manage your personal collection data.
+- To provide and improve our services.
+- To communicate with you about updates or support.
+- To ensure compliance with legal obligations.
+
+3. Data Sharing
+- We do not sell, rent, or share your personal data with third parties.
+- We only share information if required by law or with service providers who support our operations (e.g., hosting).
+
+4. Data Storage & Security
+- Data is stored securely on our service providers’ infrastructure.
+- Your Google account data is used only for authentication and is not shared.
+- Data is retained only as long as necessary for the purposes stated.
+
+5. Your Rights
+- You may request access, correction, or deletion of your data at any time.
+- To delete your account and associated data, please contact: support@nobuddy.org
+
+6. Children
+- Our services are not directed to children under 13. We do not knowingly collect personal data from children.
+
+7. Changes
+- We may update this Privacy Policy. Updates will be posted in the application.
+
+Effective date: 17 August 2025
+
+
+============================================================
+DATENSCHUTZERKLÄRUNG (DEUTSCH)
+============================================================
+
+CollectionBuddy ("wir", "uns", "unser") betrieben von nobuddy.org,  
+verantwortliche Person: Matthias Eggert, respektiert Ihre Privatsphäre.  
+Diese Datenschutzerklärung erklärt, wie wir Informationen erfassen, verwenden und schützen, wenn Sie unsere Anwendung nutzen.
+
+1. Erhobene Informationen
+- Kontoinformationen: Wenn Sie sich mit Google anmelden, erhalten wir Ihren Namen, Ihre E-Mail-Adresse und Ihr Profilbild von Google.
+- Anwendungsdaten: Wir können Informationen wie Kategorien, Objekte und Tags erfassen, die Sie in der App erstellen.
+- Technische Daten: Wir können nicht-personenbezogene Daten wie Gerätetyp, Betriebssystem und Nutzungsstatistiken erfassen.
+
+2. Nutzung der Informationen
+- Zur Authentifizierung Ihres Kontos über Google Sign-In.
+- Zur Speicherung und Verwaltung Ihrer persönlichen Sammlungsdaten.
+- Zur Bereitstellung und Verbesserung unserer Dienste.
+- Zur Kommunikation mit Ihnen über Updates oder Support.
+- Zur Erfüllung gesetzlicher Verpflichtungen.
+
+3. Weitergabe von Daten
+- Wir verkaufen, vermieten oder teilen Ihre personenbezogenen Daten nicht mit Dritten.
+- Eine Weitergabe erfolgt nur, wenn dies gesetzlich vorgeschrieben ist oder an Dienstleister, die unsere Arbeit unterstützen (z. B. Hosting).
+
+4. Datenspeicherung & Sicherheit
+- Daten werden sicher auf den Servern unserer Dienstleister gespeichert.
+- Ihre Google-Kontodaten werden ausschließlich für die Anmeldung verwendet und nicht weitergegeben.
+- Daten werden nur so lange aufbewahrt, wie es für die genannten Zwecke erforderlich ist.
+
+5. Ihre Rechte
+- Sie können jederzeit Zugang zu Ihren Daten verlangen sowie Berichtigung oder Löschung beantragen.
+- Um Ihr Konto und alle zugehörigen Daten zu löschen, kontaktieren Sie uns bitte: support@nobuddy.org
+
+6. Kinder
+- Unsere Dienste richten sich nicht an Kinder unter 13 Jahren. Wir sammeln wissentlich keine personenbezogenen Daten von Kindern.
+
+7. Änderungen
+- Wir können diese Datenschutzerklärung aktualisieren. Aktualisierungen werden in der Anwendung veröffentlicht.
+
+Gültig ab: 17. August 2025

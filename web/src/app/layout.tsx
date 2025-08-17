@@ -1,13 +1,8 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+
+import { geistMono, geistSans } from './fonts';
 import './globals.css';
 import { I18nProvider } from './i18n/I18nProvider';
-
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
