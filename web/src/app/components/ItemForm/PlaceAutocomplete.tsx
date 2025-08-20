@@ -13,10 +13,7 @@ export function PlaceAutocomplete({
   value: string;
   onChange: (v: string) => void;
 }) {
-  const { t, locale } = useI18n() as unknown as {
-    t: (k: string) => string;
-    locale?: string;
-  };
+  const { t, lang } = useI18n();
   const {
     setQuery,
     focus,
@@ -29,7 +26,7 @@ export function PlaceAutocomplete({
     menuRef,
     choose,
     onKeyDown,
-  } = usePhotonSearch(locale);
+  } = usePhotonSearch(lang);
 
   useEffect(() => {
     setQuery(value);

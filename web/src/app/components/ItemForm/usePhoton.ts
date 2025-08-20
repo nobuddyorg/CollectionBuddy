@@ -4,20 +4,6 @@ import type { PhotonFeature } from './types';
 
 type RegionNames = Intl.DisplayNames | null;
 
-function resolveLang(explicit?: string): string {
-  if (explicit && typeof explicit === 'string') return explicit;
-  if (typeof navigator !== 'undefined' && navigator.language)
-    return navigator.language;
-  return 'en';
-}
-
-function pickPhotonLang(resolvedLocale: string): string {
-  const parts = resolvedLocale.split('-');
-  const region = (parts[1] || '').toUpperCase();
-  const germanRegions = new Set(['DE', 'AT', 'CH', 'LI', 'LU']);
-  return germanRegions.has(region) ? 'de' : 'en';
-}
-
 export function usePhotonSearch(locale?: string) {
   const [query, setQuery] = useState('');
   const [focus, setFocus] = useState(false);
@@ -30,10 +16,9 @@ export function usePhotonSearch(locale?: string) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const resolvedLocale = useMemo(() => resolveLang(locale), [locale]);
   const photonLang = useMemo(
-    () => pickPhotonLang(resolvedLocale),
-    [resolvedLocale],
+    () => (locale === 'de' ? 'de' : 'en'),
+    [locale],
   );
 
   const DNConstructor = (Intl as { DisplayNames?: typeof Intl.DisplayNames })
