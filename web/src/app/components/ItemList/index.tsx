@@ -11,9 +11,14 @@ import { ModalImage } from './ModalImage';
 import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
 import type { ImgEntry } from './types';
+import Map from '../Map';
+import { usePlaces } from '../Map/usePlaces';
 
 export default function ItemList({ categoryId }: { categoryId: string }) {
   const { t } = useI18n();
+
+  const [mapOpen, setMapOpen] = useState(false);
+  const { places, loading: loadingPlaces } = usePlaces(categoryId);
 
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
@@ -103,7 +108,16 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
   return (
     <div className="space-y-4">
-      <SearchInput value={q} onChange={setQ} />
+      <div className="flex gap-2">
+        <SearchInput value={q} onChange={setQ} />
+        <button
+          className="p-2 border rounded-lg"
+          onClick={() => setMapOpen(true)}
+          title={t('item_list.open_map')}
+        >
+          🗺️
+        </button>
+      </div>
 
       <ul className="grid sm:grid-cols-2 lg:grid-cols-2 gap-3">
         {items.map((it) => (
@@ -157,6 +171,25 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
             showIconSubmit
           />
         </section>
+      </CenteredModal>
+
+      <CenteredModal
+        open={mapOpen}
+        onOpenChange={setMapOpen}
+        title={t('item_list.map_title')}
+        closeLabel="X"
+      >
+        {loadingPlaces ? (
+          <p>{t('common.loading')}</p>
+        ) : (
+          <Map
+            markers={places.map((p) => ({
+              lat: p.lat,
+              lng: p.lng,
+              popupText: p.name,
+            }))}
+          />
+        )}
       </CenteredModal>
     </div>
   );

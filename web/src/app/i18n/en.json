@@ -43,7 +43,9 @@
     "add_image": "Add image",
     "search_placeholder": "Search by title, description, city, tags…",
     "search_clear": "Clear search",
-    "edit_item": "Edit entry"
+    "edit_item": "Edit entry",
+    "open_map": "Open Map",
+    "map_title": "Map of Collectibles"
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Sign in with Google"
