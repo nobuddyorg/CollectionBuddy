@@ -42,6 +42,7 @@
     "delete": "Delete",
     "add_image": "Add image",
     "search_placeholder": "Search by title, description, city, tags…",
+    "search_clear": "Clear search",
     "edit_item": "Edit entry"
   },
   "google_sign_in_button": {

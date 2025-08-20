@@ -42,6 +42,7 @@
     "delete": "Löschen",
     "add_image": "Bild hinzufügen",
     "search_placeholder": "Suchen nach Titel, Beschreibung, Ort, Tags…",
+    "search_clear": "Suche leeren",
     "edit_item": "Eintrag bearbeiten"
   },
   "google_sign_in_button": {
