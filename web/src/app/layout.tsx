@@ -22,6 +22,9 @@ export const metadata: Metadata = {
     shortcut: [{ url: `${basePath}/favicon.ico` }],
   },
   manifest: `${basePath}/site.webmanifest`,
+};
+
+export const viewport = {
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#f9f9f9' },
     { media: '(prefers-color-scheme: dark)', color: '#1a1a1a' },

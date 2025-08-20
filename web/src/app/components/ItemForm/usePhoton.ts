@@ -16,10 +16,7 @@ export function usePhotonSearch(locale?: string) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const photonLang = useMemo(
-    () => (locale === 'de' ? 'de' : 'en'),
-    [locale],
-  );
+  const photonLang = useMemo(() => (locale === 'de' ? 'de' : 'en'), [locale]);
 
   const DNConstructor = (Intl as { DisplayNames?: typeof Intl.DisplayNames })
     .DisplayNames;
