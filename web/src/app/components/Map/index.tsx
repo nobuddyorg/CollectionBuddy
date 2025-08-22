@@ -57,6 +57,13 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation }) => {
 
       mapInstance.current = L.map(mapRef.current).setView([51.505, -0.09], 13);
 
+      mapInstance.current.createPane('currentLocation');
+      const currentLocationPane =
+        mapInstance.current.getPane('currentLocation');
+      if (currentLocationPane) {
+        currentLocationPane.style.zIndex = '650';
+      }
+
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -94,6 +101,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation }) => {
         color: '#b91c1c',
         fillColor: '#ef4444',
         fillOpacity: 1,
+        pane: 'currentLocation',
       }).addTo(layersRef.current!);
 
       if (currentLocation.popupText) {
