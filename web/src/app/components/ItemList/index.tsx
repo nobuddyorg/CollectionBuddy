@@ -142,24 +142,23 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
         <button
+          type="button"
           onClick={() => setCreateOpen(true)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110"
           aria-label={t('item_create.new_entry')}
           title={t('item_create.new_entry')}
         >
           <Icon icon={IconType.Plus} className="w-4 h-4" />
         </button>
+
         <button
-          className={
-            'w-9 h-9 flex items-center justify-center rounded-xl ' +
-            'bg-primary/10 text-primary/80 shadow-sm ' +
-            'hover:brightness-110'
-          }
+          type="button"
           onClick={() => setMapOpen(true)}
-          title={t('item_list.open_map')}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary/10 text-primary/80 shadow-sm hover:brightness-110"
           aria-label={t('item_list.open_map')}
+          title={t('item_list.open_map')}
         >
           <Icon
             icon={IconType.Map}
@@ -169,7 +168,10 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
             fill="none"
           />
         </button>
-        <SearchInput value={q} onChange={setQ} />
+
+        <div className="flex-1 min-w-[6rem] sm:min-w-[12rem]">
+          <SearchInput value={q} onChange={setQ} />
+        </div>
       </div>
 
       <ul className="grid sm:grid-cols-2 lg:grid-cols-2 gap-3">
