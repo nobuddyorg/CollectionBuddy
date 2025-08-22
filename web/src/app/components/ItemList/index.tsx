@@ -143,7 +143,14 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
-        <SearchInput value={q} onChange={setQ} />
+        <button
+          onClick={() => setCreateOpen(true)}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
+          aria-label={t('item_create.new_entry')}
+          title={t('item_create.new_entry')}
+        >
+          <Icon icon={IconType.Plus} className="w-4 h-4" />
+        </button>
         <button
           className={
             'w-9 h-9 flex items-center justify-center rounded-xl ' +
@@ -162,13 +169,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
             fill="none"
           />
         </button>
-        <button
-          onClick={() => setCreateOpen(true)}
-          className="rounded-xl px-3 py-1.5 bg-primary text-primary-foreground shadow-sm hover:brightness-110"
-          aria-label={t('item_create.new_entry')}
-        >
-          {t('common.add')}
-        </button>
+        <SearchInput value={q} onChange={setQ} />
       </div>
 
       <ul className="grid sm:grid-cols-2 lg:grid-cols-2 gap-3">
