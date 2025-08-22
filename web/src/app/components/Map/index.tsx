@@ -21,6 +21,7 @@ interface MarkerInput {
 interface MapProps {
   markers: MarkerInput[];
   currentLocation?: { lat: number; lng: number; popupText?: string };
+  command?: 'fitAll' | 'fitCurrent' | null;
 }
 
 const toUrl = (mod: unknown): string => {
@@ -30,7 +31,7 @@ const toUrl = (mod: unknown): string => {
   throw new Error('Unsupported image import format');
 };
 
-const Map: React.FC<MapProps> = ({ markers, currentLocation }) => {
+const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
   const mapRef = useRef<HTMLDivElement>(null);
 
   const LRef = useRef<Leaflet | null>(null);
@@ -85,11 +86,8 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation }) => {
 
     layersRef.current.clearLayers();
 
-    const points: Array<import('leaflet').LatLngExpression> = [];
-
     markers.forEach((m) => {
       L.marker([m.lat, m.lng]).addTo(layersRef.current!).bindPopup(m.popupText);
-      points.push([m.lat, m.lng]);
     });
 
     if (currentLocation) {
@@ -107,17 +105,40 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation }) => {
       if (currentLocation.popupText) {
         here.bindPopup(currentLocation.popupText);
       }
-
-      points.push([lat, lng]);
-    }
-
-    if (points.length > 0) {
-      const bounds = L.latLngBounds(points);
-      if (bounds.isValid()) {
-        mapInstance.current.fitBounds(bounds, { padding: [24, 24] });
-      }
     }
   }, [markers, currentLocation]);
+
+  useEffect(() => {
+    const L = LRef.current;
+    if (!L || !mapInstance.current) return;
+
+    const doFit = () => {
+      if (command === 'fitAll') {
+        const points: Array<import('leaflet').LatLngExpression> = [];
+        markers.forEach((m) => {
+          points.push([m.lat, m.lng]);
+        });
+        if (currentLocation) {
+          points.push([currentLocation.lat, currentLocation.lng]);
+        }
+
+        if (points.length > 0) {
+          const bounds = L.latLngBounds(points);
+          if (bounds.isValid()) {
+            mapInstance.current?.fitBounds(bounds, { padding: [24, 24] });
+          }
+        }
+      } else if (command === 'fitCurrent' && currentLocation) {
+        const radius = 100 * 1000; // 100km in meters
+        const circle = L.circle([currentLocation.lat, currentLocation.lng], {
+          radius,
+        });
+        mapInstance.current?.fitBounds(circle.getBounds());
+      }
+    };
+    // needs a small delay to allow map to be visible and sized correctly
+    setTimeout(doFit, 100);
+  }, [command, markers, currentLocation]);
 
   return <div ref={mapRef} style={{ height: '400px', width: '100%' }} />;
 };

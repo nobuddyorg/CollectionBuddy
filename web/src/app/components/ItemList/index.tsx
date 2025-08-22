@@ -25,6 +25,9 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
   const [mapOpen, setMapOpen] = useState(false);
   const { places, loading: loadingPlaces } = usePlaces(categoryId);
+  const [mapCommand, setMapCommand] = useState<'fitAll' | 'fitCurrent' | null>(
+    'fitAll',
+  );
 
   const [currentLocation, setCurrentLocation] = useState<null | {
     lat: number;
@@ -237,22 +240,46 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         {loadingPlaces ? (
           <p>{t('common.loading')}</p>
         ) : (
-          <Map
-            markers={places.map((p) => ({
-              lat: p.lat,
-              lng: p.lng,
-              popupText: p.name,
-            }))}
-            currentLocation={
-              currentLocation
-                ? {
-                    lat: currentLocation.lat,
-                    lng: currentLocation.lng,
-                    popupText: t('item_list.you_are_here') ?? 'You are here',
-                  }
-                : undefined
-            }
-          />
+          <div className="relative">
+            <Map
+              command={mapCommand}
+              markers={places.map((p) => ({
+                lat: p.lat,
+                lng: p.lng,
+                popupText: p.name,
+              }))}
+              currentLocation={
+                currentLocation
+                  ? {
+                      lat: currentLocation.lat,
+                      lng: currentLocation.lng,
+                      popupText: t('item_list.you_are_here') ?? 'You are here',
+                    }
+                  : undefined
+              }
+            />
+            <div className="absolute top-2 right-2 z-[1000] bg-white/50 backdrop-blur rounded-lg flex gap-1 p-1">
+              <button
+                type="button"
+                onClick={() => setMapCommand('fitCurrent')}
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary/10 text-primary/80 shadow-sm hover:brightness-110 disabled:opacity-50"
+                aria-label="Zoom to current location"
+                title="Zoom to current location"
+                disabled={!currentLocation}
+              >
+                <Icon icon={IconType.Gps} className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapCommand('fitAll')}
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary/10 text-primary/80 shadow-sm hover:brightness-110"
+                aria-label="Frame all pins"
+                title="Frame all pins"
+              >
+                <Icon icon={IconType.Frame} className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         )}
       </CenteredModal>
 
