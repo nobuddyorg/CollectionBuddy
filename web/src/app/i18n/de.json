@@ -43,7 +43,10 @@
     "add_image": "Bild hinzufügen",
     "search_placeholder": "Suchen nach Titel, Beschreibung, Ort, Tags…",
     "search_clear": "Suche leeren",
-    "edit_item": "Eintrag bearbeiten"
+    "edit_item": "Eintrag bearbeiten",
+    "open_map": "Karte öffnen",
+    "map_title": "Karte der Sammlerstücke",
+    "you_are_here": "Du bist hier"
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Mit Google anmelden"

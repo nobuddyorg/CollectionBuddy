@@ -13,11 +13,16 @@ export function SearchInput({
   const { t } = useI18n();
   return (
     <div className="relative flex w-full items-center">
+      <Icon
+        icon={IconType.Search}
+        className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
+        aria-hidden
+      />
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={t('item_list.search_placeholder')}
-        className="w-full rounded-xl border bg-background py-2 pl-3 pr-10 shadow-sm"
+        className="w-full rounded-xl border bg-background py-2 pl-9 pr-10 shadow-sm"
       />
       {value && (
         <button
