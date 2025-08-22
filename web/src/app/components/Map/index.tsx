@@ -3,8 +3,6 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Leaflet's default icon path is not set up for Next.js.
-// This is a workaround to make the default marker icon work.
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
@@ -37,7 +35,6 @@ const Map: React.FC<MapProps> = ({ markers }) => {
 
   useEffect(() => {
     if (mapInstance.current && markers.length > 0) {
-      // Clear existing markers
       mapInstance.current.eachLayer((layer) => {
         if (layer instanceof L.Marker) {
           mapInstance.current?.removeLayer(layer);

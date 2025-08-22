@@ -13,6 +13,7 @@ import { useItemImages } from './useItemImages';
 import type { ImgEntry } from './types';
 import Map from '../Map';
 import { usePlaces } from '../Map/usePlaces';
+import Icon, { IconType } from '../Icon';
 
 export default function ItemList({ categoryId }: { categoryId: string }) {
   const { t } = useI18n();
@@ -111,11 +112,18 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
       <div className="flex gap-2">
         <SearchInput value={q} onChange={setQ} />
         <button
-          className="p-2 border rounded-lg"
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110"
           onClick={() => setMapOpen(true)}
           title={t('item_list.open_map')}
+          aria-label={t('item_list.open_map')}
         >
-          🗺️
+          <Icon
+            icon={IconType.Map}
+            className="w-5 h-5"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+          />
         </button>
       </div>
 
