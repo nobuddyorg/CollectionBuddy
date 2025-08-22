@@ -1,10 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../supabase';
 import { useI18n } from '../../i18n/useI18n';
 import ItemForm, { ItemFormValues } from '../ItemForm';
 import CenteredModal from '../CenteredModal';
 import { SearchInput } from './SearchInput';
+import ItemCreate from '../ItemCreate';
+import { usePref } from '../../usePref';
 import { Pagination } from './Pagination';
 import { ItemCard } from './ItemCard';
 import { ModalImage } from './ModalImage';
@@ -17,6 +19,9 @@ import Icon, { IconType } from '../Icon';
 
 export default function ItemList({ categoryId }: { categoryId: string }) {
   const { t } = useI18n();
+
+  const prefKey = `cb_open_${categoryId}`;
+  const [isCreateOpen, setCreateOpen] = usePref(prefKey, false);
 
   const [mapOpen, setMapOpen] = useState(false);
   const { places, loading: loadingPlaces } = usePlaces(categoryId);
@@ -54,6 +59,11 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     categoryId,
     qDebounced,
   );
+
+  const handleCreated = useCallback(() => {
+    setCreateOpen(false);
+    void reload();
+  }, [setCreateOpen, reload]);
 
   const {
     images,
@@ -137,7 +147,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         <button
           className={
             'w-9 h-9 flex items-center justify-center rounded-xl ' +
-            'bg-primary text-primary-foreground shadow-sm ' +
+            'bg-primary/10 text-primary/80 shadow-sm ' +
             'hover:brightness-110'
           }
           onClick={() => setMapOpen(true)}
@@ -151,6 +161,13 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
             strokeWidth="2"
             fill="none"
           />
+        </button>
+        <button
+          onClick={() => setCreateOpen(true)}
+          className="rounded-xl px-3 py-1.5 bg-primary text-primary-foreground shadow-sm hover:brightness-110"
+          aria-label={t('item_create.new_entry')}
+        >
+          {t('common.add')}
         </button>
       </div>
 
@@ -234,6 +251,15 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
             }
           />
         )}
+      </CenteredModal>
+
+      <CenteredModal
+        open={isCreateOpen}
+        onOpenChange={setCreateOpen}
+        title={t('item_create.new_entry')}
+        closeLabel="X"
+      >
+        <ItemCreate categoryId={categoryId} onCreated={handleCreated} />
       </CenteredModal>
     </div>
   );
