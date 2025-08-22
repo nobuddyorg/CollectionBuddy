@@ -50,7 +50,7 @@ export function usePlaces(categoryId: string) {
               console.error(`Error fetching coordinates for ${place}`, e);
               return null;
             }
-          })
+          }),
         );
 
         setPlaces(placeCoordinates.filter((p): p is Place => p !== null));

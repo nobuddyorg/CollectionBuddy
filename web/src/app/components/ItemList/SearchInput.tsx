@@ -30,7 +30,10 @@ export function SearchInput({
           className="clear-button absolute right-3 top-1/2 -translate-y-1/2"
           aria-label={t('item_list.search_clear')}
         >
-          <Icon icon={IconType.Close} className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+          <Icon
+            icon={IconType.Close}
+            className="h-5 w-5 text-gray-400 hover:text-gray-600"
+          />
         </button>
       )}
     </div>

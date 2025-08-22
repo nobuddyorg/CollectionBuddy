@@ -21,12 +21,35 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
   const [mapOpen, setMapOpen] = useState(false);
   const { places, loading: loadingPlaces } = usePlaces(categoryId);
 
+  const [currentLocation, setCurrentLocation] = useState<null | {
+    lat: number;
+    lng: number;
+  }>(null);
+
+  useEffect(() => {
+    if (!mapOpen) return;
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCurrentLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      () => {
+        // silently ignore; user denied or unavailable
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60_000 },
+    );
+  }, [mapOpen]);
+
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
   useEffect(() => {
     const id = setTimeout(() => setQDebounced(q.trim()), 200);
     return () => clearTimeout(id);
   }, [q]);
+
   const { items, page, setPage, totalPages, reload, setItems } = useItems(
     categoryId,
     qDebounced,
@@ -112,7 +135,11 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
       <div className="flex gap-2">
         <SearchInput value={q} onChange={setQ} />
         <button
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110"
+          className={
+            'w-9 h-9 flex items-center justify-center rounded-xl ' +
+            'bg-primary text-primary-foreground shadow-sm ' +
+            'hover:brightness-110'
+          }
           onClick={() => setMapOpen(true)}
           title={t('item_list.open_map')}
           aria-label={t('item_list.open_map')}
@@ -196,6 +223,15 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               lng: p.lng,
               popupText: p.name,
             }))}
+            currentLocation={
+              currentLocation
+                ? {
+                    lat: currentLocation.lat,
+                    lng: currentLocation.lng,
+                    popupText: t('item_list.you_are_here') ?? 'You are here',
+                  }
+                : undefined
+            }
           />
         )}
       </CenteredModal>
