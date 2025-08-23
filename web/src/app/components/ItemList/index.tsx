@@ -263,7 +263,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
       >
         {loadingPlaces ? (
           <p>{t('common.loading')}</p>
-        ) : (
+        ) : mapOpen ? (
           <div className="relative">
             <Map
               command={mapCommand}
@@ -311,7 +311,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               </button>
             </div>
           </div>
-        )}
+        ) : null}
       </CenteredModal>
 
       <CenteredModal
