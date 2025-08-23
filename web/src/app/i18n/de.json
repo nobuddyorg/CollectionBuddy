@@ -46,7 +46,10 @@
     "edit_item": "Eintrag bearbeiten",
     "open_map": "Karte öffnen",
     "map_title": "Karte der Sammlerstücke",
-    "you_are_here": "Du bist hier"
+    "you_are_here": "Du bist hier",
+    "more_actions": "Weitere Aktionen",
+    "zoom_to_current_location": "Zum aktuellen Standort zoomen",
+    "frame_all_pins": "Alle Pins einrahmen"
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Mit Google anmelden"
@@ -59,6 +62,9 @@
     "subtitle": "Dein digitales Sammelalbum für Münzen, Plüschtiere, Briefmarken und alles, was dir am Herzen liegt."
   },
   "common": {
-    "loading":"Wird geladen…"
+    "loading":"Wird geladen…",
+    "close": "Schließen",
+    "save": "Speichern",
+    "close_x": "X"
   }
 }

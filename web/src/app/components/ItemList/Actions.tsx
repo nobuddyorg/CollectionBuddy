@@ -32,7 +32,7 @@ export function Actions({
       <button
         className="sm:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-card border text-foreground shadow"
         onClick={onClose}
-        aria-label={t('common.close') ?? 'Close'}
+        aria-label={t('common.close')}
       >
         <Icon
           icon={IconType.Close}
