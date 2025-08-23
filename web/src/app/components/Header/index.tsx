@@ -3,15 +3,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
-
-type HeaderUser = {
-  email?: string | null;
-};
-
-type Props = {
-  user: HeaderUser;
-  onSignOut: () => Promise<void> | void;
-};
+import { HeaderProps } from './types.ts';
 
 const withBasePath = (path: string): string => {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
@@ -19,7 +11,7 @@ const withBasePath = (path: string): string => {
   return `${basePath}${normalizedPath}`;
 };
 
-export default function Header({ user, onSignOut }: Props) {
+export default function Header({ user, onSignOut }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { t } = useI18n();
   const displayEmail = user.email ?? '';

@@ -5,24 +5,12 @@ import 'leaflet/dist/leaflet.css';
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
-
-type Leaflet = typeof import('leaflet');
-
-type IconDefaultPrivate = import('leaflet').Icon.Default & {
-  _getIconUrl?: () => string;
-};
-
-interface MarkerInput {
-  lat: number;
-  lng: number;
-  popupText: string;
-}
-
-interface MapProps {
-  markers: MarkerInput[];
-  currentLocation?: { lat: number; lng: number; popupText?: string };
-  command?: 'fitAll' | 'fitCurrent' | null;
-}
+import {
+  IconDefaultPrivate,
+  Leaflet,
+  MapProps,
+  MarkerInput,
+} from './types.ts';
 
 const toUrl = (mod: unknown): string => {
   if (typeof mod === 'string') return mod;

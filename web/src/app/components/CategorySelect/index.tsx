@@ -13,7 +13,7 @@ import {
 import { CategoryText } from './CategoryText';
 import { CategorySelectDropdown } from './Dropdown';
 import { CategoryInput } from './Input';
-import { useCategories } from './useCategories';
+import { useCategories } from './useCategories.tsx';
 
 type Props = {
   selectedCat: string | null;
