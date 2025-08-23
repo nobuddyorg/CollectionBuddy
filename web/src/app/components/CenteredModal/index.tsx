@@ -4,8 +4,8 @@ import { Backdrop } from './Backdrop';
 import { Dialog } from './Dialog';
 import { Portal } from './Portal';
 import type { CenteredModalProps } from './types';
-import { useEscapeToClose } from './useEscapeToClose';
-import { useLockBodyScroll } from './useLockBodyScroll';
+import { useEscapeToClose } from './useEscapeToClose.tsx';
+import { useLockBodyScroll } from './useLockBodyScroll.tsx';
 
 export default function CenteredModal({
   open,

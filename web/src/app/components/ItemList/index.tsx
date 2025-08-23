@@ -10,11 +10,11 @@ import { usePref } from '../../usePref';
 import { Pagination } from './Pagination';
 import { ItemCard } from './ItemCard';
 import { ModalImage } from './ModalImage';
-import { useItems } from './useItems';
-import { useItemImages } from './useItemImages';
+import { useItems } from './useItems.tsx';
+import { useItemImages } from './useItemImages.tsx';
 import type { ImgEntry } from './types';
 import Map from '../Map';
-import { usePlaces } from '../Map/usePlaces';
+import { usePlaces } from '../Map/usePlaces.tsx';
 import Icon, { IconType } from '../Icon';
 
 export default function ItemList({ categoryId }: { categoryId: string }) {

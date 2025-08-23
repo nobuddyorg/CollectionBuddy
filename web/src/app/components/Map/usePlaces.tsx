@@ -1,12 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../supabase';
-
-interface Place {
-  name: string;
-  lat: number;
-  lng: number;
-}
+import { Place } from './types.ts';
 
 export function usePlaces(categoryId: string) {
   const [places, setPlaces] = useState<Place[]>([]);
