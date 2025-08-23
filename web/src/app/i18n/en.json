@@ -46,7 +46,10 @@
     "edit_item": "Edit entry",
     "open_map": "Open Map",
     "map_title": "Map of Collectibles",
-    "you_are_here": "You are here"
+    "you_are_here": "You are here",
+    "more_actions": "More actions",
+    "zoom_to_current_location": "Zoom to current location",
+    "frame_all_pins": "Frame all pins"
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Sign in with Google"
@@ -59,6 +62,9 @@
     "subtitle": "Your digital scrapbook for coins, stuffed animals, stamps and everything you love."
   },
   "common": {
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "close": "Close",
+    "save": "Save",
+    "close_x": "X"
   }
 }

@@ -171,7 +171,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
       <ModalImage url={modalImage} onClose={() => setModalImage(null)} />
 
-      <CenteredModal open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) setEditing(null); }} title={t('item_list.edit_item')} closeLabel="X">
+      <CenteredModal open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) setEditing(null); }} title={t('item_list.edit_item')} closeLabel={t('common.close_x')}>
         <section className="relative z-[50]">
           <ItemForm
             key={editing?.id}
@@ -185,7 +185,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         </section>
       </CenteredModal>
 
-      <CenteredModal open={mapOpen} onOpenChange={setMapOpen} title={t('item_list.map_title')} closeLabel="X">
+      <CenteredModal open={mapOpen} onOpenChange={setMapOpen} title={t('item_list.map_title')} closeLabel={t('common.close_x')}>
         {loadingPlaces ? (
           <p>{t('common.loading')}</p>
         ) : (
@@ -195,7 +195,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               markers={places.map((p) => ({ lat: p.lat, lng: p.lng, popupText: p.name }))}
               currentLocation={
                 currentLocation
-                  ? { lat: currentLocation.lat, lng: currentLocation.lng, popupText: t('item_list.you_are_here') ?? 'You are here' }
+                  ? { lat: currentLocation.lat, lng: currentLocation.lng, popupText: t('item_list.you_are_here') }
                   : undefined
               }
             />
@@ -208,8 +208,8 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                   setTimeout(() => setMapCommand(null), 0);
                 }}
                 className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary/10 text-primary/80 shadow-sm hover:brightness-110 disabled:opacity-50"
-                aria-label="Zoom to current location"
-                title="Zoom to current location"
+                aria-label={t('item_list.zoom_to_current_location')}
+                title={t('item_list.zoom_to_current_location')}
                 disabled={!currentLocation}
               >
                 <Icon icon={IconType.Gps} className="w-5 h-5" />
@@ -221,8 +221,8 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                   setTimeout(() => setMapCommand(null), 0);
                 }}
                 className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary/10 text-primary/80 shadow-sm hover:brightness-110"
-                aria-label="Frame all pins"
-                title="Frame all pins"
+                aria-label={t('item_list.frame_all_pins')}
+                title={t('item_list.frame_all_pins')}
               >
                 <Icon icon={IconType.Frame} className="w-5 h-5" />
               </button>
@@ -231,7 +231,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         )}
       </CenteredModal>
 
-      <CenteredModal open={isCreateOpen} onOpenChange={setCreateOpen} title={t('item_create.new_entry')} closeLabel="X">
+      <CenteredModal open={isCreateOpen} onOpenChange={setCreateOpen} title={t('item_create.new_entry')} closeLabel={t('common.close_x')}>
         <ItemCreate categoryId={categoryId} onCreated={handleCreated} />
       </CenteredModal>
     </div>
