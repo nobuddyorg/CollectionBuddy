@@ -4,8 +4,8 @@ import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import ItemForm, { ItemFormValues } from '../ItemForm';
-import { useCreateItem } from './useCreateItem.tsx';
-import { Props } from './types.ts';
+import { useCreateItem } from './useCreateItem';
+import { Props } from './types';
 
 export default function ItemCreate({ categoryId, onCreated }: Props) {
   const { t } = useI18n();

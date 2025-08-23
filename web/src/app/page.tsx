@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-
 import { useRouter } from 'next/navigation';
 
 import CategorySelect from './components/CategorySelect/index';
@@ -36,10 +35,11 @@ export default function Page() {
   if (!user) return null;
 
   const hasCategory = !!selectedCategoryId;
+  const headerUser = { ...user, email: user.email ?? '' };
 
   return (
     <div className="min-h-[100dvh] bg-gradient-to-b from-amber-50 via-white to-stone-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 text-neutral-900 dark:text-neutral-100">
-      <Header user={user} onSignOut={signOut} />
+      <Header user={headerUser} onSignOut={signOut} />
 
       <main className="mx-auto max-w-3xl px-4 py-6 sm:py-8 space-y-6">
         <CategorySelect

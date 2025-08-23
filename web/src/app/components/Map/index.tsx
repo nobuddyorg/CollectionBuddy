@@ -5,12 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
-import {
-  IconDefaultPrivate,
-  Leaflet,
-  MapProps,
-  MarkerInput,
-} from './types.ts';
+import { IconDefaultPrivate, Leaflet, MapProps } from './types';
 
 const toUrl = (mod: unknown): string => {
   if (typeof mod === 'string') return mod;
@@ -18,6 +13,8 @@ const toUrl = (mod: unknown): string => {
   if (withSrc && typeof withSrc.src === 'string') return withSrc.src;
   throw new Error('Unsupported image import format');
 };
+
+const BOUNDS_PAD_RATIO = 0.015;
 
 const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -73,13 +70,17 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
         if (cmd === 'fitAll') {
           const pts: Array<import('leaflet').LatLngExpression> = [];
           markers.forEach((m) => pts.push([m.lat, m.lng]));
-          if (currentLocation) pts.push([currentLocation.lat, currentLocation.lng]);
+          if (currentLocation)
+            pts.push([currentLocation.lat, currentLocation.lng]);
           if (pts.length > 0) {
-            const bounds = L.latLngBounds(pts);
+            const bounds = L.latLngBounds(pts).pad(BOUNDS_PAD_RATIO);
             if (bounds.isValid()) map.fitBounds(bounds, { padding: [8, 8] });
           }
         } else if (cmd === 'fitCurrent' && currentLocation) {
-          const bounds = L.latLng(currentLocation.lat, currentLocation.lng).toBounds(100000);
+          const bounds = L.latLng(
+            currentLocation.lat,
+            currentLocation.lng,
+          ).toBounds(100000);
           map.fitBounds(bounds, { padding: [8, 8] });
         }
       });
@@ -116,10 +117,10 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       points.push([lat, lng]);
     }
 
-    // Only auto-fit once on first render; afterwards use the buttons.
     if (!hasInitialFit.current && points.length > 0) {
-      const bounds = L.latLngBounds(points);
-      if (bounds.isValid()) mapInstance.current.fitBounds(bounds, { padding: [8, 8] });
+      const bounds = L.latLngBounds(points).pad(BOUNDS_PAD_RATIO);
+      if (bounds.isValid())
+        mapInstance.current.fitBounds(bounds, { padding: [8, 8] });
       hasInitialFit.current = true;
     }
   }, [markers, currentLocation, ready]);
@@ -133,11 +134,15 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       markers.forEach((m) => pts.push([m.lat, m.lng]));
       if (currentLocation) pts.push([currentLocation.lat, currentLocation.lng]);
       if (pts.length > 0) {
-        const bounds = L.latLngBounds(pts);
-        if (bounds.isValid()) mapInstance.current.fitBounds(bounds, { padding: [8, 8] });
+        const bounds = L.latLngBounds(pts).pad(BOUNDS_PAD_RATIO);
+        if (bounds.isValid())
+          mapInstance.current.fitBounds(bounds, { padding: [8, 8] });
       }
     } else if (command === 'fitCurrent' && currentLocation) {
-      const bounds = L.latLng(currentLocation.lat, currentLocation.lng).toBounds(100000);
+      const bounds = L.latLng(
+        currentLocation.lat,
+        currentLocation.lng,
+      ).toBounds(100000);
       mapInstance.current.fitBounds(bounds, { padding: [8, 8] });
     }
   }, [command, markers, currentLocation, ready]);

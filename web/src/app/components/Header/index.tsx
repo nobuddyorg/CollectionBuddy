@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
-import { HeaderProps } from './types.ts';
+import { HeaderProps } from './types';
 
 const withBasePath = (path: string): string => {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
