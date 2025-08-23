@@ -57,5 +57,8 @@
     "title_collection": "Collection",
     "title_buddy": "Buddy",
     "subtitle": "Your digital scrapbook for coins, stuffed animals, stamps and everything you love."
+  },
+  "common": {
+    "loading": "Loading…"
   }
 }

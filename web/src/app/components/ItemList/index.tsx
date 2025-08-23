@@ -25,29 +25,19 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
   const [mapOpen, setMapOpen] = useState(false);
   const { places, loading: loadingPlaces } = usePlaces(categoryId);
-  const [mapCommand, setMapCommand] = useState<'fitAll' | 'fitCurrent' | null>(
-    'fitAll',
-  );
+  const [mapCommand, setMapCommand] = useState<'fitAll' | 'fitCurrent' | null>('fitAll');
 
-  const [currentLocation, setCurrentLocation] = useState<null | {
-    lat: number;
-    lng: number;
-  }>(null);
+  const [currentLocation, setCurrentLocation] = useState<null | { lat: number; lng: number }>(null);
 
   useEffect(() => {
     if (!mapOpen) return;
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setCurrentLocation({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        });
+        setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       },
-      () => {
-        // silently ignore; user denied or unavailable
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60_000 },
+      () => {},
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
     );
   }, [mapOpen]);
 
@@ -58,24 +48,14 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     return () => clearTimeout(id);
   }, [q]);
 
-  const { items, page, setPage, totalPages, reload, setItems } = useItems(
-    categoryId,
-    qDebounced,
-  );
+  const { items, page, setPage, totalPages, reload, setItems } = useItems(categoryId, qDebounced);
 
   const handleCreated = useCallback(() => {
     setCreateOpen(false);
     void reload();
   }, [setCreateOpen, reload]);
 
-  const {
-    images,
-    refreshAllImages,
-    uploadImage,
-    deleteImage,
-    busy,
-    deletingPath,
-  } = useItemImages();
+  const { images, refreshAllImages, uploadImage, deleteImage, busy, deletingPath } = useItemImages();
 
   useEffect(() => {
     if (!items.length) return;
@@ -83,10 +63,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
   }, [items, refreshAllImages]);
 
   const [editOpen, setEditOpen] = useState(false);
-  const [editing, setEditing] = useState<null | {
-    id: string;
-    values: ItemFormValues;
-  }>(null);
+  const [editing, setEditing] = useState<null | { id: string; values: ItemFormValues }>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [modalImage, setModalImage] = useState<string | null>(null);
 
@@ -119,17 +96,12 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         place: values.place.trim() || null,
         tags: values.tags,
       };
-      const { error } = await supabase
-        .from('items')
-        .update(payload)
-        .eq('id', editing.id);
+      const { error } = await supabase.from('items').update(payload).eq('id', editing.id);
       if (error) {
         alert(error.message);
         return;
       }
-      setItems((prev) =>
-        prev.map((it) => (it.id === editing.id ? { ...it, ...payload } : it)),
-      );
+      setItems((prev) => prev.map((it) => (it.id === editing.id ? { ...it, ...payload } : it)));
       setEditOpen(false);
       setEditing(null);
     } finally {
@@ -199,69 +171,42 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
       <ModalImage url={modalImage} onClose={() => setModalImage(null)} />
 
-      <CenteredModal
-        open={editOpen}
-        onOpenChange={(v) => {
-          setEditOpen(v);
-          if (!v) setEditing(null);
-        }}
-        title={t('item_list.edit_item')}
-        closeLabel="X"
-      >
+      <CenteredModal open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) setEditing(null); }} title={t('item_list.edit_item')} closeLabel="X">
         <section className="relative z-[50]">
           <ItemForm
             key={editing?.id}
-            initial={
-              editing?.values ?? {
-                title: '',
-                description: '',
-                place: '',
-                tags: [],
-              }
-            }
+            initial={editing?.values ?? { title: '', description: '', place: '', tags: [] }}
             submitLabel={t('common.save')}
             submitting={isSaving}
             onSubmit={saveEdit}
-            onCancel={() => {
-              setEditOpen(false);
-              setEditing(null);
-            }}
+            onCancel={() => { setEditOpen(false); setEditing(null); }}
             showIconSubmit
           />
         </section>
       </CenteredModal>
 
-      <CenteredModal
-        open={mapOpen}
-        onOpenChange={setMapOpen}
-        title={t('item_list.map_title')}
-        closeLabel="X"
-      >
+      <CenteredModal open={mapOpen} onOpenChange={setMapOpen} title={t('item_list.map_title')} closeLabel="X">
         {loadingPlaces ? (
           <p>{t('common.loading')}</p>
         ) : (
           <div className="relative">
             <Map
               command={mapCommand}
-              markers={places.map((p) => ({
-                lat: p.lat,
-                lng: p.lng,
-                popupText: p.name,
-              }))}
+              markers={places.map((p) => ({ lat: p.lat, lng: p.lng, popupText: p.name }))}
               currentLocation={
                 currentLocation
-                  ? {
-                      lat: currentLocation.lat,
-                      lng: currentLocation.lng,
-                      popupText: t('item_list.you_are_here') ?? 'You are here',
-                    }
+                  ? { lat: currentLocation.lat, lng: currentLocation.lng, popupText: t('item_list.you_are_here') ?? 'You are here' }
                   : undefined
               }
             />
             <div className="absolute top-2 right-2 z-[1000] bg-white/50 backdrop-blur rounded-lg flex gap-1 p-1">
               <button
                 type="button"
-                onClick={() => setMapCommand('fitCurrent')}
+                onClick={() => {
+                  if (!currentLocation) return;
+                  setMapCommand('fitCurrent');
+                  setTimeout(() => setMapCommand(null), 0);
+                }}
                 className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary/10 text-primary/80 shadow-sm hover:brightness-110 disabled:opacity-50"
                 aria-label="Zoom to current location"
                 title="Zoom to current location"
@@ -271,7 +216,10 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               </button>
               <button
                 type="button"
-                onClick={() => setMapCommand('fitAll')}
+                onClick={() => {
+                  setMapCommand('fitAll');
+                  setTimeout(() => setMapCommand(null), 0);
+                }}
                 className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary/10 text-primary/80 shadow-sm hover:brightness-110"
                 aria-label="Frame all pins"
                 title="Frame all pins"
@@ -283,12 +231,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         )}
       </CenteredModal>
 
-      <CenteredModal
-        open={isCreateOpen}
-        onOpenChange={setCreateOpen}
-        title={t('item_create.new_entry')}
-        closeLabel="X"
-      >
+      <CenteredModal open={isCreateOpen} onOpenChange={setCreateOpen} title={t('item_create.new_entry')} closeLabel="X">
         <ItemCreate categoryId={categoryId} onCreated={handleCreated} />
       </CenteredModal>
     </div>
