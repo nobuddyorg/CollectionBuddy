@@ -23,12 +23,23 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
   const layersRef = useRef<import('leaflet').LayerGroup | null>(null);
 
   const latestCommandRef = useRef<MapProps['command']>(null);
+  const markersRef = useRef(markers);
+  const currentLocRef = useRef(currentLocation);
+
   const [ready, setReady] = useState(false);
   const hasInitialFit = useRef(false);
 
   useEffect(() => {
     latestCommandRef.current = command ?? null;
   }, [command]);
+
+  useEffect(() => {
+    markersRef.current = markers;
+  }, [markers]);
+
+  useEffect(() => {
+    currentLocRef.current = currentLocation;
+  }, [currentLocation]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,23 +75,24 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       setReady(true);
       requestAnimationFrame(() => map.invalidateSize());
 
+      const L2 = LRef.current;
       const cmd = latestCommandRef.current;
-      if (!cmd) return;
+      if (!L2 || !cmd) return;
+
       requestAnimationFrame(() => {
         if (cmd === 'fitAll') {
           const pts: Array<import('leaflet').LatLngExpression> = [];
-          markers.forEach((m) => pts.push([m.lat, m.lng]));
-          if (currentLocation)
-            pts.push([currentLocation.lat, currentLocation.lng]);
+          markersRef.current.forEach((m) => pts.push([m.lat, m.lng]));
+          const loc = currentLocRef.current;
+          if (loc) pts.push([loc.lat, loc.lng]);
           if (pts.length > 0) {
-            const bounds = L.latLngBounds(pts).pad(BOUNDS_PAD_RATIO);
+            const bounds = L2.latLngBounds(pts).pad(BOUNDS_PAD_RATIO);
             if (bounds.isValid()) map.fitBounds(bounds, { padding: [8, 8] });
           }
-        } else if (cmd === 'fitCurrent' && currentLocation) {
-          const bounds = L.latLng(
-            currentLocation.lat,
-            currentLocation.lng,
-          ).toBounds(100000);
+        } else if (cmd === 'fitCurrent') {
+          const loc = currentLocRef.current;
+          if (!loc) return;
+          const bounds = L2.latLng(loc.lat, loc.lng).toBounds(100000);
           map.fitBounds(bounds, { padding: [8, 8] });
         }
       });
@@ -88,7 +100,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     return () => {
       cancelled = true;
     };
-  }, [markers, currentLocation]);
+  }, []);
 
   useEffect(() => {
     const L = LRef.current;
@@ -127,25 +139,26 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
 
   useEffect(() => {
     const L = LRef.current;
-    if (!ready || !L || !mapInstance.current) return;
+    const map = mapInstance.current;
+    if (!ready || !L || !map) return;
+    if (!command) return;
 
     if (command === 'fitAll') {
       const pts: Array<import('leaflet').LatLngExpression> = [];
-      markers.forEach((m) => pts.push([m.lat, m.lng]));
-      if (currentLocation) pts.push([currentLocation.lat, currentLocation.lng]);
+      markersRef.current.forEach((m) => pts.push([m.lat, m.lng]));
+      const loc = currentLocRef.current;
+      if (loc) pts.push([loc.lat, loc.lng]);
       if (pts.length > 0) {
         const bounds = L.latLngBounds(pts).pad(BOUNDS_PAD_RATIO);
-        if (bounds.isValid())
-          mapInstance.current.fitBounds(bounds, { padding: [8, 8] });
+        if (bounds.isValid()) map.fitBounds(bounds, { padding: [8, 8] });
       }
-    } else if (command === 'fitCurrent' && currentLocation) {
-      const bounds = L.latLng(
-        currentLocation.lat,
-        currentLocation.lng,
-      ).toBounds(100000);
-      mapInstance.current.fitBounds(bounds, { padding: [8, 8] });
+    } else if (command === 'fitCurrent') {
+      const loc = currentLocRef.current;
+      if (!loc) return;
+      const bounds = L.latLng(loc.lat, loc.lng).toBounds(100000);
+      map.fitBounds(bounds, { padding: [8, 8] });
     }
-  }, [command, markers, currentLocation, ready]);
+  }, [command, ready]);
 
   return <div ref={mapRef} style={{ height: '400px', width: '100%' }} />;
 };

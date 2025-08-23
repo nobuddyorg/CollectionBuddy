@@ -18,9 +18,7 @@ export function usePlaces(categoryId: string) {
           .not('place', 'is', null)
           .neq('place', '');
 
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         const uniquePlaces = Array.from(new Set(items.map((i) => i.place!)));
 
@@ -31,26 +29,22 @@ export function usePlaces(categoryId: string) {
               url.searchParams.set('q', place);
               url.searchParams.set('limit', '1');
               const res = await fetch(url.toString());
-              if (!res.ok) {
-                console.error(`Failed to fetch coordinates for ${place}`);
-                return null;
-              }
+              if (!res.ok) return null;
               const data = await res.json();
               if (data.features && data.features.length > 0) {
                 const [lng, lat] = data.features[0].geometry.coordinates;
                 return { name: place, lat, lng };
               }
               return null;
-            } catch (e) {
-              console.error(`Error fetching coordinates for ${place}`, e);
+            } catch {
               return null;
             }
           }),
         );
 
         setPlaces(placeCoordinates.filter((p): p is Place => p !== null));
-      } catch (error) {
-        console.error('Error fetching places:', error);
+      } catch {
+        setPlaces([]);
       } finally {
         setLoading(false);
       }
