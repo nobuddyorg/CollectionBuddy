@@ -37,7 +37,7 @@ export function Pagination({
   const { t } = useI18n();
   const paginationItems = useMemo(
     () => getPaginationItems(page, totalPages),
-    [page, totalPages]
+    [page, totalPages],
   );
 
   if (totalPages <= 1) return null;
@@ -81,7 +81,7 @@ export function Pagination({
           >
             {item}
           </button>
-        )
+        ),
       )}
 
       <button
