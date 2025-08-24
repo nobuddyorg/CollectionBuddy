@@ -59,6 +59,10 @@ The static files will be generated in the `docs` directory, ready for deployment
 
 The application is built as a static site and can be deployed on any static hosting service, such as GitHub Pages, Vercel, or Netlify. The `build.sh` script prepares the application for deployment by placing the static files in the `docs` directory.
 
+## Technology Map
+
+![technologie-map](technology-map.drawio.png)
+
 ## Contributing
 Contributions are welcome! Whether it's a bug fix, new feature, or just improving the docs—open an issue or submit a pull request.
 
