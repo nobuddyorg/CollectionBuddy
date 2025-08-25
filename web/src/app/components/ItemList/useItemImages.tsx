@@ -11,7 +11,7 @@ export function useItemImages() {
   const [deletingPath, setDeletingPath] = useState<string | null>(null);
   const [images, setImages] = useState<Record<string, ImgEntry[]>>({});
 
-  const refreshItemImages = useCallback(async (itemId: string) => {
+  const getItemImageEntries = useCallback(async (itemId: string) => {
     const { data: u } = await supabase.auth.getUser();
     const uid = u.user?.id;
     if (!uid) return;
@@ -23,11 +23,13 @@ export function useItemImages() {
         limit: 48,
         sortBy: { column: 'created_at', order: 'desc' },
       });
-    if (error) return;
 
+    if (error) {
+      console.error('Failed to list images', error);
+      return [];
+    }
     if (!data?.length) {
-      setImages((prev) => ({ ...prev, [itemId]: [] }));
-      return;
+      return [];
     }
 
     const pairs = new Map<
@@ -46,34 +48,73 @@ export function useItemImages() {
       pairs.set(base, slot);
     }
 
-    const entries: ImgEntry[] = [];
-    for (const [, { full, thumb }] of pairs) {
+    const entryData = new Map<string, { pathFull: string; pathThumb?: string }>();
+    for (const [base, { full, thumb }] of pairs) {
       if (!full) continue;
       const pathFull = `${prefix}/${full.name}`;
-      const { data: sFull } = await supabase.storage
-        .from('item-images')
-        .createSignedUrl(pathFull, 3600);
-      const urlFull = sFull?.signedUrl ?? '';
-      let pathThumb: string | undefined;
-      let urlThumb: string | undefined;
-      if (thumb) {
-        pathThumb = `${prefix}/${thumb.name}`;
-        const { data: sThumb } = await supabase.storage
-          .from('item-images')
-          .createSignedUrl(pathThumb, 3600);
-        urlThumb = sThumb?.signedUrl ?? undefined;
-      }
-      entries.push({ pathFull, urlFull, pathThumb, urlThumb });
+      const pathThumb = thumb ? `${prefix}/${thumb.name}` : undefined;
+      entryData.set(base, { pathFull, pathThumb });
     }
 
-    setImages((prev) => ({ ...prev, [itemId]: entries }));
+    const pathsToSign = Array.from(entryData.values()).flatMap((e) =>
+      e.pathThumb ? [e.pathFull, e.pathThumb] : [e.pathFull],
+    );
+    if (pathsToSign.length === 0) return [];
+
+    const { data: signedUrls, error: signError } = await supabase.storage
+      .from('item-images')
+      .createSignedUrls(pathsToSign, 3600);
+
+    if (signError) {
+      console.error('Failed to create signed URLs', signError);
+      return [];
+    }
+
+    const signedUrlMap = new Map(signedUrls.map((s) => [s.path, s.signedUrl]));
+    const entries: ImgEntry[] = [];
+    for (const data of entryData.values()) {
+      const urlFull = signedUrlMap.get(data.pathFull);
+      if (!urlFull) continue;
+      entries.push({
+        pathFull: data.pathFull,
+        urlFull,
+        pathThumb: data.pathThumb,
+        urlThumb: data.pathThumb
+          ? signedUrlMap.get(data.pathThumb)
+          : undefined,
+      });
+    }
+    return entries;
   }, []);
+
+  const refreshItemImages = useCallback(
+    async (itemId: string) => {
+      const entries = await getItemImageEntries(itemId);
+      if (typeof entries === 'undefined') return;
+      setImages((prev) => ({ ...prev, [itemId]: entries }));
+    },
+    [getItemImageEntries],
+  );
 
   const refreshAllImages = useCallback(
     async (itemIds: string[]) => {
-      await Promise.all(itemIds.map(refreshItemImages));
+      const results = await Promise.all(
+        itemIds.map(async (itemId) => {
+          const entries = await getItemImageEntries(itemId);
+          return [itemId, entries] as const;
+        }),
+      );
+
+      const validResults = results.filter(
+        (res): res is [string, ImgEntry[]] => typeof res[1] !== 'undefined',
+      );
+
+      if (validResults.length > 0) {
+        const newImages = Object.fromEntries(validResults);
+        setImages((prev) => ({ ...prev, ...newImages }));
+      }
     },
-    [refreshItemImages],
+    [getItemImageEntries],
   );
 
   const uploadImage = useCallback(
