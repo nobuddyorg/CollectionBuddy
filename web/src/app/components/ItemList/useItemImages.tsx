@@ -48,7 +48,10 @@ export function useItemImages() {
       pairs.set(base, slot);
     }
 
-    const entryData = new Map<string, { pathFull: string; pathThumb?: string }>();
+    const entryData = new Map<
+      string,
+      { pathFull: string; pathThumb?: string }
+    >();
     for (const [base, { full, thumb }] of pairs) {
       if (!full) continue;
       const pathFull = `${prefix}/${full.name}`;
@@ -79,9 +82,7 @@ export function useItemImages() {
         pathFull: data.pathFull,
         urlFull,
         pathThumb: data.pathThumb,
-        urlThumb: data.pathThumb
-          ? signedUrlMap.get(data.pathThumb)
-          : undefined,
+        urlThumb: data.pathThumb ? signedUrlMap.get(data.pathThumb) : undefined,
       });
     }
     return entries;
