@@ -1,0 +1,22 @@
+name: CollectionBuddy Keepalive
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call RPC keepalive
+        run: |
+          curl -sS -X POST "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/rpc/keepalive" \
+            -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            -H "Accept-Profile: public" \
+            -H "Content-Type: application/json" \
+            --data '{}'
+
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
