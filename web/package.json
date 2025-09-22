@@ -12,7 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
     "browser-image-compression": "^2.0.2",
-    "framer-motion": "^12.23.12",
+    "framer-motion": "^12.23.16",
     "leaflet": "^1.9.4",
     "next": "15.5.3",
     "react": "19.1.1",
