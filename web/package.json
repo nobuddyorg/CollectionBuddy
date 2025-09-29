@@ -10,11 +10,11 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.4",
+    "@supabase/supabase-js": "^2.58.0",
     "browser-image-compression": "^2.0.2",
-    "framer-motion": "^12.23.16",
+    "framer-motion": "^12.23.22",
     "leaflet": "^1.9.4",
-    "next": "15.5.3",
+    "next": "15.5.4",
     "react": "19.1.1",
     "react-dom": "19.1.1"
   },
@@ -26,7 +26,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.5.3",
+    "eslint-config-next": "15.5.4",
     "prettier": "^3.6.2",
     "tailwindcss": "^4",
     "typescript": "^5"
