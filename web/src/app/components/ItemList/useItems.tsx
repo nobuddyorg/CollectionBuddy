@@ -35,7 +35,7 @@ export function useItems(categoryId: string, q: string) {
       .eq('item_categories.category_id', categoryId);
 
     if (needle) {
-      const esc = needle.replace(/[%_]/g, '\\$&');
+      const esc = needle.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&');
       const like = `%${esc}%`;
       query = query.or(
         `title.ilike.${like},description.ilike.${like},place.ilike.${like},tags_text.ilike.${like}`,
