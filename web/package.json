@@ -10,13 +10,13 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.86.2",
+    "@supabase/supabase-js": "^2.87.1",
     "browser-image-compression": "^2.0.2",
-    "framer-motion": "^12.23.25",
+    "framer-motion": "^12.23.26",
     "leaflet": "^1.9.4",
     "next": "16.0.10",
-    "react": "19.2.1",
-    "react-dom": "19.2.1"
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -26,7 +26,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.0.7",
+    "eslint-config-next": "16.0.10",
     "prettier": "^3.7.4",
     "tailwindcss": "^4",
     "typescript": "^5"
