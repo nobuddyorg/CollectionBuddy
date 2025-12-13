@@ -36,7 +36,7 @@ To build the application for production, run the `build.sh` script from the root
 
 **Note:** A production build requires the `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` environment variables to be set. These can be obtained from your Supabase project dashboard.
 
-The static files will be generated in the `docs` directory, ready for deployment.
+The static files will be generated locally, ready for deployment. The script demonstrates how it's done, but real deployment should happen in your pipeline. 
 
 ## Technology Stack
 
