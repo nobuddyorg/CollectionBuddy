@@ -57,7 +57,7 @@ The static files will be generated locally, ready for deployment. The script dem
 
 ### Deployment
 
-The application is built as a static site and can be deployed on any static hosting service, such as GitHub Pages, Vercel, or Netlify. The `build.sh` script prepares the application for deployment by placing the static files in the `docs` directory.
+The application is built as a static site and can be deployed on any static hosting service, such as GitHub Pages, Vercel, or Netlify. The `build.sh` script prepares the application for deployment.
 
 ## Technology Map
 
