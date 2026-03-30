@@ -10,7 +10,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.99.3",
+    "@supabase/supabase-js": "^2.100.1",
     "browser-image-compression": "^2.0.2",
     "framer-motion": "^12.38.0",
     "leaflet": "^1.9.4",
