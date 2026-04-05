@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import CategorySelect from './components/CategorySelect/index';
@@ -15,6 +15,12 @@ export default function Page() {
   const { user, loading } = useSession();
   const router = useRouter();
   const { t } = useI18n();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [loading, user, router]);
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     null,
