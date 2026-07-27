@@ -2,8 +2,20 @@ import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from './data/database.types';
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
+function requireEnv(
+  name: 'NEXT_PUBLIC_SUPABASE_URL' | 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(
+      `Missing ${name} -- copy web/.env.example to web/.env.local and fill it in (see README's "Local development" section).`,
+    );
+  }
+  return value;
+}
+
+const url = requireEnv('NEXT_PUBLIC_SUPABASE_URL');
+const anon = requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
 
 export const supabase = createClient<Database>(url, anon, {
   auth: {
