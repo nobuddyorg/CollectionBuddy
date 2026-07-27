@@ -4,7 +4,7 @@ import type { ButtonHTMLAttributes } from 'react';
 
 const SIZE_CLASSES = {
   sm: 'w-8 h-8',
-  md: 'w-9 h-9',
+  md: 'w-9 h-9 max-sm:w-11 max-sm:h-11',
   lg: 'w-10 h-10',
 } as const;
 

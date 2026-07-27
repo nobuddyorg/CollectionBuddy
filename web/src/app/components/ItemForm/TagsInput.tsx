@@ -49,7 +49,7 @@ export function TagsInput({
           <button
             type="button"
             onClick={() => removeTag(tag)}
-            className="w-4 h-4 flex items-center justify-center rounded-xl bg-destructive text-destructive-foreground shadow-sm hover:brightness-110"
+            className="relative w-4 h-4 flex items-center justify-center rounded-xl bg-destructive text-destructive-foreground shadow-sm hover:brightness-110 after:absolute after:-inset-2 after:content-['']"
             aria-label={t('item_create.remove_tag').replace('{tag}', tag)}
             title={t('item_create.remove_tag').replace('{tag}', tag)}
           >

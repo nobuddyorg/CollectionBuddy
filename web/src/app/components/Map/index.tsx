@@ -198,7 +198,9 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     }
   }, [command, ready]);
 
-  return <div ref={mapRef} style={{ height: '400px', width: '100%' }} />;
+  return (
+    <div ref={mapRef} style={{ height: 'min(70dvh, 600px)', width: '100%' }} />
+  );
 };
 
 export default Map;
