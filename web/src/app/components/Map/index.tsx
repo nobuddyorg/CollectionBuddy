@@ -16,6 +16,12 @@ const toUrl = (mod: unknown): string => {
 
 const BOUNDS_PAD_RATIO = 0.015;
 
+const popupContent = (text: string): HTMLDivElement => {
+  const el = document.createElement('div');
+  el.textContent = text;
+  return el;
+};
+
 const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const LRef = useRef<Leaflet | null>(null);
@@ -111,7 +117,9 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     const points: Array<import('leaflet').LatLngExpression> = [];
 
     markers.forEach((m) => {
-      L.marker([m.lat, m.lng]).addTo(layersRef.current!).bindPopup(m.popupText);
+      L.marker([m.lat, m.lng])
+        .addTo(layersRef.current!)
+        .bindPopup(popupContent(m.popupText));
       points.push([m.lat, m.lng]);
     });
 
@@ -125,7 +133,8 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
         fillOpacity: 1,
         pane: 'currentLocation',
       }).addTo(layersRef.current!);
-      if (currentLocation.popupText) here.bindPopup(currentLocation.popupText);
+      if (currentLocation.popupText)
+        here.bindPopup(popupContent(currentLocation.popupText));
       points.push([lat, lng]);
     }
 
