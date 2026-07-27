@@ -96,7 +96,7 @@ export function Actions({
           onDelete();
           onClose();
         }}
-        className="w-9 h-9 rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600 flex items-center justify-center"
+        className="w-9 h-9 rounded-xl bg-destructive text-destructive-foreground shadow-sm hover:brightness-110 flex items-center justify-center"
         title={t('item_list.delete')}
       >
         <Icon

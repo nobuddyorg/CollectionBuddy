@@ -223,7 +223,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         <button
           type="button"
           onClick={() => setMapOpen(true)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary/10 text-primary/80 shadow-sm hover:brightness-110"
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary/15 text-amber-800 dark:text-amber-200 shadow-sm hover:brightness-110"
           aria-label={t('item_list.open_map')}
           title={t('item_list.open_map')}
         >
@@ -244,7 +244,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
       {items.length === 0 ? (
         loading ? (
           <p
-            className="py-10 text-center text-sm opacity-60"
+            className="py-10 text-center text-sm text-muted-foreground"
             aria-live="polite"
           >
             {t('common.loading')}
@@ -261,7 +261,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                     ? t('item_list.no_results_title').replace('{q}', qDebounced)
                     : t('item_list.no_items_title')}
                 </h3>
-                <p className="text-sm opacity-70">
+                <p className="text-sm text-muted-foreground">
                   {qDebounced
                     ? t('item_list.no_results_hint')
                     : t('item_list.no_items_hint')}
@@ -271,7 +271,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                 <button
                   type="button"
                   onClick={() => setQ('')}
-                  className="text-sm underline text-primary"
+                  className="text-sm underline text-amber-800 dark:text-amber-200"
                 >
                   {t('item_list.search_clear')}
                 </button>
@@ -369,7 +369,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                   : undefined
               }
             />
-            <div className="absolute top-2 right-2 z-[1000] bg-white/50 backdrop-blur rounded-lg flex gap-1 p-1">
+            <div className="absolute top-2 right-2 z-[1000] bg-card/80 backdrop-blur rounded-lg flex gap-1 p-1">
               <button
                 type="button"
                 onClick={() => {
@@ -377,7 +377,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                   setMapCommand('fitCurrent');
                   setTimeout(() => setMapCommand(null), 0);
                 }}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary/10 text-primary/80 shadow-sm hover:brightness-110 disabled:opacity-50"
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
                 aria-label={t('item_list.zoom_to_current_location')}
                 title={t('item_list.zoom_to_current_location')}
                 disabled={!currentLocation}
@@ -390,7 +390,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                   setMapCommand('fitAll');
                   setTimeout(() => setMapCommand(null), 0);
                 }}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary/10 text-primary/80 shadow-sm hover:brightness-110"
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-foreground shadow-sm hover:brightness-110"
                 aria-label={t('item_list.frame_all_pins')}
                 title={t('item_list.frame_all_pins')}
               >

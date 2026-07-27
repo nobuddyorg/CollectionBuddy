@@ -69,7 +69,7 @@ export function DeleteButtonWithLabel({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="w-8 h-8 flex items-center justify-center rounded-xl bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+      className="w-8 h-8 flex items-center justify-center rounded-xl bg-destructive text-destructive-foreground hover:brightness-110 disabled:opacity-50"
       title={label}
     >
       <Icon

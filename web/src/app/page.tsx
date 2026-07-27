@@ -80,7 +80,7 @@ export default function Page() {
                 <h3 className="text-lg font-semibold">
                   {t('page.choose_category')}
                 </h3>
-                <p className="text-sm opacity-70">
+                <p className="text-sm text-muted-foreground">
                   {t('page.add_collectibles')}
                 </p>
               </div>
@@ -89,7 +89,7 @@ export default function Page() {
         )}
       </main>
 
-      <footer className="px-4 py-8 text-center text-xs opacity-60">
+      <footer className="px-4 py-8 text-center text-xs text-muted-foreground">
         {t('page.footer')}
       </footer>
     </div>
