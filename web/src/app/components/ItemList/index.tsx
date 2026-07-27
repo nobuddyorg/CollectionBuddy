@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../supabase';
 import { useI18n } from '../../i18n/useI18n';
 import ItemForm, { ItemFormValues } from '../ItemForm';
@@ -31,6 +31,16 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
   } = usePlaces(categoryId, mapOpen);
   const [mapCommand, setMapCommand] = useState<'fitAll' | 'fitCurrent' | null>(
     'fitAll',
+  );
+
+  const mapMarkers = useMemo(
+    () =>
+      places.map((p) => ({
+        lat: p.lat,
+        lng: p.lng,
+        popupText: p.name,
+      })),
+    [places],
   );
 
   const [currentLocation, setCurrentLocation] = useState<null | {
@@ -339,11 +349,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
           <div className="relative">
             <Map
               command={mapCommand}
-              markers={places.map((p) => ({
-                lat: p.lat,
-                lng: p.lng,
-                popupText: p.name,
-              }))}
+              markers={mapMarkers}
               currentLocation={
                 currentLocation
                   ? {

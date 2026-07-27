@@ -27,6 +27,9 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
   const LRef = useRef<Leaflet | null>(null);
   const mapInstance = useRef<import('leaflet').Map | null>(null);
   const layersRef = useRef<import('leaflet').LayerGroup | null>(null);
+  const currentLocationLayerRef = useRef<import('leaflet').LayerGroup | null>(
+    null,
+  );
 
   const latestCommandRef = useRef<MapProps['command']>(null);
   const markersRef = useRef(markers);
@@ -77,6 +80,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       }).addTo(map);
 
       layersRef.current = L.layerGroup().addTo(map);
+      currentLocationLayerRef.current = L.layerGroup().addTo(map);
 
       setReady(true);
       requestAnimationFrame(() => map.invalidateSize());
@@ -105,6 +109,11 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     })();
     return () => {
       cancelled = true;
+      mapInstance.current?.remove();
+      mapInstance.current = null;
+      layersRef.current = null;
+      currentLocationLayerRef.current = null;
+      setReady(false);
     };
   }, []);
 
@@ -114,14 +123,19 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
 
     layersRef.current.clearLayers();
 
-    const points: Array<import('leaflet').LatLngExpression> = [];
-
     markers.forEach((m) => {
       L.marker([m.lat, m.lng])
         .addTo(layersRef.current!)
         .bindPopup(popupContent(m.popupText));
-      points.push([m.lat, m.lng]);
     });
+  }, [markers, ready]);
+
+  useEffect(() => {
+    const L = LRef.current;
+    if (!ready || !L || !mapInstance.current || !currentLocationLayerRef.current)
+      return;
+
+    currentLocationLayerRef.current.clearLayers();
 
     if (currentLocation) {
       const { lat, lng } = currentLocation;
@@ -132,13 +146,22 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
         fillColor: '#ef4444',
         fillOpacity: 1,
         pane: 'currentLocation',
-      }).addTo(layersRef.current!);
+      }).addTo(currentLocationLayerRef.current);
       if (currentLocation.popupText)
         here.bindPopup(popupContent(currentLocation.popupText));
-      points.push([lat, lng]);
     }
+  }, [currentLocation, ready]);
 
-    if (!hasInitialFit.current && points.length > 0) {
+  useEffect(() => {
+    const L = LRef.current;
+    if (!ready || !L || !mapInstance.current || hasInitialFit.current) return;
+
+    const points: Array<import('leaflet').LatLngExpression> = markers.map(
+      (m) => [m.lat, m.lng],
+    );
+    if (currentLocation) points.push([currentLocation.lat, currentLocation.lng]);
+
+    if (points.length > 0) {
       const bounds = L.latLngBounds(points).pad(BOUNDS_PAD_RATIO);
       if (bounds.isValid())
         mapInstance.current.fitBounds(bounds, { padding: [8, 8] });
