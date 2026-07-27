@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import Icon, { IconType } from '../Icon';
 
 function getFocusable(container: HTMLElement | null): HTMLElement[] {
   if (!container) return [];
@@ -79,11 +80,11 @@ export function Dialog({
             {title}
           </h3>
           <button
-            className="rounded-md px-3 py-1 text-sm border"
+            className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-muted"
             onClick={onClose}
             aria-label={closeLabel ?? 'Close'}
           >
-            {closeLabel ?? 'Close'}
+            <Icon icon={IconType.Close} className="w-5 h-5" />
           </button>
         </div>
         <div className="p-4 overflow-auto">{children}</div>

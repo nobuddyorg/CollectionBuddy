@@ -313,7 +313,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
           if (!v) setEditing(null);
         }}
         title={t('item_list.edit_item')}
-        closeLabel={t('common.close_x')}
+        closeLabel={t('common.close')}
       >
         <section className="relative z-[50]">
           <ItemForm
@@ -342,7 +342,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         open={mapOpen}
         onOpenChange={setMapOpen}
         title={t('item_list.map_title')}
-        closeLabel={t('common.close_x')}
+        closeLabel={t('common.close')}
       >
         {loadingPlaces ? (
           <p>{t('common.loading')}</p>
@@ -405,7 +405,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         open={isCreateOpen}
         onOpenChange={setCreateOpen}
         title={t('item_create.new_entry')}
-        closeLabel={t('common.close_x')}
+        closeLabel={t('common.close')}
       >
         <ItemCreate categoryId={categoryId} onCreated={handleCreated} />
       </CenteredModal>

@@ -2,7 +2,7 @@
   "page": {
     "entries": "Entries",
     "choose_category": "Choose category",
-    "add_collectibles": "Then you can add new collectibles and upload pictures.",
+    "add_collectibles": "Add new collectibles and upload pictures to get started.",
     "footer": "Collect • Organize • Keep"
   },
   "header": {
@@ -17,7 +17,10 @@
     "add": "Add",
     "delete": "Delete",
     "set": "Set",
-    "confirmDelete": "Confirm deletion"
+    "confirmDelete": "Confirm deletion",
+    "loadError": "Could not load categories. Please try again.",
+    "createError": "Could not create category. Please try again.",
+    "deleteError": "Could not delete category. Please try again."
   },
   "item_create": {
     "new_entry": "New entry",
@@ -29,11 +32,14 @@
     "remove_tag": "Remove tag {tag}",
     "tags_placeholder": "Enter tags… (Enter/Comma)",
     "add": "Add",
-    "search_error": "Place search failed. Please try again."
+    "search_error": "Place search failed. Please try again.",
+    "save_error": "Could not save this entry. Please try again."
   },
   "item_list": {
-    "confirm_delete": "Delete this item?",
+    "confirm_delete": "Delete this entry?",
     "no_user_session": "No user session",
+    "previous": "Previous",
+    "next": "Next",
     "image_alt": "Image {idx}",
     "full_size_image_alt": "Full size image",
     "close_modal": "Close",
@@ -42,7 +48,7 @@
     "edit": "Edit",
     "delete": "Delete",
     "add_image": "Add image",
-    "search_placeholder": "Search for…",
+    "search_placeholder": "Search",
     "search_clear": "Clear search",
     "edit_item": "Edit entry",
     "open_map": "Open Map",
@@ -50,7 +56,7 @@
     "you_are_here": "You are here",
     "more_actions": "More actions",
     "zoom_to_current_location": "Zoom to current location",
-    "frame_all_pins": "Frame all pins",
+    "frame_all_pins": "Show all locations",
     "search_error": "Search failed. Please try again.",
     "delete_images_error": "Could not delete this item's images. The item was not deleted.",
     "no_results_title": "No results for \"{q}\"",
@@ -65,7 +71,6 @@
   },
   "login_page": {
     "circle_text": "CollectionBuddy • Collect • Organize • Keep • Your treasures at a glance • ",
-    "checking_login": "Checking login…",
     "title_collection": "Collection",
     "title_buddy": "Buddy",
     "subtitle": "Your digital scrapbook for coins, stuffed animals, stamps and everything you love.",
@@ -74,7 +79,6 @@
   "common": {
     "loading": "Loading…",
     "close": "Close",
-    "save": "Save",
-    "close_x": "X"
+    "save": "Save"
   }
 }
