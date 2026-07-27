@@ -27,11 +27,11 @@ export function Actions({
         isOpen
           ? 'opacity-100 pointer-events-auto'
           : 'opacity-0 pointer-events-none',
-        'sm:opacity-0 sm:pointer-events-none sm:group-hover:opacity-100 sm:group-hover:pointer-events-auto',
+        '[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:pointer-events-auto',
       ].join(' ')}
     >
       <button
-        className="sm:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-card border text-foreground shadow"
+        className="[@media(hover:hover)]:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-card border text-foreground shadow"
         onClick={onClose}
         aria-label={t('common.close')}
       >

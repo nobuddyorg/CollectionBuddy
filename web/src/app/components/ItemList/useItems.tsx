@@ -7,7 +7,7 @@ import { useToast } from '../Toast/ToastProvider';
 import { listItems } from '../../data/items';
 import type { ItemLite } from './types';
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 9;
 
 export function useItems(categoryId: string, q: string) {
   const { t } = useI18n();

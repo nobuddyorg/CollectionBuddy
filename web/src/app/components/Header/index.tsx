@@ -22,9 +22,10 @@ export default function Header({ user, onSignOut }: HeaderProps) {
       className="sticky top-0 z-header backdrop-blur
         supports-[backdrop-filter]:bg-white/40
         dark:supports-[backdrop-filter]:bg-neutral-900/70
-        border-b border-black/5 dark:border-white/10"
+        border-b border-black/5 dark:border-white/10
+        pt-[env(safe-area-inset-top)]"
     >
-      <div className="mx-auto max-w-3xl px-4 py-3 flex items-center justify-between">
+      <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Image
             src={withBasePath('/logo.png')}

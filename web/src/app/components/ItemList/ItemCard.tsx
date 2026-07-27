@@ -44,7 +44,7 @@ export function ItemCard({
       <div className="font-medium pr-16 truncate">{item.title}</div>
 
       <button
-        className={`absolute top-3 right-3 sm:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-muted text-foreground shadow ${open ? 'hidden' : ''}`}
+        className={`absolute top-3 right-3 [@media(hover:hover)]:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-muted text-foreground shadow ${open ? 'hidden' : ''}`}
         onClick={() => setOpen(true)}
         aria-label={t('item_list.more_actions')}
       >

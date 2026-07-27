@@ -291,7 +291,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         <ul
           aria-busy={loading}
           aria-labelledby="entries-heading"
-          className={`grid sm:grid-cols-2 lg:grid-cols-2 gap-3 transition-opacity ${loading ? 'opacity-60' : ''}`}
+          className={`grid sm:grid-cols-2 lg:grid-cols-3 gap-3 transition-opacity ${loading ? 'opacity-60' : ''}`}
         >
           {items.map((it) => (
             <ItemCard

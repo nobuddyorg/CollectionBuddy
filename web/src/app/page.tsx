@@ -64,7 +64,7 @@ export default function Page() {
 
       <main
         id="main-content"
-        className="mx-auto max-w-3xl px-4 py-6 sm:py-8 space-y-6"
+        className="mx-auto max-w-5xl px-4 py-6 sm:py-8 space-y-6"
       >
         <CategorySelect
           selectedCat={selectedCategoryId}
@@ -102,7 +102,7 @@ export default function Page() {
         )}
       </main>
 
-      <footer className="px-4 py-8 text-center text-xs text-muted-foreground">
+      <footer className="px-4 py-8 pb-[calc(2rem+env(safe-area-inset-bottom))] text-center text-xs text-muted-foreground">
         {t('page.footer')}
       </footer>
     </div>

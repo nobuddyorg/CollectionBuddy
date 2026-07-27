@@ -58,8 +58,8 @@ export function ImageGrid({
             disabled={deletingPath.has(img.pathFull) || busy}
             className={[
               isOpen ? 'opacity-100' : 'opacity-0',
-              'sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100',
-              'absolute top-1 right-1 w-7 h-7 flex items-center justify-center rounded-lg bg-destructive text-destructive-foreground shadow disabled:opacity-60 transition',
+              '[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100',
+              "absolute top-1 right-1 w-7 h-7 flex items-center justify-center rounded-lg bg-destructive text-destructive-foreground shadow disabled:opacity-60 transition after:absolute after:-inset-2 after:content-['']",
             ].join(' ')}
           >
             {deletingPath.has(img.pathFull) ? (
