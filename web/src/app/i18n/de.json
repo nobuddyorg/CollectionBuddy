@@ -32,6 +32,7 @@
     "no_results": "Keine Treffer",
     "remove_tag": "Tag {tag} entfernen",
     "tags_placeholder": "Tags eingeben… (Enter/Komma)",
+    "tags_count": "{count} Tags",
     "add": "Hinzufügen",
     "search_error": "Ortssuche fehlgeschlagen. Bitte erneut versuchen.",
     "save_error": "Eintrag konnte nicht gespeichert werden. Bitte erneut versuchen."
