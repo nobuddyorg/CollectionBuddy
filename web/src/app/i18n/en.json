@@ -32,6 +32,7 @@
     "no_results": "No results",
     "remove_tag": "Remove tag {tag}",
     "tags_placeholder": "Enter tags… (Enter/Comma)",
+    "tags_count": "{count} tags",
     "add": "Add",
     "search_error": "Place search failed. Please try again.",
     "save_error": "Could not save this entry. Please try again."

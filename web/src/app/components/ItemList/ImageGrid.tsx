@@ -32,37 +32,31 @@ export function ImageGrid({
   return (
     <div className="grid grid-cols-2 gap-2">
       {imgs.map((img, i) => (
-        <div
-          key={img.pathFull}
-          className="relative group"
-          onClick={() => onOpenModal(img.urlFull)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') onOpenModal(img.urlFull);
-          }}
-        >
-          <Image
-            src={img.urlThumb || img.urlFull}
-            alt={t('item_list.image_alt')
-              .replace('{title}', itemTitle)
-              .replace('{idx}', String(i + 1))}
-            width={160}
-            height={160}
-            unoptimized
-            className="h-20 w-full object-cover rounded-xl cursor-pointer"
-          />
+        <div key={img.pathFull} className="relative group">
+          <button
+            type="button"
+            onClick={() => onOpenModal(img.urlFull)}
+            className="block w-full rounded-xl"
+          >
+            <Image
+              src={img.urlThumb || img.urlFull}
+              alt={t('item_list.image_alt')
+                .replace('{title}', itemTitle)
+                .replace('{idx}', String(i + 1))}
+              width={160}
+              height={160}
+              unoptimized
+              className="h-20 w-full object-cover rounded-xl cursor-pointer"
+            />
+          </button>
           <button
             aria-label={t('item_list.delete')}
             title={t('item_list.delete')}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(img);
-            }}
+            onClick={() => onDelete(img)}
             disabled={deletingPath.has(img.pathFull) || busy}
             className={[
               isOpen ? 'opacity-100' : 'opacity-0',
-              'sm:opacity-0 sm:group-hover:opacity-100',
+              'sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100',
               'absolute top-1 right-1 w-7 h-7 flex items-center justify-center rounded-lg bg-destructive text-destructive-foreground shadow disabled:opacity-60 transition',
             ].join(' ')}
           >

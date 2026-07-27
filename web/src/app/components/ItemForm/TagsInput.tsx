@@ -48,6 +48,7 @@ export function TagsInput({
             type="button"
             onClick={() => removeTag(tag)}
             className="w-4 h-4 flex items-center justify-center rounded-xl bg-destructive text-destructive-foreground shadow-sm hover:brightness-110"
+            aria-label={t('item_create.remove_tag').replace('{tag}', tag)}
             title={t('item_create.remove_tag').replace('{tag}', tag)}
           >
             <Icon
@@ -64,9 +65,13 @@ export function TagsInput({
         value={tagInput}
         onChange={(e) => setTagInput(e.target.value)}
         onKeyDown={onKeyDown}
+        aria-label={t('item_create.tags_placeholder')}
         placeholder={tags.length === 0 ? t('item_create.tags_placeholder') : ''}
         className="flex-1 min-w-[100px] bg-transparent py-1 text-sm"
       />
+      <span role="status" className="sr-only">
+        {t('item_create.tags_count').replace('{count}', String(tags.length))}
+      </span>
     </div>
   );
 }

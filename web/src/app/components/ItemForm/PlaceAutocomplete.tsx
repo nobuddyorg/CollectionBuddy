@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { useI18n } from '../../i18n/useI18n';
 import { usePhotonSearch } from './usePhoton';
@@ -37,6 +37,7 @@ export function PlaceAutocomplete({
     choose,
     onKeyDown,
   } = usePhotonSearch(lang);
+  const listId = useId();
 
   useEffect(() => {
     setQuery(value);
@@ -81,6 +82,13 @@ export function PlaceAutocomplete({
     <div className="relative" ref={dropdownRef}>
       <input
         ref={inputRef}
+        role="combobox"
+        aria-expanded={showMenu}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={
+          showMenu && activeIdx >= 0 ? `${listId}-opt-${activeIdx}` : undefined
+        }
         aria-label={t('item_create.place_placeholder')}
         value={value}
         onChange={(e) => {
@@ -108,6 +116,18 @@ export function PlaceAutocomplete({
         autoComplete="off"
       />
 
+      {/* The results menu is portaled to document.body, so a screen reader
+          browsing linearly never reaches it -- this status lives next to
+          the input instead, in normal reading order. */}
+      <span role="status" className="sr-only">
+        {showMenu && !loading && !error
+          ? t('item_list.results_count').replace(
+              '{count}',
+              String(results.length),
+            )
+          : ''}
+      </span>
+
       {showMenu &&
         menuPos &&
         ReactDOM.createPortal(
@@ -127,6 +147,8 @@ export function PlaceAutocomplete({
             return (
               <div
                 ref={menuRef}
+                id={listId}
+                role="listbox"
                 className="fixed rounded-xl border bg-card dark:bg-card shadow-lg overflow-y-auto max-h-60 z-popover"
                 style={style}
               >
@@ -154,7 +176,11 @@ export function PlaceAutocomplete({
                     return (
                       <button
                         key={p.osm_id}
+                        id={`${listId}-opt-${i}`}
+                        role="option"
+                        aria-selected={i === activeIdx}
                         type="button"
+                        tabIndex={-1}
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
