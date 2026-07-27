@@ -8,7 +8,7 @@ export function Backdrop({
 }) {
   return (
     <div
-      className={`fixed inset-0 z-[500] bg-black/40 backdrop-blur-sm transition-opacity ${
+      className={`fixed inset-0 z-backdrop bg-black/40 backdrop-blur-sm transition-opacity ${
         open ? 'opacity-100' : 'pointer-events-none opacity-0'
       }`}
       onClick={onClick}

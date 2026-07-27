@@ -50,7 +50,7 @@ export default function LoginPage() {
   if (checking) return <LoadingOverlay label={t('item_list.loading')} />;
 
   return (
-    <main className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden px-4 bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] overscroll-y-contain">
+    <main className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden px-4 bg-gradient-to-b from-amber-50 via-white to-stone-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 text-neutral-900 dark:text-neutral-100 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] overscroll-y-contain">
       <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight mb-2 sm:mb-4 z-20 relative">
         <span className="text-neutral-900 dark:text-neutral-100">
           {t('login_page.title_collection')}

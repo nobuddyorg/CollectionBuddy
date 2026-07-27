@@ -62,7 +62,7 @@ export function Dialog({
 
   return (
     <div
-      className={`fixed inset-0 z-[600] flex items-center justify-center p-4 transition-opacity ${
+      className={`fixed inset-0 z-modal flex items-center justify-center p-4 transition-opacity ${
         open ? 'opacity-100' : 'pointer-events-none opacity-0'
       }`}
       aria-hidden={!open}

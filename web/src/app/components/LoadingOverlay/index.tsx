@@ -25,7 +25,6 @@ export default function LoadingOverlay({
 
   const fullscreenClasses = [
     'fixed inset-0',
-    `z-[${zIndex}]`,
     scrim ? 'bg-black/60 backdrop-blur-sm' : '',
   ].join(' ');
 
@@ -42,6 +41,7 @@ export default function LoadingOverlay({
         inline ? inlineClasses : fullscreenClasses,
         className ?? '',
       ].join(' ')}
+      style={inline ? undefined : { zIndex }}
     >
       <div
         className="animate-spin rounded-full border-2 border-white/80 border-t-transparent"
