@@ -290,7 +290,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               key={it.id}
               item={it}
               imgs={images[it.id] ?? ([] as ImgEntry[])}
-              busy={busy === it.id}
+              busy={busy.has(it.id)}
               deletingPath={deletingPath}
               onUpload={(f) => uploadImage(it.id, f)}
               onEditItem={() => openEdit(it)}

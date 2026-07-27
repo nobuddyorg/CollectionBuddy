@@ -1,10 +1,10 @@
 'use client';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import imageCompression from 'browser-image-compression';
 import { supabase } from '../../supabase';
 import {
   createSignedUrls,
-  listImageObjects,
+  listAllImageObjects,
   removeImageObjects,
   removeItemImages,
   uploadImageObject,
@@ -72,9 +72,15 @@ export function useItemImages() {
   const { t } = useI18n();
   const toast = useToast();
   const confirm = useConfirm();
-  const [busy, setBusy] = useState<string | null>(null);
-  const [deletingPath, setDeletingPath] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [deletingPath, setDeletingPath] = useState<Set<string>>(new Set());
   const [images, setImages] = useState<Record<string, ImgEntry[]>>({});
+  const imagesRef = useRef(images);
+  const lastSignedAtRef = useRef(0);
+
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
 
   const getItemImageEntries = useCallback(async (itemId: string) => {
     // getSession() reads the local session, no network round trip.
@@ -83,7 +89,7 @@ export function useItemImages() {
     if (!uid) return;
 
     const prefix = `${uid}/${itemId}`;
-    const { data, error } = await listImageObjects(prefix, 48);
+    const { data, error } = await listAllImageObjects(prefix);
 
     if (error) {
       console.error('Failed to list images', error);
@@ -119,6 +125,7 @@ export function useItemImages() {
     async (itemId: string) => {
       const entries = await getItemImageEntries(itemId);
       if (typeof entries === 'undefined') return;
+      lastSignedAtRef.current = Date.now();
       setImages((prev) => ({ ...prev, [itemId]: entries }));
     },
     [getItemImageEntries],
@@ -137,7 +144,7 @@ export function useItemImages() {
     const perItem = await Promise.all(
       itemIds.map(async (itemId) => {
         const prefix = `${uid}/${itemId}`;
-        const { data, error } = await listImageObjects(prefix, 48);
+        const { data, error } = await listAllImageObjects(prefix);
         if (error) {
           console.error('Failed to list images', error);
           return [itemId, new Map<string, ImageEntryData>()] as const;
@@ -171,13 +178,34 @@ export function useItemImages() {
     for (const [itemId, entryData] of perItem) {
       newImages[itemId] = toImgEntries(entryData, signedUrlMap);
     }
+    lastSignedAtRef.current = Date.now();
     setImages((prev) => ({ ...prev, ...newImages }));
   }, []);
+
+  // Refresh signed URLs before Supabase's 1h expiry so a long-lived tab
+  // doesn't turn every thumbnail into a broken-image placeholder.
+  useEffect(() => {
+    const EXPIRY_MS = 3600_000;
+    const REFRESH_MARGIN_MS = 5 * 60_000;
+    const maybeRefresh = () => {
+      if (!lastSignedAtRef.current) return;
+      if (Date.now() - lastSignedAtRef.current < EXPIRY_MS - REFRESH_MARGIN_MS)
+        return;
+      const itemIds = Object.keys(imagesRef.current);
+      if (itemIds.length) void refreshAllImages(itemIds);
+    };
+    const interval = setInterval(maybeRefresh, 60_000);
+    document.addEventListener('visibilitychange', maybeRefresh);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', maybeRefresh);
+    };
+  }, [refreshAllImages]);
 
   const uploadImage = useCallback(
     async (itemId: string, file: File) => {
       try {
-        setBusy(itemId);
+        setBusy((prev) => new Set(prev).add(itemId));
         const { data: u } = await supabase.auth.getUser();
         const uid = u.user?.id;
         if (!uid) throw new Error(t('item_list.no_user_session'));
@@ -213,7 +241,11 @@ export function useItemImages() {
         console.error('Failed to upload image:', err);
         toast.error(t('item_list.upload_error'));
       } finally {
-        setBusy(null);
+        setBusy((prev) => {
+          const next = new Set(prev);
+          next.delete(itemId);
+          return next;
+        });
       }
     },
     [refreshItemImages, t, toast],
@@ -223,7 +255,7 @@ export function useItemImages() {
     async (itemId: string, img: ImgEntry) => {
       if (!(await confirm(t('item_list.confirm_delete_image')))) return;
       try {
-        setDeletingPath(img.pathFull);
+        setDeletingPath((prev) => new Set(prev).add(img.pathFull));
         const paths = [img.pathFull, ...(img.pathThumb ? [img.pathThumb] : [])];
         const { error } = await removeImageObjects(paths);
         if (error) {
@@ -238,7 +270,11 @@ export function useItemImages() {
           ),
         }));
       } finally {
-        setDeletingPath(null);
+        setDeletingPath((prev) => {
+          const next = new Set(prev);
+          next.delete(img.pathFull);
+          return next;
+        });
       }
     },
     [confirm, t, toast],
