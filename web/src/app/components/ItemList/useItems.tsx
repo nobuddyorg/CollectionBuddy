@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useI18n } from '../../i18n/useI18n';
 import { supabase } from '../../supabase';
 import type { ItemLite, ItemRow } from './types';
 
 const PAGE_SIZE = 6;
 
 export function useItems(categoryId: string, q: string) {
+  const { t } = useI18n();
   const [items, setItems] = useState<ItemLite[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -35,10 +37,17 @@ export function useItems(categoryId: string, q: string) {
       .eq('item_categories.category_id', categoryId);
 
     if (needle) {
-      const esc = needle.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&');
-      const like = `%${esc}%`;
+      // Escape LIKE metacharacters first, then quote the value so that
+      // PostgREST's or=() grammar (which treats , . ( ) as structural
+      // delimiters) sees one opaque string instead of parsing the search
+      // term as extra filter conditions.
+      const likeEscaped = needle
+        .replace(/\\/g, '\\\\')
+        .replace(/[%_]/g, '\\$&');
+      const like = `%${likeEscaped}%`;
+      const quoted = like.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       query = query.or(
-        `title.ilike.${like},description.ilike.${like},place.ilike.${like},tags_text.ilike.${like}`,
+        `title.ilike."${quoted}",description.ilike."${quoted}",place.ilike."${quoted}",tags_text.ilike."${quoted}"`,
       );
     }
 
@@ -49,7 +58,11 @@ export function useItems(categoryId: string, q: string) {
 
     if (mySeq !== reqSeq.current) return;
     setLoading(false);
-    if (error) return;
+    if (error) {
+      console.error('Failed to load items:', error.message);
+      alert(t('item_list.search_error'));
+      return;
+    }
 
     setItems(
       (data ?? []).map((d) => ({
@@ -61,7 +74,7 @@ export function useItems(categoryId: string, q: string) {
       })),
     );
     setTotal(count || 0);
-  }, [categoryId, page, q]);
+  }, [categoryId, page, q, t]);
 
   useEffect(() => {
     void load();
