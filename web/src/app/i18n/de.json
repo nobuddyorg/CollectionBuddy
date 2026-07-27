@@ -61,7 +61,8 @@
     "checking_login": "Anmeldung wird geprüft…",
     "title_collection": "Collection",
     "title_buddy": "Buddy",
-    "subtitle": "Dein digitales Sammelalbum für Münzen, Plüschtiere, Briefmarken und alles, was dir am Herzen liegt."
+    "subtitle": "Dein digitales Sammelalbum für Münzen, Plüschtiere, Briefmarken und alles, was dir am Herzen liegt.",
+    "sign_in_error": "Anmeldung fehlgeschlagen. Bitte Verbindung prüfen und erneut versuchen."
   },
   "common": {
     "loading": "Wird geladen…",

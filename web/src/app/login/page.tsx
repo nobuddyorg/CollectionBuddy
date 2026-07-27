@@ -40,6 +40,11 @@ export default function LoginPage() {
   const { t } = useI18n();
   const checking = useAuthRedirect('/');
   const signIn = useGoogleSignIn();
+
+  const handleSignInError = (err: unknown) => {
+    console.error('Google sign-in failed:', err);
+    alert(t('login_page.sign_in_error'));
+  };
   const positions = useMemo(() => makePositions(16, 1337, 260), []);
 
   if (checking) return <LoadingOverlay label={t('item_list.loading')} />;
@@ -59,7 +64,9 @@ export default function LoginPage() {
 
       <Coin
         text={t('login_page.circle_text').repeat(2)}
-        cta={<GoogleSignInButton onClick={signIn} />}
+        cta={
+          <GoogleSignInButton onClick={signIn} onError={handleSignInError} />
+        }
       />
 
       {positions.map((p, i) => (

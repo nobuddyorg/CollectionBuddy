@@ -61,7 +61,8 @@
     "checking_login": "Checking login…",
     "title_collection": "Collection",
     "title_buddy": "Buddy",
-    "subtitle": "Your digital scrapbook for coins, stuffed animals, stamps and everything you love."
+    "subtitle": "Your digital scrapbook for coins, stuffed animals, stamps and everything you love.",
+    "sign_in_error": "Sign-in failed. Please check your connection and try again."
   },
   "common": {
     "loading": "Loading…",
