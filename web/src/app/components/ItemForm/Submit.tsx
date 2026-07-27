@@ -1,6 +1,8 @@
 'use client';
 
 import Icon, { IconType } from '../Icon';
+import { IconButton } from '../ui/IconButton';
+import { Spinner } from '../ui/Spinner';
 
 export function Submit({
   submitting,
@@ -15,15 +17,16 @@ export function Submit({
 }) {
   if (iconMode) {
     return (
-      <button
+      <IconButton
         type="submit"
+        size="lg"
         disabled={disabled}
-        className="w-10 h-10 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 active:scale-[0.99] disabled:opacity-60 flex items-center justify-center"
+        className="active:scale-[0.99] disabled:opacity-60"
         aria-label={label}
         title={label}
       >
         {submitting ? (
-          <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+          <Spinner />
         ) : (
           <Icon
             icon={IconType.Plus}
@@ -33,7 +36,7 @@ export function Submit({
             fill="none"
           />
         )}
-      </button>
+      </IconButton>
     );
   }
 

@@ -1,6 +1,8 @@
 'use client';
 
 import Icon, { IconType } from '../Icon/index';
+import { IconButton } from '../ui/IconButton';
+import { Spinner } from '../ui/Spinner';
 
 export function AddButton({
   onClick,
@@ -21,11 +23,7 @@ export function AddButton({
       aria-label={label}
       title={label}
     >
-      {isCreating ? (
-        <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-      ) : (
-        '+'
-      )}
+      {isCreating ? <Spinner size="sm" /> : '+'}
     </button>
   );
 }
@@ -38,12 +36,7 @@ export function SetButton({
   label: string;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className="w-8 h-8 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110"
-      aria-label={label}
-      title={label}
-    >
+    <IconButton size="sm" onClick={onClick} aria-label={label} title={label}>
       <Icon
         icon={IconType.Check}
         className="w-5 h-5"
@@ -54,7 +47,7 @@ export function SetButton({
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-    </button>
+    </IconButton>
   );
 }
 
@@ -68,10 +61,12 @@ export function DeleteButtonWithLabel({
   label: string;
 }) {
   return (
-    <button
+    <IconButton
+      variant="destructive"
+      size="sm"
       onClick={onClick}
       disabled={disabled}
-      className="w-8 h-8 flex items-center justify-center rounded-xl bg-destructive text-destructive-foreground hover:brightness-110 disabled:opacity-50"
+      className="disabled:opacity-50"
       aria-label={label}
       title={label}
     >
@@ -84,7 +79,7 @@ export function DeleteButtonWithLabel({
         fill="none"
         strokeLinecap="round"
       />
-    </button>
+    </IconButton>
   );
 }
 

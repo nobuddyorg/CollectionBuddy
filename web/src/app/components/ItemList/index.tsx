@@ -17,6 +17,7 @@ import { usePlaces } from '../Map/usePlaces';
 
 const Map = dynamic(() => import('../Map'), { ssr: false });
 import Icon, { IconType } from '../Icon';
+import { IconButton } from '../ui/IconButton';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
 
@@ -213,15 +214,13 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex gap-2 items-center">
-        <button
-          type="button"
+        <IconButton
           onClick={() => setCreateOpen(true)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110"
           aria-label={t('item_create.new_entry')}
           title={t('item_create.new_entry')}
         >
           <Icon icon={IconType.Plus} className="w-4 h-4" />
-        </button>
+        </IconButton>
 
         <button
           type="button"
@@ -306,7 +305,6 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               onDeleteItem={() => void removeItem(it.id)}
               onDeleteImage={(img) => void deleteImage(it.id, img)}
               onOpenModal={setModalImage}
-              i18n={{ t }}
             />
           ))}
         </ul>

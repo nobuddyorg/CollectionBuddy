@@ -2,6 +2,7 @@
 
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
+import { IconButton } from '../ui/IconButton';
 import { useMemo } from 'react';
 
 export const getPaginationItems = (page: number, totalPages: number) => {
@@ -47,10 +48,10 @@ export function Pagination({
       aria-label={t('item_list.pagination')}
       className="flex flex-wrap gap-2 items-center justify-center"
     >
-      <button
+      <IconButton
         disabled={page === 1}
         onClick={() => setPage(page - 1)}
-        className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
+        className="disabled:opacity-50"
         aria-label={t('item_list.previous')}
         title={t('item_list.previous')}
       >
@@ -61,7 +62,7 @@ export function Pagination({
           strokeWidth="2"
           fill="none"
         />
-      </button>
+      </IconButton>
 
       {paginationItems.map((item, index) =>
         typeof item === 'string' ? (
@@ -90,10 +91,10 @@ export function Pagination({
         ),
       )}
 
-      <button
+      <IconButton
         disabled={page === totalPages}
         onClick={() => setPage(page + 1)}
-        className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
+        className="disabled:opacity-50"
         aria-label={t('item_list.next')}
         title={t('item_list.next')}
       >
@@ -104,7 +105,7 @@ export function Pagination({
           strokeWidth="2"
           fill="none"
         />
-      </button>
+      </IconButton>
     </nav>
   );
 }
