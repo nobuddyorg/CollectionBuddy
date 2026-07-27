@@ -48,7 +48,7 @@ export function useCreateItem(categoryId: string) {
           await supabase.from('items').delete().eq('id', itemId);
         }
         console.error(e);
-        alert(t('item_list.no_user_session'));
+        alert(t('item_create.save_error'));
         return false;
       } finally {
         setIsCreating(false);

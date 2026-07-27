@@ -1,10 +1,12 @@
 'use client';
+import type { TranslationKey } from '../../i18n/I18nProvider';
+
 type Props = {
   name: string;
   setName: (v: string) => void;
   createCategory: () => void;
   setExpanded: (v: boolean) => void;
-  t: (key: string) => string;
+  t: (key: TranslationKey) => string;
 };
 export function CategoryInput({
   name,

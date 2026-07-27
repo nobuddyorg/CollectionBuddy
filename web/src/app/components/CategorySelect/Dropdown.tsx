@@ -1,10 +1,12 @@
 'use client';
+import type { TranslationKey } from '../../i18n/I18nProvider';
+
 type Props = {
   selectedCat: string | null;
   onSelect: (id: string | null) => void;
   sortedCats: { id: string; name: string }[];
   isLoading: boolean;
-  t: (key: string) => string;
+  t: (key: TranslationKey) => string;
   setExpanded: (v: boolean) => void;
 };
 export function CategorySelectDropdown({

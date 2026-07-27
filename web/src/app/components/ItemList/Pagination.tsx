@@ -48,7 +48,7 @@ export function Pagination({
         disabled={page === 1}
         onClick={() => setPage(page - 1)}
         className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
-        title={t('item_list.previous') ?? 'Previous'}
+        title={t('item_list.previous')}
       >
         <Icon
           icon={IconType.ChevronLeft}
@@ -88,7 +88,7 @@ export function Pagination({
         disabled={page === totalPages}
         onClick={() => setPage(page + 1)}
         className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
-        title={t('item_list.next') ?? 'Next'}
+        title={t('item_list.next')}
       >
         <Icon
           icon={IconType.ChevronRight}

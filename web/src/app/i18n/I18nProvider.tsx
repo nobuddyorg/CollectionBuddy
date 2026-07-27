@@ -9,10 +9,21 @@ type Language = 'de' | 'en';
 
 type TranslationValue = string | { [key: string]: TranslationValue };
 
+type FlattenKeys<T, Prefix extends string = ''> = T extends string
+  ? Prefix
+  : {
+      [K in keyof T & string]: FlattenKeys<
+        T[K],
+        `${Prefix}${Prefix extends '' ? '' : '.'}${K}`
+      >;
+    }[keyof T & string];
+
+export type TranslationKey = FlattenKeys<typeof en>;
+
 type I18nContextType = {
   lang: Language;
   setLang: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: TranslationKey) => string;
 };
 
 export const I18nContext = createContext<I18nContextType | undefined>(
@@ -36,7 +47,7 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  const t = useCallback((key: string) => {
+  const t = useCallback((key: TranslationKey) => {
     const keys = key.split('.');
     let value: TranslationValue = translations[langRef.current];
     for (const k of keys) {
