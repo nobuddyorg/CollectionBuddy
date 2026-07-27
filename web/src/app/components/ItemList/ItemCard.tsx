@@ -33,7 +33,7 @@ export function ItemCard({
   const close = () => setOpen(false);
 
   return (
-    <li className="group relative rounded-2xl border bg-card/70 dark:bg-card/60 bg-neutral-100/50 dark:bg-neutral-800/50 backdrop-blur p-3 shadow-sm space-y-3">
+    <li className="group relative rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur p-3 shadow-sm space-y-3">
       <div className="font-medium pr-16 truncate">{item.title}</div>
 
       <button

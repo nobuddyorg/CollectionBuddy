@@ -73,7 +73,7 @@ export function PlaceAutocomplete({
             return (
               <div
                 ref={menuRef}
-                className="fixed rounded-xl border bg-card dark:bg-card shadow-lg overflow-hidden z-[2000]"
+                className="fixed rounded-xl border bg-card dark:bg-card shadow-lg overflow-hidden z-popover"
                 style={{ top: r.bottom, left: r.left, width: r.width }}
               >
                 {loading && (

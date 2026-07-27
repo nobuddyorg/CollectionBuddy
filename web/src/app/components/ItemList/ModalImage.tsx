@@ -18,7 +18,7 @@ export function ModalImage({
 
   return ReactDOM.createPortal(
     <div
-      className="fixed inset-0 z-[500] flex flex-col items-center justify-center bg-background/90 backdrop-blur"
+      className="fixed inset-0 z-modal flex flex-col items-center justify-center bg-background/90 backdrop-blur"
       onClick={onClose}
     >
       <Image

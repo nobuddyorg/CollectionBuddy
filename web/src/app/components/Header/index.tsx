@@ -18,7 +18,7 @@ export default function Header({ user, onSignOut }: HeaderProps) {
 
   return (
     <header
-      className="sticky top-0 z-[400] backdrop-blur
+      className="sticky top-0 z-header backdrop-blur
         supports-[backdrop-filter]:bg-white/40
         dark:supports-[backdrop-filter]:bg-neutral-900/70
         border-b border-black/5 dark:border-white/10"

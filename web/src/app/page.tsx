@@ -61,7 +61,7 @@ export default function Page() {
         />
 
         {hasCategory ? (
-          <section className="relative z-50 rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-4 sm:p-5">
+          <section className="relative z-50 rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur shadow-sm p-4 sm:p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold">{t('page.entries')}</h2>
             </div>
