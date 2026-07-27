@@ -14,9 +14,15 @@ export function useSession(): SessionState {
   useEffect(() => {
     let active = true;
     const load = async () => {
-      const { data } = await supabase.auth.getUser();
+      // getSession() reads the session already persisted locally, no
+      // network round trip -- getUser() re-validates against the auth
+      // server, which held up the very first paint behind a full request
+      // and, transitively, every fetch gated on it (categories, items,
+      // images). onAuthStateChange below still fires for any subsequent
+      // change, including a session that turns out to be stale.
+      const { data } = await supabase.auth.getSession();
       if (!active) return;
-      const u = data.user;
+      const u = data.session?.user;
       setUser(
         u
           ? {
