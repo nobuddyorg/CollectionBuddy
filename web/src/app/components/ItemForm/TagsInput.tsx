@@ -41,13 +41,13 @@ export function TagsInput({
       {tags.map((tag) => (
         <span
           key={tag}
-          className="flex items-center gap-1 bg-primary/10 dark:bg-primary/20 text-primary rounded-full px-2 py-0.5 text-sm"
+          className="flex items-center gap-1 bg-primary/15 text-amber-800 dark:text-amber-200 rounded-full px-2 py-0.5 text-sm"
         >
           {tag}
           <button
             type="button"
             onClick={() => removeTag(tag)}
-            className="w-4 h-4 flex items-center justify-center rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600"
+            className="w-4 h-4 flex items-center justify-center rounded-xl bg-destructive text-destructive-foreground shadow-sm hover:brightness-110"
             title={t('item_create.remove_tag').replace('{tag}', tag)}
           >
             <Icon

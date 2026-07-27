@@ -80,7 +80,7 @@ export function ItemCard({
           {item.tags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1 bg-primary/10 dark:bg-primary/20 text-primary rounded-full px-2 py-0.5 text-xs"
+              className="inline-flex items-center gap-1 bg-primary/15 text-amber-800 dark:text-amber-200 rounded-full px-2 py-0.5 text-xs"
             >
               {tag}
             </span>

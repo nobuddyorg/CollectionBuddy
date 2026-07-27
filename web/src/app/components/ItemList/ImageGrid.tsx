@@ -58,7 +58,7 @@ export function ImageGrid({
             className={[
               isOpen ? 'opacity-100' : 'opacity-0',
               'sm:opacity-0 sm:group-hover:opacity-100',
-              'absolute top-1 right-1 w-7 h-7 flex items-center justify-center rounded-lg bg-red-600 text-white shadow disabled:opacity-60 transition',
+              'absolute top-1 right-1 w-7 h-7 flex items-center justify-center rounded-lg bg-destructive text-destructive-foreground shadow disabled:opacity-60 transition',
             ].join(' ')}
           >
             {deletingPath === img.pathFull ? (
