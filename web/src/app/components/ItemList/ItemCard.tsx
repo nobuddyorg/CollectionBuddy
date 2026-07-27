@@ -40,7 +40,7 @@ export function ItemCard({
   }, [busy]);
 
   return (
-    <li className="group relative rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur p-3 shadow-sm space-y-3">
+    <li className="fade-up group relative rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur p-3 shadow-sm space-y-3">
       <div className="font-medium pr-16 truncate">{item.title}</div>
 
       <button
