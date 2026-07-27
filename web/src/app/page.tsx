@@ -28,10 +28,19 @@ export default function Page() {
 
   const signOut = useCallback(async () => {
     try {
-      const { error } = await supabase.auth.signOut({ scope: 'local' });
-      if (error) console.error('Sign-out failed:', error.message);
+      // Global scope revokes the refresh token server-side. Fall back to a
+      // local clear if that call fails, so the user is never left signed in
+      // on this device by a network error.
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Sign-out failed:', error.message);
+        await supabase.auth.signOut({ scope: 'local' });
+      }
     } catch (err) {
       console.error('Unexpected error during sign-out:', err);
+      await supabase.auth
+        .signOut({ scope: 'local' })
+        .catch(() => undefined);
     } finally {
       router.replace('/login');
     }
