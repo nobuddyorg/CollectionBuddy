@@ -1,6 +1,5 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import imageCompression from 'browser-image-compression';
 import { supabase } from '../../supabase';
 import {
   createSignedUrls,
@@ -210,6 +209,8 @@ export function useItemImages() {
         const uid = u.user?.id;
         if (!uid) throw new Error(t('item_list.no_user_session'));
 
+        const { default: imageCompression } =
+          await import('browser-image-compression');
         const fullFile = await imageCompression(file, {
           maxWidthOrHeight: 1000,
           initialQuality: 0.8,

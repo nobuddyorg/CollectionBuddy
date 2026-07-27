@@ -26,8 +26,6 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 
   /* Stacking order, lowest to highest. Keeps unrelated full-screen
      overlays (modal backdrop, image lightbox, autocomplete popover,

@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { deleteItem, updateItem } from '../../data/items';
 import { useI18n } from '../../i18n/useI18n';
 import ItemForm, { ItemFormValues } from '../ItemForm';
@@ -12,8 +13,9 @@ import { ModalImage } from './ModalImage';
 import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
 import type { ImgEntry } from './types';
-import Map from '../Map';
 import { usePlaces } from '../Map/usePlaces';
+
+const Map = dynamic(() => import('../Map'), { ssr: false });
 import Icon, { IconType } from '../Icon';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';

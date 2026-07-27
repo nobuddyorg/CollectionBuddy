@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 
-import { geistMono, geistSans } from './fonts';
 import './globals.css';
 import { ConfirmProvider } from './components/Confirm/ConfirmProvider';
 import { ToastProvider } from './components/Toast/ToastProvider';
@@ -40,9 +39,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="de">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className="antialiased">
         <I18nProvider>
           <ToastProvider>
             <ConfirmProvider>{children}</ConfirmProvider>
