@@ -3,15 +3,21 @@
 import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
-import { supabase } from '../../supabase';
 import { useToast } from '../Toast/ToastProvider';
-import { removeItemImages } from '../ItemList/useItemImages';
-import type { Category } from '../../types';
+import {
+  createCategory as createCategoryRow,
+  deleteCategory as deleteCategoryRow,
+  listCategories,
+  listItemIdsForCategory,
+  listItemIdsLinkedElsewhere,
+} from '../../data/categories';
+import { removeItemImages } from '../../data/images';
+import type { CategorySummary } from '../../data/categories';
 
 export function useCategories() {
   const { t } = useI18n();
   const toast = useToast();
-  const [cats, setCats] = useState<Category[]>([]);
+  const [cats, setCats] = useState<CategorySummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -19,11 +25,9 @@ export function useCategories() {
   const reload = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('id,name');
+      const { data, error } = await listCategories();
       if (error) throw error;
-      const list = (data as Category[]) ?? [];
+      const list = data ?? [];
       setCats(list);
       return list;
     } catch (e) {
@@ -40,14 +44,10 @@ export function useCategories() {
       if (!name || isCreating) return null;
       setIsCreating(true);
       try {
-        const { data, error } = await supabase
-          .from('categories')
-          .insert({ name })
-          .select('id,name')
-          .single();
+        const { data, error } = await createCategoryRow(name);
         if (error) throw error;
         await reload();
-        return data as Category;
+        return data;
       } catch (e) {
         console.error(e);
         toast.error(t('category_select.createError'));
@@ -69,10 +69,8 @@ export function useCategories() {
         // remove storage.objects metadata, not the underlying bytes. Find
         // the items this deletion would orphan and clean up their images
         // client-side first, same as a direct item delete.
-        const { data: links, error: linksError } = await supabase
-          .from('item_categories')
-          .select('item_id')
-          .eq('category_id', id);
+        const { data: links, error: linksError } =
+          await listItemIdsForCategory(id);
         if (linksError) throw linksError;
 
         const itemIds = Array.from(
@@ -80,11 +78,8 @@ export function useCategories() {
         );
         let orphanedItemIds = itemIds;
         if (itemIds.length) {
-          const { data: stillLinked, error: linkedError } = await supabase
-            .from('item_categories')
-            .select('item_id')
-            .in('item_id', itemIds)
-            .neq('category_id', id);
+          const { data: stillLinked, error: linkedError } =
+            await listItemIdsLinkedElsewhere(itemIds, id);
           if (linkedError) throw linkedError;
           const keep = new Set((stillLinked ?? []).map((l) => l.item_id));
           orphanedItemIds = itemIds.filter((itemId) => !keep.has(itemId));
@@ -94,10 +89,7 @@ export function useCategories() {
           orphanedItemIds.map((itemId) => removeItemImages(itemId)),
         );
 
-        const { error } = await supabase
-          .from('categories')
-          .delete()
-          .eq('id', id);
+        const { error } = await deleteCategoryRow(id);
         if (error) throw error;
         await reload();
         return true;

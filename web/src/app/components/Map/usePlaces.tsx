@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { supabase } from '../../supabase';
+import { listItemPlaces } from '../../data/items';
 import { Place } from './types';
 
 const GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
@@ -40,12 +40,7 @@ export function usePlaces(categoryId: string, enabled: boolean) {
       setLoading(true);
       setError(false);
       try {
-        const { data: items, error } = await supabase
-          .from('items')
-          .select('place,item_categories!inner(category_id)')
-          .eq('item_categories.category_id', categoryId)
-          .not('place', 'is', null)
-          .neq('place', '');
+        const { data: items, error } = await listItemPlaces(categoryId);
 
         if (error) throw error;
 

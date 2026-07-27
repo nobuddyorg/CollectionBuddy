@@ -2,33 +2,17 @@
 import { useCallback, useState } from 'react';
 import imageCompression from 'browser-image-compression';
 import { supabase } from '../../supabase';
+import {
+  createSignedUrls,
+  listImageObjects,
+  removeImageObjects,
+  removeItemImages,
+  uploadImageObject,
+} from '../../data/images';
 import type { ImgEntry } from './types';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
 import { useI18n } from '../../i18n/useI18n';
-
-// Deletes every stored object (full + thumb) under an item's prefix.
-// Standalone (not part of the hook) so callers that don't otherwise need
-// image state -- e.g. category deletion, which must clean up any items it
-// is about to orphan -- can invoke it without mounting image state.
-export async function removeItemImages(itemId: string): Promise<void> {
-  const { data: u } = await supabase.auth.getUser();
-  const uid = u.user?.id;
-  if (!uid) return;
-
-  const prefix = `${uid}/${itemId}`;
-  const { data, error } = await supabase.storage
-    .from('item-images')
-    .list(prefix, { limit: 100 });
-  if (error) throw error;
-  if (!data?.length) return;
-
-  const paths = data.map((o) => `${prefix}/${o.name}`);
-  const { error: removeError } = await supabase.storage
-    .from('item-images')
-    .remove(paths);
-  if (removeError) throw removeError;
-}
 
 export type StorageObjectRow = { name: string };
 export type ImageEntryData = { pathFull: string; pathThumb?: string };
@@ -99,12 +83,7 @@ export function useItemImages() {
     if (!uid) return;
 
     const prefix = `${uid}/${itemId}`;
-    const { data, error } = await supabase.storage
-      .from('item-images')
-      .list(prefix, {
-        limit: 48,
-        sortBy: { column: 'created_at', order: 'desc' },
-      });
+    const { data, error } = await listImageObjects(prefix, 48);
 
     if (error) {
       console.error('Failed to list images', error);
@@ -120,9 +99,8 @@ export function useItemImages() {
     );
     if (pathsToSign.length === 0) return [];
 
-    const { data: signedUrls, error: signError } = await supabase.storage
-      .from('item-images')
-      .createSignedUrls(pathsToSign, 3600);
+    const { data: signedUrls, error: signError } =
+      await createSignedUrls(pathsToSign);
 
     if (signError) {
       console.error('Failed to create signed URLs', signError);
@@ -159,12 +137,7 @@ export function useItemImages() {
     const perItem = await Promise.all(
       itemIds.map(async (itemId) => {
         const prefix = `${uid}/${itemId}`;
-        const { data, error } = await supabase.storage
-          .from('item-images')
-          .list(prefix, {
-            limit: 48,
-            sortBy: { column: 'created_at', order: 'desc' },
-          });
+        const { data, error } = await listImageObjects(prefix, 48);
         if (error) {
           console.error('Failed to list images', error);
           return [itemId, new Map<string, ImageEntryData>()] as const;
@@ -181,9 +154,8 @@ export function useItemImages() {
 
     let signedUrlMap = new Map<string, string>();
     if (allPaths.length > 0) {
-      const { data: signedUrls, error: signError } = await supabase.storage
-        .from('item-images')
-        .createSignedUrls(allPaths, 3600);
+      const { data: signedUrls, error: signError } =
+        await createSignedUrls(allPaths);
       if (signError) {
         console.error('Failed to create signed URLs', signError);
       } else {
@@ -228,14 +200,10 @@ export function useItemImages() {
         const pathFull = `${pathBase}.webp`;
         const pathThumb = `${pathBase}.thumb.webp`;
 
-        const upFull = await supabase.storage
-          .from('item-images')
-          .upload(pathFull, fullFile);
+        const upFull = await uploadImageObject(pathFull, fullFile);
         if (upFull.error) throw upFull.error;
 
-        const upThumb = await supabase.storage
-          .from('item-images')
-          .upload(pathThumb, thumbFile);
+        const upThumb = await uploadImageObject(pathThumb, thumbFile);
         if (upThumb.error) {
           console.warn('Thumbnail upload failed:', upThumb.error);
         }
@@ -257,9 +225,7 @@ export function useItemImages() {
       try {
         setDeletingPath(img.pathFull);
         const paths = [img.pathFull, ...(img.pathThumb ? [img.pathThumb] : [])];
-        const { error } = await supabase.storage
-          .from('item-images')
-          .remove(paths);
+        const { error } = await removeImageObjects(paths);
         if (error) {
           console.error('Failed to delete image:', error);
           toast.error(t('item_list.delete_image_error'));
