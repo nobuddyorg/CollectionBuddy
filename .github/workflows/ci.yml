@@ -35,7 +35,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Start Next.js application
-        run: npx serve@latest out -l 3000 &
+        run: npx serve out -l 3000 &
 
       - name: Wait for application to start
         run: |
