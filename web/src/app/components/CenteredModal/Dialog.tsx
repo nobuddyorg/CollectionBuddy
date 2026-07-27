@@ -17,7 +17,7 @@ export function Dialog({
   closeLabel?: string;
   onClose: () => void;
   children: React.ReactNode;
-  initialFocusRef?: React.RefObject<HTMLElement>;
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 

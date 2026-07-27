@@ -3,6 +3,8 @@ import { useCallback, useState } from 'react';
 import imageCompression from 'browser-image-compression';
 import { supabase } from '../../supabase';
 import type { ImgEntry } from './types';
+import { useConfirm } from '../Confirm/ConfirmProvider';
+import { useToast } from '../Toast/ToastProvider';
 import { useI18n } from '../../i18n/useI18n';
 
 // Deletes every stored object (full + thumb) under an item's prefix.
@@ -84,6 +86,8 @@ function toImgEntries(
 
 export function useItemImages() {
   const { t } = useI18n();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState<string | null>(null);
   const [deletingPath, setDeletingPath] = useState<string | null>(null);
   const [images, setImages] = useState<Record<string, ImgEntry[]>>({});
@@ -126,7 +130,9 @@ export function useItemImages() {
     }
 
     const signedUrlMap = new Map(
-      signedUrls.filter((s) => s.path).map((s) => [s.path as string, s.signedUrl]),
+      signedUrls
+        .filter((s) => s.path)
+        .map((s) => [s.path as string, s.signedUrl]),
     );
     return toImgEntries(entryData, signedUrlMap);
   }, []);
@@ -236,36 +242,41 @@ export function useItemImages() {
 
         await refreshItemImages(itemId);
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        alert(msg);
+        console.error('Failed to upload image:', err);
+        toast.error(t('item_list.upload_error'));
       } finally {
         setBusy(null);
       }
     },
-    [refreshItemImages, t],
+    [refreshItemImages, t, toast],
   );
 
-  const deleteImage = useCallback(async (itemId: string, img: ImgEntry) => {
-    try {
-      setDeletingPath(img.pathFull);
-      const paths = [img.pathFull, ...(img.pathThumb ? [img.pathThumb] : [])];
-      const { error } = await supabase.storage
-        .from('item-images')
-        .remove(paths);
-      if (error) {
-        alert(error.message);
-        return;
+  const deleteImage = useCallback(
+    async (itemId: string, img: ImgEntry) => {
+      if (!(await confirm(t('item_list.confirm_delete_image')))) return;
+      try {
+        setDeletingPath(img.pathFull);
+        const paths = [img.pathFull, ...(img.pathThumb ? [img.pathThumb] : [])];
+        const { error } = await supabase.storage
+          .from('item-images')
+          .remove(paths);
+        if (error) {
+          console.error('Failed to delete image:', error);
+          toast.error(t('item_list.delete_image_error'));
+          return;
+        }
+        setImages((prev) => ({
+          ...prev,
+          [itemId]: (prev[itemId] || []).filter(
+            (e) => e.pathFull !== img.pathFull,
+          ),
+        }));
+      } finally {
+        setDeletingPath(null);
       }
-      setImages((prev) => ({
-        ...prev,
-        [itemId]: (prev[itemId] || []).filter(
-          (e) => e.pathFull !== img.pathFull,
-        ),
-      }));
-    } finally {
-      setDeletingPath(null);
-    }
-  }, []);
+    },
+    [confirm, t, toast],
+  );
 
   const deleteAllItemImages = useCallback(async (itemId: string) => {
     await removeItemImages(itemId);

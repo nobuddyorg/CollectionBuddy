@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Icon, { IconType } from '../Icon';
 import type { TranslationKey } from '../../i18n/I18nProvider';
 import type { ItemLite, ImgEntry } from './types';
@@ -31,6 +31,14 @@ export function ItemCard({
 }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
+
+  // The action row is kept open through an upload so its busy spinner
+  // stays visible; close it automatically once the upload settles.
+  const wasBusy = useRef(busy);
+  useEffect(() => {
+    if (wasBusy.current && !busy) close();
+    wasBusy.current = busy;
+  }, [busy]);
 
   return (
     <li className="group relative rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur p-3 shadow-sm space-y-3">

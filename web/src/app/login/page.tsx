@@ -6,6 +6,7 @@ import Coin from '../components/Coin/index';
 import Collectible from '../components/Collectible/index';
 import GoogleSignInButton from '../components/GoogleSignInButton/index';
 import LoadingOverlay from '../components/LoadingOverlay';
+import { useToast } from '../components/Toast/ToastProvider';
 import { useI18n } from '../i18n/useI18n';
 import { useAuthRedirect } from './useAuthRedirect';
 import { useGoogleSignIn } from './useGoogleSignIn';
@@ -38,16 +39,18 @@ function makePositions(count: number, seed = 1337, spread = 260) {
 
 export default function LoginPage() {
   const { t } = useI18n();
+  const toast = useToast();
   const checking = useAuthRedirect('/');
   const signIn = useGoogleSignIn();
 
   const handleSignInError = (err: unknown) => {
     console.error('Google sign-in failed:', err);
-    alert(t('login_page.sign_in_error'));
+    toast.error(t('login_page.sign_in_error'));
   };
   const positions = useMemo(() => makePositions(16, 1337, 260), []);
 
-  if (checking) return <LoadingOverlay label={t('item_list.loading')} />;
+  if (checking)
+    return <LoadingOverlay label={t('item_list.loading')} theme="auto" />;
 
   return (
     <main className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden px-4 bg-gradient-to-b from-amber-50 via-white to-stone-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 text-neutral-900 dark:text-neutral-100 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] overscroll-y-contain">

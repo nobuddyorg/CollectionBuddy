@@ -4,12 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import { supabase } from '../../supabase';
+import { useToast } from '../Toast/ToastProvider';
 import type { ItemLite, ItemRow } from './types';
 
 const PAGE_SIZE = 6;
 
 export function useItems(categoryId: string, q: string) {
   const { t } = useI18n();
+  const toast = useToast();
   const [items, setItems] = useState<ItemLite[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -76,7 +78,7 @@ export function useItems(categoryId: string, q: string) {
     setLoading(false);
     if (error) {
       console.error('Failed to load items:', error.message);
-      alert(t('item_list.search_error'));
+      toast.error(t('item_list.search_error'));
       return;
     }
 
@@ -90,7 +92,7 @@ export function useItems(categoryId: string, q: string) {
       })),
     );
     setTotal(count || 0);
-  }, [categoryId, page, q, t]);
+  }, [categoryId, page, q, t, toast]);
 
   useEffect(() => {
     void load();

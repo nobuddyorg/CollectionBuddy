@@ -7,12 +7,14 @@ import { getFocusable } from './getFocusable';
 export function useFocusTrap(
   open: boolean,
   containerRef: React.RefObject<HTMLElement | null>,
-  initialFocusRef?: React.RefObject<HTMLElement>,
+  initialFocusRef?: React.RefObject<HTMLElement | null>,
 ) {
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
-    (initialFocusRef?.current ?? getFocusable(containerRef.current)[0])?.focus();
+    (
+      initialFocusRef?.current ?? getFocusable(containerRef.current)[0]
+    )?.focus();
     return () => prev?.focus?.();
   }, [open, containerRef, initialFocusRef]);
 
