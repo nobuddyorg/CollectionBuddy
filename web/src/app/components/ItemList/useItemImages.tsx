@@ -28,6 +28,60 @@ export async function removeItemImages(itemId: string): Promise<void> {
   if (removeError) throw removeError;
 }
 
+type StorageObjectRow = { name: string };
+type ImageEntryData = { pathFull: string; pathThumb?: string };
+
+// Groups a flat listing of `<base>.webp` / `<base>.thumb.webp` objects into
+// full+thumb pairs, keyed by base name, with paths prefixed for signing.
+function pairImageEntries(
+  data: StorageObjectRow[],
+  prefix: string,
+): Map<string, ImageEntryData> {
+  const pairs = new Map<
+    string,
+    { full?: { name: string }; thumb?: { name: string } }
+  >();
+  for (const o of data) {
+    const name = o.name;
+    const base = name.endsWith('.thumb.webp')
+      ? name.replace(/\.thumb\.webp$/, '')
+      : name.replace(/\.webp$/, '');
+    const slot = pairs.get(base) ?? {};
+    if (name.endsWith('.thumb.webp')) slot.thumb = { name };
+    else if (name.endsWith('.webp')) slot.full = { name };
+    else slot.full = { name };
+    pairs.set(base, slot);
+  }
+
+  const entryData = new Map<string, ImageEntryData>();
+  for (const [base, { full, thumb }] of pairs) {
+    if (!full) continue;
+    entryData.set(base, {
+      pathFull: `${prefix}/${full.name}`,
+      pathThumb: thumb ? `${prefix}/${thumb.name}` : undefined,
+    });
+  }
+  return entryData;
+}
+
+function toImgEntries(
+  entryData: Map<string, ImageEntryData>,
+  signedUrlMap: Map<string, string>,
+): ImgEntry[] {
+  const entries: ImgEntry[] = [];
+  for (const data of entryData.values()) {
+    const urlFull = signedUrlMap.get(data.pathFull);
+    if (!urlFull) continue;
+    entries.push({
+      pathFull: data.pathFull,
+      urlFull,
+      pathThumb: data.pathThumb,
+      urlThumb: data.pathThumb ? signedUrlMap.get(data.pathThumb) : undefined,
+    });
+  }
+  return entries;
+}
+
 export function useItemImages() {
   const { t } = useI18n();
   const [busy, setBusy] = useState<string | null>(null);
@@ -35,8 +89,9 @@ export function useItemImages() {
   const [images, setImages] = useState<Record<string, ImgEntry[]>>({});
 
   const getItemImageEntries = useCallback(async (itemId: string) => {
-    const { data: u } = await supabase.auth.getUser();
-    const uid = u.user?.id;
+    // getSession() reads the local session, no network round trip.
+    const { data: sessionData } = await supabase.auth.getSession();
+    const uid = sessionData.session?.user.id;
     if (!uid) return;
 
     const prefix = `${uid}/${itemId}`;
@@ -55,33 +110,7 @@ export function useItemImages() {
       return [];
     }
 
-    const pairs = new Map<
-      string,
-      { full?: { name: string }; thumb?: { name: string } }
-    >();
-    for (const o of data) {
-      const name = o.name;
-      const base = name.endsWith('.thumb.webp')
-        ? name.replace(/\.thumb\.webp$/, '')
-        : name.replace(/\.webp$/, '');
-      const slot = pairs.get(base) ?? {};
-      if (name.endsWith('.thumb.webp')) slot.thumb = { name };
-      else if (name.endsWith('.webp')) slot.full = { name };
-      else slot.full = { name };
-      pairs.set(base, slot);
-    }
-
-    const entryData = new Map<
-      string,
-      { pathFull: string; pathThumb?: string }
-    >();
-    for (const [base, { full, thumb }] of pairs) {
-      if (!full) continue;
-      const pathFull = `${prefix}/${full.name}`;
-      const pathThumb = thumb ? `${prefix}/${thumb.name}` : undefined;
-      entryData.set(base, { pathFull, pathThumb });
-    }
-
+    const entryData = pairImageEntries(data, prefix);
     const pathsToSign = Array.from(entryData.values()).flatMap((e) =>
       e.pathThumb ? [e.pathFull, e.pathThumb] : [e.pathFull],
     );
@@ -96,19 +125,10 @@ export function useItemImages() {
       return [];
     }
 
-    const signedUrlMap = new Map(signedUrls.map((s) => [s.path, s.signedUrl]));
-    const entries: ImgEntry[] = [];
-    for (const data of entryData.values()) {
-      const urlFull = signedUrlMap.get(data.pathFull);
-      if (!urlFull) continue;
-      entries.push({
-        pathFull: data.pathFull,
-        urlFull,
-        pathThumb: data.pathThumb,
-        urlThumb: data.pathThumb ? signedUrlMap.get(data.pathThumb) : undefined,
-      });
-    }
-    return entries;
+    const signedUrlMap = new Map(
+      signedUrls.filter((s) => s.path).map((s) => [s.path as string, s.signedUrl]),
+    );
+    return toImgEntries(entryData, signedUrlMap);
   }, []);
 
   const refreshItemImages = useCallback(
@@ -120,26 +140,61 @@ export function useItemImages() {
     [getItemImageEntries],
   );
 
-  const refreshAllImages = useCallback(
-    async (itemIds: string[]) => {
-      const results = await Promise.all(
-        itemIds.map(async (itemId) => {
-          const entries = await getItemImageEntries(itemId);
-          return [itemId, entries] as const;
-        }),
-      );
+  const refreshAllImages = useCallback(async (itemIds: string[]) => {
+    if (itemIds.length === 0) return;
 
-      const validResults = results.filter(
-        (res): res is [string, ImgEntry[]] => typeof res[1] !== 'undefined',
-      );
+    const { data: sessionData } = await supabase.auth.getSession();
+    const uid = sessionData.session?.user.id;
+    if (!uid) return;
 
-      if (validResults.length > 0) {
-        const newImages = Object.fromEntries(validResults);
-        setImages((prev) => ({ ...prev, ...newImages }));
+    // One list() call per item is unavoidable (Supabase storage has no
+    // recursive/flat listing across prefixes), but every item's paths are
+    // signed together in a single createSignedUrls call.
+    const perItem = await Promise.all(
+      itemIds.map(async (itemId) => {
+        const prefix = `${uid}/${itemId}`;
+        const { data, error } = await supabase.storage
+          .from('item-images')
+          .list(prefix, {
+            limit: 48,
+            sortBy: { column: 'created_at', order: 'desc' },
+          });
+        if (error) {
+          console.error('Failed to list images', error);
+          return [itemId, new Map<string, ImageEntryData>()] as const;
+        }
+        return [itemId, pairImageEntries(data ?? [], prefix)] as const;
+      }),
+    );
+
+    const allPaths = perItem.flatMap(([, entryData]) =>
+      Array.from(entryData.values()).flatMap((e) =>
+        e.pathThumb ? [e.pathFull, e.pathThumb] : [e.pathFull],
+      ),
+    );
+
+    let signedUrlMap = new Map<string, string>();
+    if (allPaths.length > 0) {
+      const { data: signedUrls, error: signError } = await supabase.storage
+        .from('item-images')
+        .createSignedUrls(allPaths, 3600);
+      if (signError) {
+        console.error('Failed to create signed URLs', signError);
+      } else {
+        signedUrlMap = new Map(
+          signedUrls
+            .filter((s) => s.path)
+            .map((s) => [s.path as string, s.signedUrl]),
+        );
       }
-    },
-    [getItemImageEntries],
-  );
+    }
+
+    const newImages: Record<string, ImgEntry[]> = {};
+    for (const [itemId, entryData] of perItem) {
+      newImages[itemId] = toImgEntries(entryData, signedUrlMap);
+    }
+    setImages((prev) => ({ ...prev, ...newImages }));
+  }, []);
 
   const uploadImage = useCallback(
     async (itemId: string, file: File) => {

@@ -114,10 +114,11 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     deletingPath,
   } = useItemImages();
 
+  const itemIdsKey = items.map((i) => i.id).join(',');
   useEffect(() => {
-    if (!items.length) return;
-    void refreshAllImages(items.map((i) => i.id));
-  }, [items, refreshAllImages]);
+    if (!itemIdsKey) return;
+    void refreshAllImages(itemIdsKey.split(','));
+  }, [itemIdsKey, refreshAllImages]);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<null | {
