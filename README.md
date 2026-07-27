@@ -10,17 +10,26 @@ This project was created to provide a simple and elegant solution for cataloging
 
 ### Development
 
-To run the application in a development environment, follow these steps:
+CollectionBuddy needs a Supabase backend to run -- see
+[CONTRIBUTING.md](CONTRIBUTING.md) for the full local setup, including
+starting the local Supabase stack in [`supabase/`](supabase/) and the
+Google OAuth credentials it needs. The short version, once that's done:
 
 1.  Navigate to the `web` directory:
     ```bash
     cd web
     ```
-2.  Install the dependencies:
+2.  Copy the environment template and fill in `NEXT_PUBLIC_SUPABASE_URL` /
+    `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the defaults in `web/.env.example`
+    match a local `supabase start`):
+    ```bash
+    cp .env.example .env.local
+    ```
+3.  Install the dependencies:
     ```bash
     npm install
     ```
-3.  Start the development server:
+4.  Start the development server:
     ```bash
     npm run dev
     ```
@@ -42,11 +51,10 @@ The static files will be generated locally, ready for deployment. The script dem
 
 ### Frontend
 
-*   **[Next.js](https://nextjs.org/)**: A React framework for building server-side rendered and static web applications.
+*   **[Next.js](https://nextjs.org/)**: A React framework, used here in **static export mode** (`output: 'export'`) -- there is no server runtime or route handlers, and Server Components only ever render at build time, before any user session exists. See [CONTRIBUTING.md](CONTRIBUTING.md) for what that means for contributors.
 *   **[React](https://reactjs.org/)**: A JavaScript library for building user interfaces.
 *   **[TypeScript](https://www.typescriptlang.org/)**: A typed superset of JavaScript that compiles to plain JavaScript.
 *   **[Tailwind CSS](https://tailwindcss.com/)**: A utility-first CSS framework for rapidly building custom designs.
-*   **[Framer Motion](https://www.framer.com/motion/)**: A React library for creating animations.
 
 ### Backend
 
@@ -64,9 +72,11 @@ The application is built as a static site and can be deployed on any static host
 ![technologie-map](technology-map.drawio.png)
 
 ## Contributing
+
 Contributions are welcome! Whether it's a bug fix, new feature, or just improving the docs—open an issue or submit a pull request.
 
-Before contributing, please check out our Contributing Guide.
+Before contributing, please check out [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and the checks CI runs.
 
 ## License
+
 This project is licensed under the MIT License.
