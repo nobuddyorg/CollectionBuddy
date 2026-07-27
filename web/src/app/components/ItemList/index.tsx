@@ -12,7 +12,7 @@ import { ItemCard } from './ItemCard';
 import { ModalImage } from './ModalImage';
 import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
-import type { ImgEntry } from './types';
+import type { ImgEntry, ItemLite } from './types';
 import Map from '../Map';
 import { usePlaces } from '../Map/usePlaces';
 import Icon, { IconType } from '../Icon';
@@ -151,22 +151,27 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     if (!editing || isSaving) return;
     setIsSaving(true);
     try {
+      // The DB is the normalization authority (trims, collapses whitespace,
+      // dedupes/sorts tags) -- send raw values and merge the row it returns,
+      // rather than re-deriving a client-side copy that can diverge from it.
       const payload = {
-        title: values.title.trim(),
-        description: values.description.trim() || null,
-        place: values.place.trim() || null,
+        title: values.title,
+        description: values.description,
+        place: values.place,
         tags: values.tags,
       };
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('items')
         .update(payload)
-        .eq('id', editing.id);
-      if (error) {
-        alert(error.message);
+        .eq('id', editing.id)
+        .select('id,title,description,place,tags')
+        .single<ItemLite>();
+      if (error || !data) {
+        alert(error?.message ?? t('item_list.search_error'));
         return;
       }
       setItems((prev) =>
-        prev.map((it) => (it.id === editing.id ? { ...it, ...payload } : it)),
+        prev.map((it) => (it.id === editing.id ? { ...it, ...data } : it)),
       );
       setEditOpen(false);
       setEditing(null);

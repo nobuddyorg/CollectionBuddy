@@ -13,19 +13,23 @@ export function useCreateItem(categoryId: string) {
   const create = useCallback(
     async (values: ItemFormValues): Promise<boolean> => {
       if (isCreating) return false;
-      const title = values.title.trim();
-      const description = values.description.trim() || null;
-      const place = values.place.trim() || null;
+      // The DB is the normalization authority (trims, collapses whitespace,
+      // nullifies blanks, dedupes/sorts tags) -- only guard against an
+      // obviously-blank title here so we don't submit for nothing.
+      if (!values.title.trim()) return false;
       const tags = Array.isArray(values.tags) ? values.tags : [];
-
-      if (!title) return false;
 
       setIsCreating(true);
       let itemId: string | null = null;
       try {
         const { data, error } = await supabase
           .from('items')
-          .insert({ title, description, place, tags })
+          .insert({
+            title: values.title,
+            description: values.description,
+            place: values.place,
+            tags,
+          })
           .select('id')
           .single<{ id: string }>();
 
