@@ -3,8 +3,8 @@
 import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
-import { supabase } from '../../supabase';
 import { useToast } from '../Toast/ToastProvider';
+import { createItem, deleteItem, linkItemToCategory } from '../../data/items';
 import type { ItemFormValues } from '../ItemForm';
 
 export function useCreateItem(categoryId: string) {
@@ -24,30 +24,27 @@ export function useCreateItem(categoryId: string) {
       setIsCreating(true);
       let itemId: string | null = null;
       try {
-        const { data, error } = await supabase
-          .from('items')
-          .insert({
-            title: values.title,
-            description: values.description,
-            place: values.place,
-            tags,
-          })
-          .select('id')
-          .single<{ id: string }>();
+        const { data, error } = await createItem({
+          title: values.title,
+          description: values.description,
+          place: values.place,
+          tags,
+        });
 
         if (error || !data) throw error ?? new Error('insert failed');
         itemId = data.id;
 
-        const { error: linkError } = await supabase
-          .from('item_categories')
-          .insert({ item_id: itemId, category_id: categoryId });
+        const { error: linkError } = await linkItemToCategory(
+          itemId,
+          categoryId,
+        );
 
         if (linkError) throw linkError;
 
         return true;
       } catch (e) {
         if (itemId) {
-          await supabase.from('items').delete().eq('id', itemId);
+          await deleteItem(itemId);
         }
         console.error(e);
         toast.error(t('item_create.save_error'));

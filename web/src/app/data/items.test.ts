@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSearchFilter } from './useItems';
+import { buildSearchFilter } from './items';
 
 // Pulls the quoted value back out of `title.ilike."<value>"` and undoes
 // PostgREST's own quoted-string escaping, i.e. simulates what the server

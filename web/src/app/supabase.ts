@@ -1,9 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
+import type { Database } from './data/database.types';
+
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
 
-export const supabase = createClient(url, anon, {
+export const supabase = createClient<Database>(url, anon, {
   auth: {
     // PKCE returns a single-use ?code= in the query string instead of putting
     // access and refresh tokens in the URL fragment. auth-js defaults to the

@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from '../../supabase';
+import { deleteItem, updateItem } from '../../data/items';
 import { useI18n } from '../../i18n/useI18n';
 import ItemForm, { ItemFormValues } from '../ItemForm';
 import CenteredModal from '../CenteredModal';
@@ -11,7 +11,7 @@ import { ItemCard } from './ItemCard';
 import { ModalImage } from './ModalImage';
 import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
-import type { ImgEntry, ItemLite } from './types';
+import type { ImgEntry } from './types';
 import Map from '../Map';
 import { usePlaces } from '../Map/usePlaces';
 import Icon, { IconType } from '../Icon';
@@ -170,12 +170,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         place: values.place,
         tags: values.tags,
       };
-      const { data, error } = await supabase
-        .from('items')
-        .update(payload)
-        .eq('id', editing.id)
-        .select('id,title,description,place,tags')
-        .single<ItemLite>();
+      const { data, error } = await updateItem(editing.id, payload);
       if (error || !data) {
         console.error('Failed to save item:', error);
         toast.error(t('item_list.save_error'));
@@ -204,7 +199,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
       toast.error(t('item_list.delete_images_error'));
       return;
     }
-    const { error } = await supabase.from('items').delete().eq('id', id);
+    const { error } = await deleteItem(id);
     if (error) {
       console.error('Failed to delete item:', error);
       toast.error(t('item_list.delete_error'));
