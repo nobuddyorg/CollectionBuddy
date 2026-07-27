@@ -32,14 +32,20 @@ export const viewport = {
   ],
 };
 
+// Sets data-theme before hydration so a system-dark visitor (or one who
+// picked "dark" last visit) doesn't see a flash of the light theme --
+// useTheme.ts takes over keeping it in sync after this point.
+const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme');var t=s==='light'||s==='dark'?s:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="de">
+    <html lang="de" suppressHydrationWarning>
       <body className="antialiased">
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <I18nProvider>
           <ToastProvider>
             <ConfirmProvider>{children}</ConfirmProvider>

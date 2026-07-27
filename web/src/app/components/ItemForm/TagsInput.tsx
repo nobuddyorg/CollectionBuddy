@@ -43,7 +43,7 @@ export function TagsInput({
       {tags.map((tag) => (
         <span
           key={tag}
-          className="flex items-center gap-1 bg-primary/15 text-amber-800 dark:text-amber-200 rounded-full px-2 py-0.5 text-sm"
+          className="fade-up flex items-center gap-1 bg-primary/15 text-amber-800 dark:text-amber-200 rounded-full px-2 py-0.5 text-sm"
         >
           {tag}
           <button

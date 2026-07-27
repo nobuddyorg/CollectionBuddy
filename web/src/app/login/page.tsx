@@ -80,6 +80,7 @@ export default function LoginPage() {
           emoji={EMOJIS[i % EMOJIS.length]}
           x={p.x}
           y={p.y}
+          variant="bob"
         />
       ))}
 

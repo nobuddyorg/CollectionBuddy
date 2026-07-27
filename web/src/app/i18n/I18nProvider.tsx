@@ -57,6 +57,8 @@ export const I18nContext = createContext<I18nContextType | undefined>(
   undefined,
 );
 
+const LANG_STORAGE_KEY = 'lang';
+
 export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   const [lang, setLang] = useState<Language>('de');
   // t reads lang through this ref instead of depending on it directly, so
@@ -68,11 +70,35 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   langRef.current = lang;
 
   useEffect(() => {
+    const stored = localStorage.getItem(LANG_STORAGE_KEY);
+    if (stored && stored in translations) {
+      setLang(stored as Language);
+      return;
+    }
     const browserLang = navigator.language.split('-')[0];
     if (browserLang in translations) {
       setLang(browserLang as Language);
     }
   }, []);
+
+  const setLangAndPersist = useCallback((next: Language) => {
+    setLang(next);
+    localStorage.setItem(LANG_STORAGE_KEY, next);
+  }, []);
+
+  // Keeps the document's declared language and description in sync with
+  // the active UI language -- screen readers otherwise pronounce the
+  // other language with the wrong phonetics, and browsers offer to
+  // "translate" a page that's already in the visitor's language.
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document
+      .querySelector('meta[name="description"]')
+      ?.setAttribute(
+        'content',
+        resolveTranslationKey(translations[lang], 'page.footer') ?? '',
+      );
+  }, [lang]);
 
   const t = useCallback(
     (key: TranslationKey) =>
@@ -80,7 +106,10 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
     [],
   );
 
-  const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t]);
+  const value = useMemo(
+    () => ({ lang, setLang: setLangAndPersist, t }),
+    [lang, setLangAndPersist, t],
+  );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 };
