@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
@@ -29,8 +29,15 @@ export default function ItemForm({
   const [description, setDescription] = useState(initial.description ?? '');
   const [place, setPlace] = useState(initial.place ?? '');
   const [tags, setTags] = useState<string[]>(initial.tags ?? []);
+  const [titleTouched, setTitleTouched] = useState(false);
 
-  const canSubmit = useMemo(() => !!title.trim(), [title]);
+  const titleId = useId();
+  const descriptionId = useId();
+  const placeId = useId();
+  const tagsId = useId();
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  const titleError = titleTouched && !title.trim();
   const isEditMode = typeof onCancel === 'function';
 
   const renderIcon = () =>
@@ -53,35 +60,85 @@ export default function ItemForm({
       />
     );
 
-  const submitNow = useCallback(() => {
-    if (!canSubmit) return;
-    onSubmit({ title, description, place, tags } as ItemFormValues);
-  }, [canSubmit, onSubmit, title, description, place, tags]);
+  const handleSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (!title.trim()) {
+        setTitleTouched(true);
+        titleRef.current?.focus();
+        return;
+      }
+      onSubmit({ title, description, place, tags } as ItemFormValues);
+    },
+    [onSubmit, title, description, place, tags],
+  );
 
   return (
-    <div className="space-y-3">
+    <form className="space-y-3" onSubmit={handleSubmit} noValidate>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <input
-          aria-label={t('item_create.title')}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && canSubmit && submitNow()}
-          placeholder={t('item_create.title')}
-          className="rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 focus:border-primary dark:focus:border-primary"
-        />
-        <input
-          aria-label={t('item_create.description')}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && canSubmit && submitNow()}
-          placeholder={t('item_create.description')}
-          className="rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 focus:border-primary dark:focus:border-primary"
-        />
+        <div className="space-y-1">
+          <label
+            htmlFor={titleId}
+            className="text-xs font-medium text-muted-foreground"
+          >
+            {t('item_create.title')}
+            <span aria-hidden="true"> *</span>
+          </label>
+          <input
+            id={titleId}
+            ref={titleRef}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={() => setTitleTouched(true)}
+            required
+            aria-required="true"
+            aria-invalid={titleError}
+            aria-describedby={titleError ? `${titleId}-error` : undefined}
+            className="w-full rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 focus:border-primary dark:focus:border-primary"
+          />
+          {titleError && (
+            <p id={`${titleId}-error`} className="text-xs text-destructive">
+              {t('item_create.title_required')}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          <label
+            htmlFor={descriptionId}
+            className="text-xs font-medium text-muted-foreground"
+          >
+            {t('item_create.description')}
+          </label>
+          <textarea
+            id={descriptionId}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            className="w-full rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 focus:border-primary dark:focus:border-primary resize-none"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <PlaceAutocomplete value={place} onChange={setPlace} />
-        <TagsInput tags={tags} setTags={setTags} />
+        <div className="space-y-1">
+          <label
+            htmlFor={placeId}
+            className="text-xs font-medium text-muted-foreground"
+          >
+            {t('item_create.place')}
+          </label>
+          <PlaceAutocomplete id={placeId} value={place} onChange={setPlace} />
+        </div>
+        <div className="space-y-1">
+          <label
+            htmlFor={tagsId}
+            className="text-xs font-medium text-muted-foreground"
+          >
+            {t('item_create.tags')}
+          </label>
+          <TagsInput id={tagsId} tags={tags} setTags={setTags} />
+        </div>
       </div>
 
       <div className="flex justify-end gap-2">
@@ -97,9 +154,8 @@ export default function ItemForm({
 
         {showIconSubmit ? (
           <button
-            type="button"
-            disabled={submitting || !canSubmit}
-            onClick={submitNow}
+            type="submit"
+            disabled={submitting}
             className="w-10 h-10 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 active:scale-[0.99] disabled:opacity-60 flex items-center justify-center"
             aria-label={submitLabel}
             title={submitLabel}
@@ -113,13 +169,12 @@ export default function ItemForm({
         ) : (
           <Submit
             submitting={submitting}
-            disabled={submitting || !canSubmit}
+            disabled={submitting}
             label={submitLabel}
             iconMode={false}
-            onClick={submitNow}
           />
         )}
       </div>
-    </div>
+    </form>
   );
 }

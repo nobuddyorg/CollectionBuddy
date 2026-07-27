@@ -19,6 +19,8 @@ export function SearchInput({
         aria-hidden
       />
       <input
+        type="search"
+        enterKeyHint="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={t('item_list.search_placeholder')}

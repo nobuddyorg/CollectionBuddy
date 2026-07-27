@@ -7,20 +7,17 @@ export function Submit({
   disabled,
   label,
   iconMode,
-  onClick,
 }: {
   submitting: boolean;
   disabled: boolean;
   label: string;
   iconMode: boolean;
-  onClick: () => void;
 }) {
   if (iconMode) {
     return (
       <button
-        type="button"
+        type="submit"
         disabled={disabled}
-        onClick={onClick}
         className="w-10 h-10 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 active:scale-[0.99] disabled:opacity-60 flex items-center justify-center"
         aria-label={label}
         title={label}
@@ -42,12 +39,11 @@ export function Submit({
 
   return (
     <button
-      type="button"
+      type="submit"
       disabled={disabled}
-      onClick={onClick}
       className="h-9 px-3 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-60"
     >
-      {submitting ? label : label}
+      {label}
     </button>
   );
 }
