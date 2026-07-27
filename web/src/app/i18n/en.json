@@ -49,7 +49,8 @@
     "you_are_here": "You are here",
     "more_actions": "More actions",
     "zoom_to_current_location": "Zoom to current location",
-    "frame_all_pins": "Frame all pins"
+    "frame_all_pins": "Frame all pins",
+    "search_error": "Search failed. Please try again."
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Sign in with Google"
