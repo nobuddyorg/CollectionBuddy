@@ -16,9 +16,11 @@ type MenuPos = {
 };
 
 export function PlaceAutocomplete({
+  id,
   value,
   onChange,
 }: {
+  id?: string;
   value: string;
   onChange: (v: string) => void;
 }) {
@@ -81,6 +83,7 @@ export function PlaceAutocomplete({
   return (
     <div className="relative" ref={dropdownRef}>
       <input
+        id={id}
         ref={inputRef}
         role="combobox"
         aria-expanded={showMenu}
@@ -114,6 +117,7 @@ export function PlaceAutocomplete({
         placeholder={t('item_create.place_placeholder')}
         className="w-full rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 focus:border-primary dark:focus:border-primary"
         autoComplete="off"
+        autoCapitalize="words"
       />
 
       {/* The results menu is portaled to document.body, so a screen reader

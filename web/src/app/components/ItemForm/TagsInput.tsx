@@ -6,9 +6,11 @@ import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 
 export function TagsInput({
+  id,
   tags,
   setTags,
 }: {
+  id?: string;
   tags: string[];
   setTags: (tags: string[]) => void;
 }) {
@@ -62,11 +64,13 @@ export function TagsInput({
         </span>
       ))}
       <input
+        id={id}
         value={tagInput}
         onChange={(e) => setTagInput(e.target.value)}
         onKeyDown={onKeyDown}
         aria-label={t('item_create.tags_placeholder')}
         placeholder={tags.length === 0 ? t('item_create.tags_placeholder') : ''}
+        enterKeyHint="done"
         className="flex-1 min-w-[100px] bg-transparent py-1 text-sm"
       />
       <span role="status" className="sr-only">

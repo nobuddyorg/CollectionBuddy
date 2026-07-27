@@ -184,10 +184,6 @@ body {
     justify-content: center;
     z-index: 9999;
   }
-
-  input:placeholder-shown + .clear-button {
-    display: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

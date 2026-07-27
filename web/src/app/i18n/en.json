@@ -26,8 +26,11 @@
   "item_create": {
     "new_entry": "New entry",
     "title": "Title",
+    "title_required": "Title is required.",
     "description": "Description",
+    "place": "Place",
     "place_placeholder": "City (e.g. Cologne)",
+    "tags": "Tags",
     "searching": "Searching…",
     "no_results": "No results",
     "remove_tag": "Remove tag {tag}",

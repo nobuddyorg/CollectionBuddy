@@ -26,8 +26,11 @@
   "item_create": {
     "new_entry": "Neuer Eintrag",
     "title": "Titel",
+    "title_required": "Titel ist erforderlich.",
     "description": "Beschreibung",
+    "place": "Ort",
     "place_placeholder": "Ort (z. B. Köln)",
+    "tags": "Tags",
     "searching": "Suche…",
     "no_results": "Keine Treffer",
     "remove_tag": "Tag {tag} entfernen",
