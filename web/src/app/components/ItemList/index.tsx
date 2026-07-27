@@ -98,7 +98,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     return () => clearTimeout(id);
   }, [q]);
 
-  const { items, loading, page, setPage, totalPages, reload, setItems } =
+  const { items, total, loading, page, setPage, totalPages, reload, setItems } =
     useItems(categoryId, qDebounced);
 
   const handleCreated = useCallback(() => {
@@ -242,6 +242,12 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         </div>
       </div>
 
+      <span className="sr-only" aria-live="polite">
+        {!loading && qDebounced
+          ? t('item_list.results_count').replace('{count}', String(total))
+          : ''}
+      </span>
+
       {items.length === 0 ? (
         loading ? (
           <p
@@ -283,6 +289,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
       ) : (
         <ul
           aria-busy={loading}
+          aria-labelledby="entries-heading"
           className={`grid sm:grid-cols-2 lg:grid-cols-2 gap-3 transition-opacity ${loading ? 'opacity-60' : ''}`}
         >
           {items.map((it) => (

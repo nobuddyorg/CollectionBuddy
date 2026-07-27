@@ -3,7 +3,8 @@
     "entries": "Entries",
     "choose_category": "Choose category",
     "add_collectibles": "Add new collectibles and upload pictures to get started.",
-    "footer": "Collect • Organize • Keep"
+    "footer": "Collect • Organize • Keep",
+    "skip_to_content": "Skip to content"
   },
   "header": {
     "title": "CollectionBuddy",
@@ -41,7 +42,7 @@
     "no_user_session": "No user session",
     "previous": "Previous",
     "next": "Next",
-    "image_alt": "Image {idx}",
+    "image_alt": "{title} — image {idx}",
     "full_size_image_alt": "Full size image",
     "close_modal": "Close",
     "loading": "Loading…",
@@ -69,7 +70,10 @@
     "no_items_title": "No entries yet",
     "no_items_hint": "Add your first entry to this category to see it here.",
     "map_error": "Couldn't load map locations. Please try again.",
-    "map_empty": "No locations to show yet."
+    "map_empty": "No locations to show yet.",
+    "pagination": "Pagination",
+    "page": "Page {n}",
+    "results_count": "{count} results"
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Sign in with Google"

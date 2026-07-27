@@ -67,6 +67,11 @@ body {
   ::before {
     border-color: var(--color-border);
   }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
 }
 
 @layer utilities {
@@ -186,10 +191,12 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .collectible,
-  .collectible-bob,
-  .spin-slow,
-  .fade-up {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

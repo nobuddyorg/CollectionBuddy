@@ -46,6 +46,7 @@ export function Actions({
 
       <label
         className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 transition cursor-pointer"
+        aria-label={t('item_list.add_image')}
         title={t('item_list.add_image')}
       >
         <input
@@ -86,6 +87,7 @@ export function Actions({
           onClose();
         }}
         className="w-9 h-9 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 flex items-center justify-center"
+        aria-label={t('item_list.edit')}
         title={t('item_list.edit')}
       >
         <Icon
@@ -104,6 +106,7 @@ export function Actions({
           onClose();
         }}
         className="w-9 h-9 rounded-xl bg-destructive text-destructive-foreground shadow-sm hover:brightness-110 flex items-center justify-center"
+        aria-label={t('item_list.delete')}
         title={t('item_list.delete')}
       >
         <Icon

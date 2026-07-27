@@ -3,7 +3,8 @@
     "entries": "Einträge",
     "choose_category": "Kategorie wählen",
     "add_collectibles": "Füge neue Sammlerstücke hinzu und lade Bilder hoch, um loszulegen.",
-    "footer": "Sammeln • Ordnen • Behalten"
+    "footer": "Sammeln • Ordnen • Behalten",
+    "skip_to_content": "Zum Inhalt springen"
   },
   "header": {
     "title": "CollectionBuddy",
@@ -41,7 +42,7 @@
     "no_user_session": "Keine Benutzersitzung",
     "previous": "Zurück",
     "next": "Weiter",
-    "image_alt": "Bild {idx}",
+    "image_alt": "{title} — Bild {idx}",
     "full_size_image_alt": "Vollbild",
     "close_modal": "Schließen",
     "loading": "Wird geladen…",
@@ -69,7 +70,10 @@
     "no_items_title": "Noch keine Einträge",
     "no_items_hint": "Füge deinen ersten Eintrag in dieser Kategorie hinzu, um ihn hier zu sehen.",
     "map_error": "Kartenstandorte konnten nicht geladen werden. Bitte erneut versuchen.",
-    "map_empty": "Noch keine Standorte vorhanden."
+    "map_empty": "Noch keine Standorte vorhanden.",
+    "pagination": "Seitennavigation",
+    "page": "Seite {n}",
+    "results_count": "{count} Treffer"
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Mit Google anmelden"

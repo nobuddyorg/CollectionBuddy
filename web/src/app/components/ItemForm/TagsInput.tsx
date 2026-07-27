@@ -65,7 +65,7 @@ export function TagsInput({
         onChange={(e) => setTagInput(e.target.value)}
         onKeyDown={onKeyDown}
         placeholder={tags.length === 0 ? t('item_create.tags_placeholder') : ''}
-        className="flex-1 min-w-[100px] bg-transparent outline-none py-1 text-sm"
+        className="flex-1 min-w-[100px] bg-transparent py-1 text-sm"
       />
     </div>
   );

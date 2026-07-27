@@ -67,7 +67,7 @@ export default function ItemForm({
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && canSubmit && submitNow()}
           placeholder={t('item_create.title')}
-          className="rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 outline-none focus:border-primary dark:focus:border-primary"
+          className="rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 focus:border-primary dark:focus:border-primary"
         />
         <input
           aria-label={t('item_create.description')}
@@ -75,7 +75,7 @@ export default function ItemForm({
           onChange={(e) => setDescription(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && canSubmit && submitNow()}
           placeholder={t('item_create.description')}
-          className="rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 outline-none focus:border-primary dark:focus:border-primary"
+          className="rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 focus:border-primary dark:focus:border-primary"
         />
       </div>
 
@@ -101,6 +101,7 @@ export default function ItemForm({
             disabled={submitting || !canSubmit}
             onClick={submitNow}
             className="w-10 h-10 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 active:scale-[0.99] disabled:opacity-60 flex items-center justify-center"
+            aria-label={submitLabel}
             title={submitLabel}
           >
             {submitting ? (
