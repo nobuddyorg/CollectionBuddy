@@ -46,6 +46,7 @@ export function ImageGrid({
               width={160}
               height={160}
               unoptimized
+              loading="lazy"
               className="h-20 w-full object-cover rounded-xl cursor-pointer"
             />
           </button>

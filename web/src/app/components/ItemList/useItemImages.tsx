@@ -216,7 +216,11 @@ export function useItemImages() {
           fileType: 'image/webp',
           useWebWorker: true,
         });
-        const thumbFile = await imageCompression(file, {
+        // Derive the thumbnail from the already-downscaled 1000px image
+        // rather than the original file -- a 12MP phone JPEG decoded and
+        // canvas-resized twice is roughly 2x the wall time and peak memory
+        // for no visible quality difference at 250px.
+        const thumbFile = await imageCompression(fullFile, {
           maxWidthOrHeight: 250,
           initialQuality: 0.75,
           fileType: 'image/webp',

@@ -1,5 +1,12 @@
 'use client';
-import { createContext, useEffect, useState, useCallback, useRef } from 'react';
+import {
+  createContext,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import de from './de.json';
 import en from './en.json';
 
@@ -73,9 +80,7 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
     [],
   );
 
-  return (
-    <I18nContext.Provider value={{ lang, setLang, t }}>
-      {children}
-    </I18nContext.Provider>
-  );
+  const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t]);
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 };
