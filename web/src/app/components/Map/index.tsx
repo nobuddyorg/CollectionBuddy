@@ -132,7 +132,12 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
 
   useEffect(() => {
     const L = LRef.current;
-    if (!ready || !L || !mapInstance.current || !currentLocationLayerRef.current)
+    if (
+      !ready ||
+      !L ||
+      !mapInstance.current ||
+      !currentLocationLayerRef.current
+    )
       return;
 
     currentLocationLayerRef.current.clearLayers();
@@ -159,7 +164,8 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     const points: Array<import('leaflet').LatLngExpression> = markers.map(
       (m) => [m.lat, m.lng],
     );
-    if (currentLocation) points.push([currentLocation.lat, currentLocation.lng]);
+    if (currentLocation)
+      points.push([currentLocation.lat, currentLocation.lng]);
 
     if (points.length > 0) {
       const bounds = L.latLngBounds(points).pad(BOUNDS_PAD_RATIO);

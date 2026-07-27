@@ -6,8 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "format": "prettier --write ."
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "vitest run"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",
@@ -19,17 +20,17 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^25",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^10",
+    "eslint": "^9",
     "eslint-config-next": "16.2.12",
     "prettier": "^3.8.2",
     "serve": "^14.2.6",
     "tailwindcss": "^4",
-    "typescript": "^6"
+    "typescript": "^6",
+    "vitest": "^4.1.10"
   }
 }

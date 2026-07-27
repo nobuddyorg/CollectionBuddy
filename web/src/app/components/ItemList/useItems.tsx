@@ -9,6 +9,17 @@ import type { ItemLite, ItemRow } from './types';
 
 const PAGE_SIZE = 6;
 
+// Escape LIKE metacharacters first, then quote the value so that
+// PostgREST's or=() grammar (which treats , . ( ) as structural
+// delimiters) sees one opaque string instead of parsing the search term
+// as extra filter conditions.
+export function buildSearchFilter(needle: string): string {
+  const likeEscaped = needle.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&');
+  const like = `%${likeEscaped}%`;
+  const quoted = like.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return `title.ilike."${quoted}",description.ilike."${quoted}",place.ilike."${quoted}",tags_text.ilike."${quoted}"`;
+}
+
 export function useItems(categoryId: string, q: string) {
   const { t } = useI18n();
   const toast = useToast();
@@ -55,18 +66,7 @@ export function useItems(categoryId: string, q: string) {
     // keystroke for no benefit. Same threshold PlaceAutocomplete already
     // uses.
     if (needle.length >= 3) {
-      // Escape LIKE metacharacters first, then quote the value so that
-      // PostgREST's or=() grammar (which treats , . ( ) as structural
-      // delimiters) sees one opaque string instead of parsing the search
-      // term as extra filter conditions.
-      const likeEscaped = needle
-        .replace(/\\/g, '\\\\')
-        .replace(/[%_]/g, '\\$&');
-      const like = `%${likeEscaped}%`;
-      const quoted = like.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      query = query.or(
-        `title.ilike."${quoted}",description.ilike."${quoted}",place.ilike."${quoted}",tags_text.ilike."${quoted}"`,
-      );
+      query = query.or(buildSearchFilter(needle));
     }
 
     const { data, error, count } = await query

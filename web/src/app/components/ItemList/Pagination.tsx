@@ -4,7 +4,7 @@ import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 import { useMemo } from 'react';
 
-const getPaginationItems = (page: number, totalPages: number) => {
+export const getPaginationItems = (page: number, totalPages: number) => {
   if (totalPages <= 7) {
     return Array.from({ length: totalPages }, (_, i) => i + 1);
   }
