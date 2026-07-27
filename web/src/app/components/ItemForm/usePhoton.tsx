@@ -9,6 +9,7 @@ export function usePhotonSearch(locale?: string) {
   const [focus, setFocus] = useState(false);
   const [results, setResults] = useState<PhotonFeature[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -51,6 +52,7 @@ export function usePhotonSearch(locale?: string) {
     if (!focus || query.trim().length < 3) {
       setResults([]);
       setActiveIdx(-1);
+      setError(false);
       return;
     }
     const q = query.trim();
@@ -60,6 +62,7 @@ export function usePhotonSearch(locale?: string) {
         const ctl = new AbortController();
         abortRef.current = ctl;
         setLoading(true);
+        setError(false);
         const url = new URL('https://photon.komoot.io/api/');
         url.searchParams.set('q', q);
         url.searchParams.set('limit', '5');
@@ -81,9 +84,13 @@ export function usePhotonSearch(locale?: string) {
         }
         setResults(deduped);
         setActiveIdx(-1);
-      } catch {
+      } catch (err) {
+        // A newer keystroke aborting this request isn't a failure -- the
+        // request that superseded it owns the resulting state.
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         setResults([]);
         setActiveIdx(-1);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -145,6 +152,7 @@ export function usePhotonSearch(locale?: string) {
     setFocus,
     results,
     loading,
+    error,
     activeIdx,
     setActiveIdx,
     dropdownRef,

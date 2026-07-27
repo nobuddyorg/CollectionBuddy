@@ -29,6 +29,7 @@ function writeGeocodeCache(cache: Record<string, Place>) {
 export function usePlaces(categoryId: string, enabled: boolean) {
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!enabled) return;
@@ -37,6 +38,7 @@ export function usePlaces(categoryId: string, enabled: boolean) {
 
     const fetchPlaces = async () => {
       setLoading(true);
+      setError(false);
       try {
         const { data: items, error } = await supabase
           .from('items')
@@ -79,10 +81,22 @@ export function usePlaces(categoryId: string, enabled: boolean) {
 
         if (cacheDirty) writeGeocodeCache(cache);
         if (!cancelled) {
-          setPlaces(placeCoordinates.filter((p): p is Place => p !== null));
+          const resolved = placeCoordinates.filter(
+            (p): p is Place => p !== null,
+          );
+          setPlaces(resolved);
+          // Every place failed to geocode (as opposed to there being no
+          // places to geocode) -- distinguish "geocoding is broken" from
+          // "nothing to show" instead of silently rendering an empty map.
+          if (uniquePlaces.length > 0 && resolved.length === 0) {
+            setError(true);
+          }
         }
       } catch {
-        if (!cancelled) setPlaces([]);
+        if (!cancelled) {
+          setPlaces([]);
+          setError(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -95,5 +109,5 @@ export function usePlaces(categoryId: string, enabled: boolean) {
     };
   }, [categoryId, enabled]);
 
-  return { places, loading };
+  return { places, loading, error };
 }
