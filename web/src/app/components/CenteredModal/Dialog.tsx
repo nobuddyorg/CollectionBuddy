@@ -1,20 +1,8 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import Icon, { IconType } from '../Icon';
-
-function getFocusable(container: HTMLElement | null): HTMLElement[] {
-  if (!container) return [];
-  const selectors = [
-    'a[href]',
-    'button:not([disabled])',
-    'textarea:not([disabled])',
-    'input:not([disabled])',
-    'select:not([disabled])',
-    '[tabindex]:not([tabindex="-1"])',
-  ].join(',');
-  return Array.from(container.querySelectorAll<HTMLElement>(selectors));
-}
+import { useFocusTrap } from './useFocusTrap';
 
 export function Dialog({
   open,
@@ -33,32 +21,7 @@ export function Dialog({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const el = initialFocusRef?.current ?? getFocusable(panelRef.current)[0];
-    el?.focus?.();
-  }, [open, initialFocusRef]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const f = getFocusable(panelRef.current);
-      if (f.length === 0) return;
-      const first = f[0];
-      const last = f[f.length - 1];
-      const active = document.activeElement as HTMLElement | null;
-      if (e.shiftKey && active === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open]);
+  useFocusTrap(open, panelRef, initialFocusRef);
 
   return (
     <div
@@ -66,6 +29,7 @@ export function Dialog({
         open ? 'opacity-100' : 'pointer-events-none opacity-0'
       }`}
       aria-hidden={!open}
+      inert={!open}
     >
       <div
         ref={panelRef}

@@ -25,12 +25,13 @@ export default function Coin({
   }, [size]);
 
   return (
-    <div
-      className={`relative ${className ?? ''}`}
-      style={style}
-      aria-hidden="true"
-    >
-      <Icon icon={IconType.Coin} className="w-full h-full" rimId={rimId}>
+    <div className={`relative ${className ?? ''}`} style={style}>
+      <Icon
+        icon={IconType.Coin}
+        className="w-full h-full"
+        rimId={rimId}
+        aria-hidden="true"
+      >
         <TextRing
           rimId={rimId}
           text={text}
