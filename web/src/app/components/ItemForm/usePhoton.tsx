@@ -4,6 +4,47 @@ import type { PhotonFeature } from './types';
 
 type RegionNames = Intl.DisplayNames | null;
 
+export function formatPlaceDisplay(
+  p: PhotonFeature['properties'],
+  regionNames: RegionNames,
+): { city: string; line2: string; key: string } {
+  const city = p.city || p.town || p.village || p.municipality || p.name || '';
+  const country =
+    p.country ||
+    (p.countrycode && regionNames
+      ? regionNames.of(p.countrycode.toUpperCase())
+      : undefined);
+  const line2 = [p.state, country].filter(Boolean).join(', ');
+  // Normalize each side of the separator independently -- trimming only
+  // the fully-joined string would leave whitespace trailing off `city`
+  // sitting in the middle of the key (right before `|||`), so two
+  // entries differing only in incidental whitespace wouldn't dedupe.
+  const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+  const key = `${normalize(city)}|||${normalize(line2)}`;
+  return { city, line2, key };
+}
+
+// De-duplicates Photon results first by OSM id, then by their rendered
+// display (some places share an OSM id-distinct entry but format
+// identically, e.g. differently-tagged nodes for the same city).
+export function dedupePhotonFeatures(
+  features: PhotonFeature[],
+  regionNames: RegionNames,
+): PhotonFeature[] {
+  const uniqueByOsm = Array.from(
+    new Map(features.map((f) => [f.properties.osm_id, f])).values(),
+  );
+  const seen = new Set<string>();
+  const deduped: PhotonFeature[] = [];
+  for (const f of uniqueByOsm) {
+    const { key } = formatPlaceDisplay(f.properties, regionNames);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(f);
+  }
+  return deduped;
+}
+
 export function usePhotonSearch(locale?: string) {
   const [query, setQuery] = useState('');
   const [focus, setFocus] = useState(false);
@@ -30,21 +71,7 @@ export function usePhotonSearch(locale?: string) {
   );
 
   const formatDisplay = useCallback(
-    (p: PhotonFeature['properties']) => {
-      const city =
-        p.city || p.town || p.village || p.municipality || p.name || '';
-      const country =
-        p.country ||
-        (p.countrycode && regionNames
-          ? regionNames.of(p.countrycode.toUpperCase())
-          : undefined);
-      const line2 = [p.state, country].filter(Boolean).join(', ');
-      const key = `${city}|||${line2}`
-        .toLowerCase()
-        .replace(/\s+/g, ' ')
-        .trim();
-      return { city, line2, key };
-    },
+    (p: PhotonFeature['properties']) => formatPlaceDisplay(p, regionNames),
     [regionNames],
   );
 
@@ -71,18 +98,7 @@ export function usePhotonSearch(locale?: string) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: { features: PhotonFeature[] } = await res.json();
 
-        const uniqueByOsm = Array.from(
-          new Map(data.features.map((f) => [f.properties.osm_id, f])).values(),
-        );
-        const seen = new Set<string>();
-        const deduped: PhotonFeature[] = [];
-        for (const f of uniqueByOsm) {
-          const { key } = formatDisplay(f.properties);
-          if (seen.has(key)) continue;
-          seen.add(key);
-          deduped.push(f);
-        }
-        setResults(deduped);
+        setResults(dedupePhotonFeatures(data.features, regionNames));
         setActiveIdx(-1);
       } catch (err) {
         // A newer keystroke aborting this request isn't a failure -- the
@@ -96,7 +112,7 @@ export function usePhotonSearch(locale?: string) {
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, focus, photonLang, formatDisplay]);
+  }, [query, focus, photonLang, regionNames]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {

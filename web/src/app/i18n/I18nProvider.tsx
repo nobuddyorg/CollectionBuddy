@@ -20,6 +20,26 @@ type FlattenKeys<T, Prefix extends string = ''> = T extends string
 
 export type TranslationKey = FlattenKeys<typeof en>;
 
+// Resolves a dotted key path against a translation tree. Returns
+// undefined on any miss (unknown segment, or the path bottoms out on a
+// sub-object instead of a string) rather than falling back to the key
+// itself, so callers can decide what a miss means.
+export function resolveTranslationKey(
+  dict: TranslationValue,
+  key: string,
+): string | undefined {
+  const keys = key.split('.');
+  let value: TranslationValue = dict;
+  for (const k of keys) {
+    if (typeof value === 'object' && value !== null && k in value) {
+      value = value[k];
+    } else {
+      return undefined;
+    }
+  }
+  return typeof value === 'string' ? value : undefined;
+}
+
 type I18nContextType = {
   lang: Language;
   setLang: (lang: Language) => void;
@@ -47,25 +67,11 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  const t = useCallback((key: TranslationKey) => {
-    const keys = key.split('.');
-    let value: TranslationValue = translations[langRef.current];
-    for (const k of keys) {
-      if (typeof value === 'object' && value !== null && k in value) {
-        const newValue: TranslationValue = value[k];
-        if (typeof newValue === 'string') {
-          value = newValue;
-        } else if (typeof newValue === 'object' && newValue !== null) {
-          value = newValue;
-        } else {
-          return key;
-        }
-      } else {
-        return key;
-      }
-    }
-    return typeof value === 'string' ? value : key;
-  }, []);
+  const t = useCallback(
+    (key: TranslationKey) =>
+      resolveTranslationKey(translations[langRef.current], key) ?? key,
+    [],
+  );
 
   return (
     <I18nContext.Provider value={{ lang, setLang, t }}>

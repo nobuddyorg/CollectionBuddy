@@ -30,12 +30,12 @@ export async function removeItemImages(itemId: string): Promise<void> {
   if (removeError) throw removeError;
 }
 
-type StorageObjectRow = { name: string };
-type ImageEntryData = { pathFull: string; pathThumb?: string };
+export type StorageObjectRow = { name: string };
+export type ImageEntryData = { pathFull: string; pathThumb?: string };
 
 // Groups a flat listing of `<base>.webp` / `<base>.thumb.webp` objects into
 // full+thumb pairs, keyed by base name, with paths prefixed for signing.
-function pairImageEntries(
+export function pairImageEntries(
   data: StorageObjectRow[],
   prefix: string,
 ): Map<string, ImageEntryData> {
