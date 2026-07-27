@@ -50,7 +50,8 @@
     "more_actions": "More actions",
     "zoom_to_current_location": "Zoom to current location",
     "frame_all_pins": "Frame all pins",
-    "search_error": "Search failed. Please try again."
+    "search_error": "Search failed. Please try again.",
+    "delete_images_error": "Could not delete this item's images. The item was not deleted."
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Sign in with Google"

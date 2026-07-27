@@ -97,6 +97,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     refreshAllImages,
     uploadImage,
     deleteImage,
+    deleteAllItemImages,
     busy,
     deletingPath,
   } = useItemImages();
@@ -163,7 +164,22 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
   const removeItem = async (id: string) => {
     if (!confirm(t('item_list.confirm_delete'))) return;
-    await supabase.from('items').delete().eq('id', id);
+    try {
+      // Delete storage objects before the row: the DB trigger can only ever
+      // remove the storage.objects metadata row, not the underlying bytes
+      // in the storage backend, so this is the only path that actually
+      // reclaims the space.
+      await deleteAllItemImages(id);
+    } catch (err) {
+      console.error('Failed to delete item images:', err);
+      alert(t('item_list.delete_images_error'));
+      return;
+    }
+    const { error } = await supabase.from('items').delete().eq('id', id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
     await reload();
   };
 

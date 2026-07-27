@@ -5,6 +5,29 @@ import { supabase } from '../../supabase';
 import type { ImgEntry } from './types';
 import { useI18n } from '../../i18n/useI18n';
 
+// Deletes every stored object (full + thumb) under an item's prefix.
+// Standalone (not part of the hook) so callers that don't otherwise need
+// image state -- e.g. category deletion, which must clean up any items it
+// is about to orphan -- can invoke it without mounting image state.
+export async function removeItemImages(itemId: string): Promise<void> {
+  const { data: u } = await supabase.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) return;
+
+  const prefix = `${uid}/${itemId}`;
+  const { data, error } = await supabase.storage
+    .from('item-images')
+    .list(prefix, { limit: 100 });
+  if (error) throw error;
+  if (!data?.length) return;
+
+  const paths = data.map((o) => `${prefix}/${o.name}`);
+  const { error: removeError } = await supabase.storage
+    .from('item-images')
+    .remove(paths);
+  if (removeError) throw removeError;
+}
+
 export function useItemImages() {
   const { t } = useI18n();
   const [busy, setBusy] = useState<string | null>(null);
@@ -189,12 +212,22 @@ export function useItemImages() {
     }
   }, []);
 
+  const deleteAllItemImages = useCallback(async (itemId: string) => {
+    await removeItemImages(itemId);
+    setImages((prev) => {
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
+  }, []);
+
   return {
     images,
     refreshItemImages,
     refreshAllImages,
     uploadImage,
     deleteImage,
+    deleteAllItemImages,
     busy,
     deletingPath,
   };
