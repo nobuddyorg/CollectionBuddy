@@ -50,7 +50,8 @@
     "more_actions": "Weitere Aktionen",
     "zoom_to_current_location": "Zum aktuellen Standort zoomen",
     "frame_all_pins": "Alle Pins einrahmen",
-    "search_error": "Suche fehlgeschlagen. Bitte erneut versuchen."
+    "search_error": "Suche fehlgeschlagen. Bitte erneut versuchen.",
+    "delete_images_error": "Die Bilder dieses Eintrags konnten nicht gelöscht werden. Der Eintrag wurde nicht entfernt."
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Mit Google anmelden"

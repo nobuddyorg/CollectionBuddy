@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import { supabase } from '../../supabase';
+import { removeItemImages } from '../ItemList/useItemImages';
 import type { Category } from '../../types';
 
 export function useCategories() {
@@ -61,6 +62,34 @@ export function useCategories() {
       if (!id || isDeleting) return false;
       setIsDeleting(true);
       try {
+        // Deleting a category cascades (item_categories -> orphan-item
+        // deletion -> items) through DB triggers, which can only ever
+        // remove storage.objects metadata, not the underlying bytes. Find
+        // the items this deletion would orphan and clean up their images
+        // client-side first, same as a direct item delete.
+        const { data: links, error: linksError } = await supabase
+          .from('item_categories')
+          .select('item_id')
+          .eq('category_id', id);
+        if (linksError) throw linksError;
+
+        const itemIds = Array.from(
+          new Set((links ?? []).map((l) => l.item_id)),
+        );
+        let orphanedItemIds = itemIds;
+        if (itemIds.length) {
+          const { data: stillLinked, error: linkedError } = await supabase
+            .from('item_categories')
+            .select('item_id')
+            .in('item_id', itemIds)
+            .neq('category_id', id);
+          if (linkedError) throw linkedError;
+          const keep = new Set((stillLinked ?? []).map((l) => l.item_id));
+          orphanedItemIds = itemIds.filter((itemId) => !keep.has(itemId));
+        }
+
+        await Promise.all(orphanedItemIds.map((itemId) => removeItemImages(itemId)));
+
         const { error } = await supabase
           .from('categories')
           .delete()
