@@ -114,7 +114,11 @@ export function PlaceAutocomplete({
           (() => {
             const style: React.CSSProperties =
               menuPos.placement === 'below'
-                ? { top: menuPos.anchorBottom, left: menuPos.left, width: menuPos.width }
+                ? {
+                    top: menuPos.anchorBottom,
+                    left: menuPos.left,
+                    width: menuPos.width,
+                  }
                 : {
                     bottom: window.innerHeight - menuPos.anchorTop,
                     left: menuPos.left,
