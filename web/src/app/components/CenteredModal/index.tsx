@@ -20,7 +20,7 @@ export default function CenteredModal({
   useLockBodyScroll(open);
   useEscapeToClose(open && closeOnEsc, () => onOpenChange(false));
 
-  if (typeof document === 'undefined') return null;
+  if (typeof document === 'undefined' || !open) return null;
 
   return (
     <Portal>
