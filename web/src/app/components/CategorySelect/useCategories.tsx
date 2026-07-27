@@ -4,11 +4,13 @@ import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import { supabase } from '../../supabase';
+import { useToast } from '../Toast/ToastProvider';
 import { removeItemImages } from '../ItemList/useItemImages';
 import type { Category } from '../../types';
 
 export function useCategories() {
   const { t } = useI18n();
+  const toast = useToast();
   const [cats, setCats] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -26,12 +28,12 @@ export function useCategories() {
       return list;
     } catch (e) {
       console.error(e);
-      alert(t('category_select.loadError'));
+      toast.error(t('category_select.loadError'));
       return [];
     } finally {
       setIsLoading(false);
     }
-  }, [t]);
+  }, [t, toast]);
 
   const createCategory = useCallback(
     async (name: string) => {
@@ -48,13 +50,13 @@ export function useCategories() {
         return data as Category;
       } catch (e) {
         console.error(e);
-        alert(t('category_select.createError'));
+        toast.error(t('category_select.createError'));
         return null;
       } finally {
         setIsCreating(false);
       }
     },
-    [reload, t, isCreating],
+    [reload, t, isCreating, toast],
   );
 
   const deleteCategory = useCallback(
@@ -88,7 +90,9 @@ export function useCategories() {
           orphanedItemIds = itemIds.filter((itemId) => !keep.has(itemId));
         }
 
-        await Promise.all(orphanedItemIds.map((itemId) => removeItemImages(itemId)));
+        await Promise.all(
+          orphanedItemIds.map((itemId) => removeItemImages(itemId)),
+        );
 
         const { error } = await supabase
           .from('categories')
@@ -99,13 +103,13 @@ export function useCategories() {
         return true;
       } catch (e) {
         console.error(e);
-        alert(t('category_select.deleteError'));
+        toast.error(t('category_select.deleteError'));
         return false;
       } finally {
         setIsDeleting(false);
       }
     },
-    [reload, t, isDeleting],
+    [reload, t, isDeleting, toast],
   );
 
   return {

@@ -55,8 +55,15 @@ export function Actions({
           disabled={busy}
           onChange={(e) => {
             const f = e.target.files?.[0];
-            if (f) onUpload(f);
-            onClose();
+            if (f) {
+              // Keep the row open (with its busy spinner) for the
+              // duration of the upload -- ItemCard closes it once the
+              // busy flag clears, instead of hiding all feedback the
+              // instant a file is picked.
+              onUpload(f);
+            } else {
+              onClose();
+            }
           }}
         />
         {busy ? (

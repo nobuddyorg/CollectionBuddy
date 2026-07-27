@@ -37,6 +37,7 @@
   },
   "item_list": {
     "confirm_delete": "Diesen Eintrag löschen?",
+    "confirm_delete_image": "Dieses Bild löschen?",
     "no_user_session": "Keine Benutzersitzung",
     "previous": "Zurück",
     "next": "Weiter",
@@ -58,6 +59,10 @@
     "zoom_to_current_location": "Zum aktuellen Standort zoomen",
     "frame_all_pins": "Alle Orte anzeigen",
     "search_error": "Suche fehlgeschlagen. Bitte erneut versuchen.",
+    "save_error": "Änderungen konnten nicht gespeichert werden. Bitte erneut versuchen.",
+    "delete_error": "Eintrag konnte nicht gelöscht werden. Bitte erneut versuchen.",
+    "upload_error": "Bild konnte nicht hochgeladen werden. Bitte erneut versuchen.",
+    "delete_image_error": "Bild konnte nicht gelöscht werden. Bitte erneut versuchen.",
     "delete_images_error": "Die Bilder dieses Eintrags konnten nicht gelöscht werden. Der Eintrag wurde nicht entfernt.",
     "no_results_title": "Keine Treffer für \"{q}\"",
     "no_results_hint": "Versuche einen anderen Suchbegriff.",
@@ -78,7 +83,10 @@
   },
   "common": {
     "loading": "Wird geladen…",
+    "loading_slow": "Das dauert länger als sonst…",
     "close": "Schließen",
-    "save": "Speichern"
+    "save": "Speichern",
+    "confirm": "Bestätigen",
+    "cancel": "Abbrechen"
   }
 }

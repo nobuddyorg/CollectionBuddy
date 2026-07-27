@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 
 import { geistMono, geistSans } from './fonts';
 import './globals.css';
+import { ConfirmProvider } from './components/Confirm/ConfirmProvider';
+import { ToastProvider } from './components/Toast/ToastProvider';
 import { I18nProvider } from './i18n/I18nProvider';
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
@@ -41,7 +43,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <I18nProvider>{children}</I18nProvider>
+        <I18nProvider>
+          <ToastProvider>
+            <ConfirmProvider>{children}</ConfirmProvider>
+          </ToastProvider>
+        </I18nProvider>
       </body>
     </html>
   );

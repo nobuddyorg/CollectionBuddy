@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useI18n } from '../../i18n/useI18n';
 import type { Category } from '../../types';
 import {
@@ -22,6 +23,7 @@ type Props = {
 
 export default function CategorySelect({ selectedCat, onSelect }: Props) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const {
     cats,
     isLoading,
@@ -74,13 +76,13 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
 
   const onDelete = useCallback(async () => {
     if (!selectedCat) return;
-    if (!confirm(t('category_select.confirmDelete'))) return;
+    if (!(await confirm(t('category_select.confirmDelete')))) return;
     const ok = await deleteCategory(selectedCat);
     if (ok) {
       onSelect(null);
       setExpanded(true);
     }
-  }, [selectedCat, deleteCategory, onSelect, t]);
+  }, [selectedCat, deleteCategory, onSelect, t, confirm]);
 
   if (!expanded && selected) {
     return (

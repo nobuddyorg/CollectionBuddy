@@ -37,6 +37,7 @@
   },
   "item_list": {
     "confirm_delete": "Delete this entry?",
+    "confirm_delete_image": "Delete this image?",
     "no_user_session": "No user session",
     "previous": "Previous",
     "next": "Next",
@@ -58,6 +59,10 @@
     "zoom_to_current_location": "Zoom to current location",
     "frame_all_pins": "Show all locations",
     "search_error": "Search failed. Please try again.",
+    "save_error": "Could not save changes. Please try again.",
+    "delete_error": "Could not delete this entry. Please try again.",
+    "upload_error": "Could not upload this image. Please try again.",
+    "delete_image_error": "Could not delete this image. Please try again.",
     "delete_images_error": "Could not delete this item's images. The item was not deleted.",
     "no_results_title": "No results for \"{q}\"",
     "no_results_hint": "Try a different search term.",
@@ -78,7 +83,10 @@
   },
   "common": {
     "loading": "Loading…",
+    "loading_slow": "This is taking longer than usual…",
     "close": "Close",
-    "save": "Save"
+    "save": "Save",
+    "confirm": "Confirm",
+    "cancel": "Cancel"
   }
 }

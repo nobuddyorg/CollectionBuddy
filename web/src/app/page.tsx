@@ -44,7 +44,8 @@ export default function Page() {
     }
   }, [router]);
 
-  if (loading) return <LoadingOverlay label={t('item_list.loading')} />;
+  if (loading)
+    return <LoadingOverlay label={t('item_list.loading')} theme="auto" />;
   if (!user) return null;
 
   const hasCategory = !!selectedCategoryId;

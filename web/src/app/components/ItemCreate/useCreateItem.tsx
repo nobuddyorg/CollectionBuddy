@@ -4,10 +4,12 @@ import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import { supabase } from '../../supabase';
+import { useToast } from '../Toast/ToastProvider';
 import type { ItemFormValues } from '../ItemForm';
 
 export function useCreateItem(categoryId: string) {
   const { t } = useI18n();
+  const toast = useToast();
   const [isCreating, setIsCreating] = useState(false);
 
   const create = useCallback(
@@ -48,13 +50,13 @@ export function useCreateItem(categoryId: string) {
           await supabase.from('items').delete().eq('id', itemId);
         }
         console.error(e);
-        alert(t('item_create.save_error'));
+        toast.error(t('item_create.save_error'));
         return false;
       } finally {
         setIsCreating(false);
       }
     },
-    [categoryId, isCreating, t],
+    [categoryId, isCreating, t, toast],
   );
 
   return { create, isCreating };

@@ -15,9 +15,13 @@ import type { ImgEntry, ItemLite } from './types';
 import Map from '../Map';
 import { usePlaces } from '../Map/usePlaces';
 import Icon, { IconType } from '../Icon';
+import { useConfirm } from '../Confirm/ConfirmProvider';
+import { useToast } from '../Toast/ToastProvider';
 
 export default function ItemList({ categoryId }: { categoryId: string }) {
   const { t } = useI18n();
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const [isCreateOpen, setCreateOpen] = useState(false);
 
@@ -173,7 +177,8 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         .select('id,title,description,place,tags')
         .single<ItemLite>();
       if (error || !data) {
-        alert(error?.message ?? t('item_list.search_error'));
+        console.error('Failed to save item:', error);
+        toast.error(t('item_list.save_error'));
         return;
       }
       setItems((prev) =>
@@ -187,7 +192,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
   };
 
   const removeItem = async (id: string) => {
-    if (!confirm(t('item_list.confirm_delete'))) return;
+    if (!(await confirm(t('item_list.confirm_delete')))) return;
     try {
       // Delete storage objects before the row: the DB trigger can only ever
       // remove the storage.objects metadata row, not the underlying bytes
@@ -196,12 +201,13 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
       await deleteAllItemImages(id);
     } catch (err) {
       console.error('Failed to delete item images:', err);
-      alert(t('item_list.delete_images_error'));
+      toast.error(t('item_list.delete_images_error'));
       return;
     }
     const { error } = await supabase.from('items').delete().eq('id', id);
     if (error) {
-      alert(error.message);
+      console.error('Failed to delete item:', error);
+      toast.error(t('item_list.delete_error'));
       return;
     }
     await reload();

@@ -8,5 +8,5 @@ export type CenteredModalProps = {
   children: React.ReactNode;
   closeOnBackdrop?: boolean;
   closeOnEsc?: boolean;
-  initialFocusRef?: React.RefObject<HTMLElement>;
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
 };
