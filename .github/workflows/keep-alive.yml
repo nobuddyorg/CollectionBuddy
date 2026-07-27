@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Call RPC keepalive
         run: |
-          curl -sS -X POST "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/rpc/keepalive" \
+          curl -sS --fail-with-body -X POST "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/rpc/keepalive" \
             -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
             -H "Authorization: Bearer $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
             -H "Accept-Profile: public" \

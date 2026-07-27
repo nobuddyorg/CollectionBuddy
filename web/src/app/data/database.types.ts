@@ -114,21 +114,6 @@ export type Database = {
           },
         ];
       };
-      profiles: {
-        Row: {
-          id: string;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -139,6 +124,10 @@ export type Database = {
       join_tags: {
         Args: { tags: string[] };
         Returns: string;
+      };
+      keepalive: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
       };
     };
     Enums: Record<string, never>;
