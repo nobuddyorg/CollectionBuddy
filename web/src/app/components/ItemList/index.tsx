@@ -24,7 +24,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
   const [isCreateOpen, setCreateOpen] = usePref(prefKey, false);
 
   const [mapOpen, setMapOpen] = useState(false);
-  const { places, loading: loadingPlaces } = usePlaces(categoryId);
+  const { places, loading: loadingPlaces } = usePlaces(categoryId, mapOpen);
   const [mapCommand, setMapCommand] = useState<'fitAll' | 'fitCurrent' | null>(
     'fitAll',
   );
