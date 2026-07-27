@@ -6,6 +6,7 @@ import { useI18n } from '../../i18n/useI18n';
 
 export function ImageGrid({
   imgs,
+  itemTitle,
   isOpen,
   onOpenModal,
   onDelete,
@@ -13,6 +14,7 @@ export function ImageGrid({
   busy,
 }: {
   imgs: ImgEntry[];
+  itemTitle: string;
   isOpen: boolean;
   onOpenModal: (url: string) => void;
   onDelete: (img: ImgEntry) => void;
@@ -29,7 +31,7 @@ export function ImageGrid({
   }
   return (
     <div className="grid grid-cols-2 gap-2">
-      {imgs.map((img) => (
+      {imgs.map((img, i) => (
         <div
           key={img.pathFull}
           className="relative group"
@@ -42,13 +44,16 @@ export function ImageGrid({
         >
           <Image
             src={img.urlThumb || img.urlFull}
-            alt={t('item_list.image_alt').replace('{idx}', '')}
+            alt={t('item_list.image_alt')
+              .replace('{title}', itemTitle)
+              .replace('{idx}', String(i + 1))}
             width={160}
             height={160}
             unoptimized
             className="h-20 w-full object-cover rounded-xl cursor-pointer"
           />
           <button
+            aria-label={t('item_list.delete')}
             title={t('item_list.delete')}
             onClick={(e) => {
               e.stopPropagation();

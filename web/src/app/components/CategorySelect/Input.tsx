@@ -24,7 +24,7 @@ export function CategoryInput({
         if (e.key === 'Enter') createCategory();
         if (e.key === 'Escape') setExpanded(false);
       }}
-      className="w-full rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 outline-none focus:border-primary dark:focus:border-primary"
+      className="w-full rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 focus:border-primary dark:focus:border-primary"
     />
   );
 }

@@ -21,6 +21,7 @@ export function SearchInput({
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        aria-label={t('item_list.search_placeholder')}
         placeholder={t('item_list.search_placeholder')}
         className="w-full rounded-xl border bg-background py-2 pl-9 pr-10 shadow-sm"
       />

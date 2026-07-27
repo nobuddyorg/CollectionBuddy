@@ -22,6 +22,7 @@ export function Submit({
         disabled={disabled}
         onClick={onClick}
         className="w-10 h-10 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 active:scale-[0.99] disabled:opacity-60 flex items-center justify-center"
+        aria-label={label}
         title={label}
       >
         {submitting ? (

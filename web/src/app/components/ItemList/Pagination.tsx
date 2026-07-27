@@ -43,11 +43,15 @@ export function Pagination({
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex flex-wrap gap-2 items-center justify-center">
+    <nav
+      aria-label={t('item_list.pagination')}
+      className="flex flex-wrap gap-2 items-center justify-center"
+    >
       <button
         disabled={page === 1}
         onClick={() => setPage(page - 1)}
         className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
+        aria-label={t('item_list.previous')}
         title={t('item_list.previous')}
       >
         <Icon
@@ -63,6 +67,7 @@ export function Pagination({
         typeof item === 'string' ? (
           <span
             key={`ellipsis-${index}`}
+            aria-hidden="true"
             className="w-9 h-9 flex items-center justify-center"
           >
             {item}
@@ -77,6 +82,7 @@ export function Pagination({
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-primary/60 text-primary-foreground hover:bg-primary')
             }
+            aria-label={t('item_list.page').replace('{n}', String(item))}
             aria-current={item === page ? 'page' : undefined}
           >
             {item}
@@ -88,6 +94,7 @@ export function Pagination({
         disabled={page === totalPages}
         onClick={() => setPage(page + 1)}
         className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
+        aria-label={t('item_list.next')}
         title={t('item_list.next')}
       >
         <Icon
@@ -98,6 +105,6 @@ export function Pagination({
           fill="none"
         />
       </button>
-    </div>
+    </nav>
   );
 }

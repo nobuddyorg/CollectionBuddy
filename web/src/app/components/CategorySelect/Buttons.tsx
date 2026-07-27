@@ -18,6 +18,7 @@ export function AddButton({
       onClick={onClick}
       disabled={disabled}
       className="rounded-xl px-3 py-1.5 bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
+      aria-label={label}
       title={label}
     >
       {isCreating ? (
@@ -40,6 +41,7 @@ export function SetButton({
     <button
       onClick={onClick}
       className="w-8 h-8 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110"
+      aria-label={label}
       title={label}
     >
       <Icon
@@ -70,6 +72,7 @@ export function DeleteButtonWithLabel({
       onClick={onClick}
       disabled={disabled}
       className="w-8 h-8 flex items-center justify-center rounded-xl bg-destructive text-destructive-foreground hover:brightness-110 disabled:opacity-50"
+      aria-label={label}
       title={label}
     >
       <Icon

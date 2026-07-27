@@ -71,5 +71,14 @@ export function useItems(categoryId: string, q: string) {
     void load();
   }, [load]);
 
-  return { items, loading, page, setPage, totalPages, reload: load, setItems };
+  return {
+    items,
+    total,
+    loading,
+    page,
+    setPage,
+    totalPages,
+    reload: load,
+    setItems,
+  };
 }

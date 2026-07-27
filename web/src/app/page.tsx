@@ -53,9 +53,19 @@ export default function Page() {
 
   return (
     <div className="min-h-[100dvh] bg-gradient-to-b from-amber-50 via-white to-stone-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 text-neutral-900 dark:text-neutral-100">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-overlay focus:rounded-xl focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
+      >
+        {t('page.skip_to_content')}
+      </a>
+
       <Header user={headerUser} onSignOut={signOut} />
 
-      <main className="mx-auto max-w-3xl px-4 py-6 sm:py-8 space-y-6">
+      <main
+        id="main-content"
+        className="mx-auto max-w-3xl px-4 py-6 sm:py-8 space-y-6"
+      >
         <CategorySelect
           selectedCat={selectedCategoryId}
           onSelect={setSelectedCategoryId}
@@ -64,7 +74,9 @@ export default function Page() {
         {hasCategory ? (
           <section className="relative z-50 rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur shadow-sm p-4 sm:p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold">{t('page.entries')}</h2>
+              <h2 id="entries-heading" className="text-base font-semibold">
+                {t('page.entries')}
+              </h2>
             </div>
             <ItemList
               key={selectedCategoryId}

@@ -98,6 +98,7 @@ export function ItemCard({
 
       <ImageGrid
         imgs={imgs}
+        itemTitle={item.title}
         isOpen={open}
         onOpenModal={onOpenModal}
         onDelete={onDeleteImage}

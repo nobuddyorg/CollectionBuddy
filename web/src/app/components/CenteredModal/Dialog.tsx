@@ -36,7 +36,7 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="centered-modal-title"
-        className="bg-background rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90dvh] flex flex-col overflow-hidden outline-none"
+        className="bg-background rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90dvh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
