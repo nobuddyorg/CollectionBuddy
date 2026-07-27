@@ -24,7 +24,11 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
   const [isCreateOpen, setCreateOpen] = usePref(prefKey, false);
 
   const [mapOpen, setMapOpen] = useState(false);
-  const { places, loading: loadingPlaces } = usePlaces(categoryId, mapOpen);
+  const {
+    places,
+    loading: loadingPlaces,
+    error: placesError,
+  } = usePlaces(categoryId, mapOpen);
   const [mapCommand, setMapCommand] = useState<'fitAll' | 'fitCurrent' | null>(
     'fitAll',
   );
@@ -82,10 +86,8 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     return () => clearTimeout(id);
   }, [q]);
 
-  const { items, page, setPage, totalPages, reload, setItems } = useItems(
-    categoryId,
-    qDebounced,
-  );
+  const { items, loading, page, setPage, totalPages, reload, setItems } =
+    useItems(categoryId, qDebounced);
 
   const handleCreated = useCallback(() => {
     setCreateOpen(false);
@@ -217,23 +219,69 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         </div>
       </div>
 
-      <ul className="grid sm:grid-cols-2 lg:grid-cols-2 gap-3">
-        {items.map((it) => (
-          <ItemCard
-            key={it.id}
-            item={it}
-            imgs={images[it.id] ?? ([] as ImgEntry[])}
-            busy={busy === it.id}
-            deletingPath={deletingPath}
-            onUpload={(f) => uploadImage(it.id, f)}
-            onEditItem={() => openEdit(it)}
-            onDeleteItem={() => void removeItem(it.id)}
-            onDeleteImage={(img) => void deleteImage(it.id, img)}
-            onOpenModal={setModalImage}
-            i18n={{ t }}
-          />
-        ))}
-      </ul>
+      {items.length === 0 ? (
+        loading ? (
+          <p
+            className="py-10 text-center text-sm opacity-60"
+            aria-live="polite"
+          >
+            {t('common.loading')}
+          </p>
+        ) : (
+          <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-10 grid place-items-center text-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="h-16 w-16 rounded-full bg-amber-500/90 ring-8 ring-amber-200/40 dark:ring-amber-900/20 grid place-items-center text-3xl">
+                {qDebounced ? '🔍' : '🧺'}
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold">
+                  {qDebounced
+                    ? t('item_list.no_results_title').replace(
+                        '{q}',
+                        qDebounced,
+                      )
+                    : t('item_list.no_items_title')}
+                </h3>
+                <p className="text-sm opacity-70">
+                  {qDebounced
+                    ? t('item_list.no_results_hint')
+                    : t('item_list.no_items_hint')}
+                </p>
+              </div>
+              {qDebounced && (
+                <button
+                  type="button"
+                  onClick={() => setQ('')}
+                  className="text-sm underline text-primary"
+                >
+                  {t('item_list.search_clear')}
+                </button>
+              )}
+            </div>
+          </section>
+        )
+      ) : (
+        <ul
+          aria-busy={loading}
+          className={`grid sm:grid-cols-2 lg:grid-cols-2 gap-3 transition-opacity ${loading ? 'opacity-60' : ''}`}
+        >
+          {items.map((it) => (
+            <ItemCard
+              key={it.id}
+              item={it}
+              imgs={images[it.id] ?? ([] as ImgEntry[])}
+              busy={busy === it.id}
+              deletingPath={deletingPath}
+              onUpload={(f) => uploadImage(it.id, f)}
+              onEditItem={() => openEdit(it)}
+              onDeleteItem={() => void removeItem(it.id)}
+              onDeleteImage={(img) => void deleteImage(it.id, img)}
+              onOpenModal={setModalImage}
+              i18n={{ t }}
+            />
+          ))}
+        </ul>
+      )}
 
       <Pagination page={page} setPage={setPage} totalPages={totalPages} />
 
@@ -279,7 +327,15 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
       >
         {loadingPlaces ? (
           <p>{t('common.loading')}</p>
-        ) : mapOpen ? (
+        ) : !mapOpen ? null : placesError ? (
+          <p className="py-6 text-center text-sm opacity-70">
+            {t('item_list.map_error')}
+          </p>
+        ) : places.length === 0 ? (
+          <p className="py-6 text-center text-sm opacity-70">
+            {t('item_list.map_empty')}
+          </p>
+        ) : (
           <div className="relative">
             <Map
               command={mapCommand}
@@ -327,7 +383,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               </button>
             </div>
           </div>
-        ) : null}
+        )}
       </CenteredModal>
 
       <CenteredModal

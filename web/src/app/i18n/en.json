@@ -28,7 +28,8 @@
     "no_results": "No results",
     "remove_tag": "Remove tag {tag}",
     "tags_placeholder": "Enter tags… (Enter/Comma)",
-    "add": "Add"
+    "add": "Add",
+    "search_error": "Place search failed. Please try again."
   },
   "item_list": {
     "confirm_delete": "Delete this item?",
@@ -51,7 +52,13 @@
     "zoom_to_current_location": "Zoom to current location",
     "frame_all_pins": "Frame all pins",
     "search_error": "Search failed. Please try again.",
-    "delete_images_error": "Could not delete this item's images. The item was not deleted."
+    "delete_images_error": "Could not delete this item's images. The item was not deleted.",
+    "no_results_title": "No results for \"{q}\"",
+    "no_results_hint": "Try a different search term.",
+    "no_items_title": "No entries yet",
+    "no_items_hint": "Add your first entry to this category to see it here.",
+    "map_error": "Couldn't load map locations. Please try again.",
+    "map_empty": "No locations to show yet."
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Sign in with Google"

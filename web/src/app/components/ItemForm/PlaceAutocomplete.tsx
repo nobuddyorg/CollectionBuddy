@@ -20,6 +20,7 @@ export function PlaceAutocomplete({
     setFocus,
     results,
     loading,
+    error,
     activeIdx,
     dropdownRef,
     inputRef,
@@ -64,7 +65,7 @@ export function PlaceAutocomplete({
       />
 
       {focus &&
-        (loading || results.length > 0) &&
+        (loading || results.length > 0 || error) &&
         ReactDOM.createPortal(
           (() => {
             const r = inputRef.current?.getBoundingClientRect();
@@ -81,7 +82,14 @@ export function PlaceAutocomplete({
                   </div>
                 )}
 
+                {!loading && error && (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    {t('item_create.search_error')}
+                  </div>
+                )}
+
                 {!loading &&
+                  !error &&
                   results.map((hit, i) => {
                     const p = hit.properties;
                     const city =
@@ -113,7 +121,7 @@ export function PlaceAutocomplete({
                     );
                   })}
 
-                {!loading && results.length === 0 && (
+                {!loading && !error && results.length === 0 && (
                   <div className="px-3 py-2 text-sm text-muted-foreground">
                     {t('item_create.no_results')}
                   </div>
