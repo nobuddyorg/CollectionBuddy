@@ -107,7 +107,6 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
         onSelect={onSelect}
         sortedCats={sortedCats}
         isLoading={isLoading}
-        t={t}
         setExpanded={setExpanded}
       />
 
@@ -117,7 +116,6 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
           setName={setName}
           createCategory={onCreate}
           setExpanded={setExpanded}
-          t={t}
         />
 
         <div className="flex items-center gap-2 pt-1">

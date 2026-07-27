@@ -1,12 +1,11 @@
 'use client';
-import type { TranslationKey } from '../../i18n/I18nProvider';
+import { useI18n } from '../../i18n/useI18n';
 
 type Props = {
   selectedCat: string | null;
   onSelect: (id: string | null) => void;
   sortedCats: { id: string; name: string }[];
   isLoading: boolean;
-  t: (key: TranslationKey) => string;
   setExpanded: (v: boolean) => void;
 };
 export function CategorySelectDropdown({
@@ -14,9 +13,9 @@ export function CategorySelectDropdown({
   onSelect,
   sortedCats,
   isLoading,
-  t,
   setExpanded,
 }: Props) {
+  const { t } = useI18n();
   return (
     <div className="relative">
       <select

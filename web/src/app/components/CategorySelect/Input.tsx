@@ -1,20 +1,19 @@
 'use client';
-import type { TranslationKey } from '../../i18n/I18nProvider';
+import { useI18n } from '../../i18n/useI18n';
 
 type Props = {
   name: string;
   setName: (v: string) => void;
   createCategory: () => void;
   setExpanded: (v: boolean) => void;
-  t: (key: TranslationKey) => string;
 };
 export function CategoryInput({
   name,
   setName,
   createCategory,
   setExpanded,
-  t,
 }: Props) {
+  const { t } = useI18n();
   return (
     <>
       <label htmlFor="new-category-name" className="sr-only">

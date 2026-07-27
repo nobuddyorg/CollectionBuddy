@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Icon, { IconType } from '../Icon';
 import type { ImgEntry } from './types';
 import { useI18n } from '../../i18n/useI18n';
+import { Spinner } from '../ui/Spinner';
 
 export function ImageGrid({
   imgs,
@@ -62,7 +63,7 @@ export function ImageGrid({
             ].join(' ')}
           >
             {deletingPath.has(img.pathFull) ? (
-              <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              <Spinner size="sm" />
             ) : (
               <Icon
                 icon={IconType.Trash}

@@ -2,6 +2,7 @@
 
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
+import { IconButton } from '../ui/IconButton';
 
 export function Actions({
   isOpen,
@@ -81,12 +82,11 @@ export function Actions({
         )}
       </label>
 
-      <button
+      <IconButton
         onClick={() => {
           onEdit();
           onClose();
         }}
-        className="w-9 h-9 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 flex items-center justify-center"
         aria-label={t('item_list.edit')}
         title={t('item_list.edit')}
       >
@@ -98,14 +98,14 @@ export function Actions({
           strokeWidth="2"
           fill="none"
         />
-      </button>
+      </IconButton>
 
-      <button
+      <IconButton
+        variant="destructive"
         onClick={() => {
           onDelete();
           onClose();
         }}
-        className="w-9 h-9 rounded-xl bg-destructive text-destructive-foreground shadow-sm hover:brightness-110 flex items-center justify-center"
         aria-label={t('item_list.delete')}
         title={t('item_list.delete')}
       >
@@ -117,7 +117,7 @@ export function Actions({
           strokeWidth="2"
           fill="none"
         />
-      </button>
+      </IconButton>
     </div>
   );
 }

@@ -2,7 +2,6 @@
 
 import { useCallback, useId, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
-import Icon, { IconType } from '../Icon';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { Submit } from './Submit';
 import { TagsInput } from './TagsInput';
@@ -38,27 +37,6 @@ export default function ItemForm({
   const titleRef = useRef<HTMLInputElement>(null);
 
   const titleError = titleTouched && !title.trim();
-  const isEditMode = typeof onCancel === 'function';
-
-  const renderIcon = () =>
-    isEditMode ? (
-      <Icon
-        icon={IconType.Check}
-        className="w-5 h-5"
-        aria-hidden="true"
-        stroke="currentColor"
-        strokeWidth="2"
-        fill="none"
-      />
-    ) : (
-      <Icon
-        icon={IconType.Plus}
-        className="w-6 h-6"
-        stroke="currentColor"
-        strokeWidth="2"
-        fill="none"
-      />
-    );
 
   const handleSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
@@ -152,28 +130,12 @@ export default function ItemForm({
           </button>
         )}
 
-        {showIconSubmit ? (
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-10 h-10 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 active:scale-[0.99] disabled:opacity-60 flex items-center justify-center"
-            aria-label={submitLabel}
-            title={submitLabel}
-          >
-            {submitting ? (
-              <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-            ) : (
-              renderIcon()
-            )}
-          </button>
-        ) : (
-          <Submit
-            submitting={submitting}
-            disabled={submitting}
-            label={submitLabel}
-            iconMode={false}
-          />
-        )}
+        <Submit
+          submitting={submitting}
+          disabled={submitting}
+          label={submitLabel}
+          iconMode={showIconSubmit}
+        />
       </div>
     </form>
   );

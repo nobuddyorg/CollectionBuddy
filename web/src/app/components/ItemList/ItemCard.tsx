@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Icon, { IconType } from '../Icon';
-import type { TranslationKey } from '../../i18n/I18nProvider';
+import { useI18n } from '../../i18n/useI18n';
 import type { ItemLite, ImgEntry } from './types';
 import { Actions } from './Actions';
 import { ImageGrid } from './ImageGrid';
@@ -16,7 +16,6 @@ export function ItemCard({
   onDeleteItem,
   onDeleteImage,
   onOpenModal,
-  i18n: { t },
 }: {
   item: ItemLite;
   imgs: ImgEntry[];
@@ -27,8 +26,8 @@ export function ItemCard({
   onDeleteItem: () => void;
   onDeleteImage: (img: ImgEntry) => void;
   onOpenModal: (url: string) => void;
-  i18n: { t: (k: TranslationKey) => string };
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 

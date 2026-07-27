@@ -1,9 +1,10 @@
 'use client';
-import { useState } from 'react';
 import Image from 'next/image';
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 import { HeaderProps } from './types';
+import { useMenu } from './useMenu';
+import Menu from './Menu';
 
 const withBasePath = (path: string): string => {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
@@ -12,7 +13,7 @@ const withBasePath = (path: string): string => {
 };
 
 export default function Header({ user, onSignOut }: HeaderProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { open: menuOpen, toggle, close, anchorRef, panelRef } = useMenu();
   const { t } = useI18n();
   const displayEmail = user.email ?? '';
 
@@ -40,12 +41,15 @@ export default function Header({ user, onSignOut }: HeaderProps) {
 
         <div className="relative">
           <button
-            onClick={() => setMenuOpen((v) => !v)}
+            ref={anchorRef}
+            id="user-menu-button"
+            onClick={toggle}
             className="group flex items-center gap-2 rounded-xl px-2.5 py-1.5
               bg-white/70 dark:bg-neutral-900/60
               border border-black/10 dark:border-white/10
               shadow-sm hover:shadow transition"
             aria-haspopup="menu"
+            aria-controls="user-menu"
             aria-expanded={menuOpen ? 'true' : 'false'}
             title={displayEmail || t('header.title')}
           >
@@ -58,27 +62,15 @@ export default function Header({ user, onSignOut }: HeaderProps) {
             </span>
           </button>
 
-          {menuOpen && (
-            <div
-              role="menu"
-              className="absolute right-0 mt-2 w-56 rounded-xl
-                border border-black/10 dark:border-white/10
-                bg-white/90 dark:bg-neutral-900/90
-                backdrop-blur p-1 shadow-lg"
-            >
-              <div className="px-3 py-2 text-xs opacity-70 truncate">
-                {displayEmail}
-              </div>
-              <button
-                onClick={onSignOut}
-                className="w-full text-left px-3 py-2 rounded-lg
-                  hover:bg-stone-100 dark:hover:bg-neutral-800 text-sm"
-                role="menuitem"
-              >
-                {t('header.sign_out')}
-              </button>
-            </div>
-          )}
+          <div ref={panelRef}>
+            <Menu
+              user={{ email: displayEmail }}
+              open={menuOpen}
+              onSignOut={onSignOut}
+              onClose={close}
+              labelSignOut={t('header.sign_out')}
+            />
+          </div>
         </div>
       </div>
     </header>
