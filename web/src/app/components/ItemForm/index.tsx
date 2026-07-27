@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
@@ -20,17 +20,15 @@ export default function ItemForm({
 }: ItemFormProps) {
   const { t } = useI18n();
 
+  // Callers reset the form by changing `key` (see ItemCreate and the edit
+  // modal in ItemList), which remounts this component and reruns these
+  // initializers. Resyncing on `initial` identity here too meant any
+  // unrelated parent re-render — e.g. images finishing a signed-URL
+  // refresh — cleared whatever the user had just typed.
   const [title, setTitle] = useState(initial.title ?? '');
   const [description, setDescription] = useState(initial.description ?? '');
   const [place, setPlace] = useState(initial.place ?? '');
   const [tags, setTags] = useState<string[]>(initial.tags ?? []);
-
-  useEffect(() => {
-    setTitle(initial.title ?? '');
-    setDescription(initial.description ?? '');
-    setPlace(initial.place ?? '');
-    setTags(initial.tags ?? []);
-  }, [initial]);
 
   const canSubmit = useMemo(() => !!title.trim(), [title]);
   const isEditMode = typeof onCancel === 'function';

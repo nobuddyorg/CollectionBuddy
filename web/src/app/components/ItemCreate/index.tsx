@@ -7,6 +7,13 @@ import ItemForm, { ItemFormValues } from '../ItemForm';
 import { useCreateItem } from './useCreateItem';
 import { Props } from './types';
 
+const EMPTY_VALUES: ItemFormValues = {
+  title: '',
+  description: '',
+  place: '',
+  tags: [],
+};
+
 export default function ItemCreate({ categoryId, onCreated }: Props) {
   const { t } = useI18n();
   const [formKey, setFormKey] = useState(0);
@@ -26,7 +33,7 @@ export default function ItemCreate({ categoryId, onCreated }: Props) {
     <section className="relative z-[70] p-4 sm:p-5 space-y-3">
       <ItemForm
         key={formKey}
-        initial={{ title: '', description: '', place: '', tags: [] }}
+        initial={EMPTY_VALUES}
         submitting={isCreating}
         submitLabel={t('item_create.add')}
         onSubmit={handleCreate}
