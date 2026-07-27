@@ -20,6 +20,17 @@ export function useItems(categoryId: string, q: string) {
 
   const totalPages = useMemo(() => Math.ceil(total / PAGE_SIZE), [total]);
 
+  // Clamp page when the result set shrinks out from under it (e.g. deleting
+  // the last item on the last page), otherwise `.range()` requests an
+  // out-of-bounds slice and the grid renders empty with no active page.
+  useEffect(() => {
+    if (totalPages > 0 && page > totalPages) {
+      setPage(totalPages);
+    } else if (totalPages === 0 && page !== 1) {
+      setPage(1);
+    }
+  }, [totalPages, page]);
+
   const load = useCallback(async () => {
     const mySeq = ++reqSeq.current;
     setLoading(true);

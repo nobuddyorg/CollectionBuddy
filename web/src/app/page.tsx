@@ -38,9 +38,7 @@ export default function Page() {
       }
     } catch (err) {
       console.error('Unexpected error during sign-out:', err);
-      await supabase.auth
-        .signOut({ scope: 'local' })
-        .catch(() => undefined);
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
     } finally {
       router.replace('/login');
     }
@@ -67,7 +65,10 @@ export default function Page() {
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold">{t('page.entries')}</h2>
             </div>
-            <ItemList categoryId={selectedCategoryId!} />
+            <ItemList
+              key={selectedCategoryId}
+              categoryId={selectedCategoryId!}
+            />
           </section>
         ) : (
           <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-10 grid place-items-center text-center">

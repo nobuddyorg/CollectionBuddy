@@ -6,7 +6,6 @@ import ItemForm, { ItemFormValues } from '../ItemForm';
 import CenteredModal from '../CenteredModal';
 import { SearchInput } from './SearchInput';
 import ItemCreate from '../ItemCreate';
-import { usePref } from '../../usePref';
 import { Pagination } from './Pagination';
 import { ItemCard } from './ItemCard';
 import { ModalImage } from './ModalImage';
@@ -20,8 +19,7 @@ import Icon, { IconType } from '../Icon';
 export default function ItemList({ categoryId }: { categoryId: string }) {
   const { t } = useI18n();
 
-  const prefKey = `cb_open_${categoryId}`;
-  const [isCreateOpen, setCreateOpen] = usePref(prefKey, false);
+  const [isCreateOpen, setCreateOpen] = useState(false);
 
   const [mapOpen, setMapOpen] = useState(false);
   const {
@@ -101,8 +99,16 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
   const handleCreated = useCallback(() => {
     setCreateOpen(false);
-    void reload();
-  }, [setCreateOpen, reload]);
+    // New items sort to page 1 (created_at desc). If we're already there,
+    // reload() to reveal it; otherwise setPage(1) and let useItems' own
+    // page-change effect fetch it -- reload() would just re-fetch the page
+    // we're leaving.
+    if (page !== 1) {
+      setPage(1);
+    } else {
+      void reload();
+    }
+  }, [setCreateOpen, page, setPage, reload]);
 
   const {
     images,
@@ -252,10 +258,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               <div className="space-y-1">
                 <h3 className="text-lg font-semibold">
                   {qDebounced
-                    ? t('item_list.no_results_title').replace(
-                        '{q}',
-                        qDebounced,
-                      )
+                    ? t('item_list.no_results_title').replace('{q}', qDebounced)
                     : t('item_list.no_items_title')}
                 </h3>
                 <p className="text-sm opacity-70">
