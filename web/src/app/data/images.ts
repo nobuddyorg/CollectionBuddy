@@ -9,6 +9,30 @@ export function listImageObjects(prefix: string, limit: number) {
   });
 }
 
+// Pages through the full listing under a prefix so a `.webp`/`.thumb.webp`
+// pair can never be split across a page boundary (each page is a multiple
+// of one full page, not an arbitrary object cap).
+export async function listAllImageObjects(prefix: string) {
+  const pageSize = 100;
+  const all: { name: string }[] = [];
+  let offset = 0;
+  for (;;) {
+    const { data, error } = await supabase.storage
+      .from(ITEM_IMAGES_BUCKET)
+      .list(prefix, {
+        limit: pageSize,
+        offset,
+        sortBy: { column: 'created_at', order: 'desc' },
+      });
+    if (error) return { data: null, error };
+    if (!data?.length) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+    offset += pageSize;
+  }
+  return { data: all, error: null };
+}
+
 export function createSignedUrls(paths: string[], expiresInSeconds = 3600) {
   return supabase.storage
     .from(ITEM_IMAGES_BUCKET)

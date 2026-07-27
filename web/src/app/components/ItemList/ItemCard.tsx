@@ -21,7 +21,7 @@ export function ItemCard({
   item: ItemLite;
   imgs: ImgEntry[];
   busy: boolean;
-  deletingPath: string | null;
+  deletingPath: Set<string>;
   onUpload: (file: File) => void;
   onEditItem: () => void;
   onDeleteItem: () => void;

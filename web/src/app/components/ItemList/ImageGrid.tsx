@@ -16,7 +16,7 @@ export function ImageGrid({
   isOpen: boolean;
   onOpenModal: (url: string) => void;
   onDelete: (img: ImgEntry) => void;
-  deletingPath: string | null;
+  deletingPath: Set<string>;
   busy: boolean;
 }) {
   const { t } = useI18n();
@@ -54,14 +54,14 @@ export function ImageGrid({
               e.stopPropagation();
               onDelete(img);
             }}
-            disabled={deletingPath === img.pathFull || busy}
+            disabled={deletingPath.has(img.pathFull) || busy}
             className={[
               isOpen ? 'opacity-100' : 'opacity-0',
               'sm:opacity-0 sm:group-hover:opacity-100',
               'absolute top-1 right-1 w-7 h-7 flex items-center justify-center rounded-lg bg-destructive text-destructive-foreground shadow disabled:opacity-60 transition',
             ].join(' ')}
           >
-            {deletingPath === img.pathFull ? (
+            {deletingPath.has(img.pathFull) ? (
               <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
             ) : (
               <Icon
