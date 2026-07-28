@@ -32,7 +32,7 @@ export default defineConfig({
         // https://github.com/nobuddyorg/CollectionBuddy/issues/140 --
         // string/boundary construction where line coverage alone doesn't
         // prove the assertions are load-bearing (see the mutation-testing
-        // config in stryker.config.json for that part). Each of these
+        // config in stryker.config.mjs for that part). Each of these
         // files pairs a `/* v8 ignore start/stop */` block around
         // React/effect/I-O internals with one or more exported pure
         // functions that carry the actual risk, so the 100% floor only

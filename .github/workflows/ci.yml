@@ -58,7 +58,7 @@ jobs:
           timeout 30s bash -c 'until curl -sSf http://localhost:3000 > /dev/null; do echo "Waiting for app to start..."; sleep 1; done'
           curl -I http://localhost:3000
 
-  # Scoped to a handful of pure, high-risk modules (see stryker.config.json
+  # Scoped to a handful of pure, high-risk modules (see stryker.config.mjs
   # and vitest.config.ts) -- mutating the whole app tree would mean mutating
   # JSX and Tailwind class strings, producing a score that means nothing.
   # Runs on push to main rather than per-PR: it's slower than the unit
@@ -88,6 +88,7 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          STRYKER_DASHBOARD_API_KEY: ${{ secrets.STRYKER_DASHBOARD_API_KEY }}
 
       - name: Upload mutation report
         if: always()
