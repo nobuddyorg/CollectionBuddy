@@ -5,9 +5,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   AddButton,
+  CollapseButton,
   DeleteButtonWithLabel,
   ExpandButton,
-  SetButton,
 } from './Buttons';
 
 describe('AddButton', () => {
@@ -58,11 +58,13 @@ describe('AddButton', () => {
   });
 });
 
-describe('SetButton', () => {
+// Replaced SetButton, which re-selected the already-selected category and
+// collapsed the panel -- it never set anything.
+describe('CollapseButton', () => {
   it('fires onClick when clicked', async () => {
     const onClick = vi.fn();
-    render(<SetButton onClick={onClick} label="Set" />);
-    await userEvent.click(screen.getByRole('button', { name: 'Set' }));
+    render(<CollapseButton onClick={onClick} label="Close" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClick).toHaveBeenCalledOnce();
   });
 });

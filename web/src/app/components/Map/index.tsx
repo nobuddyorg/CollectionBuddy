@@ -22,7 +22,12 @@ const popupContent = (text: string): HTMLDivElement => {
   return el;
 };
 
-const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
+const Map: React.FC<MapProps> = ({
+  markers,
+  currentLocation,
+  command,
+  fullscreen = false,
+}) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const LRef = useRef<Leaflet | null>(null);
   const mapInstance = useRef<import('leaflet').Map | null>(null);
@@ -198,8 +203,25 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     }
   }, [command, ready]);
 
+  // Leaflet caches the container size, so a map that changes size while
+  // mounted -- toggling fullscreen -- renders into stale dimensions and
+  // leaves grey tiles until told to re-measure.
+  useEffect(() => {
+    if (!ready) return;
+    const map = mapInstance.current;
+    if (!map) return;
+    const id = requestAnimationFrame(() => map.invalidateSize());
+    return () => cancelAnimationFrame(id);
+  }, [fullscreen, ready]);
+
   return (
-    <div ref={mapRef} style={{ height: 'min(70dvh, 600px)', width: '100%' }} />
+    <div
+      ref={mapRef}
+      style={{
+        height: fullscreen ? '100%' : 'min(70dvh, 600px)',
+        width: '100%',
+      }}
+    />
   );
 };
 

@@ -11,6 +11,7 @@ export function Dialog({
   onClose,
   children,
   initialFocusRef,
+  size = 'default',
 }: {
   open: boolean;
   title: string;
@@ -18,6 +19,7 @@ export function Dialog({
   onClose: () => void;
   children: React.ReactNode;
   initialFocusRef?: React.RefObject<HTMLElement | null>;
+  size?: 'default' | 'full';
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -25,9 +27,11 @@ export function Dialog({
 
   return (
     <div
-      className={`fixed inset-0 z-modal flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] transition-opacity duration-200 ease-out ${
-        open ? 'opacity-100' : 'pointer-events-none opacity-0'
-      }`}
+      className={`fixed inset-0 z-modal flex items-center justify-center transition-opacity duration-200 ease-out ${
+        size === 'full'
+          ? 'p-0'
+          : 'p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]'
+      } ${open ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
       aria-hidden={!open}
       inert={!open}
     >
@@ -36,9 +40,11 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="centered-modal-title"
-        className={`bg-card text-card-foreground ring-1 ring-border rounded-sm shadow-2xl w-full max-w-2xl max-h-[90dvh] flex flex-col overflow-hidden transition-[opacity,transform] duration-200 ease-out ${
-          open ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-        }`}
+        className={`bg-card text-card-foreground ring-1 ring-border shadow-2xl w-full flex flex-col overflow-hidden transition-[opacity,transform] duration-200 ease-out ${
+          size === 'full'
+            ? 'h-[100dvh] max-w-none rounded-none pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
+            : 'max-w-2xl max-h-[90dvh] rounded-sm'
+        } ${open ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
@@ -53,7 +59,18 @@ export function Dialog({
             <Icon icon={IconType.Close} className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-4 overflow-auto">{children}</div>
+        {/* Fullscreen drops the padding and lets the body claim the
+            remaining height, so content sized to 100% (the map) fills the
+            screen rather than collapsing to nothing. */}
+        <div
+          className={
+            size === 'full'
+              ? 'flex-1 min-h-0 overflow-hidden'
+              : 'p-4 overflow-auto'
+          }
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
