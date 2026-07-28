@@ -15,6 +15,7 @@
     "title": "Kategorie",
     "select_placeholder": "Kategorie wählen oder erstellen",
     "new_category": "Neue Kategorie",
+    "rename": "Umbenennen",
     "open_category": "Kategorie öffnen",
     "add": "Hinzufügen",
     "delete": "Löschen",
@@ -22,7 +23,8 @@
     "confirmDelete": "Löschen bestätigen",
     "loadError": "Kategorien konnten nicht geladen werden. Bitte erneut versuchen.",
     "createError": "Kategorie konnte nicht erstellt werden. Bitte erneut versuchen.",
-    "deleteError": "Kategorie konnte nicht gelöscht werden. Bitte erneut versuchen."
+    "deleteError": "Kategorie konnte nicht gelöscht werden. Bitte erneut versuchen.",
+    "renameError": "Kategorie konnte nicht umbenannt werden. Bitte erneut versuchen."
   },
   "item_create": {
     "new_entry": "Neuer Eintrag",
@@ -54,6 +56,8 @@
     "no_images": "Keine Bilder",
     "edit": "Bearbeiten",
     "delete": "Löschen",
+    "delete_entry": "Eintrag löschen",
+    "delete_image": "Bild löschen",
     "add_image": "Bild hinzufügen",
     "search_placeholder": "Suchen nach…",
     "search_clear": "Suche leeren",

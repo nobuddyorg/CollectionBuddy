@@ -64,19 +64,24 @@ export default function LoginPage() {
 
   return (
     <main className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden px-6 bg-background text-foreground pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      {/* "Collection" is underscored in ink and "Buddy" carries the accent,
+          so the two halves of the name read as two things joined -- the
+          catalogue and the companion. */}
       <h1 className="font-display text-4xl sm:text-5xl mb-3 text-center">
-        {t('login_page.title_collection')}
-        {t('login_page.title_buddy')}
+        <span className="border-b-[3px] border-foreground pb-0.5">
+          {t('login_page.title_collection')}
+        </span>
+        <span className="text-accent">{t('login_page.title_buddy')}</span>
       </h1>
 
-      <p className="font-label text-[0.6875rem] text-muted-foreground text-center mb-8 sm:mb-10">
+      <p className="font-label text-[0.6875rem] text-muted-foreground text-center mt-2 mb-8 sm:mb-10">
         {t('page.footer')}
       </p>
 
       {/* The engraved medallion is the one piece of ornament on the page,
           and the sign-in sits at its centre -- the single thing to do. */}
       <Coin
-        text={t('login_page.circle_text').repeat(2)}
+        text={t('login_page.circle_text')}
         cta={
           <GoogleSignInButton onClick={signIn} onError={handleSignInError} />
         }

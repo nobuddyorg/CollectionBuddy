@@ -11,7 +11,6 @@ import { Spinner } from '../ui/Spinner';
 export function ImageGrid({
   imgs,
   itemTitle,
-  isOpen,
   onOpenModal,
   onDelete,
   deletingPath,
@@ -19,7 +18,6 @@ export function ImageGrid({
 }: {
   imgs: ImgEntry[];
   itemTitle: string;
-  isOpen: boolean;
   onOpenModal: (url: string) => void;
   onDelete: (img: ImgEntry) => void;
   deletingPath: Set<string>;
@@ -39,16 +37,21 @@ export function ImageGrid({
       .replace('{title}', itemTitle)
       .replace('{idx}', String(i + 1));
 
+  // Deliberately not a red trash icon: that is what removes the whole
+  // entry, from the labelled row under the caption. This sits *on* the
+  // photograph it affects and reads as "take this one off", so the two
+  // destructive actions can never be confused for one another.
   const deleteButton = (img: ImgEntry, size: 'lg' | 'sm') => (
     <button
-      aria-label={t('item_list.delete')}
-      title={t('item_list.delete')}
+      aria-label={t('item_list.delete_image')}
+      title={t('item_list.delete_image')}
       onClick={() => onDelete(img)}
       disabled={deletingPath.has(img.pathFull) || busy}
       className={[
-        isOpen ? 'opacity-100' : 'opacity-0',
-        '[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100',
-        'absolute top-1.5 right-1.5 flex items-center justify-center rounded-sm bg-destructive text-destructive-foreground shadow disabled:opacity-60 transition',
+        'absolute top-1.5 right-1.5 flex items-center justify-center rounded-full',
+        'bg-black/55 text-white backdrop-blur-[2px] hover:bg-black/75',
+        'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100',
+        'disabled:opacity-60 transition',
         size === 'lg' ? 'w-8 h-8' : 'w-7 h-7',
       ].join(' ')}
     >
@@ -56,10 +59,10 @@ export function ImageGrid({
         <Spinner size="sm" />
       ) : (
         <Icon
-          icon={IconType.Trash}
-          className="w-4 h-4"
+          icon={IconType.Close}
+          className={size === 'lg' ? 'w-4 h-4' : 'w-3.5 h-3.5'}
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="2.5"
           fill="none"
         />
       )}
@@ -74,11 +77,15 @@ export function ImageGrid({
           onClick={() => onOpenModal(hero.urlFull)}
           className="block w-full"
         >
+          {/* The full-size render, not the thumbnail: the hero spans the
+              whole card (~390px on mobile), and the stored thumb is only
+              250px, so using it here upscaled past its native size and
+              looked mushy. Thumbs stay on the small strip below. */}
           <Image
-            src={hero.urlThumb || hero.urlFull}
+            src={hero.urlFull}
             alt={altFor(0)}
-            width={640}
-            height={480}
+            width={800}
+            height={600}
             unoptimized
             loading="lazy"
             className="aspect-4/3 w-full object-cover cursor-zoom-in"
@@ -87,13 +94,11 @@ export function ImageGrid({
         {deleteButton(hero, 'lg')}
       </div>
 
+      {/* Always four columns, however many thumbnails there are. Sizing the
+          track count to the thumbnail count made a lone extra image stretch
+          to the full card width as a giant square under the hero. */}
       {!!strip.length && (
-        <div
-          className="grid gap-px bg-border"
-          style={{
-            gridTemplateColumns: `repeat(${strip.length}, minmax(0, 1fr))`,
-          }}
-        >
+        <div className="grid grid-cols-4 gap-px">
           {strip.map((img, i) => (
             <div key={img.pathFull} className="relative bg-muted">
               <button

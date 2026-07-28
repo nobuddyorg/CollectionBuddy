@@ -31,5 +31,4 @@ export type ItemFormProps = {
   submitLabel: string;
   onSubmit: (values: ItemFormValues) => void;
   onCancel?: () => void;
-  showIconSubmit?: boolean;
 };

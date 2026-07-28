@@ -16,6 +16,11 @@
   --muted-foreground: #6a6e7c;
   --destructive: #a32017;
   --destructive-foreground: #ffffff;
+
+  /* The one chromatic note in the system, reserved for the wordmark. A
+     burnt amber that sits warm against the ink without competing with the
+     photographs, which remain the only other colour on screen. */
+  --accent: #c2622a;
 }
 
 @theme inline {
@@ -30,6 +35,7 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent: var(--accent);
 
   --font-display: var(--font-display-family), ui-sans-serif, sans-serif;
   --font-label: var(--font-label-family), ui-monospace, monospace;

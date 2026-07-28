@@ -10,6 +10,7 @@ import {
   listCategories,
   listItemIdsForCategory,
   listItemIdsLinkedElsewhere,
+  renameCategory as renameCategoryRow,
 } from '../../data/categories';
 import { removeItemImages } from '../../data/images';
 import type { CategorySummary } from '../../data/categories';
@@ -21,6 +22,7 @@ export function useCategories() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
 
   const reload = useCallback(async () => {
     setIsLoading(true);
@@ -57,6 +59,33 @@ export function useCategories() {
       }
     },
     [reload, t, isCreating, toast],
+  );
+
+  const renameCategory = useCallback(
+    async (id: string, name: string) => {
+      const trimmed = name.trim();
+      if (!id || !trimmed || isRenaming) return false;
+      setIsRenaming(true);
+      try {
+        const { data, error } = await renameCategoryRow(id, trimmed);
+        if (error) throw error;
+        // Merge the row the DB returned rather than the value sent -- a
+        // trigger normalises the name before it lands.
+        if (data) {
+          setCats((prev) =>
+            prev.map((c) => (c.id === id ? { ...c, ...data } : c)),
+          );
+        }
+        return true;
+      } catch (e) {
+        console.error(e);
+        toast.error(t('category_select.renameError'));
+        return false;
+      } finally {
+        setIsRenaming(false);
+      }
+    },
+    [t, isRenaming, toast],
   );
 
   const deleteCategory = useCallback(
@@ -109,8 +138,10 @@ export function useCategories() {
     isLoading,
     isCreating,
     isDeleting,
+    isRenaming,
     reload,
     createCategory,
+    renameCategory,
     deleteCategory,
   };
 }

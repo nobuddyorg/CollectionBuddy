@@ -11,7 +11,7 @@ import {
 } from './Buttons';
 
 describe('AddButton', () => {
-  it('shows a spinner instead of the + glyph while creating', () => {
+  it('keeps its label and marks itself busy while creating', () => {
     render(
       <AddButton
         onClick={vi.fn()}
@@ -20,12 +20,15 @@ describe('AddButton', () => {
         label="Add"
       />,
     );
+    // The label stays put rather than being swapped for a glyph -- the
+    // spinner joins it, so the control still says what it does mid-flight.
     const button = screen.getByRole('button', { name: 'Add' });
-    expect(button).not.toHaveTextContent('+');
+    expect(button).toHaveTextContent('Add');
+    expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button.querySelector('.animate-spin')).toBeInTheDocument();
   });
 
-  it('shows the + glyph and fires onClick when not creating', async () => {
+  it('shows its label and fires onClick when not creating', async () => {
     const onClick = vi.fn();
     render(
       <AddButton
@@ -36,7 +39,8 @@ describe('AddButton', () => {
       />,
     );
     const button = screen.getByRole('button', { name: 'Add' });
-    expect(button).toHaveTextContent('+');
+    expect(button).toHaveTextContent('Add');
+    expect(button.querySelector('.animate-spin')).not.toBeInTheDocument();
     await userEvent.click(button);
     expect(onClick).toHaveBeenCalledOnce();
   });

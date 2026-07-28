@@ -21,4 +21,44 @@ describe('TextRing', () => {
     expect(textPath).toHaveTextContent('Hello');
     expect(container.querySelector('text')).toHaveAttribute('opacity', '0.5');
   });
+
+  // Regression: without a textLength the string ran past the end of the rim
+  // path and wrapped over its own start, clipping the overlap mid-glyph and
+  // leaving a stray half-letter engraved on the coin.
+  it('fits the text to exactly one turn of the rim', () => {
+    const { container } = render(
+      <TextRing
+        rimId="rim-1"
+        text="Hello"
+        fontFamily="serif"
+        fontSize={12}
+        letterSpacing={2}
+        opacity={1}
+        radius={100}
+      />,
+    );
+    const textPath = container.querySelector('textPath');
+    expect(textPath).toHaveAttribute('startOffset', '0');
+    expect(textPath).toHaveAttribute('lengthAdjust', 'spacing');
+    expect(Number(textPath?.getAttribute('textLength'))).toBeCloseTo(
+      2 * Math.PI * 100,
+      3,
+    );
+  });
+
+  it('defaults to the rim radius the coin actually draws', () => {
+    const { container } = render(
+      <TextRing
+        rimId="rim-1"
+        text="Hello"
+        fontFamily="serif"
+        fontSize={12}
+        letterSpacing={2}
+        opacity={1}
+      />,
+    );
+    expect(
+      Number(container.querySelector('textPath')?.getAttribute('textLength')),
+    ).toBeCloseTo(2 * Math.PI * 160, 3);
+  });
 });

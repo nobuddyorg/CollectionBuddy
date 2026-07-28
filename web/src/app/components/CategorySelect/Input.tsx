@@ -15,21 +15,16 @@ export function CategoryInput({
 }: Props) {
   const { t } = useI18n();
   return (
-    <>
-      <label htmlFor="new-category-name" className="sr-only">
-        {t('category_select.new_category')}
-      </label>
-      <input
-        id="new-category-name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder={t('category_select.new_category')}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') createCategory();
-          if (e.key === 'Escape') setExpanded(false);
-        }}
-        className="w-full rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
-      />
-    </>
+    <input
+      id="new-category-name"
+      value={name}
+      onChange={(e) => setName(e.target.value)}
+      placeholder={t('category_select.new_category')}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') createCategory();
+        if (e.key === 'Escape') setExpanded(false);
+      }}
+      className="flex-1 min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
+    />
   );
 }

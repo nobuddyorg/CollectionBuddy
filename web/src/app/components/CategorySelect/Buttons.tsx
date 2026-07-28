@@ -15,15 +15,19 @@ export function AddButton({
   isCreating: boolean;
   label: string;
 }) {
+  // Spelled out rather than a bare "+": a control should say what happens
+  // when it is used, and a lone glyph gave no confirmation of that.
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
-      className="min-h-11 px-4 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 disabled:opacity-50"
-      aria-label={label}
+      aria-busy={isCreating}
+      className="min-h-11 px-4 shrink-0 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 disabled:opacity-40 transition-opacity flex items-center gap-2"
       title={label}
     >
-      {isCreating ? <Spinner size="sm" /> : '+'}
+      {isCreating && <Spinner size="sm" />}
+      {label}
     </button>
   );
 }
@@ -36,18 +40,14 @@ export function SetButton({
   label: string;
 }) {
   return (
-    <IconButton size="sm" onClick={onClick} aria-label={label} title={label}>
-      <Icon
-        icon={IconType.Check}
-        className="w-5 h-5"
-        aria-hidden="true"
-        stroke="currentColor"
-        strokeWidth="2"
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </IconButton>
+    <button
+      type="button"
+      onClick={onClick}
+      className="min-h-11 px-4 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 transition-opacity"
+      title={label}
+    >
+      {label}
+    </button>
   );
 }
 
