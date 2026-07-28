@@ -24,7 +24,12 @@ export function useTheme() {
   const [preference, setPreference] = useState<ThemePreference>('system');
   const [system, setSystem] = useState<ResolvedTheme>('light');
 
+  // Reads localStorage/matchMedia -- browser-only APIs unavailable during
+  // the static-export prerender, hence deferred to an effect (which only
+  // runs client-side) rather than a useState lazy initializer, which would
+  // run during prerender too and throw.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPreference(readStoredPreference());
     setSystem(systemTheme());
 

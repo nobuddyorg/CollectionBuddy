@@ -36,9 +36,14 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
   const [name, setName] = useState('');
   const [expanded, setExpanded] = useState(!selectedCat);
 
-  useEffect(() => {
+  // Collapses/expands in response to the selection changing (e.g. a
+  // category getting deleted out from under it) without the extra
+  // render-then-effect round trip a useEffect would add.
+  const [prevSelectedCat, setPrevSelectedCat] = useState(selectedCat);
+  if (selectedCat !== prevSelectedCat) {
+    setPrevSelectedCat(selectedCat);
     setExpanded(!selectedCat);
-  }, [selectedCat]);
+  }
 
   useEffect(() => {
     reload().then((catsData) => {
