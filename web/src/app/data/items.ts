@@ -13,9 +13,13 @@ export type ItemSearchRow = ItemFields & {
   item_categories: { category_id: string }[];
 };
 
+/* v8 ignore start -- only used by the ignored query builders below. */
+// Stryker disable all: only used by the ignored query builders below.
 const ITEMS_SEARCH_SELECT =
   'id,title,description,place,tags,item_categories!inner(category_id)';
 const ITEM_FIELDS_SELECT = 'id,title,description,place,tags';
+// Stryker restore all
+/* v8 ignore stop */
 
 // Escape LIKE metacharacters first, then quote the value so that
 // PostgREST's or=() grammar (which treats , . ( ) as structural
@@ -28,6 +32,10 @@ export function buildSearchFilter(needle: string): string {
   return `title.ilike."${quoted}",description.ilike."${quoted}",place.ilike."${quoted}",tags_text.ilike."${quoted}"`;
 }
 
+/* v8 ignore start -- thin Supabase query builders; buildSearchFilter
+ * above is what's gated and mutation-tested. */
+// Stryker disable all: these query builders aren't covered by tests, only
+// buildSearchFilter above is -- mutants in here would only be noise.
 export function listItems({
   categoryId,
   search,
@@ -98,3 +106,5 @@ export function listItemPlaces(categoryId: string) {
     .not('place', 'is', null)
     .neq('place', '');
 }
+// Stryker restore all
+/* v8 ignore stop */

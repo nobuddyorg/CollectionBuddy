@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "testRunner": "vitest",
+  "coverageAnalysis": "perTest",
+  "reporters": ["html", "clear-text", "progress"],
+  "mutate": [
+    "src/app/data/items.ts",
+    "src/app/components/ItemList/Pagination.tsx",
+    "src/app/components/ItemList/useItemImages.tsx",
+    "src/app/components/ItemForm/usePhoton.tsx",
+    "src/app/i18n/I18nProvider.tsx"
+  ],
+  "thresholds": {
+    "high": 100,
+    "low": 90,
+    "break": 90
+  }
+}

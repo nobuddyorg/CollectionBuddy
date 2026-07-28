@@ -48,7 +48,7 @@ jobs:
         run: npm run lint
 
       - name: Run tests
-        run: npm test
+        run: npm test -- --coverage
 
       - name: Start Next.js application
         run: npx serve out -l 3000 &
@@ -57,3 +57,42 @@ jobs:
         run: |
           timeout 30s bash -c 'until curl -sSf http://localhost:3000 > /dev/null; do echo "Waiting for app to start..."; sleep 1; done'
           curl -I http://localhost:3000
+
+  # Scoped to a handful of pure, high-risk modules (see stryker.config.json
+  # and vitest.config.ts) -- mutating the whole app tree would mean mutating
+  # JSX and Tailwind class strings, producing a score that means nothing.
+  # Runs on push to main rather than per-PR: it's slower than the unit
+  # suite, and a flapping break threshold on every PR would get this step
+  # deleted rather than fixed.
+  mutation_test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run mutation testing
+        run: npx stryker run
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: web/reports/mutation
+          retention-days: 30
