@@ -22,7 +22,7 @@ function SegmentedControl<T extends string>({
           type="button"
           aria-pressed={value === option}
           onClick={() => onChange(option)}
-          className={`px-2 py-1 text-xs ${
+          className={`px-2.5 min-h-9 text-xs transition-colors ${
             value === option
               ? 'bg-primary text-primary-foreground'
               : 'hover:bg-muted'
@@ -53,7 +53,7 @@ export default function Menu({
       aria-labelledby="user-menu-button"
       className="absolute right-0 mt-2 w-56 rounded-sm border bg-card text-card-foreground backdrop-blur p-1 shadow-lg"
     >
-      <div className="px-3 py-2 font-label text-[0.65rem] opacity-70 truncate">
+      <div className="px-3 py-2 font-label text-[0.6875rem] text-muted-foreground truncate">
         {user.email}
       </div>
 
@@ -76,7 +76,7 @@ export default function Menu({
           await onSignOut();
           onClose();
         }}
-        className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted text-sm"
+        className="w-full text-left px-3 min-h-11 flex items-center rounded-sm hover:bg-muted text-sm transition-colors"
       >
         {labelSignOut}
       </button>
