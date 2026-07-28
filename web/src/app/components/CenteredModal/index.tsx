@@ -16,6 +16,7 @@ export default function CenteredModal({
   closeOnBackdrop = true,
   closeOnEsc = true,
   initialFocusRef,
+  size = 'default',
 }: CenteredModalProps) {
   useLockBodyScroll(open);
   useEscapeToClose(open && closeOnEsc, () => onOpenChange(false));
@@ -34,6 +35,7 @@ export default function CenteredModal({
         closeLabel={closeLabel}
         onClose={() => onOpenChange(false)}
         initialFocusRef={initialFocusRef}
+        size={size}
       >
         {children}
       </Dialog>

@@ -28,6 +28,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
   const [isCreateOpen, setCreateOpen] = useState(false);
 
   const [mapOpen, setMapOpen] = useState(false);
+  const [mapFullscreen, setMapFullscreen] = useState(false);
   const {
     places,
     loading: loadingPlaces,
@@ -295,7 +296,11 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         <ul
           aria-busy={loading}
           aria-labelledby="entries-heading"
-          className={`-mx-4 sm:mx-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px sm:gap-4 bg-border sm:bg-transparent transition-opacity ${loading ? 'opacity-60' : ''}`}
+          // Cards stay full-bleed on mobile, but separated by a real gap of
+          // page background rather than a 1px hairline: run together, they
+          // read as one continuous stack and nothing binds a caption or its
+          // buttons to the photograph above them.
+          className={`-mx-4 sm:mx-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 transition-opacity ${loading ? 'opacity-60' : ''}`}
         >
           {items.map((it) => (
             <ItemCard
@@ -351,9 +356,14 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
       <CenteredModal
         open={mapOpen}
-        onOpenChange={setMapOpen}
+        onOpenChange={(v) => {
+          setMapOpen(v);
+          // Don't leave the next open stuck in fullscreen.
+          if (!v) setMapFullscreen(false);
+        }}
         title={t('item_list.map_title')}
         closeLabel={t('common.close')}
+        size={mapFullscreen ? 'full' : 'default'}
       >
         {loadingPlaces ? (
           <p>{t('common.loading')}</p>
@@ -366,10 +376,11 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
             {t('item_list.map_empty')}
           </p>
         ) : (
-          <div className="relative">
+          <div className={`relative ${mapFullscreen ? 'h-full' : ''}`}>
             <Map
               command={mapCommand}
               markers={mapMarkers}
+              fullscreen={mapFullscreen}
               currentLocation={
                 currentLocation
                   ? {
@@ -406,6 +417,27 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                 title={t('item_list.frame_all_pins')}
               >
                 <Icon icon={IconType.Frame} className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapFullscreen((v) => !v)}
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-card-foreground shadow-sm hover:opacity-90"
+                aria-label={
+                  mapFullscreen
+                    ? t('item_list.map_exit_fullscreen')
+                    : t('item_list.map_fullscreen')
+                }
+                title={
+                  mapFullscreen
+                    ? t('item_list.map_exit_fullscreen')
+                    : t('item_list.map_fullscreen')
+                }
+                aria-pressed={mapFullscreen}
+              >
+                <Icon
+                  icon={mapFullscreen ? IconType.Collapse : IconType.Expand}
+                  className="w-5 h-5"
+                />
               </button>
             </div>
           </div>

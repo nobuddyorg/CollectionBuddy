@@ -7,9 +7,9 @@ import { useI18n } from '../../i18n/useI18n';
 import type { Category } from '../../types';
 import {
   AddButton,
+  CollapseButton,
   DeleteButtonWithLabel,
   ExpandButton,
-  SetButton,
 } from './Buttons';
 import { CategoryText } from './CategoryText';
 import { CategorySelectDropdown } from './Dropdown';
@@ -128,9 +128,20 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
 
   return (
     <section className="space-y-3">
-      <h2 className="font-label text-[0.6875rem] text-muted-foreground">
-        {t('category_select.title')}
-      </h2>
+      {/* The close sits where the pencil that opened this panel was, so the
+          same spot toggles it. Hidden until a category exists to go back
+          to -- on first run there is nothing to collapse to. */}
+      <div className="flex items-center justify-between gap-3 min-h-11 sm:min-h-9">
+        <h2 className="font-label text-[0.6875rem] text-muted-foreground">
+          {t('category_select.title')}
+        </h2>
+        {selected && (
+          <CollapseButton
+            onClick={() => setExpanded(false)}
+            label={t('common.close')}
+          />
+        )}
+      </div>
 
       <CategorySelectDropdown
         selectedCat={selectedCat}
@@ -202,18 +213,6 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
           />
         </div>
       </div>
-
-      {selectedCat && (
-        <div className="pt-1">
-          <SetButton
-            onClick={() => {
-              setExpanded(false);
-              onSelect(selectedCat);
-            }}
-            label={t('category_select.set')}
-          />
-        </div>
-      )}
     </section>
   );
 }

@@ -17,6 +17,8 @@ export enum IconType {
   Map,
   Gps,
   Frame,
+  Expand,
+  Collapse,
 }
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
@@ -292,6 +294,40 @@ export const Icon: React.FC<IconProps> = ({
           <line x1="6" x2="2" y1="12" y2="12" />
           <line x1="12" y1="6" x2="12" y2="2" />
           <line x1="12" y1="22" x2="12" y2="18" />
+        </svg>
+      );
+    case IconType.Expand:
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          {...props}
+        >
+          <path d="M15 3h6v6" />
+          <path d="M9 21H3v-6" />
+          <path d="M21 3l-7 7" />
+          <path d="M3 21l7-7" />
+        </svg>
+      );
+    case IconType.Collapse:
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          {...props}
+        >
+          <path d="M14 10h6V4" />
+          <path d="M10 14H4v6" />
+          <path d="M20 4l-7 7" />
+          <path d="M4 20l7-7" />
         </svg>
       );
     case IconType.Frame:
