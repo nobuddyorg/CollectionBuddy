@@ -67,9 +67,20 @@ describe('ImageGrid', () => {
     renderGrid([img('a'), img('b')]);
     const images = screen.getAllByRole('img');
     expect(images).toHaveLength(2);
-    for (const image of images) expect(image).toHaveClass('aspect-square');
     expect(images[0]).toHaveAttribute('src', 'https://example.test/a.webp');
     expect(images[1]).toHaveAttribute('src', 'https://example.test/b.webp');
+  });
+
+  // From `sm` up the pair fills the same 4:3 box a single image would, so
+  // cards sitting side by side in a desktop row have image regions of equal
+  // height. Mobile shows one card per row and keeps the squarer crop.
+  it('gives a pair the same image height as a single image on desktop', () => {
+    const { container } = renderGrid([img('a'), img('b')]);
+    expect(container.querySelector('.sm\\:aspect-4\\/3')).not.toBeNull();
+    for (const image of screen.getAllByRole('img')) {
+      expect(image).toHaveClass('aspect-square');
+      expect(image).toHaveClass('sm:aspect-auto');
+    }
   });
 
   it('renders the first image as hero and the rest as a strip', () => {
