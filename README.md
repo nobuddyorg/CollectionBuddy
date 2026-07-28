@@ -60,6 +60,15 @@ To build the application for production, run the `build.sh` script from the root
 
 The static files will be generated locally, ready for deployment. The script demonstrates how it's done, but real deployment should happen in your pipeline. 
 
+## Documentation
+
+Full docs live in [`docs/`](docs/README.md), organised by [Diátaxis](https://diataxis.fr):
+
+- **Tutorial** — [Getting started](docs/tutorials/getting-started.md)
+- **How-to** — [User guide](docs/how-to/user-guide.md) · [Developer guide](docs/how-to/developer-guide.md) (checks, migrations, new environments, deploy)
+- **Reference** — [Architecture](docs/reference/architecture.md) · [Configuration](docs/reference/configuration.md)
+- **Explanation** — [Design decisions](docs/explanation/design-decisions.md)
+
 ## Technology Stack
 
 ### Frontend
