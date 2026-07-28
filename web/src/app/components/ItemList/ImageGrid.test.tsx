@@ -52,11 +52,24 @@ describe('ImageGrid', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders a single image as the hero with no contact strip', () => {
+  it('renders a single image as one full-width plate', () => {
     renderGrid([img('a')]);
     const images = screen.getAllByRole('img');
     expect(images).toHaveLength(1);
     expect(images[0]).toHaveAccessibleName('Blue Mauritius — image 1');
+    expect(images[0]).toHaveClass('aspect-4/3');
+  });
+
+  // Two photographs are usually a matched pair -- the front and back of a
+  // coin, both faces of a stamp. Demoting the second to a thumbnail strip
+  // misrepresented that as a main shot plus an afterthought.
+  it('renders two images as an equal pair, both at full resolution', () => {
+    renderGrid([img('a'), img('b')]);
+    const images = screen.getAllByRole('img');
+    expect(images).toHaveLength(2);
+    for (const image of images) expect(image).toHaveClass('aspect-square');
+    expect(images[0]).toHaveAttribute('src', 'https://example.test/a.webp');
+    expect(images[1]).toHaveAttribute('src', 'https://example.test/b.webp');
   });
 
   it('renders the first image as hero and the rest as a strip', () => {
@@ -88,10 +101,10 @@ describe('ImageGrid', () => {
     expect(onOpenModal).toHaveBeenCalledWith('https://example.test/a.webp');
   });
 
-  // The hero spans the whole card, which is wider than the 250px stored
+  // The hero spans the whole card, which is wider than the stored
   // thumbnail; sourcing it from the thumb upscaled past its native size.
   it('renders the hero from the full image and the strip from thumbnails', () => {
-    renderGrid([img('a'), img('b')]);
+    renderGrid([img('a'), img('b'), img('c')]);
     const images = screen.getAllByRole('img');
     expect(images[0]).toHaveAttribute('src', 'https://example.test/a.webp');
     expect(images[1]).toHaveAttribute(
