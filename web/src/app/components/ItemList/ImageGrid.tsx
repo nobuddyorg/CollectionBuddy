@@ -25,7 +25,7 @@ export function ImageGrid({
   const { t } = useI18n();
   if (!imgs.length) {
     return (
-      <div className="text-sm text-muted-foreground">
+      <div className="text-sm text-card-foreground/60 italic">
         {t('item_list.no_images')}
       </div>
     );

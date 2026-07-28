@@ -9,11 +9,7 @@
   "header": {
     "title": "CollectionBuddy",
     "sign_out": "Sign out",
-    "language": "Language",
-    "theme": "Theme",
-    "theme_system": "System",
-    "theme_light": "Light",
-    "theme_dark": "Dark"
+    "language": "Language"
   },
   "category_select": {
     "title": "Category",

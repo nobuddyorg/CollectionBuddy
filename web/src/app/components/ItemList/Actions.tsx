@@ -31,7 +31,7 @@ export function Actions({
       ].join(' ')}
     >
       <button
-        className="[@media(hover:hover)]:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-card border text-foreground shadow"
+        className="[@media(hover:hover)]:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-muted border text-foreground shadow"
         onClick={onClose}
         aria-label={t('common.close')}
       >

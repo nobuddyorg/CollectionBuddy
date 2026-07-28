@@ -82,10 +82,10 @@ export function Pagination({
             key={item}
             onClick={() => setPage(item)}
             className={
-              'min-w-9 h-9 px-2 flex items-center justify-center rounded-xl shadow-sm ' +
+              'min-w-9 h-9 px-2 flex items-center justify-center rounded-xl shadow-sm font-label text-xs ' +
               (item === page
                 ? 'bg-primary text-primary-foreground'
-                : 'bg-primary/60 text-primary-foreground hover:bg-primary')
+                : 'border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground')
             }
             aria-label={t('item_list.page').replace('{n}', String(item))}
             aria-current={item === page ? 'page' : undefined}

@@ -20,22 +20,25 @@ export default function Header({ user, onSignOut }: HeaderProps) {
   return (
     <header
       className="sticky top-0 z-header backdrop-blur
-        supports-[backdrop-filter]:bg-white/40
-        dark:supports-[backdrop-filter]:bg-neutral-900/70
-        border-b border-black/5 dark:border-white/10
+        supports-[backdrop-filter]:bg-background/85
+        border-b-2 border-primary/70
         pt-[env(safe-area-inset-top)]"
     >
       <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className="inline-block w-3 h-3 rounded-full bg-primary shadow-[0_1px_2px_rgb(0_0_0/0.4)]"
+          />
           <Image
             src={withBasePath('/logo.png')}
-            alt={t('header.title')}
-            width={28}
-            height={28}
+            alt=""
+            width={26}
+            height={26}
             className="object-contain"
             priority
           />
-          <span className="font-semibold tracking-tight">
+          <span className="font-display text-lg tracking-tight text-foreground">
             {t('header.title')}
           </span>
         </div>
@@ -46,9 +49,9 @@ export default function Header({ user, onSignOut }: HeaderProps) {
             id="user-menu-button"
             onClick={toggle}
             className="group flex items-center gap-2 rounded-xl px-2.5 py-1.5
-              bg-white/70 dark:bg-neutral-900/60
-              border border-black/10 dark:border-white/10
-              shadow-sm hover:shadow transition"
+              bg-card/90 text-card-foreground
+              border border-primary/40
+              shadow-sm hover:shadow hover:border-primary transition"
             aria-haspopup="menu"
             aria-controls="user-menu"
             aria-expanded={menuOpen ? 'true' : 'false'}

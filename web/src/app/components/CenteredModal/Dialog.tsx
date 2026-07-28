@@ -36,17 +36,17 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="centered-modal-title"
-        className={`bg-background rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90dvh] flex flex-col overflow-hidden transition-[opacity,transform] duration-200 ease-out ${
+        className={`bg-card text-card-foreground border-2 border-primary/40 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90dvh] flex flex-col overflow-hidden transition-[opacity,transform] duration-200 ease-out ${
           open ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h3 id="centered-modal-title" className="text-base font-semibold">
+          <h3 id="centered-modal-title" className="font-display text-base">
             {title}
           </h3>
           <button
-            className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-muted"
+            className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-card-foreground/10"
             onClick={onClose}
             aria-label={closeLabel ?? 'Close'}
           >

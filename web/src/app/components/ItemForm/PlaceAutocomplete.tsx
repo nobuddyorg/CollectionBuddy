@@ -115,7 +115,7 @@ export function PlaceAutocomplete({
           }
         }}
         placeholder={t('item_create.place_placeholder')}
-        className="w-full rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 focus:border-primary dark:focus:border-primary"
+        className="w-full rounded-xl border px-3 py-2 bg-card text-card-foreground focus:border-primary"
         autoComplete="off"
         autoCapitalize="words"
       />
@@ -153,7 +153,7 @@ export function PlaceAutocomplete({
                 ref={menuRef}
                 id={listId}
                 role="listbox"
-                className="fixed rounded-xl border bg-card dark:bg-card shadow-lg overflow-y-auto max-h-60 z-popover"
+                className="fixed rounded-xl border bg-card text-card-foreground shadow-lg overflow-y-auto max-h-60 z-popover"
                 style={style}
               >
                 {loading && (
@@ -193,10 +193,8 @@ export function PlaceAutocomplete({
                           onChange(choose(hit));
                           setFocus(false);
                         }}
-                        className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 dark:hover:bg-primary/10 ${
-                          i === activeIdx
-                            ? 'bg-primary/10 dark:bg-primary/10'
-                            : ''
+                        className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 ${
+                          i === activeIdx ? 'bg-primary/10' : ''
                         }`}
                       >
                         <div className="font-medium">{city}</div>

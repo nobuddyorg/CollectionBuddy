@@ -89,7 +89,7 @@ export default function LoadingOverlay({
       </span>
       {slow && (
         <span
-          className={`text-sm ${isDark ? 'text-white/80' : 'text-muted-foreground'}`}
+          className={`text-sm ${isDark ? 'text-white/80' : 'text-foreground/70'}`}
         >
           {t('common.loading_slow')}
         </span>

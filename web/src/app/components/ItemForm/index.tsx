@@ -72,7 +72,7 @@ export default function ItemForm({
             aria-required="true"
             aria-invalid={titleError}
             aria-describedby={titleError ? `${titleId}-error` : undefined}
-            className="w-full rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 focus:border-primary dark:focus:border-primary"
+            className="w-full rounded-xl border px-3 py-2 bg-card text-card-foreground focus:border-primary"
           />
           {titleError && (
             <p id={`${titleId}-error`} className="text-xs text-destructive">
@@ -93,7 +93,7 @@ export default function ItemForm({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="w-full rounded-xl border px-3 py-2 bg-card/60 dark:bg-card/70 focus:border-primary dark:focus:border-primary resize-none"
+            className="w-full rounded-xl border px-3 py-2 bg-card text-card-foreground focus:border-primary resize-none"
           />
         </div>
       </div>

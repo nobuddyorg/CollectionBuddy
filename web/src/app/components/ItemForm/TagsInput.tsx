@@ -39,11 +39,11 @@ export function TagsInput({
   };
 
   return (
-    <div className="rounded-xl border bg-card/60 dark:bg-card/70 px-2 py-1 flex flex-wrap items-center gap-1 focus-within:border-primary dark:focus-within:border-primary">
+    <div className="rounded-xl border bg-card text-card-foreground px-2 py-1 flex flex-wrap items-center gap-1 focus-within:border-primary">
       {tags.map((tag) => (
         <span
           key={tag}
-          className="fade-up flex items-center gap-1 bg-primary/15 text-amber-800 dark:text-amber-200 rounded-full px-2 py-0.5 text-sm"
+          className="fade-up font-label text-[0.65rem] flex items-center gap-1 border border-primary text-primary rounded-full px-2 py-0.5"
         >
           {tag}
           <button

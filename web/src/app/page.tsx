@@ -52,7 +52,7 @@ export default function Page() {
   const headerUser = { ...user, email: user.email ?? '' };
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-b from-amber-50 via-white to-stone-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 text-neutral-900 dark:text-neutral-100">
+    <div className="min-h-[100dvh] bg-background text-foreground">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-overlay focus:rounded-xl focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
@@ -72,9 +72,9 @@ export default function Page() {
         />
 
         {hasCategory ? (
-          <section className="relative z-50 rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur shadow-sm p-4 sm:p-5">
+          <section className="relative z-50 rounded-2xl border-2 border-primary/50 bg-muted p-4 sm:p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 id="entries-heading" className="text-base font-semibold">
+              <h2 id="entries-heading" className="font-display text-lg">
                 {t('page.entries')}
               </h2>
             </div>
@@ -84,16 +84,21 @@ export default function Page() {
             />
           </section>
         ) : (
-          <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-10 grid place-items-center text-center">
+          <section className="rounded-2xl border-2 border-dashed border-primary/40 p-10 grid place-items-center text-center">
             <div className="flex flex-col items-center gap-4">
-              <div className="h-16 w-16 rounded-full bg-amber-500/90 ring-8 ring-amber-200/40 dark:ring-amber-900/20 grid place-items-center text-3xl">
+              <div className="relative h-16 w-16 rounded-full bg-card grid place-items-center text-3xl shadow-inner border-2 border-primary/60">
+                <span
+                  className="pin"
+                  style={{ top: -8, left: 'calc(50% - 9px)' }}
+                  aria-hidden="true"
+                />
                 🧺
               </div>
               <div className="space-y-1">
-                <h3 className="text-lg font-semibold">
+                <h3 className="font-display text-lg">
                   {t('page.choose_category')}
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-foreground/70">
                   {t('page.add_collectibles')}
                 </p>
               </div>
@@ -102,7 +107,7 @@ export default function Page() {
         )}
       </main>
 
-      <footer className="px-4 py-8 pb-[calc(2rem+env(safe-area-inset-bottom))] text-center text-xs text-muted-foreground">
+      <footer className="px-4 py-8 pb-[calc(2rem+env(safe-area-inset-bottom))] text-center font-label text-[0.65rem] text-foreground/60">
         {t('page.footer')}
       </footer>
     </div>

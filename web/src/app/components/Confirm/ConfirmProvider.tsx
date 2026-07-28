@@ -57,7 +57,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             ref={cancelRef}
             type="button"
             onClick={() => settle(false)}
-            className="rounded-xl px-3 py-1.5 border hover:bg-muted"
+            className="rounded-xl px-3 py-1.5 border hover:bg-card-foreground/10"
           >
             {t('common.cancel')}
           </button>

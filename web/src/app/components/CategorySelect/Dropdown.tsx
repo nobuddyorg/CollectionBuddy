@@ -1,5 +1,7 @@
 'use client';
+import type { CSSProperties } from 'react';
 import { useI18n } from '../../i18n/useI18n';
+import { inkVarFor } from '../../lib/specimen';
 
 type Props = {
   selectedCat: string | null;
@@ -8,6 +10,10 @@ type Props = {
   isLoading: boolean;
   setExpanded: (v: boolean) => void;
 };
+
+// A row of labeled drawer pulls rather than a native <select> -- every
+// category is visible at once, tinted by its own assigned ink, and the
+// selected one reads as "pulled open" toward the content below it.
 export function CategorySelectDropdown({
   selectedCat,
   onSelect,
@@ -16,32 +22,48 @@ export function CategorySelectDropdown({
   setExpanded,
 }: Props) {
   const { t } = useI18n();
+
+  if (isLoading) {
+    return (
+      <div className="font-label text-xs text-foreground/70" aria-live="polite">
+        {t('common.loading')}
+      </div>
+    );
+  }
+
+  if (!sortedCats.length) return null;
+
   return (
-    <div className="relative">
-      <select
-        value={selectedCat ?? ''}
-        onChange={(e) => {
-          const v = e.target.value || null;
-          onSelect(v);
-          if (v) setExpanded(false);
-        }}
-        disabled={isLoading}
-        className="w-full appearance-none rounded-xl border px-3 py-2 pr-10 bg-card/60 dark:bg-card/70 focus:border-primary dark:focus:border-primary transition"
-        aria-label={t('category_select.select_placeholder')}
-      >
-        <option value="">{t('category_select.select_placeholder')}</option>
-        {sortedCats.map((c) => (
-          <option key={c.id} value={c.id}>
+    <div
+      role="tablist"
+      aria-label={t('category_select.select_placeholder')}
+      className="flex flex-wrap gap-2"
+    >
+      {sortedCats.map((c) => {
+        const active = c.id === selectedCat;
+        const ink = inkVarFor(c.name);
+        return (
+          <button
+            key={c.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => {
+              onSelect(c.id);
+              setExpanded(false);
+            }}
+            style={{ '--ink': ink } as CSSProperties}
+            className={[
+              'font-label text-xs rounded-t-lg rounded-b-sm px-3 py-2 border-2 transition-transform',
+              active
+                ? 'bg-[var(--ink)] text-card border-[var(--ink)] translate-y-0.5 shadow-inner'
+                : 'bg-card text-card-foreground border-[var(--ink)] hover:-translate-y-0.5 hover:shadow-sm',
+            ].join(' ')}
+          >
             {c.name}
-          </option>
-        ))}
-      </select>
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm opacity-70"
-      >
-        ▾
-      </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

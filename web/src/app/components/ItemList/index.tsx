@@ -225,7 +225,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         <button
           type="button"
           onClick={() => setMapOpen(true)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary/15 text-amber-800 dark:text-amber-200 shadow-sm hover:brightness-110"
+          className="w-9 h-9 flex items-center justify-center rounded-xl border-2 border-primary text-primary shadow-sm hover:bg-primary hover:text-primary-foreground transition-colors"
           aria-label={t('item_list.open_map')}
           title={t('item_list.open_map')}
         >
@@ -252,24 +252,29 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
       {items.length === 0 ? (
         loading ? (
           <p
-            className="py-10 text-center text-sm text-muted-foreground"
+            className="py-10 text-center text-sm text-foreground/70"
             aria-live="polite"
           >
             {t('common.loading')}
           </p>
         ) : (
-          <section className="rounded-2xl border bg-white/70 dark:bg-neutral-900/60 backdrop-blur shadow-sm p-10 grid place-items-center text-center">
+          <section className="rounded-2xl border-2 border-dashed border-card-foreground/20 bg-card/40 p-10 grid place-items-center text-center">
             <div className="flex flex-col items-center gap-4">
-              <div className="h-16 w-16 rounded-full bg-amber-500/90 ring-8 ring-amber-200/40 dark:ring-amber-900/20 grid place-items-center text-3xl">
+              <div className="relative h-16 w-16 rounded-full bg-card grid place-items-center text-3xl shadow-inner border-2 border-primary/50">
+                <span
+                  className="pin"
+                  style={{ top: -8, left: 'calc(50% - 9px)' }}
+                  aria-hidden="true"
+                />
                 {qDebounced ? '🔍' : '🧺'}
               </div>
               <div className="space-y-1">
-                <h3 className="text-lg font-semibold">
+                <h3 className="font-display text-lg text-foreground">
                   {qDebounced
                     ? t('item_list.no_results_title').replace('{q}', qDebounced)
                     : t('item_list.no_items_title')}
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-foreground/70">
                   {qDebounced
                     ? t('item_list.no_results_hint')
                     : t('item_list.no_items_hint')}
@@ -279,7 +284,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                 <button
                   type="button"
                   onClick={() => setQ('')}
-                  className="text-sm underline text-amber-800 dark:text-amber-200"
+                  className="text-sm underline text-primary hover:text-foreground"
                 >
                   {t('item_list.search_clear')}
                 </button>
@@ -291,7 +296,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         <ul
           aria-busy={loading}
           aria-labelledby="entries-heading"
-          className={`grid sm:grid-cols-2 lg:grid-cols-3 gap-3 transition-opacity ${loading ? 'opacity-60' : ''}`}
+          className={`grid sm:grid-cols-2 lg:grid-cols-3 gap-5 pt-2 transition-opacity ${loading ? 'opacity-60' : ''}`}
         >
           {items.map((it) => (
             <ItemCard
@@ -385,7 +390,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                   setMapCommand('fitCurrent');
                   setTimeout(() => setMapCommand(null), 0);
                 }}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-card-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
                 aria-label={t('item_list.zoom_to_current_location')}
                 title={t('item_list.zoom_to_current_location')}
                 disabled={!currentLocation}
@@ -398,7 +403,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                   setMapCommand('fitAll');
                   setTimeout(() => setMapCommand(null), 0);
                 }}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-foreground shadow-sm hover:brightness-110"
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-card-foreground shadow-sm hover:brightness-110"
                 aria-label={t('item_list.frame_all_pins')}
                 title={t('item_list.frame_all_pins')}
               >
