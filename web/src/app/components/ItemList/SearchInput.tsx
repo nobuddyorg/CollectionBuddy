@@ -15,7 +15,7 @@ export function SearchInput({
     <div className="relative flex w-full items-center">
       <Icon
         icon={IconType.Search}
-        className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-card-foreground/50"
+        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
         aria-hidden
       />
       <input
@@ -25,7 +25,7 @@ export function SearchInput({
         onChange={(e) => onChange(e.target.value)}
         aria-label={t('item_list.search_placeholder')}
         placeholder={t('item_list.search_placeholder')}
-        className="w-full rounded-xl border bg-card text-card-foreground py-2 pl-9 pr-10 shadow-sm focus:border-primary placeholder:text-card-foreground/50"
+        className="w-full min-h-11 rounded-sm bg-card text-card-foreground py-2 pl-9 pr-10 ring-1 ring-inset ring-border focus:ring-foreground placeholder:text-muted-foreground"
       />
       {value && (
         <button
@@ -35,7 +35,7 @@ export function SearchInput({
         >
           <Icon
             icon={IconType.Close}
-            className="h-5 w-5 text-card-foreground/50 hover:text-card-foreground"
+            className="h-5 w-5 text-muted-foreground hover:text-foreground"
           />
         </button>
       )}

@@ -58,8 +58,8 @@ export default function LoadingOverlay({
   ].join(' ');
 
   const inlineClasses = isDark
-    ? 'absolute inset-0 bg-black/40 backdrop-blur-[2px] rounded-xl'
-    : 'absolute inset-0 bg-background/60 backdrop-blur-[2px] rounded-xl';
+    ? 'absolute inset-0 bg-black/40 backdrop-blur-[2px] rounded-sm'
+    : 'absolute inset-0 bg-background/60 backdrop-blur-[2px] rounded-sm';
 
   const spinnerClasses = isDark
     ? 'border-white/80 border-t-transparent'

@@ -91,7 +91,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
 
   if (!expanded && selected) {
     return (
-      <section className="rounded-2xl border-2 border-primary/50 bg-card text-card-foreground shadow-sm p-4 flex items-center justify-between">
+      <section className="flex items-end justify-between gap-3 border-b border-border pb-3">
         <CategoryText title={t('category_select.title')} name={selected.name} />
         <div className="flex items-center gap-2">
           <ExpandButton
@@ -104,8 +104,8 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
   }
 
   return (
-    <section className="rounded-2xl border-2 border-primary/50 bg-muted p-4 space-y-3">
-      <h2 className="font-display text-base text-foreground">
+    <section className="space-y-3">
+      <h2 className="font-label text-[0.6875rem] text-muted-foreground">
         {t('category_select.title')}
       </h2>
 

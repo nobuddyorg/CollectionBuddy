@@ -23,7 +23,7 @@ export function Actions({
   return (
     <div
       className={[
-        'absolute top-3 right-3 flex items-center gap-2 transition-opacity',
+        'absolute top-3.5 right-3 z-10 flex items-center gap-2 transition-opacity',
         isOpen
           ? 'opacity-100 pointer-events-auto'
           : 'opacity-0 pointer-events-none',
@@ -31,7 +31,7 @@ export function Actions({
       ].join(' ')}
     >
       <button
-        className="[@media(hover:hover)]:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-muted border text-foreground shadow"
+        className="[@media(hover:hover)]:hidden w-9 h-9 flex items-center justify-center rounded-sm bg-muted border text-foreground shadow"
         onClick={onClose}
         aria-label={t('common.close')}
       >
@@ -46,7 +46,7 @@ export function Actions({
       </button>
 
       <label
-        className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 transition cursor-pointer"
+        className="w-9 h-9 flex items-center justify-center rounded-sm bg-primary text-primary-foreground shadow-sm hover:opacity-90 transition cursor-pointer"
         aria-label={t('item_list.add_image')}
         title={t('item_list.add_image')}
       >

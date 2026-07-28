@@ -57,14 +57,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             ref={cancelRef}
             type="button"
             onClick={() => settle(false)}
-            className="rounded-xl px-3 py-1.5 border hover:bg-card-foreground/10"
+            className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-border hover:bg-muted"
           >
             {t('common.cancel')}
           </button>
           <button
             type="button"
             onClick={() => settle(true)}
-            className="rounded-xl px-3 py-1.5 bg-destructive text-destructive-foreground hover:brightness-110"
+            className="min-h-11 px-4 rounded-sm font-label text-xs bg-destructive text-destructive-foreground hover:opacity-90"
           >
             {t('common.confirm')}
           </button>

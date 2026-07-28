@@ -112,7 +112,7 @@ export const Icon: React.FC<IconProps> = ({
             cy="190"
             r="180"
             fill="none"
-            className="stroke-primary/50"
+            className="stroke-foreground/30"
             strokeWidth="3"
             strokeDasharray="6 4"
             opacity="0.85"
@@ -122,7 +122,7 @@ export const Icon: React.FC<IconProps> = ({
             cy="190"
             r="153"
             fill="none"
-            className="stroke-primary/50"
+            className="stroke-foreground/30"
             strokeWidth="1.5"
             strokeDasharray="3 3"
             opacity="0.6"
@@ -134,7 +134,7 @@ export const Icon: React.FC<IconProps> = ({
             strokeLinejoin="round"
             strokeLinecap="round"
             opacity="0.9"
-            className="stroke-primary/50"
+            className="stroke-foreground/30"
           >
             <path d="M-128 0 L0 -64 L128 0 Z" />
             <line x1="-140" y1="0" x2="140" y2="0" />

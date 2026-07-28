@@ -74,7 +74,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 key={entry.id}
                 role="alert"
                 aria-live="assertive"
-                className="pointer-events-auto max-w-sm w-full rounded-xl bg-destructive text-destructive-foreground shadow-lg px-4 py-3 flex items-start gap-3"
+                className="pointer-events-auto max-w-sm w-full rounded-sm bg-destructive text-destructive-foreground shadow-lg px-4 py-3 flex items-start gap-3"
               >
                 <span className="flex-1 text-sm">{entry.message}</span>
                 <button

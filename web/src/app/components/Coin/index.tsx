@@ -11,11 +11,11 @@ export default function Coin({
   cta,
   size = 380,
   className,
-  textClassName = 'fill-primary/70',
+  textClassName = 'fill-muted-foreground',
   fontFamily = 'var(--font-label-family), monospace',
-  fontSize = 16,
+  fontSize = 15,
   letterSpacing = 4,
-  opacity = 0.9,
+  opacity = 1,
 }: CoinProps) {
   const rimId = useId();
 

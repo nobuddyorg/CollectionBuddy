@@ -115,7 +115,7 @@ export function PlaceAutocomplete({
           }
         }}
         placeholder={t('item_create.place_placeholder')}
-        className="w-full rounded-xl border px-3 py-2 bg-card text-card-foreground focus:border-primary"
+        className="w-full rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
         autoComplete="off"
         autoCapitalize="words"
       />
@@ -153,7 +153,7 @@ export function PlaceAutocomplete({
                 ref={menuRef}
                 id={listId}
                 role="listbox"
-                className="fixed rounded-xl border bg-card text-card-foreground shadow-lg overflow-y-auto max-h-60 z-popover"
+                className="fixed rounded-sm border bg-card text-card-foreground shadow-lg overflow-y-auto max-h-60 z-popover"
                 style={style}
               >
                 {loading && (

@@ -17,7 +17,6 @@ import { usePlaces } from '../Map/usePlaces';
 
 const Map = dynamic(() => import('../Map'), { ssr: false });
 import Icon, { IconType } from '../Icon';
-import { IconButton } from '../ui/IconButton';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
 
@@ -213,33 +212,38 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 items-center">
-        <IconButton
-          onClick={() => setCreateOpen(true)}
-          aria-label={t('item_create.new_entry')}
-          title={t('item_create.new_entry')}
-        >
-          <Icon icon={IconType.Plus} className="w-4 h-4" />
-        </IconButton>
-
-        <button
-          type="button"
-          onClick={() => setMapOpen(true)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl border-2 border-primary text-primary shadow-sm hover:bg-primary hover:text-primary-foreground transition-colors"
-          aria-label={t('item_list.open_map')}
-          title={t('item_list.open_map')}
-        >
-          <Icon
-            icon={IconType.Map}
-            className="w-5 h-5"
-            stroke="currentColor"
-            strokeWidth="2"
-            fill="none"
-          />
-        </button>
-
-        <div className="flex-1 min-w-[6rem] sm:min-w-[12rem]">
+      {/* Mobile-first toolbar: search takes the full first row where it is
+          actually usable, actions sit beside it from `sm` up. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex-1">
           <SearchInput value={q} onChange={setQ} />
+        </div>
+
+        <div className="flex gap-2 sm:shrink-0">
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="flex-1 sm:flex-none min-h-11 px-4 flex items-center justify-center gap-2 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 transition-opacity"
+          >
+            <Icon icon={IconType.Plus} className="w-4 h-4" aria-hidden="true" />
+            {t('item_create.new_entry')}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMapOpen(true)}
+            className="min-h-11 w-11 shrink-0 flex items-center justify-center rounded-sm ring-1 ring-inset ring-border text-foreground hover:bg-muted transition-colors"
+            aria-label={t('item_list.open_map')}
+            title={t('item_list.open_map')}
+          >
+            <Icon
+              icon={IconType.Map}
+              className="w-5 h-5"
+              stroke="currentColor"
+              strokeWidth="2"
+              fill="none"
+            />
+          </button>
         </div>
       </div>
 
@@ -258,23 +262,18 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
             {t('common.loading')}
           </p>
         ) : (
-          <section className="rounded-2xl border-2 border-dashed border-card-foreground/20 bg-card/40 p-10 grid place-items-center text-center">
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative h-16 w-16 rounded-full bg-card grid place-items-center text-3xl shadow-inner border-2 border-primary/50">
-                <span
-                  className="pin"
-                  style={{ top: -8, left: 'calc(50% - 9px)' }}
-                  aria-hidden="true"
-                />
+          <section className="py-16 grid place-items-center text-center">
+            <div className="flex flex-col items-center gap-4 max-w-xs">
+              <div className="h-16 w-16 bg-card ring-1 ring-border grid place-items-center text-3xl">
                 {qDebounced ? '🔍' : '🧺'}
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <h3 className="font-display text-lg text-foreground">
                   {qDebounced
                     ? t('item_list.no_results_title').replace('{q}', qDebounced)
                     : t('item_list.no_items_title')}
                 </h3>
-                <p className="text-sm text-foreground/70">
+                <p className="text-sm text-muted-foreground">
                   {qDebounced
                     ? t('item_list.no_results_hint')
                     : t('item_list.no_items_hint')}
@@ -284,7 +283,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                 <button
                   type="button"
                   onClick={() => setQ('')}
-                  className="text-sm underline text-primary hover:text-foreground"
+                  className="min-h-11 px-3 font-label text-xs text-foreground underline underline-offset-4"
                 >
                   {t('item_list.search_clear')}
                 </button>
@@ -296,7 +295,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         <ul
           aria-busy={loading}
           aria-labelledby="entries-heading"
-          className={`grid sm:grid-cols-2 lg:grid-cols-3 gap-5 pt-2 transition-opacity ${loading ? 'opacity-60' : ''}`}
+          className={`-mx-4 sm:mx-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 items-start gap-px sm:gap-4 bg-border sm:bg-transparent transition-opacity ${loading ? 'opacity-60' : ''}`}
         >
           {items.map((it) => (
             <ItemCard
@@ -390,7 +389,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                   setMapCommand('fitCurrent');
                   setTimeout(() => setMapCommand(null), 0);
                 }}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-card-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-card-foreground shadow-sm hover:opacity-90 disabled:opacity-50"
                 aria-label={t('item_list.zoom_to_current_location')}
                 title={t('item_list.zoom_to_current_location')}
                 disabled={!currentLocation}
@@ -403,7 +402,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                   setMapCommand('fitAll');
                   setTimeout(() => setMapCommand(null), 0);
                 }}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-card-foreground shadow-sm hover:brightness-110"
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-card-foreground shadow-sm hover:opacity-90"
                 aria-label={t('item_list.frame_all_pins')}
                 title={t('item_list.frame_all_pins')}
               >

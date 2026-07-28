@@ -19,7 +19,7 @@ export function AddButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="rounded-xl px-3 py-1.5 bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-50"
+      className="min-h-11 px-4 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 disabled:opacity-50"
       aria-label={label}
       title={label}
     >
@@ -93,7 +93,7 @@ export function ExpandButton({
   return (
     <button
       onClick={onClick}
-      className="rounded-xl w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-primary text-primary-foreground shadow-sm hover:brightness-110"
+      className="rounded-sm w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
       aria-label={label}
       title={label}
     >

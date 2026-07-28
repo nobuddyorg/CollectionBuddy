@@ -51,7 +51,7 @@ export default function Menu({
       id={menuId}
       role="menu"
       aria-labelledby="user-menu-button"
-      className="absolute right-0 mt-2 w-56 rounded-xl border bg-card text-card-foreground backdrop-blur p-1 shadow-lg"
+      className="absolute right-0 mt-2 w-56 rounded-sm border bg-card text-card-foreground backdrop-blur p-1 shadow-lg"
     >
       <div className="px-3 py-2 font-label text-[0.65rem] opacity-70 truncate">
         {user.email}

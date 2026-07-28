@@ -1,7 +1,5 @@
 'use client';
-import type { CSSProperties } from 'react';
 import { useI18n } from '../../i18n/useI18n';
-import { inkVarFor } from '../../lib/specimen';
 
 type Props = {
   selectedCat: string | null;
@@ -11,9 +9,11 @@ type Props = {
   setExpanded: (v: boolean) => void;
 };
 
-// A row of labeled drawer pulls rather than a native <select> -- every
-// category is visible at once, tinted by its own assigned ink, and the
-// selected one reads as "pulled open" toward the content below it.
+// Card-catalogue dividers: the active category is marked by an ink rule
+// under its name, the way a tabbed divider stands proud of the cards behind
+// it. No fills, no per-category colour -- colour belongs to the photographs.
+//
+// Scrolls horizontally on narrow screens rather than wrapping to three rows.
 export function CategorySelectDropdown({
   selectedCat,
   onSelect,
@@ -37,11 +37,10 @@ export function CategorySelectDropdown({
     <div
       role="tablist"
       aria-label={t('category_select.select_placeholder')}
-      className="flex flex-wrap gap-2"
+      className="-mx-4 px-4 flex gap-5 overflow-x-auto border-b border-border sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {sortedCats.map((c) => {
         const active = c.id === selectedCat;
-        const ink = inkVarFor(c.name);
         return (
           <button
             key={c.id}
@@ -52,12 +51,11 @@ export function CategorySelectDropdown({
               onSelect(c.id);
               setExpanded(false);
             }}
-            style={{ '--ink': ink } as CSSProperties}
             className={[
-              'font-label text-xs rounded-t-lg rounded-b-sm px-3 py-2 border-2 transition-transform',
+              'font-label text-xs shrink-0 min-h-11 -mb-px border-b-2 transition-colors',
               active
-                ? 'bg-[var(--ink)] text-card border-[var(--ink)] translate-y-0.5 shadow-inner'
-                : 'bg-card text-card-foreground border-[var(--ink)] hover:-translate-y-0.5 hover:shadow-sm',
+                ? 'border-foreground text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
             ].join(' ')}
           >
             {c.name}

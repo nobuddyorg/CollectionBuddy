@@ -20,50 +20,42 @@ export default function Header({ user, onSignOut }: HeaderProps) {
   return (
     <header
       className="sticky top-0 z-header backdrop-blur
-        supports-[backdrop-filter]:bg-background/85
-        border-b-2 border-primary/70
+        supports-[backdrop-filter]:bg-background/90
+        border-b border-border
         pt-[env(safe-area-inset-top)]"
     >
-      <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <span
-            aria-hidden="true"
-            className="inline-block w-3 h-3 rounded-full bg-primary shadow-[0_1px_2px_rgb(0_0_0/0.4)]"
-          />
+      <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
           <Image
             src={withBasePath('/logo.png')}
             alt=""
-            width={26}
-            height={26}
-            className="object-contain"
+            width={24}
+            height={24}
+            className="object-contain shrink-0"
             priority
           />
-          <span className="font-display text-lg tracking-tight text-foreground">
+          <span className="font-display text-base sm:text-lg text-foreground truncate">
             {t('header.title')}
           </span>
         </div>
 
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             ref={anchorRef}
             id="user-menu-button"
             onClick={toggle}
-            className="group flex items-center gap-2 rounded-xl px-2.5 py-1.5
-              bg-card/90 text-card-foreground
-              border border-primary/40
-              shadow-sm hover:shadow hover:border-primary transition"
+            className="group flex items-center gap-2 rounded-sm px-2 min-h-10
+              text-foreground hover:bg-muted transition-colors"
             aria-haspopup="menu"
             aria-controls="user-menu"
             aria-expanded={menuOpen ? 'true' : 'false'}
             title={displayEmail || t('header.title')}
           >
             <Icon icon={IconType.Google} className="w-5 h-5" />
-            <span className="text-sm opacity-80 max-sm:hidden">
+            <span className="text-sm text-muted-foreground max-sm:hidden">
               {displayEmail}
             </span>
-            <span className="text-xs opacity-60 group-hover:opacity-100">
-              ▾
-            </span>
+            <span className="text-xs text-muted-foreground">▾</span>
           </button>
 
           <div ref={panelRef}>

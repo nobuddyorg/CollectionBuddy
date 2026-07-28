@@ -43,14 +43,14 @@ export function ModalImage({
         width={0}
         height={0}
         sizes="100vw"
-        className="w-auto h-auto max-w-full max-h-full object-contain rounded-xl shadow-lg"
+        className="w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg"
       />
       <button
         onClick={(e) => {
           e.stopPropagation();
           onClose();
         }}
-        className="mt-4 w-10 h-10 flex items-center justify-center rounded-xl bg-card text-card-foreground hover:bg-card/80 transition"
+        className="mt-4 w-10 h-10 flex items-center justify-center rounded-sm bg-card text-card-foreground hover:bg-card/80 transition"
         title={t('item_list.close_modal')}
         aria-label={t('item_list.close_modal')}
       >

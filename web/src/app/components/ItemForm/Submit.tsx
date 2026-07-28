@@ -44,7 +44,7 @@ export function Submit({
     <button
       type="submit"
       disabled={disabled}
-      className="h-9 px-3 rounded-xl bg-primary text-primary-foreground shadow-sm hover:brightness-110 disabled:opacity-60"
+      className="min-h-11 px-4 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 disabled:opacity-50 transition-opacity"
     >
       {label}
     </button>

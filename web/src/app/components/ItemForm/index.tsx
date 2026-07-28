@@ -72,7 +72,7 @@ export default function ItemForm({
             aria-required="true"
             aria-invalid={titleError}
             aria-describedby={titleError ? `${titleId}-error` : undefined}
-            className="w-full rounded-xl border px-3 py-2 bg-card text-card-foreground focus:border-primary"
+            className="w-full rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
           />
           {titleError && (
             <p id={`${titleId}-error`} className="text-xs text-destructive">
@@ -93,7 +93,7 @@ export default function ItemForm({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="w-full rounded-xl border px-3 py-2 bg-card text-card-foreground focus:border-primary resize-none"
+            className="w-full rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground resize-none"
           />
         </div>
       </div>
@@ -124,7 +124,7 @@ export default function ItemForm({
           <button
             type="button"
             onClick={onCancel}
-            className="h-9 px-3 rounded-xl border shadow-sm hover:bg-muted/50"
+            className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-border hover:bg-muted transition-colors"
           >
             {t('item_list.close_modal')}
           </button>

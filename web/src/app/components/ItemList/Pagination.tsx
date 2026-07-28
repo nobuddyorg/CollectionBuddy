@@ -2,7 +2,6 @@
 
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
-import { IconButton } from '../ui/IconButton';
 import { useMemo } from 'react';
 
 export const getPaginationItems = (page: number, totalPages: number) => {
@@ -50,12 +49,13 @@ export function Pagination({
   return (
     <nav
       aria-label={t('item_list.pagination')}
-      className="flex flex-wrap gap-2 items-center justify-center"
+      className="flex flex-wrap gap-1.5 items-center justify-center pt-2"
     >
-      <IconButton
+      <button
+        type="button"
         disabled={page === 1}
         onClick={() => setPage(page - 1)}
-        className="disabled:opacity-50"
+        className="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
         aria-label={t('item_list.previous')}
         title={t('item_list.previous')}
       >
@@ -66,14 +66,14 @@ export function Pagination({
           strokeWidth="2"
           fill="none"
         />
-      </IconButton>
+      </button>
 
       {paginationItems.map((item, index) =>
         typeof item === 'string' ? (
           <span
             key={`ellipsis-${index}`}
             aria-hidden="true"
-            className="w-9 h-9 flex items-center justify-center"
+            className="w-5 h-9 flex items-center justify-center text-muted-foreground"
           >
             {item}
           </span>
@@ -82,10 +82,10 @@ export function Pagination({
             key={item}
             onClick={() => setPage(item)}
             className={
-              'min-w-9 h-9 px-2 flex items-center justify-center rounded-xl shadow-sm font-label text-xs ' +
+              'min-w-11 min-h-11 sm:min-w-9 sm:min-h-9 px-2 flex items-center justify-center rounded-sm font-label text-xs transition-colors ' +
               (item === page
                 ? 'bg-primary text-primary-foreground'
-                : 'border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground')
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted')
             }
             aria-label={t('item_list.page').replace('{n}', String(item))}
             aria-current={item === page ? 'page' : undefined}
@@ -95,10 +95,11 @@ export function Pagination({
         ),
       )}
 
-      <IconButton
+      <button
+        type="button"
         disabled={page === totalPages}
         onClick={() => setPage(page + 1)}
-        className="disabled:opacity-50"
+        className="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
         aria-label={t('item_list.next')}
         title={t('item_list.next')}
       >
@@ -109,7 +110,7 @@ export function Pagination({
           strokeWidth="2"
           fill="none"
         />
-      </IconButton>
+      </button>
     </nav>
   );
 }

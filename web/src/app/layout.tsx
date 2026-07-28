@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Baloo_2, IBM_Plex_Mono, Inter } from 'next/font/google';
+import { Archivo, IBM_Plex_Mono, Inter } from 'next/font/google';
 
 import './globals.css';
 import { ConfirmProvider } from './components/Confirm/ConfirmProvider';
@@ -8,13 +8,13 @@ import { I18nProvider } from './i18n/I18nProvider';
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
-// Three roles, on purpose: a chunky display face for the wordmark and
-// headers only, a quiet body face for everything read at length, and a
-// tracked-out mono face for tags/place/labels -- the "hand-labeled
-// specimen tag" motif that recurs through the redesign.
-const displayFont = Baloo_2({
+// Three roles, on purpose: a grotesque with institutional-signage weight
+// for the wordmark and headings, a quiet body face for everything read at
+// length, and a tracked-out mono for object labels -- the museum-caption
+// motif that recurs through the app.
+const displayFont = Archivo({
   subsets: ['latin'],
-  weight: ['600', '700', '800'],
+  weight: ['600', '700'],
   variable: '--font-display-family',
 });
 const bodyFont = Inter({
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: '#1f3b38',
+  themeColor: '#f4f3ef',
 };
 
 export default function RootLayout({

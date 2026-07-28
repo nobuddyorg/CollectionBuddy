@@ -1,13 +1,15 @@
 'use client';
 import { useState } from 'react';
-import type { CSSProperties } from 'react';
 import Icon, { IconType } from '../Icon';
 import { useI18n } from '../../i18n/useI18n';
-import { inkVarFor, rotationDegFor } from '../../lib/specimen';
 import type { ItemLite, ImgEntry } from './types';
 import { Actions } from './Actions';
 import { ImageGrid } from './ImageGrid';
 
+// A specimen mount: the object leads, the label sits underneath. Photos are
+// what a collector actually recognises an item by, so they get the top of
+// the card and the full width of it -- the previous layout buried
+// thumbnails below three blocks of text.
 export function ItemCard({
   item,
   imgs,
@@ -43,25 +45,20 @@ export function ItemCard({
     if (wasBusy && !busy) close();
   }
 
-  const ink = inkVarFor(item.id);
-  const rotation = rotationDegFor(item.id);
-
   return (
-    <li
-      className="fade-up group relative rounded-lg border-2 border-card-foreground/10 bg-card text-card-foreground p-4 pt-5 shadow-md space-y-3 transition-transform hover:z-10 hover:-translate-y-0.5"
-      style={
-        {
-          '--ink': ink,
-          transform: `rotate(${rotation}deg)`,
-        } as CSSProperties
-      }
-    >
-      <span className="pin left-4 -top-2.5" aria-hidden="true" />
-
-      <div className="font-display text-base pr-16 truncate">{item.title}</div>
+    <li className="fade-up group relative flex flex-col bg-card text-card-foreground ring-1 ring-border sm:rounded-sm shadow-[0_1px_2px_rgb(23_32_58/0.06)] transition-shadow hover:shadow-[0_6px_20px_rgb(23_32_58/0.10)]">
+      <ImageGrid
+        imgs={imgs}
+        itemTitle={item.title}
+        isOpen={open}
+        onOpenModal={onOpenModal}
+        onDelete={onDeleteImage}
+        deletingPath={deletingPath}
+        busy={busy}
+      />
 
       <button
-        className={`absolute top-4 right-3 [@media(hover:hover)]:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-muted text-foreground shadow ${open ? 'hidden' : ''}`}
+        className={`absolute top-2 right-2 [@media(hover:hover)]:hidden w-10 h-10 flex items-center justify-center rounded-sm bg-card/90 text-card-foreground ring-1 ring-border ${open ? 'hidden' : ''}`}
         onClick={() => setOpen(true)}
         aria-label={t('item_list.more_actions')}
       >
@@ -82,46 +79,37 @@ export function ItemCard({
         onDelete={onDeleteItem}
       />
 
-      {item.description && (
-        <div className="text-sm text-card-foreground/70 line-clamp-3">
-          {item.description}
-        </div>
-      )}
+      {/* The object label. */}
+      <div className="flex flex-col gap-2 p-4">
+        <h3 className="font-display text-[0.95rem] leading-snug pr-8">
+          {item.title}
+        </h3>
 
-      {item.place && (
-        <div className="flex items-center gap-2 font-label text-[0.7rem] text-card-foreground/70">
-          <Icon
-            icon={IconType.Pin}
-            className="w-4 h-4 shrink-0 opacity-80"
-            aria-hidden="true"
-          />
-          <span className="truncate normal-case">{item.place}</span>
-        </div>
-      )}
+        {item.description && (
+          <p className="text-sm leading-relaxed text-muted-foreground line-clamp-2">
+            {item.description}
+          </p>
+        )}
 
-      {!!item.tags.length && (
-        <div className="flex flex-wrap gap-1.5">
-          {item.tags.map((tag) => (
-            <span
-              key={tag}
-              className="font-label text-[0.65rem] inline-flex items-center gap-1 border border-[var(--ink)] text-[var(--ink)] rounded-full px-2 py-0.5"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
+        {(item.place || !!item.tags.length) && (
+          <div className="flex flex-col gap-2 border-t border-border pt-2.5 mt-0.5">
+            {item.place && (
+              <div className="font-label text-[0.6875rem] text-muted-foreground truncate">
+                {item.place}
+              </div>
+            )}
 
-      <div className={imgs.length ? 'corner-mount' : undefined}>
-        <ImageGrid
-          imgs={imgs}
-          itemTitle={item.title}
-          isOpen={open}
-          onOpenModal={onOpenModal}
-          onDelete={onDeleteImage}
-          deletingPath={deletingPath}
-          busy={busy}
-        />
+            {!!item.tags.length && (
+              <div className="flex flex-wrap gap-1">
+                {item.tags.map((tag) => (
+                  <span key={tag} className="tag-chip">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </li>
   );

@@ -28,7 +28,7 @@ export function CategoryInput({
           if (e.key === 'Enter') createCategory();
           if (e.key === 'Escape') setExpanded(false);
         }}
-        className="w-full rounded-xl border px-3 py-2 bg-card text-card-foreground focus:border-primary"
+        className="w-full rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
       />
     </>
   );

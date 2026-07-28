@@ -39,17 +39,14 @@ export function TagsInput({
   };
 
   return (
-    <div className="rounded-xl border bg-card text-card-foreground px-2 py-1 flex flex-wrap items-center gap-1 focus-within:border-primary">
+    <div className="rounded-sm bg-card text-card-foreground px-2 py-1.5 min-h-11 flex flex-wrap items-center gap-1.5 ring-1 ring-inset ring-border focus-within:ring-foreground">
       {tags.map((tag) => (
-        <span
-          key={tag}
-          className="fade-up font-label text-[0.65rem] flex items-center gap-1 border border-primary text-primary rounded-full px-2 py-0.5"
-        >
+        <span key={tag} className="fade-up tag-chip flex items-center gap-1.5">
           {tag}
           <button
             type="button"
             onClick={() => removeTag(tag)}
-            className="relative w-4 h-4 flex items-center justify-center rounded-xl bg-destructive text-destructive-foreground shadow-sm hover:brightness-110 after:absolute after:-inset-2 after:content-['']"
+            className="relative w-3.5 h-3.5 flex items-center justify-center rounded-full text-foreground/50 hover:text-destructive after:absolute after:-inset-2 after:content-['']"
             aria-label={t('item_create.remove_tag').replace('{tag}', tag)}
             title={t('item_create.remove_tag').replace('{tag}', tag)}
           >

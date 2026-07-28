@@ -9,9 +9,8 @@ const SIZE_CLASSES = {
 } as const;
 
 const VARIANT_CLASSES = {
-  primary: 'bg-primary text-primary-foreground shadow-sm hover:brightness-110',
-  destructive:
-    'bg-destructive text-destructive-foreground shadow-sm hover:brightness-110',
+  primary: 'bg-primary text-primary-foreground hover:opacity-90',
+  destructive: 'bg-destructive text-destructive-foreground hover:opacity-90',
 } as const;
 
 export type IconButtonSize = keyof typeof SIZE_CLASSES;
@@ -32,7 +31,7 @@ export function IconButton({
   return (
     <button
       type={type}
-      className={`${SIZE_CLASSES[size]} flex items-center justify-center rounded-xl ${VARIANT_CLASSES[variant]} ${className}`.trim()}
+      className={`${SIZE_CLASSES[size]} flex items-center justify-center rounded-sm transition-opacity ${VARIANT_CLASSES[variant]} ${className}`.trim()}
       {...props}
     />
   );
