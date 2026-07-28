@@ -21,7 +21,6 @@ function renderGrid(
   const props = {
     imgs,
     itemTitle: 'Blue Mauritius',
-    isOpen: false,
     onOpenModal: vi.fn(),
     onDelete: vi.fn(),
     deletingPath: new Set<string>(),
@@ -105,17 +104,17 @@ describe('ImageGrid', () => {
     const onDelete = vi.fn();
     const imgs = [img('a')];
     renderGrid(imgs, { onDelete });
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete image' }));
     expect(onDelete).toHaveBeenCalledWith(imgs[0]);
   });
 
   it('disables delete while that image is already being deleted', () => {
     renderGrid([img('a')], { deletingPath: new Set(['a.webp']) });
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Delete image' })).toBeDisabled();
   });
 
   it('disables delete while the item is busy', () => {
     renderGrid([img('a')], { busy: true });
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Delete image' })).toBeDisabled();
   });
 });

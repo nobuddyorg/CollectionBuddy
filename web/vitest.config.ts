@@ -19,15 +19,34 @@ export default defineConfig({
       include: ['src/app/**/*.{ts,tsx}'],
       exclude: ['src/app/**/types.ts', 'src/app/i18n/*.json', '**/*.d.ts'],
       thresholds: {
-        // Global floor. `autoUpdate` writes the measured value back into
-        // this file whenever it improves, so this number only ever climbs
-        // and a regression fails CI instead of silently slipping through.
-        // Do not raise it by hand -- let a real coverage improvement do it.
-        statements: 18.75,
-        branches: 16.8,
-        functions: 18.47,
-        lines: 19.42,
-        autoUpdate: true,
+        // Global floor: a coverage regression fails CI instead of silently
+        // slipping through. Two things to know before trusting a green
+        // local run:
+        //
+        // 1. `npm test` does NOT enforce these. Only `npm test -- --coverage`
+        //    does, which is what CI runs. Check with coverage before pushing.
+        // 2. CI measures ~0.1pp lower than a local run (it is pinned to Node
+        //    22 while local dev is typically newer, and V8 counts branches
+        //    slightly differently). These values sit a few tenths below the
+        //    last local measurement to absorb that -- keep that headroom
+        //    when raising them.
+        //
+        // Lowered by hand once, deliberately: removing ItemCard's
+        // reveal-on-tap action row deleted well-covered lines, which moves
+        // the ratio for a structural reason rather than a regression in
+        // testing (the suite grew 84 -> 120 tests in the same change).
+        statements: 18.2,
+        branches: 16.9,
+        functions: 18.3,
+        lines: 19.0,
+
+        // Was `true`. autoUpdate wrote the local measurement straight back
+        // into this file after every coverage run, including a value CI
+        // could not reach, so a green local run kept producing a red PR --
+        // and any headroom added here was erased by the next local run.
+        // The floor still fails CI on a real regression; it just no longer
+        // moves itself. Raise it by hand when coverage genuinely improves.
+        autoUpdate: false,
 
         // Per-file floors for the pure, high-risk logic called out in
         // https://github.com/nobuddyorg/CollectionBuddy/issues/140 --

@@ -10,7 +10,12 @@ type Props = {
   letterSpacing: number;
   opacity: number;
   className?: string;
+  /** Radius of the rim path the text is set on, in user units. */
+  radius?: number;
 };
+
+// The rim path in Icon's Coin case is a circle of r=160.
+const DEFAULT_RADIUS = 160;
 
 export function TextRing({
   rimId,
@@ -20,7 +25,15 @@ export function TextRing({
   letterSpacing,
   opacity,
   className,
+  radius = DEFAULT_RADIUS,
 }: Props) {
+  // Fit the string to exactly one full turn. Left to flow naturally the
+  // text ran past the end of the path and wrapped over its own start,
+  // clipping the overlap mid-glyph and leaving a stray half-letter on the
+  // rim. `textLength` + `lengthAdjust="spacing"` distributes the slack
+  // between characters instead, so the engraving closes cleanly.
+  const circumference = 2 * Math.PI * radius;
+
   return (
     <text
       fontSize={fontSize}
@@ -28,7 +41,12 @@ export function TextRing({
       style={{ letterSpacing, fontFamily }}
       opacity={opacity}
     >
-      <textPath href={`#${rimId}`} startOffset="50%" textAnchor="middle">
+      <textPath
+        href={`#${rimId}`}
+        startOffset="0"
+        textLength={circumference}
+        lengthAdjust="spacing"
+      >
         {text}
       </textPath>
     </text>
