@@ -2,6 +2,19 @@
 
 A web-app catalog for your collected items 🗂️
 
+![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen?logo=node.js)
+![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
+![Supabase](https://img.shields.io/badge/backend-Supabase-3ECF8E?logo=supabase&logoColor=white)
+![GitHub Pages](https://img.shields.io/badge/hosting-GitHub%20Pages-blue?logo=github)
+![ESLint](https://img.shields.io/badge/ESLint-9-4B32C3?logo=eslint)
+![Prettier](https://img.shields.io/badge/Prettier-3-F7B93E?logo=prettier)
+![Vitest](https://img.shields.io/badge/tested%20with-Vitest-6E9F18?logo=vitest)
+![Mutation testing](https://img.shields.io/badge/mutation%20testing-Stryker-E74C3C?logo=stryker)
+[![CI](https://github.com/nobuddyorg/CollectionBuddy/actions/workflows/ci.yml/badge.svg)](https://github.com/nobuddyorg/CollectionBuddy/actions/workflows/ci.yml)
+[![CodeQL](https://img.shields.io/badge/security-CodeQL-blue?logo=github)](https://github.com/nobuddyorg/CollectionBuddy/security/code-scanning)
+[![Last commit](https://img.shields.io/github/last-commit/nobuddyorg/CollectionBuddy)](https://github.com/nobuddyorg/CollectionBuddy/commits/main)
+[![License: MIT](https://img.shields.io/github/license/nobuddyorg/CollectionBuddy)](LICENSE)
+
 ## Motivation
 
 This project was created to provide a simple and elegant solution for cataloging personal collections. Whether it's stamps, coins, or any other collectible, CollectionBuddy helps you keep track of your items in an organized manner.
@@ -69,7 +82,37 @@ The application is built as a static site and can be deployed on any static host
 
 ## Technology Map
 
-![technologie-map](technology-map.drawio.png)
+<p align="center">
+  <img src="https://api.iconify.design/logos:nodejs-icon.svg?height=88" height="88" alt="Node.js" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:typescript-icon.svg?height=88" height="88" alt="TypeScript" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:react.svg?height=82" height="82" alt="React" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:nextjs-icon.svg?height=82" height="82" alt="Next.js" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:tailwindcss-icon.svg?height=82" height="82" alt="Tailwind CSS" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:supabase-icon.svg?height=82" height="82" alt="Supabase" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:leaflet.svg?height=66" height="66" alt="Leaflet" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:docker-icon.svg?height=72" height="72" alt="Docker" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:github-icon.svg?height=82" height="82" alt="GitHub Pages" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:github-actions.svg?height=82" height="82" alt="GitHub Actions" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/vscode-icons:file-type-codeql.svg?height=78" height="78" alt="CodeQL" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:vitest.svg?height=82" height="82" alt="Vitest" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/simple-icons:stryker.svg?height=82&color=%23E74C3C" height="82" alt="Stryker" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:eslint.svg?height=82" height="82" alt="ESLint" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:prettier.svg?height=72" height="72" alt="Prettier" />
+</p>
 
 ## Contributing
 
