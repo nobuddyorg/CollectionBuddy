@@ -117,8 +117,8 @@ export function useItemImages() {
 
     const signedUrlMap = new Map(
       signedUrls
-        .filter((s) => s.path)
-        .map((s) => [s.path as string, s.signedUrl]),
+        .filter((s) => s.path && s.signedUrl)
+        .map((s) => [s.path as string, s.signedUrl as string]),
     );
     return toImgEntries(entryData, signedUrlMap);
   }, []);
@@ -170,8 +170,8 @@ export function useItemImages() {
       } else {
         signedUrlMap = new Map(
           signedUrls
-            .filter((s) => s.path)
-            .map((s) => [s.path as string, s.signedUrl]),
+            .filter((s) => s.path && s.signedUrl)
+            .map((s) => [s.path as string, s.signedUrl as string]),
         );
       }
     }
