@@ -74,13 +74,18 @@ export function ImageGrid({
   const plate = (
     img: ImgEntry,
     index: number,
-    { ratio, src, small }: { ratio: string; src: string; small: boolean },
+    {
+      ratio,
+      src,
+      small,
+      wrapper = '',
+    }: { ratio: string; src: string; small: boolean; wrapper?: string },
   ) => (
-    <div key={img.pathFull} className="relative bg-muted">
+    <div key={img.pathFull} className={`relative bg-muted ${wrapper}`}>
       <button
         type="button"
         onClick={() => onOpenModal(img.urlFull)}
-        className="block w-full"
+        className="block h-full w-full"
       >
         <Image
           src={src}
@@ -114,13 +119,19 @@ export function ImageGrid({
   }
 
   if (imgs.length === 2) {
+    // From `sm` up the pair fills the same 4:3 box a single image would,
+    // cropping width rather than height, so every card's image region is
+    // the same height and cards sitting side by side line up. Below `sm`
+    // there is one card per row with nothing to line up against, so the
+    // pair keeps its squarer, less aggressively cropped shape.
     return (
-      <div className="grid grid-cols-2 gap-px">
+      <div className="grid grid-cols-2 gap-px sm:aspect-4/3">
         {imgs.map((img, i) =>
           plate(img, i, {
-            ratio: 'aspect-square',
+            ratio: 'aspect-square sm:aspect-auto sm:h-full',
             src: img.urlFull,
             small: false,
+            wrapper: 'sm:h-full',
           }),
         )}
       </div>
