@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -32,6 +33,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastEntry[]>([]);
   const nextId = useRef(0);
 
+  // The portal target (document.body) only exists in the browser. Gating on
+  // a post-mount flag instead of a bare `typeof document` check keeps the
+  // client's first render pass -- the one hydration diffs against -- matching
+  // the server's, which never renders the portal at all.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const dismiss = useCallback((id: number) => {
     setToasts((prev) => prev.filter((entry) => entry.id !== id));
   }, []);
@@ -50,7 +58,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      {typeof document !== 'undefined' &&
+      {mounted &&
         ReactDOM.createPortal(
           <div className="fixed inset-x-0 bottom-4 z-overlay flex flex-col items-center gap-2 px-4 pointer-events-none">
             {toasts.map((entry) => (
