@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
+    setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     // Modules under test transitively import supabase.ts, which builds a
     // client at import time and throws without these. Never used to reach
@@ -22,10 +23,10 @@ export default defineConfig({
         // this file whenever it improves, so this number only ever climbs
         // and a regression fails CI instead of silently slipping through.
         // Do not raise it by hand -- let a real coverage improvement do it.
-        statements: 9.11,
-        branches: 6.04,
-        functions: 4.69,
-        lines: 9.73,
+        statements: 13.92,
+        branches: 11.36,
+        functions: 10.83,
+        lines: 14.99,
         autoUpdate: true,
 
         // Per-file floors for the pure, high-risk logic called out in
