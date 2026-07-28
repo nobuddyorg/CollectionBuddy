@@ -1,0 +1,60 @@
+// @vitest-environment jsdom
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { I18nProvider } from '../../i18n/I18nProvider';
+import { ModalImage } from './ModalImage';
+
+const URL = 'https://example.test/full.webp';
+
+function renderModal(url: string | null, onClose = vi.fn()) {
+  render(
+    <I18nProvider>
+      <ModalImage url={url} onClose={onClose} />
+    </I18nProvider>,
+  );
+  return onClose;
+}
+
+describe('ModalImage', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('lang', 'en');
+  });
+
+  it('renders nothing without a url', () => {
+    renderModal(null);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('renders the image in a modal dialog', () => {
+    renderModal(URL);
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal', 'true');
+    expect(screen.getByRole('img')).toBeInTheDocument();
+  });
+
+  // Regression: the close button used to sit *below* the image in a flex
+  // column. With the image free to take max-h-full, it was pushed past the
+  // bottom of a fixed, unscrollable overlay and could not be reached at all
+  // on a portrait image -- Escape or a backdrop click were the only ways
+  // out. It must stay a sibling of the image wrapper, not stacked after it.
+  it('keeps the close button outside the image wrapper so it cannot be pushed offscreen', () => {
+    renderModal(URL);
+    const closeButton = screen.getByRole('button', { name: 'Close' });
+    const image = screen.getByRole('img');
+    expect(closeButton.contains(image)).toBe(false);
+    expect(image.closest('button')).not.toBe(closeButton);
+  });
+
+  it('closes when the close button is used', async () => {
+    const onClose = renderModal(URL);
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('closes on a backdrop click', async () => {
+    const onClose = renderModal(URL);
+    await userEvent.click(screen.getByRole('dialog'));
+    expect(onClose).toHaveBeenCalled();
+  });
+});
