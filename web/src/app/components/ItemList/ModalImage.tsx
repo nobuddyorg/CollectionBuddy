@@ -33,24 +33,18 @@ export function ModalImage({
       role="dialog"
       aria-modal="true"
       aria-label={t('item_list.full_size_image_alt')}
-      className="fixed inset-0 z-modal flex flex-col items-center justify-center bg-background/90 backdrop-blur"
+      className="fixed inset-0 z-modal bg-background/95 backdrop-blur"
       onClick={onClose}
     >
-      <Image
-        src={url}
-        alt={t('item_list.full_size_image_alt')}
-        unoptimized
-        width={0}
-        height={0}
-        sizes="100vw"
-        className="w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg"
-      />
+      {/* Pinned to the corner, not stacked under the image: with the image
+          free to take max-h-full, a button below it landed past the bottom
+          of a fixed, unscrollable overlay and could not be reached. */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           onClose();
         }}
-        className="mt-4 w-10 h-10 flex items-center justify-center rounded-sm bg-card text-card-foreground hover:bg-card/80 transition"
+        className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors"
         title={t('item_list.close_modal')}
         aria-label={t('item_list.close_modal')}
       >
@@ -62,6 +56,18 @@ export function ModalImage({
           fill="none"
         />
       </button>
+
+      <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <Image
+          src={url}
+          alt={t('item_list.full_size_image_alt')}
+          unoptimized
+          width={0}
+          height={0}
+          sizes="100vw"
+          className="w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg"
+        />
+      </div>
     </div>,
     document.body,
   );
