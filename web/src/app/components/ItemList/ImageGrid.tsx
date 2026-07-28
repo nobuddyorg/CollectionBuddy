@@ -119,19 +119,24 @@ export function ImageGrid({
   }
 
   if (imgs.length === 2) {
-    // From `sm` up the pair fills the same 4:3 box a single image would,
-    // cropping width rather than height, so every card's image region is
-    // the same height and cards sitting side by side line up. Below `sm`
-    // there is one card per row with nothing to line up against, so the
-    // pair keeps its squarer, less aggressively cropped shape.
+    // From `sm` up each half is 2:3, so the pair is exactly as tall as the
+    // 4:3 box a single image fills: a half-width cell at 2:3 is
+    // (W/2) x (3/4 W). Cards side by side then line up.
+    //
+    // The ratio is set on the cells rather than as `aspect-4/3` on this
+    // container: a container aspect is not a hard constraint, so the images
+    // inside resolved to their intrinsic height and stretched it, leaving
+    // the pair ~50px taller than a single image instead of equal.
+    //
+    // Below `sm` there is one card per row and nothing to line up against,
+    // so the pair keeps its squarer, less aggressively cropped shape.
     return (
-      <div className="grid grid-cols-2 gap-px sm:aspect-4/3">
+      <div className="grid grid-cols-2 gap-px">
         {imgs.map((img, i) =>
           plate(img, i, {
-            ratio: 'aspect-square sm:aspect-auto sm:h-full',
+            ratio: 'aspect-square sm:aspect-2/3',
             src: img.urlFull,
             small: false,
-            wrapper: 'sm:h-full',
           }),
         )}
       </div>

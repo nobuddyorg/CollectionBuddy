@@ -71,15 +71,19 @@ describe('ImageGrid', () => {
     expect(images[1]).toHaveAttribute('src', 'https://example.test/b.webp');
   });
 
-  // From `sm` up the pair fills the same 4:3 box a single image would, so
-  // cards sitting side by side in a desktop row have image regions of equal
-  // height. Mobile shows one card per row and keeps the squarer crop.
+  // A half-width cell at 2:3 is (W/2) x (3/4 W), so from `sm` up the pair is
+  // exactly as tall as the 4:3 box a single image fills and cards side by
+  // side line up. Mobile shows one card per row and keeps the squarer crop.
+  //
+  // The ratio has to sit on the cells, not as an aspect on their container:
+  // a container aspect is not a hard constraint, so the images resolved to
+  // their intrinsic height and left the pair ~50px taller than a single
+  // image instead of equal.
   it('gives a pair the same image height as a single image on desktop', () => {
-    const { container } = renderGrid([img('a'), img('b')]);
-    expect(container.querySelector('.sm\\:aspect-4\\/3')).not.toBeNull();
+    renderGrid([img('a'), img('b')]);
     for (const image of screen.getAllByRole('img')) {
       expect(image).toHaveClass('aspect-square');
-      expect(image).toHaveClass('sm:aspect-auto');
+      expect(image).toHaveClass('sm:aspect-2/3');
     }
   });
 
