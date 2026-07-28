@@ -34,7 +34,12 @@ export default function LoadingOverlay({
   const { t } = useI18n();
   const [slow, setSlow] = useState(false);
 
+  // Subscribes state to an external timer -- the canonical use of an effect.
+  // The synchronous reset covers `label` changing while already slow (a new
+  // wait starting without the overlay unmounting), so the message doesn't
+  // stay stuck in the "slow" state for the new wait's first 8s.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSlow(false);
     const id = setTimeout(() => setSlow(true), SLOW_THRESHOLD_MS);
     return () => clearTimeout(id);

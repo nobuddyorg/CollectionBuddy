@@ -75,6 +75,10 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   // lists t (or something derived from it) as a dependency -- category
   // loading, item creation -- re-fires once right after mount.
   const langRef = useRef(lang);
+  // Written synchronously during render (not in an effect) so `t`, called
+  // by consumers during their own render, never reads a stale `lang` for
+  // the one render cycle before an effect would otherwise have fired.
+  // eslint-disable-next-line react-hooks/refs
   langRef.current = lang;
 
   useEffect(() => {

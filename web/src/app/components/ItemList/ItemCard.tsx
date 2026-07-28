@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import Icon, { IconType } from '../Icon';
 import { useI18n } from '../../i18n/useI18n';
 import type { ItemLite, ImgEntry } from './types';
@@ -31,13 +31,15 @@ export function ItemCard({
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
-  // The action row is kept open through an upload so its busy spinner
-  // stays visible; close it automatically once the upload settles.
-  const wasBusy = useRef(busy);
-  useEffect(() => {
-    if (wasBusy.current && !busy) close();
-    wasBusy.current = busy;
-  }, [busy]);
+  // The action row is kept open through an upload so its busy spinner stays
+  // visible; close it automatically once the upload settles. Detected as a
+  // render-time transition rather than a useEffect so it takes effect the
+  // same render busy flips, not one render later.
+  const [wasBusy, setWasBusy] = useState(busy);
+  if (busy !== wasBusy) {
+    setWasBusy(busy);
+    if (wasBusy && !busy) close();
+  }
 
   return (
     <li className="fade-up group relative rounded-2xl border bg-card/70 dark:bg-card/60 backdrop-blur p-3 shadow-sm space-y-3">

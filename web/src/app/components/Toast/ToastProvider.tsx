@@ -42,6 +42,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   // client's first render pass -- the one hydration diffs against -- matching
   // the server's, which never renders the portal at all.
   const [mounted, setMounted] = useState(false);
+  // Effects only run client-side, which is exactly the "am I in the
+  // browser yet" signal the portal below needs -- can't be computed
+  // during render without breaking the SSR/hydration match this exists for.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
   const dismiss = useCallback((id: number) => {

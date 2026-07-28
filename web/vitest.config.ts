@@ -23,10 +23,10 @@ export default defineConfig({
         // this file whenever it improves, so this number only ever climbs
         // and a regression fails CI instead of silently slipping through.
         // Do not raise it by hand -- let a real coverage improvement do it.
-        statements: 13.92,
-        branches: 11.36,
-        functions: 10.83,
-        lines: 14.99,
+        statements: 15.8,
+        branches: 13.66,
+        functions: 13.18,
+        lines: 16.9,
         autoUpdate: true,
 
         // Per-file floors for the pure, high-risk logic called out in
