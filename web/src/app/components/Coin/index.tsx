@@ -19,8 +19,11 @@ export default function Coin({
 }: CoinProps) {
   const rimId = useId();
 
+  // Scales with the viewport instead of pinning a 340px floor, which on a
+  // 390px screen left the medallion touching both edges. Caps at `size` so
+  // it stops growing once there is room to spare.
   const style = useMemo<React.CSSProperties>(() => {
-    const clamped = `clamp(340px, ${size}px, ${size}px)`;
+    const clamped = `clamp(200px, 68vw, ${size}px)`;
     return { width: clamped, height: clamped };
   }, [size]);
 

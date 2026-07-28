@@ -37,7 +37,6 @@ export default function ItemCreate({ categoryId, onCreated }: Props) {
         submitting={isCreating}
         submitLabel={t('item_create.add')}
         onSubmit={handleCreate}
-        showIconSubmit
       />
     </section>
   );

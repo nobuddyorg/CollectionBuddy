@@ -89,6 +89,18 @@ describe('ImageGrid', () => {
     expect(onOpenModal).toHaveBeenCalledWith('https://example.test/a.webp');
   });
 
+  // The hero spans the whole card, which is wider than the 250px stored
+  // thumbnail; sourcing it from the thumb upscaled past its native size.
+  it('renders the hero from the full image and the strip from thumbnails', () => {
+    renderGrid([img('a'), img('b')]);
+    const images = screen.getAllByRole('img');
+    expect(images[0]).toHaveAttribute('src', 'https://example.test/a.webp');
+    expect(images[1]).toHaveAttribute(
+      'src',
+      'https://example.test/b.thumb.webp',
+    );
+  });
+
   it('passes the image being removed to onDelete', async () => {
     const onDelete = vi.fn();
     const imgs = [img('a')];

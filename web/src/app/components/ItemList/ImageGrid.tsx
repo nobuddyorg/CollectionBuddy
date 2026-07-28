@@ -74,11 +74,15 @@ export function ImageGrid({
           onClick={() => onOpenModal(hero.urlFull)}
           className="block w-full"
         >
+          {/* The full-size render, not the thumbnail: the hero spans the
+              whole card (~390px on mobile), and the stored thumb is only
+              250px, so using it here upscaled past its native size and
+              looked mushy. Thumbs stay on the small strip below. */}
           <Image
-            src={hero.urlThumb || hero.urlFull}
+            src={hero.urlFull}
             alt={altFor(0)}
-            width={640}
-            height={480}
+            width={800}
+            height={600}
             unoptimized
             loading="lazy"
             className="aspect-4/3 w-full object-cover cursor-zoom-in"
@@ -87,13 +91,11 @@ export function ImageGrid({
         {deleteButton(hero, 'lg')}
       </div>
 
+      {/* Always four columns, however many thumbnails there are. Sizing the
+          track count to the thumbnail count made a lone extra image stretch
+          to the full card width as a giant square under the hero. */}
       {!!strip.length && (
-        <div
-          className="grid gap-px bg-border"
-          style={{
-            gridTemplateColumns: `repeat(${strip.length}, minmax(0, 1fr))`,
-          }}
-        >
+        <div className="grid grid-cols-4 gap-px">
           {strip.map((img, i) => (
             <div key={img.pathFull} className="relative bg-muted">
               <button

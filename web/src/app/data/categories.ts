@@ -19,6 +19,18 @@ export function createCategory(name: string) {
     .single<CategorySummary>();
 }
 
+// Permitted by the "update own categories" RLS policy; a trigger keeps
+// updated_at current and normalises the name, so the returned row -- not
+// the value sent -- is what should be merged into local state.
+export function renameCategory(id: string, name: string) {
+  return supabase
+    .from('categories')
+    .update({ name })
+    .eq('id', id)
+    .select('id,name')
+    .single<CategorySummary>();
+}
+
 export function deleteCategory(id: string) {
   return supabase.from('categories').delete().eq('id', id);
 }

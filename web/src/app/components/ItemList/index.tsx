@@ -345,7 +345,6 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               setEditOpen(false);
               setEditing(null);
             }}
-            showIconSubmit
           />
         </section>
       </CenteredModal>

@@ -15,6 +15,7 @@
     "title": "Category",
     "select_placeholder": "Select or create category",
     "new_category": "New category",
+    "rename": "Rename",
     "open_category": "Open category",
     "add": "Add",
     "delete": "Delete",
@@ -22,7 +23,8 @@
     "confirmDelete": "Confirm deletion",
     "loadError": "Could not load categories. Please try again.",
     "createError": "Could not create category. Please try again.",
-    "deleteError": "Could not delete category. Please try again."
+    "deleteError": "Could not delete category. Please try again.",
+    "renameError": "Could not rename this category. Please try again."
   },
   "item_create": {
     "new_entry": "New entry",

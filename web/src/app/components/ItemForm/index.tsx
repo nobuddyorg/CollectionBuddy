@@ -15,7 +15,6 @@ export default function ItemForm({
   submitLabel,
   onSubmit,
   onCancel,
-  showIconSubmit = false,
 }: ItemFormProps) {
   const { t } = useI18n();
 
@@ -119,14 +118,14 @@ export default function ItemForm({
         </div>
       </div>
 
-      <div className="flex justify-end gap-2">
-        {onCancel && !showIconSubmit && (
+      <div className="flex justify-end gap-2 pt-1">
+        {onCancel && (
           <button
             type="button"
             onClick={onCancel}
             className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-border hover:bg-muted transition-colors"
           >
-            {t('item_list.close_modal')}
+            {t('common.cancel')}
           </button>
         )}
 
@@ -134,7 +133,6 @@ export default function ItemForm({
           submitting={submitting}
           disabled={submitting}
           label={submitLabel}
-          iconMode={showIconSubmit}
         />
       </div>
     </form>

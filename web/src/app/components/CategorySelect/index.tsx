@@ -29,11 +29,14 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
     isLoading,
     isCreating,
     isDeleting,
+    isRenaming,
     createCategory,
+    renameCategory,
     deleteCategory,
     reload,
   } = useCategories();
   const [name, setName] = useState('');
+  const [renameValue, setRenameValue] = useState('');
   const [expanded, setExpanded] = useState(!selectedCat);
 
   // Collapses/expands in response to the selection changing (e.g. a
@@ -67,6 +70,26 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
       selectedCat ? (cats.find((c) => c.id === selectedCat) ?? null) : null,
     [cats, selectedCat],
   );
+
+  // Keeps the rename field showing the selected category, including when
+  // the selection changes underneath it or a rename normalises server-side.
+  // Done as a render-time transition rather than an effect so the field is
+  // never briefly out of sync with the selection.
+  const [syncedName, setSyncedName] = useState<string | null>(null);
+  if (selected && selected.name !== syncedName) {
+    setSyncedName(selected.name);
+    setRenameValue(selected.name);
+  }
+
+  const renameIsDirty =
+    !!selected &&
+    renameValue.trim() !== '' &&
+    renameValue.trim() !== selected.name;
+
+  const onRename = useCallback(async () => {
+    if (!selectedCat || !renameIsDirty) return;
+    await renameCategory(selectedCat, renameValue);
+  }, [selectedCat, renameIsDirty, renameCategory, renameValue]);
 
   const onCreate = useCallback(async () => {
     const trimmed = name.trim();
@@ -117,43 +140,80 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
         setExpanded={setExpanded}
       />
 
-      <div className="space-y-2">
-        <CategoryInput
-          name={name}
-          setName={setName}
-          createCategory={onCreate}
-          setExpanded={setExpanded}
-        />
-
-        <div className="flex items-center gap-2 pt-1">
-          {selectedCat && (
+      {/* Rename and create are separate rows with their own field and their
+          own button. Sharing one input meant the same box created a
+          category or did nothing depending on hidden state, and there was
+          no way to rename at all. */}
+      {selected && (
+        <div className="space-y-1.5">
+          <label
+            htmlFor="rename-category"
+            className="font-label text-[0.6875rem] text-muted-foreground block"
+          >
+            {t('category_select.rename')}
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              id="rename-category"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void onRename();
+                if (e.key === 'Escape') setRenameValue(selected.name);
+              }}
+              className="flex-1 min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
+            />
+            <button
+              type="button"
+              onClick={() => void onRename()}
+              disabled={!renameIsDirty || isRenaming}
+              className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-border hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+            >
+              {t('category_select.rename')}
+            </button>
             <DeleteButtonWithLabel
               onClick={onDelete}
               disabled={isDeleting}
               label={t('category_select.delete')}
             />
-          )}
+          </div>
+        </div>
+      )}
 
-          {selectedCat && name.trim() === '' && (
-            <SetButton
-              onClick={() => {
-                setExpanded(false);
-                onSelect(selectedCat);
-              }}
-              label={t('category_select.set')}
-            />
-          )}
-
-          {(!selectedCat || name.trim() !== '') && (
-            <AddButton
-              onClick={onCreate}
-              disabled={name.trim() === '' || isCreating}
-              isCreating={isCreating}
-              label={t('category_select.add')}
-            />
-          )}
+      <div className="space-y-1.5">
+        <label
+          htmlFor="new-category-name"
+          className="font-label text-[0.6875rem] text-muted-foreground block"
+        >
+          {t('category_select.new_category')}
+        </label>
+        <div className="flex items-center gap-2">
+          <CategoryInput
+            name={name}
+            setName={setName}
+            createCategory={onCreate}
+            setExpanded={setExpanded}
+          />
+          <AddButton
+            onClick={onCreate}
+            disabled={name.trim() === '' || isCreating}
+            isCreating={isCreating}
+            label={t('category_select.add')}
+          />
         </div>
       </div>
+
+      {selectedCat && (
+        <div className="pt-1">
+          <SetButton
+            onClick={() => {
+              setExpanded(false);
+              onSelect(selectedCat);
+            }}
+            label={t('category_select.set')}
+          />
+        </div>
+      )}
     </section>
   );
 }
