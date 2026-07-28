@@ -5,9 +5,17 @@ import type { ImgEntry } from './types';
 import { useI18n } from '../../i18n/useI18n';
 import { Spinner } from '../ui/Spinner';
 
-// The object, full width, at the top of its mount. The first image is the
-// specimen shot; any others follow as a thin contact strip beneath it, the
-// way a catalogue plate carries detail views.
+const STRIP_MAX = 4;
+
+// The layout follows how many photographs there actually are, because the
+// common cases are one and two -- and two is usually a matched pair (the
+// front and back of a coin, both faces of a stamp). Giving the second shot
+// a thumbnail slot under a hero misrepresented that pair as a main image
+// plus an afterthought.
+//
+//   1   a single full-width plate
+//   2   two equal halves, read as a pair
+//   3+  a hero plus a contact strip of the rest
 export function ImageGrid({
   imgs,
   itemTitle,
@@ -25,13 +33,8 @@ export function ImageGrid({
 }) {
   const { t } = useI18n();
 
-  // An item with no photo yet gets no placeholder at all -- a 4:3 empty box
-  // is a screenful of dead grey on mobile. The card collapses to its label
-  // and the "add image" action still lives in the action row.
   if (!imgs.length) return null;
 
-  const [hero, ...rest] = imgs;
-  const strip = rest.slice(0, 4);
   const altFor = (i: number) =>
     t('item_list.image_alt')
       .replace('{title}', itemTitle)
@@ -39,9 +42,8 @@ export function ImageGrid({
 
   // Deliberately not a red trash icon: that is what removes the whole
   // entry, from the labelled row under the caption. This sits *on* the
-  // photograph it affects and reads as "take this one off", so the two
-  // destructive actions can never be confused for one another.
-  const deleteButton = (img: ImgEntry, size: 'lg' | 'sm') => (
+  // photograph it affects and reads as "take this one off".
+  const deleteButton = (img: ImgEntry, small: boolean) => (
     <button
       aria-label={t('item_list.delete_image')}
       title={t('item_list.delete_image')}
@@ -52,7 +54,7 @@ export function ImageGrid({
         'bg-black/55 text-white backdrop-blur-[2px] hover:bg-black/75',
         'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100',
         'disabled:opacity-60 transition',
-        size === 'lg' ? 'w-8 h-8' : 'w-7 h-7',
+        small ? 'w-7 h-7' : 'w-8 h-8',
       ].join(' ')}
     >
       {deletingPath.has(img.pathFull) ? (
@@ -60,7 +62,7 @@ export function ImageGrid({
       ) : (
         <Icon
           icon={IconType.Close}
-          className={size === 'lg' ? 'w-4 h-4' : 'w-3.5 h-3.5'}
+          className={small ? 'w-3.5 h-3.5' : 'w-4 h-4'}
           stroke="currentColor"
           strokeWidth="2.5"
           fill="none"
@@ -69,58 +71,82 @@ export function ImageGrid({
     </button>
   );
 
+  const plate = (
+    img: ImgEntry,
+    index: number,
+    { ratio, src, small }: { ratio: string; src: string; small: boolean },
+  ) => (
+    <div key={img.pathFull} className="relative bg-muted">
+      <button
+        type="button"
+        onClick={() => onOpenModal(img.urlFull)}
+        className="block w-full"
+      >
+        <Image
+          src={src}
+          alt={altFor(index)}
+          width={800}
+          height={600}
+          unoptimized
+          loading="lazy"
+          className={`${ratio} w-full object-cover cursor-zoom-in`}
+        />
+      </button>
+      {deleteButton(img, small)}
+    </div>
+  );
+
+  // The strip takes one track per thumbnail so it never leaves dead cells
+  // at the end of the row, and a fixed height rather than a square ratio so
+  // two thumbnails spread across the card can't balloon into a second hero.
+  const stripStyle = (count: number) => ({
+    gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))`,
+  });
+
+  if (imgs.length === 1) {
+    return plate(imgs[0], 0, {
+      ratio: 'aspect-4/3',
+      // The full render, not the thumbnail: this spans the whole card,
+      // which is wider than the stored 250-400px thumb.
+      src: imgs[0].urlFull,
+      small: false,
+    });
+  }
+
+  if (imgs.length === 2) {
+    return (
+      <div className="grid grid-cols-2 gap-px">
+        {imgs.map((img, i) =>
+          plate(img, i, {
+            ratio: 'aspect-square',
+            src: img.urlFull,
+            small: false,
+          }),
+        )}
+      </div>
+    );
+  }
+
+  const [hero, ...rest] = imgs;
+  const strip = rest.slice(0, STRIP_MAX);
+
   return (
     <div className="w-full">
-      <div className="relative group/hero bg-muted">
-        <button
-          type="button"
-          onClick={() => onOpenModal(hero.urlFull)}
-          className="block w-full"
-        >
-          {/* The full-size render, not the thumbnail: the hero spans the
-              whole card (~390px on mobile), and the stored thumb is only
-              250px, so using it here upscaled past its native size and
-              looked mushy. Thumbs stay on the small strip below. */}
-          <Image
-            src={hero.urlFull}
-            alt={altFor(0)}
-            width={800}
-            height={600}
-            unoptimized
-            loading="lazy"
-            className="aspect-4/3 w-full object-cover cursor-zoom-in"
-          />
-        </button>
-        {deleteButton(hero, 'lg')}
-      </div>
+      {plate(hero, 0, {
+        ratio: 'aspect-4/3',
+        src: hero.urlFull,
+        small: false,
+      })}
 
-      {/* Always four columns, however many thumbnails there are. Sizing the
-          track count to the thumbnail count made a lone extra image stretch
-          to the full card width as a giant square under the hero. */}
-      {!!strip.length && (
-        <div className="grid grid-cols-4 gap-px">
-          {strip.map((img, i) => (
-            <div key={img.pathFull} className="relative bg-muted">
-              <button
-                type="button"
-                onClick={() => onOpenModal(img.urlFull)}
-                className="block w-full"
-              >
-                <Image
-                  src={img.urlThumb || img.urlFull}
-                  alt={altFor(i + 1)}
-                  width={160}
-                  height={160}
-                  unoptimized
-                  loading="lazy"
-                  className="aspect-square w-full object-cover cursor-zoom-in"
-                />
-              </button>
-              {deleteButton(img, 'sm')}
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="grid gap-px" style={stripStyle(strip.length)}>
+        {strip.map((img, i) =>
+          plate(img, i + 1, {
+            ratio: 'h-20 sm:h-24',
+            src: img.urlThumb || img.urlFull,
+            small: true,
+          }),
+        )}
+      </div>
     </div>
   );
 }

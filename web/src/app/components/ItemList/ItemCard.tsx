@@ -1,7 +1,7 @@
 'use client';
 import { useI18n } from '../../i18n/useI18n';
 import type { ItemLite, ImgEntry } from './types';
-import { Actions } from './Actions';
+import { Actions, AddPhoto } from './Actions';
 import { ImageGrid } from './ImageGrid';
 
 // A specimen mount: the object leads, the label sits underneath. Photos are
@@ -34,8 +34,12 @@ export function ItemCard({
 }) {
   const { t } = useI18n();
 
+  // h-full so cards in a desktop row share a height -- ragged card bottoms
+  // read as a broken grid. The caption grows and the action row is pushed
+  // to the bottom, so those rows line up across the row and the extra space
+  // looks intended rather than left over.
   return (
-    <li className="fade-up group relative flex flex-col bg-card text-card-foreground ring-1 ring-border sm:rounded-sm shadow-[0_1px_2px_rgb(23_32_58/0.06)] transition-shadow hover:shadow-[0_6px_20px_rgb(23_32_58/0.10)]">
+    <li className="fade-up group relative flex h-full flex-col bg-card text-card-foreground ring-1 ring-border sm:rounded-sm shadow-[0_1px_2px_rgb(23_32_58/0.06)] transition-shadow hover:shadow-[0_6px_20px_rgb(23_32_58/0.10)]">
       <ImageGrid
         imgs={imgs}
         itemTitle={item.title}
@@ -45,8 +49,10 @@ export function ItemCard({
         busy={busy}
       />
 
+      <AddPhoto onUpload={onUpload} busy={busy} />
+
       {/* The object label. */}
-      <div className="flex flex-col gap-2 p-4">
+      <div className="flex flex-1 flex-col gap-2 p-4">
         <h3 className="font-display text-[0.95rem] leading-snug">
           {item.title}
         </h3>
@@ -77,12 +83,7 @@ export function ItemCard({
           </div>
         )}
 
-        <Actions
-          onUpload={onUpload}
-          busy={busy}
-          onEdit={onEditItem}
-          onDelete={onDeleteItem}
-        />
+        <Actions onEdit={onEditItem} onDelete={onDeleteItem} />
 
         <span className="sr-only" aria-live="polite">
           {busy ? t('item_list.loading') : ''}

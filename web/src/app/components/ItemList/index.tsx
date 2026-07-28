@@ -295,7 +295,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         <ul
           aria-busy={loading}
           aria-labelledby="entries-heading"
-          className={`-mx-4 sm:mx-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 items-start gap-px sm:gap-4 bg-border sm:bg-transparent transition-opacity ${loading ? 'opacity-60' : ''}`}
+          className={`-mx-4 sm:mx-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px sm:gap-4 bg-border sm:bg-transparent transition-opacity ${loading ? 'opacity-60' : ''}`}
         >
           {items.map((it) => (
             <ItemCard
