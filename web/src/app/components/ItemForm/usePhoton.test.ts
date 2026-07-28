@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { dedupePhotonFeatures, formatPlaceDisplay } from './usePhoton';
+import {
+  dedupePhotonFeatures,
+  formatPlaceDisplay,
+  isQueryLongEnough,
+} from './usePhoton';
 import type { PhotonFeature } from './types';
 
 function props(
@@ -51,6 +55,35 @@ describe('formatPlaceDisplay', () => {
     expect(formatPlaceDisplay(props({ state: 'NRW' }), null).line2).toBe('NRW');
   });
 
+  it('falls back to an empty city when no name field is present at all', () => {
+    expect(formatPlaceDisplay(props(), null).city).toBe('');
+  });
+
+  it('does not look up a region name when regionNames is unavailable, even with a countrycode', () => {
+    expect(() =>
+      formatPlaceDisplay(props({ countrycode: 'de' }), null),
+    ).not.toThrow();
+    expect(formatPlaceDisplay(props({ countrycode: 'de' }), null).line2).toBe(
+      '',
+    );
+  });
+
+  it('lowercases the dedupe key', () => {
+    expect(formatPlaceDisplay(props({ city: 'COLOGNE' }), null).key).toBe(
+      'cologne|||',
+    );
+  });
+
+  it('collapses a run of whitespace to one separator, so it cannot merge two distinct names', () => {
+    const collapsed = formatPlaceDisplay(props({ city: 'A\t\tB' }), null);
+    const singleSpace = formatPlaceDisplay(props({ city: 'A B' }), null);
+    expect(collapsed.key).toBe(singleSpace.key);
+
+    const twoWords = formatPlaceDisplay(props({ city: 'New York' }), null);
+    const oneWord = formatPlaceDisplay(props({ city: 'Newyork' }), null);
+    expect(twoWords.key).not.toBe(oneWord.key);
+  });
+
   it('produces the same dedupe key regardless of case or whitespace', () => {
     const a = formatPlaceDisplay(
       props({ city: 'Cologne', country: 'Germany' }),
@@ -92,5 +125,26 @@ describe('dedupePhotonFeatures', () => {
     const a = feature(1, { city: 'Cologne' });
     const b = feature(2, { city: 'Berlin' });
     expect(dedupePhotonFeatures([a, b], null)).toEqual([a, b]);
+  });
+});
+
+describe('isQueryLongEnough', () => {
+  it('rejects fewer than 3 characters', () => {
+    expect(isQueryLongEnough('')).toBe(false);
+    expect(isQueryLongEnough('a')).toBe(false);
+    expect(isQueryLongEnough('ab')).toBe(false);
+  });
+
+  it('accepts exactly 3 characters', () => {
+    expect(isQueryLongEnough('abc')).toBe(true);
+  });
+
+  it('accepts more than 3 characters', () => {
+    expect(isQueryLongEnough('abcd')).toBe(true);
+  });
+
+  it('measures the trimmed length, not the raw length', () => {
+    expect(isQueryLongEnough('  ab  ')).toBe(false);
+    expect(isQueryLongEnough('  abc  ')).toBe(true);
   });
 });

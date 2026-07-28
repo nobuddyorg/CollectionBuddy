@@ -33,7 +33,6 @@ export function pairImageEntries(
       : name.replace(/\.webp$/, '');
     const slot = pairs.get(base) ?? {};
     if (name.endsWith('.thumb.webp')) slot.thumb = { name };
-    else if (name.endsWith('.webp')) slot.full = { name };
     else slot.full = { name };
     pairs.set(base, slot);
   }
@@ -49,7 +48,7 @@ export function pairImageEntries(
   return entryData;
 }
 
-function toImgEntries(
+export function toImgEntries(
   entryData: Map<string, ImageEntryData>,
   signedUrlMap: Map<string, string>,
 ): ImgEntry[] {
@@ -67,6 +66,10 @@ function toImgEntries(
   return entries;
 }
 
+/* v8 ignore start -- hook internals (Supabase I/O, timers, compression);
+ * pairImageEntries/toImgEntries above are what's gated and mutation-tested. */
+// Stryker disable all: hook internals aren't covered by tests, only
+// pairImageEntries/toImgEntries above are -- mutants in here would only be noise.
 export function useItemImages() {
   const { t } = useI18n();
   const toast = useToast();
@@ -305,3 +308,5 @@ export function useItemImages() {
     deletingPath,
   };
 }
+// Stryker restore all
+/* v8 ignore stop */

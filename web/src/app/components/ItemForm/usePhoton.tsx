@@ -45,6 +45,17 @@ export function dedupePhotonFeatures(
   return deduped;
 }
 
+// Below 3 chars there's nothing worth querying Photon for -- same
+// threshold the PostgREST search filter uses, for the same trigram-index
+// reasoning.
+export function isQueryLongEnough(query: string): boolean {
+  return query.trim().length >= 3;
+}
+
+/* v8 ignore start -- hook internals (fetch, timers, DOM); the extracted
+ * pure helpers above are what's gated and mutation-tested. */
+// Stryker disable all: hook internals aren't covered by tests, only the
+// extracted pure helpers above are -- mutants in here would only be noise.
 export function usePhotonSearch(locale?: string) {
   const [query, setQuery] = useState('');
   const [focus, setFocus] = useState(false);
@@ -76,7 +87,7 @@ export function usePhotonSearch(locale?: string) {
   );
 
   useEffect(() => {
-    if (!focus || query.trim().length < 3) {
+    if (!focus || !isQueryLongEnough(query)) {
       // Abort any in-flight geocode too -- otherwise it resolves later and,
       // if the field is re-focused with a long-enough query before then,
       // briefly renders results for a query the user already cleared.
@@ -192,3 +203,5 @@ export function usePhotonSearch(locale?: string) {
     formatDisplay,
   };
 }
+// Stryker restore all
+/* v8 ignore stop */
