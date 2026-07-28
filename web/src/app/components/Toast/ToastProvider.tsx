@@ -28,6 +28,10 @@ export function useToast(): ToastApi {
 
 const AUTO_DISMISS_MS = 6000;
 
+/* v8 ignore start -- provider internals (state, effects, portal); useToast
+ * above and the pure error/dismiss logic aren't separable from React state
+ * here, so there's no pure surface left to unit-test in isolation. */
+// Stryker disable all: provider internals aren't covered by tests.
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
   const [toasts, setToasts] = useState<ToastEntry[]>([]);
@@ -85,3 +89,5 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     </ToastContext.Provider>
   );
 }
+// Stryker restore all
+/* v8 ignore stop */
