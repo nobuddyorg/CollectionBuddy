@@ -12,19 +12,28 @@ const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 // for the wordmark and headings, a quiet body face for everything read at
 // length, and a tracked-out mono for object labels -- the museum-caption
 // motif that recurs through the app.
+// Weights are deliberately not enumerated for the two families that have a
+// variable version: naming them makes next/font emit one static file per
+// weight and preload every one, and the browser then complains about the
+// ones the page never renders (#240). Only three weights are used in the
+// whole app -- 700 via `.font-display`, 500 via `font-medium`, 400 for
+// everything else -- so most of what was being fetched was dead weight.
+// One variable file per family covers all of them and can't fall out of
+// sync with the CSS the way a hand-kept weight list does.
 const displayFont = Archivo({
   subsets: ['latin'],
-  weight: ['600', '700'],
   variable: '--font-display-family',
 });
 const bodyFont = Inter({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
   variable: '--font-body-family',
 });
+// IBM Plex Mono has no variable version on Google Fonts, so this one still
+// has to name its weight. 400 is the only one used: `.font-label` sets no
+// weight of its own and never sits under `font-medium`.
 const labelFont = IBM_Plex_Mono({
   subsets: ['latin'],
-  weight: ['400', '500'],
+  weight: ['400'],
   variable: '--font-label-family',
 });
 
