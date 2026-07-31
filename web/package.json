@@ -39,7 +39,7 @@
     "prettier": "^3.9.6",
     "serve": "^14.2.6",
     "tailwindcss": "^4",
-    "typescript": "^6",
+    "typescript": "^7",
     "vitest": "^4.1.10"
   },
   "overrides": {
