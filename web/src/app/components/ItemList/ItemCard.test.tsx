@@ -31,7 +31,6 @@ function renderCard(
       <ItemCard
         item={{ ...item, ...overrides }}
         imgs={[]}
-        busy={false}
         deletingPath={new Set()}
         {...handlers}
         {...props}
@@ -111,7 +110,6 @@ describe('ItemCard', () => {
         <ItemCard
           item={item}
           imgs={[]}
-          busy={false}
           deletingPath={new Set()}
           onUpload={vi.fn()}
           onEditItem={vi.fn()}
@@ -150,7 +148,6 @@ describe('ItemCard', () => {
         <ItemCard
           item={item}
           imgs={[]}
-          busy={false}
           imagesLoading
           deletingPath={new Set()}
           onUpload={vi.fn()}
@@ -164,13 +161,38 @@ describe('ItemCard', () => {
     expect(screen.queryByText('No images')).not.toBeInTheDocument();
   });
 
+  // An upload takes seconds -- compression, then two objects over the
+  // wire. The entry showed nothing of that beyond a spinner on a button,
+  // so the photograph arrived by shoving the caption down, and a second
+  // tap on "add" was the only way to check the first had registered.
+  it('holds a frame for a photograph that is still being uploaded', () => {
+    renderCard({}, { pendingUploads: 1 });
+    expect(
+      screen.getByRole('status', { name: 'Uploading image…' }),
+    ).toBeInTheDocument();
+    // Not the empty mount: inviting a photograph is the wrong thing to say
+    // to someone who has just handed one over.
+    expect(screen.queryByText('No images')).not.toBeInTheDocument();
+  });
+
+  it('keeps the photographs it already has while another uploads', () => {
+    renderCard(
+      {},
+      { imgs: [{ pathFull: 'a', urlFull: 'a.jpg' }], pendingUploads: 1 },
+    );
+    expect(screen.getByRole('img')).toBeInTheDocument();
+    expect(
+      screen.getByRole('status', { name: 'Uploading image…' }),
+    ).toBeInTheDocument();
+  });
+
   it('disables the file input while an upload is in flight', () => {
     const { container } = render(
       <I18nProvider>
         <ItemCard
           item={item}
           imgs={[]}
-          busy={true}
+          pendingUploads={1}
           deletingPath={new Set()}
           onUpload={vi.fn()}
           onEditItem={vi.fn()}

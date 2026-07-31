@@ -14,7 +14,7 @@ import { ImageGrid } from './ImageGrid';
 export function ItemCard({
   item,
   imgs,
-  busy,
+  pendingUploads = 0,
   imagesLoading = false,
   deletingPath,
   onUpload,
@@ -25,7 +25,8 @@ export function ItemCard({
 }: {
   item: ItemLite;
   imgs: ImgEntry[];
-  busy: boolean;
+  /** Photographs handed over for this entry that have not landed yet. */
+  pendingUploads?: number;
   imagesLoading?: boolean;
   deletingPath: Set<string>;
   onUpload: (file: File) => void;
@@ -36,10 +37,14 @@ export function ItemCard({
 }) {
   const { t } = useI18n();
 
+  const busy = pendingUploads > 0;
+
   // Nothing to show and nothing still coming: the card leads with an empty
   // mount instead of an add-photo strip, so every card in the stack has the
-  // same silhouette whether or not it has been photographed yet.
-  const awaitingPhoto = !imgs.length && !imagesLoading;
+  // same silhouette whether or not it has been photographed yet. An upload
+  // in flight counts as something coming -- the invitation to add a
+  // photograph is the wrong thing to show to someone who just did.
+  const awaitingPhoto = !imgs.length && !imagesLoading && !busy;
 
   // h-full so cards in a desktop row share a height -- ragged card bottoms
   // read as a broken grid. The caption grows and the action row is pushed
@@ -64,6 +69,7 @@ export function ItemCard({
           deletingPath={deletingPath}
           busy={busy}
           loading={imagesLoading}
+          pending={pendingUploads}
         />
       )}
 
@@ -107,7 +113,7 @@ export function ItemCard({
         />
 
         <span className="sr-only" aria-live="polite">
-          {busy ? t('item_list.loading') : ''}
+          {busy ? t('item_list.uploading') : ''}
         </span>
       </div>
     </li>

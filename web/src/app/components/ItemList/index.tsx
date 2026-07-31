@@ -132,7 +132,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     uploadImage,
     deleteImage,
     deleteAllItemImages,
-    busy,
+    pendingUploads,
     deletingPath,
   } = useItemImages();
 
@@ -316,7 +316,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               key={it.id}
               item={it}
               imgs={images[it.id] ?? ([] as ImgEntry[])}
-              busy={busy.has(it.id)}
+              pendingUploads={pendingUploads[it.id] ?? 0}
               imagesLoading={loadingItems.has(it.id)}
               deletingPath={deletingPath}
               onUpload={(f) => uploadImage(it.id, f)}
