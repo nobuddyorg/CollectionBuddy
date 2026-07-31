@@ -1,7 +1,7 @@
 'use client';
 import { useI18n } from '../../i18n/useI18n';
 import type { ItemLite, ImgEntry } from './types';
-import { Actions, AddPhoto } from './Actions';
+import { Actions, AddPhoto, AddPhotoPlate } from './Actions';
 import { ImageGrid } from './ImageGrid';
 
 // A specimen mount: the object leads, the label sits underneath. Photos are
@@ -36,23 +36,40 @@ export function ItemCard({
 }) {
   const { t } = useI18n();
 
+  // Nothing to show and nothing still coming: the card leads with an empty
+  // mount instead of an add-photo strip, so every card in the stack has the
+  // same silhouette whether or not it has been photographed yet.
+  const awaitingPhoto = !imgs.length && !imagesLoading;
+
   // h-full so cards in a desktop row share a height -- ragged card bottoms
   // read as a broken grid. The caption grows and the action row is pushed
   // to the bottom, so those rows line up across the row and the extra space
   // looks intended rather than left over.
+  //
+  // The card is a discrete object at every width: rounded, and lifted off
+  // the paper by a real two-part shadow -- a tight contact shadow plus a
+  // wide soft one. The old single `0 1px 2px / 0.06` was invisible against
+  // #f4f3ef, which left a 1px hairline ring as the only thing marking where
+  // one card ended and the next began.
   return (
-    <li className="fade-up group relative flex h-full flex-col bg-card text-card-foreground ring-1 ring-border sm:rounded-sm shadow-[0_1px_2px_rgb(23_32_58/0.06)] transition-shadow hover:shadow-[0_6px_20px_rgb(23_32_58/0.10)]">
-      <ImageGrid
-        imgs={imgs}
-        itemTitle={item.title}
-        onOpenModal={onOpenModal}
-        onDelete={onDeleteImage}
-        deletingPath={deletingPath}
-        busy={busy}
-        loading={imagesLoading}
-      />
+    <li className="fade-up group relative flex h-full flex-col overflow-hidden rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-[0_1px_2px_rgb(23_32_58/0.08),0_10px_24px_-8px_rgb(23_32_58/0.18)] transition-shadow hover:shadow-[0_1px_2px_rgb(23_32_58/0.10),0_16px_32px_-10px_rgb(23_32_58/0.24)]">
+      {awaitingPhoto ? (
+        <AddPhotoPlate onUpload={onUpload} busy={busy} />
+      ) : (
+        <>
+          <ImageGrid
+            imgs={imgs}
+            itemTitle={item.title}
+            onOpenModal={onOpenModal}
+            onDelete={onDeleteImage}
+            deletingPath={deletingPath}
+            busy={busy}
+            loading={imagesLoading}
+          />
 
-      <AddPhoto onUpload={onUpload} busy={busy} />
+          <AddPhoto onUpload={onUpload} busy={busy} />
+        </>
+      )}
 
       {/* The object label. */}
       <div className="flex flex-1 flex-col gap-2 p-4">

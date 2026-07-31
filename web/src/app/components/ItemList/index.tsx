@@ -297,11 +297,13 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         <ul
           aria-busy={loading}
           aria-labelledby="entries-heading"
-          // Cards stay full-bleed on mobile, but separated by a real gap of
-          // page background rather than a 1px hairline: run together, they
-          // read as one continuous stack and nothing binds a caption or its
-          // buttons to the photograph above them.
-          className={`-mx-4 sm:mx-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 transition-opacity ${loading ? 'opacity-60' : ''}`}
+          // Cards are detached objects on mobile too, not a full-bleed
+          // stack: they keep the page's own side margin, so paper shows on
+          // all four edges of every card. Edge-to-edge cards had no left or
+          // right boundary at all, which left a thin horizontal band as the
+          // single cue separating one entry from the next -- not enough to
+          // bind a caption and its buttons to the photograph above them.
+          className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-4 transition-opacity ${loading ? 'opacity-60' : ''}`}
         >
           {items.map((it) => (
             <ItemCard
