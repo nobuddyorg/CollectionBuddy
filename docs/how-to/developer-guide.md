@@ -58,7 +58,7 @@ One-time setup for a new fork or a repo renamed away from `CollectionBuddy`:
 
 1. Repo Settings → Pages → set the source to **GitHub Actions**.
 2. Add repository secrets `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, pointed at your (non-local) Supabase project.
-3. Add `SUPABASE_ACCESS_TOKEN` (dashboard → account → Access Tokens), `SUPABASE_PROJECT_REF` (the ref in your project URL), and `SUPABASE_DB_PASSWORD` (set at project creation; resettable under Project Settings → Database). The `migrate` job needs all three — the token authenticates to the management API, the password opens the actual Postgres connection, and neither substitutes for the other.
+3. Add `SUPABASE_DB_URL` — the **session pooler** connection string, Project Settings → Database → Connection string → Session pooler, with the password filled in and percent-encoded. The `migrate` job uses only this. It must be the pooler host (`aws-0-<region>.pooler.supabase.com`), not `db.<ref>.supabase.co`: the direct host is IPv6-only and GitHub runners have no IPv6, and `supabase link` does not paper over this — it reports success and the subsequent push fails anyway.
 4. If the repo isn't named `CollectionBuddy`, update the `repo` constant in `web/next.config.ts` — the production `basePath` (`/CollectionBuddy`) is derived from it, and a mismatch breaks every static asset path on Pages.
 5. Optional: add `STRYKER_DASHBOARD_API_KEY` as a secret if you want mutation-test reports published (see above).
 6. Optional: if your Supabase project is on the free tier, keep [`keep-alive.yml`](../../.github/workflows/keep-alive.yml) enabled (it's on by default) — it pings a `keepalive()` RPC daily so the project doesn't auto-pause from inactivity.

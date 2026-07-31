@@ -44,26 +44,30 @@ jobs:
           # is not the place to discover a CLI behaviour change.
           version: 2.110.0
 
-      - name: Link to the Supabase project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-
-      # Prints what would be applied before applying it, so the log says
-      # what changed even when the push itself is a no-op.
+      # `supabase link` + `--linked` is the documented path and it does not
+      # work here: link reports success but leaves no usable connection
+      # behind, and the push then resolves db.<ref>.supabase.co, which has
+      # only an AAAA record. GitHub runners have no IPv6, so the first real
+      # run of this job died on "IPv6 is not supported on your current
+      # network" -- pointing at `supabase link` as the fix, having just run
+      # it. The session pooler is reachable over IPv4, so the connection is
+      # given explicitly instead of being discovered.
+      #
+      # The whole URL is one secret rather than assembled here from a
+      # password: it keeps GitHub's log masking over the credential (a
+      # string composed in a step is not masked), and the password needs
+      # percent-encoding that YAML is the wrong place to be doing.
+      # Dry run first, so the log names what is about to be applied even on
+      # the runs where the push itself turns out to be a no-op.
       - name: Show pending migrations
-        run: supabase db push --linked --dry-run
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
       - name: Apply migrations
-        run: supabase db push --linked
+        run: supabase db push --db-url "$SUPABASE_DB_URL"
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
   build:
     needs: migrate
