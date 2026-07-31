@@ -5,8 +5,8 @@
   },
   "page": {
     "entries": "Einträge",
-    "choose_category": "Kategorie wählen",
-    "add_collectibles": "Füge neue Sammlerstücke hinzu und lade Bilder hoch, um loszulegen.",
+    "no_categories": "Noch keine Kategorien",
+    "name_first_category": "Lege oben deine erste Kategorie an — Münzen, Briefmarken, was du sammelst.",
     "footer": "Sammeln • Ordnen • Behalten",
     "skip_to_content": "Zum Inhalt springen"
   },
