@@ -9,6 +9,14 @@ import type { ItemFormProps, ItemFormValues, PlaceCoords } from './types';
 
 export type { ItemFormValues } from './types';
 
+// `block` is what makes the four fields line up, and it has to be on all of
+// them or none. A label is inline by default, so it sits in a line box sized
+// by the inherited 1.5 line-height rather than its own -- which pushes the
+// text down by 6px and the field under it by 4. Everything used to be inline
+// and therefore wrong in the same way; the description is now a flex item,
+// which blockifies it, so it would be the only one that isn't.
+const LABEL = 'block text-xs font-medium text-muted-foreground';
+
 export default function ItemForm({
   initial,
   submitting = false,
@@ -74,12 +82,19 @@ export default function ItemForm({
 
   return (
     <form className="space-y-3" onSubmit={handleSubmit} noValidate>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {/* Title, place and tags stack down the left; the description takes
+          the whole right column beside them. It is the only free-form field
+          here -- the other three are one-liners -- so it is the only one
+          that has any use for the height, and giving it all three rows'
+          worth is what stops it being a two-line box with empty space
+          alongside the fields underneath it.
+
+          The desktop placement is done by the grid rather than by the DOM,
+          so source order stays title -> description -> place -> tags and
+          the single-column phone layout still reads in that order. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-3">
         <div className="space-y-1">
-          <label
-            htmlFor={titleId}
-            className="text-xs font-medium text-muted-foreground"
-          >
+          <label htmlFor={titleId} className={LABEL}>
             {t('item_create.title')}
             <span aria-hidden="true"> *</span>
           </label>
@@ -102,34 +117,30 @@ export default function ItemForm({
           )}
         </div>
 
-        <div className="space-y-1">
-          <label
-            htmlFor={descriptionId}
-            className="text-xs font-medium text-muted-foreground"
-          >
+        <div className="space-y-1 sm:col-start-2 sm:row-start-1 sm:row-span-3 sm:flex sm:flex-col">
+          <label htmlFor={descriptionId} className={LABEL}>
             {t('item_create.description')}
           </label>
           {/* Two rows is right on a phone, where the modal is the whole
               screen and every extra row pushes the save button further out
-              of reach. On a desktop the dialog has room going spare, so the
-              field takes it rather than making a paragraph scroll inside
-              three lines (#251), and can be dragged taller from there. */}
+              of reach. On a desktop it fills the column instead (#251), and
+              can still be dragged taller from there: `flex-auto` -- rather
+              than `flex-1` -- keeps the dragged height as the flex base
+              size, so the grid row grows with it instead of the browser
+              writing a height the layout then ignores. Dragging it shorter
+              than the fields beside it does nothing, which is the price of
+              having it match their height by default. */}
           <textarea
             id={descriptionId}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="w-full rounded-sm px-3 py-2 min-h-11 sm:min-h-32 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground resize-none sm:resize-y"
+            className="w-full rounded-sm px-3 py-2 min-h-11 sm:min-h-32 sm:flex-auto bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground resize-none sm:resize-y"
           />
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div className="space-y-1">
-          <label
-            htmlFor={placeId}
-            className="text-xs font-medium text-muted-foreground"
-          >
+          <label htmlFor={placeId} className={LABEL}>
             {t('item_create.place')}
           </label>
           <PlaceAutocomplete
@@ -138,11 +149,9 @@ export default function ItemForm({
             onChange={handlePlaceChange}
           />
         </div>
+
         <div className="space-y-1">
-          <label
-            htmlFor={tagsId}
-            className="text-xs font-medium text-muted-foreground"
-          >
+          <label htmlFor={tagsId} className={LABEL}>
             {t('item_create.tags')}
           </label>
           <TagsInput id={tagsId} tags={tags} setTags={setTags} />
