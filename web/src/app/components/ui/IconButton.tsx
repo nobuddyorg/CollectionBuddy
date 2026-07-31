@@ -11,10 +11,28 @@ const SIZE_CLASSES = {
 const VARIANT_CLASSES = {
   primary: 'bg-primary text-primary-foreground hover:opacity-90',
   destructive: 'bg-destructive text-destructive-foreground hover:opacity-90',
+  // A drawn box rather than a filled one. Three filled ink squares on every
+  // card would out-shout the photographs; a hairline frame still reads
+  // unmistakably as a control, which bare glyphs on the card did not.
+  outline:
+    'bg-card text-muted-foreground ring-1 ring-border hover:bg-muted hover:text-foreground',
 } as const;
 
 export type IconButtonSize = keyof typeof SIZE_CLASSES;
 export type IconButtonVariant = keyof typeof VARIANT_CLASSES;
+
+/** Shared so non-button controls -- a file-input `<label>` -- can match. */
+export function iconButtonClasses({
+  variant = 'primary',
+  size = 'md',
+  className = '',
+}: {
+  variant?: IconButtonVariant;
+  size?: IconButtonSize;
+  className?: string;
+} = {}) {
+  return `${SIZE_CLASSES[size]} flex items-center justify-center rounded-sm transition ${VARIANT_CLASSES[variant]} ${className}`.trim();
+}
 
 type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: IconButtonVariant;
@@ -31,7 +49,7 @@ export function IconButton({
   return (
     <button
       type={type}
-      className={`${SIZE_CLASSES[size]} flex items-center justify-center rounded-sm transition-opacity ${VARIANT_CLASSES[variant]} ${className}`.trim()}
+      className={iconButtonClasses({ variant, size, className })}
       {...props}
     />
   );

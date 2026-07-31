@@ -2,14 +2,7 @@
 
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
-
-// Tightened from px-2/gap-1.5: the row now carries three labelled controls
-// instead of two, and German runs long ("Bearbeiten", "Eintrag löschen").
-// px-1 rather than px-1.5 is what clears the tightest case -- German in a
-// two-column grid at exactly 640px, which was 3px over and would have sat
-// right on the wrap boundary, flickering between one line and two.
-const ROW_ITEM =
-  'inline-flex shrink-0 items-center gap-1 min-h-9 px-1 rounded-sm font-label text-[0.6875rem] whitespace-nowrap transition-colors';
+import { IconButton, iconButtonClasses } from '../ui/IconButton';
 
 // The file picker itself, wrapped so both the row control and the empty
 // plate can hand a chosen file straight to onUpload.
@@ -109,28 +102,22 @@ export function AddPhotoPlate({
   );
 }
 
-// Entry-level actions, in the label area and spelled out. They used to
-// float as bare icons in the card's top-right corner, on top of the hero
-// image's own delete button -- two identical red trash icons overlapping,
-// with nothing to say which removed the photo and which removed the entry.
+// The three things you can do to an entry, as drawn boxes at the foot of
+// the card. Adding a photo used to be a full-width band between the
+// photograph and the caption -- a slab across the card at exactly the point
+// the eye wants an uninterrupted run from object to label.
 //
-// Adding a photo now lives here too. It had been a full-width band between
-// the photograph and the caption, and a slab across the card at exactly the
-// point the eye wants an uninterrupted run from object to label is the one
-// place it could not go. All three things you can do to an entry are in one
-// row instead, at the foot of the card.
+// It joined edit and delete as spelled-out words first, and that failed for
+// a reason worth recording: a row of bare mono capitals on a white card
+// gives no hint that any of it is clickable. Framed icons do, and three of
+// them fit any width in any language, which spelled-out words did not --
+// German ("Bearbeiten", "Eintrag löschen") overflowed the card by up to
+// 45px and got clipped.
 //
-// Two things buy the space for a third control, because three of them
-// genuinely did not fit one line before:
-//
-//   - The upload label is short ("Photo" / "Bild"); its input carries the
-//     full "Add image" as its accessible name.
-//   - The row is words only, no icons. Measured across en/de at 390-1280px,
-//     the icons cost 54px of a row that was overflowing by up to 45px in
-//     German ("Bearbeiten", "Eintrag löschen"). Words alone fit every
-//     width in both languages with room to spare -- and a line of spaced
-//     mono capitals is the museum object label this whole card is built
-//     around, so the icons were the less considered half anyway.
+// Icons alone are only safe here because each has a title and an
+// aria-label, and because the entry's trash no longer collides with the
+// per-photo control: that one is an ✕ sitting on the photograph itself.
+// Delete also keeps the far end of the row, away from the other two.
 export function Actions({
   onEdit,
   onDelete,
@@ -144,13 +131,12 @@ export function Actions({
 }) {
   const { t } = useI18n();
 
-  // flex-wrap is a safety net, not a layout: nothing wraps at any width in
-  // either language today, but a longer translation should drop to a second
-  // line rather than run off a card that clips its overflow.
   return (
-    <div className="-mx-1 mt-auto flex flex-wrap items-center gap-x-1 gap-y-1 border-t border-border pt-2.5">
+    <div className="mt-auto flex items-center gap-2 border-t border-border pt-3">
+      {/* A file input needs a label, not a button, so it borrows the icon
+          button's own classes rather than approximating them. */}
       <label
-        className={`${ROW_ITEM} cursor-pointer text-muted-foreground hover:text-foreground hover:bg-muted ${
+        className={`${iconButtonClasses({ variant: 'outline' })} cursor-pointer ${
           busy ? 'pointer-events-none opacity-60' : ''
         }`}
         title={t('item_list.add_image')}
@@ -160,38 +146,56 @@ export function Actions({
           busy={busy}
           label={t('item_list.add_image')}
         />
-        {/* The one mark left in the row: without it "Photo" reads as a
-            label for something rather than as the thing that adds one. */}
         {busy ? (
           <span
-            className="w-2.5 h-2.5 rounded-full border-2 border-current/30 border-t-current animate-spin"
+            className="w-4 h-4 rounded-full border-2 border-current/30 border-t-current animate-spin"
             role="status"
             aria-label={t('common.loading')}
           />
         ) : (
-          <span aria-hidden="true">+</span>
+          <Icon
+            icon={IconType.Plus}
+            className="w-4 h-4"
+            aria-hidden="true"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+          />
         )}
-        {t('item_list.add_image_short')}
       </label>
 
-      <button
-        type="button"
+      <IconButton
+        variant="outline"
         onClick={onEdit}
-        className={`${ROW_ITEM} text-muted-foreground hover:text-foreground hover:bg-muted`}
+        aria-label={t('item_list.edit')}
+        title={t('item_list.edit')}
       >
-        {t('item_list.edit')}
-      </button>
+        <Icon
+          icon={IconType.Edit}
+          className="w-4 h-4"
+          aria-hidden="true"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+        />
+      </IconButton>
 
-      {/* Names the entry explicitly so it can never be mistaken for the
-          delete control sitting on an individual photo, and stays pushed
-          to the far end of the row, away from edit. */}
-      <button
-        type="button"
+      <IconButton
+        variant="outline"
         onClick={onDelete}
-        className={`${ROW_ITEM} ml-auto text-muted-foreground hover:text-destructive hover:bg-destructive/10`}
+        aria-label={t('item_list.delete_entry')}
+        title={t('item_list.delete_entry')}
+        className="ml-auto hover:bg-destructive/10 hover:text-destructive hover:ring-destructive/30"
       >
-        {t('item_list.delete_entry')}
-      </button>
+        <Icon
+          icon={IconType.Trash}
+          className="w-4 h-4"
+          aria-hidden="true"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+        />
+      </IconButton>
     </div>
   );
 }
