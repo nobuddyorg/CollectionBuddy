@@ -15,14 +15,18 @@ function SegmentedControl<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex rounded-lg border overflow-hidden">
+    // Full width with equal segments, rather than sized to its contents:
+    // the labels are language names, which are never translated and so
+    // can't be budgeted for. Sitting beside the caption, the pair fit in
+    // German and were clipped by the menu's edge in English (#242).
+    <div className="flex w-full rounded-lg border overflow-hidden">
       {options.map((option) => (
         <button
           key={option}
           type="button"
           aria-pressed={value === option}
           onClick={() => onChange(option)}
-          className={`px-2.5 min-h-9 text-xs transition-colors ${
+          className={`flex-1 px-2.5 min-h-9 text-xs transition-colors ${
             value === option
               ? 'bg-primary text-primary-foreground'
               : 'hover:bg-muted'
@@ -57,8 +61,11 @@ export default function Menu({
         {user.email}
       </div>
 
-      <div className="px-3 py-2 flex items-center justify-between gap-2">
-        <span className="text-sm">{t('header.language')}</span>
+      {/* Caption above rather than beside, so the control gets the menu's
+          full width and the layout doesn't depend on how long any
+          translation of "Language" happens to be. */}
+      <div className="px-3 py-2 space-y-1.5">
+        <span className="block text-sm">{t('header.language')}</span>
         <SegmentedControl
           value={lang}
           options={['de', 'en']}
