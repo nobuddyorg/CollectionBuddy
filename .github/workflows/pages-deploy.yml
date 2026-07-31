@@ -37,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           # Pinned deliberately: this is the version the migration chain was
           # verified against, and an unattended `db push` against production
@@ -120,7 +120,7 @@ jobs:
       - run: test -d out && test -f out/index.html
       - run: touch out/.nojekyll
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: web/out
 

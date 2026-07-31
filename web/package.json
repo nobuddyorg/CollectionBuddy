@@ -45,6 +45,7 @@
   "overrides": {
     "qs": "6.15.3",
     "@babel/core": "7.29.7",
-    "minimatch": "10.2.6"
+    "minimatch": "10.2.6",
+    "typescript-eslint": "^8.65.0"
   }
 }
