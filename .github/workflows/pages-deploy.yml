@@ -5,10 +5,12 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Read-only by default; the two jobs that need to write say so themselves.
+# Granting `pages: write` and `id-token: write` at the top handed them to
+# every job in the file, including the ones that run `npm ci` and so execute
+# third-party install scripts with a token that can publish the site.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -35,9 +37,11 @@ jobs:
   migrate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
-      - uses: supabase/setup-cli@v3
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3
         with:
           # Pinned deliberately: this is the version the migration chain was
           # verified against, and an unattended `db push` against production
@@ -106,9 +110,11 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '22.x'
           cache: npm
@@ -120,13 +126,16 @@ jobs:
       - run: test -d out && test -f out/index.html
       - run: touch out/.nojekyll
 
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: web/out
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -134,7 +143,7 @@ jobs:
       page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
 
   # Loads the *live* deployed page in a real browser and fails if it throws.
   # A successful build isn't enough proof the site works: prerendering runs
@@ -147,9 +156,11 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '22.x'
           cache: npm
@@ -157,4 +168,10 @@ jobs:
 
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run smoke -- "${{ needs.deploy.outputs.page_url }}"
+      # Through the environment rather than expanded into the command line:
+      # `${{ }}` is substituted before the shell ever sees it, so anything
+      # quote-like in the value would be parsed as shell rather than passed
+      # as an argument.
+      - run: npm run smoke -- "$PAGE_URL"
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}

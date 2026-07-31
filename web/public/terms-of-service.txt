@@ -12,7 +12,7 @@ By using CollectionBuddy, you agree to the following Terms of Service:
 - Do not misuse the service (e.g., hacking, distributing malware, violating intellectual property).
 
 3. Intellectual Property
-- All rights to the application remain with nobuddy.org.  
+- All rights to the application remain with nobuddy.org.
 - You may not copy, modify, or redistribute the application without permission.
 
 4. Disclaimer
@@ -42,7 +42,7 @@ Durch die Nutzung von CollectionBuddy stimmen Sie den folgenden Nutzungsbedingun
 - Missbrauch des Dienstes ist untersagt (z. B. Hacking, Verbreitung von Malware, Verletzung geistigen Eigentums).
 
 3. Geistiges Eigentum
-- Alle Rechte an der Anwendung verbleiben bei nobuddy.org.  
+- Alle Rechte an der Anwendung verbleiben bei nobuddy.org.
 - Eine Vervielfältigung, Änderung oder Weiterverbreitung ist ohne Genehmigung nicht gestattet.
 
 4. Haftungsausschluss

@@ -6,10 +6,10 @@ CollectionBuddy needs a Supabase backend (Postgres + Auth + Storage) to run
 at all -- there is no mock/offline mode. The steps below set up the local
 stack that ships in [`supabase/`](supabase/).
 
-1.  Install the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)
+1. Install the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)
     and Docker (the CLI runs the local stack in containers).
 
-2.  From the repository root, start the local stack and apply migrations:
+2. From the repository root, start the local stack and apply migrations:
 
     ```bash
     supabase start
@@ -31,7 +31,7 @@ stack that ships in [`supabase/`](supabase/).
     export GOTRUE_EXTERNAL_GOOGLE_SECRET=...
     ```
 
-3.  Set up the web app's environment and dependencies:
+3. Set up the web app's environment and dependencies:
 
     ```bash
     cd web
@@ -41,6 +41,38 @@ stack that ships in [`supabase/`](supabase/).
     ```
 
     The app is now at `http://localhost:3000`.
+
+## Commit hooks
+
+[prek](https://github.com/j178/prek) runs the checks in
+[`.pre-commit-config.yaml`](.pre-commit-config.yaml) against each commit.
+Install it once, then install the hook:
+
+```bash
+prek install
+```
+
+`pre-commit` works too — the config is the standard format, and prek is just
+a faster runner for it.
+
+To run everything over the whole repo without committing:
+
+```bash
+prek run --all-files
+```
+
+Most of it is file hygiene and spell checking, plus:
+
+- **[zizmor](https://docs.zizmor.sh/)** — security analysis of the GitHub
+  Actions workflows. This is why every action is pinned to a commit hash
+  rather than a tag: a tag can be repointed at new code, a hash cannot.
+  Dependabot moves the hashes.
+- **markdownlint** and **shellcheck** for the docs and `build.sh`.
+- **ESLint / Prettier / TypeScript** for `web/`, so a commit is checked
+  before it is made rather than after CI says so.
+
+CI runs the same config (minus the three `web/` hooks, which duplicate what
+the build job already does).
 
 ## Before opening a pull request
 

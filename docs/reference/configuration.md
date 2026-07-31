@@ -5,7 +5,7 @@
 Set in `web/.env.local` (see `web/.env.example`). Both are required — the Supabase client throws at import time if either is missing.
 
 | Variable | Local default | Production |
-|---|---|---|
+| --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | `http://127.0.0.1:54321` (matches `supabase start`) | Your Supabase project's API URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase's well-known local dev anon key (not a secret) | Your Supabase project's anon key |
 
@@ -20,7 +20,7 @@ Required even for local development — see [CONTRIBUTING.md](../../CONTRIBUTING
 From `supabase/config.toml`:
 
 | Service | Port |
-|---|---|
+| --- | --- |
 | API | 54321 |
 | Postgres | 54322 |
 | Studio (dashboard UI) | 54323 |
@@ -31,7 +31,7 @@ Project-level storage limit is 50 MiB (`[storage]`), though the `item-images` bu
 ## GitHub Actions secrets
 
 | Secret | Used by | Required? |
-|---|---|---|
+| --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml` | Yes |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml` | Yes |
 | `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test` job) | No — without it, Stryker just skips the dashboard reporter and writes a local HTML report instead. |
