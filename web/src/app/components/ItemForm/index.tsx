@@ -109,12 +109,17 @@ export default function ItemForm({
           >
             {t('item_create.description')}
           </label>
+          {/* Two rows is right on a phone, where the modal is the whole
+              screen and every extra row pushes the save button further out
+              of reach. On a desktop the dialog has room going spare, so the
+              field takes it rather than making a paragraph scroll inside
+              three lines (#251), and can be dragged taller from there. */}
           <textarea
             id={descriptionId}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="w-full rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground resize-none"
+            className="w-full rounded-sm px-3 py-2 min-h-11 sm:min-h-32 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground resize-none sm:resize-y"
           />
         </div>
       </div>
