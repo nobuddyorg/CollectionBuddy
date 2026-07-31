@@ -28,7 +28,6 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
   const [isCreateOpen, setCreateOpen] = useState(false);
 
   const [mapOpen, setMapOpen] = useState(false);
-  const [mapFullscreen, setMapFullscreen] = useState(false);
   const {
     places,
     loading: loadingPlaces,
@@ -47,6 +46,16 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
       })),
     [places],
   );
+
+  // Pins stream in as each place is geocoded, and the map fits whatever it
+  // has as soon as the first one lands. Re-frame once the last one is in so
+  // the view covers the whole collection, not just the quickest lookups.
+  useEffect(() => {
+    if (!mapOpen || loadingPlaces) return;
+    setMapCommand('fitAll');
+    const id = setTimeout(() => setMapCommand(null), 0);
+    return () => clearTimeout(id);
+  }, [mapOpen, loadingPlaces]);
 
   const [currentLocation, setCurrentLocation] = useState<null | {
     lat: number;
@@ -360,31 +369,27 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
       <CenteredModal
         open={mapOpen}
-        onOpenChange={(v) => {
-          setMapOpen(v);
-          // Don't leave the next open stuck in fullscreen.
-          if (!v) setMapFullscreen(false);
-        }}
+        onOpenChange={setMapOpen}
         title={t('item_list.map_title')}
         closeLabel={t('common.close')}
-        size={mapFullscreen ? 'full' : 'default'}
+        size="full"
       >
-        {loadingPlaces ? (
-          <p>{t('common.loading')}</p>
-        ) : !mapOpen ? null : placesError ? (
-          <p className="py-6 text-center text-sm opacity-70">
+        {placesError ? (
+          <p className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70">
             {t('item_list.map_error')}
           </p>
-        ) : places.length === 0 ? (
-          <p className="py-6 text-center text-sm opacity-70">
+        ) : !loadingPlaces && places.length === 0 ? (
+          <p className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70">
             {t('item_list.map_empty')}
           </p>
         ) : (
-          <div className={`relative ${mapFullscreen ? 'h-full' : ''}`}>
+          // The map mounts right away rather than behind the geocoding
+          // spinner: Leaflet's chunk and the first tiles then load while the
+          // places are still being resolved, instead of after.
+          <div className="relative h-full">
             <Map
               command={mapCommand}
               markers={mapMarkers}
-              fullscreen={mapFullscreen}
               currentLocation={
                 currentLocation
                   ? {
@@ -395,6 +400,11 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                   : undefined
               }
             />
+            {loadingPlaces && (
+              <div className="absolute top-2 left-2 z-[1000] rounded-lg border bg-card/80 px-3 py-1.5 text-xs text-card-foreground shadow-sm backdrop-blur">
+                {t('common.loading')}
+              </div>
+            )}
             <div className="absolute top-2 right-2 z-[1000] bg-card/80 backdrop-blur rounded-lg flex gap-1 p-1">
               <button
                 type="button"
@@ -421,27 +431,6 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                 title={t('item_list.frame_all_pins')}
               >
                 <Icon icon={IconType.Frame} className="w-5 h-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setMapFullscreen((v) => !v)}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-card-foreground shadow-sm hover:opacity-90"
-                aria-label={
-                  mapFullscreen
-                    ? t('item_list.map_exit_fullscreen')
-                    : t('item_list.map_fullscreen')
-                }
-                title={
-                  mapFullscreen
-                    ? t('item_list.map_exit_fullscreen')
-                    : t('item_list.map_fullscreen')
-                }
-                aria-pressed={mapFullscreen}
-              >
-                <Icon
-                  icon={mapFullscreen ? IconType.Collapse : IconType.Expand}
-                  className="w-5 h-5"
-                />
               </button>
             </div>
           </div>

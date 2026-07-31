@@ -22,12 +22,7 @@ const popupContent = (text: string): HTMLDivElement => {
   return el;
 };
 
-const Map: React.FC<MapProps> = ({
-  markers,
-  currentLocation,
-  command,
-  fullscreen = false,
-}) => {
+const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const LRef = useRef<Leaflet | null>(null);
   const mapInstance = useRef<import('leaflet').Map | null>(null);
@@ -72,7 +67,10 @@ const Map: React.FC<MapProps> = ({
         shadowUrl: toUrl(shadowUrl),
       });
 
-      const map = L.map(mapRef.current).setView([51.505, -0.09], 13);
+      // The map is mounted before its pins are geocoded, so it opens on a
+      // world view: a zoomed-in default would fetch a screenful of tiles
+      // for a place nobody asked about, then throw them away on the fit.
+      const map = L.map(mapRef.current).setView([20, 0], 2);
       mapInstance.current = map;
 
       map.createPane('currentLocation');
@@ -203,26 +201,22 @@ const Map: React.FC<MapProps> = ({
     }
   }, [command, ready]);
 
-  // Leaflet caches the container size, so a map that changes size while
-  // mounted -- toggling fullscreen -- renders into stale dimensions and
-  // leaves grey tiles until told to re-measure.
+  // Leaflet caches the container size, so a map whose box changes while
+  // mounted -- rotation, the mobile URL bar collapsing, the on-screen
+  // keyboard -- renders into stale dimensions and leaves grey tiles until
+  // told to re-measure.
   useEffect(() => {
     if (!ready) return;
+    const el = mapRef.current;
     const map = mapInstance.current;
-    if (!map) return;
-    const id = requestAnimationFrame(() => map.invalidateSize());
-    return () => cancelAnimationFrame(id);
-  }, [fullscreen, ready]);
+    if (!el || !map) return;
 
-  return (
-    <div
-      ref={mapRef}
-      style={{
-        height: fullscreen ? '100%' : 'min(70dvh, 600px)',
-        width: '100%',
-      }}
-    />
-  );
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ready]);
+
+  return <div ref={mapRef} style={{ height: '100%', width: '100%' }} />;
 };
 
 export default Map;

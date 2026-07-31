@@ -14,8 +14,6 @@ export interface MapProps {
   markers: MarkerInput[];
   currentLocation?: { lat: number; lng: number; popupText?: string };
   command?: 'fitAll' | 'fitCurrent' | null;
-  /** Fills its container instead of the boxed default height. */
-  fullscreen?: boolean;
 }
 
 export interface Place {
