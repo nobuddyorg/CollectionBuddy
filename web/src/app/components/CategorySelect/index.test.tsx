@@ -111,6 +111,30 @@ describe('CategorySelect', () => {
     expect(screen.getByLabelText('New category')).toBeVisible();
   });
 
+  // Laid out row by row, the new-category field came out wider than the
+  // rename field by exactly the delete button the rename row carries and
+  // it does not. One grid for both rows, with the add button spanning the
+  // two trailing columns, is what makes them equal.
+  it('gives the two fields the same column', async () => {
+    renderSelect();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Open category' }),
+    );
+
+    const rename = screen.getByLabelText('Rename');
+    const create = screen.getByLabelText('New category');
+    expect(rename.parentElement).toBe(create.parentElement);
+    expect(rename.parentElement?.className).toContain('grid');
+
+    // Both fields fill a single column of it; the add button takes the two
+    // the rename row's own buttons occupy.
+    expect(rename.className).toContain('w-full');
+    expect(create.className).toContain('w-full');
+    expect(screen.getByRole('button', { name: 'Add' }).className).toContain(
+      'col-span-2',
+    );
+  });
+
   // On first run there is no collection to name and nothing to collapse
   // back to, so the header still holds its line and the slot stays empty.
   it('holds the header when nothing is selected', () => {

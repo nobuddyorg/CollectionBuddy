@@ -24,7 +24,9 @@ export function CategoryInput({
         if (e.key === 'Enter') createCategory();
         if (e.key === 'Escape') setExpanded(false);
       }}
-      className="flex-1 min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
+      // Sized by its grid column, which it shares with the rename field
+      // above so the two come out the same width.
+      className="w-full min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
     />
   );
 }

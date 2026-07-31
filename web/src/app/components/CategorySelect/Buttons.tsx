@@ -9,11 +9,14 @@ export function AddButton({
   disabled,
   isCreating,
   label,
+  className = '',
 }: {
   onClick: () => void;
   disabled: boolean;
   isCreating: boolean;
   label: string;
+  /** Lets the field rows size it, so their inputs come out equal. */
+  className?: string;
 }) {
   // Spelled out rather than a bare "+": a control should say what happens
   // when it is used, and a lone glyph gave no confirmation of that.
@@ -23,7 +26,7 @@ export function AddButton({
       onClick={onClick}
       disabled={disabled}
       aria-busy={isCreating}
-      className="min-h-11 px-4 shrink-0 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 disabled:opacity-40 transition-opacity flex items-center gap-2"
+      className={`min-h-11 px-4 shrink-0 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 disabled:opacity-40 transition-opacity flex items-center justify-center gap-2 ${className}`.trim()}
       title={label}
     >
       {isCreating && <Spinner size="sm" />}
@@ -78,7 +81,9 @@ export function DeleteButtonWithLabel({
   return (
     <IconButton
       variant="destructive"
-      size="sm"
+      // Drawn to the same height as the field and the rename button it
+      // stands beside; at `sm` it was a 32px box in a 44px row.
+      size="xl"
       onClick={onClick}
       disabled={disabled}
       className="disabled:opacity-50"
