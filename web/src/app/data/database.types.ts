@@ -50,6 +50,10 @@ export type Database = {
           title: string;
           description: string | null;
           place: string | null;
+          // Set only when `place` came from a picked Photon suggestion;
+          // null for hand-typed places and for rows predating 0015.
+          place_lat: number | null;
+          place_lng: number | null;
           tags: string[];
           // Generated (stored) from tags via join_tags(); read-only.
           tags_text: string | null;
@@ -62,6 +66,8 @@ export type Database = {
           title: string;
           description?: string | null;
           place?: string | null;
+          place_lat?: number | null;
+          place_lng?: number | null;
           tags?: string[];
           created_at?: string;
           updated_at?: string;
@@ -72,6 +78,8 @@ export type Database = {
           title?: string;
           description?: string | null;
           place?: string | null;
+          place_lat?: number | null;
+          place_lng?: number | null;
           tags?: string[];
           created_at?: string;
           updated_at?: string;

@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { PhotonFeature } from './types';
+import type { PhotonFeature, PlaceChoice, PlaceCoords } from './types';
 
 type RegionNames = Intl.DisplayNames | null;
 
@@ -50,6 +50,27 @@ export function dedupePhotonFeatures(
 // reasoning.
 export function isQueryLongEnough(query: string): boolean {
   return query.trim().length >= 3;
+}
+
+/**
+ * The coordinates a suggestion carries, or null if it carries none usable.
+ *
+ * GeoJSON orders coordinates lng-first, so the pair is deliberately
+ * destructured the "wrong" way round -- same reasoning as
+ * `placeFromPhotonResponse` in the map's `usePlaces`. The type says this is
+ * always a numeric pair; the runtime data is a third party's, so it is
+ * checked rather than trusted. `Number.isFinite` does that in one step: it
+ * coerces nothing, so a missing element, a string, and a NaN all fail it.
+ * Storing a NaN would put a pin nowhere and, worse, suppress the geocode
+ * fallback that would have found the place properly.
+ */
+export function coordsFromFeature(feature: PhotonFeature): PlaceCoords | null {
+  const coordinates = (feature as { geometry?: { coordinates?: unknown } })
+    .geometry?.coordinates;
+  if (!Array.isArray(coordinates)) return null;
+  const [lng, lat] = coordinates as number[];
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
 }
 
 /* v8 ignore start -- hook internals (fetch, timers, DOM); the extracted
@@ -151,20 +172,24 @@ export function usePhotonSearch(locale?: string) {
   }, []);
 
   const choose = useCallback(
-    (hit: PhotonFeature) => {
+    (hit: PhotonFeature): PlaceChoice => {
       const { city, line2 } = formatDisplay(hit.properties);
       const countryOnly = line2.split(', ').pop() || '';
       const label = countryOnly ? `${city}, ${countryOnly}` : city;
       setResults([]);
       setActiveIdx(-1);
       setFocus(false);
-      return label;
+      // The coordinates ride along with the label: this is the one moment
+      // the app knows where the place the user picked actually is, and
+      // dropping them here is what forced the map to ask Photon all over
+      // again later.
+      return { label, coords: coordsFromFeature(hit) };
     },
     [formatDisplay],
   );
 
   const onKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
+    (e: React.KeyboardEvent<HTMLInputElement>): PlaceChoice | undefined => {
       if (!results.length) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();

@@ -7,17 +7,24 @@ export type ItemUpdate = Database['public']['Tables']['items']['Update'];
 
 export type ItemFields = Pick<
   ItemRow,
-  'id' | 'title' | 'description' | 'place' | 'tags'
+  'id' | 'title' | 'description' | 'place' | 'place_lat' | 'place_lng' | 'tags'
 >;
 export type ItemSearchRow = ItemFields & {
   item_categories: { category_id: string }[];
 };
 
+/** A place as stored on an item, for the map to draw without geocoding. */
+export type ItemPlaceRow = Pick<ItemRow, 'place' | 'place_lat' | 'place_lng'>;
+
 /* v8 ignore start -- only used by the ignored query builders below. */
 // Stryker disable all: only used by the ignored query builders below.
+// The coordinates come back with every item read so the edit form can hand
+// them straight back on save -- an item edited without touching its place
+// must keep the pin it already had.
 const ITEMS_SEARCH_SELECT =
-  'id,title,description,place,tags,item_categories!inner(category_id)';
-const ITEM_FIELDS_SELECT = 'id,title,description,place,tags';
+  'id,title,description,place,place_lat,place_lng,tags,item_categories!inner(category_id)';
+const ITEM_FIELDS_SELECT =
+  'id,title,description,place,place_lat,place_lng,tags';
 // Stryker restore all
 /* v8 ignore stop */
 
@@ -67,7 +74,10 @@ export function listItems({
 }
 
 export function createItem(
-  payload: Pick<ItemInsert, 'title' | 'description' | 'place' | 'tags'>,
+  payload: Pick<
+    ItemInsert,
+    'title' | 'description' | 'place' | 'place_lat' | 'place_lng' | 'tags'
+  >,
 ) {
   return supabase
     .from('items')
@@ -78,7 +88,10 @@ export function createItem(
 
 export function updateItem(
   id: string,
-  payload: Pick<ItemUpdate, 'title' | 'description' | 'place' | 'tags'>,
+  payload: Pick<
+    ItemUpdate,
+    'title' | 'description' | 'place' | 'place_lat' | 'place_lng' | 'tags'
+  >,
 ) {
   return supabase
     .from('items')
@@ -101,10 +114,11 @@ export function linkItemToCategory(itemId: string, categoryId: string) {
 export function listItemPlaces(categoryId: string) {
   return supabase
     .from('items')
-    .select('place,item_categories!inner(category_id)')
+    .select('place,place_lat,place_lng,item_categories!inner(category_id)')
     .eq('item_categories.category_id', categoryId)
     .not('place', 'is', null)
-    .neq('place', '');
+    .neq('place', '')
+    .returns<ItemPlaceRow[]>();
 }
 // Stryker restore all
 /* v8 ignore stop */

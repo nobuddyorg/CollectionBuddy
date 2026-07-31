@@ -70,6 +70,8 @@ export function useItems(categoryId: string, q: string) {
         title: d.title,
         description: d.description,
         place: d.place ?? null,
+        place_lat: d.place_lat ?? null,
+        place_lng: d.place_lng ?? null,
         tags: d.tags ?? [],
       })),
     );

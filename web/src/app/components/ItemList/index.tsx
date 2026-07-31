@@ -164,6 +164,8 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     title: string;
     description: string | null;
     place: string | null;
+    place_lat: number | null;
+    place_lng: number | null;
     tags: string[];
   }) => {
     setEditing({
@@ -172,6 +174,11 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         title: it.title,
         description: it.description ?? '',
         place: it.place ?? '',
+        // Round-tripped rather than dropped: the form only replaces these
+        // when the place field itself is edited, so an item edited for any
+        // other reason keeps the pin it already had.
+        place_lat: it.place_lat,
+        place_lng: it.place_lng,
         tags: it.tags ?? [],
       },
     });
@@ -189,6 +196,8 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         title: values.title,
         description: values.description,
         place: values.place,
+        place_lat: values.place_lat,
+        place_lng: values.place_lng,
         tags: values.tags,
       };
       const { data, error } = await updateItem(editing.id, payload);
@@ -359,6 +368,8 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
                 title: '',
                 description: '',
                 place: '',
+                place_lat: null,
+                place_lng: null,
                 tags: [],
               }
             }

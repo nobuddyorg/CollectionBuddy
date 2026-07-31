@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  coordsFromFeature,
   dedupePhotonFeatures,
   formatPlaceDisplay,
   isQueryLongEnough,
@@ -28,6 +29,39 @@ function feature(
     geometry: { type: 'Point', coordinates: [0, 0] },
   };
 }
+
+describe('coordsFromFeature', () => {
+  // Anything constructed here stands in for a third party's response, so
+  // the casts are the point: these shapes are what the type forbids and
+  // the network can still deliver.
+  const withGeometry = (coordinates: unknown) =>
+    ({ properties: props(), geometry: { coordinates } }) as PhotonFeature;
+
+  it('reads GeoJSON lng-first coordinates into lat/lng', () => {
+    expect(coordsFromFeature(withGeometry([6.96, 50.94]))).toEqual({
+      lat: 50.94,
+      lng: 6.96,
+    });
+  });
+
+  it('keeps zero coordinates rather than reading them as absent', () => {
+    expect(coordsFromFeature(withGeometry([0, 0]))).toEqual({ lat: 0, lng: 0 });
+  });
+
+  it('returns null for a suggestion carrying no usable geometry', () => {
+    expect(coordsFromFeature(withGeometry(undefined))).toBeNull();
+    expect(coordsFromFeature(withGeometry([6.96]))).toBeNull();
+    expect(coordsFromFeature({ properties: props() } as PhotonFeature)).toBe(
+      null,
+    );
+  });
+
+  it('returns null rather than storing a coordinate that is not a number', () => {
+    expect(coordsFromFeature(withGeometry(['6.96', '50.94']))).toBeNull();
+    expect(coordsFromFeature(withGeometry([6.96, NaN]))).toBeNull();
+    expect(coordsFromFeature(withGeometry([Infinity, 50.94]))).toBeNull();
+  });
+});
 
 describe('formatPlaceDisplay', () => {
   it('prefers city, falling back through town/village/municipality/name', () => {

@@ -12,6 +12,8 @@ const item: ItemLite = {
   title: 'Item',
   description: null,
   place: null,
+  place_lat: null,
+  place_lng: null,
   tags: [],
 };
 
