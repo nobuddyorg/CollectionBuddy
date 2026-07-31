@@ -22,6 +22,43 @@ function writeGeocodeCache(cache: Record<string, Place>) {
   }
 }
 
+/**
+ * Splits the places to draw into the ones the cache already answers and the
+ * ones still needing a lookup, preserving input order in both.
+ */
+export function partitionByCache(
+  places: string[],
+  cache: Record<string, Place>,
+): { cached: Place[]; pending: string[] } {
+  const cached: Place[] = [];
+  const pending: string[] = [];
+  for (const place of places) {
+    const hit = cache[place];
+    if (hit) cached.push(hit);
+    else pending.push(place);
+  }
+  return { cached, pending };
+}
+
+/**
+ * Reads a Place out of a Photon response. GeoJSON orders coordinates
+ * lng-first, so the pair is deliberately destructured the "wrong" way round.
+ */
+export function placeFromPhotonResponse(
+  name: string,
+  data: unknown,
+): Place | null {
+  const features = (data as { features?: unknown })?.features;
+  if (!Array.isArray(features) || features.length === 0) return null;
+  const coordinates = (
+    features[0] as { geometry?: { coordinates?: unknown } } | undefined
+  )?.geometry?.coordinates;
+  if (!Array.isArray(coordinates) || coordinates.length < 2) return null;
+  const [lng, lat] = coordinates as number[];
+  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+  return { name, lat, lng };
+}
+
 // `enabled` gates fetching behind the map actually being open: geocoding
 // every distinct place is an unbounded number of requests to a free public
 // API, and running it on category *selection* rather than map *open* paid
@@ -39,6 +76,7 @@ export function usePlaces(categoryId: string, enabled: boolean) {
     const fetchPlaces = async () => {
       setLoading(true);
       setError(false);
+      setPlaces([]);
       try {
         const { data: items, error } = await listItemPlaces(categoryId);
 
@@ -48,44 +86,44 @@ export function usePlaces(categoryId: string, enabled: boolean) {
         const cache = readGeocodeCache();
         let cacheDirty = false;
 
-        const placeCoordinates = await Promise.all(
-          uniquePlaces.map(async (place) => {
-            const cached = cache[place];
-            if (cached) return cached;
+        const { cached, pending } = partitionByCache(uniquePlaces, cache);
+        // Cached places land in one batch before any request goes out, so a
+        // second visit draws its pins immediately instead of waiting on the
+        // slowest lookup of the batch.
+        if (!cancelled && cached.length > 0) setPlaces(cached);
 
+        let resolvedCount = cached.length;
+
+        await Promise.all(
+          pending.map(async (place) => {
             try {
               const url = new URL('https://photon.komoot.io/api/');
               url.searchParams.set('q', place);
               url.searchParams.set('limit', '1');
               const res = await fetch(url.toString());
-              if (!res.ok) return null;
-              const data = await res.json();
-              if (data.features && data.features.length > 0) {
-                const [lng, lat] = data.features[0].geometry.coordinates;
-                const entry: Place = { name: place, lat, lng };
-                cache[place] = entry;
-                cacheDirty = true;
-                return entry;
-              }
-              return null;
+              if (!res.ok) return;
+              const entry = placeFromPhotonResponse(place, await res.json());
+              if (!entry) return;
+
+              cache[place] = entry;
+              cacheDirty = true;
+              resolvedCount += 1;
+              // Appended as each lookup lands rather than after the whole
+              // batch: a single slow geocode no longer holds back every
+              // other pin.
+              if (!cancelled) setPlaces((prev) => [...prev, entry]);
             } catch {
-              return null;
+              // A place that can't be geocoded is simply not drawn.
             }
           }),
         );
 
         if (cacheDirty) writeGeocodeCache(cache);
-        if (!cancelled) {
-          const resolved = placeCoordinates.filter(
-            (p): p is Place => p !== null,
-          );
-          setPlaces(resolved);
-          // Every place failed to geocode (as opposed to there being no
-          // places to geocode) -- distinguish "geocoding is broken" from
-          // "nothing to show" instead of silently rendering an empty map.
-          if (uniquePlaces.length > 0 && resolved.length === 0) {
-            setError(true);
-          }
+        // Every place failed to geocode (as opposed to there being no
+        // places to geocode) -- distinguish "geocoding is broken" from
+        // "nothing to show" instead of silently rendering an empty map.
+        if (!cancelled && uniquePlaces.length > 0 && resolvedCount === 0) {
+          setError(true);
         }
       } catch {
         if (!cancelled) {
