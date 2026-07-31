@@ -1,13 +1,15 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 
 import Coin from '../components/Coin/index';
+import { coinSizeCss } from '../components/Coin/size';
 import Collectible from '../components/Collectible/index';
 import GoogleSignInButton from '../components/GoogleSignInButton/index';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { useToast } from '../components/Toast/ToastProvider';
 import { useI18n } from '../i18n/useI18n';
+import { fanOffsetX, fanOffsetY, fanPositions } from './collectibleFan';
 import { useAuthRedirect } from './useAuthRedirect';
 import { useGoogleSignIn } from './useGoogleSignIn';
 
@@ -24,35 +26,20 @@ const EMOJIS = [
   '📀',
 ] as const;
 
-function rng(seed: number) {
-  let s = seed >>> 0;
-  return () => (s = (1664525 * s + 1013904223) >>> 0) / 2 ** 32;
-}
+const COIN_SIZE = 420;
 
-// An elliptical fan, not a random scatter: each chip gets its own slice of
-// the ring so they never bunch up, with a little jitter so it doesn't read
-// as mechanically perfect. Wider than tall, to clear the wordmark above and
-// the subtitle below.
-function makePositions(count: number, seed = 1337) {
-  const r = rng(seed);
-  const slice = (Math.PI * 2) / count;
-  return Array.from({ length: count }, (_, i) => {
-    const angle = slice * i + (r() - 0.5) * slice * 0.6;
-    const rx = 250 + r() * 140;
-    const ry = 150 + r() * 60;
-    return {
-      x: `${Math.round(Math.cos(angle) * rx)}px`,
-      y: `${Math.round(Math.sin(angle) * ry)}px`,
-    };
-  });
-}
+// Published to the fan as a custom property, so the chips are laid out in
+// units of the coin they have to clear.
+const COIN_BOX = {
+  ['--coin-size']: coinSizeCss(COIN_SIZE),
+} as CSSProperties;
 
 export default function LoginPage() {
   const { t } = useI18n();
   const toast = useToast();
   const checking = useAuthRedirect('/');
   const signIn = useGoogleSignIn();
-  const positions = useMemo(() => makePositions(EMOJIS.length), []);
+  const positions = useMemo(() => fanPositions(EMOJIS.length), []);
 
   const handleSignInError = (err: unknown) => {
     console.error('Google sign-in failed:', err);
@@ -79,26 +66,33 @@ export default function LoginPage() {
       </p>
 
       {/* The engraved medallion is the one piece of ornament on the page,
-          and the sign-in sits at its centre -- the single thing to do. */}
-      <Coin
-        text={t('login_page.circle_text')}
-        cta={
-          <GoogleSignInButton onClick={signIn} onError={handleSignInError} />
-        }
-      />
+          and the sign-in sits at its centre -- the single thing to do.
+          The chips are positioned against this box rather than against the
+          page, so "around the coin" is measured from the coin: centred on
+          the page, they orbited a point the medallion had drifted away
+          from and settled on top of it. */}
+      <div className="relative" style={COIN_BOX}>
+        <Coin
+          size={COIN_SIZE}
+          text={t('login_page.circle_text')}
+          cta={
+            <GoogleSignInButton onClick={signIn} onError={handleSignInError} />
+          }
+        />
 
-      {/* The chips need real width to fan into without clipping; below `sm`
-          the medallion carries the page on its own. */}
-      <div className="hidden sm:contents">
-        {positions.map((p, i) => (
-          <Collectible
-            key={i}
-            delay={i * 0.35}
-            emoji={EMOJIS[i % EMOJIS.length]}
-            x={p.x}
-            y={p.y}
-          />
-        ))}
+        {/* The chips need real width to fan into without clipping; below
+            `sm` the medallion carries the page on its own. */}
+        <div className="hidden sm:contents">
+          {positions.map((p, i) => (
+            <Collectible
+              key={i}
+              delay={i * 0.35}
+              emoji={EMOJIS[i % EMOJIS.length]}
+              x={fanOffsetX(p.ux)}
+              y={fanOffsetY(p.uy)}
+            />
+          ))}
+        </div>
       </div>
 
       <p className="mt-8 sm:mt-10 text-sm sm:text-base text-muted-foreground text-center max-w-sm text-balance">
