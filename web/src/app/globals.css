@@ -114,8 +114,18 @@ body {
     }
   }
 
+  /* `backwards`, not `both`. A forwards fill never ends: the element keeps
+     holding the 100% frame, and `transform: translateY(0)` is a transform,
+     not `none` -- so every card in the grid stayed a stacking context, a
+     containing block, and a compositing candidate for as long as it was on
+     screen. That is what let a card go blank for a frame when it was
+     scrolled fast: its backdrop-filtered child had the card itself as a
+     backdrop root, and a stale snapshot of that root blanks the whole card,
+     not just the button. Backwards fill still covers the run-up to the
+     animation, and the 100% frame is the element's resting style anyway, so
+     nothing moves when the fill is dropped. */
   .fade-up {
-    animation: fade-up 500ms ease-out both;
+    animation: fade-up 500ms ease-out backwards;
   }
 
   /* Out from the rim, not out from the middle. The chips are placed from
