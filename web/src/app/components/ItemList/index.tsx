@@ -14,6 +14,7 @@ import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
 import type { ImgEntry } from './types';
 import { usePlaces } from '../Map/usePlaces';
+import { useCurrentLocation } from '../Map/useCurrentLocation';
 
 const Map = dynamic(() => import('../Map'), { ssr: false });
 
@@ -69,51 +70,30 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     return () => clearTimeout(id);
   }, [mapOpen, loadingPlaces]);
 
-  const [currentLocation, setCurrentLocation] = useState<null | {
-    lat: number;
-    lng: number;
-  }>(null);
+  const {
+    location: currentLocation,
+    locating,
+    request: requestLocation,
+  } = useCurrentLocation(mapOpen);
 
-  useEffect(() => {
-    if (!mapOpen) return;
-    if (!navigator.geolocation) return;
-
-    let stopped = false;
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (stopped) return;
-        setCurrentLocation({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        });
-      },
-      () => {},
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
-    );
-
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        if (stopped) return;
-        setCurrentLocation({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        });
-      },
-      () => {},
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
-    );
-
-    const timer = window.setTimeout(() => {
-      if (watchId != null) navigator.geolocation.clearWatch(watchId);
-    }, 10000);
-
-    return () => {
-      stopped = true;
-      window.clearTimeout(timer);
-      if (watchId != null) navigator.geolocation.clearWatch(watchId);
-    };
-  }, [mapOpen]);
+  // The button asks for the fix rather than merely re-using one: in an
+  // installed PWA this tap is the gesture the permission prompt hangs off,
+  // and it is the only place a refusal can be explained.
+  const showCurrentLocation = useCallback(async () => {
+    const result = await requestLocation();
+    if (!result.ok) {
+      toast.error(
+        t(
+          result.reason === 'denied'
+            ? 'item_list.location_denied'
+            : 'item_list.location_unavailable',
+        ),
+      );
+      return;
+    }
+    setMapCommand('fitCurrent');
+    setTimeout(() => setMapCommand(null), 0);
+  }, [requestLocation, toast, t]);
 
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
@@ -423,15 +403,12 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
             <div className="absolute top-2 right-2 z-[1000] bg-card/80 backdrop-blur rounded-lg flex gap-1 p-1">
               <button
                 type="button"
-                onClick={() => {
-                  if (!currentLocation) return;
-                  setMapCommand('fitCurrent');
-                  setTimeout(() => setMapCommand(null), 0);
-                }}
+                onClick={() => void showCurrentLocation()}
                 className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-card-foreground shadow-sm hover:opacity-90 disabled:opacity-50"
                 aria-label={t('item_list.zoom_to_current_location')}
                 title={t('item_list.zoom_to_current_location')}
-                disabled={!currentLocation}
+                aria-busy={locating}
+                disabled={locating}
               >
                 <Icon icon={IconType.Gps} className="w-5 h-5" />
               </button>
