@@ -41,7 +41,7 @@ Project-level storage limit is 50 MiB (`[storage]`), though the `item-images` bu
 Defined in [`web/vitest.config.ts`](../../web/vitest.config.ts) (`test.coverage.thresholds`) and [`web/stryker.config.mjs`](../../web/stryker.config.mjs):
 
 - Global coverage floor auto-ratchets upward (`autoUpdate: true`) as real coverage improves — it's never edited down, so a regression fails CI.
-- Five pure, high-risk modules (see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-five-files)) additionally have a 100% per-file coverage floor and a mutation-score break threshold of 90.
+- A handful of pure, high-risk modules (see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files)) additionally have a 100% per-file coverage floor and a mutation-score break threshold of 90.
 
 ## i18n
 

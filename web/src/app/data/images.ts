@@ -51,17 +51,22 @@ export function removeImageObjects(paths: string[]) {
 // Standalone (not part of a hook) so callers that don't otherwise need
 // image state -- e.g. category deletion, which must clean up any items it
 // is about to orphan -- can invoke it without mounting image state.
-export async function removeItemImages(itemId: string): Promise<void> {
+//
+// Returns the uid whose prefix was cleared, so a caller that needs it (to
+// invalidate a cached listing, say) doesn't have to ask the auth client all
+// over again for something this function has already looked up.
+export async function removeItemImages(itemId: string): Promise<string | null> {
   const { data: u } = await supabase.auth.getUser();
   const uid = u.user?.id;
-  if (!uid) return;
+  if (!uid) return null;
 
   const prefix = `${uid}/${itemId}`;
   const { data, error } = await listImageObjects(prefix, 100);
   if (error) throw error;
-  if (!data?.length) return;
+  if (!data?.length) return uid;
 
   const paths = data.map((o) => `${prefix}/${o.name}`);
   const { error: removeError } = await removeImageObjects(paths);
   if (removeError) throw removeError;
+  return uid;
 }

@@ -42,41 +42,48 @@ export function useItems(categoryId: string, q: string) {
   // last page) and the grid would render empty with no active page.
   const currentPage = totalPages > 0 ? Math.min(page, totalPages) : 1;
 
-  const load = useCallback(async () => {
-    const mySeq = ++reqSeq.current;
-    setLoading(true);
+  // `silent` refetches without raising `loading`. A delete now removes its
+  // card up front and resyncs behind that, so the refetch has no wait to
+  // announce -- flagging it would only dim a grid the user already sees the
+  // result in.
+  const load = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      const mySeq = ++reqSeq.current;
+      if (!silent) setLoading(true);
 
-    const from = (currentPage - 1) * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+      const from = (currentPage - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
 
-    const { data, error, count } = await listItems({
-      categoryId,
-      search: q.trim(),
-      from,
-      to,
-    });
+      const { data, error, count } = await listItems({
+        categoryId,
+        search: q.trim(),
+        from,
+        to,
+      });
 
-    if (mySeq !== reqSeq.current) return;
-    setLoading(false);
-    if (error) {
-      console.error('Failed to load items:', error.message);
-      toast.error(t('item_list.search_error'));
-      return;
-    }
+      if (mySeq !== reqSeq.current) return;
+      if (!silent) setLoading(false);
+      if (error) {
+        console.error('Failed to load items:', error.message);
+        toast.error(t('item_list.search_error'));
+        return;
+      }
 
-    setItems(
-      (data ?? []).map((d) => ({
-        id: d.id,
-        title: d.title,
-        description: d.description,
-        place: d.place ?? null,
-        place_lat: d.place_lat ?? null,
-        place_lng: d.place_lng ?? null,
-        tags: d.tags ?? [],
-      })),
-    );
-    setTotal(count || 0);
-  }, [categoryId, currentPage, q, t, toast]);
+      setItems(
+        (data ?? []).map((d) => ({
+          id: d.id,
+          title: d.title,
+          description: d.description,
+          place: d.place ?? null,
+          place_lat: d.place_lat ?? null,
+          place_lng: d.place_lng ?? null,
+          tags: d.tags ?? [],
+        })),
+      );
+      setTotal(count || 0);
+    },
+    [categoryId, currentPage, q, t, toast],
+  );
 
   // Fetches on mount and whenever `load`'s own dependencies change --
   // exactly what an effect is for: synchronizing component state with the

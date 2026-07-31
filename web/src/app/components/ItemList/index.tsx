@@ -13,6 +13,7 @@ import { ModalImage } from './ModalImage';
 import { GridSkeleton } from './Skeleton';
 import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
+import { restoreAt } from './optimistic';
 import type { ImgEntry } from './types';
 import { usePlaces } from '../Map/usePlaces';
 import { useCurrentLocation } from '../Map/useCurrentLocation';
@@ -216,26 +217,51 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     }
   };
 
+  // The card goes the moment the deletion is confirmed, and the work runs
+  // behind it. Deleting used to hold the card on screen through five
+  // sequential round trips -- and clear its image state partway through, so
+  // it sat there as a photoless shell before finally vanishing on a full
+  // page refetch (#238). Nothing about that wait was informative: the
+  // outcome is almost always success, and the one thing the user wants to
+  // see is the card gone.
+  //
+  // Failure puts it back where it was rather than leaving a card the
+  // database still has silently missing from the grid.
   const removeItem = async (id: string) => {
     if (!(await confirm(t('item_list.confirm_delete')))) return;
+
+    // Captured before the optimistic removal, from the rendered list rather
+    // than inside the state updater -- updaters can run more than once.
+    const index = items.findIndex((it) => it.id === id);
+    const snapshot = items[index];
+    setItems((prev) => prev.filter((it) => it.id !== id));
+
+    const restore = () => {
+      if (!snapshot) return;
+      setItems((prev) => restoreAt(prev, index, snapshot));
+    };
+
     try {
-      // Delete storage objects before the row: the DB trigger can only ever
-      // remove the storage.objects metadata row, not the underlying bytes
-      // in the storage backend, so this is the only path that actually
-      // reclaims the space.
+      // Storage objects before the row, still: only the Storage API can
+      // reclaim the actual bytes, and once the row is gone there is nothing
+      // left to find them by.
       await deleteAllItemImages(id);
     } catch (err) {
       console.error('Failed to delete item images:', err);
       toast.error(t('item_list.delete_images_error'));
+      restore();
       return;
     }
     const { error } = await deleteItem(id);
     if (error) {
       console.error('Failed to delete item:', error);
       toast.error(t('item_list.delete_error'));
+      restore();
       return;
     }
-    await reload();
+    // Resyncs the page silently: pulls up whatever item now belongs in the
+    // freed slot and corrects the total the pagination is drawn from.
+    void reload({ silent: true });
   };
 
   return (
