@@ -18,7 +18,7 @@ These match [`ci.yml`](../../.github/workflows/ci.yml) exactly, in the order it 
 
 ## Run mutation testing
 
-A separate, slower check from the unit test suite — see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-five-files) for why it's scoped the way it is.
+A separate, slower check from the unit test suite — see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files) for why it's scoped the way it is.
 
 ```bash
 cd web

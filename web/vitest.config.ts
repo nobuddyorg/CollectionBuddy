@@ -76,6 +76,12 @@ export default defineConfig({
           branches: 100,
           lines: 100,
         },
+        'src/app/components/ItemList/optimistic.ts': {
+          statements: 100,
+          functions: 100,
+          branches: 100,
+          lines: 100,
+        },
         'src/app/components/ItemForm/usePhoton.tsx': {
           statements: 100,
           functions: 100,

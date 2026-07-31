@@ -367,9 +367,9 @@ export function useItemImages() {
   );
 
   const deleteAllItemImages = useCallback(async (itemId: string) => {
-    await removeItemImages(itemId);
-    const { data: sessionData } = await supabase.auth.getSession();
-    const uid = sessionData.session?.user.id;
+    // The uid comes back from the removal rather than from a second auth
+    // call: that was one more round trip on a path the user is waiting on.
+    const uid = await removeItemImages(itemId);
     if (uid) invalidateListing(`${uid}/${itemId}`);
     setImages((prev) => {
       const next = { ...prev };

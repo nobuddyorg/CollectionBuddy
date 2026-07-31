@@ -24,7 +24,7 @@ Early migrations (`0002`, `0008`) added `tsvector` full-text-search columns and 
 
 The 3-character minimum before a search fires (`buildSearchFilter` isn't called below that, both in the item list and in place autocomplete) exists for the same reason: a trigram index needs at least one 3-character trigram to produce candidates, so a 1–2 character query can't use the index at all — it would force a sequential scan on every keystroke for no benefit, since the result set at that length is nearly the whole table anyway.
 
-## Why mutation testing is scoped to five files
+## Why mutation testing is scoped to a handful of files
 
 Line coverage answers "did this code run during a test," not "would a real bug in this code have been caught." For most of this app — presentational components, hooks that mostly orchestrate Supabase calls — that gap doesn't matter much. It matters a lot for a handful of pure functions doing string and boundary-condition construction, where a test can execute every line and still not assert anything meaningful:
 
@@ -33,6 +33,7 @@ Line coverage answers "did this code run during a test," not "would a real bug i
 - `pairImageEntries` / `toImgEntries` (`useItemImages.tsx`) — matching `.webp`/`.thumb.webp` pairs by filename.
 - `formatPlaceDisplay` / `dedupePhotonFeatures` / `isQueryLongEnough` / `coordsFromFeature` (`usePhoton.tsx`) — geocoding result formatting, de-duplication, and reading the coordinates off a picked suggestion.
 - `resolveTranslationKey` (`I18nProvider.tsx`) — dotted-key lookup against the translation tree.
+- `restoreAt` (`ItemList/optimistic.ts`) — putting a card back at its old index after a failed delete. Clamping an index against a list that may have changed underneath, with an off-by-one on either side that would drop the card in the wrong place and a negative index that `splice` would silently read as "from the end".
 
 Stryker is scoped to exactly these ([`web/stryker.config.mjs`](../../web/stryker.config.mjs)), each paired with a `/* v8 ignore start/stop */` + `// Stryker disable all/restore all` block around the surrounding React/effect/Supabase code in the same file. Running mutation testing over the whole `src/app` tree would mean mutating JSX and Tailwind class strings too — thousands of mostly-equivalent mutants, a multi-minute run, and a score that means nothing either way. Five small, pure, high-consequence functions run in seconds and produce a number worth acting on. This is also why CI runs it only on push to `main` rather than per PR (see [`ci.yml`](../../.github/workflows/ci.yml)) — it's slower than the unit suite, and a flapping break threshold on every PR would get the whole step deleted rather than fixed.
 
