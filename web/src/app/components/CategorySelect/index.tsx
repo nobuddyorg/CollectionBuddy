@@ -157,16 +157,22 @@ export default function CategorySelect({
           {/* Rename and create are separate rows with their own field and
               their own button. Sharing one input meant the same box
               created a category or did nothing depending on hidden state,
-              and there was no way to rename at all. */}
-          {selected && (
-            <div className="space-y-1.5">
-              <label
-                htmlFor="rename-category"
-                className="font-label text-[0.6875rem] text-muted-foreground block"
-              >
-                {t('category_select.rename')}
-              </label>
-              <div className="flex items-center gap-2">
+              and there was no way to rename at all.
+
+              They do share one grid, though, so the two fields come out
+              the same width: the trailing controls sit in the same two
+              columns and the add button spans both. Laid out row by row
+              the fields differed by exactly the delete button the rename
+              row carries and this one does not. */}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1.5">
+            {selected && (
+              <>
+                <label
+                  htmlFor="rename-category"
+                  className="col-span-3 font-label text-[0.6875rem] text-muted-foreground"
+                >
+                  {t('category_select.rename')}
+                </label>
                 <input
                   id="rename-category"
                   value={renameValue}
@@ -175,7 +181,7 @@ export default function CategorySelect({
                     if (e.key === 'Enter') void onRename();
                     if (e.key === 'Escape') setRenameValue(selected.name);
                   }}
-                  className="flex-1 min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
+                  className="w-full min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
                 />
                 <button
                   type="button"
@@ -190,31 +196,30 @@ export default function CategorySelect({
                   disabled={isDeleting}
                   label={t('category_select.delete')}
                 />
-              </div>
-            </div>
-          )}
+              </>
+            )}
 
-          <div className="space-y-1.5">
             <label
               htmlFor="new-category-name"
-              className="font-label text-[0.6875rem] text-muted-foreground block"
+              className={`col-span-3 font-label text-[0.6875rem] text-muted-foreground ${
+                selected ? 'mt-1.5' : ''
+              }`}
             >
               {t('category_select.new_category')}
             </label>
-            <div className="flex items-center gap-2">
-              <CategoryInput
-                name={name}
-                setName={setName}
-                createCategory={onCreate}
-                setExpanded={setExpanded}
-              />
-              <AddButton
-                onClick={onCreate}
-                disabled={name.trim() === '' || isCreating}
-                isCreating={isCreating}
-                label={t('category_select.add')}
-              />
-            </div>
+            <CategoryInput
+              name={name}
+              setName={setName}
+              createCategory={onCreate}
+              setExpanded={setExpanded}
+            />
+            <AddButton
+              onClick={onCreate}
+              disabled={name.trim() === '' || isCreating}
+              isCreating={isCreating}
+              label={t('category_select.add')}
+              className="col-span-2 w-full"
+            />
           </div>
         </>
       )}

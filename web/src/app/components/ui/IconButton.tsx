@@ -6,6 +6,9 @@ const SIZE_CLASSES = {
   sm: 'w-8 h-8',
   md: 'w-9 h-9 max-sm:w-11 max-sm:h-11',
   lg: 'w-10 h-10',
+  // The height the form controls elsewhere are drawn to (`min-h-11`), for
+  // an icon button standing in a row of them.
+  xl: 'w-11 h-11',
 } as const;
 
 // A drawn box rather than a filled one. Three filled ink squares on every
