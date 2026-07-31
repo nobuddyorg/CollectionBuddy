@@ -23,10 +23,25 @@ export function CategorySelectDropdown({
 }: Props) {
   const { t } = useI18n();
 
+  // Placeholder dividers rather than a "Loading…" line: the strip keeps
+  // its height and its rule, so the page below it doesn't step down when
+  // the real tabs arrive. Three of them, at uneven widths, because
+  // category names are uneven -- three matched bars read as a component
+  // rather than as something unfinished.
   if (isLoading) {
     return (
-      <div className="font-label text-xs text-foreground/70" aria-live="polite">
-        {t('common.loading')}
+      <div
+        role="status"
+        aria-label={t('common.loading')}
+        className="flex min-h-11 items-center gap-5 border-b border-border"
+      >
+        {['4.5rem', '3rem', '5.5rem'].map((w) => (
+          <div
+            key={w}
+            className="h-3 rounded-sm bg-muted"
+            style={{ width: w }}
+          />
+        ))}
       </div>
     );
   }

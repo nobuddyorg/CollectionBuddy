@@ -15,11 +15,19 @@ import {
 import { removeItemImages } from '../../data/images';
 import type { CategorySummary } from '../../data/categories';
 
+export type UseCategories = ReturnType<typeof useCategories>;
+
+// Owned by the page rather than by CategorySelect: the page decides what
+// to render below the strip, and "the categories haven't arrived yet" is
+// the difference between an empty-state prompt and a placeholder grid.
 export function useCategories() {
   const { t } = useI18n();
   const toast = useToast();
   const [cats, setCats] = useState<CategorySummary[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  // Starts loading: the only consumer fetches on mount, and an initial
+  // `false` meant the tab strip rendered its "no categories" state for a
+  // render before the request it is waiting on had even started.
+  const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);

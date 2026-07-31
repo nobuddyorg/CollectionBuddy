@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import CategorySelect from './components/CategorySelect/index';
+import { useCategories } from './components/CategorySelect/useCategories';
 import Header from './components/Header/index';
 import ItemList from './components/ItemList/index';
+import { ItemListSkeleton } from './components/ItemList/Skeleton';
 import LoadingOverlay from './components/LoadingOverlay/index';
 import { useI18n } from './i18n/useI18n';
 import { supabase } from './supabase';
@@ -25,6 +27,27 @@ export default function Page() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     null,
   );
+
+  const categories = useCategories();
+  const { reload } = categories;
+
+  // False until the first listing has come back *and* a lone category has
+  // been selected from it -- both in the same tick, so there is no render
+  // in between where the categories exist but nothing is selected yet.
+  // That render is what used to flash the "choose a category" prompt on
+  // the way to a collection the user never had to choose.
+  const [catalogueReady, setCatalogueReady] = useState(false);
+
+  // Waits for the session: these rows are readable only under the signed-in
+  // user's RLS policies, so firing this before the session resolves asks
+  // the database for a list it will refuse to return.
+  useEffect(() => {
+    if (loading || !user) return;
+    void reload().then((catsData) => {
+      if (catsData.length === 1) setSelectedCategoryId(catsData[0].id);
+      setCatalogueReady(true);
+    });
+  }, [loading, user, reload]);
 
   const signOut = useCallback(async () => {
     try {
@@ -72,9 +95,16 @@ export default function Page() {
         <CategorySelect
           selectedCat={selectedCategoryId}
           onSelect={setSelectedCategoryId}
+          categories={categories}
         />
 
-        {hasCategory ? (
+        {!catalogueReady ? (
+          // Sign-in lands here before the categories are back, and for a
+          // single-category collection the entries are the next thing to
+          // appear. Holding their shape means the page fills in rather
+          // than assembling itself in three visible steps.
+          <ItemListSkeleton />
+        ) : hasCategory ? (
           <section className="relative z-50 space-y-4">
             <h2 id="entries-heading" className="sr-only">
               {t('page.entries')}

@@ -10,6 +10,7 @@ import ItemCreate from '../ItemCreate';
 import { Pagination } from './Pagination';
 import { ItemCard } from './ItemCard';
 import { ModalImage } from './ModalImage';
+import { GridSkeleton } from './Skeleton';
 import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
 import type { ImgEntry } from './types';
@@ -261,12 +262,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
       {items.length === 0 ? (
         loading ? (
-          <p
-            className="py-10 text-center text-sm text-foreground/70"
-            aria-live="polite"
-          >
-            {t('common.loading')}
-          </p>
+          <GridSkeleton />
         ) : (
           <section className="py-16 grid place-items-center text-center">
             <div className="flex flex-col items-center gap-4 max-w-xs">
