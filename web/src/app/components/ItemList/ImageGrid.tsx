@@ -35,6 +35,15 @@ function Plate({
           width={800}
           height={600}
           unoptimized
+          // Fetched in CORS mode with credentials omitted, which makes the
+          // browser ignore Set-Cookie on the response. Cloudflare fronts
+          // Supabase storage and sets `__cf_bm` scoped to `Domain=supabase.co`
+          // -- a public suffix, so browsers are obliged to reject it and say
+          // so, once per image (#258). The bucket answers
+          // `access-control-allow-origin: *`, so nothing about loading
+          // changes; if that ever stopped being true these would fail to
+          // render rather than merely warn, which is the risk being taken.
+          crossOrigin="anonymous"
           loading="lazy"
           onLoad={() => setLoaded(true)}
           onError={() => setLoaded(true)}

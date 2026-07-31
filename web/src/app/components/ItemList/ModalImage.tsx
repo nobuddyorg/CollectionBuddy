@@ -62,6 +62,8 @@ export function ModalImage({
           src={url}
           alt={t('item_list.full_size_image_alt')}
           unoptimized
+          // Same reasoning as the grid: see the note in ImageGrid.tsx.
+          crossOrigin="anonymous"
           width={0}
           height={0}
           sizes="100vw"

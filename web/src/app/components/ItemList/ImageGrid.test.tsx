@@ -69,6 +69,16 @@ describe('ImageGrid', () => {
     expect(screen.getByRole('img')).toBeInTheDocument();
   });
 
+  // Load-bearing despite looking like decoration: without it the browser
+  // processes Cloudflare's Set-Cookie on every photograph and rejects it,
+  // because it is scoped to the public suffix supabase.co (#258).
+  it('fetches photographs without credentials', () => {
+    renderGrid([img('a'), img('b')]);
+    for (const image of screen.getAllByRole('img')) {
+      expect(image).toHaveAttribute('crossorigin', 'anonymous');
+    }
+  });
+
   it('renders a single image as one full-width plate', () => {
     renderGrid([img('a')]);
     const images = screen.getAllByRole('img');
