@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
-import { Actions, AddPhoto } from './Actions';
+import { Actions, AddPhoto, AddPhotoPlate } from './Actions';
 
 function renderActions(overrides: Partial<Parameters<typeof Actions>[0]> = {}) {
   const props = { onEdit: vi.fn(), onDelete: vi.fn(), ...overrides };
@@ -87,5 +87,51 @@ describe('AddPhoto', () => {
   it('blocks the file picker while an upload is in flight', () => {
     const { input } = renderAddPhoto({ busy: true });
     expect(input).toBeDisabled();
+  });
+});
+
+function renderPlate(
+  overrides: Partial<Parameters<typeof AddPhotoPlate>[0]> = {},
+) {
+  const props = { onUpload: vi.fn(), busy: false, ...overrides };
+  const { container } = render(
+    <I18nProvider>
+      <AddPhotoPlate {...props} />
+    </I18nProvider>,
+  );
+  const input = container.querySelector(
+    'input[type="file"]',
+  ) as HTMLInputElement;
+  return { props, input };
+}
+
+describe('AddPhotoPlate', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('lang', 'en');
+  });
+
+  it('names the empty condition as well as the way out of it', () => {
+    renderPlate();
+    expect(screen.getByText('No images')).toBeVisible();
+    expect(screen.getByText('Add image')).toBeVisible();
+  });
+
+  it('is itself the upload target, so an empty card needs no second control', async () => {
+    const { props, input } = renderPlate();
+    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    await userEvent.upload(input, file);
+    expect(props.onUpload).toHaveBeenCalledWith(file);
+  });
+
+  it('blocks the file picker while an upload is in flight', () => {
+    const { input } = renderPlate({ busy: true });
+    expect(input).toBeDisabled();
+  });
+
+  // The shared <Spinner> is white-on-dark; on this pale plate it would be
+  // an invisible busy state.
+  it('shows a visible busy indicator while uploading', () => {
+    renderPlate({ busy: true });
+    expect(screen.getByRole('status', { name: 'Loading…' })).toBeVisible();
   });
 });

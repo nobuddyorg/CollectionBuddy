@@ -19,6 +19,7 @@ export enum IconType {
   Frame,
   Expand,
   Collapse,
+  Photo,
 }
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
@@ -345,6 +346,22 @@ export const Icon: React.FC<IconProps> = ({
           <path d="M3 3l6 6m-6-6v4m0-4h4" />
           <path d="M21 3l-6 6m6-6v4m0-4h-4" />
           <path d="M3 21l6-6m-6 6v-4m0 4h-4" />
+        </svg>
+      );
+    case IconType.Photo:
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          {...props}
+        >
+          <rect x="3" y="4" width="18" height="16" rx="1.5" />
+          <circle cx="8.5" cy="9.5" r="1.5" />
+          <path d="M3 16.5 8.5 12l4 3.5L16 13l5 4" />
         </svg>
       );
     default:

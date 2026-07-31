@@ -102,6 +102,54 @@ describe('ItemCard', () => {
     expect(handlers.onDeleteItem).toHaveBeenCalledOnce();
   });
 
+  // Cards with no photograph used to open straight onto the caption, so a
+  // scrolling stack of them had no repeating shape to break on. They now
+  // lead with an empty mount that holds the same frame a photo would --
+  // and it is the only upload control on the card, not a second one
+  // alongside the band.
+  it('leads an unphotographed entry with an empty mount', () => {
+    const { container } = render(
+      <I18nProvider>
+        <ItemCard
+          item={item}
+          imgs={[]}
+          busy={false}
+          deletingPath={new Set()}
+          onUpload={vi.fn()}
+          onEditItem={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onDeleteImage={vi.fn()}
+          onOpenModal={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+    expect(screen.getByText('No images')).toBeVisible();
+    expect(container.querySelectorAll('input[type="file"]')).toHaveLength(1);
+  });
+
+  // Regression: the mount is the *resolved* empty state. Showing it while
+  // the signed URLs are still in flight flashes "no images" on an entry
+  // that has them, then swaps it for a photograph.
+  it('waits for the image listing before declaring an entry empty', () => {
+    render(
+      <I18nProvider>
+        <ItemCard
+          item={item}
+          imgs={[]}
+          busy={false}
+          imagesLoading
+          deletingPath={new Set()}
+          onUpload={vi.fn()}
+          onEditItem={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onDeleteImage={vi.fn()}
+          onOpenModal={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+    expect(screen.queryByText('No images')).not.toBeInTheDocument();
+  });
+
   it('disables the file input while an upload is in flight', () => {
     const { container } = render(
       <I18nProvider>
