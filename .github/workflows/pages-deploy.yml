@@ -15,7 +15,58 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The database is deployed before the bundle that depends on it, because
+  # that is the only order that can't break the live site: a frontend
+  # referencing a column the database doesn't have yet makes PostgREST
+  # reject the query outright. Nothing downstream runs if this fails, so a
+  # rejected migration leaves the old (working) bundle deployed against the
+  # old schema rather than a new one against a schema it doesn't match.
+  #
+  # This job exists because the alternative -- applying migrations by hand
+  # -- silently stopped happening: 0009 through 0014 sat unapplied in
+  # production for months while the repo and its docs described them as
+  # live, including the storage restrictions in 0009.
+  #
+  # Note the workflow-level `cancel-in-progress` above can cancel this
+  # mid-push. That is survivable rather than good: each migration file is
+  # its own transaction and is recorded as it lands, so an interrupted push
+  # leaves a prefix applied and the rest pending, which the next run
+  # continues. It cannot leave a half-applied file behind.
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: supabase/setup-cli@v1
+        with:
+          # Pinned deliberately: this is the version the migration chain was
+          # verified against, and an unattended `db push` against production
+          # is not the place to discover a CLI behaviour change.
+          version: 2.110.0
+
+      - name: Link to the Supabase project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      # Prints what would be applied before applying it, so the log says
+      # what changed even when the push itself is a no-op.
+      - name: Show pending migrations
+        run: supabase db push --linked --dry-run
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Apply migrations
+        run: supabase db push --linked
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
   build:
+    needs: migrate
     runs-on: ubuntu-latest
     defaults:
       run:
