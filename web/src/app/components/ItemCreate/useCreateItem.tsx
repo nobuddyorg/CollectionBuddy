@@ -28,6 +28,8 @@ export function useCreateItem(categoryId: string) {
           title: values.title,
           description: values.description,
           place: values.place,
+          place_lat: values.place_lat,
+          place_lng: values.place_lng,
           tags,
         });
 

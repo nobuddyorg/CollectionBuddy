@@ -3,6 +3,7 @@ import { useEffect, useId, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { useI18n } from '../../i18n/useI18n';
 import { usePhotonSearch } from './usePhoton';
+import type { PlaceCoords } from './types';
 
 const MIN_Q = 3;
 const ESTIMATED_MENU_HEIGHT = 240;
@@ -15,6 +16,9 @@ type MenuPos = {
   anchorBottom: number;
 };
 
+// `onChange` always says what the coordinates are now, never just what the
+// text is: passing null for a hand-typed edit is how stale coordinates are
+// stopped from outliving the name they were looked up for.
 export function PlaceAutocomplete({
   id,
   value,
@@ -22,7 +26,7 @@ export function PlaceAutocomplete({
 }: {
   id?: string;
   value: string;
-  onChange: (v: string) => void;
+  onChange: (v: string, coords: PlaceCoords | null) => void;
 }) {
   const { t, lang } = useI18n();
   const {
@@ -96,7 +100,9 @@ export function PlaceAutocomplete({
         value={value}
         onChange={(e) => {
           const v = e.target.value;
-          onChange(v);
+          // Typed by hand, so whatever coordinates were attached belong to
+          // a place that is no longer what this field says.
+          onChange(v, null);
           const len = v.trim().length;
           if (len < MIN_Q) {
             setFocus(false);
@@ -108,9 +114,9 @@ export function PlaceAutocomplete({
           if (value.trim().length >= MIN_Q) setFocus(true);
         }}
         onKeyDown={(e) => {
-          const maybeLabel = onKeyDown(e);
-          if (typeof maybeLabel === 'string') {
-            onChange(maybeLabel);
+          const picked = onKeyDown(e);
+          if (picked) {
+            onChange(picked.label, picked.coords);
             setFocus(false);
           }
         }}
@@ -190,7 +196,8 @@ export function PlaceAutocomplete({
                           e.stopPropagation();
                         }}
                         onClick={() => {
-                          onChange(choose(hit));
+                          const picked = choose(hit);
+                          onChange(picked.label, picked.coords);
                           setFocus(false);
                         }}
                         className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 ${

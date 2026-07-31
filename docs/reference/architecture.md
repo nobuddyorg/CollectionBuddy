@@ -18,7 +18,7 @@ Defined across [`supabase/migrations/`](../../supabase/migrations/), applied in 
 | Table | Columns | Notes |
 |---|---|---|
 | `categories` | `id`, `user_id`, `name`, `created_at`, `updated_at` | Name must be non-blank after normalization; unique per user, case-insensitively (`(user_id, lower(name))`). |
-| `items` | `id`, `user_id`, `title`, `description`, `place`, `tags text[]`, `tags_text` (generated), `created_at`, `updated_at` | Title must be non-blank. `tags_text` is a space-joined copy of `tags`, generated purely so tag search can share the same `ILIKE` filter as the other text columns. |
+| `items` | `id`, `user_id`, `title`, `description`, `place`, `place_lat`, `place_lng`, `tags text[]`, `tags_text` (generated), `created_at`, `updated_at` | Title must be non-blank. `tags_text` is a space-joined copy of `tags`, generated purely so tag search can share the same `ILIKE` filter as the other text columns. `place_lat`/`place_lng` are captured when the user picks a place suggestion ([`0015_place_coordinates.sql`](../../supabase/migrations/0015_place_coordinates.sql)), so the map draws those pins without geocoding; they are null for hand-typed places and for rows predating that migration, which fall back to a lookup. |
 | `item_categories` | `item_id`, `category_id`, `user_id`, `created_at` | Join table, composite primary key `(item_id, category_id)`. An item *can* belong to more than one category, though the UI only ever browses one at a time. |
 
 `public.profiles` existed in early migrations but was dropped in `0014_schema_hygiene.sql` — it was never populated or queried. Don't recreate it without a reason; it was dead weight, not a placeholder for something planned.

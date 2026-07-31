@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { listItemPlaces } from '../../data/items';
+import { listItemPlaces, type ItemPlaceRow } from '../../data/items';
 import { Place } from './types';
 
 const GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
@@ -20,6 +20,49 @@ function writeGeocodeCache(cache: Record<string, Place>) {
     // Storage full or unavailable (private browsing) -- caching is
     // best-effort, geocoding still works without it.
   }
+}
+
+/**
+ * Splits the rows to draw into places that already know where they are and
+ * names that still have to be looked up, preserving input order in both and
+ * deduplicating by name across the pair.
+ *
+ * Coordinates are stored at entry time (`0015_place_coordinates.sql`), so
+ * anything entered by picking a suggestion arrives ready to draw. A name is
+ * only unlocated if *no* row carrying it has coordinates -- one item entered
+ * before this shipped doesn't force a lookup for a place another item
+ * already located.
+ */
+export function partitionByStoredCoords(rows: ItemPlaceRow[]): {
+  located: Place[];
+  unlocated: string[];
+} {
+  const byName = new Map<string, Place>();
+  for (const row of rows) {
+    const { place, place_lat: lat, place_lng: lng } = row;
+    if (!place || byName.has(place)) continue;
+    // Null is the normal state of older and hand-typed rows. Checked
+    // separately from the finite test below because `Number.isFinite`,
+    // while it does reject null, isn't a type guard -- this is what
+    // narrows the pair to `number` for the Place built underneath.
+    if (lat == null || lng == null) continue;
+    // A stored NaN would draw a pin nowhere *and* suppress the geocode
+    // that would have found the place properly.
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    byName.set(place, { name: place, lat, lng });
+  }
+
+  const located: Place[] = [];
+  const unlocated: string[] = [];
+  const seen = new Set<string>();
+  for (const { place } of rows) {
+    if (!place || seen.has(place)) continue;
+    seen.add(place);
+    const hit = byName.get(place);
+    if (hit) located.push(hit);
+    else unlocated.push(place);
+  }
+  return { located, unlocated };
 }
 
 /**
@@ -106,17 +149,21 @@ export function usePlaces(categoryId: string, enabled: boolean) {
 
         if (error) throw error;
 
-        const uniquePlaces = Array.from(new Set(items.map((i) => i.place!)));
+        // Places entered since 0015 carry their own coordinates and skip
+        // the gazetteer entirely; only what's left over is looked up.
+        const { located, unlocated } = partitionByStoredCoords(items);
         const cache = readGeocodeCache();
         let cacheDirty = false;
 
-        const { cached, pending } = partitionByCache(uniquePlaces, cache);
-        // Cached places land in one batch before any request goes out, so a
-        // second visit draws its pins immediately instead of waiting on the
-        // slowest lookup of the batch.
-        if (!cancelled && cached.length > 0) setPlaces(cached);
+        const { cached, pending } = partitionByCache(unlocated, cache);
+        // Everything already known lands in one batch before any request
+        // goes out, so the map draws those pins immediately instead of
+        // waiting on the slowest lookup of the batch.
+        const known = [...located, ...cached];
+        if (!cancelled && known.length > 0) setPlaces(known);
 
-        let resolvedCount = cached.length;
+        const placeCount = located.length + unlocated.length;
+        let resolvedCount = known.length;
 
         // One place, asked for as many times as it is worth asking. Returns
         // null once the answer is settled -- either the service named
@@ -173,7 +220,7 @@ export function usePlaces(categoryId: string, enabled: boolean) {
         // Every place failed to geocode (as opposed to there being no
         // places to geocode) -- distinguish "geocoding is broken" from
         // "nothing to show" instead of silently rendering an empty map.
-        if (!cancelled && uniquePlaces.length > 0 && resolvedCount === 0) {
+        if (!cancelled && placeCount > 0 && resolvedCount === 0) {
           setError(true);
         }
       } catch {

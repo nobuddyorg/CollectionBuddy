@@ -11,6 +11,8 @@ const EMPTY_VALUES: ItemFormValues = {
   title: '',
   description: '',
   place: '',
+  place_lat: null,
+  place_lng: null,
   tags: [],
 };
 

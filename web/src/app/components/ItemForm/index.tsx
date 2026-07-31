@@ -5,7 +5,7 @@ import { useI18n } from '../../i18n/useI18n';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { Submit } from './Submit';
 import { TagsInput } from './TagsInput';
-import type { ItemFormProps, ItemFormValues } from './types';
+import type { ItemFormProps, ItemFormValues, PlaceCoords } from './types';
 
 export type { ItemFormValues } from './types';
 
@@ -26,6 +26,13 @@ export default function ItemForm({
   const [title, setTitle] = useState(initial.title ?? '');
   const [description, setDescription] = useState(initial.description ?? '');
   const [place, setPlace] = useState(initial.place ?? '');
+  // Carried through untouched unless the field is edited, so editing an
+  // item's title doesn't quietly strip the coordinates off its place.
+  const [placeCoords, setPlaceCoords] = useState<PlaceCoords | null>(
+    initial.place_lat != null && initial.place_lng != null
+      ? { lat: initial.place_lat, lng: initial.place_lng }
+      : null,
+  );
   const [tags, setTags] = useState<string[]>(initial.tags ?? []);
   const [titleTouched, setTitleTouched] = useState(false);
 
@@ -45,9 +52,24 @@ export default function ItemForm({
         titleRef.current?.focus();
         return;
       }
-      onSubmit({ title, description, place, tags } as ItemFormValues);
+      onSubmit({
+        title,
+        description,
+        place,
+        place_lat: placeCoords?.lat ?? null,
+        place_lng: placeCoords?.lng ?? null,
+        tags,
+      } as ItemFormValues);
     },
-    [onSubmit, title, description, place, tags],
+    [onSubmit, title, description, place, placeCoords, tags],
+  );
+
+  const handlePlaceChange = useCallback(
+    (value: string, coords: PlaceCoords | null) => {
+      setPlace(value);
+      setPlaceCoords(coords);
+    },
+    [],
   );
 
   return (
@@ -105,7 +127,11 @@ export default function ItemForm({
           >
             {t('item_create.place')}
           </label>
-          <PlaceAutocomplete id={placeId} value={place} onChange={setPlace} />
+          <PlaceAutocomplete
+            id={placeId}
+            value={place}
+            onChange={handlePlaceChange}
+          />
         </div>
         <div className="space-y-1">
           <label
