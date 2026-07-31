@@ -181,11 +181,11 @@ export function Actions({
       </IconButton>
 
       <IconButton
-        variant="outline"
+        variant="outlineDestructive"
         onClick={onDelete}
         aria-label={t('item_list.delete_entry')}
         title={t('item_list.delete_entry')}
-        className="ml-auto hover:bg-destructive/10 hover:text-destructive hover:ring-destructive/30"
+        className="ml-auto"
       >
         <Icon
           icon={IconType.Trash}
