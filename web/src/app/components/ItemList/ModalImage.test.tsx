@@ -33,6 +33,13 @@ describe('ModalImage', () => {
     expect(screen.getByRole('img')).toBeInTheDocument();
   });
 
+  // Matches the grid: fetched without credentials so the browser never
+  // processes Cloudflare's public-suffix-scoped Set-Cookie (#258).
+  it('fetches the full-size image without credentials', () => {
+    renderModal(URL);
+    expect(screen.getByRole('img')).toHaveAttribute('crossorigin', 'anonymous');
+  });
+
   // Regression: the close button used to sit *below* the image in a flex
   // column. With the image free to take max-h-full, it was pushed past the
   // bottom of a fixed, unscrollable overlay and could not be reached at all
