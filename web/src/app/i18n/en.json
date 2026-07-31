@@ -5,8 +5,8 @@
   },
   "page": {
     "entries": "Entries",
-    "choose_category": "Choose category",
-    "add_collectibles": "Add new collectibles and upload pictures to get started.",
+    "no_categories": "No categories yet",
+    "name_first_category": "Name your first category above — coins, stamps, whatever you keep.",
     "footer": "Collect • Organize • Keep",
     "skip_to_content": "Skip to content"
   },

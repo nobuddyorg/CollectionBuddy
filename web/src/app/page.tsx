@@ -4,6 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import CategorySelect from './components/CategorySelect/index';
+import {
+  pickInitialCategory,
+  readStoredCategory,
+  storeSelectedCategory,
+} from './components/CategorySelect/selection';
 import { useCategories } from './components/CategorySelect/useCategories';
 import Header from './components/Header/index';
 import ItemList from './components/ItemList/index';
@@ -28,14 +33,21 @@ export default function Page() {
     null,
   );
 
+  // Every selection is remembered, so the next visit opens where this one
+  // left off rather than on a chooser.
+  const selectCategory = useCallback((id: string | null) => {
+    setSelectedCategoryId(id);
+    storeSelectedCategory(id);
+  }, []);
+
   const categories = useCategories();
   const { reload } = categories;
 
-  // False until the first listing has come back *and* a lone category has
-  // been selected from it -- both in the same tick, so there is no render
-  // in between where the categories exist but nothing is selected yet.
-  // That render is what used to flash the "choose a category" prompt on
-  // the way to a collection the user never had to choose.
+  // False until the first listing has come back *and* a category has been
+  // selected from it -- both in the same tick, so there is no render in
+  // between where the categories exist but nothing is selected yet. That
+  // render is what used to flash the "choose a category" prompt on the way
+  // to a collection the user never had to choose.
   const [catalogueReady, setCatalogueReady] = useState(false);
 
   // Waits for the session: these rows are readable only under the signed-in
@@ -44,7 +56,13 @@ export default function Page() {
   useEffect(() => {
     if (loading || !user) return;
     void reload().then((catsData) => {
-      if (catsData.length === 1) setSelectedCategoryId(catsData[0].id);
+      // Whatever was last on screen, or the first category, whichever the
+      // listing can honour. Auto-selecting only a lone category meant that
+      // owning a second one turned every sign-in into a decision.
+      setSelectedCategoryId(
+        (current) =>
+          current ?? pickInitialCategory(catsData, readStoredCategory()),
+      );
       setCatalogueReady(true);
     });
   }, [loading, user, reload]);
@@ -94,13 +112,13 @@ export default function Page() {
       >
         <CategorySelect
           selectedCat={selectedCategoryId}
-          onSelect={setSelectedCategoryId}
+          onSelect={selectCategory}
           categories={categories}
         />
 
         {!catalogueReady ? (
-          // Sign-in lands here before the categories are back, and for a
-          // single-category collection the entries are the next thing to
+          // Sign-in lands here before the categories are back, and the
+          // entries of the category it opens on are the next thing to
           // appear. Holding their shape means the page fills in rather
           // than assembling itself in three visible steps.
           <ItemListSkeleton />
@@ -115,6 +133,9 @@ export default function Page() {
             />
           </section>
         ) : (
+          // Reached only by a collection with no categories at all: one
+          // that has any opens on one of them. The prompt names that,
+          // rather than asking for a choice there is nothing to make.
           <section className="py-16 grid place-items-center text-center">
             <div className="flex flex-col items-center gap-4 max-w-xs">
               <div className="h-16 w-16 bg-card ring-1 ring-border grid place-items-center text-3xl">
@@ -122,10 +143,10 @@ export default function Page() {
               </div>
               <div className="space-y-1.5">
                 <h3 className="font-display text-lg">
-                  {t('page.choose_category')}
+                  {t('page.no_categories')}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {t('page.add_collectibles')}
+                  {t('page.name_first_category')}
                 </p>
               </div>
             </div>

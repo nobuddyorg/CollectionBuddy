@@ -14,6 +14,7 @@ import {
 import { CategoryText } from './CategoryText';
 import { CategorySelectDropdown } from './Dropdown';
 import { CategoryInput } from './Input';
+import { sortCategories } from './selection';
 import type { UseCategories } from './useCategories';
 
 type Props = {
@@ -57,13 +58,9 @@ export default function CategorySelect({
   // the collapse that used to ride along with the auto-select is already
   // handled by the selection transition above.
 
-  const sortedCats = useMemo(
-    () =>
-      [...cats].sort((a, b) =>
-        a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }),
-      ),
-    [cats],
-  );
+  // The same order the page picks "the first category" from, so the tab it
+  // opens on is the tab that reads as first.
+  const sortedCats = useMemo(() => sortCategories(cats), [cats]);
 
   const selected = useMemo<Category | null>(
     () =>
@@ -107,10 +104,13 @@ export default function CategorySelect({
     if (!(await confirm(t('category_select.confirmDelete')))) return;
     const ok = await deleteCategory(selectedCat);
     if (ok) {
-      onSelect(null);
-      setExpanded(true);
+      // Falls through to what is left rather than to nothing: a collection
+      // with categories in it should always be showing one of them, and
+      // deleting a category is no reason to be sent back to a chooser.
+      const remaining = sortedCats.filter((c) => c.id !== selectedCat);
+      onSelect(remaining[0]?.id ?? null);
     }
-  }, [selectedCat, deleteCategory, onSelect, t, confirm]);
+  }, [selectedCat, deleteCategory, onSelect, sortedCats, t, confirm]);
 
   return (
     <section className="space-y-3">
