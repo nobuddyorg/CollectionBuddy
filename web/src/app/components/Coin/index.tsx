@@ -4,6 +4,7 @@ import React, { useId, useMemo } from 'react';
 
 import type { CoinProps } from '../Coin/types';
 import { Icon, IconType } from '../Icon/index';
+import { coinSizeCss } from './size';
 import { TextRing } from './TextRing';
 
 export default function Coin({
@@ -24,7 +25,7 @@ export default function Coin({
   // deliberately generous: an earlier 68vw/200px pairing shrank it far too
   // far on phones, where this is the whole page.
   const style = useMemo<React.CSSProperties>(() => {
-    const clamped = `clamp(300px, 80vw, ${size}px)`;
+    const clamped = coinSizeCss(size);
     return { width: clamped, height: clamped };
   }, [size]);
 
