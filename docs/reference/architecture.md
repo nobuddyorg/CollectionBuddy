@@ -36,7 +36,7 @@ All in [`0004_functions_triggers.sql`](../../supabase/migrations/0004_functions_
 - `tg_categories_normalize()` / `tg_items_normalize()` — apply `normalize_text()` to name/title/description/place, and for items also dedupe + sort `tags`.
 - `tg_item_categories_enforce()` — verifies the item and category exist, belong to the *same* user, and sets/rechecks `user_id` on the join row (a cross-tenant assignment guard).
 - `delete_item_if_orphan()` — after an `item_categories` row is deleted, deletes the item if it now belongs to zero categories. Runs `FOR EACH STATEMENT` with a transition table (not `FOR EACH ROW`) — see [Design decisions](../explanation/design-decisions.md#why-the-orphan-cleanup-trigger-is-statement-level).
-- `cleanup_item_images()` — on item delete, removes matching rows from `storage.objects`. This only ever cleans up storage **metadata**, never the actual bytes — see [Design decisions](../explanation/design-decisions.md#why-images-are-deleted-client-side-before-the-database-row).
+There is no image-cleanup trigger: `cleanup_item_images()` was dropped in `0016_drop_storage_cleanup_trigger.sql`, since Supabase now forbids deleting from `storage.objects` outside the Storage API and the trigger made every item delete fail — see [Design decisions](../explanation/design-decisions.md#why-images-are-deleted-client-side-before-the-database-row).
 - `keepalive()` — no-op RPC, granted to `anon` and `authenticated`, called daily by [`keep-alive.yml`](../../.github/workflows/keep-alive.yml) to stop a free-tier Supabase project from auto-pausing.
 
 ### Indexes
