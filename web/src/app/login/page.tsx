@@ -69,9 +69,9 @@ export default function LoginPage() {
           catalogue and the companion. */}
       <h1 className="font-display text-4xl sm:text-5xl mb-3 text-center">
         <span className="border-b-[3px] border-foreground pb-0.5">
-          {t('login_page.title_collection')}
+          {t('brand.collection')}
         </span>
-        <span className="text-accent">{t('login_page.title_buddy')}</span>
+        <span className="text-accent">{t('brand.buddy')}</span>
       </h1>
 
       <p className="font-label text-[0.6875rem] text-muted-foreground text-center mt-2 mb-8 sm:mb-10">

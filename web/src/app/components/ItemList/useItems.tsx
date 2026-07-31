@@ -15,7 +15,12 @@ export function useItems(categoryId: string, q: string) {
   const [items, setItems] = useState<ItemLite[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  // Starts loading, because mounting always fetches (the effect below runs
+  // unconditionally). Starting at `false` gave one render where there were
+  // no items and nothing in flight, which is the state the list renders as
+  // "No entries yet" -- so every category opened with a flash of the empty
+  // state before its entries appeared.
+  const [loading, setLoading] = useState(true);
   const reqSeq = useRef(0);
 
   // Resets to page 1 whenever the category or search query changes, computed

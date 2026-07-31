@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useI18n } from '../../i18n/useI18n';
@@ -14,14 +14,19 @@ import {
 import { CategoryText } from './CategoryText';
 import { CategorySelectDropdown } from './Dropdown';
 import { CategoryInput } from './Input';
-import { useCategories } from './useCategories';
+import type { UseCategories } from './useCategories';
 
 type Props = {
   selectedCat: string | null;
   onSelect: (id: string | null) => void;
+  categories: UseCategories;
 };
 
-export default function CategorySelect({ selectedCat, onSelect }: Props) {
+export default function CategorySelect({
+  selectedCat,
+  onSelect,
+  categories,
+}: Props) {
   const { t } = useI18n();
   const confirm = useConfirm();
   const {
@@ -33,8 +38,7 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
     createCategory,
     renameCategory,
     deleteCategory,
-    reload,
-  } = useCategories();
+  } = categories;
   const [name, setName] = useState('');
   const [renameValue, setRenameValue] = useState('');
   const [expanded, setExpanded] = useState(!selectedCat);
@@ -48,14 +52,10 @@ export default function CategorySelect({ selectedCat, onSelect }: Props) {
     setExpanded(!selectedCat);
   }
 
-  useEffect(() => {
-    reload().then((catsData) => {
-      if (catsData.length === 1) {
-        onSelect(catsData[0].id);
-        setExpanded(false);
-      }
-    });
-  }, [reload, onSelect]);
+  // The initial load, and the auto-select of a lone category, now happen in
+  // the page: it needs the answer to decide what goes below this strip, and
+  // the collapse that used to ride along with the auto-select is already
+  // handled by the selection transition above.
 
   const sortedCats = useMemo(
     () =>

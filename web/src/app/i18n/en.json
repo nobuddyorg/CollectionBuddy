@@ -1,4 +1,8 @@
 {
+  "brand": {
+    "collection": "Collection",
+    "buddy": "Buddy"
+  },
   "page": {
     "entries": "Entries",
     "choose_category": "Choose category",
@@ -90,8 +94,6 @@
   },
   "login_page": {
     "circle_text": "CollectionBuddy • Collect • Organize • Keep • Your treasures at a glance • ",
-    "title_collection": "Collection",
-    "title_buddy": "Buddy",
     "subtitle": "Your digital scrapbook for coins, stuffed animals, stamps and everything you love.",
     "sign_in_error": "Sign-in failed. Please check your connection and try again."
   },

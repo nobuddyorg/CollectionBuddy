@@ -10,6 +10,7 @@ import ItemCreate from '../ItemCreate';
 import { Pagination } from './Pagination';
 import { ItemCard } from './ItemCard';
 import { ModalImage } from './ModalImage';
+import { GridSkeleton } from './Skeleton';
 import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
 import type { ImgEntry } from './types';
@@ -46,8 +47,14 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     loading: loadingPlaces,
     error: placesError,
   } = usePlaces(categoryId, mapOpen);
+  // Starts empty, not at 'fitAll'. The map frames the pins it has as they
+  // stream in on its own; this state exists for the re-frame below, once
+  // the last place has been geocoded. Opening at 'fitAll' meant that
+  // re-frame set the value it already held -- no state change, so no
+  // re-render, so the effect that runs a command never fired, and the view
+  // stayed framed around whichever pins happened to resolve first.
   const [mapCommand, setMapCommand] = useState<'fitAll' | 'fitCurrent' | null>(
-    'fitAll',
+    null,
   );
 
   const mapMarkers = useMemo(
@@ -261,12 +268,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
       {items.length === 0 ? (
         loading ? (
-          <p
-            className="py-10 text-center text-sm text-foreground/70"
-            aria-live="polite"
-          >
-            {t('common.loading')}
-          </p>
+          <GridSkeleton />
         ) : (
           <section className="py-16 grid place-items-center text-center">
             <div className="flex flex-col items-center gap-4 max-w-xs">
