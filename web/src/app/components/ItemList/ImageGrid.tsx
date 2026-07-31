@@ -48,6 +48,35 @@ function Plate({
   );
 }
 
+// A photograph's frame, held from the moment it is handed over. Compressing
+// and uploading a phone photo takes seconds, and until it was done the card
+// showed no sign of it at all beyond a spinner on a button -- so the picture
+// arrived by shoving the caption down, and a second tap on "add" felt like
+// the only way to tell whether the first had registered.
+function PendingPlate({
+  ratio,
+  small,
+  label,
+}: {
+  ratio: string;
+  small: boolean;
+  label: string;
+}) {
+  return (
+    <div
+      className={`img-skeleton relative w-full ${ratio}`}
+      role="status"
+      aria-label={label}
+    >
+      <span className="absolute inset-0 grid place-items-center text-muted-foreground">
+        <span
+          className={`${small ? 'w-4 h-4' : 'w-8 h-8'} rounded-full border-2 border-current/40 border-t-current animate-spin`}
+        />
+      </span>
+    </div>
+  );
+}
+
 // The layout follows how many photographs there actually are, because the
 // common cases are one and two -- and two is usually a matched pair (the
 // front and back of a coin, both faces of a stamp). Giving the second shot
@@ -65,6 +94,7 @@ export function ImageGrid({
   deletingPath,
   busy,
   loading = false,
+  pending = 0,
 }: {
   imgs: ImgEntry[];
   itemTitle: string;
@@ -74,13 +104,20 @@ export function ImageGrid({
   busy: boolean;
   /** Listing/signatures still in flight -- not the same as having none. */
   loading?: boolean;
+  /** Photographs handed over but not yet on the wall; each gets a frame. */
+  pending?: number;
 }) {
   const { t } = useI18n();
+
+  // Uploads count towards the layout, so the arrangement a card settles
+  // into is the one it already had while the picture was on its way -- the
+  // placeholder is replaced in place rather than rearranging the card.
+  const total = imgs.length + pending;
 
   // Reserve the frame while we still don't know whether there is a picture.
   // Rendering nothing and growing an image region later is what pushed the
   // caption and buttons down as the photographs arrived.
-  if (loading && !imgs.length) {
+  if (loading && !total) {
     return (
       <div
         className="img-skeleton aspect-4/3 w-full"
@@ -90,7 +127,7 @@ export function ImageGrid({
     );
   }
 
-  if (!imgs.length) return null;
+  if (!total) return null;
 
   const altFor = (i: number) =>
     t('item_list.image_alt')
@@ -128,21 +165,39 @@ export function ImageGrid({
     </button>
   );
 
-  const plate = (
-    img: ImgEntry,
+  // One slot of the arrangement: a photograph if there is one for it yet,
+  // and its held frame if it is still being uploaded. Slots past the end of
+  // `imgs` are the pending ones, so a new picture fills the frame that was
+  // standing in for it.
+  const slot = (
     index: number,
-    { ratio, src, small }: { ratio: string; src: string; small: boolean },
-  ) => (
-    <Plate
-      key={img.pathFull}
-      src={src}
-      alt={altFor(index)}
-      ratio={ratio}
-      onOpen={() => onOpenModal(img.urlFull)}
-    >
-      {deleteButton(img, small)}
-    </Plate>
-  );
+    { ratio, small }: { ratio: string; small: boolean },
+  ) => {
+    const img = imgs[index];
+    if (!img)
+      return (
+        <PendingPlate
+          key={`pending-${index}`}
+          ratio={ratio}
+          small={small}
+          label={t('item_list.uploading')}
+        />
+      );
+
+    return (
+      <Plate
+        key={img.pathFull}
+        // The strip cells are about a quarter of a card; everything else
+        // spans it, which is wider than the stored thumbnail.
+        src={small ? img.urlThumb || img.urlFull : img.urlFull}
+        alt={altFor(index)}
+        ratio={ratio}
+        onOpen={() => onOpenModal(img.urlFull)}
+      >
+        {deleteButton(img, small)}
+      </Plate>
+    );
+  };
 
   // The strip takes one track per thumbnail so it never leaves dead cells
   // at the end of the row, and a fixed height rather than a square ratio so
@@ -151,17 +206,11 @@ export function ImageGrid({
     gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))`,
   });
 
-  if (imgs.length === 1) {
-    return plate(imgs[0], 0, {
-      ratio: 'aspect-4/3',
-      // The full render, not the thumbnail: this spans the whole card,
-      // which is wider than the stored 250-400px thumb.
-      src: imgs[0].urlFull,
-      small: false,
-    });
+  if (total === 1) {
+    return slot(0, { ratio: 'aspect-4/3', small: false });
   }
 
-  if (imgs.length === 2) {
+  if (total === 2) {
     // From `sm` up each half is 2:3, so the pair is exactly as tall as the
     // 4:3 box a single image fills: a half-width cell at 2:3 is
     // (W/2) x (3/4 W). Cards side by side then line up.
@@ -175,35 +224,22 @@ export function ImageGrid({
     // so the pair keeps its squarer, less aggressively cropped shape.
     return (
       <div className="grid grid-cols-2 gap-px">
-        {imgs.map((img, i) =>
-          plate(img, i, {
-            ratio: 'aspect-square sm:aspect-2/3',
-            src: img.urlFull,
-            small: false,
-          }),
+        {[0, 1].map((i) =>
+          slot(i, { ratio: 'aspect-square sm:aspect-2/3', small: false }),
         )}
       </div>
     );
   }
 
-  const [hero, ...rest] = imgs;
-  const strip = rest.slice(0, STRIP_MAX);
+  const stripCount = Math.min(total - 1, STRIP_MAX);
 
   return (
     <div className="w-full">
-      {plate(hero, 0, {
-        ratio: 'aspect-4/3',
-        src: hero.urlFull,
-        small: false,
-      })}
+      {slot(0, { ratio: 'aspect-4/3', small: false })}
 
-      <div className="grid gap-px" style={stripStyle(strip.length)}>
-        {strip.map((img, i) =>
-          plate(img, i + 1, {
-            ratio: 'h-20 sm:h-24',
-            src: img.urlThumb || img.urlFull,
-            small: true,
-          }),
+      <div className="grid gap-px" style={stripStyle(stripCount)}>
+        {Array.from({ length: stripCount }, (_, i) =>
+          slot(i + 1, { ratio: 'h-20 sm:h-24', small: true }),
         )}
       </div>
     </div>

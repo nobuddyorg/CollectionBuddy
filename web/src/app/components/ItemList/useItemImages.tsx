@@ -82,7 +82,12 @@ export function useItemImages() {
   const { t } = useI18n();
   const toast = useToast();
   const confirm = useConfirm();
-  const [busy, setBusy] = useState<Set<string>>(new Set());
+  // A count, not a flag: a card can be given a second photograph while the
+  // first is still compressing, and each one owes the grid a placeholder
+  // of its own until it lands.
+  const [pendingUploads, setPendingUploads] = useState<Record<string, number>>(
+    {},
+  );
   const [deletingPath, setDeletingPath] = useState<Set<string>>(new Set());
   const [images, setImages] = useState<Record<string, ImgEntry[]>>({});
   // Items whose listing/signatures are still in flight. Distinct from "has
@@ -266,7 +271,10 @@ export function useItemImages() {
   const uploadImage = useCallback(
     async (itemId: string, file: File) => {
       try {
-        setBusy((prev) => new Set(prev).add(itemId));
+        setPendingUploads((prev) => ({
+          ...prev,
+          [itemId]: (prev[itemId] ?? 0) + 1,
+        }));
         const { data: u } = await supabase.auth.getUser();
         const uid = u.user?.id;
         if (!uid) throw new Error(t('item_list.no_user_session'));
@@ -308,14 +316,19 @@ export function useItemImages() {
           console.warn('Thumbnail upload failed:', upThumb.error);
         }
 
+        // Held until the listing has come back: the placeholder is meant to
+        // stand in for the photograph until the photograph itself is there
+        // to replace it, not until the bytes have merely been accepted.
         await refreshItemImages(itemId);
       } catch (err: unknown) {
         console.error('Failed to upload image:', err);
         toast.error(t('item_list.upload_error'));
       } finally {
-        setBusy((prev) => {
-          const next = new Set(prev);
-          next.delete(itemId);
+        setPendingUploads((prev) => {
+          const remaining = (prev[itemId] ?? 1) - 1;
+          const next = { ...prev };
+          if (remaining > 0) next[itemId] = remaining;
+          else delete next[itemId];
           return next;
         });
       }
@@ -373,7 +386,7 @@ export function useItemImages() {
     uploadImage,
     deleteImage,
     deleteAllItemImages,
-    busy,
+    pendingUploads,
     deletingPath,
   };
 }

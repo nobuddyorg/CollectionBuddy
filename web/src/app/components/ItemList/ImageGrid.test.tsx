@@ -181,4 +181,47 @@ describe('ImageGrid', () => {
     renderGrid([img('a')], { busy: true });
     expect(screen.getByRole('button', { name: 'Delete image' })).toBeDisabled();
   });
+
+  // A photograph being uploaded gets its frame straight away, and keeps it
+  // until the photograph itself is there to take it over.
+  describe('while a photograph is uploading', () => {
+    it('stands a placeholder in for it', () => {
+      renderGrid([], { pending: 1 });
+      const pending = screen.getByRole('status');
+      expect(pending).toHaveAccessibleName('Uploading image…');
+      expect(pending).toHaveClass('img-skeleton');
+      expect(pending).toHaveClass('aspect-4/3');
+    });
+
+    // The point of counting uploads into the layout: the card settles into
+    // its final arrangement while the picture is still on its way, rather
+    // than rearranging itself the moment it lands.
+    it('lays the card out as though the photograph had arrived', () => {
+      const { container } = renderGrid([img('a')], { pending: 1 });
+      expect(screen.getByRole('img')).toHaveClass('sm:aspect-2/3');
+      expect(container.querySelectorAll('.grid-cols-2')).toHaveLength(1);
+    });
+
+    it('gives the hero to the photographs and the strip to the wait', () => {
+      renderGrid([img('a'), img('b')], { pending: 1 });
+      const images = screen.getAllByRole('img');
+      expect(images[0]).toHaveClass('aspect-4/3');
+      expect(screen.getByRole('status')).toHaveClass('h-20');
+    });
+
+    it('holds one frame per upload', () => {
+      renderGrid([], { pending: 2 });
+      expect(screen.getAllByRole('status')).toHaveLength(2);
+    });
+
+    // The listing skeleton is for "we don't know yet"; an upload is a
+    // different, known thing, and it owns the frame while it runs.
+    it('takes precedence over the listing skeleton', () => {
+      renderGrid([], { pending: 1, loading: true });
+      expect(screen.getAllByRole('status')).toHaveLength(1);
+      expect(screen.getByRole('status')).toHaveAccessibleName(
+        'Uploading image…',
+      );
+    });
+  });
 });
