@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
-import { IconDefaultPrivate, Leaflet, MapProps } from './types';
+import { IconDefaultPrivate, Leaflet, MapProps, MarkerInput } from './types';
 
 const toUrl = (mod: unknown): string => {
   if (typeof mod === 'string') return mod;
@@ -16,10 +16,63 @@ const toUrl = (mod: unknown): string => {
 
 const BOUNDS_PAD_RATIO = 0.015;
 
+// A ceiling for every automatic fit. Pins are geocoded from a place *name*
+// ("Cologne"), so they are only ever city-accurate -- and fitBounds, left
+// alone, frames a single pin or a tight cluster at the tile layer's maximum
+// zoom, dropping the viewer onto a rooftop that the underlying data never
+// claimed. Zoom 12 shows the city the pin actually means.
+const FIT_MAX_ZOOM = 12;
+
+// Width of the box "zoom to me" frames around the current position: a
+// regional view, so the surrounding pins stay in the picture.
+const CURRENT_LOCATION_SPAN_M = 100000;
+
+const FIT_OPTIONS: import('leaflet').FitBoundsOptions = {
+  padding: [8, 8],
+  maxZoom: FIT_MAX_ZOOM,
+};
+
 const popupContent = (text: string): HTMLDivElement => {
   const el = document.createElement('div');
   el.textContent = text;
   return el;
+};
+
+const fitToPoints = (
+  map: import('leaflet').Map,
+  L: Leaflet,
+  points: Array<import('leaflet').LatLngExpression>,
+): void => {
+  if (points.length === 0) return;
+  const bounds = L.latLngBounds(points).pad(BOUNDS_PAD_RATIO);
+  if (bounds.isValid()) map.fitBounds(bounds, FIT_OPTIONS);
+};
+
+// Shared by the two places a command can arrive: one already queued when the
+// map finishes initialising, and every later one. Both used to frame the view
+// with their own copy of this, which is two ways for the zoom to drift apart.
+const runCommand = (
+  map: import('leaflet').Map,
+  L: Leaflet,
+  command: MapProps['command'],
+  markers: MarkerInput[],
+  currentLocation: MapProps['currentLocation'],
+): void => {
+  if (command === 'fitAll') {
+    const points: Array<import('leaflet').LatLngExpression> = markers.map(
+      (m) => [m.lat, m.lng],
+    );
+    if (currentLocation)
+      points.push([currentLocation.lat, currentLocation.lng]);
+    fitToPoints(map, L, points);
+  } else if (command === 'fitCurrent') {
+    if (!currentLocation) return;
+    const { lat, lng } = currentLocation;
+    map.fitBounds(
+      L.latLng(lat, lng).toBounds(CURRENT_LOCATION_SPAN_M),
+      FIT_OPTIONS,
+    );
+  }
 };
 
 const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
@@ -93,21 +146,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       if (!L2 || !cmd) return;
 
       requestAnimationFrame(() => {
-        if (cmd === 'fitAll') {
-          const pts: Array<import('leaflet').LatLngExpression> = [];
-          markersRef.current.forEach((m) => pts.push([m.lat, m.lng]));
-          const loc = currentLocRef.current;
-          if (loc) pts.push([loc.lat, loc.lng]);
-          if (pts.length > 0) {
-            const bounds = L2.latLngBounds(pts).pad(BOUNDS_PAD_RATIO);
-            if (bounds.isValid()) map.fitBounds(bounds, { padding: [8, 8] });
-          }
-        } else if (cmd === 'fitCurrent') {
-          const loc = currentLocRef.current;
-          if (!loc) return;
-          const bounds = L2.latLng(loc.lat, loc.lng).toBounds(100000);
-          map.fitBounds(bounds, { padding: [8, 8] });
-        }
+        runCommand(map, L2, cmd, markersRef.current, currentLocRef.current);
       });
     })();
     return () => {
@@ -171,9 +210,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       points.push([currentLocation.lat, currentLocation.lng]);
 
     if (points.length > 0) {
-      const bounds = L.latLngBounds(points).pad(BOUNDS_PAD_RATIO);
-      if (bounds.isValid())
-        mapInstance.current.fitBounds(bounds, { padding: [8, 8] });
+      fitToPoints(mapInstance.current, L, points);
       hasInitialFit.current = true;
     }
   }, [markers, currentLocation, ready]);
@@ -184,21 +221,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     if (!ready || !L || !map) return;
     if (!command) return;
 
-    if (command === 'fitAll') {
-      const pts: Array<import('leaflet').LatLngExpression> = [];
-      markersRef.current.forEach((m) => pts.push([m.lat, m.lng]));
-      const loc = currentLocRef.current;
-      if (loc) pts.push([loc.lat, loc.lng]);
-      if (pts.length > 0) {
-        const bounds = L.latLngBounds(pts).pad(BOUNDS_PAD_RATIO);
-        if (bounds.isValid()) map.fitBounds(bounds, { padding: [8, 8] });
-      }
-    } else if (command === 'fitCurrent') {
-      const loc = currentLocRef.current;
-      if (!loc) return;
-      const bounds = L.latLng(loc.lat, loc.lng).toBounds(100000);
-      map.fitBounds(bounds, { padding: [8, 8] });
-    }
+    runCommand(map, L, command, markersRef.current, currentLocRef.current);
   }, [command, ready]);
 
   // Leaflet caches the container size, so a map whose box changes while
