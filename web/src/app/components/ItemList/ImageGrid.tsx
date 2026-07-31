@@ -145,7 +145,12 @@ export function ImageGrid({
       disabled={deletingPath.has(img.pathFull) || busy}
       className={[
         'absolute top-1.5 right-1.5 flex items-center justify-center rounded-full',
-        'bg-black/55 text-white backdrop-blur-[2px] hover:bg-black/75',
+        // No backdrop blur. It bought nothing behind 55% black sitting on a
+        // photograph, and it cost a backdrop root: the browser has to
+        // snapshot everything painted under the button every time the card
+        // moves, and a snapshot that misses a frame during a fast scroll is
+        // drawn as nothing at all. A slightly heavier scrim reads the same.
+        'bg-black/60 text-white hover:bg-black/80',
         'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100',
         'disabled:opacity-60 transition',
         small ? 'w-7 h-7' : 'w-8 h-8',
