@@ -112,107 +112,112 @@ export default function CategorySelect({
     }
   }, [selectedCat, deleteCategory, onSelect, t, confirm]);
 
-  if (!expanded && selected) {
-    return (
-      <section className="flex items-end justify-between gap-3 border-b border-border pb-3">
-        <CategoryText title={t('category_select.title')} name={selected.name} />
-        <div className="flex items-center gap-2">
-          <ExpandButton
-            onClick={() => setExpanded(true)}
-            label={t('category_select.open_category')}
-          />
-        </div>
-      </section>
-    );
-  }
-
   return (
     <section className="space-y-3">
-      {/* The close sits where the pencil that opened this panel was, so the
-          same spot toggles it. Hidden until a category exists to go back
-          to -- on first run there is nothing to collapse to. */}
-      <div className="flex items-center justify-between gap-3 min-h-11 sm:min-h-9">
-        <h2 className="font-label text-[0.6875rem] text-muted-foreground">
-          {t('category_select.title')}
-        </h2>
-        {selected && (
-          <CollapseButton
-            onClick={() => setExpanded(false)}
-            label={t('common.close')}
-          />
-        )}
+      {/* One heading, in both states. Opening the panel used to replace the
+          collection's name with a bare label and swap the pencil for a
+          close button drawn at a different height, so every toggle moved
+          the heading down, moved the button up, and shifted everything
+          below by the difference. The panel now opens *underneath* a
+          header that does not move: same line, same slot, same size --
+          only the glyph in it changes. */}
+      <div className="flex items-end justify-between gap-3 border-b border-border pb-3">
+        <CategoryText
+          title={t('category_select.title')}
+          name={selected ? selected.name : t('category_select.none_selected')}
+          placeholder={!selected}
+        />
+        {/* Nothing to collapse to until a category exists, so on first run
+            the slot stays empty rather than offering a way back to no
+            selection at all. */}
+        {selected &&
+          (expanded ? (
+            <CollapseButton
+              onClick={() => setExpanded(false)}
+              label={t('common.close')}
+            />
+          ) : (
+            <ExpandButton
+              onClick={() => setExpanded(true)}
+              label={t('category_select.open_category')}
+            />
+          ))}
       </div>
 
-      <CategorySelectDropdown
-        selectedCat={selectedCat}
-        onSelect={onSelect}
-        sortedCats={sortedCats}
-        isLoading={isLoading}
-        setExpanded={setExpanded}
-      />
-
-      {/* Rename and create are separate rows with their own field and their
-          own button. Sharing one input meant the same box created a
-          category or did nothing depending on hidden state, and there was
-          no way to rename at all. */}
-      {selected && (
-        <div className="space-y-1.5">
-          <label
-            htmlFor="rename-category"
-            className="font-label text-[0.6875rem] text-muted-foreground block"
-          >
-            {t('category_select.rename')}
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              id="rename-category"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void onRename();
-                if (e.key === 'Escape') setRenameValue(selected.name);
-              }}
-              className="flex-1 min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
-            />
-            <button
-              type="button"
-              onClick={() => void onRename()}
-              disabled={!renameIsDirty || isRenaming}
-              className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-border hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
-            >
-              {t('category_select.rename')}
-            </button>
-            <DeleteButtonWithLabel
-              onClick={onDelete}
-              disabled={isDeleting}
-              label={t('category_select.delete')}
-            />
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-1.5">
-        <label
-          htmlFor="new-category-name"
-          className="font-label text-[0.6875rem] text-muted-foreground block"
-        >
-          {t('category_select.new_category')}
-        </label>
-        <div className="flex items-center gap-2">
-          <CategoryInput
-            name={name}
-            setName={setName}
-            createCategory={onCreate}
+      {expanded && (
+        <>
+          <CategorySelectDropdown
+            selectedCat={selectedCat}
+            onSelect={onSelect}
+            sortedCats={sortedCats}
+            isLoading={isLoading}
             setExpanded={setExpanded}
           />
-          <AddButton
-            onClick={onCreate}
-            disabled={name.trim() === '' || isCreating}
-            isCreating={isCreating}
-            label={t('category_select.add')}
-          />
-        </div>
-      </div>
+
+          {/* Rename and create are separate rows with their own field and
+              their own button. Sharing one input meant the same box
+              created a category or did nothing depending on hidden state,
+              and there was no way to rename at all. */}
+          {selected && (
+            <div className="space-y-1.5">
+              <label
+                htmlFor="rename-category"
+                className="font-label text-[0.6875rem] text-muted-foreground block"
+              >
+                {t('category_select.rename')}
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="rename-category"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void onRename();
+                    if (e.key === 'Escape') setRenameValue(selected.name);
+                  }}
+                  className="flex-1 min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
+                />
+                <button
+                  type="button"
+                  onClick={() => void onRename()}
+                  disabled={!renameIsDirty || isRenaming}
+                  className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-border hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                >
+                  {t('category_select.rename')}
+                </button>
+                <DeleteButtonWithLabel
+                  onClick={onDelete}
+                  disabled={isDeleting}
+                  label={t('category_select.delete')}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="new-category-name"
+              className="font-label text-[0.6875rem] text-muted-foreground block"
+            >
+              {t('category_select.new_category')}
+            </label>
+            <div className="flex items-center gap-2">
+              <CategoryInput
+                name={name}
+                setName={setName}
+                createCategory={onCreate}
+                setExpanded={setExpanded}
+              />
+              <AddButton
+                onClick={onCreate}
+                disabled={name.trim() === '' || isCreating}
+                isCreating={isCreating}
+                label={t('category_select.add')}
+              />
+            </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }

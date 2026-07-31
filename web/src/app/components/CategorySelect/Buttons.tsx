@@ -36,7 +36,8 @@ export function AddButton({
 // already-selected category and collapsed the panel -- it never set
 // anything, so it was named for something it did not do. This pairs with
 // ExpandButton: the pencil opens the panel, this closes it from the same
-// spot.
+// spot, and the two are drawn to the same box so the spot does not move
+// between them.
 export function CollapseButton({
   onClick,
   label,
@@ -106,8 +107,9 @@ export function ExpandButton({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="rounded-sm w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+      className="rounded-sm w-11 h-11 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
       aria-label={label}
       title={label}
     >
