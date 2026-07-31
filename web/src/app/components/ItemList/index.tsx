@@ -119,6 +119,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
   const {
     images,
+    loadingItems,
     refreshAllImages,
     uploadImage,
     deleteImage,
@@ -308,6 +309,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               item={it}
               imgs={images[it.id] ?? ([] as ImgEntry[])}
               busy={busy.has(it.id)}
+              imagesLoading={loadingItems.has(it.id)}
               deletingPath={deletingPath}
               onUpload={(f) => uploadImage(it.id, f)}
               onEditItem={() => openEdit(it)}

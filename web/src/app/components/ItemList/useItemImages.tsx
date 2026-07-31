@@ -12,6 +12,14 @@ import type { ImgEntry } from './types';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
 import { useI18n } from '../../i18n/useI18n';
+import {
+  cacheListing,
+  cacheSignedUrls,
+  getCachedListing,
+  getCachedSignedUrl,
+  invalidateListing,
+  unsignedPaths,
+} from './imageCache';
 
 export type StorageObjectRow = { name: string };
 export type ImageEntryData = { pathFull: string; pathThumb?: string };
@@ -77,6 +85,11 @@ export function useItemImages() {
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [deletingPath, setDeletingPath] = useState<Set<string>>(new Set());
   const [images, setImages] = useState<Record<string, ImgEntry[]>>({});
+  // Items whose listing/signatures are still in flight. Distinct from "has
+  // no images": both used to look like an empty array, so a card rendered
+  // with no image region at all and then grew one, shoving its caption and
+  // buttons down the moment the pictures arrived.
+  const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
   const imagesRef = useRef(images);
   const lastSignedAtRef = useRef(0);
 
@@ -102,29 +115,46 @@ export function useItemImages() {
     }
 
     const entryData = pairImageEntries(data, prefix);
-    const pathsToSign = Array.from(entryData.values()).flatMap((e) =>
+    cacheListing(prefix, entryData);
+
+    const allPaths = Array.from(entryData.values()).flatMap((e) =>
       e.pathThumb ? [e.pathFull, e.pathThumb] : [e.pathFull],
     );
-    if (pathsToSign.length === 0) return [];
+    if (allPaths.length === 0) return [];
 
-    const { data: signedUrls, error: signError } =
-      await createSignedUrls(pathsToSign);
+    const toSign = unsignedPaths(allPaths);
+    if (toSign.length > 0) {
+      const { data: signedUrls, error: signError } =
+        await createSignedUrls(toSign);
 
-    if (signError) {
-      console.error('Failed to create signed URLs', signError);
-      return [];
+      if (signError) {
+        console.error('Failed to create signed URLs', signError);
+        return [];
+      }
+
+      cacheSignedUrls(
+        signedUrls
+          .filter((s) => s.path && s.signedUrl)
+          .map((s) => [s.path as string, s.signedUrl as string] as const),
+      );
     }
 
     const signedUrlMap = new Map(
-      signedUrls
-        .filter((s) => s.path && s.signedUrl)
-        .map((s) => [s.path as string, s.signedUrl as string]),
+      allPaths
+        .map((path) => [path, getCachedSignedUrl(path)] as const)
+        .filter((pair): pair is readonly [string, string] => !!pair[1]),
     );
     return toImgEntries(entryData, signedUrlMap);
   }, []);
 
+  // Always re-lists: this runs right after an upload or delete, so the
+  // cached listing for that item is exactly the thing that just went stale.
   const refreshItemImages = useCallback(
     async (itemId: string) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const uid = sessionData.session?.user.id;
+      if (uid) invalidateListing(`${uid}/${itemId}`);
+
       const entries = await getItemImageEntries(itemId);
       if (typeof entries === 'undefined') return;
       lastSignedAtRef.current = Date.now();
@@ -140,18 +170,34 @@ export function useItemImages() {
     const uid = sessionData.session?.user.id;
     if (!uid) return;
 
+    // Only the items we don't already hold a fresh answer for are marked
+    // as loading; a cached category switch should not flash skeletons.
+    setLoadingItems((prev) => {
+      const next = new Set(prev);
+      for (const itemId of itemIds) {
+        if (!getCachedListing(`${uid}/${itemId}`)) next.add(itemId);
+      }
+      return next;
+    });
+
     // One list() call per item is unavoidable (Supabase storage has no
-    // recursive/flat listing across prefixes), but every item's paths are
-    // signed together in a single createSignedUrls call.
+    // recursive/flat listing across prefixes), but a cached listing skips
+    // the call outright, and every remaining path is signed together in a
+    // single createSignedUrls call.
     const perItem = await Promise.all(
       itemIds.map(async (itemId) => {
         const prefix = `${uid}/${itemId}`;
+        const cached = getCachedListing(prefix);
+        if (cached) return [itemId, cached] as const;
+
         const { data, error } = await listAllImageObjects(prefix);
         if (error) {
           console.error('Failed to list images', error);
           return [itemId, new Map<string, ImageEntryData>()] as const;
         }
-        return [itemId, pairImageEntries(data ?? [], prefix)] as const;
+        const entryData = pairImageEntries(data ?? [], prefix);
+        cacheListing(prefix, entryData);
+        return [itemId, entryData] as const;
       }),
     );
 
@@ -161,20 +207,28 @@ export function useItemImages() {
       ),
     );
 
-    let signedUrlMap = new Map<string, string>();
-    if (allPaths.length > 0) {
+    // Re-signing a path that already has a valid signature changes its URL
+    // for no reason, which throws away the browser's copy of the bytes.
+    const toSign = unsignedPaths(allPaths);
+    if (toSign.length > 0) {
       const { data: signedUrls, error: signError } =
-        await createSignedUrls(allPaths);
+        await createSignedUrls(toSign);
       if (signError) {
         console.error('Failed to create signed URLs', signError);
       } else {
-        signedUrlMap = new Map(
+        cacheSignedUrls(
           signedUrls
             .filter((s) => s.path && s.signedUrl)
-            .map((s) => [s.path as string, s.signedUrl as string]),
+            .map((s) => [s.path as string, s.signedUrl as string] as const),
         );
       }
     }
+
+    const signedUrlMap = new Map(
+      allPaths
+        .map((path) => [path, getCachedSignedUrl(path)] as const)
+        .filter((pair): pair is readonly [string, string] => !!pair[1]),
+    );
 
     const newImages: Record<string, ImgEntry[]> = {};
     for (const [itemId, entryData] of perItem) {
@@ -182,6 +236,11 @@ export function useItemImages() {
     }
     lastSignedAtRef.current = Date.now();
     setImages((prev) => ({ ...prev, ...newImages }));
+    setLoadingItems((prev) => {
+      const next = new Set(prev);
+      for (const itemId of itemIds) next.delete(itemId);
+      return next;
+    });
   }, []);
 
   // Refresh signed URLs before Supabase's 1h expiry so a long-lived tab
@@ -276,6 +335,7 @@ export function useItemImages() {
           toast.error(t('item_list.delete_image_error'));
           return;
         }
+        invalidateListing(img.pathFull.split('/').slice(0, 2).join('/'));
         setImages((prev) => ({
           ...prev,
           [itemId]: (prev[itemId] || []).filter(
@@ -295,6 +355,9 @@ export function useItemImages() {
 
   const deleteAllItemImages = useCallback(async (itemId: string) => {
     await removeItemImages(itemId);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const uid = sessionData.session?.user.id;
+    if (uid) invalidateListing(`${uid}/${itemId}`);
     setImages((prev) => {
       const next = { ...prev };
       delete next[itemId];
@@ -304,6 +367,7 @@ export function useItemImages() {
 
   return {
     images,
+    loadingItems,
     refreshItemImages,
     refreshAllImages,
     uploadImage,

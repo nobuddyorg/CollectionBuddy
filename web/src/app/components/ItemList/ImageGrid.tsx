@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import Image from 'next/image';
 import Icon, { IconType } from '../Icon';
 import type { ImgEntry } from './types';
@@ -6,6 +7,46 @@ import { useI18n } from '../../i18n/useI18n';
 import { Spinner } from '../ui/Spinner';
 
 const STRIP_MAX = 4;
+
+// Holds the frame while the bytes are still on the wire, then fades the
+// photograph in over it. A signed URL existing does not mean the image has
+// arrived -- without this the plate is blank white until it does.
+function Plate({
+  src,
+  alt,
+  ratio,
+  onOpen,
+  children,
+}: {
+  src: string;
+  alt: string;
+  ratio: string;
+  onOpen: () => void;
+  children?: React.ReactNode;
+}) {
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <div className={`relative bg-muted ${!loaded ? 'img-skeleton' : ''}`}>
+      <button type="button" onClick={onOpen} className="block h-full w-full">
+        <Image
+          src={src}
+          alt={alt}
+          width={800}
+          height={600}
+          unoptimized
+          loading="lazy"
+          onLoad={() => setLoaded(true)}
+          onError={() => setLoaded(true)}
+          className={`${ratio} w-full object-cover cursor-zoom-in transition-opacity duration-300 ${
+            loaded ? 'opacity-100' : 'opacity-0'
+          }`}
+        />
+      </button>
+      {children}
+    </div>
+  );
+}
 
 // The layout follows how many photographs there actually are, because the
 // common cases are one and two -- and two is usually a matched pair (the
@@ -23,6 +64,7 @@ export function ImageGrid({
   onDelete,
   deletingPath,
   busy,
+  loading = false,
 }: {
   imgs: ImgEntry[];
   itemTitle: string;
@@ -30,8 +72,23 @@ export function ImageGrid({
   onDelete: (img: ImgEntry) => void;
   deletingPath: Set<string>;
   busy: boolean;
+  /** Listing/signatures still in flight -- not the same as having none. */
+  loading?: boolean;
 }) {
   const { t } = useI18n();
+
+  // Reserve the frame while we still don't know whether there is a picture.
+  // Rendering nothing and growing an image region later is what pushed the
+  // caption and buttons down as the photographs arrived.
+  if (loading && !imgs.length) {
+    return (
+      <div
+        className="img-skeleton aspect-4/3 w-full"
+        role="status"
+        aria-label={t('common.loading')}
+      />
+    );
+  }
 
   if (!imgs.length) return null;
 
@@ -74,31 +131,17 @@ export function ImageGrid({
   const plate = (
     img: ImgEntry,
     index: number,
-    {
-      ratio,
-      src,
-      small,
-      wrapper = '',
-    }: { ratio: string; src: string; small: boolean; wrapper?: string },
+    { ratio, src, small }: { ratio: string; src: string; small: boolean },
   ) => (
-    <div key={img.pathFull} className={`relative bg-muted ${wrapper}`}>
-      <button
-        type="button"
-        onClick={() => onOpenModal(img.urlFull)}
-        className="block h-full w-full"
-      >
-        <Image
-          src={src}
-          alt={altFor(index)}
-          width={800}
-          height={600}
-          unoptimized
-          loading="lazy"
-          className={`${ratio} w-full object-cover cursor-zoom-in`}
-        />
-      </button>
+    <Plate
+      key={img.pathFull}
+      src={src}
+      alt={altFor(index)}
+      ratio={ratio}
+      onOpen={() => onOpenModal(img.urlFull)}
+    >
       {deleteButton(img, small)}
-    </div>
+    </Plate>
   );
 
   // The strip takes one track per thumbnail so it never leaves dead cells

@@ -52,6 +52,23 @@ describe('ImageGrid', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  // "Still loading" and "has none" both used to arrive as an empty array,
+  // so a card rendered with no image region and then grew one, shoving its
+  // caption and buttons down the moment the pictures resolved.
+  it('holds the frame while the listing is still in flight', () => {
+    const { container } = renderGrid([], { loading: true });
+    const skeleton = container.querySelector('.img-skeleton');
+    expect(skeleton).not.toBeNull();
+    expect(skeleton).toHaveClass('aspect-4/3');
+    expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+
+  it('shows the photographs, not the skeleton, once they arrive', () => {
+    const { container } = renderGrid([img('a')], { loading: false });
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(screen.getByRole('img')).toBeInTheDocument();
+  });
+
   it('renders a single image as one full-width plate', () => {
     renderGrid([img('a')]);
     const images = screen.getAllByRole('img');
@@ -126,6 +143,25 @@ describe('ImageGrid', () => {
       'src',
       'https://example.test/b.thumb.webp',
     );
+  });
+
+  // A signed URL existing does not mean the bytes have arrived, so a plate
+  // starts covered and uncovers on load.
+  //
+  // Only the covered half is asserted here: next/image never dispatches a
+  // load in jsdom (it wires loading through a ref that inspects the real
+  // decode), so firing one proves nothing. The uncovering was checked in a
+  // real browser instead -- a loaded plate reaches opacity 1 and its
+  // skeleton is gone, while a still-loading card keeps its skeleton.
+  it('keeps a plate covered until its image loads', () => {
+    const { container } = renderGrid([img('a')]);
+    expect(screen.getByRole('img')).toHaveClass('opacity-0');
+    expect(container.querySelector('.img-skeleton')).not.toBeNull();
+  });
+
+  it('fades the plate in rather than swapping it', () => {
+    renderGrid([img('a')]);
+    expect(screen.getByRole('img')).toHaveClass('transition-opacity');
   });
 
   it('passes the image being removed to onDelete', async () => {
