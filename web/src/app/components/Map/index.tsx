@@ -27,8 +27,25 @@ const FIT_MAX_ZOOM = 12;
 // regional view, so the surrounding pins stay in the picture.
 const CURRENT_LOCATION_SPAN_M = 100000;
 
+// Every automatic fit frames the pins' *coordinates*, but a marker is a
+// 25x41 icon hanging above the point it marks, so a pin on the edge of the
+// bounds had its head cut off by the viewport -- 8px of padding could not
+// hold a 41px icon. The asymmetry is the icon's: it rises from its anchor,
+// and nothing hangs below it.
+//
+// The top allowance also clears the map's own furniture -- the geocoding
+// chip on the left and the zoom/locate cluster on the right, both `top-2`
+// and 36px tall -- so the outermost pin isn't framed underneath a button.
+const MARKER_ICON_HEIGHT = 41;
+const MARKER_ICON_HALF_WIDTH = 13;
+const CONTROLS_BOTTOM_EDGE = 44;
+
 const FIT_OPTIONS: import('leaflet').FitBoundsOptions = {
-  padding: [8, 8],
+  paddingTopLeft: [
+    MARKER_ICON_HALF_WIDTH,
+    Math.max(MARKER_ICON_HEIGHT, CONTROLS_BOTTOM_EDGE),
+  ],
+  paddingBottomRight: [MARKER_ICON_HALF_WIDTH, 8],
   maxZoom: FIT_MAX_ZOOM,
 };
 
