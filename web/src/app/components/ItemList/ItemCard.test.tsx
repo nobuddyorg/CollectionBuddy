@@ -104,11 +104,9 @@ describe('ItemCard', () => {
 
   // Cards with no photograph used to open straight onto the caption, so a
   // scrolling stack of them had no repeating shape to break on. They now
-  // lead with an empty mount that holds the same frame a photo would --
-  // and it is the only upload control on the card, not a second one
-  // alongside the band.
+  // lead with an empty mount that holds the same frame a photo would.
   it('leads an unphotographed entry with an empty mount', () => {
-    const { container } = render(
+    render(
       <I18nProvider>
         <ItemCard
           item={item}
@@ -124,7 +122,17 @@ describe('ItemCard', () => {
       </I18nProvider>,
     );
     expect(screen.getByText('No images')).toBeVisible();
-    expect(container.querySelectorAll('input[type="file"]')).toHaveLength(1);
+  });
+
+  // The action row is identical on every card, so an unphotographed one
+  // carries both the mount's own call to action and the row control. Two
+  // ways into the same picker is fine; two *different-looking* action rows
+  // depending on whether an entry has been photographed is not.
+  it('keeps the same action row whether or not the entry has photos', () => {
+    renderCard();
+    expect(screen.getByText('Photo')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Delete entry' })).toBeVisible();
   });
 
   // Regression: the mount is the *resolved* empty state. Showing it while
