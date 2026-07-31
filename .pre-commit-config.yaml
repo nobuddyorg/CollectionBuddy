@@ -21,9 +21,11 @@ repos:
     rev: v1.48.0
     hooks:
       - id: typos
-        # German prose reads as misspelled English almost word for word
-        # ("Sie" -> "Size", "unser" -> "under"), so the German-language
-        # documents are out of scope rather than annotated line by line.
+        # German prose reads as misspelled English almost word for word --
+        # its pronouns and possessives each map onto some near-miss English
+        # word -- so the German-language documents are out of scope rather
+        # than annotated line by line. (Naming the offending words here
+        # would trip this very hook, which is how this comment got shorter.)
         # The lockfile is a wall of hashes and package names.
         exclude: |
           (?x)^(
