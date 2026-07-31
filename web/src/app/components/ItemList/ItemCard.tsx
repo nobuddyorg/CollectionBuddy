@@ -15,6 +15,7 @@ export function ItemCard({
   item,
   imgs,
   busy,
+  imagesLoading = false,
   deletingPath,
   onUpload,
   onEditItem,
@@ -25,6 +26,7 @@ export function ItemCard({
   item: ItemLite;
   imgs: ImgEntry[];
   busy: boolean;
+  imagesLoading?: boolean;
   deletingPath: Set<string>;
   onUpload: (file: File) => void;
   onEditItem: () => void;
@@ -47,6 +49,7 @@ export function ItemCard({
         onDelete={onDeleteImage}
         deletingPath={deletingPath}
         busy={busy}
+        loading={imagesLoading}
       />
 
       <AddPhoto onUpload={onUpload} busy={busy} />
