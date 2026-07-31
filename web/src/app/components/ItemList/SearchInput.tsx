@@ -27,10 +27,14 @@ export function SearchInput({
         placeholder={t('item_list.search_placeholder')}
         className="w-full min-h-11 rounded-sm bg-card text-card-foreground py-2 pl-9 pr-10 ring-1 ring-inset ring-border focus:ring-foreground placeholder:text-muted-foreground"
       />
+      {/* The only clear button: the browser's own is suppressed in
+          globals.css. This one is labelled, keyboard-reachable and drawn
+          to the app's ink, which the native glyph is none of. */}
       {value && (
         <button
+          type="button"
           onClick={() => onChange('')}
-          className="clear-button absolute right-3 top-1/2 -translate-y-1/2"
+          className="absolute right-3 top-1/2 -translate-y-1/2"
           aria-label={t('item_list.search_clear')}
         >
           <Icon
