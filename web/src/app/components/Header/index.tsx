@@ -34,8 +34,21 @@ export default function Header({ user, onSignOut }: HeaderProps) {
             className="object-contain shrink-0"
             priority
           />
-          <span className="font-display text-base sm:text-lg text-foreground truncate">
-            {t('header.title')}
+          {/* The login page's wordmark, at header scale: "Collection"
+              underscored in ink, "Buddy" carrying the accent. The two
+              screens now show the same mark rather than the same letters
+              in two different treatments. A 2px rule, not the login
+              page's 3px -- that weight belongs to a 48px heading, and
+              under 16px type it reads as a highlighter stroke.
+
+              `pb-0.5` on the outer span is what keeps the rule visible:
+              `truncate` clips overflow, and the inner span's border sits
+              below the line box. */}
+          <span className="font-display text-base sm:text-lg text-foreground truncate pb-0.5">
+            <span className="border-b-2 border-foreground pb-px">
+              {t('brand.collection')}
+            </span>
+            <span className="text-accent">{t('brand.buddy')}</span>
           </span>
         </div>
 

@@ -1,4 +1,8 @@
 {
+  "brand": {
+    "collection": "Collection",
+    "buddy": "Buddy"
+  },
   "page": {
     "entries": "Einträge",
     "choose_category": "Kategorie wählen",
@@ -90,8 +94,6 @@
   },
   "login_page": {
     "circle_text": "CollectionBuddy • Sammeln • Ordnen • Behalten • Deine Schätze im Blick • ",
-    "title_collection": "Collection",
-    "title_buddy": "Buddy",
     "subtitle": "Dein digitales Sammelalbum für Münzen, Plüschtiere, Briefmarken und alles, was dir am Herzen liegt.",
     "sign_in_error": "Anmeldung fehlgeschlagen. Bitte Verbindung prüfen und erneut versuchen."
   },
