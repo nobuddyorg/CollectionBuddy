@@ -44,7 +44,7 @@ All in [`0004_functions_triggers.sql`](../../supabase/migrations/0004_functions_
 - Unique `(user_id, lower(name))` on `categories`.
 - `(user_id, created_at desc)` on `items`, for list ordering.
 - Trigram GIN indexes (`pg_trgm`) on `items.title`, `items.description`, `items.place`, `items.tags_text` — see [Design decisions](../explanation/design-decisions.md#why-search-uses-trigram-ilike-instead-of-full-text-search) for why these exist instead of Postgres full-text search.
-- `(bucket_id, name text_pattern_ops)` on `storage.objects`, so the batched image-cleanup trigger's `LIKE ANY (...)` uses an index instead of scanning the whole (cross-user, cross-bucket) storage table.
+There is deliberately no index on `storage.objects` for the batched image-cleanup trigger's `LIKE ANY (...)`, which therefore scans that (cross-user, cross-bucket) table once per delete statement. `0012` originally created one and could never be applied: hosted Supabase owns `storage.objects` as `supabase_storage_admin` and doesn't make `postgres` a member, so `create index` on it raises `42501` for every role available to us.
 
 ### Storage
 
