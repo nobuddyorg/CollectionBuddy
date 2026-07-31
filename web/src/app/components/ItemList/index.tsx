@@ -16,6 +16,18 @@ import type { ImgEntry } from './types';
 import { usePlaces } from '../Map/usePlaces';
 
 const Map = dynamic(() => import('../Map'), { ssr: false });
+
+// Warms the chunk dynamic() above will ask for -- Leaflet is ~40 KB gzipped
+// and, with the geocode cache primed, downloading it is what the map now
+// waits on. Requesting the same specifier is deduped by the bundler, so the
+// later mount resolves straight from the module cache. Hung off intent
+// (hover, focus, the press that precedes the click) rather than page load,
+// so nobody who leaves the map alone pays for it.
+const prefetchMap = () => {
+  // A failed prefetch is not worth reporting: dynamic() retries the same
+  // import when the map actually opens, and surfaces the error there.
+  void import('../Map').catch(() => {});
+};
 import Icon, { IconType } from '../Icon';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
@@ -243,6 +255,9 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
           <button
             type="button"
             onClick={() => setMapOpen(true)}
+            onPointerEnter={prefetchMap}
+            onPointerDown={prefetchMap}
+            onFocus={prefetchMap}
             className="min-h-11 w-11 shrink-0 flex items-center justify-center rounded-sm ring-1 ring-inset ring-border text-foreground hover:bg-muted transition-colors"
             aria-label={t('item_list.open_map')}
             title={t('item_list.open_map')}
