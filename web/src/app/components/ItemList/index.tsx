@@ -16,6 +16,7 @@ import { useItemImages } from './useItemImages';
 import type { ImgEntry } from './types';
 import { usePlaces } from '../Map/usePlaces';
 import { useCurrentLocation } from '../Map/useCurrentLocation';
+import type { MapCommand, MapCommandKind } from '../Map/types';
 
 const Map = dynamic(() => import('../Map'), { ssr: false });
 
@@ -47,15 +48,21 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     loading: loadingPlaces,
     error: placesError,
   } = usePlaces(categoryId, mapOpen);
-  // Starts empty, not at 'fitAll'. The map frames the pins it has as they
-  // stream in on its own; this state exists for the re-frame below, once
-  // the last place has been geocoded. Opening at 'fitAll' meant that
-  // re-frame set the value it already held -- no state change, so no
-  // re-render, so the effect that runs a command never fired, and the view
-  // stayed framed around whichever pins happened to resolve first.
-  const [mapCommand, setMapCommand] = useState<'fitAll' | 'fitCurrent' | null>(
-    null,
-  );
+  // Starts empty. The map frames the pins it has as they stream in on its
+  // own; this state exists for the re-frame below, once the last place has
+  // been geocoded.
+  const [mapCommand, setMapCommand] = useState<MapCommand | null>(null);
+
+  // Issued and then left standing. Every command used to be withdrawn again
+  // on a 0ms timeout, purely so that asking for the same one twice running
+  // still counted as a change -- which made each one a pulse a single tick
+  // wide. A map that had not finished loading Leaflet inside that tick never
+  // saw it, and on the second open, with the library, the pins and the
+  // geolocation fix all already in hand, that is the normal case. The
+  // counter does the same job without the taking-back.
+  const issueMapCommand = useCallback((kind: MapCommandKind) => {
+    setMapCommand((prev) => ({ kind, id: (prev?.id ?? 0) + 1 }));
+  }, []);
 
   const mapMarkers = useMemo(
     () =>
@@ -70,12 +77,15 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
   // Pins stream in as each place is geocoded, and the map fits whatever it
   // has as soon as the first one lands. Re-frame once the last one is in so
   // the view covers the whole collection, not just the quickest lookups.
+  //
+  // Waits for a pin as well as for the loading to finish. `loadingPlaces` is
+  // still false on the render that opens the map -- the fetch has not been
+  // started yet, let alone flagged -- so without this the first thing the
+  // map is told on every open is to frame an empty collection.
   useEffect(() => {
-    if (!mapOpen || loadingPlaces) return;
-    setMapCommand('fitAll');
-    const id = setTimeout(() => setMapCommand(null), 0);
-    return () => clearTimeout(id);
-  }, [mapOpen, loadingPlaces]);
+    if (!mapOpen || loadingPlaces || places.length === 0) return;
+    issueMapCommand('fitAll');
+  }, [mapOpen, loadingPlaces, places.length, issueMapCommand]);
 
   const {
     location: currentLocation,
@@ -98,9 +108,8 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
       );
       return;
     }
-    setMapCommand('fitCurrent');
-    setTimeout(() => setMapCommand(null), 0);
-  }, [requestLocation, toast, t]);
+    issueMapCommand('fitCurrent');
+  }, [requestLocation, toast, t, issueMapCommand]);
 
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
@@ -416,10 +425,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setMapCommand('fitAll');
-                  setTimeout(() => setMapCommand(null), 0);
-                }}
+                onClick={() => issueMapCommand('fitAll')}
                 className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-card-foreground shadow-sm hover:opacity-90"
                 aria-label={t('item_list.frame_all_pins')}
                 title={t('item_list.frame_all_pins')}

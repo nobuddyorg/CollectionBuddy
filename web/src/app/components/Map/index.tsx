@@ -5,7 +5,13 @@ import 'leaflet/dist/leaflet.css';
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
-import { IconDefaultPrivate, Leaflet, MapProps, MarkerInput } from './types';
+import {
+  IconDefaultPrivate,
+  Leaflet,
+  MapCommandKind,
+  MapProps,
+  MarkerInput,
+} from './types';
 
 const toUrl = (mod: unknown): string => {
   if (typeof mod === 'string') return mod;
@@ -65,13 +71,15 @@ const fitToPoints = (
   if (bounds.isValid()) map.fitBounds(bounds, FIT_OPTIONS);
 };
 
-// Shared by the two places a command can arrive: one already queued when the
-// map finishes initialising, and every later one. Both used to frame the view
-// with their own copy of this, which is two ways for the zoom to drift apart.
+// The one way the view is ever framed on command. There used to be a second
+// entry point for a command that arrived before the map had finished
+// initialising, which is two ways for the zoom to drift apart; a command that
+// is never withdrawn is simply still there to be read when the map is ready,
+// so the effect below covers both cases on its own.
 const runCommand = (
   map: import('leaflet').Map,
   L: Leaflet,
-  command: MapProps['command'],
+  command: MapCommandKind,
   markers: MarkerInput[],
   currentLocation: MapProps['currentLocation'],
 ): void => {
@@ -101,16 +109,11 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     null,
   );
 
-  const latestCommandRef = useRef<MapProps['command']>(null);
   const markersRef = useRef(markers);
   const currentLocRef = useRef(currentLocation);
 
   const [ready, setReady] = useState(false);
   const hasInitialFit = useRef(false);
-
-  useEffect(() => {
-    latestCommandRef.current = command ?? null;
-  }, [command]);
 
   useEffect(() => {
     markersRef.current = markers;
@@ -157,14 +160,6 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
 
       setReady(true);
       requestAnimationFrame(() => map.invalidateSize());
-
-      const L2 = LRef.current;
-      const cmd = latestCommandRef.current;
-      if (!L2 || !cmd) return;
-
-      requestAnimationFrame(() => {
-        runCommand(map, L2, cmd, markersRef.current, currentLocRef.current);
-      });
     })();
     return () => {
       cancelled = true;
@@ -216,9 +211,20 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     }
   }, [currentLocation, ready]);
 
+  // The opening frame, so the map does not sit on a world view while the
+  // pins are still being geocoded. It waits for a pin: the location dot on
+  // its own is not a collection, and framing a single point puts the viewer
+  // on their own doorstep at maximum zoom with nothing else in sight.
+  //
+  // That was the second-open bug. The map remounts every time the modal is
+  // opened, but the geolocation fix does not -- it is held by the page
+  // above, so on the second open it is already in hand while the pins are
+  // being re-read. This effect fired with one point, framed it, and latched,
+  // and the map opened zoomed to the dot.
   useEffect(() => {
     const L = LRef.current;
     if (!ready || !L || !mapInstance.current || hasInitialFit.current) return;
+    if (markers.length === 0) return;
 
     const points: Array<import('leaflet').LatLngExpression> = markers.map(
       (m) => [m.lat, m.lng],
@@ -226,19 +232,30 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     if (currentLocation)
       points.push([currentLocation.lat, currentLocation.lng]);
 
-    if (points.length > 0) {
-      fitToPoints(mapInstance.current, L, points);
-      hasInitialFit.current = true;
-    }
+    fitToPoints(mapInstance.current, L, points);
+    hasInitialFit.current = true;
   }, [markers, currentLocation, ready]);
 
+  // Runs on the command *or* on becoming ready, which is how an instruction
+  // issued before Leaflet had loaded still gets carried out rather than
+  // being missed. Re-measuring first: a fit computed against a container
+  // Leaflet has not sized yet frames the wrong box.
   useEffect(() => {
     const L = LRef.current;
     const map = mapInstance.current;
-    if (!ready || !L || !map) return;
-    if (!command) return;
+    if (!ready || !L || !map || !command) return;
 
-    runCommand(map, L, command, markersRef.current, currentLocRef.current);
+    const frame = requestAnimationFrame(() => {
+      map.invalidateSize();
+      runCommand(
+        map,
+        L,
+        command.kind,
+        markersRef.current,
+        currentLocRef.current,
+      );
+    });
+    return () => cancelAnimationFrame(frame);
   }, [command, ready]);
 
   // Leaflet caches the container size, so a map whose box changes while
