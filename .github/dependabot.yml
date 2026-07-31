@@ -5,12 +5,30 @@ updates:
   # forcing its Node 20 runtime onto Node 24 (#237). Grouped into one PR
   # because these move rarely and reviewing five separate bumps of pinned
   # third-party actions is worse than reviewing one.
+  #
+  # Actions are pinned by commit hash, so this is also the only thing that
+  # can move them: a tag repointed at new code silently does not.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       actions:
+        patterns:
+          - "*"
+
+  # The hooks in .pre-commit-config.yaml pin their own revisions, and go
+  # stale the same way, for the same reason.
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      hooks:
         patterns:
           - "*"
 
@@ -18,6 +36,8 @@ updates:
     directory: "/web"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       patch-updates:
         patterns:

@@ -25,7 +25,7 @@ If you only ever have one category, the picker auto-collapses and auto-selects i
 Fields:
 
 | Field | Notes |
-|---|---|
+| --- | --- |
 | Title | Required. |
 | Description | Optional, free text. |
 | Place | Optional. Autocompletes after 3 characters via the [Photon](https://photon.komoot.io/) geocoding API — pick a suggestion rather than typing free text if you want the item to show up on the map. |

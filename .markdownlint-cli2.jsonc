@@ -1,0 +1,12 @@
+{
+  "config": {
+    // Prose wraps at whatever the author found readable; this is not a
+    // codebase where line length carries meaning.
+    "MD013": false,
+    // Bare URLs are fine in issue references and log excerpts.
+    "MD034": false,
+    // Inline HTML is occasionally the only way to get a layout right.
+    "MD033": false
+  },
+  "globs": ["**/*.md", "!**/node_modules/**", "!web/out/**", "!web/.next/**"]
+}

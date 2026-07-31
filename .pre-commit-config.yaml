@@ -1,0 +1,81 @@
+repos:
+  # Standard file hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-json
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+      - id: no-commit-to-branch
+        args: ["--branch", "main"]
+
+  # Spell checking
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.48.0
+    hooks:
+      - id: typos
+        # German prose reads as misspelled English almost word for word
+        # ("Sie" -> "Size", "unser" -> "under"), so the German-language
+        # documents are out of scope rather than annotated line by line.
+        # The lockfile is a wall of hashes and package names.
+        exclude: |
+          (?x)^(
+            web/src/app/i18n/(de|en)\.json|
+            web/public/(privacy-policy|terms-of-service)\.txt|
+            web/package-lock\.json
+          )$
+
+  # zizmor: security analysis of the GitHub Actions workflows
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.27.0
+    hooks:
+      - id: zizmor
+
+  # ShellCheck (build.sh, and anything else that appears)
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        args: ["--severity=warning"]
+
+  # markdownlint for the docs tree (config: .markdownlint-cli2.jsonc)
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.23.1
+    hooks:
+      - id: markdownlint-cli2
+
+  # The web app's own checks, run from web/ where its config lives. These
+  # are the same commands CI runs, so a passing commit is a passing build.
+  - repo: local
+    hooks:
+      - id: prettier
+        name: Prettier (web)
+        entry: bash -c 'cd web && npx prettier --check .'
+        language: system
+        pass_filenames: false
+        files: ^web/.*\.(ts|tsx|js|mjs|json|css)$
+        exclude: ^web/package-lock\.json$
+        stages: [pre-commit]
+
+      - id: eslint
+        name: ESLint (web)
+        entry: bash -c 'cd web && npm run lint'
+        language: system
+        pass_filenames: false
+        files: ^web/src/.*\.(ts|tsx)$
+        stages: [pre-commit]
+
+      - id: tsc
+        name: TypeScript (web)
+        entry: bash -c 'cd web && npx tsc --noEmit'
+        language: system
+        pass_filenames: false
+        files: ^web/(src/.*\.(ts|tsx)|tsconfig\.json)$
+        stages: [pre-commit]

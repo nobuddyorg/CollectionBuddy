@@ -10,16 +10,43 @@ permissions:
   contents: read
 
 jobs:
+  # The repo-wide hooks from .pre-commit-config.yaml: file hygiene, spell
+  # checking, shellcheck, markdownlint, and zizmor's security analysis of
+  # these workflows. Runs alongside build_and_test rather than gating it --
+  # both take a couple of minutes, and serialising them would double the
+  # wait for the first sign of a broken build.
+  #
+  # The config's ESLint/Prettier/TypeScript hooks are skipped here on
+  # purpose. They exist so a developer's commit is checked before it is
+  # made, and they run the same three commands build_and_test already runs
+  # below; installing web/'s dependencies a second time to repeat them
+  # would buy nothing. no-commit-to-branch is meaningless off a working
+  # copy.
+  prek:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0
+        with:
+          extra-args: "--all-files"
+        env:
+          SKIP: no-commit-to-branch,prettier,eslint,tsc
+
   build_and_test:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./web
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '22.x'
           cache: 'npm'
@@ -71,10 +98,12 @@ jobs:
       run:
         working-directory: ./web
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '22.x'
           cache: 'npm'
@@ -92,7 +121,7 @@ jobs:
 
       - name: Upload mutation report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: mutation-report
           path: web/reports/mutation
