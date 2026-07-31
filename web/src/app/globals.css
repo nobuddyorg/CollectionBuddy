@@ -14,6 +14,12 @@
   --border: #e3e0d8;
   --muted: #eceae3;
   --muted-foreground: #6a6e7c;
+
+  /* A recessed surface -- the empty mount waiting for a photograph. Sits a
+     step below --muted so it reads as a hollow cut into the white card
+     rather than another pale panel floating on it. */
+  --mount: #e3e0d8;
+  --mount-hover: #d8d4c9;
   --destructive: #a32017;
   --destructive-foreground: #ffffff;
 
@@ -33,6 +39,8 @@
   --color-border: var(--border);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-mount: var(--mount);
+  --color-mount-hover: var(--mount-hover);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-accent: var(--accent);

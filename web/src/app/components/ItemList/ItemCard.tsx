@@ -1,7 +1,7 @@
 'use client';
 import { useI18n } from '../../i18n/useI18n';
 import type { ItemLite, ImgEntry } from './types';
-import { Actions, AddPhoto, AddPhotoPlate } from './Actions';
+import { Actions, AddPhotoPlate } from './Actions';
 import { ImageGrid } from './ImageGrid';
 
 // A specimen mount: the object leads, the label sits underneath. Photos are
@@ -56,19 +56,15 @@ export function ItemCard({
       {awaitingPhoto ? (
         <AddPhotoPlate onUpload={onUpload} busy={busy} />
       ) : (
-        <>
-          <ImageGrid
-            imgs={imgs}
-            itemTitle={item.title}
-            onOpenModal={onOpenModal}
-            onDelete={onDeleteImage}
-            deletingPath={deletingPath}
-            busy={busy}
-            loading={imagesLoading}
-          />
-
-          <AddPhoto onUpload={onUpload} busy={busy} />
-        </>
+        <ImageGrid
+          imgs={imgs}
+          itemTitle={item.title}
+          onOpenModal={onOpenModal}
+          onDelete={onDeleteImage}
+          deletingPath={deletingPath}
+          busy={busy}
+          loading={imagesLoading}
+        />
       )}
 
       {/* The object label. */}
@@ -103,7 +99,12 @@ export function ItemCard({
           </div>
         )}
 
-        <Actions onEdit={onEditItem} onDelete={onDeleteItem} />
+        <Actions
+          onEdit={onEditItem}
+          onDelete={onDeleteItem}
+          onUpload={onUpload}
+          busy={busy}
+        />
 
         <span className="sr-only" aria-live="polite">
           {busy ? t('item_list.loading') : ''}
