@@ -69,6 +69,33 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
+      # PostgREST answers from a cached copy of the schema, and a migration
+      # that adds a column is invisible to it until that cache is reloaded:
+      # every write naming the new column comes back as PGRST204 "Could not
+      # find the 'x' column of 'items' in the schema cache", which is what
+      # broke adding items after 0015 (#239). Normally a `pgrst_ddl_watch`
+      # event trigger reloads it automatically -- this project has no such
+      # trigger, and cannot be given one, because creating an event trigger
+      # requires superuser and `postgres` here is not one.
+      #
+      # So the reload is sent by hand, over the management API rather than
+      # the pooler, because NOTIFY needs a session and `supabase db push`
+      # doesn't leave one open. Unconditional: it is cheap, and it is not
+      # worth reasoning about which migrations changed a shape PostgREST
+      # cares about.
+      - name: Reload the PostgREST schema cache
+        run: |
+          curl -sS --fail-with-body -X POST \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data @- <<'JSON'
+          {"query": "notify pgrst, 'reload schema'"}
+          JSON
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
   build:
     needs: migrate
     runs-on: ubuntu-latest

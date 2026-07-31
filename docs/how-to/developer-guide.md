@@ -37,6 +37,8 @@ Every schema change goes through a new migration file, never an edit to an exist
 4. See [Architecture reference](../reference/architecture.md#database-schema) for what's already there, so your migration doesn't duplicate an existing table, trigger, or index.
 5. Merging to `main` applies it to production — see below. Nothing needs applying by hand.
 
+If you ever apply a migration outside the pipeline (SQL editor, `db push` by hand), send `notify pgrst, 'reload schema'` afterwards. PostgREST serves from a cached schema, so until it reloads, every write naming a newly added column fails with `PGRST204: Could not find the 'x' column of 'items' in the schema cache` — the table is fine, the API just hasn't noticed. Most Supabase projects have a `pgrst_ddl_watch` event trigger that does this automatically; this one doesn't, and can't, since creating an event trigger needs superuser and `postgres` isn't. The `migrate` job sends it on every run, so migrations that go through `main` are covered.
+
 `0012_batch_delete_triggers.sql` used to fail here with "must be owner of table objects", which was recorded as a local permissions quirk. It wasn't: it created an index on `storage.objects`, which hosted Supabase owns as `supabase_storage_admin` and never grants to `postgres`. The statement was impossible in every environment, and because the file is one transaction, *none* of 0012 had ever applied anywhere. The index was removed from that migration; the triggers it exists for are unaffected.
 
 ## Set up a new Supabase environment (e.g. for a fork, or production)
