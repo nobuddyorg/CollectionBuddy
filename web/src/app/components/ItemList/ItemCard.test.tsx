@@ -130,9 +130,15 @@ describe('ItemCard', () => {
   // depending on whether an entry has been photographed is not.
   it('keeps the same action row whether or not the entry has photos', () => {
     renderCard();
-    expect(screen.getByText('Photo')).toBeVisible();
+    // The mount's own call to action, plus the row control.
+    expect(screen.getAllByTitle('Add image')).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Edit' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Delete entry' })).toBeVisible();
+  });
+
+  it('offers the row control alone once the entry has a photo', () => {
+    renderCard({}, { imgs: [{ pathFull: 'a', urlFull: 'a.jpg' }] });
+    expect(screen.getAllByTitle('Add image')).toHaveLength(1);
   });
 
   // Regression: the mount is the *resolved* empty state. Showing it while

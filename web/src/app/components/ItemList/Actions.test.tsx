@@ -30,29 +30,32 @@ describe('Actions', () => {
     window.localStorage.setItem('lang', 'en');
   });
 
-  // Regression: these were bare icons floating over the photograph, on top
-  // of the image's own delete control, so nothing said which destructive
-  // action removed which thing.
-  it('spells out what each action affects', () => {
-    renderActions();
+  // The controls are icon-only, so the names exist solely in the
+  // accessibility tree -- there is no visible text to fall back on.
+  it('names every action for assistive tech', () => {
+    const { input } = renderActions();
     expect(screen.getByRole('button', { name: 'Edit' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Delete entry' })).toBeVisible();
+    expect(screen.getByLabelText('Add image')).toBe(input);
   });
 
-  // All three things you can do to an entry now sit in this one row; the
-  // upload control used to be a full-width band across the middle of the
-  // card, between the photograph and its caption.
+  // All three things you can do to an entry sit in this one row; the upload
+  // control used to be a full-width band across the middle of the card,
+  // between the photograph and its caption.
   it('carries the upload control alongside edit and delete', () => {
     const { input } = renderActions();
     expect(input).toBeInTheDocument();
-    expect(screen.getByText('Photo')).toBeVisible();
+    expect(screen.getAllByRole('button')).toHaveLength(2);
   });
 
-  // The visible label is short so three controls fit one line in a
-  // two-column grid; the input still has to say what it actually does.
-  it('names the upload control in full for assistive tech', () => {
-    const { input } = renderActions();
-    expect(screen.getByLabelText('Add image')).toBe(input);
+  // Regression: spelled-out labels overflowed the card in German and were
+  // clipped. Icons are fixed-width, but only work as controls if they are
+  // also hoverable/tappable targets, which the shared icon button provides.
+  it('gives each control a title so the icon is not the only cue', () => {
+    renderActions();
+    expect(screen.getByTitle('Add image')).toBeInTheDocument();
+    expect(screen.getByTitle('Edit')).toBeInTheDocument();
+    expect(screen.getByTitle('Delete entry')).toBeInTheDocument();
   });
 
   it('hands the chosen file to onUpload', async () => {
