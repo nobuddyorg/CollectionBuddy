@@ -59,6 +59,30 @@ export function placeFromPhotonResponse(
   return { name, lat, lng };
 }
 
+// Photon is a free public service with no API key, and it sheds load by
+// refusing requests. Firing one per unknown place at once is what got them
+// refused: a batch of a dozen came back mostly 429, every refusal was
+// swallowed, and the map drew the one or two pins that got through as if
+// that were the whole collection. A few at a time, and asked again if the
+// answer was "not now".
+const GEOCODE_CONCURRENCY = 3;
+const GEOCODE_ATTEMPTS = 3;
+const RETRY_BASE_MS = 500;
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Whether asking again could plausibly give a different answer.
+ *
+ * A refusal to serve right now (429) and a service that is broken right now
+ * (5xx) are worth another go. Anything else is the service having understood
+ * the question and answered it, and repeating it verbatim only spends
+ * someone else's quota.
+ */
+export function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
 // `enabled` gates fetching behind the map actually being open: geocoding
 // every distinct place is an unbounded number of requests to a free public
 // API, and running it on category *selection* rather than map *open* paid
@@ -94,28 +118,55 @@ export function usePlaces(categoryId: string, enabled: boolean) {
 
         let resolvedCount = cached.length;
 
-        await Promise.all(
-          pending.map(async (place) => {
+        // One place, asked for as many times as it is worth asking. Returns
+        // null once the answer is settled -- either the service named
+        // nowhere, or it kept refusing.
+        const geocode = async (place: string): Promise<Place | null> => {
+          for (let attempt = 0; attempt < GEOCODE_ATTEMPTS; attempt += 1) {
+            if (cancelled) return null;
             try {
               const url = new URL('https://photon.komoot.io/api/');
               url.searchParams.set('q', place);
               url.searchParams.set('limit', '1');
               const res = await fetch(url.toString());
-              if (!res.ok) return;
-              const entry = placeFromPhotonResponse(place, await res.json());
-              if (!entry) return;
-
-              cache[place] = entry;
-              cacheDirty = true;
-              resolvedCount += 1;
-              // Appended as each lookup lands rather than after the whole
-              // batch: a single slow geocode no longer holds back every
-              // other pin.
-              if (!cancelled) setPlaces((prev) => [...prev, entry]);
+              // An answer, even an empty one: a place the gazetteer does not
+              // know is not going to be known on the third try.
+              if (res.ok)
+                return placeFromPhotonResponse(place, await res.json());
+              if (!isRetryableStatus(res.status)) return null;
             } catch {
-              // A place that can't be geocoded is simply not drawn.
+              // A network error is worth another go, same as a refusal.
             }
-          }),
+            // Backing off rather than hammering: the point of the wait is to
+            // give the service a moment to stop refusing.
+            await delay(RETRY_BASE_MS * 2 ** attempt);
+          }
+          return null;
+        };
+
+        // A queue drained by a few workers, rather than the whole batch let
+        // loose at once. Pins still appear as each lookup lands -- one slow
+        // geocode holds back nothing but its own place in the queue.
+        const queue = [...pending];
+        const worker = async () => {
+          for (;;) {
+            const place = queue.shift();
+            if (place === undefined || cancelled) return;
+            const entry = await geocode(place);
+            if (!entry) continue;
+
+            cache[place] = entry;
+            cacheDirty = true;
+            resolvedCount += 1;
+            if (!cancelled) setPlaces((prev) => [...prev, entry]);
+          }
+        };
+
+        await Promise.all(
+          Array.from(
+            { length: Math.min(GEOCODE_CONCURRENCY, queue.length) },
+            worker,
+          ),
         );
 
         if (cacheDirty) writeGeocodeCache(cache);
