@@ -36,7 +36,7 @@ repos:
 
   # zizmor: security analysis of the GitHub Actions workflows
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.27.0
+    rev: v1.28.0
     hooks:
       - id: zizmor
 
