@@ -38,6 +38,7 @@ const config = {
     'src/app/components/ItemList/Pagination.tsx',
     'src/app/components/ItemList/useItemImages.tsx',
     'src/app/components/ItemList/optimistic.ts',
+    'src/app/components/ItemList/paging.ts',
     'src/app/components/ItemList/imageCache.ts',
     'src/app/components/Map/usePlaces.tsx',
     'src/app/components/Map/useCurrentLocation.ts',

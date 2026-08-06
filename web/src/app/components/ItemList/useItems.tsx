@@ -5,9 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { listItems } from '../../data/items';
+import { clampPage, pageCount, pageRange } from './paging';
 import type { ItemLite } from './types';
-
-const PAGE_SIZE = 9;
 
 export function useItems(categoryId: string, q: string) {
   const { t } = useI18n();
@@ -33,14 +32,14 @@ export function useItems(categoryId: string, q: string) {
     setPage(1);
   }
 
-  const totalPages = useMemo(() => Math.ceil(total / PAGE_SIZE), [total]);
+  const totalPages = useMemo(() => pageCount(total), [total]);
 
   // Clamped rather than written back into `page` state via an effect: it's a
   // pure function of state that already exists, and deriving it avoids a
   // stale render where `.range()` below would otherwise request an
   // out-of-bounds slice (e.g. right after deleting the last item on the
   // last page) and the grid would render empty with no active page.
-  const currentPage = totalPages > 0 ? Math.min(page, totalPages) : 1;
+  const currentPage = clampPage(page, totalPages);
 
   // `silent` refetches without raising `loading`. A delete now removes its
   // card up front and resyncs behind that, so the refetch has no wait to
@@ -51,8 +50,7 @@ export function useItems(categoryId: string, q: string) {
       const mySeq = ++reqSeq.current;
       if (!silent) setLoading(true);
 
-      const from = (currentPage - 1) * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
+      const { from, to } = pageRange(currentPage);
 
       const { data, error, count } = await listItems({
         categoryId,
