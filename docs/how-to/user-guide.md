@@ -49,7 +49,9 @@ Below 10 items, all pages show as individual numbers; beyond that, the page cont
 
 ## View items on a map
 
-Click the map icon (next to **+**) to open a map of every item in the current category that has a place set. Geocoding results are cached in your browser, so reopening the map for the same category won't look places up again. If you allow location access, your current position shows as a red marker; the "zoom to current location" and "frame all pins" buttons in the map are quick ways to reorient.
+Click the map icon (next to **+**) to open a map of the items in the current category that have a place set. Geocoding results are cached in your browser, so reopening the map for the same category won't look places up again. If you allow location access, your current position shows as a red marker; the "zoom to current location" and "frame all pins" buttons in the map are quick ways to reorient.
+
+The map shows the same items the grid does: an active search narrows the pins too, and the same third-character threshold applies, so a one- or two-character query leaves both unfiltered. Unlike the grid, the map is not paginated — it draws every match, not just the page you're on. Changing the search while the map is open re-draws and re-frames it.
 
 Only items with a **place** set appear — an item without one simply won't show on the map.
 

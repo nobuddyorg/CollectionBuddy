@@ -39,10 +39,31 @@ export function buildSearchFilter(needle: string): string {
   return `title.ilike."${quoted}",description.ilike."${quoted}",place.ilike."${quoted}",tags_text.ilike."${quoted}"`;
 }
 
-/* v8 ignore start -- thin Supabase query builders; buildSearchFilter
- * above is what's gated and mutation-tested. */
-// Stryker disable all: these query builders aren't covered by tests, only
-// buildSearchFilter above is -- mutants in here would only be noise.
+// Below 3 characters the trigram indexes can't produce any candidates
+// (ILIKE %q% needs at least one 3-char trigram to seed a bitmap scan), so a
+// 1-2 char search would force a sequential scan on every keystroke for no
+// benefit. Same threshold PlaceAutocomplete already uses.
+export const SEARCH_MIN_LENGTH = 3;
+
+/**
+ * The filter a search term earns, or null for a term too short to be worth
+ * one.
+ *
+ * Shared rather than restated at each call site because the list and the map
+ * are two views of one filtered set: the moment they disagree about what
+ * counts as a search, the map shows pins for entries the list is hiding
+ * (#241). Every query that narrows by search goes through here.
+ */
+export function searchFilterFor(search: string): string | null {
+  return search.length >= SEARCH_MIN_LENGTH ? buildSearchFilter(search) : null;
+}
+
+/* v8 ignore start -- thin Supabase query builders; buildSearchFilter and
+ * searchFilterFor above are what's gated and mutation-tested. The two list
+ * builders do have tests, but of the request they compose rather than of
+ * running them, so they stay outside the line-coverage gate. */
+// Stryker disable all: what these builders are held to is the shape of the
+// query, not their lines -- mutants in here would only be noise.
 export function listItems({
   categoryId,
   search,
@@ -59,13 +80,8 @@ export function listItems({
     .select(ITEMS_SEARCH_SELECT, { count: 'exact' })
     .eq('item_categories.category_id', categoryId);
 
-  // Below 3 characters the trigram indexes can't produce any candidates
-  // (ILIKE %q% needs at least one 3-char trigram to seed a bitmap scan),
-  // so a 1-2 char search would force a sequential scan on every keystroke
-  // for no benefit. Same threshold PlaceAutocomplete already uses.
-  if (search.length >= 3) {
-    query = query.or(buildSearchFilter(search));
-  }
+  const filter = searchFilterFor(search);
+  if (filter) query = query.or(filter);
 
   return query
     .order('created_at', { ascending: false })
@@ -111,14 +127,22 @@ export function linkItemToCategory(itemId: string, categoryId: string) {
     .insert({ item_id: itemId, category_id: categoryId });
 }
 
-export function listItemPlaces(categoryId: string) {
-  return supabase
+// Narrowed by the same search as the list, so the map is the same set of
+// entries seen from above rather than a second, wider one. Not paginated,
+// though: a page is how many cards fit on a screen, which has nothing to say
+// about how many pins fit on a map.
+export function listItemPlaces(categoryId: string, search: string) {
+  let query = supabase
     .from('items')
     .select('place,place_lat,place_lng,item_categories!inner(category_id)')
     .eq('item_categories.category_id', categoryId)
     .not('place', 'is', null)
-    .neq('place', '')
-    .returns<ItemPlaceRow[]>();
+    .neq('place', '');
+
+  const filter = searchFilterFor(search);
+  if (filter) query = query.or(filter);
+
+  return query.returns<ItemPlaceRow[]>();
 }
 // Stryker restore all
 /* v8 ignore stop */
