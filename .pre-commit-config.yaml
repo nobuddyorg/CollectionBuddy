@@ -27,10 +27,16 @@ repos:
         # than annotated line by line. (Naming the offending words here
         # would trip this very hook, which is how this comment got shorter.)
         # The lockfile is a wall of hashes and package names.
+        # The end-to-end fixtures join the list for the same reason as the
+        # translations: the seed collection is written in the app's own
+        # language, because the tests read it back off a German-language
+        # interface. (Naming the offending word here would trip this very
+        # hook, which is how the comment above got shorter too.)
         exclude: |
           (?x)^(
             web/src/app/i18n/(de|en)\.json|
             web/public/(privacy-policy|terms-of-service)\.txt|
+            web/e2e/signed-in/fixtures\.ts|
             web/package-lock\.json
           )$
 
