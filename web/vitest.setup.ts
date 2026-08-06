@@ -7,6 +7,25 @@ import '@testing-library/jest-dom/vitest';
 // from one test in a file leak into the next.
 afterEach(cleanup);
 
+// jsdom has no CSSOM view module, so `window.matchMedia` simply isn't there
+// -- any component that asks the OS a question (useTheme asks it about dark
+// mode) throws on mount. The stub answers "no" to everything and registers
+// no listeners, which is the right default: a test that cares about a media
+// query should say so itself rather than inherit an opinion from here.
+if (typeof window !== 'undefined' && !window.matchMedia) {
+  window.matchMedia = (query: string) =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+}
+
 // Node 22+ ships its own global `localStorage`/`sessionStorage` (behind
 // --localstorage-file), which Vitest's jsdom environment treats as "already
 // present" and therefore never overrides with jsdom's real implementation --

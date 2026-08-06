@@ -56,8 +56,30 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: '#f4f3ef',
+  // The browser chrome around the page -- the address bar on Android, the
+  // status bar area of an installed app. Two entries rather than one so it
+  // matches whichever theme the page settles on; a paper-coloured bar over
+  // a near-black page is the seam that gives a retrofitted dark mode away.
+  //
+  // These follow the OS, not the in-app control, because that is the whole
+  // of what a meta tag can express. A visitor who overrides the OS keeps a
+  // bar from the other theme, which is a smaller wrong than no dark bar at
+  // all for the many who don't.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f4f3ef' },
+    { media: '(prefers-color-scheme: dark)', color: '#191815' },
+  ],
 };
+
+// Runs before the first paint, so the page is already the right colour when
+// it arrives rather than flashing paper and correcting itself a beat later.
+// It reads exactly what useTheme.ts reads and answers it the same way; the
+// hook takes over keeping the attribute in step once React is running.
+//
+// Inline and blocking on purpose: an external file, or `defer`, is a file
+// the browser fetches after it has painted, which is the flash this exists
+// to prevent.
+const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme');document.documentElement.setAttribute('data-theme',s==='light'||s==='dark'?s:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));}catch(e){}})();`;
 
 export default function RootLayout({
   children,
@@ -68,7 +90,14 @@ export default function RootLayout({
     <html
       lang="de"
       className={`${displayFont.variable} ${bodyFont.variable} ${labelFont.variable}`}
+      // The script above writes data-theme onto this element before React
+      // sees it, so the server's markup and the client's never match here.
+      // That is the mechanism working, not a bug to be reported.
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="antialiased">
         <I18nProvider>
           <ToastProvider>

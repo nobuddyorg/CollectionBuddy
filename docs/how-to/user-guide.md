@@ -57,8 +57,8 @@ Only items with a **place** set appear — an item without one simply won't show
 
 Open the user menu (click your email in the header) for two independent toggles:
 
-- **Language**: Deutsch / English. Auto-detected from your browser on first visit, then remembered.
-- **Theme**: System / Light / Dark. "System" tracks your OS setting live, including changes made while the app is open.
+- **Language** (*Sprache*): Deutsch / English. Auto-detected from your browser on first visit, then remembered.
+- **Appearance** (*Darstellung*): System / Light / Dark. The default is System, which tracks your OS setting live — including a change made while the app is open. Picking Light or Dark overrides the OS until you switch back to System. Either way the page changes as you click, and the choice is remembered on the next visit.
 
 ## Accessibility
 

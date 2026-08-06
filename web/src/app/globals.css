@@ -1,10 +1,18 @@
 @import 'tailwindcss';
 
-/* One committed theme: an archival gallery. Warm-neutral paper, white
-   mounts, ink-navy type, hairline rules. The UI is deliberately
-   achromatic -- the only colour on screen comes from the user's own
-   photographs, which is the whole point of a collection app. */
+/* Dark follows an explicit attribute rather than the media query, because
+   the choice on offer is system/light/dark: a visitor on a dark OS who asks
+   for light has to get light. useTheme.ts resolves the three down to the two
+   and writes the attribute; everything below only ever sees the answer. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* An archival gallery. Warm-neutral paper, white mounts, ink-navy type,
+   hairline rules. The UI is deliberately achromatic -- the only colour on
+   screen comes from the user's own photographs, which is the whole point of
+   a collection app. */
 :root {
+  color-scheme: light;
+
   --background: #f4f3ef;
   --foreground: #17203a;
   --card: #ffffff;
@@ -27,6 +35,79 @@
      burnt amber that sits warm against the ink without competing with the
      photographs, which remain the only other colour on screen. */
   --accent: #c2622a;
+
+  /* The tint under a specimen tag, and the strength of the sweep across a
+     photograph's held frame. Both are the page's own ink laid on thinly,
+     which means both have to change hands when the page does. */
+  --chip-tint: rgb(23 32 58 / 0.06);
+  --shimmer-strength: 0.55;
+
+  /* A card is lifted off the paper by its shadow, and the shadow is the
+     page's own ink rather than black -- a neutral black shadow on warm
+     paper reads as dirt. */
+  --shadow-rgb: 23 32 58;
+  --shadow-contact: 0.08;
+  --shadow-ambient: 0.18;
+  --shadow-contact-hover: 0.1;
+  --shadow-ambient-hover: 0.24;
+}
+
+/* The same gallery with the lights down. Not an inversion -- an inverted
+   paper is a grey the photographs have to fight, and #000 is a hole. The
+   warmth of the paper is kept at about 3% chroma, enough that the two
+   themes read as one building and little enough that nothing on the page
+   tints a photograph hanging on it.
+   Every text pair here clears WCAG AA; globals.contrast.test.ts measures
+   them rather than trusting the eye. */
+[data-theme='dark'] {
+  /* Tells the browser this is a dark surface, which is what gets form
+     controls, scrollbars and the like drawn dark instead of leaving light
+     widgets stranded on a dark page. */
+  color-scheme: dark;
+
+  --background: #191815;
+  --foreground: #f2f0ea;
+  --card: #232120;
+  --card-foreground: #f2f0ea;
+
+  /* Primary is "the maximum-contrast block" rather than a colour, so on a
+     dark page it changes hands: paper fills the button, and the page's own
+     near-black is what's written on it. */
+  --primary: #f2f0ea;
+  --primary-foreground: #191815;
+
+  --border: #39352f;
+  --muted: #302d2a;
+  --muted-foreground: #a8a196;
+
+  /* A hollow is darker than what it is cut into, whichever way round the
+     theme is -- so the empty mount goes below the card here, where in the
+     light theme it sits below the white. */
+  --mount: #141311;
+  --mount-hover: #1e1c1a;
+
+  /* The light theme's #a32017 is a deep red for white paper; on a dark page
+     it reads as a stain rather than a warning, and drops under AA as text.
+     Lifted until it carries at 4.8:1 on a card. */
+  --destructive: #e06a5e;
+  --destructive-foreground: #191815;
+
+  /* The same note played higher: the burnt amber lifted until it clears AA
+     on the dark page (7.3:1), so the wordmark stays the wordmark. */
+  --accent: #e0954f;
+
+  --chip-tint: rgb(242 240 234 / 0.09);
+  --shimmer-strength: 0.06;
+
+  /* On a dark page a card is read as lifted because it is *lighter* than
+     the page, not because of what falls beneath it -- so the shadow's job
+     shrinks to seating the card's edge, and it goes black, since ink navy
+     over near-black is a smudge nobody can see. */
+  --shadow-rgb: 0 0 0;
+  --shadow-contact: 0.5;
+  --shadow-ambient: 0.4;
+  --shadow-contact-hover: 0.6;
+  --shadow-ambient-hover: 0.5;
 }
 
 @theme inline {
@@ -202,6 +283,9 @@ body {
     background: var(--muted);
   }
 
+  /* The sweep is a highlight, so it is always white -- but 55% of it across
+     a dark mount is a searchlight, not a sheen. The strength is a variable
+     for that reason and nothing else. */
   .img-skeleton::after {
     content: '';
     position: absolute;
@@ -210,7 +294,7 @@ body {
     background: linear-gradient(
       90deg,
       transparent,
-      rgb(255 255 255 / 0.55),
+      rgb(255 255 255 / var(--shimmer-strength, 0.55)),
       transparent
     );
     animation: shimmer 1.4s ease-in-out infinite;
@@ -223,7 +307,25 @@ body {
     }
   }
 
-  /* A specimen tag: ink on a faint tinted chip. 14:1 against white. */
+  /* The card's two-part lift: a tight contact shadow that seats its edge,
+     and a wide soft one that puts it above the page. A class rather than an
+     arbitrary Tailwind value because both parts change with the theme, and
+     a colour spelled out inside a utility name cannot. */
+  .card-lift {
+    box-shadow:
+      0 1px 2px rgb(var(--shadow-rgb) / var(--shadow-contact)),
+      0 10px 24px -8px rgb(var(--shadow-rgb) / var(--shadow-ambient));
+  }
+
+  .card-lift-hover:hover {
+    box-shadow:
+      0 1px 2px rgb(var(--shadow-rgb) / var(--shadow-contact-hover)),
+      0 16px 32px -10px rgb(var(--shadow-rgb) / var(--shadow-ambient-hover));
+  }
+
+  /* A specimen tag: type on a faint tinted chip, the tint being the page's
+     own type colour at a whisper. 14:1 against white, 13:1 against a dark
+     card -- the chip tints the surface, it never carries the contrast. */
   .tag-chip {
     font-family: var(--font-label);
     letter-spacing: 0.08em;
@@ -233,7 +335,7 @@ body {
     padding: 0.2rem 0.45rem;
     border-radius: 3px;
     color: var(--foreground);
-    background: rgb(23 32 58 / 0.06);
+    background: var(--chip-tint);
   }
 }
 

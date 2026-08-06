@@ -19,7 +19,7 @@ const bar = 'rounded-sm bg-muted';
 
 function CardSkeleton() {
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-sm bg-card ring-1 ring-border shadow-[0_1px_2px_rgb(23_32_58/0.08),0_10px_24px_-8px_rgb(23_32_58/0.18)]">
+    <div className="flex h-full flex-col overflow-hidden rounded-sm bg-card ring-1 ring-border card-lift">
       {/* 4:3, the ratio a single photograph gets on a real card. */}
       <div className="img-skeleton aspect-4/3 w-full" />
 
