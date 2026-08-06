@@ -43,6 +43,8 @@ const config = {
     'src/app/components/Map/usePlaces.tsx',
     'src/app/components/Map/useCurrentLocation.ts',
     'src/app/components/Coin/size.ts',
+    'src/app/components/CenteredModal/getFocusable.ts',
+    'src/app/components/CenteredModal/useEscapeToClose.tsx',
     'src/app/useTheme.ts',
     'src/app/components/ItemForm/usePhoton.tsx',
     'src/app/i18n/I18nProvider.tsx',
