@@ -130,7 +130,15 @@ export function isRetryableStatus(status: number): boolean {
 // every distinct place is an unbounded number of requests to a free public
 // API, and running it on category *selection* rather than map *open* paid
 // that cost far more often than the map was ever looked at.
-export function usePlaces(categoryId: string, enabled: boolean) {
+//
+// `search` is the same term the list is filtered by, already debounced by the
+// caller -- the map draws the entries the list is showing, not every entry in
+// the category (#241). Narrowing can only ever shorten the geocoding queue.
+export function usePlaces(
+  categoryId: string,
+  search: string,
+  enabled: boolean,
+) {
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -145,7 +153,7 @@ export function usePlaces(categoryId: string, enabled: boolean) {
       setError(false);
       setPlaces([]);
       try {
-        const { data: items, error } = await listItemPlaces(categoryId);
+        const { data: items, error } = await listItemPlaces(categoryId, search);
 
         if (error) throw error;
 
@@ -238,7 +246,7 @@ export function usePlaces(categoryId: string, enabled: boolean) {
     return () => {
       cancelled = true;
     };
-  }, [categoryId, enabled]);
+  }, [categoryId, search, enabled]);
 
   return { places, loading, error };
 }

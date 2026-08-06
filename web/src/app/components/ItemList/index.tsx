@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { deleteItem, updateItem } from '../../data/items';
+import { deleteItem, updateItem, SEARCH_MIN_LENGTH } from '../../data/items';
 import { useI18n } from '../../i18n/useI18n';
 import ItemForm, { ItemFormValues } from '../ItemForm';
 import CenteredModal from '../CenteredModal';
@@ -43,12 +43,21 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
   const [isCreateOpen, setCreateOpen] = useState(false);
 
+  // Declared up here, ahead of the map, because the map is filtered by the
+  // same term the list is: they are one filtered set drawn two ways.
+  const [q, setQ] = useState('');
+  const [qDebounced, setQDebounced] = useState('');
+  useEffect(() => {
+    const id = setTimeout(() => setQDebounced(q.trim()), 200);
+    return () => clearTimeout(id);
+  }, [q]);
+
   const [mapOpen, setMapOpen] = useState(false);
   const {
     places,
     loading: loadingPlaces,
     error: placesError,
-  } = usePlaces(categoryId, mapOpen);
+  } = usePlaces(categoryId, qDebounced, mapOpen);
   // Starts empty. The map frames the pins it has as they stream in on its
   // own; this state exists for the re-frame below, once the last place has
   // been geocoded.
@@ -111,13 +120,6 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     }
     issueMapCommand('fitCurrent');
   }, [requestLocation, toast, t, issueMapCommand]);
-
-  const [q, setQ] = useState('');
-  const [qDebounced, setQDebounced] = useState('');
-  useEffect(() => {
-    const id = setTimeout(() => setQDebounced(q.trim()), 200);
-    return () => clearTimeout(id);
-  }, [q]);
 
   const { items, total, loading, page, setPage, totalPages, reload, setItems } =
     useItems(categoryId, qDebounced);
@@ -422,8 +424,16 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
             {t('item_list.map_error')}
           </p>
         ) : !loadingPlaces && places.length === 0 ? (
+          // "Nothing here yet" is the wrong sentence when a search is what
+          // emptied the map -- it reads as "you have entered no places",
+          // which sends the reader looking for a bug in their collection
+          // rather than at the search box they typed in.
           <p className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70">
-            {t('item_list.map_empty')}
+            {t(
+              qDebounced.length >= SEARCH_MIN_LENGTH
+                ? 'item_list.map_empty_filtered'
+                : 'item_list.map_empty',
+            )}
           </p>
         ) : (
           // The map mounts right away rather than behind the geocoding
