@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { cssVar } from './helpers';
+import { cssVar } from '../helpers';
 
 const PAPER = 'rgb(244, 243, 239)';
 const CHARCOAL = 'rgb(25, 24, 21)';

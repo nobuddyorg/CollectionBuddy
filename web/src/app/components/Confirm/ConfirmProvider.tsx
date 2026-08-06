@@ -56,6 +56,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           <button
             ref={cancelRef}
             type="button"
+            data-testid="confirm-cancel"
             onClick={() => settle(false)}
             className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-border hover:bg-muted"
           >
@@ -63,6 +64,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           </button>
           <button
             type="button"
+            data-testid="confirm-accept"
             onClick={() => settle(true)}
             className="min-h-11 px-4 rounded-sm font-label text-xs bg-destructive text-destructive-foreground hover:opacity-90"
           >

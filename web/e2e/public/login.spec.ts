@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { horizontalOverflow } from './helpers';
+import { horizontalOverflow } from '../helpers';
 
 // The only page a signed-out visitor can reach, and so the only page these
 // runs can hold to account. It is also the one that has to work perfectly:

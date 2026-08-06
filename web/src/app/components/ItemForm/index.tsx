@@ -100,6 +100,9 @@ export default function ItemForm({
           </label>
           <input
             id={titleId}
+            // Named for the end-to-end suite: every label in this form is
+            // translated, so naming a field by its label pins the language.
+            data-testid="item-title"
             ref={titleRef}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -132,6 +135,7 @@ export default function ItemForm({
               having it match their height by default. */}
           <textarea
             id={descriptionId}
+            data-testid="item-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}

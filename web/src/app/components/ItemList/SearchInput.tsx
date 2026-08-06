@@ -21,6 +21,10 @@ export function SearchInput({
       <input
         type="search"
         enterKeyHint="search"
+        // Named for the end-to-end suite. Its only other handle is the
+        // placeholder, which is translated -- so a test would either pin the
+        // language or break when the wording changes.
+        data-testid="search-input"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={t('item_list.search_placeholder')}

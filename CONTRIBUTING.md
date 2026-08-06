@@ -94,6 +94,14 @@ enforce the coverage floors -- only `--coverage` does, which is what CI uses.
 And `npm run e2e` needs `npm run build` first: it drives the built export, not
 the dev server.
 
+If your change touches the catalogue, search, the map or the entry forms,
+also run the signed-in suite against a local database:
+
+```bash
+supabase start   # from the repository root
+cd web && npm run e2e:local
+```
+
 ## Architecture constraints worth knowing
 
 - The app is a **static export** (`output: 'export'` in `next.config.ts`).

@@ -51,6 +51,9 @@ export function CollapseButton({
   return (
     <button
       type="button"
+      // Named for the end-to-end suite: an icon button whose only label is
+      // translated.
+      data-testid="collapse-categories"
       onClick={onClick}
       className="rounded-sm w-11 h-11 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
       aria-label={label}
@@ -113,6 +116,7 @@ export function ExpandButton({
   return (
     <button
       type="button"
+      data-testid="expand-categories"
       onClick={onClick}
       className="rounded-sm w-11 h-11 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
       aria-label={label}

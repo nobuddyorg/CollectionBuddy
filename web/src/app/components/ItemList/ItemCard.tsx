@@ -58,7 +58,12 @@ export function ItemCard({
   // invisible against #f4f3ef, which left a 1px hairline ring as the only
   // thing marking where one card ended and the next began.
   return (
-    <li className="fade-up group relative flex h-full flex-col overflow-hidden rounded-sm bg-card text-card-foreground ring-1 ring-border card-lift card-lift-hover transition-shadow">
+    <li
+      // Named so the end-to-end suite can count entries and read one without
+      // depending on the shape of what is inside it.
+      data-testid="item-card"
+      className="fade-up group relative flex h-full flex-col overflow-hidden rounded-sm bg-card text-card-foreground ring-1 ring-border card-lift card-lift-hover transition-shadow"
+    >
       {awaitingPhoto ? (
         <AddPhotoPlate onUpload={onUpload} busy={busy} />
       ) : (
