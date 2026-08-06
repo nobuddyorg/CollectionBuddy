@@ -40,8 +40,21 @@ Project-level storage limit is 50 MiB (`[storage]`), though the `item-images` bu
 
 Defined in [`web/vitest.config.ts`](../../web/vitest.config.ts) (`test.coverage.thresholds`) and [`web/stryker.config.mjs`](../../web/stryker.config.mjs):
 
-- Global coverage floor auto-ratchets upward (`autoUpdate: true`) as real coverage improves — it's never edited down, so a regression fails CI.
-- A handful of pure, high-risk modules (see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files)) additionally have a 100% per-file coverage floor and a mutation-score break threshold of 90.
+- Global coverage floor is raised **by hand** (`autoUpdate: false`) as real coverage improves, and never edited down — so a regression fails CI. It auto-ratcheted once and was turned off: it wrote the local measurement straight back into the file after every run, including values CI could not reach, so a green local run kept producing a red PR.
+- The pure, high-risk modules (see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files)) additionally have a 100% per-file coverage floor and a mutation-score break threshold of 90.
+- Mutation testing runs on every PR, not only on `main`. Only `main` publishes to the dashboard, so the badge tracks one branch.
+
+## End-to-end tests
+
+[`web/playwright.config.ts`](../../web/playwright.config.ts), specs in `web/e2e/`. Two projects — desktop Chrome and a Pixel 7 viewport — run against the built export in CI and against the deployed site after a release.
+
+| Variable | Effect |
+| --- | --- |
+| *(unset)* | Builds nothing; serves `web/out` under the base path and tests that. |
+| `E2E_BASE_URL` | Tests a deployed origin instead, and starts no server. |
+| `E2E_PORT` | Port for the local server (default `4173`). |
+
+No retries locally — a page that fails one run in ten fails for a tenth of visitors — and two against a remote target, where a retry separates a broken deploy from a dropped connection.
 
 ## i18n
 

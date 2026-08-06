@@ -145,10 +145,16 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
 
-  # Loads the *live* deployed page in a real browser and fails if it throws.
-  # A successful build isn't enough proof the site works: prerendering runs
-  # in Node with real env vars, which can mask client code that silently
-  # breaks once it's just a JS bundle in a browser with no Node underneath.
+  # Runs the end-to-end suite against the *live* deployed site. A successful
+  # build isn't enough proof the site works: prerendering runs in Node with
+  # real env vars, which can mask client code that silently breaks once it's
+  # just a JS bundle in a browser with no Node underneath.
+  #
+  # It is the same suite CI runs against the local export (#246), pointed at
+  # another origin -- so it also catches what only production can get wrong:
+  # a base path that doesn't match, an icon that 404s once deployed, a stale
+  # asset served by the CDN. Everything in it holds for a signed-out visitor,
+  # which is what keeps a run against production read-only.
   smoke_test:
     runs-on: ubuntu-latest
     needs: deploy
@@ -171,7 +177,16 @@ jobs:
       # Through the environment rather than expanded into the command line:
       # `${{ }}` is substituted before the shell ever sees it, so anything
       # quote-like in the value would be parsed as shell rather than passed
-      # as an argument.
-      - run: npm run smoke -- "$PAGE_URL"
+      # as an argument. E2E_BASE_URL is also what tells the config there is a
+      # deployed site to point at, so it starts no server of its own.
+      - run: npm run e2e
         env:
-          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+          E2E_BASE_URL: ${{ needs.deploy.outputs.page_url }}
+
+      - name: Keep the report from a failed run
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: playwright-report-production
+          path: web/playwright-report
+          retention-days: 7

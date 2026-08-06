@@ -97,6 +97,18 @@ describe('partitionByStoredCoords', () => {
     });
   });
 
+  // Two items can name the same place and disagree about where it is -- one
+  // entered by picking a suggestion, another edited by hand. The first
+  // located row wins, so the pin does not jump about depending on the order
+  // the rows happen to come back in.
+  it('keeps the first coordinates given for a repeated place', () => {
+    const { located } = partitionByStoredCoords([
+      row('Cologne', 50.94, 6.96),
+      row('Cologne', 1, 2),
+    ]);
+    expect(located).toEqual([cologne]);
+  });
+
   it('ignores rows with no place at all', () => {
     expect(partitionByStoredCoords([row(null, 50.94, 6.96), row('')])).toEqual({
       located: [],
@@ -176,6 +188,28 @@ describe('placeFromPhotonResponse', () => {
     expect(placeFromPhotonResponse('Broken', photon(['6.96', '50.94']))).toBe(
       null,
     );
+  });
+
+  // Each coordinate is checked on its own. A pair where only one side is a
+  // number is the dangerous shape: half of it is usable, so a check that
+  // required *both* to be wrong before giving up would pin the place at
+  // NaN -- which Leaflet draws nowhere, silently.
+  it('returns null when only one of the two coordinates is a number', () => {
+    expect(placeFromPhotonResponse('Half', photon([6.96, '50.94']))).toBeNull();
+    expect(placeFromPhotonResponse('Half', photon(['6.96', 50.94]))).toBeNull();
+    expect(placeFromPhotonResponse('Half', photon([6.96, null]))).toBeNull();
+  });
+
+  // Photon answers with GeoJSON, and a feature is not obliged to carry a
+  // geometry. Reaching through it is how a missing one becomes a thrown
+  // TypeError inside a geocoding worker, which is swallowed and reported as
+  // "that place could not be found".
+  it('returns null for a feature with nothing to read', () => {
+    expect(placeFromPhotonResponse('Odd', { features: [null] })).toBeNull();
+    expect(placeFromPhotonResponse('Odd', { features: [{}] })).toBeNull();
+    expect(
+      placeFromPhotonResponse('Odd', { features: [{ geometry: {} }] }),
+    ).toBeNull();
   });
 });
 

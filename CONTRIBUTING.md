@@ -81,11 +81,18 @@ From `web/`:
 ```bash
 npm run lint
 npx prettier --check .
-npm test
+npm test -- --coverage
 npm run build
+npm run e2e
+npm run test:mutation
 ```
 
 These are the same checks CI runs (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
+Two of them are easy to skip and shouldn't be. `npm test` on its own does not
+enforce the coverage floors -- only `--coverage` does, which is what CI uses.
+And `npm run e2e` needs `npm run build` first: it drives the built export, not
+the dev server.
 
 ## Architecture constraints worth knowing
 

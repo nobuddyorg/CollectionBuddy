@@ -35,10 +35,17 @@ export default defineConfig({
         // reveal-on-tap action row deleted well-covered lines, which moves
         // the ratio for a structural reason rather than a regression in
         // testing (the suite grew 84 -> 120 tests in the same change).
-        statements: 18.2,
-        branches: 16.9,
-        functions: 18.3,
-        lines: 19.0,
+        //
+        // Raised to the measurement in #246. They had drifted to roughly 16
+        // points below what the suite actually achieved, which meant half the
+        // tests could have been deleted and CI would still have gone green --
+        // a floor that far under the floorboards is not holding anything up.
+        // The rule from here is that a PR may raise these and must not lower
+        // them.
+        statements: 34.3,
+        branches: 33.9,
+        functions: 34.2,
+        lines: 35.3,
 
         // Was `true`. autoUpdate wrote the local measurement straight back
         // into this file after every coverage run, including a value CI
@@ -83,6 +90,18 @@ export default defineConfig({
           lines: 100,
         },
         'src/app/components/ItemList/optimistic.ts': {
+          statements: 100,
+          functions: 100,
+          branches: 100,
+          lines: 100,
+        },
+        'src/app/components/ItemList/imageCache.ts': {
+          statements: 100,
+          functions: 100,
+          branches: 100,
+          lines: 100,
+        },
+        'src/app/components/Coin/size.ts': {
           statements: 100,
           functions: 100,
           branches: 100,

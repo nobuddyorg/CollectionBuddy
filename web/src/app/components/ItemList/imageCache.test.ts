@@ -41,6 +41,28 @@ describe('signed URL cache', () => {
     expect(getCachedSignedUrl('a.webp', atMargin)).toBeUndefined();
   });
 
+  // Spelled out in minutes rather than computed from the constants, because
+  // an expectation derived from the thing under test agrees with whatever it
+  // becomes: the margin could shrink to a fraction of a millisecond and the
+  // test above would still pass. These are the durations Supabase actually
+  // signs for and the head start the app actually wants.
+  it('signs for an hour and keeps five minutes of it in hand', () => {
+    const ONE_HOUR = 60 * 60_000;
+    const FIVE_MINUTES = 5 * 60_000;
+    expect(SIGNED_URL_TTL_MS).toBe(ONE_HOUR);
+    expect(SIGNED_URL_MARGIN_MS).toBe(FIVE_MINUTES);
+
+    cacheSignedUrls([['a.webp', 'u']], T0);
+    // A second before the margin opens, still good.
+    expect(getCachedSignedUrl('a.webp', T0 + ONE_HOUR - FIVE_MINUTES - 1)).toBe(
+      'u',
+    );
+    // The moment it opens, gone -- five whole minutes before the real expiry.
+    expect(
+      getCachedSignedUrl('a.webp', T0 + ONE_HOUR - FIVE_MINUTES),
+    ).toBeUndefined();
+  });
+
   it('forgets an expired entry rather than re-checking it forever', () => {
     cacheSignedUrls([['a.webp', 'u']], T0);
     getCachedSignedUrl('a.webp', T0 + SIGNED_URL_TTL_MS);

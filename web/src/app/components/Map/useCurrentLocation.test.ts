@@ -21,6 +21,14 @@ describe('classifyLocationError', () => {
   it('treats an error without a code as unavailable', () => {
     expect(classifyLocationError({})).toBe('unavailable');
   });
+
+  // The callback is documented to hand over an error object, so this is
+  // defensive rather than expected -- but the defence is only worth keeping
+  // if it works, and "unavailable" is the answer that leads somewhere.
+  it('survives being handed nothing at all', () => {
+    const nothing = undefined as unknown as { code?: number };
+    expect(classifyLocationError(nothing)).toBe('unavailable');
+  });
 });
 
 describe('isGeolocationGranted', () => {
@@ -71,5 +79,15 @@ describe('isGeolocationGranted', () => {
   it('falls back to asking when there is no Permissions API', async () => {
     vi.stubGlobal('navigator', {});
     await expect(isGeolocationGranted()).resolves.toBe(true);
+  });
+
+  // The permission name is the whole question. Asked about anything else, the
+  // browser either throws -- and the fallback then reports "granted" for a
+  // permission never checked -- or answers about the wrong capability.
+  it('asks about geolocation and nothing else', async () => {
+    const query = vi.fn(async () => ({ state: 'granted' }));
+    stubPermissions(query);
+    await isGeolocationGranted();
+    expect(query).toHaveBeenCalledWith({ name: 'geolocation' });
   });
 });
