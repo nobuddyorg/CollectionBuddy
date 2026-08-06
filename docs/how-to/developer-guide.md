@@ -39,7 +39,15 @@ Every schema change goes through a new migration file, never an edit to an exist
 
 If you ever apply a migration outside the pipeline (SQL editor, `db push` by hand), send `notify pgrst, 'reload schema'` afterwards. PostgREST serves from a cached schema, so until it reloads, every write naming a newly added column fails with `PGRST204: Could not find the 'x' column of 'items' in the schema cache` — the table is fine, the API just hasn't noticed. Most Supabase projects have a `pgrst_ddl_watch` event trigger that does this automatically; this one doesn't, and can't, since creating an event trigger needs superuser and `postgres` isn't. The `migrate` job sends it on every run, so migrations that go through `main` are covered.
 
-`0012_batch_delete_triggers.sql` used to fail here with "must be owner of table objects", which was recorded as a local permissions quirk. It wasn't: it created an index on `storage.objects`, which hosted Supabase owns as `supabase_storage_admin` and never grants to `postgres`. The statement was impossible in every environment, and because the file is one transaction, *none* of 0012 had ever applied anywhere. The index was removed from that migration; the triggers it exists for are unaffected.
+A migration that touches `storage.objects` can create and drop *policies* on it, but not indexes or anything else needing ownership: hosted Supabase owns that table as `supabase_storage_admin` and never grants it to `postgres`, so `create index` on it raises `42501` for every role available to us. An earlier migration carried such an index for a year, which meant that file — one transaction — had never applied anywhere, locally or in production, while the repo and its docs described it as live.
+
+### Migrations
+
+The seven files in `supabase/migrations/` are a squashed baseline, taken on 2026-08-06 and replacing the sixteen that came before. Those sixteen had reached the point where a third of their statements existed only to undo an earlier file: a table created and dropped, two full-text-search columns added and removed, one trigger written three times and then deleted. Reading them told you the history but not the schema.
+
+The baseline was verified rather than asserted: the local stack was reset from it, both databases were introspected down to column defaults, constraint expressions, index definitions, function bodies, trigger timing, policy predicates and grants, and the two were diffed. The only differences left were local-stack platform defaults that no migration here sets.
+
+Squashing again is a deliberate, occasional act, not routine. It needs the same verification, and it needs `supabase_migrations.schema_migrations` on the hosted project cleared so the new files are recorded as themselves. That table is the only reason the chain can't simply be rewritten in place.
 
 ## Set up a new Supabase environment (e.g. for a fork, or production)
 
