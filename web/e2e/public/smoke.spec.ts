@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { collectPageProblems, expectNoPageProblems } from './helpers';
+import { collectPageProblems, expectNoPageProblems } from '../helpers';
 
 // The sign-in button is named in whatever language the app picked, so the
 // locale is pinned rather than inherited from whoever is running this.

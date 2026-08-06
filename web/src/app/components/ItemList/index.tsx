@@ -278,6 +278,8 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         <div className="flex gap-2 sm:shrink-0">
           <button
             type="button"
+            // Named for the end-to-end suite: its label is translated.
+            data-testid="new-entry"
             onClick={() => setCreateOpen(true)}
             className="flex-1 sm:flex-none min-h-11 px-4 flex items-center justify-center gap-2 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 transition-opacity"
           >
@@ -287,6 +289,9 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
           <button
             type="button"
+            // Named for the end-to-end suite: an icon button whose only label
+            // is translated.
+            data-testid="open-map"
             onClick={() => setMapOpen(true)}
             onPointerEnter={prefetchMap}
             onPointerDown={prefetchMap}

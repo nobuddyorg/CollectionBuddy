@@ -53,6 +53,11 @@ Defined in [`web/vitest.config.ts`](../../web/vitest.config.ts) (`test.coverage.
 | *(unset)* | Builds nothing; serves `web/out` under the base path and tests that. |
 | `E2E_BASE_URL` | Tests a deployed origin instead, and starts no server. |
 | `E2E_PORT` | Port for the local server (default `4173`). |
+| `E2E_SUPABASE_URL` | Adds the `setup` and `signed-in` projects. Unset, they do not exist, so `npm run e2e` needs nothing installed. |
+| `E2E_SUPABASE_ANON_KEY` | Used by the setup step to sign the test user in. |
+| `E2E_SUPABASE_SERVICE_KEY` | Used *only* to create that user — `service_role` has no table grants. |
+
+`npm run e2e:local` sets all three from `supabase status` and builds the bundle against the local stack. Point it at anything other than a local stack and it would seed a real database, which is why nothing reads these from a deployed project's secrets.
 
 No retries locally — a page that fails one run in ten fails for a tenth of visitors — and two against a remote target, where a retry separates a broken deploy from a dropped connection.
 

@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 import { EXPORT_BASE_PATH } from './next.config';
+import { AUTH_STATE_PATH } from './e2e/signed-in/fixtures';
 
 // One suite, two targets. Unset, it builds nothing and serves the local
 // export; with E2E_BASE_URL it runs against a deployed site, which is how the
@@ -18,6 +19,12 @@ const PORT = Number(process.env.E2E_PORT ?? 4173);
 const localURL = `http://127.0.0.1:${PORT}${EXPORT_BASE_PATH}/`;
 const baseURL = process.env.E2E_BASE_URL ?? localURL;
 const isRemote = Boolean(process.env.E2E_BASE_URL);
+
+// Signed-in tests need a database to be signed in to. They run when one is
+// pointed at -- a local `supabase start`, never a deployed project -- and are
+// simply absent otherwise, so `npm run e2e` on its own stays a suite anybody
+// can run with nothing installed.
+const localStack = Boolean(process.env.E2E_SUPABASE_URL);
 
 export default defineConfig({
   testDir: './e2e',
@@ -41,11 +48,40 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      testDir: './e2e/public',
+      use: { ...devices['Desktop Chrome'] },
+    },
     // The app is mobile-first and most of its layout bugs have been phone-only
     // (#242, #251, #264), so a phone viewport is a target rather than a
     // variation.
-    { name: 'mobile', use: { ...devices['Pixel 7'] } },
+    {
+      name: 'mobile',
+      testDir: './e2e/public',
+      use: { ...devices['Pixel 7'] },
+    },
+    ...(localStack
+      ? [
+          {
+            name: 'setup',
+            testDir: './e2e',
+            testMatch: /signed-in\.setup\.ts/,
+          },
+          {
+            name: 'signed-in',
+            testDir: './e2e/signed-in',
+            dependencies: ['setup'],
+            use: {
+              ...devices['Desktop Chrome'],
+              // The session the setup project minted. Loaded per test, so
+              // nothing here has to sign in and no test can leave another
+              // signed out.
+              storageState: AUTH_STATE_PATH,
+            },
+          },
+        ]
+      : []),
   ],
   webServer: isRemote
     ? undefined

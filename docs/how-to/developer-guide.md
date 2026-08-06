@@ -45,7 +45,28 @@ E2E_BASE_URL="https://nobuddyorg.github.io/CollectionBuddy/" npm run e2e
 
 With `E2E_BASE_URL` set it starts no server of its own. That run is what catches the failures only production can have — a base path that doesn't match, an icon that 404s once deployed, a stale asset from the CDN.
 
-**Everything in `e2e/` has to hold for a signed-out visitor.** These runs have no Supabase session, which is what keeps a run against production read-only, and it is also the current ceiling: signed-in journeys (the item grid, search, the map, uploads) need a local Supabase stack with a seeded session, which is not wired up yet.
+**Everything in `e2e/public/` has to hold for a signed-out visitor.** Those runs have no Supabase session, which is what keeps a run against production read-only.
+
+### The signed-in suite
+
+`e2e/signed-in/` covers the catalogue, search, the map and the entry forms, against a real database:
+
+```bash
+supabase start     # from the repository root
+cd web
+npm run e2e:local
+```
+
+That one script reads the stack's own keys, **builds the bundle against it** — the Supabase URL is baked in at build time, so a build pointed elsewhere would produce a suite that passes while testing a bundle talking to production — and runs the suite. CI runs the same script, so the two cannot drift.
+
+Sign-in does not go through the interface, because the only way in is Google OAuth and no runner can drive it. `e2e/signed-in.setup.ts` creates a user through the auth admin API, signs in, and writes the session into `localStorage` as Playwright storage state. It does not spell out the storage key: supabase-js derives that from the project URL, so the setup hands the same library somewhere to write and reads back what it wrote.
+
+Two things worth knowing before adding tests here:
+
+- **Seeding runs as the user, not as `service_role`.** That role is granted nothing on these tables — [`0006_policies.sql`](../../supabase/migrations/0006_policies.sql) grants `authenticated` and no one else, because row-level security is this app's only authorization layer. The service key opens exactly one door: creating the user. Everything else goes through the same policies the app does, so a fixture cannot set up a state the app itself could not reach.
+- **Spec files run in parallel against one database.** Tests that write use their own category (`SEED.scratchCategory`); the collections the reading tests describe are never touched. A test that creates an entry in a collection another file is counting would make both wrong, at random.
+
+Prefer `expectTitles(page, [...])` over reading the grid once: the search box debounces and then waits on a round trip, so anything that asserts immediately after typing is asserting on the previous answer.
 
 ## Run mutation testing
 

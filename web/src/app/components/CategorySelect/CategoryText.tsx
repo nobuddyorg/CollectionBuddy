@@ -21,6 +21,10 @@ export function CategoryText({
         {title}
       </h2>
       <div
+        // Named for the end-to-end suite: this is the only thing on the page
+        // that says which collection is on show once the strip has collapsed,
+        // and the strip collapses as soon as one is chosen.
+        data-testid="selected-category"
         className={`font-display text-2xl sm:text-3xl truncate ${
           placeholder ? 'text-muted-foreground' : 'text-foreground'
         }`}

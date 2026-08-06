@@ -17,6 +17,9 @@ export function Submit({
   return (
     <button
       type="submit"
+      // Named for the end-to-end suite: the label differs between creating
+      // and editing, and both are translated.
+      data-testid="item-submit"
       disabled={disabled}
       aria-busy={submitting}
       className="min-h-11 px-4 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"

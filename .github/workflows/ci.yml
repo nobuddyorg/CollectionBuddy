@@ -98,6 +98,73 @@ jobs:
           path: web/playwright-report
           retention-days: 7
 
+  # The signed-in half of the app, against a real database.
+  #
+  # Its own job because it needs Docker and a Supabase stack, which the rest
+  # of CI does not, and because a stack that fails to start should say so
+  # plainly rather than looking like a broken build. Everything the other jobs
+  # test is what a signed-out visitor sees; this is the catalogue, search, the
+  # map and the entry forms, going through the same row-level security that is
+  # the app's only authorization layer.
+  #
+  # Sign-in cannot go through the interface -- the only way in is Google
+  # OAuth, which no runner can drive -- so the suite's setup step mints a
+  # session through the auth API and writes it into localStorage. That path
+  # exists for the local stack alone: the production run is the signed-out
+  # suite, which cannot write anything to a live database.
+  e2e_local_stack:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3
+        with:
+          # The same version pages-deploy.yml pins for `db push`, so the
+          # migrations are exercised here by the CLI that will apply them.
+          version: 2.110.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start Supabase
+        # From the repository root: that is where supabase/ lives. Applies
+        # every migration on the way up, so a migration that cannot apply
+        # fails here rather than against production.
+        run: supabase start
+        working-directory: .
+
+      - run: npx playwright install --with-deps chromium
+
+      # Reads the stack's own keys, builds the bundle against it and runs the
+      # suite -- the same script a developer runs, so the two cannot drift.
+      - name: Run the signed-in end-to-end suite
+        run: npm run e2e:local
+
+      - name: Keep the report from a failed run
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: playwright-report-signed-in
+          path: web/playwright-report
+          retention-days: 7
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
+        working-directory: .
+
   # Scoped to the pure, high-risk modules (see stryker.config.mjs and
   # vitest.config.ts) -- mutating the whole app tree would mean mutating JSX
   # and Tailwind class strings, producing a score that means nothing.

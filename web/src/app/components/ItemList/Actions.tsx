@@ -166,6 +166,7 @@ export function Actions({
 
       <IconButton
         variant="outline"
+        data-testid="edit-entry"
         onClick={onEdit}
         aria-label={t('item_list.edit')}
         title={t('item_list.edit')}
@@ -182,6 +183,7 @@ export function Actions({
 
       <IconButton
         variant="outlineDestructive"
+        data-testid="delete-entry"
         onClick={onDelete}
         aria-label={t('item_list.delete_entry')}
         title={t('item_list.delete_entry')}
