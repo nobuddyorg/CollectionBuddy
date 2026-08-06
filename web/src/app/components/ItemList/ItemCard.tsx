@@ -53,11 +53,12 @@ export function ItemCard({
   //
   // The card is a discrete object at every width: rounded, and lifted off
   // the paper by a real two-part shadow -- a tight contact shadow plus a
-  // wide soft one. The old single `0 1px 2px / 0.06` was invisible against
-  // #f4f3ef, which left a 1px hairline ring as the only thing marking where
-  // one card ended and the next began.
+  // wide soft one (`.card-lift`, which carries both and knows what each
+  // theme's shadow is made of). The old single `0 1px 2px / 0.06` was
+  // invisible against #f4f3ef, which left a 1px hairline ring as the only
+  // thing marking where one card ended and the next began.
   return (
-    <li className="fade-up group relative flex h-full flex-col overflow-hidden rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-[0_1px_2px_rgb(23_32_58/0.08),0_10px_24px_-8px_rgb(23_32_58/0.18)] transition-shadow hover:shadow-[0_1px_2px_rgb(23_32_58/0.10),0_16px_32px_-10px_rgb(23_32_58/0.24)]">
+    <li className="fade-up group relative flex h-full flex-col overflow-hidden rounded-sm bg-card text-card-foreground ring-1 ring-border card-lift card-lift-hover transition-shadow">
       {awaitingPhoto ? (
         <AddPhotoPlate onUpload={onUpload} busy={busy} />
       ) : (

@@ -21,6 +21,7 @@ const config = {
     'src/app/components/ItemList/Pagination.tsx',
     'src/app/components/ItemList/useItemImages.tsx',
     'src/app/components/ItemList/optimistic.ts',
+    'src/app/useTheme.ts',
     'src/app/components/ItemForm/usePhoton.tsx',
     'src/app/i18n/I18nProvider.tsx',
   ],

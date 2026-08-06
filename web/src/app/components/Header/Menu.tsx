@@ -1,6 +1,7 @@
 'use client';
 
 import { useI18n } from '../../i18n/useI18n';
+import { THEME_PREFERENCES, useTheme } from '../../useTheme';
 import type { MenuProps } from './types';
 
 function SegmentedControl<T extends string>({
@@ -47,6 +48,7 @@ export default function Menu({
   labelSignOut,
 }: MenuProps) {
   const { t, lang, setLang } = useI18n();
+  const { preference, setThemePreference } = useTheme();
   if (!open) return null;
   const menuId = 'user-menu';
 
@@ -71,6 +73,24 @@ export default function Menu({
           options={['de', 'en']}
           labels={{ de: 'Deutsch', en: 'English' }}
           onChange={setLang}
+        />
+      </div>
+
+      {/* Same shape as the language control directly above it: caption on
+          its own line, segments sharing the menu's full width. Three
+          segments rather than two, and the labels are translated, so
+          neither German nor English can crowd the row. */}
+      <div className="px-3 py-2 space-y-1.5">
+        <span className="block text-sm">{t('header.theme')}</span>
+        <SegmentedControl
+          value={preference}
+          options={THEME_PREFERENCES}
+          labels={{
+            system: t('header.theme_system'),
+            light: t('header.theme_light'),
+            dark: t('header.theme_dark'),
+          }}
+          onChange={setThemePreference}
         />
       </div>
 
