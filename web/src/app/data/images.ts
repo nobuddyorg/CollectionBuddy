@@ -2,10 +2,24 @@ import { supabase } from '../supabase';
 
 export const ITEM_IMAGES_BUCKET = 'item-images';
 
+// Oldest photograph first, which is what puts a listing in the same order the
+// grid lays its frames out in: the first shot of an item keeps the hero slot
+// however many more are added, and a new one lands at the end -- exactly where
+// its placeholder was already standing while it uploaded.
+//
+// Newest-first is what made an upload appear to jump (#265). The placeholder
+// is appended, because that is where the picture is about to go; the listing
+// then came back with that same picture at the *front*, so it displaced the
+// hero and shifted every other photograph down one slot.
+export const IMAGE_LIST_SORT = {
+  column: 'created_at',
+  order: 'asc',
+} as const;
+
 export function listImageObjects(prefix: string, limit: number) {
   return supabase.storage.from(ITEM_IMAGES_BUCKET).list(prefix, {
     limit,
-    sortBy: { column: 'created_at', order: 'desc' },
+    sortBy: IMAGE_LIST_SORT,
   });
 }
 
@@ -22,7 +36,7 @@ export async function listAllImageObjects(prefix: string) {
       .list(prefix, {
         limit: pageSize,
         offset,
-        sortBy: { column: 'created_at', order: 'desc' },
+        sortBy: IMAGE_LIST_SORT,
       });
     if (error) return { data: null, error };
     if (!data?.length) break;

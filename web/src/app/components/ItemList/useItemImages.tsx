@@ -26,6 +26,10 @@ export type ImageEntryData = { pathFull: string; pathThumb?: string };
 
 // Groups a flat listing of `<base>.webp` / `<base>.thumb.webp` objects into
 // full+thumb pairs, keyed by base name, with paths prefixed for signing.
+//
+// Listing order is carried through to the returned map, and from there to the
+// order the grid hangs its photographs in, so it is load-bearing rather than
+// incidental -- see IMAGE_LIST_SORT for what that order has to be and why.
 export function pairImageEntries(
   data: StorageObjectRow[],
   prefix: string,
@@ -152,18 +156,23 @@ export function useItemImages() {
     return toImgEntries(entryData, signedUrlMap);
   }, []);
 
-  // Always re-lists: this runs right after an upload or delete, so the
-  // cached listing for that item is exactly the thing that just went stale.
-  const refreshItemImages = useCallback(
+  // Always re-lists: this runs right after an upload, so the cached listing
+  // for that item is exactly the thing that just went stale.
+  //
+  // Hands the entries back rather than storing them, so a caller that has
+  // other state to settle at the same moment -- an upload, which owes the
+  // grid a placeholder until the picture takes over -- can apply both in one
+  // go instead of letting the card render in between.
+  const fetchItemImages = useCallback(
     async (itemId: string) => {
       const { data: sessionData } = await supabase.auth.getSession();
       const uid = sessionData.session?.user.id;
       if (uid) invalidateListing(`${uid}/${itemId}`);
 
       const entries = await getItemImageEntries(itemId);
-      if (typeof entries === 'undefined') return;
+      if (typeof entries === 'undefined') return undefined;
       lastSignedAtRef.current = Date.now();
-      setImages((prev) => ({ ...prev, [itemId]: entries }));
+      return entries;
     },
     [getItemImageEntries],
   );
@@ -319,7 +328,14 @@ export function useItemImages() {
         // Held until the listing has come back: the placeholder is meant to
         // stand in for the photograph until the photograph itself is there
         // to replace it, not until the bytes have merely been accepted.
-        await refreshItemImages(itemId);
+        //
+        // Stored here rather than inside the fetch so that this and the
+        // release in `finally` land in the same synchronous run and React
+        // batches them into one render. Two renders would put the photograph
+        // on the wall with its own placeholder still standing beside it, for
+        // a frame, and then take a slot back.
+        const entries = await fetchItemImages(itemId);
+        if (entries) setImages((prev) => ({ ...prev, [itemId]: entries }));
       } catch (err: unknown) {
         console.error('Failed to upload image:', err);
         toast.error(t('item_list.upload_error'));
@@ -333,7 +349,7 @@ export function useItemImages() {
         });
       }
     },
-    [refreshItemImages, t, toast],
+    [fetchItemImages, t, toast],
   );
 
   const deleteImage = useCallback(
@@ -381,7 +397,6 @@ export function useItemImages() {
   return {
     images,
     loadingItems,
-    refreshItemImages,
     refreshAllImages,
     uploadImage,
     deleteImage,
