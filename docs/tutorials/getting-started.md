@@ -38,6 +38,8 @@ Hover the new item's card (or tap the **⋯** button on touch devices) to reveal
 
 Click the uploaded thumbnail to open it full-size in a lightbox.
 
+Add a second photo and the card lays both out as a pair; a third and beyond gives the first photo a large slot with the rest as a strip beneath it. Photos keep the order you added them in, so the first one you upload stays the big one — and while a photo is still uploading, its placeholder holds exactly the slot it will end up in.
+
 ## 6. Find it again
 
 Add one or two more items (different titles/places), then:

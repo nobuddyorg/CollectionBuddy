@@ -68,6 +68,43 @@ describe('pairImageEntries', () => {
     });
   });
 
+  // The grid hangs its photographs in this order and stands an upload's
+  // placeholder at the end, so a listing that arrives oldest-first has to stay
+  // oldest-first through here -- otherwise the new picture lands somewhere
+  // other than the frame that was held for it (#265).
+  it('carries listing order through to the paired entries', () => {
+    const result = pairImageEntries(
+      [
+        { name: 'oldest.webp' },
+        { name: 'oldest.thumb.webp' },
+        { name: 'middle.webp' },
+        { name: 'middle.thumb.webp' },
+        { name: 'newest.webp' },
+        { name: 'newest.thumb.webp' },
+      ],
+      prefix,
+    );
+    expect(Array.from(result.keys())).toEqual(['oldest', 'middle', 'newest']);
+  });
+
+  // A card can be given a second photograph while the first is still
+  // compressing, so two uploads can interleave their full and thumb objects in
+  // the listing. Each image still takes its place from where its full-size
+  // object falls -- the one uploaded first of the pair, and so the first of
+  // that base the listing shows.
+  it('keeps each image in place when two uploads interleave', () => {
+    const result = pairImageEntries(
+      [
+        { name: 'first.webp' },
+        { name: 'second.webp' },
+        { name: 'second.thumb.webp' },
+        { name: 'first.thumb.webp' },
+      ],
+      prefix,
+    );
+    expect(Array.from(result.keys())).toEqual(['first', 'second']);
+  });
+
   it('pairs multiple independent images from one flat listing', () => {
     const result = pairImageEntries(
       [
