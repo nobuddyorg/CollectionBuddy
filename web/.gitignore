@@ -14,6 +14,12 @@
 /coverage
 /reports
 .stryker-tmp
+/test-results
+/playwright-report
+/blob-report
+# The directory scripts/serve-export.mjs builds to put out/ under the base
+# path; it holds nothing but a symlink and is removed when the server stops.
+/.e2e-serve
 
 # next.js
 /.next/

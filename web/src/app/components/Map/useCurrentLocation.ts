@@ -11,6 +11,10 @@ export type LocationFailure = 'denied' | 'unavailable';
 export type LocationResult =
   { ok: true; location: Coords } | { ok: false; reason: LocationFailure };
 
+// Stryker disable all: what follows is the settings handed to the browser's
+// geolocation API and the shape it hands back. A test asserting a 12-second
+// timeout can only restate the 12 seconds, which proves the constant is the
+// constant; the judgement in these numbers is not the kind a test can hold.
 const FIX_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
   timeout: 12000,
@@ -40,6 +44,7 @@ const coordsOf = (position: GeolocationPosition): Coords => ({
   lat: position.coords.latitude,
   lng: position.coords.longitude,
 });
+// Stryker restore all
 
 /**
  * Separates "you said no" from every other way a fix can fail (no hardware,
@@ -81,14 +86,16 @@ export async function isGeolocationGranted(): Promise<boolean> {
  * which is the only reliable moment to raise a permission prompt in a
  * standalone PWA, and the only path that reports why it failed.
  */
+// Stryker disable all: the hook entire, not just its effects -- mutants in
+// here would report on how thoroughly the navigator API is stubbed, which is
+// not a thing worth a score. The pure classification and permission reads
+// above carry the logic worth asserting on, and they are scored.
 export function useCurrentLocation(active: boolean) {
   const [location, setLocation] = useState<Coords | null>(null);
   const [locating, setLocating] = useState(false);
 
   /* v8 ignore start -- browser geolocation: callbacks, watch lifetime and
-   * teardown, none of it separable from the navigator API here. The pure
-   * classification and permission reads above carry the logic worth
-   * asserting on. */
+   * teardown, none of it separable from the navigator API here. */
   useEffect(() => {
     if (!active) return;
     if (typeof navigator === 'undefined' || !navigator.geolocation) return;
@@ -157,3 +164,4 @@ export function useCurrentLocation(active: boolean) {
 
   return { location, locating, request };
 }
+// Stryker restore all

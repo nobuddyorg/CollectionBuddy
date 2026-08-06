@@ -12,20 +12,57 @@ npx prettier --check .
 npx tsc --noEmit
 npm test -- --coverage
 npm run build
+npm run e2e
+npm run test:mutation
 ```
 
 These match [`ci.yml`](../../.github/workflows/ci.yml) exactly, in the order it runs them.
 
+## Run the end-to-end suite
+
+```bash
+cd web
+npm run build   # e2e drives the built export, not the dev server
+npm run e2e
+```
+
+Playwright starts and stops the server itself. It serves `out/` **under the base path**, because that is where GitHub Pages puts it and `next build` bakes that path into every asset URL, router link and manifest entry — an export served at `/` 404s on nearly everything it asks for. `scripts/serve-export.mjs` builds a directory for that, and takes the path from `EXPORT_BASE_PATH` in [`next.config.ts`](../../web/next.config.ts) so the name exists in one place.
+
+Useful while writing tests:
+
+```bash
+npx playwright test --ui             # pick tests, watch them run, step through
+npx playwright test e2e/theme.spec.ts
+npx playwright test --project=mobile # the phone viewport only
+npx playwright show-report           # after a failed run
+```
+
+The same suite runs against the deployed site after every release, pointed at another origin:
+
+```bash
+E2E_BASE_URL="https://nobuddyorg.github.io/CollectionBuddy/" npm run e2e
+```
+
+With `E2E_BASE_URL` set it starts no server of its own. That run is what catches the failures only production can have — a base path that doesn't match, an icon that 404s once deployed, a stale asset from the CDN.
+
+**Everything in `e2e/` has to hold for a signed-out visitor.** These runs have no Supabase session, which is what keeps a run against production read-only, and it is also the current ceiling: signed-in journeys (the item grid, search, the map, uploads) need a local Supabase stack with a seeded session, which is not wired up yet.
+
 ## Run mutation testing
 
-A separate, slower check from the unit test suite — see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files) for why it's scoped the way it is.
+Line coverage counts lines that *ran*; mutation testing counts lines that are actually *checked*. It is the number worth reading — see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files) for why it's scoped the way it is.
 
 ```bash
 cd web
 npm run test:mutation
 ```
 
-CI only runs this on push to `main` (not per-PR), and publishes a report to the [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main) when `STRYKER_DASHBOARD_API_KEY` is set — locally, without that variable, it just writes an HTML report to `web/reports/mutation/index.html`.
+CI runs this on **every** PR as well as on pushes to `main` (about a minute for ~270 mutants). The score has been 100% throughout; the break threshold is 90. Only main publishes to the [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main), so the badge keeps tracking one branch — locally, without `STRYKER_DASHBOARD_API_KEY`, it writes an HTML report to `web/reports/mutation/index.html`.
+
+Adding a file to `mutate` in [`stryker.config.mjs`](../../web/stryker.config.mjs) means first drawing a line inside it: every file in that list pairs pure exported logic with a `// Stryker disable all` region around whatever I/O it sits beside. Mutating a `fetch` call scores how elaborately the network was faked, which is not worth a number. Where a mutant is genuinely equivalent — a check the type system needs but the runtime does not — say so with `// Stryker disable next-line all` and a comment explaining why, rather than writing a test that cannot fail.
+
+## Coverage floors
+
+`vitest.config.ts` carries a global floor plus per-file 100% floors for the pure, high-risk modules. The global floor is not auto-updated: raise it by hand when coverage genuinely improves, and never lower it to make a change fit. It had been left about 16 points below what the suite actually achieved, which meant half the tests could have been deleted with CI still green.
 
 ## Regenerate the app icons
 

@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react';
 import { listItemPlaces, type ItemPlaceRow } from '../../data/items';
 import { Place } from './types';
 
+// Stryker disable all: localStorage, and two try/catch wrappers whose whole
+// content is "carry on without the cache". Mutating them scores how well the
+// storage API is stubbed rather than anything about the app.
 const GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
 
 function readGeocodeCache(): Record<string, Place> {
@@ -21,6 +24,7 @@ function writeGeocodeCache(cache: Record<string, Place>) {
     // best-effort, geocoding still works without it.
   }
 }
+// Stryker restore all
 
 /**
  * Splits the rows to draw into places that already know where they are and
@@ -45,6 +49,11 @@ export function partitionByStoredCoords(rows: ItemPlaceRow[]): {
     // separately from the finite test below because `Number.isFinite`,
     // while it does reject null, isn't a type guard -- this is what
     // narrows the pair to `number` for the Place built underneath.
+    //
+    // Which also makes every mutant of this line equivalent: at runtime
+    // `Number.isFinite` rejects null too, so removing or weakening the check
+    // changes nothing a test could observe. It is here for the compiler.
+    // Stryker disable next-line all
     if (lat == null || lng == null) continue;
     // A stored NaN would draw a pin nowhere *and* suppress the geocode
     // that would have found the place properly.
@@ -92,10 +101,18 @@ export function placeFromPhotonResponse(
   data: unknown,
 ): Place | null {
   const features = (data as { features?: unknown })?.features;
+  // The emptiness test is a shortcut, not a guard: an empty array falls
+  // through the reads below and lands on the same null anyway, so dropping it
+  // is unobservable. Kept because "no matches" is the ordinary answer here
+  // and saying so at the top reads better than discovering it three lines on.
+  // Stryker disable next-line all
   if (!Array.isArray(features) || features.length === 0) return null;
   const coordinates = (
     features[0] as { geometry?: { coordinates?: unknown } } | undefined
   )?.geometry?.coordinates;
+  // Same again: a one-element array leaves `lat` undefined and is refused by
+  // the type check below, so the length test only makes the intent legible.
+  // Stryker disable next-line all
   if (!Array.isArray(coordinates) || coordinates.length < 2) return null;
   const [lng, lat] = coordinates as number[];
   if (typeof lat !== 'number' || typeof lng !== 'number') return null;
@@ -108,11 +125,15 @@ export function placeFromPhotonResponse(
 // swallowed, and the map drew the one or two pins that got through as if
 // that were the whole collection. A few at a time, and asked again if the
 // answer was "not now".
+// Stryker disable all: rate-limiting numbers and a sleep. A test can restate
+// "three at a time" but cannot say whether three is right -- that was learned
+// from Photon refusing the requests, not from an assertion.
 const GEOCODE_CONCURRENCY = 3;
 const GEOCODE_ATTEMPTS = 3;
 const RETRY_BASE_MS = 500;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// Stryker restore all
 
 /**
  * Whether asking again could plausibly give a different answer.
@@ -134,6 +155,10 @@ export function isRetryableStatus(status: number): boolean {
 // `search` is the same term the list is filtered by, already debounced by the
 // caller -- the map draws the entries the list is showing, not every entry in
 // the category (#241). Narrowing can only ever shorten the geocoding queue.
+// Stryker disable all: hook internals -- Supabase I/O, a geocoding queue and
+// its retries, none of it reachable without stubbing the network. The four
+// exported functions above are the logic worth scoring, and they are; mutants
+// down here would only measure how elaborately the fetch was faked.
 export function usePlaces(
   categoryId: string,
   search: string,
@@ -250,3 +275,4 @@ export function usePlaces(
 
   return { places, loading, error };
 }
+// Stryker restore all
