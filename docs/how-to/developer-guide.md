@@ -27,6 +27,19 @@ npm run test:mutation
 
 CI only runs this on push to `main` (not per-PR), and publishes a report to the [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main) when `STRYKER_DASHBOARD_API_KEY` is set — locally, without that variable, it just writes an HTML report to `web/reports/mutation/index.html`.
 
+## Regenerate the app icons
+
+The home-screen and splash-screen icons in `web/public/` are rendered from a single piece of artwork, `web/public/logo.png`:
+
+```bash
+cd web
+npm run icons
+```
+
+Run it after changing `logo.png`, and commit what it writes — it needs a headless browser, so it is not part of the build. It only ever scales the artwork down, and refuses to write an icon that would need scaling up: `logo.png` is 414px across, which is the hard ceiling on how sharp any icon can be. Raising that ceiling means a vector source, not a bigger export of the same raster.
+
+`site.webmanifest` lists the results by hand. `src/app/manifest.test.ts` checks that every icon it names exists, is the size it claims, and covers what a launcher needs — so an entry added there without a file (or the other way round) fails the suite rather than a phone.
+
 ## Change the database schema
 
 Every schema change goes through a new migration file, never an edit to an existing one:
