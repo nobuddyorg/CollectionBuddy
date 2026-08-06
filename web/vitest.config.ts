@@ -42,10 +42,10 @@ export default defineConfig({
         // a floor that far under the floorboards is not holding anything up.
         // The rule from here is that a PR may raise these and must not lower
         // them.
-        statements: 37.9,
-        branches: 36.9,
-        functions: 39.3,
-        lines: 38.5,
+        statements: 39.4,
+        branches: 38.8,
+        functions: 40.8,
+        lines: 40.0,
 
         // Was `true`. autoUpdate wrote the local measurement straight back
         // into this file after every coverage run, including a value CI
@@ -102,6 +102,18 @@ export default defineConfig({
           lines: 100,
         },
         'src/app/components/ItemList/imageCache.ts': {
+          statements: 100,
+          functions: 100,
+          branches: 100,
+          lines: 100,
+        },
+        'src/app/components/CenteredModal/getFocusable.ts': {
+          statements: 100,
+          functions: 100,
+          branches: 100,
+          lines: 100,
+        },
+        'src/app/components/CenteredModal/useEscapeToClose.tsx': {
           statements: 100,
           functions: 100,
           branches: 100,

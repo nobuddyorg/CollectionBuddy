@@ -7,6 +7,20 @@ export const AUTH_STATE_PATH = resolve(
 );
 
 /**
+ * Where the setup leaves the ids and access tokens of both users, for the
+ * tests that ask the database questions the interface cannot ask -- whether
+ * one visitor's token can reach another's rows.
+ */
+export const CONTEXT_PATH = resolve(process.cwd(), '.e2e-auth/context.json');
+
+export type SeedContext = {
+  userId: string;
+  token: string;
+  otherUserId: string;
+  otherToken: string;
+};
+
+/**
  * The collection every signed-in test looks at.
  *
  * Small enough to assert on exactly, and shaped around what the tests need to
@@ -21,14 +35,37 @@ export const SEED = {
   email: 'e2e@collectionbuddy.test',
   password: 'e2e-password-not-a-secret',
 
-  // Two collections to read, and a third for the tests that write.
+  /**
+   * A second collector, with a collection of their own.
+   *
+   * Row-level security is the whole of this app's authorization -- there is
+   * no server to check anything, so a policy that stopped holding would show
+   * one visitor another's collection with nothing else standing in the way.
+   * A single-user suite cannot notice that: every query it makes is one the
+   * policies are supposed to allow. Somebody else's rows have to exist before
+   * "cannot see them" means anything.
+   */
+  other: {
+    email: 'e2e-other@collectionbuddy.test',
+    password: 'other-password-not-a-secret',
+    category: 'Fremde Sammlung',
+    item: 'Fremdes Fundstück',
+  },
+
+  // Two collections to read, and one scratch collection *per writing spec*.
   //
-  // Playwright runs spec files in parallel, and they all share one database
-  // and one user -- so a test creating an entry in Münzen while another
-  // asserts Münzen contains exactly three would fail, correctly, and at
-  // random. Writes are kept off the collections the read tests describe.
-  categories: ['Münzen', 'Briefmarken', 'Werkstatt'],
+  // Playwright runs spec files in parallel -- two workers in CI -- against one
+  // database and one user. A test creating an entry while another counts them
+  // fails correctly and at random, so writes are kept off the collections the
+  // read tests describe. They also have to be kept off each other: photos and
+  // entries sharing one scratch collection was the same bug a second time,
+  // and it survived a local run because the interleaving happened not to
+  // occur.
+  categories: ['Münzen', 'Briefmarken', 'Werkstatt', 'Fotostudio'],
+  /** For entries.spec.ts. */
   scratchCategory: 'Werkstatt',
+  /** For photos.spec.ts, which also creates and deletes entries. */
+  photoCategory: 'Fotostudio',
 
   // Oldest first. The list sorts newest-first, so the last one here is the
   // first card on the page.
@@ -71,12 +108,21 @@ export const SEED = {
       tags: ['selten'],
     },
     {
-      // The scratch collection is never empty, so opening it looks the same
-      // as opening any other and the tests that write have a baseline to be
+      // A scratch collection is never empty, so opening it looks the same as
+      // opening any other and the tests that write have a baseline to be
       // added to.
       category: 'Werkstatt',
       title: 'Werkstattstück',
-      description: 'Bleibt liegen, damit die Werkstatt nie leer ist.',
+      description: 'Bleibt liegen, damit die Werkstatt nie leer bleibt.',
+      place: null,
+      place_lat: null,
+      place_lng: null,
+      tags: [],
+    },
+    {
+      category: 'Fotostudio',
+      title: 'Studiostück',
+      description: 'Bleibt liegen, damit das Studio nie leer bleibt.',
       place: null,
       place_lat: null,
       place_lng: null,

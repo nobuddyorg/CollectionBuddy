@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 
 import { SEED, itemsIn } from './fixtures';
 import { expectTitles, openCategory, visibleTitles } from './helpers';
