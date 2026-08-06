@@ -7,6 +7,20 @@ export const AUTH_STATE_PATH = resolve(
 );
 
 /**
+ * Where the setup leaves the ids and access tokens of both users, for the
+ * tests that ask the database questions the interface cannot ask -- whether
+ * one visitor's token can reach another's rows.
+ */
+export const CONTEXT_PATH = resolve(process.cwd(), '.e2e-auth/context.json');
+
+export type SeedContext = {
+  userId: string;
+  token: string;
+  otherUserId: string;
+  otherToken: string;
+};
+
+/**
  * The collection every signed-in test looks at.
  *
  * Small enough to assert on exactly, and shaped around what the tests need to
@@ -20,6 +34,23 @@ export const AUTH_STATE_PATH = resolve(
 export const SEED = {
   email: 'e2e@collectionbuddy.test',
   password: 'e2e-password-not-a-secret',
+
+  /**
+   * A second collector, with a collection of their own.
+   *
+   * Row-level security is the whole of this app's authorization -- there is
+   * no server to check anything, so a policy that stopped holding would show
+   * one visitor another's collection with nothing else standing in the way.
+   * A single-user suite cannot notice that: every query it makes is one the
+   * policies are supposed to allow. Somebody else's rows have to exist before
+   * "cannot see them" means anything.
+   */
+  other: {
+    email: 'e2e-other@collectionbuddy.test',
+    password: 'other-password-not-a-secret',
+    category: 'Fremde Sammlung',
+    item: 'Fremdes Fundstück',
+  },
 
   // Two collections to read, and a third for the tests that write.
   //

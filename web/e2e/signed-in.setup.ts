@@ -4,7 +4,7 @@ import { dirname } from 'node:path';
 import { test as setup } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-import { AUTH_STATE_PATH, SEED } from './signed-in/fixtures';
+import { AUTH_STATE_PATH, CONTEXT_PATH, SEED } from './signed-in/fixtures';
 
 // Signs a test user in against the local Supabase stack and leaves the
 // session where the browser will find it, plus a known collection to look at.
@@ -37,11 +37,11 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-/** The user the whole signed-in suite runs as, created if it isn't there. */
-async function ensureUser(): Promise<string> {
+/** A user of the local stack, created if this run is the first to want it. */
+async function ensureUser(email: string, password: string): Promise<string> {
   const { data, error } = await admin.auth.admin.createUser({
-    email: SEED.email,
-    password: SEED.password,
+    email,
+    password,
     email_confirm: true,
   });
   if (!error && data.user) return data.user.id;
@@ -50,8 +50,8 @@ async function ensureUser(): Promise<string> {
   // than fail, so the suite is re-runnable without tearing the stack down.
   const { data: list, error: listError } = await admin.auth.admin.listUsers();
   if (listError) throw listError;
-  const existing = list.users.find((user) => user.email === SEED.email);
-  if (!existing) throw error ?? new Error('could not create or find the user');
+  const existing = list.users.find((user) => user.email === email);
+  if (!existing) throw error ?? new Error(`could not create or find ${email}`);
   return existing.id;
 }
 
@@ -100,6 +100,33 @@ async function reseed(as: SupabaseClient, userId: string) {
   }
 }
 
+/** The other collector's one category and one entry. */
+async function reseedOther(as: SupabaseClient, userId: string) {
+  await as.from('items').delete().eq('user_id', userId);
+  await as.from('categories').delete().eq('user_id', userId);
+
+  const { data: category, error: categoryError } = await as
+    .from('categories')
+    .insert({ user_id: userId, name: SEED.other.category })
+    .select('id')
+    .single();
+  if (categoryError) throw categoryError;
+
+  const { data: item, error: itemError } = await as
+    .from('items')
+    .insert({ user_id: userId, title: SEED.other.item, place: 'Reykjavik' })
+    .select('id')
+    .single();
+  if (itemError) throw itemError;
+
+  const { error: linkError } = await as.from('item_categories').insert({
+    item_id: item.id,
+    category_id: category.id,
+    user_id: userId,
+  });
+  if (linkError) throw linkError;
+}
+
 /**
  * Signs in and returns the localStorage entry the browser build would hold.
  *
@@ -108,9 +135,13 @@ async function reseed(as: SupabaseClient, userId: string) {
  * it somewhere to write and reading back what it wrote. Guessing the format
  * would be a second place for it to be wrong.
  */
-async function mintSession(): Promise<{
+async function mintSession(
+  email: string,
+  password: string,
+): Promise<{
   key: string;
   value: string;
+  token: string;
   client: SupabaseClient;
 }> {
   const written = new Map<string, string>();
@@ -126,23 +157,41 @@ async function mintSession(): Promise<{
     },
   });
 
-  const { error } = await client.auth.signInWithPassword({
-    email: SEED.email,
-    password: SEED.password,
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password,
   });
   if (error) throw error;
 
   const [entry] = [...written.entries()];
   if (!entry) throw new Error('signing in stored no session');
-  return { key: entry[0], value: entry[1], client };
+  const token = data.session?.access_token;
+  if (!token) throw new Error('signing in produced no access token');
+  return { key: entry[0], value: entry[1], token, client };
 }
 
 setup('seed the stack and sign in', async ({ baseURL }) => {
-  const userId = await ensureUser();
-  const session = await mintSession();
+  const userId = await ensureUser(SEED.email, SEED.password);
+  const session = await mintSession(SEED.email, SEED.password);
   await reseed(session.client, userId);
 
+  // The second collector, and a collection for the first one to be unable to
+  // see. Seeded through their own session for the same reason as the first:
+  // service_role has no grant on these tables.
+  const otherId = await ensureUser(SEED.other.email, SEED.other.password);
+  const other = await mintSession(SEED.other.email, SEED.other.password);
+  await reseedOther(other.client, otherId);
+
   mkdirSync(dirname(AUTH_STATE_PATH), { recursive: true });
+  writeFileSync(
+    CONTEXT_PATH,
+    JSON.stringify({
+      userId,
+      token: session.token,
+      otherUserId: otherId,
+      otherToken: other.token,
+    }),
+  );
   writeFileSync(
     AUTH_STATE_PATH,
     JSON.stringify({

@@ -20,6 +20,9 @@ function UploadInput({
     <input
       type="file"
       accept="image/*"
+      // Named for the end-to-end suite: the input is hidden behind a label,
+      // and its own name is translated.
+      data-testid="upload-photo"
       className="hidden"
       aria-label={label}
       disabled={busy}
