@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 import { createClient } from '@supabase/supabase-js';
 
 import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
@@ -17,6 +17,18 @@ import { openCategory } from './helpers';
 // upload still works, which is the half a policy tightened too far would
 // break.
 test.use({ locale: 'en-GB' });
+
+// Every test here decodes a photograph, resizes it twice in a canvas and
+// uploads two objects -- real work, done in the browser, with another worker
+// doing the same thing beside it. Playwright's default 30s covers one upload
+// comfortably and two under load not at all.
+//
+// The assertions below wait for less than this, on purpose: an assertion
+// allowed to run as long as the test can never fail with its own message, so
+// a slow upload was reported as "test timed out" with nothing about what it
+// had been waiting for.
+test.describe.configure({ timeout: 120_000 });
+const ARRIVES = 45_000;
 
 // A real photograph rather than a fabricated one: the compressor decodes what
 // it is given, and a handful of bytes that merely claim to be a PNG is not
@@ -72,7 +84,7 @@ const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
 
 test.describe('photographs', () => {
   test.beforeEach(async ({ page }) => {
-    await openCategory(page, SEED.scratchCategory);
+    await openCategory(page, SEED.photoCategory);
   });
 
   test('a photograph can be added to an entry and is drawn', async ({
@@ -86,7 +98,7 @@ test.describe('photographs', () => {
     // Compression happens in the browser and the upload is two round trips,
     // so this waits rather than assuming. What it waits for is the picture
     // itself, not the placeholder that stood in for it.
-    await expect(card.locator('img')).toBeVisible({ timeout: 30_000 });
+    await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
     await expect(card.locator('img')).toHaveAttribute('src', /token=/);
 
     await removeEntry(page, title);
@@ -96,11 +108,11 @@ test.describe('photographs', () => {
     const title = uniqueTitle('Bleibt');
     const card = await newEntry(page, title);
     await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toBeVisible({ timeout: 30_000 });
+    await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
 
-    await openCategory(page, SEED.scratchCategory);
+    await openCategory(page, SEED.photoCategory);
     const again = page.getByTestId('item-card').filter({ hasText: title });
-    await expect(again.locator('img')).toBeVisible({ timeout: 30_000 });
+    await expect(again.locator('img')).toBeVisible({ timeout: ARRIVES });
 
     await removeEntry(page, title);
   });
@@ -118,7 +130,7 @@ test.describe('photographs', () => {
     const title = uniqueTitle('Paarweise');
     const card = await newEntry(page, title);
     await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toBeVisible({ timeout: 30_000 });
+    await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
 
     const added = (await storedObjects(token, userId)).filter(
       (name) => !before.includes(name),
@@ -143,10 +155,10 @@ test.describe('photographs', () => {
     const card = await newEntry(page, title);
 
     await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toHaveCount(1, { timeout: 30_000 });
+    await expect(card.locator('img')).toHaveCount(1, { timeout: ARRIVES });
 
     await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toHaveCount(2, { timeout: 30_000 });
+    await expect(card.locator('img')).toHaveCount(2, { timeout: ARRIVES });
 
     await removeEntry(page, title);
   });
@@ -155,7 +167,7 @@ test.describe('photographs', () => {
     const title = uniqueTitle('Wieder weg');
     const card = await newEntry(page, title);
     await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toBeVisible({ timeout: 30_000 });
+    await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
 
     await card.getByRole('button', { name: /delete image/i }).click();
     await page.getByTestId('confirm-accept').click();
@@ -178,7 +190,7 @@ test.describe('photographs', () => {
     const title = uniqueTitle('Mit Aufräumen');
     const card = await newEntry(page, title);
     await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toBeVisible({ timeout: 30_000 });
+    await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
 
     const during = await storedObjects(token, userId);
     expect(during.length).toBeGreaterThan(before.length);

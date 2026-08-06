@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 import { createClient } from '@supabase/supabase-js';
 
 import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
@@ -200,18 +200,42 @@ test.describe('one collection cannot reach another', () => {
     expect(error).not.toBeNull();
   });
 
-  // Signed out is the other boundary: `anon` holds no grant at all, so the
-  // predicate is never even reached.
-  test('a visitor with no session sees nothing', async ({}, testInfo) => {
+  // Signed out is the other boundary, and it is refused a step earlier than
+  // the rest: `anon` holds no grant on these tables at all, so the request is
+  // turned away before any policy predicate is evaluated. 42501 is what that
+  // looks like -- an empty result would mean the grant had been given and the
+  // policy was doing the work, which is a weaker place to be standing.
+  //
+  // Asserted on the code rather than on "there was an error", because the
+  // first version of this test read `expect(error ?? {}).toBeTruthy()`, and
+  // an object is always truthy: it passed whether the boundary held or not.
+  for (const table of ['items', 'categories']) {
+    test(`a visitor with no session is refused ${table} outright`, async ({}, testInfo) => {
+      testInfo.skip(!process.env.E2E_SUPABASE_URL);
+      const anon = createClient(
+        process.env.E2E_SUPABASE_URL!,
+        process.env.E2E_SUPABASE_ANON_KEY!,
+        { auth: { persistSession: false } },
+      );
+
+      const { data, error, status } = await anon.from(table).select('id');
+      expect(data).toBeNull();
+      expect(error).not.toBeNull();
+      expect(error!.code).toBe('42501');
+      expect(status).toBe(401);
+    });
+  }
+
+  test('a visitor with no session can list no photographs', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { otherUserId } = context();
     const anon = createClient(
       process.env.E2E_SUPABASE_URL!,
       process.env.E2E_SUPABASE_ANON_KEY!,
       { auth: { persistSession: false } },
     );
 
-    const { data, error } = await anon.from('items').select('id');
+    const { data } = await anon.storage.from('item-images').list(otherUserId);
     expect(data ?? []).toEqual([]);
-    expect(error ?? { message: '' }).toBeTruthy();
   });
 });
