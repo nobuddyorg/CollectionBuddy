@@ -71,7 +71,12 @@ export function AddPhotoPlate({
       {/* States the condition, then offers the way out of it -- the band
           only ever named the action, which said nothing about why the
           frame was empty. */}
-      <span className="relative flex flex-col items-center gap-2.5 text-muted-foreground transition-colors group-hover/plate:text-foreground">
+      {/* `text-muted-foreground` on `bg-mount` reads at 3.85:1 in the light
+          theme, below the 4.5:1 AA floor for this 11px label -- and the
+          resting state is the one read, since touch has no hover.
+          `text-foreground/80` carries 7.10:1 on light `--mount` and 10.65:1
+          on dark, so both themes clear AA without a new token. */}
+      <span className="relative flex flex-col items-center gap-2.5 text-foreground/80 transition-colors group-hover/plate:text-foreground">
         {/* The shared <Spinner> draws in white, for the dark controls it
             normally sits on; on this pale plate it would be invisible.
             The `.spinner` utility inherits currentColor instead. */}

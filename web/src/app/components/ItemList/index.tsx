@@ -146,7 +146,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
             onPointerEnter={prefetchMap}
             onPointerDown={prefetchMap}
             onFocus={prefetchMap}
-            className="min-h-11 w-11 shrink-0 flex items-center justify-center rounded-sm ring-1 ring-inset ring-border text-foreground hover:bg-muted transition-colors"
+            className="min-h-11 w-11 shrink-0 flex items-center justify-center rounded-sm ring-1 ring-inset ring-control-border text-foreground hover:bg-muted transition-colors"
             aria-label={t('item_list.open_map')}
             title={t('item_list.open_map')}
           >

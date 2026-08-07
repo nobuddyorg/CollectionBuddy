@@ -58,7 +58,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             type="button"
             data-testid="confirm-cancel"
             onClick={() => settle(false)}
-            className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-border hover:bg-muted"
+            className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-control-border hover:bg-muted"
           >
             {t('common.cancel')}
           </button>
