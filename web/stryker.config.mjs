@@ -37,6 +37,7 @@ const config = {
     'src/app/data/items.ts',
     'src/app/data/zip.ts',
     'src/app/data/exportFormat.ts',
+    'src/app/data/exportCategory.ts',
     'src/app/components/CategorySelect/useExportCategory.tsx',
     'src/app/components/ItemList/Pagination.tsx',
     'src/app/components/ItemList/useItemImages.tsx',

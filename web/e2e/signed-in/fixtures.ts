@@ -61,11 +61,19 @@ export const SEED = {
   // entries sharing one scratch collection was the same bug a second time,
   // and it survived a local run because the interleaving happened not to
   // occur.
-  categories: ['Münzen', 'Briefmarken', 'Werkstatt', 'Fotostudio'],
+  categories: [
+    'Münzen',
+    'Briefmarken',
+    'Werkstatt',
+    'Fotostudio',
+    'Exportarchiv',
+  ],
   /** For entries.spec.ts. */
   scratchCategory: 'Werkstatt',
   /** For photos.spec.ts, which also creates and deletes entries. */
   photoCategory: 'Fotostudio',
+  /** For export.spec.ts, which also creates, photographs and deletes an entry. */
+  exportCategory: 'Exportarchiv',
 
   // Oldest first. The list sorts newest-first, so the last one here is the
   // first card on the page.
@@ -123,6 +131,15 @@ export const SEED = {
       category: 'Fotostudio',
       title: 'Studiostück',
       description: 'Bleibt liegen, damit das Studio nie leer bleibt.',
+      place: null,
+      place_lat: null,
+      place_lng: null,
+      tags: [],
+    },
+    {
+      category: 'Exportarchiv',
+      title: 'Archivstück',
+      description: 'Bleibt liegen, damit das Archiv nie leer bleibt.',
       place: null,
       place_lat: null,
       place_lng: null,

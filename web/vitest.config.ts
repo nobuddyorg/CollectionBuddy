@@ -77,6 +77,12 @@ export default defineConfig({
           branches: 100,
           lines: 100,
         },
+        'src/app/data/exportCategory.ts': {
+          statements: 100,
+          functions: 100,
+          branches: 100,
+          lines: 100,
+        },
         'src/app/components/CategorySelect/useExportCategory.tsx': {
           statements: 100,
           functions: 100,

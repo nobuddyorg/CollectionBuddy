@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   assertZipRoom,
@@ -298,11 +298,22 @@ describe('createZipWriter', () => {
     expect(u16(bytes, 12)).toBe(date);
   });
 
+  // A real `new Date()` here (there being no `modified` to fake it with)
+  // used to be called twice -- once inside the writer, once in the
+  // assertion -- which fails the one run in a thousand where the local
+  // clock ticks past midnight between the two. A pinned clock makes both
+  // calls see the same instant regardless of when the suite happens to run.
   it('defaults the modification time to now when none is given', async () => {
-    const writer = createZipWriter();
-    writer.add('f.txt', encoder.encode('x'));
-    const bytes = await bytesOf(writer.finish());
-    expect(u16(bytes, 12)).toBe(dosDateTime(new Date()).date);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 15, 23, 59, 59));
+    try {
+      const writer = createZipWriter();
+      writer.add('f.txt', encoder.encode('x'));
+      const bytes = await bytesOf(writer.finish());
+      expect(u16(bytes, 12)).toBe(dosDateTime(new Date()).date);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps directory paths as they were given', async () => {
