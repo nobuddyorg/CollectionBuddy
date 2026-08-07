@@ -150,7 +150,7 @@ describe('CategorySelect', () => {
     expect(exportButton).toBeVisible();
     expect(exportButton).toBeEnabled();
     // Not a third control in the rename row: those edit the category, this
-    // takes a copy of it, and a mis-tap between the two is a deletion.
+    // takes a copy of it, and a slip between the two is a deletion.
     expect(exportButton.parentElement).not.toBe(
       screen.getByRole('button', { name: 'Delete' }).parentElement,
     );

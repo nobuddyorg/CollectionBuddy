@@ -59,7 +59,9 @@ describe('crc32', () => {
   });
 
   it('is order-sensitive', () => {
-    expect(crc32(encoder.encode('ab'))).not.toBe(crc32(encoder.encode('ba')));
+    expect(crc32(new Uint8Array([1, 2]))).not.toBe(
+      crc32(new Uint8Array([2, 1])),
+    );
   });
 
   it('stays unsigned for input whose CRC has the high bit set', () => {
