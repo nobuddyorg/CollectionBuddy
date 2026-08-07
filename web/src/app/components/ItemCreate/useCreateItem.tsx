@@ -24,14 +24,7 @@ export function useCreateItem(categoryId: string) {
       setIsCreating(true);
       let itemId: string | null = null;
       try {
-        const { data, error } = await createItem({
-          title: values.title,
-          description: values.description,
-          place: values.place,
-          place_lat: values.place_lat,
-          place_lng: values.place_lng,
-          tags,
-        });
+        const { data, error } = await createItem({ ...values, tags });
 
         if (error || !data) throw error ?? new Error('insert failed');
         itemId = data.id;

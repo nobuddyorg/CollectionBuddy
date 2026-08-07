@@ -40,15 +40,7 @@ export function useItemMutations({
         // whitespace, dedupes/sorts tags) -- send raw values and merge the
         // row it returns, rather than re-deriving a client-side copy that
         // can diverge from it.
-        const payload = {
-          title: values.title,
-          description: values.description,
-          place: values.place,
-          place_lat: values.place_lat,
-          place_lng: values.place_lng,
-          tags: values.tags,
-        };
-        const { data, error } = await updateItem(id, payload);
+        const { data, error } = await updateItem(id, values);
         if (error || !data) {
           console.error('Failed to save item:', error);
           toast.error(t('item_list.save_error'));

@@ -1,25 +1,16 @@
 'use client';
 
 import CenteredModal from '../CenteredModal';
-import ItemForm, { ItemFormValues } from '../ItemForm';
+import ItemForm, { EMPTY_ITEM_FORM_VALUES, ItemFormValues } from '../ItemForm';
 import { useI18n } from '../../i18n/useI18n';
 import type { ItemLite } from './types';
-
-const EMPTY_VALUES: ItemFormValues = {
-  title: '',
-  description: '',
-  place: '',
-  place_lat: null,
-  place_lng: null,
-  tags: [],
-};
 
 // The entry passed in is a snapshot taken when the card's edit button was
 // pressed, not a live lookup by id -- so what the form opens onto cannot
 // shift out from under the user if the underlying list changes while the
 // modal is up.
 function valuesFor(item: ItemLite | null): ItemFormValues {
-  if (!item) return EMPTY_VALUES;
+  if (!item) return EMPTY_ITEM_FORM_VALUES;
   return {
     title: item.title,
     description: item.description ?? '',

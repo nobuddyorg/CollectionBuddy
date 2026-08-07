@@ -1,3 +1,5 @@
+import type { ItemFields } from '../../data/items';
+
 export type PhotonFeature = {
   properties: {
     osm_id: number;
@@ -29,16 +31,34 @@ export type PlaceCoords = { lat: number; lng: number };
  */
 export type PlaceChoice = { label: string; coords: PlaceCoords | null };
 
-export type ItemFormValues = {
-  title: string;
+// Tied to the table's own field list (`data/items.ts`) rather than a
+// separate hand-written copy of the same six names, so the compiler
+// connects the form to the row it edits. `description`/`place` are widened
+// back to plain `string`: the database stores blank as NULL, but a
+// controlled input has to hold *something*, and every caller already
+// normalizes null to '' at the boundary (see EditItemModal's `valuesFor`).
+// `place_lat`/`place_lng` stay null-or-number as `ItemFields` already has
+// them -- null whenever `place` wasn't picked from a suggestion. The two
+// travel together: anything that changes `place` must set these to match,
+// or a pin outlives the name it belonged to.
+export type ItemFormValues = Omit<
+  ItemFields,
+  'id' | 'description' | 'place'
+> & {
   description: string;
   place: string;
-  // Null whenever `place` wasn't picked from a suggestion. The two travel
-  // together: anything that changes `place` must set these to match, or a
-  // pin outlives the name it belonged to.
-  place_lat: number | null;
-  place_lng: number | null;
-  tags: string[];
+};
+
+// Shared by every entry point that opens the form with nothing to show yet
+// (a new entry, or a modal about to receive an item) -- was two
+// byte-identical literals, one per caller.
+export const EMPTY_ITEM_FORM_VALUES: ItemFormValues = {
+  title: '',
+  description: '',
+  place: '',
+  place_lat: null,
+  place_lng: null,
+  tags: [],
 };
 
 export type ItemFormProps = {
