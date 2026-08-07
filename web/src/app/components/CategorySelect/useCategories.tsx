@@ -103,9 +103,10 @@ export function useCategories() {
       try {
         // Deleting a category cascades (item_categories -> orphan-item
         // deletion -> items) through DB triggers, which can only ever
-        // remove storage.objects metadata, not the underlying bytes. Find
-        // the items this deletion would orphan and clean up their images
-        // client-side first, same as a direct item delete.
+        // remove storage.objects metadata, not the underlying bytes. Work
+        // out which items this deletion would orphan *before* the row is
+        // gone -- the cascade takes item_categories with it, so this is
+        // the last point those links can still be read.
         const { data: links, error: linksError } =
           await listItemIdsForCategory(id);
         if (linksError) throw linksError;
@@ -122,13 +123,37 @@ export function useCategories() {
           orphanedItemIds = itemIds.filter((itemId) => !keep.has(itemId));
         }
 
-        await Promise.all(
-          orphanedItemIds.map((itemId) => removeItemImages(itemId)),
-        );
-
+        // The row before the bytes: the storage prefix is keyed by each
+        // item's id, not derived from the row itself, so nothing is lost
+        // by deleting it last. Deleting the row first also means a
+        // failure here still means "nothing happened" -- no photograph is
+        // ever destroyed on a path that reports itself as failed (#306),
+        // same as a direct item delete.
         const { error } = await deleteCategoryRow(id);
         if (error) throw error;
         await reload();
+
+        if (orphanedItemIds.length) {
+          // The row is already gone at this point, irreversibly. A
+          // failure here is a storage leak, not data loss -- there is no
+          // category left to restore, and nothing to gain by letting one
+          // item's failure stop the rest from being attempted, so every
+          // removal runs to completion rather than aborting on the first
+          // rejection.
+          const results = await Promise.allSettled(
+            orphanedItemIds.map((itemId) => removeItemImages(itemId)),
+          );
+          const failures = results.filter(
+            (r): r is PromiseRejectedResult => r.status === 'rejected',
+          );
+          if (failures.length) {
+            failures.forEach((f) =>
+              console.error('Failed to clean up category images:', f.reason),
+            );
+            toast.error(t('category_select.deleteImagesCleanupError'));
+          }
+        }
+
         return true;
       } catch (e) {
         console.error(e);
