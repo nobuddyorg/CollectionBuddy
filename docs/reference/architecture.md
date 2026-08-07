@@ -59,17 +59,19 @@ There are two sets of four policies on `storage.objects`, saying the same thing 
 
 ## Client data-access layer
 
-[`web/src/app/data/`](../../web/src/app/data/) is the only code that talks to Supabase directly:
+[`web/src/app/data/`](../../web/src/app/data/) holds the table and storage queries:
 
 - `items.ts` — `listItems()` (paginated, category-scoped, optional search via `buildSearchFilter()`), `createItem()`, `updateItem()`, `deleteItem()`, `linkItemToCategory()`, `listItemPlaces()`.
-- `categories.ts` — `listCategories()`, `createCategory()`, `deleteCategory()`, plus `listItemIdsForCategory()` / `listItemIdsLinkedElsewhere()` used to work out which items a category deletion would orphan.
+- `categories.ts` — `listCategories()`, `createCategory()`, `renameCategory()`, `deleteCategory()`, plus `listItemIdsForCategory()` / `countItemsForCategory()` / `listItemIdsLinkedElsewhere()` used to work out which items a category deletion would orphan, and to warn about how many before it runs.
 - `images.ts` — `listImageObjects()` / `listAllImageObjects()`, `createSignedUrls()` (1 hour expiry), `uploadImageObject()`, `removeImageObjects()`, `removeItemImages()`.
+
+It is not the only code holding the client, though. Auth and session work reaches [`supabase.ts`](../../web/src/app/supabase.ts) directly — `useSession.ts`, `page.tsx`, `login/useAuthRedirect.ts`, `login/useGoogleSignIn.ts` — and so does `components/ItemList/useItemImages.tsx`, which calls `auth.getSession()` / `auth.getUser()` to build the `<uid>/<itemId>/` storage prefixes its uploads and listings are keyed by. Adding a *table or storage query* still belongs in `data/`.
 
 ## CI/CD
 
 | Workflow | Trigger | Does |
 | --- | --- | --- |
-| [`ci.yml`](../../.github/workflows/ci.yml) | push/PR to `main` | Build, type-check, format check, lint, `vitest run --coverage` (gated by thresholds — see [Configuration](configuration.md#coverage-and-mutation-thresholds)), serves the static export and checks it boots. A separate `mutation_test` job (push-to-`main` only) runs Stryker against five pure/high-risk modules. |
+| [`ci.yml`](../../.github/workflows/ci.yml) | push/PR to `main` | `build_and_test` job: build, type-check, format check, lint, `vitest run --coverage` (gated by thresholds — see [Configuration](configuration.md#coverage-and-mutation-thresholds)), then the signed-out Playwright suite against the built export — this replaced an earlier check that only served the export and confirmed it booted. Two more jobs run alongside it, on every PR as well as pushes to `main`: `mutation_test` runs Stryker against the pure, high-risk modules listed in [`stryker.config.mjs`](../../web/stryker.config.mjs); `e2e_local_stack` runs the signed-in Playwright suite against a local Supabase stack it starts itself. |
 | [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) | push to `main`, manual | Builds the static export and deploys it to GitHub Pages. |
 | [`keep-alive.yml`](../../.github/workflows/keep-alive.yml) | daily cron, manual | Calls the `keepalive()` RPC to stop a free-tier Supabase project auto-pausing. |
 | [`auto-merge.yml`](../../.github/workflows/auto-merge.yml) | PR events | Auto-approves and merges Dependabot PRs that are patch-level semver bumps only. |
