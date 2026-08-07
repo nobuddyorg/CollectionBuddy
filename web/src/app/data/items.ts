@@ -144,5 +144,31 @@ export function listItemPlaces(categoryId: string, search: string) {
 
   return query.returns<ItemPlaceRow[]>();
 }
+
+// One page of a category's items for export. Unfiltered by the search box
+// on purpose: an export is of a category, not of whatever happens to be
+// typed into the field at the moment the button is pressed.
+//
+// Ordered oldest-first, the reverse of the list, because the archive
+// numbers its folders in the order it walks them -- and a collection
+// should be numbered from its first entry, so that exporting it again next
+// year leaves 001 where it was instead of renumbering everything.
+export function listItemsForExport(
+  categoryId: string,
+  from: number,
+  to: number,
+) {
+  return supabase
+    .from('items')
+    .select(
+      `${ITEM_FIELDS_SELECT},created_at,item_categories!inner(category_id)`,
+    )
+    .eq('item_categories.category_id', categoryId)
+    .order('created_at', { ascending: true })
+    .range(from, to)
+    .returns<ExportItemRow[]>();
+}
 // Stryker restore all
 /* v8 ignore stop */
+
+export type ExportItemRow = ItemFields & { created_at: string };

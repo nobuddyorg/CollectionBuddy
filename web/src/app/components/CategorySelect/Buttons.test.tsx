@@ -8,6 +8,7 @@ import {
   CollapseButton,
   DeleteButtonWithLabel,
   ExpandButton,
+  ExportButton,
 } from './Buttons';
 
 describe('AddButton', () => {
@@ -92,6 +93,54 @@ describe('DeleteButtonWithLabel', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(onClick).toHaveBeenCalledOnce();
+  });
+});
+
+describe('ExportButton', () => {
+  it('fires onClick when clicked', async () => {
+    const onClick = vi.fn();
+    render(
+      <ExportButton
+        onClick={onClick}
+        disabled={false}
+        isExporting={false}
+        label="Export"
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it('keeps its label and marks itself busy while exporting', () => {
+    render(
+      <ExportButton
+        onClick={vi.fn()}
+        disabled={true}
+        isExporting={true}
+        label="Export"
+      />,
+    );
+    const button = screen.getByRole('button', { name: 'Export' });
+    // Named throughout, not replaced by a spinner: an export can run for
+    // minutes, and a button that loses its label for that long stops
+    // saying what is happening.
+    expect(button).toHaveTextContent('Export');
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toBeDisabled();
+  });
+
+  it('cannot be fired a second time while one export is running', async () => {
+    const onClick = vi.fn();
+    render(
+      <ExportButton
+        onClick={onClick}
+        disabled={true}
+        isExporting={true}
+        label="Export"
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    expect(onClick).not.toHaveBeenCalled();
   });
 });
 

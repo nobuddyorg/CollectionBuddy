@@ -35,6 +35,9 @@ const config = {
   // that carries the risk. Adding a file means first drawing that line in it.
   mutate: [
     'src/app/data/items.ts',
+    'src/app/data/zip.ts',
+    'src/app/data/exportFormat.ts',
+    'src/app/components/CategorySelect/useExportCategory.tsx',
     'src/app/components/ItemList/Pagination.tsx',
     'src/app/components/ItemList/useItemImages.tsx',
     'src/app/components/ItemList/optimistic.ts',

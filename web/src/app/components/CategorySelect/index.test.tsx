@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
+import { ToastProvider } from '../Toast/ToastProvider';
 import CategorySelect from './index';
 import type { UseCategories } from './useCategories';
 
@@ -33,15 +34,19 @@ function renderSelect(
 ) {
   const onSelect = vi.fn();
   render(
+    // ToastProvider because export reports its failures there, the same
+    // way the category actions around it already do.
     <I18nProvider>
-      <ConfirmProvider>
-        <CategorySelect
-          selectedCat="a"
-          onSelect={onSelect}
-          categories={categories()}
-          {...props}
-        />
-      </ConfirmProvider>
+      <ToastProvider>
+        <ConfirmProvider>
+          <CategorySelect
+            selectedCat="a"
+            onSelect={onSelect}
+            categories={categories()}
+            {...props}
+          />
+        </ConfirmProvider>
+      </ToastProvider>
     </I18nProvider>,
   );
   return { onSelect };
@@ -133,6 +138,42 @@ describe('CategorySelect', () => {
     expect(screen.getByRole('button', { name: 'Add' }).className).toContain(
       'col-span-2',
     );
+  });
+
+  it('offers the export under a rule of its own, away from delete', async () => {
+    renderSelect();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Open category' }),
+    );
+
+    const exportButton = screen.getByRole('button', { name: 'Export' });
+    expect(exportButton).toBeVisible();
+    expect(exportButton).toBeEnabled();
+    // Not a third control in the rename row: those edit the category, this
+    // takes a copy of it, and a mis-tap between the two is a deletion.
+    expect(exportButton.parentElement).not.toBe(
+      screen.getByRole('button', { name: 'Delete' }).parentElement,
+    );
+    expect(exportButton.parentElement?.className).toContain('border-t');
+  });
+
+  it('says what the export contains while it is not running', async () => {
+    renderSelect();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Open category' }),
+    );
+    // One line, not two: the progress messages that replace this are all
+    // one line, and a hint that wrapped would shrink the row on the way in.
+    expect(screen.getByText('Photos, JSON and CSV.')).toBeVisible();
+  });
+
+  // Nothing to take a copy of yet, so the row is absent rather than
+  // present and disabled.
+  it('offers no export when no category is selected', async () => {
+    renderSelect({ selectedCat: null });
+    expect(
+      screen.queryByRole('button', { name: 'Export' }),
+    ).not.toBeInTheDocument();
   });
 
   // On first run there is no collection to name and nothing to collapse

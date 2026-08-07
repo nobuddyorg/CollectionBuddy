@@ -18,6 +18,7 @@ export enum IconType {
   Gps,
   Frame,
   Photo,
+  Download,
 }
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
@@ -329,6 +330,25 @@ export const Icon: React.FC<IconProps> = ({
           <rect x="3" y="4" width="18" height="16" rx="1.5" />
           <circle cx="8.5" cy="9.5" r="1.5" />
           <path d="M3 16.5 8.5 12l4 3.5L16 13l5 4" />
+        </svg>
+      );
+    case IconType.Download:
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          {...props}
+        >
+          {/* Arrow into a tray: the download glyph, drawn downward so it
+              reads as "out of here and onto your device" rather than as
+              the upload it would be with the arrowhead reversed. */}
+          <path d="M12 3v11" />
+          <path d="m7 10 5 5 5-5" />
+          <path d="M4 19h16" />
         </svg>
       );
     default:
