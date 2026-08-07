@@ -158,7 +158,14 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
       </span>
 
       {items.length === 0 ? (
-        loading ? (
+        // `total > 0` alongside an empty `items` is not "no entries": it is
+        // the one-render gap between a silent refetch landing for a page
+        // that no longer exists (deleting the last card on the last page)
+        // and the corrected page's own fetch resolving. `currentPage`
+        // (see clampPage) has already moved on by this point, so the
+        // re-fetch is already in flight -- painting the empty state here
+        // would flash "No entries yet" over entries that are still there.
+        loading || total > 0 ? (
           <GridSkeleton />
         ) : (
           <section className="py-16 grid place-items-center text-center">
