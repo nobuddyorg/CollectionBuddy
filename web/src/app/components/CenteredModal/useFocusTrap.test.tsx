@@ -12,9 +12,13 @@ import { useFocusTrap } from './useFocusTrap';
 function Harness({
   open,
   useInitialFocus = false,
+  removeTrigger = false,
 }: {
   open: boolean;
   useInitialFocus?: boolean;
+  /** Mimics an optimistic delete: the button that opened the dialog is
+   * gone from the DOM by the time the dialog closes. */
+  removeTrigger?: boolean;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const second = useRef<HTMLButtonElement>(null);
@@ -22,7 +26,10 @@ function Harness({
 
   return (
     <div>
-      <button>outside before</button>
+      <main id="main-content" tabIndex={-1}>
+        main
+      </main>
+      {!removeTrigger && <button>outside before</button>}
       {open && (
         <div ref={container}>
           <button>first</button>
@@ -64,6 +71,24 @@ describe('useFocusTrap', () => {
 
     rerender(<Harness open={false} />);
     expect(button('outside before')).toHaveFocus();
+  });
+
+  // A confirmed delete removes the card's trash button (the trigger)
+  // optimistically while the confirm dialog is still open, so by the time it
+  // closes `prev` is detached and `.focus()` on it is a no-op (#293).
+  it('falls back to the main landmark when the trigger was removed while open', () => {
+    const { rerender } = render(<Harness open={false} removeTrigger={false} />);
+
+    button('outside before').focus();
+    rerender(<Harness open removeTrigger={false} />);
+    expect(button('first')).toHaveFocus();
+
+    // The trigger is optimistically removed from the DOM while the dialog
+    // is still open -- `prev` (captured on open) is now detached.
+    rerender(<Harness open removeTrigger />);
+    rerender(<Harness open={false} removeTrigger />);
+
+    expect(screen.getByText('main')).toHaveFocus();
   });
 
   it('sends Tab from the last control round to the first', async () => {
