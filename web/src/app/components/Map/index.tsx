@@ -186,7 +186,16 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       // The map is mounted before its pins are geocoded, so it opens on a
       // world view: a zoomed-in default would fetch a screenful of tiles
       // for a place nobody asked about, then throw them away on the fit.
-      const map = L.map(mapRef.current).setView([20, 0], 2);
+      //
+      // worldCopyJump snaps the view back to the primary copy of the world
+      // once a pan crosses into a repeated one -- without it the tile layer
+      // keeps repeating forever as you scroll, but pins and the current
+      // location dot only exist on the original copy, so they vanish the
+      // moment the view drifts past it.
+      const map = L.map(mapRef.current, { worldCopyJump: true }).setView(
+        [20, 0],
+        2,
+      );
       mapInstance.current = map;
 
       map.createPane('currentLocation');
