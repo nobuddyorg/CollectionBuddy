@@ -1,7 +1,10 @@
 'use client';
 
+import { useCallback, useState } from 'react';
+
 import CenteredModal from '../CenteredModal';
 import ItemForm, { EMPTY_ITEM_FORM_VALUES, ItemFormValues } from '../ItemForm';
+import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useI18n } from '../../i18n/useI18n';
 import type { ItemLite } from './types';
 
@@ -38,11 +41,30 @@ export function EditItemModal({
   onSubmit: (values: ItemFormValues) => void;
 }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
+  const [isDirty, setIsDirty] = useState(false);
+
+  // The single path every dismissal goes through -- backdrop tap, Escape,
+  // the dialog's own X, and the form's Cancel button all resolve to this
+  // (see the wiring below), so a stray tap doesn't lose an edit any more
+  // easily than tapping Cancel on purpose would (#308).
+  const guardedClose = useCallback(() => {
+    if (!isDirty) {
+      onOpenChange(false);
+      return;
+    }
+    void (async () => {
+      if (await confirm(t('item_create.confirm_discard'))) {
+        setIsDirty(false);
+        onOpenChange(false);
+      }
+    })();
+  }, [isDirty, confirm, onOpenChange, t]);
 
   return (
     <CenteredModal
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(v) => (v ? undefined : guardedClose())}
       title={t('item_list.edit_item')}
       closeLabel={t('common.close')}
     >
@@ -53,7 +75,8 @@ export function EditItemModal({
           submitLabel={t('common.save')}
           submitting={isSaving}
           onSubmit={onSubmit}
-          onCancel={() => onOpenChange(false)}
+          onCancel={guardedClose}
+          onDirtyChange={setIsDirty}
         />
       </section>
     </CenteredModal>

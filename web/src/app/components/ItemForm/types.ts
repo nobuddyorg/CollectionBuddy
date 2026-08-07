@@ -67,4 +67,9 @@ export type ItemFormProps = {
   submitLabel: string;
   onSubmit: (values: ItemFormValues) => void;
   onCancel?: () => void;
+  /** Reported whenever any field's value stops (or resumes) matching
+   * `initial` -- so a caller closing the surrounding modal can ask before
+   * discarding it (#308) instead of a backdrop tap or Escape losing it
+   * silently. */
+  onDirtyChange?: (dirty: boolean) => void;
 };
