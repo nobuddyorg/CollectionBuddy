@@ -11,10 +11,10 @@ type LoadingOverlayProps = {
   className?: string;
   zIndex?: number;
   scrim?: boolean;
-  // 'dark' is the hardcoded black scrim/white text used for the OAuth
-  // redirect wait, which covers the real page content behind it. 'auto'
-  // follows the app's own background/foreground tokens, for overlays
-  // (like the initial session check) that are the only thing on screen.
+  // 'dark' is a hardcoded black scrim/white text, for overlays meant to
+  // read as a distinct layer over real page content. 'auto' follows the
+  // app's own background/foreground tokens, for overlays (like the
+  // session checks) that are the only thing on screen.
   theme?: 'dark' | 'auto';
   ariaLive?: 'polite' | 'assertive' | 'off';
 };
