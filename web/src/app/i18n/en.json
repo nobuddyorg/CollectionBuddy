@@ -37,6 +37,7 @@
     "export_photos": "Photographs {done} of {total}…",
     "export_packing": "Packing the archive…",
     "exportError": "Could not export this category. Please try again.",
+    "exportPartial": "{skipped} of {total} photographs could not be included in the export.",
     "loadError": "Could not load categories. Please try again.",
     "createError": "Could not create category. Please try again.",
     "deleteError": "Could not delete category. Please try again.",

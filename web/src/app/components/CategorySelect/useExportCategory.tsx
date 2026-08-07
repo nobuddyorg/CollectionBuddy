@@ -60,6 +60,21 @@ export function useExportCategory() {
           onProgress: setProgress,
         });
         downloadBlob(result.blob, result.filename);
+        // The download itself never fails on a skipped photograph -- an
+        // archive missing a few pictures is still worth having -- but the
+        // canonical use of an export is "export, then delete the
+        // originals", so a silent gap here is unrecoverable data loss
+        // rather than a mere inconvenience (#414).
+        if (result.skippedPhotoCount > 0) {
+          toast.error(
+            t('category_select.exportPartial')
+              .replace('{skipped}', String(result.skippedPhotoCount))
+              .replace(
+                '{total}',
+                String(result.photoCount + result.skippedPhotoCount),
+              ),
+          );
+        }
       } catch (e) {
         console.error(e);
         toast.error(t('category_select.exportError'));
