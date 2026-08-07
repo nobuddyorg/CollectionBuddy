@@ -96,6 +96,7 @@
     "map_error": "Couldn't load map locations. Please try again.",
     "map_empty": "No locations to show yet.",
     "map_empty_filtered": "No locations match your search.",
+    "map_entries_count": "{count} entries",
     "location_denied": "Location access is blocked. Allow it for CollectionBuddy in your device or browser settings, then try again.",
     "location_unavailable": "Couldn't determine your location. Please try again.",
     "pagination": "Pagination",

@@ -1,14 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { listItemPlaces, type ItemPlaceRow } from '../../data/items';
-import { Place } from './types';
+import { Place, PlaceCoords } from './types';
 
 // Stryker disable all: localStorage, and two try/catch wrappers whose whole
 // content is "carry on without the cache". Mutating them scores how well the
 // storage API is stubbed rather than anything about the app.
 const GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
 
-function readGeocodeCache(): Record<string, Place> {
+function readGeocodeCache(): Record<string, PlaceCoords> {
   try {
     return JSON.parse(localStorage.getItem(GEOCODE_CACHE_KEY) ?? '{}');
   } catch {
@@ -16,7 +16,7 @@ function readGeocodeCache(): Record<string, Place> {
   }
 }
 
-function writeGeocodeCache(cache: Record<string, Place>) {
+function writeGeocodeCache(cache: Record<string, PlaceCoords>) {
   try {
     localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache));
   } catch {
@@ -38,13 +38,24 @@ function writeGeocodeCache(cache: Record<string, Place>) {
  * already located.
  */
 export function partitionByStoredCoords(rows: ItemPlaceRow[]): {
-  located: Place[];
+  located: PlaceCoords[];
   unlocated: string[];
+  titles: Map<string, string[]>;
 } {
-  const byName = new Map<string, Place>();
+  const byName = new Map<string, PlaceCoords>();
+  const titles = new Map<string, string[]>();
   for (const row of rows) {
-    const { place, place_lat: lat, place_lng: lng } = row;
-    if (!place || byName.has(place)) continue;
+    const { place, title, place_lat: lat, place_lng: lng } = row;
+    if (!place) continue;
+
+    // Every entry at this place is named in its popup, including the ones
+    // whose own row carried no coordinates: they are still catalogued
+    // there, and it is a neighbouring row that says where "there" is.
+    const at = titles.get(place);
+    if (at) at.push(title);
+    else titles.set(place, [title]);
+
+    if (byName.has(place)) continue;
     // Null is the normal state of older and hand-typed rows. Checked
     // separately from the finite test below because `Number.isFinite`,
     // while it does reject null, isn't a type guard -- this is what
@@ -61,7 +72,7 @@ export function partitionByStoredCoords(rows: ItemPlaceRow[]): {
     byName.set(place, { name: place, lat, lng });
   }
 
-  const located: Place[] = [];
+  const located: PlaceCoords[] = [];
   const unlocated: string[] = [];
   const seen = new Set<string>();
   for (const { place } of rows) {
@@ -71,7 +82,24 @@ export function partitionByStoredCoords(rows: ItemPlaceRow[]): {
     if (hit) located.push(hit);
     else unlocated.push(place);
   }
-  return { located, unlocated };
+  return { located, unlocated, titles };
+}
+
+/**
+ * Puts a located place back together with the entries catalogued there.
+ *
+ * The two arrive separately because they come from different places: the
+ * coordinates may have been read from a row, pulled out of the cache or
+ * fetched from the gazetteer, while the titles only ever come from the rows
+ * this query returned. A place the map somehow located without any row
+ * behind it gets an empty list rather than a missing one, so the popup
+ * still draws its name.
+ */
+export function withTitles(
+  coords: PlaceCoords,
+  titles: Map<string, string[]>,
+): Place {
+  return { ...coords, titles: titles.get(coords.name) ?? [] };
 }
 
 /**
@@ -80,9 +108,9 @@ export function partitionByStoredCoords(rows: ItemPlaceRow[]): {
  */
 export function partitionByCache(
   places: string[],
-  cache: Record<string, Place>,
-): { cached: Place[]; pending: string[] } {
-  const cached: Place[] = [];
+  cache: Record<string, PlaceCoords>,
+): { cached: PlaceCoords[]; pending: string[] } {
+  const cached: PlaceCoords[] = [];
   const pending: string[] = [];
   for (const place of places) {
     const hit = cache[place];
@@ -99,7 +127,7 @@ export function partitionByCache(
 export function placeFromPhotonResponse(
   name: string,
   data: unknown,
-): Place | null {
+): PlaceCoords | null {
   const features = (data as { features?: unknown })?.features;
   // The emptiness test is a shortcut, not a guard: an empty array falls
   // through the reads below and lands on the same null anyway, so dropping it
@@ -184,7 +212,7 @@ export function usePlaces(
 
         // Places entered since 0015 carry their own coordinates and skip
         // the gazetteer entirely; only what's left over is looked up.
-        const { located, unlocated } = partitionByStoredCoords(items);
+        const { located, unlocated, titles } = partitionByStoredCoords(items);
         const cache = readGeocodeCache();
         let cacheDirty = false;
 
@@ -192,7 +220,9 @@ export function usePlaces(
         // Everything already known lands in one batch before any request
         // goes out, so the map draws those pins immediately instead of
         // waiting on the slowest lookup of the batch.
-        const known = [...located, ...cached];
+        // Titles are attached here rather than carried through the cache
+        // and the gazetteer, both of which only ever know about coordinates.
+        const known = [...located, ...cached].map((c) => withTitles(c, titles));
         if (!cancelled && known.length > 0) setPlaces(known);
 
         const placeCount = located.length + unlocated.length;
@@ -201,7 +231,7 @@ export function usePlaces(
         // One place, asked for as many times as it is worth asking. Returns
         // null once the answer is settled -- either the service named
         // nowhere, or it kept refusing.
-        const geocode = async (place: string): Promise<Place | null> => {
+        const geocode = async (place: string): Promise<PlaceCoords | null> => {
           for (let attempt = 0; attempt < GEOCODE_ATTEMPTS; attempt += 1) {
             if (cancelled) return null;
             try {
@@ -238,7 +268,8 @@ export function usePlaces(
             cache[place] = entry;
             cacheDirty = true;
             resolvedCount += 1;
-            if (!cancelled) setPlaces((prev) => [...prev, entry]);
+            if (!cancelled)
+              setPlaces((prev) => [...prev, withTitles(entry, titles)]);
           }
         };
 

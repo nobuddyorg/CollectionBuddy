@@ -80,8 +80,19 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         lat: p.lat,
         lng: p.lng,
         popupText: p.name,
+        titles: p.titles,
+        // Only worth saying when there is more than one. A lone entry is
+        // already fully described by the single line under the place name,
+        // and "1 entries" is the wording this sidesteps rather than solves.
+        countLabel:
+          p.titles.length > 1
+            ? t('item_list.map_entries_count').replace(
+                '{count}',
+                String(p.titles.length),
+              )
+            : undefined,
       })),
-    [places],
+    [places, t],
   );
 
   // Pins stream in as each place is geocoded, and the map fits whatever it

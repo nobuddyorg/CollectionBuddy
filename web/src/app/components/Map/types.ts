@@ -8,6 +8,17 @@ export interface MarkerInput {
   lat: number;
   lng: number;
   popupText: string;
+  /**
+   * The entries catalogued at this place, named under it in the popup
+   * (#404). A pin stands for what is there, not just for where there is.
+   */
+  titles?: string[];
+  /**
+   * How many entries, already translated. The map is a leaf component with
+   * no i18n of its own -- it draws Leaflet layers rather than React, so the
+   * caller, which has `t`, does the counting and the wording.
+   */
+  countLabel?: string;
 }
 
 export type MapCommandKind = 'fitAll' | 'fitCurrent';
@@ -33,8 +44,22 @@ export interface MapProps {
   command?: MapCommand | null;
 }
 
-export interface Place {
+/**
+ * Where a place is, and nothing else.
+ *
+ * Kept separate from `Place` below because this is exactly what the
+ * geocode cache in localStorage holds and all it may hold: coordinates for
+ * a name are true until the world moves, whereas the entries catalogued
+ * there change every time one is added or deleted. Caching those too would
+ * have the map naming yesterday's collection.
+ */
+export interface PlaceCoords {
   name: string;
   lat: number;
   lng: number;
+}
+
+/** A located place together with the entries catalogued there (#404). */
+export interface Place extends PlaceCoords {
+  titles: string[];
 }

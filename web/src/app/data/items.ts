@@ -13,8 +13,16 @@ export type ItemSearchRow = ItemFields & {
   item_categories: { category_id: string }[];
 };
 
-/** A place as stored on an item, for the map to draw without geocoding. */
-export type ItemPlaceRow = Pick<ItemRow, 'place' | 'place_lat' | 'place_lng'>;
+/**
+ * A place as stored on an item, for the map to draw without geocoding.
+ *
+ * The title rides along because a pin is not just a dot on a city: it
+ * stands for the entries catalogued there, and the popup names them (#404).
+ */
+export type ItemPlaceRow = Pick<
+  ItemRow,
+  'title' | 'place' | 'place_lat' | 'place_lng'
+>;
 
 /* v8 ignore start -- only used by the ignored query builders below. */
 // Stryker disable all: only used by the ignored query builders below.
@@ -134,7 +142,9 @@ export function linkItemToCategory(itemId: string, categoryId: string) {
 export function listItemPlaces(categoryId: string, search: string) {
   let query = supabase
     .from('items')
-    .select('place,place_lat,place_lng,item_categories!inner(category_id)')
+    .select(
+      'title,place,place_lat,place_lng,item_categories!inner(category_id)',
+    )
     .eq('item_categories.category_id', categoryId)
     .not('place', 'is', null)
     .neq('place', '');
@@ -142,7 +152,12 @@ export function listItemPlaces(categoryId: string, search: string) {
   const filter = searchFilterFor(search);
   if (filter) query = query.or(filter);
 
-  return query.returns<ItemPlaceRow[]>();
+  // Newest first, the same order the list uses. A pin's popup now names the
+  // entries catalogued at that place (#404), and the two readings of one
+  // collection should not disagree about which of them comes first.
+  return query
+    .order('created_at', { ascending: false })
+    .returns<ItemPlaceRow[]>();
 }
 
 // One page of a category's items for export. Unfiltered by the search box
