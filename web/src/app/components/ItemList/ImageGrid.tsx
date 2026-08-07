@@ -16,12 +16,18 @@ function Plate({
   alt,
   ratio,
   onOpen,
+  overlay,
   children,
 }: {
   src: string;
   alt: string;
   ratio: string;
   onOpen: () => void;
+  /** Rendered *inside* the open button, over the photograph -- so a click
+   * on it is a click on the button (the "+N" badge opens the same modal
+   * a tap on the thumbnail underneath it would have, #304), not a second,
+   * separate hit target relying on `pointer-events` to fall through to it. */
+  overlay?: React.ReactNode;
   children?: React.ReactNode;
 }) {
   const [loaded, setLoaded] = useState(false);
@@ -51,6 +57,7 @@ function Plate({
             loaded ? 'opacity-100' : 'opacity-0'
           }`}
         />
+        {overlay}
       </button>
       {children}
     </div>
@@ -107,7 +114,10 @@ export function ImageGrid({
 }: {
   imgs: ImgEntry[];
   itemTitle: string;
-  onOpenModal: (url: string) => void;
+  /** Opens the full-size carousel starting at this photograph's position
+   * in `imgs` -- an index rather than a URL, so the modal can navigate to
+   * every photograph, including ones with no strip cell of their own. */
+  onOpenModal: (index: number) => void;
   onDelete: (img: ImgEntry) => void;
   deletingPath: Set<string>;
   busy: boolean;
@@ -189,7 +199,18 @@ export function ImageGrid({
       ratio,
       small,
       preferThumb = small,
-    }: { ratio: string; small: boolean; preferThumb?: boolean },
+      overflowCount,
+    }: {
+      ratio: string;
+      small: boolean;
+      preferThumb?: boolean;
+      /** Set only on the last strip cell when photographs beyond `imgs`'
+       * strip allowance exist. Covers this cell's own thumbnail with a
+       * "+N" badge rather than hiding it -- the photograph underneath is
+       * still this same index, so opening the modal from here already
+       * lands on the first one the strip had no room for (#304). */
+      overflowCount?: number;
+    },
   ) => {
     const img = imgs[index];
     if (!img)
@@ -202,6 +223,10 @@ export function ImageGrid({
         />
       );
 
+    const alt = overflowCount
+      ? t('item_list.more_images').replace('{count}', String(overflowCount))
+      : altFor(index);
+
     return (
       <Plate
         key={img.pathFull}
@@ -211,9 +236,24 @@ export function ImageGrid({
         // hero's full width, so it reads from the thumbnail too (#289)
         // without shrinking the controls sized for a much bigger plate.
         src={preferThumb ? img.urlThumb || img.urlFull : img.urlFull}
-        alt={altFor(index)}
+        alt={alt}
         ratio={ratio}
-        onOpen={() => onOpenModal(img.urlFull)}
+        onOpen={() => onOpenModal(index)}
+        overlay={
+          overflowCount ? (
+            // aria-hidden: the accessible name already carries this via
+            // the image's own alt above -- this is the sighted-user copy
+            // of it, not a second announcement.
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 flex items-center justify-center bg-black/55"
+            >
+              <span className="font-label text-base text-white">
+                +{overflowCount}
+              </span>
+            </div>
+          ) : undefined
+        }
       >
         {deleteButton(img, small)}
       </Plate>
@@ -262,13 +302,27 @@ export function ImageGrid({
 
   const stripCount = Math.min(total - 1, STRIP_MAX);
 
+  // A photograph beyond the strip's last cell used to have nowhere to be
+  // reached from at all -- not rendered, not deletable, still billed
+  // against storage (#304). `total - STRIP_MAX` counts everyone that
+  // situation now applies to, *including* the photograph the last cell
+  // would otherwise have shown on its own: that cell's thumbnail is about
+  // to be covered by the badge instead, so it is exactly as unreachable by
+  // itself as the ones after it, and the modal it opens is where all of
+  // them -- including it -- become reachable.
+  const overflowCount = total - 1 > STRIP_MAX ? total - STRIP_MAX : 0;
+
   return (
     <div className="w-full">
       {slot(0, { ratio: 'aspect-4/3', small: false })}
 
       <div className="grid gap-px" style={stripStyle(stripCount)}>
         {Array.from({ length: stripCount }, (_, i) =>
-          slot(i + 1, { ratio: 'h-20 sm:h-24', small: true }),
+          slot(i + 1, {
+            ratio: 'h-20 sm:h-24',
+            small: true,
+            overflowCount: i === stripCount - 1 ? overflowCount : undefined,
+          }),
         )}
       </div>
     </div>
