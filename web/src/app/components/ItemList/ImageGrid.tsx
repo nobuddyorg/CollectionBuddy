@@ -185,7 +185,11 @@ export function ImageGrid({
   // standing in for it.
   const slot = (
     index: number,
-    { ratio, small }: { ratio: string; small: boolean },
+    {
+      ratio,
+      small,
+      preferThumb = small,
+    }: { ratio: string; small: boolean; preferThumb?: boolean },
   ) => {
     const img = imgs[index];
     if (!img)
@@ -201,9 +205,12 @@ export function ImageGrid({
     return (
       <Plate
         key={img.pathFull}
-        // The strip cells are about a quarter of a card; everything else
-        // spans it, which is wider than the stored thumbnail.
-        src={small ? img.urlThumb || img.urlFull : img.urlFull}
+        // `preferThumb` is its own flag, not just `small`: a two-up half is
+        // full plate chrome (`small: false`, a full-size delete control) at
+        // ~178 CSS px -- closer to the strip's quarter-card cells than to a
+        // hero's full width, so it reads from the thumbnail too (#289)
+        // without shrinking the controls sized for a much bigger plate.
+        src={preferThumb ? img.urlThumb || img.urlFull : img.urlFull}
         alt={altFor(index)}
         ratio={ratio}
         onOpen={() => onOpenModal(img.urlFull)}
@@ -239,7 +246,15 @@ export function ImageGrid({
     return (
       <div className="grid grid-cols-2 gap-px">
         {[0, 1].map((i) =>
-          slot(i, { ratio: 'aspect-square sm:aspect-2/3', small: false }),
+          slot(i, {
+            ratio: 'aspect-square sm:aspect-2/3',
+            small: false,
+            // Each half is ~178 CSS px (a card is ~360px, halved), so the
+            // 1000px full image was ~6x the pixel count the slot can show
+            // at 2x DPR. `small: false` keeps the full-size delete control
+            // a pair's larger plate calls for.
+            preferThumb: true,
+          }),
         )}
       </div>
     );

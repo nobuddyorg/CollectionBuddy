@@ -90,12 +90,40 @@ describe('ImageGrid', () => {
   // Two photographs are usually a matched pair -- the front and back of a
   // coin, both faces of a stamp. Demoting the second to a thumbnail strip
   // misrepresented that as a main shot plus an afterthought.
-  it('renders two images as an equal pair, both at full resolution', () => {
+  it('renders two images as an equal pair', () => {
     renderGrid([img('a'), img('b')]);
     const images = screen.getAllByRole('img');
     expect(images).toHaveLength(2);
-    expect(images[0]).toHaveAttribute('src', 'https://example.test/a.webp');
-    expect(images[1]).toHaveAttribute('src', 'https://example.test/b.webp');
+  });
+
+  // A pair's half is ~178 CSS px -- a quarter-card's worth, not a hero's --
+  // so it reads from the stored thumbnail rather than pulling a 1000px
+  // image into a slot 1/6th that size (#289).
+  it('sources a pair from the thumbnail, not the full image', () => {
+    renderGrid([img('a'), img('b')]);
+    const images = screen.getAllByRole('img');
+    expect(images[0]).toHaveAttribute(
+      'src',
+      'https://example.test/a.thumb.webp',
+    );
+    expect(images[1]).toHaveAttribute(
+      'src',
+      'https://example.test/b.thumb.webp',
+    );
+  });
+
+  // preferThumb (which image to fetch) is deliberately independent of
+  // `small` (how big the delete control is): a pair's plate is still full
+  // size, so shrinking its controls to strip scale just because the source
+  // is now a thumbnail would be its own regression.
+  it('keeps the full-size delete control on a pair despite sourcing it from the thumbnail', () => {
+    renderGrid([img('a'), img('b')]);
+    for (const button of screen.getAllByRole('button', {
+      name: 'Delete image',
+    })) {
+      expect(button.className).toContain('w-8');
+      expect(button.className).not.toContain('w-7');
+    }
   });
 
   // A half-width cell at 2:3 is (W/2) x (3/4 W), so from `sm` up the pair is
