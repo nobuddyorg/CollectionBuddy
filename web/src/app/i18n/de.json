@@ -12,6 +12,7 @@
   },
   "header": {
     "title": "CollectionBuddy",
+    "account_menu": "Kontomenü",
     "sign_out": "Abmelden",
     "language": "Sprache",
     "theme": "Darstellung",

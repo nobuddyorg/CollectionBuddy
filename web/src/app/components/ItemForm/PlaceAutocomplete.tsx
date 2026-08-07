@@ -121,7 +121,7 @@ export function PlaceAutocomplete({
           }
         }}
         placeholder={t('item_create.place_placeholder')}
-        className="w-full rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
+        className="w-full rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-control-border focus:ring-foreground"
         autoComplete="off"
         autoCapitalize="words"
       />
