@@ -21,6 +21,15 @@ export function useItems(categoryId: string, q: string) {
   // state before its entries appeared.
   const [loading, setLoading] = useState(true);
   const reqSeq = useRef(0);
+  // Counts non-silent requests currently in flight, rather than relying on
+  // whichever request happens to be the one the sequence guard lets through.
+  // A non-silent request superseded by a *silent* one used to return at the
+  // guard below without clearing `loading`, and the silent one never clears
+  // it either -- `loading` got stuck true forever (#303). Decrementing this
+  // in `finally`, for every non-silent request that settles regardless of
+  // whether it's the one that ends up "winning", means `loading` always
+  // comes back down once nothing non-silent is left in flight.
+  const pendingNonSilent = useRef(0);
 
   // Resets to page 1 whenever the category or search query changes, computed
   // at render time (rather than via a useEffect) so it takes effect the same
@@ -48,37 +57,50 @@ export function useItems(categoryId: string, q: string) {
   const load = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
       const mySeq = ++reqSeq.current;
-      if (!silent) setLoading(true);
-
-      const { from, to } = pageRange(currentPage);
-
-      const { data, error, count } = await listItems({
-        categoryId,
-        search: q.trim(),
-        from,
-        to,
-      });
-
-      if (mySeq !== reqSeq.current) return;
-      if (!silent) setLoading(false);
-      if (error) {
-        console.error('Failed to load items:', error.message);
-        toast.error(t('item_list.search_error'));
-        return;
+      if (!silent) {
+        pendingNonSilent.current += 1;
+        setLoading(true);
       }
 
-      setItems(
-        (data ?? []).map((d) => ({
-          id: d.id,
-          title: d.title,
-          description: d.description,
-          place: d.place ?? null,
-          place_lat: d.place_lat ?? null,
-          place_lng: d.place_lng ?? null,
-          tags: d.tags ?? [],
-        })),
-      );
-      setTotal(count || 0);
+      try {
+        const { from, to } = pageRange(currentPage);
+
+        const { data, error, count } = await listItems({
+          categoryId,
+          search: q.trim(),
+          from,
+          to,
+        });
+
+        if (mySeq !== reqSeq.current) return;
+        if (error) {
+          console.error('Failed to load items:', error.message);
+          toast.error(t('item_list.search_error'));
+          return;
+        }
+
+        setItems(
+          (data ?? []).map((d) => ({
+            id: d.id,
+            title: d.title,
+            description: d.description,
+            place: d.place ?? null,
+            place_lat: d.place_lat ?? null,
+            place_lng: d.place_lng ?? null,
+            tags: d.tags ?? [],
+          })),
+        );
+        setTotal(count || 0);
+      } finally {
+        // Runs for every non-silent request that settles -- including one
+        // discarded by the sequence guard above -- so `loading` always ends
+        // up false once nothing non-silent is left in flight, regardless of
+        // which request happens to be the last to resolve.
+        if (!silent) {
+          pendingNonSilent.current -= 1;
+          if (pendingNonSilent.current === 0) setLoading(false);
+        }
+      }
     },
     [categoryId, currentPage, q, t, toast],
   );
@@ -87,9 +109,26 @@ export function useItems(categoryId: string, q: string) {
   // exactly what an effect is for: synchronizing component state with the
   // database.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+
+  // `load` is recreated whenever the query/page/category change, but a
+  // caller that kicks off a slow round trip (a delete's confirm + two
+  // requests) and only *then* wants to resync can be holding a `load`/`reload`
+  // reference from several renders ago -- the query may have moved on by the
+  // time that round trip finishes. `reload` below stays one stable identity
+  // and always dispatches through this ref, so whichever `reload` a caller
+  // captured, calling it late still resyncs against whatever is current when
+  // it actually runs, not whatever was current when it was captured (#303).
+  const loadRef = useRef(load);
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
+
+  const reload = useCallback(
+    (opts?: { silent?: boolean }) => loadRef.current(opts),
+    [],
+  );
 
   return {
     items,
@@ -98,7 +137,7 @@ export function useItems(categoryId: string, q: string) {
     page: currentPage,
     setPage,
     totalPages,
-    reload: load,
+    reload,
     setItems,
   };
 }
