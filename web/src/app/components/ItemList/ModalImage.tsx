@@ -44,7 +44,7 @@ export function ModalImage({
           e.stopPropagation();
           onClose();
         }}
-        className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors"
+        className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-control-border shadow-sm hover:bg-muted transition-colors"
         title={t('item_list.close_modal')}
         aria-label={t('item_list.close_modal')}
       >

@@ -29,7 +29,7 @@ export function SearchInput({
         onChange={(e) => onChange(e.target.value)}
         aria-label={t('item_list.search_placeholder')}
         placeholder={t('item_list.search_placeholder')}
-        className="w-full min-h-11 rounded-sm bg-card text-card-foreground py-2 pl-9 pr-10 ring-1 ring-inset ring-border focus:ring-foreground placeholder:text-muted-foreground"
+        className="w-full min-h-11 rounded-sm bg-card text-card-foreground py-2 pl-9 pr-10 ring-1 ring-inset ring-control-border focus:ring-foreground placeholder:text-muted-foreground"
       />
       {/* The only clear button: the browser's own is suppressed in
           globals.css. This one is labelled, keyboard-reachable and drawn
