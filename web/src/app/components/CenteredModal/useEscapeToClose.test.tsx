@@ -69,4 +69,29 @@ describe('useEscapeToClose', () => {
     await user.keyboard('{Escape}');
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  // Regression: a nested widget (the place autocomplete's suggestion menu)
+  // handles its own Escape and calls preventDefault() to say so. Before this
+  // listener checked that flag, the same keystroke closed the modal around
+  // it too, discarding whatever the user had typed into the form.
+  it('does not close when a nested handler already called preventDefault()', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    function NestedHandler() {
+      useEscapeToClose(true, onClose);
+      return (
+        <input
+          aria-label="inner"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') e.preventDefault();
+          }}
+        />
+      );
+    }
+    render(<NestedHandler />);
+
+    await user.click(document.querySelector('input') as HTMLInputElement);
+    await user.keyboard('{Escape}');
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });

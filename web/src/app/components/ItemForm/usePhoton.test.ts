@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
+// @vitest-environment jsdom
+import { act, renderHook } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   coordsFromFeature,
   dedupePhotonFeatures,
   formatPlaceDisplay,
   isQueryLongEnough,
+  usePhotonSearch,
 } from './usePhoton';
 import type { PhotonFeature } from './types';
 
@@ -159,6 +162,70 @@ describe('dedupePhotonFeatures', () => {
     const a = feature(1, { city: 'Cologne' });
     const b = feature(2, { city: 'Berlin' });
     expect(dedupePhotonFeatures([a, b], null)).toEqual([a, b]);
+  });
+});
+
+describe('usePhotonSearch onKeyDown', () => {
+  // Regression: Escape used to only clear local state, with neither
+  // preventDefault() nor stopPropagation(). The keystroke then bubbled past
+  // React's root to the modal's own window-level Escape listener, which
+  // closed the entire create/edit form -- discarding a title, description
+  // and tags along with the suggestion menu the user actually meant to
+  // dismiss.
+  it('stops Escape from propagating once suggestions are open, instead of only clearing local state', async () => {
+    vi.useFakeTimers();
+    try {
+      const hit = feature(1, { city: 'Cologne' });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({ features: [hit] }),
+        }),
+      );
+
+      const { result } = renderHook(() => usePhotonSearch('en'));
+
+      act(() => {
+        result.current.setFocus(true);
+        result.current.setQuery('Col');
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+
+      expect(result.current.results.length).toBe(1);
+
+      const event = {
+        key: 'Escape',
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      } as unknown as React.KeyboardEvent<HTMLInputElement>;
+      act(() => {
+        result.current.onKeyDown(event);
+      });
+
+      expect(event.preventDefault).toHaveBeenCalledOnce();
+      expect(event.stopPropagation).toHaveBeenCalledOnce();
+      expect(result.current.results).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('leaves Escape alone when there is no suggestion menu to dismiss', () => {
+    const { result } = renderHook(() => usePhotonSearch('en'));
+    const event = {
+      key: 'Escape',
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+    } as unknown as React.KeyboardEvent<HTMLInputElement>;
+    act(() => {
+      result.current.onKeyDown(event);
+    });
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(event.stopPropagation).not.toHaveBeenCalled();
   });
 });
 

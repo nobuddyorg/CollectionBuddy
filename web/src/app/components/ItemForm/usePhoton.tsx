@@ -202,6 +202,11 @@ export function usePhotonSearch(locale?: string) {
         const sel = activeIdx >= 0 ? results[activeIdx] : results[0];
         if (sel) return choose(sel);
       } else if (e.key === 'Escape') {
+        // Dismisses the suggestion menu only -- without stopping the
+        // keystroke here, it bubbles past React's root to the modal's own
+        // `window`-level Escape listener and closes the whole form.
+        e.preventDefault();
+        e.stopPropagation();
         setResults([]);
         setActiveIdx(-1);
         setFocus(false);
