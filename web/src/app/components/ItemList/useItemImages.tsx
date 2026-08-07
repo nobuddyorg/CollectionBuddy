@@ -301,12 +301,14 @@ export function useItemImages() {
         // canvas-resized twice is roughly 2x the wall time and peak memory
         // for no visible quality difference.
         //
-        // 400px rather than 250: the contact-strip cells are about a
-        // quarter of the card, which is ~100px CSS and so 200-300 physical
-        // pixels on a 2-3x display. A 250px source had nothing left to
-        // resolve there.
+        // 600px, not 400: this now serves two slots, not one. The
+        // contact-strip cells are about a quarter of the card (~100px CSS,
+        // 200-300 physical pixels on a 2-3x display), but a two-up pair's
+        // half is ~178px CSS -- up to 534 physical pixels at 3x (#289). 600
+        // covers that with headroom for a few more KB, rather than leaving
+        // a 3x pair slightly soft.
         const thumbFile = await imageCompression(fullFile, {
-          maxWidthOrHeight: 400,
+          maxWidthOrHeight: 600,
           initialQuality: 0.8,
           fileType: 'image/webp',
           useWebWorker: true,
