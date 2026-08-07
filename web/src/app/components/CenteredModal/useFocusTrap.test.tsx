@@ -77,9 +77,7 @@ describe('useFocusTrap', () => {
   // optimistically while the confirm dialog is still open, so by the time it
   // closes `prev` is detached and `.focus()` on it is a no-op (#293).
   it('falls back to the main landmark when the trigger was removed while open', () => {
-    const { rerender } = render(
-      <Harness open={false} removeTrigger={false} />,
-    );
+    const { rerender } = render(<Harness open={false} removeTrigger={false} />);
 
     button('outside before').focus();
     rerender(<Harness open removeTrigger={false} />);
