@@ -164,11 +164,69 @@ describe('ImageGrid', () => {
     expect(screen.getAllByRole('img')).toHaveLength(5);
   });
 
-  it('opens the full-size url rather than the thumbnail', async () => {
+  // The bug this closes: a sixth photograph had no strip cell, so it was
+  // never rendered anywhere -- unviewable and undeletable despite still
+  // occupying storage (#304). The last strip cell now covers its own
+  // thumbnail with a "+N" badge instead of pretending nothing is past it.
+  describe('when there are more photographs than the strip can show', () => {
+    it('shows no overflow badge right at the strip limit', () => {
+      // 1 hero + 4 strip = 5 photographs fill every cell exactly.
+      renderGrid([img('a'), img('b'), img('c'), img('d'), img('e')]);
+      expect(screen.queryByText(/^\+\d+$/)).not.toBeInTheDocument();
+    });
+
+    it('badges the last strip cell with the count of photographs it is standing in for', () => {
+      // 1 hero + 5 non-hero: the last cell (image 5) is covered, and image
+      // 6 has no cell of its own -- 2 photographs the badge accounts for.
+      renderGrid([img('a'), img('b'), img('c'), img('d'), img('e'), img('f')]);
+      expect(screen.getByText('+2')).toBeInTheDocument();
+    });
+
+    it('grows the count as more photographs are added past the limit', () => {
+      renderGrid([
+        img('a'),
+        img('b'),
+        img('c'),
+        img('d'),
+        img('e'),
+        img('f'),
+        img('g'),
+      ]);
+      expect(screen.getByText('+3')).toBeInTheDocument();
+    });
+
+    it('still renders every strip cell, including the badged one', () => {
+      renderGrid([img('a'), img('b'), img('c'), img('d'), img('e'), img('f')]);
+      // hero + 4 strip cells, the last one carrying the badge on top of it.
+      expect(screen.getAllByRole('img')).toHaveLength(5);
+    });
+
+    // Clicking the badged cell opens the modal at the photograph it covers
+    // -- the first one the strip ran out of room for -- and every one
+    // after it becomes reachable from there via the modal's own next/prev.
+    it('opens the modal at the first hidden photograph when the badge is clicked', async () => {
+      const onOpenModal = vi.fn();
+      renderGrid([img('a'), img('b'), img('c'), img('d'), img('e'), img('f')], {
+        onOpenModal,
+      });
+      await userEvent.click(screen.getByText('+2'));
+      expect(onOpenModal).toHaveBeenCalledWith(4);
+    });
+  });
+
+  it('opens the modal at the photograph position within imgs', async () => {
     const onOpenModal = vi.fn();
     renderGrid([img('a')], { onOpenModal });
     await userEvent.click(screen.getByRole('img'));
-    expect(onOpenModal).toHaveBeenCalledWith('https://example.test/a.webp');
+    expect(onOpenModal).toHaveBeenCalledWith(0);
+  });
+
+  it('opens the modal at the clicked strip photograph, not always the hero', async () => {
+    const onOpenModal = vi.fn();
+    renderGrid([img('a'), img('b'), img('c')], { onOpenModal });
+    const images = screen.getAllByRole('img');
+    await userEvent.click(images[2]);
+    expect(onOpenModal).toHaveBeenCalledWith(2);
   });
 
   // The hero spans the whole card, which is wider than the stored
