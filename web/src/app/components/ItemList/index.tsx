@@ -10,6 +10,7 @@ import { GridSkeleton } from './Skeleton';
 import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
 import { useItemMutations } from './useItemMutations';
+import { searchStatusFor } from './searchStatus';
 import { EditItemModal } from './EditItemModal';
 import { MapModal } from './MapModal';
 import CenteredModal from '../CenteredModal';
@@ -47,6 +48,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
   const { items, total, loading, page, setPage, totalPages, reload, setItems } =
     useItems(categoryId, qDebounced);
+  const searchStatus = searchStatusFor(qDebounced, total);
 
   const handleCreated = useCallback(() => {
     setCreateOpen(false);
@@ -161,10 +163,21 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         </div>
       </div>
 
+      {/* `searchStatus` -- not raw `qDebounced` -- decides what this says: a
+          1-2 char term (or a non-ASCII one below its own, lower floor) earns
+          no filter from listItems, so announcing a count here would be the
+          unfiltered category's count passed off as a search result (#307). */}
       <span className="sr-only" aria-live="polite">
-        {!loading && qDebounced
-          ? t('item_list.results_count').replace('{count}', String(total))
-          : ''}
+        {loading
+          ? ''
+          : searchStatus.kind === 'active'
+            ? t('item_list.results_count').replace(
+                '{count}',
+                String(searchStatus.total),
+              )
+            : searchStatus.kind === 'tooShort'
+              ? t('item_list.search_too_short')
+              : ''}
       </span>
 
       {items.length === 0 ? (
@@ -178,12 +191,12 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               </div>
               <div className="space-y-1.5">
                 <h3 className="font-display text-lg text-foreground">
-                  {qDebounced
+                  {searchStatus.kind === 'active'
                     ? t('item_list.no_results_title').replace('{q}', qDebounced)
                     : t('item_list.no_items_title')}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {qDebounced
+                  {searchStatus.kind === 'active'
                     ? t('item_list.no_results_hint')
                     : t('item_list.no_items_hint')}
                 </p>
