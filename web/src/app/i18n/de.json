@@ -113,7 +113,8 @@
     "location_unavailable": "Dein Standort konnte nicht ermittelt werden. Bitte erneut versuchen.",
     "pagination": "Seitennavigation",
     "page": "Seite {n}",
-    "results_count": "{count} Treffer"
+    "results_count": "{count} Treffer",
+    "search_too_short": "Weiter tippen, um zu suchen"
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Mit Google anmelden"
