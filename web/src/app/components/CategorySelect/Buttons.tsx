@@ -106,6 +106,41 @@ export function DeleteButtonWithLabel({
   );
 }
 
+// Full width and quiet, sitting under a rule of its own. Export is not a
+// third verb in the rename row: those two edit the category, this one takes
+// a copy of it away, and the one thing it must never be is a neighbour of
+// Delete that a thumb can miss by 6px.
+export function ExportButton({
+  onClick,
+  disabled,
+  isExporting,
+  label,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  isExporting: boolean;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid="export-category"
+      onClick={onClick}
+      disabled={disabled}
+      aria-busy={isExporting}
+      className="min-h-11 px-4 shrink-0 rounded-sm font-label text-xs ring-1 ring-inset ring-border hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent transition-colors flex items-center justify-center gap-2"
+      title={label}
+    >
+      {isExporting ? (
+        <Spinner size="sm" />
+      ) : (
+        <Icon icon={IconType.Download} className="w-4 h-4" aria-hidden="true" />
+      )}
+      {label}
+    </button>
+  );
+}
+
 export function ExpandButton({
   onClick,
   label,

@@ -10,12 +10,14 @@ import {
   CollapseButton,
   DeleteButtonWithLabel,
   ExpandButton,
+  ExportButton,
 } from './Buttons';
 import { CategoryText } from './CategoryText';
 import { CategorySelectDropdown } from './Dropdown';
 import { CategoryInput } from './Input';
 import { sortCategories } from './selection';
 import type { UseCategories } from './useCategories';
+import { useExportCategory } from './useExportCategory';
 
 type Props = {
   selectedCat: string | null;
@@ -40,6 +42,11 @@ export default function CategorySelect({
     renameCategory,
     deleteCategory,
   } = categories;
+  const {
+    isExporting,
+    message: exportMessage,
+    runExport,
+  } = useExportCategory();
   const [name, setName] = useState('');
   const [renameValue, setRenameValue] = useState('');
   const [expanded, setExpanded] = useState(!selectedCat);
@@ -221,6 +228,28 @@ export default function CategorySelect({
               className="col-span-2 w-full"
             />
           </div>
+
+          {/* Below its own rule, and only once there is a category to take
+              a copy of. The line beside the button is where the export
+              reports from: it runs for as long as the photographs take,
+              which on a large collection is long enough that a button
+              which only dimmed would read as broken. */}
+          {selected && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3">
+              <ExportButton
+                onClick={() => void runExport(selected)}
+                disabled={isExporting}
+                isExporting={isExporting}
+                label={t('category_select.export')}
+              />
+              <p
+                aria-live="polite"
+                className="min-w-0 flex-1 font-label text-[0.6875rem] text-muted-foreground"
+              >
+                {exportMessage ?? t('category_select.export_hint')}
+              </p>
+            </div>
+          )}
         </>
       )}
     </section>

@@ -65,6 +65,24 @@ export default defineConfig({
         // functions that carry the actual risk, so the 100% floor only
         // has to hold for what's left instrumented -- also autoUpdated,
         // so any future line added to these functions must be tested.
+        'src/app/data/zip.ts': {
+          statements: 100,
+          functions: 100,
+          branches: 100,
+          lines: 100,
+        },
+        'src/app/data/exportFormat.ts': {
+          statements: 100,
+          functions: 100,
+          branches: 100,
+          lines: 100,
+        },
+        'src/app/components/CategorySelect/useExportCategory.tsx': {
+          statements: 100,
+          functions: 100,
+          branches: 100,
+          lines: 100,
+        },
         'src/app/data/items.ts': {
           statements: 100,
           functions: 100,
