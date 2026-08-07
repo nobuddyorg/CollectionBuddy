@@ -113,7 +113,8 @@
     "location_unavailable": "Couldn't determine your location. Please try again.",
     "pagination": "Pagination",
     "page": "Page {n}",
-    "results_count": "{count} results"
+    "results_count": "{count} results",
+    "search_too_short": "Keep typing to search"
   },
   "google_sign_in_button": {
     "sign_in_with_google": "Sign in with Google"
