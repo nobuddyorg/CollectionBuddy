@@ -101,7 +101,13 @@ describe('ItemList empty state', () => {
   // empty collection -- the basket must not paint over it.
   it('does not flash "No entries yet" while a page correction is pending', () => {
     useItemsMock.mockReturnValue(
-      itemsState({ items: [], total: 9, loading: false, page: 1, totalPages: 1 }),
+      itemsState({
+        items: [],
+        total: 9,
+        loading: false,
+        page: 1,
+        totalPages: 1,
+      }),
     );
     renderList();
     expect(screen.queryByText('No entries yet')).not.toBeInTheDocument();
@@ -129,11 +135,7 @@ describe('ItemList empty state', () => {
     );
     renderList();
     expect(screen.queryByText('No entries yet')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Item 1' }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole('heading', { name: 'Item 2' }),
-    ).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Item 1' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Item 2' })).toBeVisible();
   });
 });
