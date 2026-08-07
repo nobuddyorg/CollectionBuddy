@@ -23,7 +23,7 @@ function UploadInput({
       // Named for the end-to-end suite: the input is hidden behind a label,
       // and its own name is translated.
       data-testid="upload-photo"
-      className="hidden"
+      className="peer sr-only"
       aria-label={label}
       disabled={busy}
       onChange={(e) => {
@@ -52,7 +52,7 @@ export function AddPhotoPlate({
   const { t } = useI18n();
   return (
     <label
-      className={`group/plate relative flex aspect-4/3 w-full cursor-pointer items-center justify-center bg-mount transition-colors hover:bg-mount-hover ${
+      className={`group/plate relative flex aspect-4/3 w-full cursor-pointer items-center justify-center bg-mount transition-colors hover:bg-mount-hover peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-foreground ${
         busy ? 'pointer-events-none opacity-60' : ''
       }`}
       title={t('item_list.add_image')}
@@ -139,7 +139,7 @@ export function Actions({
       {/* A file input needs a label, not a button, so it borrows the icon
           button's own classes rather than approximating them. */}
       <label
-        className={`${iconButtonClasses({ variant: 'outline' })} cursor-pointer ${
+        className={`${iconButtonClasses({ variant: 'outline' })} peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-foreground cursor-pointer ${
           busy ? 'pointer-events-none opacity-60' : ''
         }`}
         title={t('item_list.add_image')}

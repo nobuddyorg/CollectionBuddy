@@ -188,6 +188,19 @@ describe('ItemCard', () => {
     ).toBeInTheDocument();
   });
 
+  // Regression: the file input was hidden with `display: none`, which pulls
+  // it out of the tab order entirely -- the label wrapping it is never a
+  // tab stop either. That left "Add image" reachable by mouse or touch
+  // only, with no other way to attach a photograph.
+  it('keeps the add-image controls reachable by keyboard', async () => {
+    renderCard();
+    const inputs = screen.getAllByTestId('upload-photo');
+    await userEvent.tab();
+    expect(inputs).toContain(document.activeElement);
+    await userEvent.tab();
+    expect(inputs).toContain(document.activeElement);
+  });
+
   it('disables the file input while an upload is in flight', () => {
     const { container } = render(
       <I18nProvider>
