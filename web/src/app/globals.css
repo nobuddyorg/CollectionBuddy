@@ -23,6 +23,14 @@
   --muted: #eceae3;
   --muted-foreground: #6a6e7c;
 
+  /* --border reads at ~1.2-1.3:1 against card/background -- fine for a
+     hairline divider nobody has to operate, but every text input, textarea
+     and outline button uses it as their only visible edge, and WCAG 1.4.11
+     wants 3:1 for that. A second, darker step of the same warm neutral
+     carries the boundary on actual controls; --border stays put for plain
+     dividers and card/dialog outlines that aren't operated. */
+  --control-border: #8c8779;
+
   /* A recessed surface -- the empty mount waiting for a photograph. Sits a
      step below --muted so it reads as a hollow cut into the white card
      rather than another pale panel floating on it. */
@@ -80,6 +88,10 @@
   --muted: #302d2a;
   --muted-foreground: #a8a196;
 
+  /* The light theme's control boundary, lifted the other way: lighter than
+     --border until it clears 3:1 on both the card and the page. */
+  --control-border: #786f62;
+
   /* A hollow is darker than what it is cut into, whichever way round the
      theme is -- so the empty mount goes below the card here, where in the
      light theme it sits below the white. */
@@ -118,6 +130,7 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-border: var(--border);
+  --color-control-border: var(--control-border);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-mount: var(--mount);
