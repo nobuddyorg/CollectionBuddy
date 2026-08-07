@@ -61,7 +61,8 @@
     "add": "Hinzufügen",
     "search_error": "Ortssuche fehlgeschlagen. Bitte erneut versuchen.",
     "save_error": "Eintrag konnte nicht gespeichert werden. Bitte erneut versuchen.",
-    "entry_added": "Eintrag hinzugefügt."
+    "entry_added": "Eintrag hinzugefügt.",
+    "confirm_discard": "Änderungen verwerfen?"
   },
   "item_list": {
     "confirm_delete": "Diesen Eintrag löschen?",

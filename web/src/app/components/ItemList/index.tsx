@@ -13,6 +13,7 @@ import { useItemMutations } from './useItemMutations';
 import { EditItemModal } from './EditItemModal';
 import { MapModal } from './MapModal';
 import CenteredModal from '../CenteredModal';
+import { useConfirm } from '../Confirm/ConfirmProvider';
 import type { ItemFormValues } from '../ItemForm';
 import type { ImgEntry, ItemLite } from './types';
 
@@ -31,8 +32,27 @@ import Icon, { IconType } from '../Icon';
 
 export default function ItemList({ categoryId }: { categoryId: string }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
 
   const [isCreateOpen, setCreateOpen] = useState(false);
+  const [isCreateDirty, setCreateDirty] = useState(false);
+
+  // Same reasoning as EditItemModal's guardedClose: backdrop, Escape and the
+  // dialog's X all resolve to this, so none of them can silently drop a
+  // half-written entry (#308). No separate Cancel button exists for create,
+  // so unlike edit there's only the one path to guard here.
+  const guardedCloseCreate = useCallback(() => {
+    if (!isCreateDirty) {
+      setCreateOpen(false);
+      return;
+    }
+    void (async () => {
+      if (await confirm(t('item_create.confirm_discard'))) {
+        setCreateDirty(false);
+        setCreateOpen(false);
+      }
+    })();
+  }, [isCreateDirty, confirm, t]);
 
   // Declared up here, ahead of the map, because the map is filtered by the
   // same term the list is: they are one filtered set drawn two ways.
@@ -267,11 +287,15 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
       <CenteredModal
         open={isCreateOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={(v) => (v ? undefined : guardedCloseCreate())}
         title={t('item_create.new_entry')}
         closeLabel={t('common.close')}
       >
-        <ItemCreate categoryId={categoryId} onCreated={handleCreated} />
+        <ItemCreate
+          categoryId={categoryId}
+          onCreated={handleCreated}
+          onDirtyChange={setCreateDirty}
+        />
       </CenteredModal>
     </div>
   );

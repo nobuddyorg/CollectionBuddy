@@ -61,7 +61,8 @@
     "add": "Add",
     "search_error": "Place search failed. Please try again.",
     "save_error": "Could not save this entry. Please try again.",
-    "entry_added": "Entry added."
+    "entry_added": "Entry added.",
+    "confirm_discard": "Discard your changes?"
   },
   "item_list": {
     "confirm_delete": "Delete this entry?",
