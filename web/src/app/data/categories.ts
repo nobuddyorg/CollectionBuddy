@@ -12,11 +12,18 @@ export function listCategories() {
 }
 
 export function createCategory(name: string) {
-  return supabase
-    .from('categories')
-    .insert({ name })
-    .select('id,name')
-    .single<CategorySummary>();
+  return (
+    supabase
+      .from('categories')
+      // The generated Insert type requires user_id because the column is
+      // `not null` with no default -- it doesn't know enforce_user_id()
+      // (0002_functions.sql) fills it in from the JWT on every insert. The
+      // client never sends it, on purpose: RLS plus that trigger is what
+      // makes it impossible to hand a row to another user.
+      .insert({ name } as Database['public']['Tables']['categories']['Insert'])
+      .select('id,name')
+      .single<CategorySummary>()
+  );
 }
 
 // Permitted by the "update own categories" RLS policy; a trigger keeps

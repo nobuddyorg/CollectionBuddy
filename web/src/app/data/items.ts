@@ -103,11 +103,18 @@ export function createItem(
     'title' | 'description' | 'place' | 'place_lat' | 'place_lng' | 'tags'
   >,
 ) {
-  return supabase
-    .from('items')
-    .insert(payload)
-    .select('id')
-    .single<{ id: string }>();
+  return (
+    supabase
+      .from('items')
+      // The generated Insert type requires user_id because the column itself
+      // is `not null` with no default -- it doesn't know enforce_user_id()
+      // (0002_functions.sql) fills it in from the JWT on every insert. The
+      // client never sends it, on purpose: RLS plus that trigger is what
+      // makes it impossible to hand a row to another user.
+      .insert(payload as ItemInsert)
+      .select('id')
+      .single<{ id: string }>()
+  );
 }
 
 export function updateItem(
@@ -138,9 +145,12 @@ export function deleteItem(id: string) {
 }
 
 export function linkItemToCategory(itemId: string, categoryId: string) {
-  return supabase
-    .from('item_categories')
-    .insert({ item_id: itemId, category_id: categoryId });
+  return supabase.from('item_categories').insert({
+    item_id: itemId,
+    category_id: categoryId,
+    // Same as createItem above: tg_item_categories_enforce() derives and
+    // rechecks this from the item/category it links, not from the client.
+  } as Database['public']['Tables']['item_categories']['Insert']);
 }
 
 // Narrowed by the same search as the list, so the map is the same set of

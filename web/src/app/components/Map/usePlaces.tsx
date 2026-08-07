@@ -31,11 +31,11 @@ function writeGeocodeCache(cache: Record<string, PlaceCoords>) {
  * names that still have to be looked up, preserving input order in both and
  * deduplicating by name across the pair.
  *
- * Coordinates are stored at entry time (`0015_place_coordinates.sql`), so
- * anything entered by picking a suggestion arrives ready to draw. A name is
- * only unlocated if *no* row carrying it has coordinates -- one item entered
- * before this shipped doesn't force a lookup for a place another item
- * already located.
+ * Coordinates are stored at entry time (`place_lat`/`place_lng` on `items`,
+ * `supabase/migrations/0003_tables.sql`), so anything entered by picking a
+ * suggestion arrives ready to draw. A name is only unlocated if *no* row
+ * carrying it has coordinates -- one item entered before this shipped
+ * doesn't force a lookup for a place another item already located.
  */
 export function partitionByStoredCoords(rows: ItemPlaceRow[]): {
   located: PlaceCoords[];
@@ -210,8 +210,9 @@ export function usePlaces(
 
         if (error) throw error;
 
-        // Places entered since 0015 carry their own coordinates and skip
-        // the gazetteer entirely; only what's left over is looked up.
+        // Places entered by picking a suggestion carry their own
+        // coordinates and skip the gazetteer entirely; only what's left
+        // over is looked up.
         const { located, unlocated, titles } = partitionByStoredCoords(items);
         const cache = readGeocodeCache();
         let cacheDirty = false;

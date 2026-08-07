@@ -145,6 +145,28 @@ jobs:
         run: supabase start
         working-directory: .
 
+      # database.types.ts documents itself as generated output (see its own
+      # header). This regenerates the body against the stack just started
+      # and fails the job on any difference -- the drift that let the
+      # checked-in file's header cite migrations that no longer existed and
+      # go stale past its own claimed cutoff (#286). Piped through the
+      # project's own Prettier config before diffing: raw CLI output has
+      # neither semicolons nor single quotes, so an unformatted diff would
+      # flag every line on every run regardless of actual schema drift.
+      #
+      # The checked-in file's own header (everything before `export type
+      # Json =`) is carried over rather than hardcoded here, so this check
+      # cares about the generated body matching the schema, not about the
+      # header's wording matching some copy pasted into a workflow file.
+      - name: Verify database.types.ts matches the schema
+        working-directory: .
+        run: |
+          supabase gen types typescript --local > /tmp/database.types.body.ts
+          web/node_modules/.bin/prettier --config web/.prettierrc --write /tmp/database.types.body.ts
+          awk '/^export type Json =/{exit} {print}' web/src/app/data/database.types.ts > /tmp/database.types.expected.ts
+          cat /tmp/database.types.body.ts >> /tmp/database.types.expected.ts
+          diff -u web/src/app/data/database.types.ts /tmp/database.types.expected.ts
+
       - run: npx playwright install --with-deps chromium
 
       # Reads the stack's own keys, builds the bundle against it and runs the
