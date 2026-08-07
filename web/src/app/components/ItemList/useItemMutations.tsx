@@ -49,6 +49,7 @@ export function useItemMutations({
         setItems((prev) =>
           prev.map((it) => (it.id === id ? { ...it, ...data } : it)),
         );
+        toast.announce(t('item_list.changes_saved'));
         return true;
       } finally {
         setIsSaving(false);
@@ -96,6 +97,11 @@ export function useItemMutations({
         restore();
         return;
       }
+
+      // The card is already gone from the grid, and for anyone not looking
+      // at it right now (or focused on it -- see #293) this is the only
+      // evidence the deletion happened at all.
+      toast.announce(t('item_list.entry_deleted'));
 
       try {
         // The row is already gone at this point, irreversibly. A failure

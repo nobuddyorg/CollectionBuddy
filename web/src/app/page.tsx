@@ -108,6 +108,9 @@ export default function Page() {
           screen and contradicted the board metaphor. */}
       <main
         id="main-content"
+        // Focusable so a closing dialog can land focus here when the
+        // control that opened it is gone -- see useFocusTrap's fallback.
+        tabIndex={-1}
         className="mx-auto max-w-6xl px-4 py-5 sm:py-8 space-y-5 sm:space-y-7"
       >
         <CategorySelect
