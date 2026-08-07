@@ -79,6 +79,24 @@ export function buildSearchFilter(needle: string): string {
 // benefit. Same threshold PlaceAutocomplete already uses.
 export const SEARCH_MIN_LENGTH = 3;
 
+// A term with any non-ASCII character in it -- a CJK ideograph, a Cyrillic
+// letter, a currency symbol like "€" -- carries far more of its meaning per
+// character than a Latin letter does, so the scan-cost argument above lands
+// at a lower floor: two characters already narrow a trigram scan usefully.
+// A plain two-letter ASCII term (a country code, say) still waits for a
+// third character -- that's an accepted gap (#307), not one this can close
+// without giving up the cost argument entirely.
+export const SEARCH_MIN_LENGTH_NON_ASCII = 2;
+
+const NON_ASCII_PATTERN = /[^\x00-\x7F]/;
+
+/** The minimum length `search` needs before it earns a filter. */
+export function searchMinLength(search: string): number {
+  return NON_ASCII_PATTERN.test(search)
+    ? SEARCH_MIN_LENGTH_NON_ASCII
+    : SEARCH_MIN_LENGTH;
+}
+
 /**
  * The filter a search term earns, or null for a term too short to be worth
  * one.
@@ -89,7 +107,9 @@ export const SEARCH_MIN_LENGTH = 3;
  * (#241). Every query that narrows by search goes through here.
  */
 export function searchFilterFor(search: string): string | null {
-  return search.length >= SEARCH_MIN_LENGTH ? buildSearchFilter(search) : null;
+  return search.length >= searchMinLength(search)
+    ? buildSearchFilter(search)
+    : null;
 }
 
 /* v8 ignore start -- thin Supabase query builders; buildSearchFilter and

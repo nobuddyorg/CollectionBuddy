@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   SEARCH_MIN_LENGTH,
+  SEARCH_MIN_LENGTH_NON_ASCII,
   buildSearchFilter,
   listItemPlaces,
   listItems,
   searchFilterFor,
+  searchMinLength,
 } from './items';
 
 // Pulls the quoted value back out of `title.ilike."<value>"` and undoes
@@ -82,6 +84,33 @@ describe('searchFilterFor', () => {
 
   it('declines an empty term', () => {
     expect(searchFilterFor('')).toBeNull();
+  });
+
+  // A CJK ideograph, a Cyrillic letter, a currency symbol -- each carries
+  // more of a search term's meaning than a Latin letter does, so the floor
+  // is lower (#307). Two characters already earns a filter here, where the
+  // same length declines for a plain ASCII term above.
+  it('filters a two-character non-ASCII term', () => {
+    expect(searchFilterFor('日本')).toBe(buildSearchFilter('日本'));
+    expect(searchFilterFor('日本')).not.toBeNull();
+  });
+
+  it('still declines a one-character non-ASCII term', () => {
+    expect(searchFilterFor('日')).toBeNull();
+  });
+});
+
+describe('searchMinLength', () => {
+  it('is the ASCII minimum for a plain Latin term', () => {
+    expect(searchMinLength('ab')).toBe(SEARCH_MIN_LENGTH);
+  });
+
+  it('is lower for a term carrying any non-ASCII character', () => {
+    expect(searchMinLength('日本')).toBe(SEARCH_MIN_LENGTH_NON_ASCII);
+  });
+
+  it('drops to the non-ASCII floor even for a single non-ASCII character mixed with ASCII', () => {
+    expect(searchMinLength('a€')).toBe(SEARCH_MIN_LENGTH_NON_ASCII);
   });
 });
 
