@@ -87,7 +87,17 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
   const [editOpen, setEditOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ItemLite | null>(null);
-  const [modalImage, setModalImage] = useState<string | null>(null);
+  // Which entry's carousel is open, and where in its `imgs` it's showing --
+  // not a URL, so the modal can navigate to every photograph an entry has,
+  // including ones a strip cell never had room for (#304).
+  const [modalState, setModalState] = useState<{
+    itemId: string;
+    index: number;
+  } | null>(null);
+  const modalImgs = modalState ? (images[modalState.itemId] ?? []) : [];
+  const modalItemTitle = modalState
+    ? (items.find((i) => i.id === modalState.itemId)?.title ?? '')
+    : '';
 
   const openEdit = (it: ItemLite) => {
     setEditingItem(it);
@@ -214,7 +224,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               onEditItem={() => openEdit(it)}
               onDeleteItem={() => void removeItem(it.id)}
               onDeleteImage={(img) => void deleteImage(it.id, img)}
-              onOpenModal={setModalImage}
+              onOpenModal={(index) => setModalState({ itemId: it.id, index })}
             />
           ))}
         </ul>
@@ -222,7 +232,20 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
 
       <Pagination page={page} setPage={setPage} totalPages={totalPages} />
 
-      <ModalImage url={modalImage} onClose={() => setModalImage(null)} />
+      <ModalImage
+        imgs={modalImgs}
+        index={modalState ? modalState.index : null}
+        itemTitle={modalItemTitle}
+        onIndexChange={(index) =>
+          setModalState((prev) => (prev ? { ...prev, index } : prev))
+        }
+        onClose={() => setModalState(null)}
+        onDelete={(img) => {
+          if (modalState) void deleteImage(modalState.itemId, img);
+        }}
+        deletingPath={deletingPath}
+        busy={modalState ? (pendingUploads[modalState.itemId] ?? 0) > 0 : false}
+      />
 
       <EditItemModal
         open={editOpen}
