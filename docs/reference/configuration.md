@@ -34,6 +34,9 @@ Project-level storage limit is 50 MiB (`[storage]`), though the `item-images` bu
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml` | Yes |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml` | Yes |
+| `SUPABASE_DB_URL` | `pages-deploy.yml` (`migrate` job) | Yes — session-pooler connection string; `db push` uses it |
+| `SUPABASE_ACCESS_TOKEN` | `pages-deploy.yml` (`migrate` job) | Yes — management-API token for the PostgREST schema reload |
+| `SUPABASE_PROJECT_REF` | `pages-deploy.yml` (`migrate` job) | Yes — names the project for that same call |
 | `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test` job) | No — without it, Stryker just skips the dashboard reporter and writes a local HTML report instead. |
 
 ## Coverage and mutation thresholds
