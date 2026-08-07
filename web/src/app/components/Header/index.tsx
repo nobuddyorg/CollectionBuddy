@@ -59,7 +59,7 @@ export default function Header({ user, onSignOut }: HeaderProps) {
             onClick={toggle}
             className="group flex items-center gap-2 rounded-sm px-2 min-h-10
               text-foreground hover:bg-muted transition-colors"
-            aria-haspopup="menu"
+            aria-haspopup="true"
             aria-controls="user-menu"
             aria-expanded={menuOpen ? 'true' : 'false'}
             title={displayEmail || t('header.title')}
