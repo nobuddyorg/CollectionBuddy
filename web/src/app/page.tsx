@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 
 import CategorySelect from './components/CategorySelect/index';
 import {
+  CATEGORY_TABPANEL_ID,
+  categoryTabId,
+} from './components/CategorySelect/Dropdown';
+import {
   pickInitialCategory,
   readStoredCategory,
   storeSelectedCategory,
@@ -126,7 +130,16 @@ export default function Page() {
           // than assembling itself in three visible steps.
           <ItemListSkeleton />
         ) : hasCategory ? (
-          <section className="relative z-50 space-y-4">
+          <section
+            role="tabpanel"
+            id={CATEGORY_TABPANEL_ID}
+            // Both ids: the heading always resolves, the tab only while the
+            // category strip is expanded and that tab is actually in the
+            // DOM. An id that doesn't resolve is just skipped, so the panel
+            // is never left without an accessible name either way.
+            aria-labelledby={`entries-heading ${categoryTabId(selectedCategoryId!)}`}
+            className="relative z-50 space-y-4"
+          >
             <h2 id="entries-heading" className="sr-only">
               {t('page.entries')}
             </h2>
