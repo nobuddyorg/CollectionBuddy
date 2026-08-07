@@ -35,6 +35,18 @@ function contrast(a: string, b: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+// Tailwind's `/NN` opacity modifier composites the colour onto whatever sits
+// behind it before the browser ever paints -- so a pair drawn with one, like
+// `text-foreground/80` on `bg-mount`, isn't `fg` and isn't `mount`, it's the
+// two blended. This mirrors that compositing so the pair can be measured as
+// what actually reaches the screen.
+function withAlpha(hexFg: string, alpha: number, hexBg: string): string {
+  const fg = [1, 3, 5].map((i) => parseInt(hexFg.slice(i, i + 2), 16));
+  const bg = [1, 3, 5].map((i) => parseInt(hexBg.slice(i, i + 2), 16));
+  const blended = fg.map((f, i) => Math.round(alpha * f + (1 - alpha) * bg[i]));
+  return `#${blended.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+}
+
 const themes = {
   light: tokensIn(':root {'),
   dark: tokensIn("[data-theme='dark'] {"),
@@ -77,6 +89,16 @@ describe.each(Object.entries(themes))('%s theme', (name, tokens) => {
     expect(tokens[fg]).toBeDefined();
     expect(tokens[bg]).toBeDefined();
     expect(contrast(tokens[fg], tokens[bg])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // The empty-mount "no images" label draws `text-foreground/80` on
+  // `bg-mount` (AddPhotoPlate, ItemList/Actions.tsx) rather than
+  // `muted-foreground`, which measured 3.85:1 on this surface in the light
+  // theme -- below AA, and the resting colour, since touch has no hover to
+  // raise it. This is the pair that combination actually paints.
+  it('carries foreground/80 on mount at WCAG AA', () => {
+    const composite = withAlpha(tokens.foreground, 0.8, tokens.mount);
+    expect(contrast(composite, tokens.mount)).toBeGreaterThanOrEqual(4.5);
   });
 
   it.each(CONTROL_BORDER_PAIRS)(
