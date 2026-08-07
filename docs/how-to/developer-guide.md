@@ -4,19 +4,29 @@ Task-oriented recipes for contributing to or operating CollectionBuddy. For the 
 
 ## Run the checks CI runs, locally
 
-From `web/`:
+From `web/`, in this order — the build comes first on purpose. `next build` generates
+`next-env.d.ts` (gitignored), and both `tsc` and ESLint need it on a clean checkout to
+resolve the ambient module types it references:
 
 ```bash
-npm run lint
-npx prettier --check .
-npx tsc --noEmit
-npm test -- --coverage
 npm run build
+npx tsc --noEmit
+npx prettier --check .
+npm run lint
+npm test -- --coverage
 npm run e2e
-npm run test:mutation
 ```
 
-These match [`ci.yml`](../../.github/workflows/ci.yml) exactly, in the order it runs them.
+That is the `build_and_test` job in [`ci.yml`](../../.github/workflows/ci.yml), step for
+step. Two more jobs run alongside it rather than after it, so run them separately:
+
+```bash
+npm run test:mutation   # the mutation_test job
+npm run e2e:local       # the e2e_local_stack job; needs `supabase start` first
+```
+
+A fourth job, `prek`, runs the repo-wide hooks — `prek run --all-files` from the repository
+root is the same thing.
 
 ## Run the end-to-end suite
 
