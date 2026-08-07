@@ -8,6 +8,7 @@ import { TagsInput } from './TagsInput';
 import type { ItemFormProps, ItemFormValues, PlaceCoords } from './types';
 
 export type { ItemFormValues } from './types';
+export { EMPTY_ITEM_FORM_VALUES } from './types';
 
 // `block` is what makes the four fields line up, and it has to be on all of
 // them or none. A label is inline by default, so it sits in a line box sized

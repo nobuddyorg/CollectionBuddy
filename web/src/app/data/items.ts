@@ -5,9 +5,30 @@ export type ItemRow = Database['public']['Tables']['items']['Row'];
 export type ItemInsert = Database['public']['Tables']['items']['Insert'];
 export type ItemUpdate = Database['public']['Tables']['items']['Update'];
 
-export type ItemFields = Pick<
-  ItemRow,
-  'id' | 'title' | 'description' | 'place' | 'place_lat' | 'place_lng' | 'tags'
+// The single source for both the `items` field list and the wire-format
+// select string built from it below -- so dropping a field here can't leave
+// a `.select()` string one field short of the type asserted onto its
+// response. Before this, ITEM_FIELDS_SELECT and ITEM_FIELDS were two
+// independent copies of the same six names: drop one from the select
+// string and TypeScript still believed every row had it, `useItems.tsx`
+// substituted a default for the now-missing column, and every card lost
+// that field with no error anywhere -- `.returns<T>()` is an assertion, not
+// a check.
+export const ITEM_FIELD_KEYS = [
+  'id',
+  'title',
+  'description',
+  'place',
+  'place_lat',
+  'place_lng',
+  'tags',
+] as const;
+export type ItemFields = Pick<ItemRow, (typeof ITEM_FIELD_KEYS)[number]>;
+// What a create/update payload carries: every field but the id the row
+// gets assigned on insert.
+export type ItemEditableFieldKey = Exclude<
+  (typeof ITEM_FIELD_KEYS)[number],
+  'id'
 >;
 export type ItemSearchRow = ItemFields & {
   item_categories: { category_id: string }[];
@@ -19,9 +40,15 @@ export type ItemSearchRow = ItemFields & {
  * The title rides along because a pin is not just a dot on a city: it
  * stands for the entries catalogued there, and the popup names them (#404).
  */
+export const ITEM_PLACE_FIELD_KEYS = [
+  'title',
+  'place',
+  'place_lat',
+  'place_lng',
+] as const;
 export type ItemPlaceRow = Pick<
   ItemRow,
-  'title' | 'place' | 'place_lat' | 'place_lng'
+  (typeof ITEM_PLACE_FIELD_KEYS)[number]
 >;
 
 /* v8 ignore start -- only used by the ignored query builders below. */
@@ -29,10 +56,9 @@ export type ItemPlaceRow = Pick<
 // The coordinates come back with every item read so the edit form can hand
 // them straight back on save -- an item edited without touching its place
 // must keep the pin it already had.
-const ITEMS_SEARCH_SELECT =
-  'id,title,description,place,place_lat,place_lng,tags,item_categories!inner(category_id)';
-const ITEM_FIELDS_SELECT =
-  'id,title,description,place,place_lat,place_lng,tags';
+const ITEM_FIELDS_SELECT = ITEM_FIELD_KEYS.join(',');
+const ITEMS_SEARCH_SELECT = `${ITEM_FIELDS_SELECT},item_categories!inner(category_id)`;
+const ITEM_PLACE_FIELDS_SELECT = ITEM_PLACE_FIELD_KEYS.join(',');
 // Stryker restore all
 /* v8 ignore stop */
 
@@ -97,12 +123,7 @@ export function listItems({
     .returns<ItemSearchRow[]>();
 }
 
-export function createItem(
-  payload: Pick<
-    ItemInsert,
-    'title' | 'description' | 'place' | 'place_lat' | 'place_lng' | 'tags'
-  >,
-) {
+export function createItem(payload: Pick<ItemInsert, ItemEditableFieldKey>) {
   return (
     supabase
       .from('items')
@@ -119,10 +140,7 @@ export function createItem(
 
 export function updateItem(
   id: string,
-  payload: Pick<
-    ItemUpdate,
-    'title' | 'description' | 'place' | 'place_lat' | 'place_lng' | 'tags'
-  >,
+  payload: Pick<ItemUpdate, ItemEditableFieldKey>,
 ) {
   return supabase
     .from('items')
@@ -160,9 +178,7 @@ export function linkItemToCategory(itemId: string, categoryId: string) {
 export function listItemPlaces(categoryId: string, search: string) {
   let query = supabase
     .from('items')
-    .select(
-      'title,place,place_lat,place_lng,item_categories!inner(category_id)',
-    )
+    .select(`${ITEM_PLACE_FIELDS_SELECT},item_categories!inner(category_id)`)
     .eq('item_categories.category_id', categoryId)
     .not('place', 'is', null)
     .neq('place', '');

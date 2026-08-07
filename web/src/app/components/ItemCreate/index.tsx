@@ -3,18 +3,9 @@
 import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
-import ItemForm, { ItemFormValues } from '../ItemForm';
+import ItemForm, { EMPTY_ITEM_FORM_VALUES, ItemFormValues } from '../ItemForm';
 import { useCreateItem } from './useCreateItem';
 import { Props } from './types';
-
-const EMPTY_VALUES: ItemFormValues = {
-  title: '',
-  description: '',
-  place: '',
-  place_lat: null,
-  place_lng: null,
-  tags: [],
-};
 
 export default function ItemCreate({ categoryId, onCreated }: Props) {
   const { t } = useI18n();
@@ -35,7 +26,7 @@ export default function ItemCreate({ categoryId, onCreated }: Props) {
     <section className="relative z-[70] p-4 sm:p-5 space-y-3">
       <ItemForm
         key={formKey}
-        initial={EMPTY_VALUES}
+        initial={EMPTY_ITEM_FORM_VALUES}
         submitting={isCreating}
         submitLabel={t('item_create.add')}
         onSubmit={handleCreate}
