@@ -125,8 +125,16 @@ export function updateItem(
     .single<ItemFields>();
 }
 
+// `.select().single()` turns an RLS-refused delete -- zero rows affected,
+// which a bare `.delete()` reports as `{ error: null }` -- into an error a
+// caller can actually see instead of silently doing nothing.
 export function deleteItem(id: string) {
-  return supabase.from('items').delete().eq('id', id);
+  return supabase
+    .from('items')
+    .delete()
+    .eq('id', id)
+    .select('id')
+    .single<{ id: string }>();
 }
 
 export function linkItemToCategory(itemId: string, categoryId: string) {
