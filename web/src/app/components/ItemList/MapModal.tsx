@@ -156,11 +156,15 @@ export function MapModal({
               {t('common.loading')}
             </div>
           )}
-          <div className="absolute top-2 right-2 z-[1000] bg-card/80 backdrop-blur rounded-lg flex gap-1 p-1">
+          {/* Fixed light colours rather than the theme tokens: the map
+              tiles beneath never go dark, so a chip that did would be the
+              one thing on top of the map switching hands with the rest of
+              the app. */}
+          <div className="absolute top-2 right-2 z-[1000] bg-white/80 backdrop-blur rounded-lg flex gap-1 p-1">
             <button
               type="button"
               onClick={() => void showCurrentLocation()}
-              className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-card-foreground shadow-sm hover:opacity-90 disabled:opacity-50"
+              className="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-neutral-300 text-neutral-900 shadow-sm hover:opacity-90 disabled:opacity-50"
               aria-label={t('item_list.zoom_to_current_location')}
               title={t('item_list.zoom_to_current_location')}
               aria-busy={locating}
@@ -171,7 +175,7 @@ export function MapModal({
             <button
               type="button"
               onClick={() => issueMapCommand('fitAll')}
-              className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border text-card-foreground shadow-sm hover:opacity-90"
+              className="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-neutral-300 text-neutral-900 shadow-sm hover:opacity-90"
               aria-label={t('item_list.frame_all_pins')}
               title={t('item_list.frame_all_pins')}
             >
