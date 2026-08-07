@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useI18n } from '../../i18n/useI18n';
+import { countItemsForCategory } from '../../data/categories';
 import type { Category } from '../../types';
 import {
   AddButton,
@@ -108,7 +109,25 @@ export default function CategorySelect({
 
   const onDelete = useCallback(async () => {
     if (!selectedCat) return;
-    if (!(await confirm(t('category_select.confirmDelete')))) return;
+    const name = selected?.name ?? '';
+
+    // Named and counted rather than a bare "Confirm deletion": this is the
+    // easiest way for someone to destroy their whole collection by
+    // accident -- the trash sits right beside the rename field they were
+    // probably reaching for -- and it is permanent, with no undo.
+    const { count, error: countError } =
+      await countItemsForCategory(selectedCat);
+    if (countError) console.error(countError);
+    const message =
+      countError || count == null
+        ? t('category_select.confirmDeleteGeneric').replace('{name}', name)
+        : count > 0
+          ? t('category_select.confirmDeleteWithEntries')
+              .replace('{name}', name)
+              .replace('{count}', String(count))
+          : t('category_select.confirmDeleteEmpty').replace('{name}', name);
+
+    if (!(await confirm(message))) return;
     const ok = await deleteCategory(selectedCat);
     if (ok) {
       // Falls through to what is left rather than to nothing: a collection
@@ -117,7 +136,7 @@ export default function CategorySelect({
       const remaining = sortedCats.filter((c) => c.id !== selectedCat);
       onSelect(remaining[0]?.id ?? null);
     }
-  }, [selectedCat, deleteCategory, onSelect, sortedCats, t, confirm]);
+  }, [selectedCat, selected, deleteCategory, onSelect, sortedCats, t, confirm]);
 
   return (
     <section className="space-y-3">

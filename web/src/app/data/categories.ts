@@ -44,6 +44,16 @@ export function listItemIdsForCategory(categoryId: string) {
     .eq('category_id', categoryId);
 }
 
+// An exact count with no rows fetched, so the delete-confirmation dialog can
+// name the number of entries at risk without paying for the full listing
+// `listItemIdsForCategory` above returns once the deletion is confirmed.
+export function countItemsForCategory(categoryId: string) {
+  return supabase
+    .from('item_categories')
+    .select('item_id', { count: 'exact', head: true })
+    .eq('category_id', categoryId);
+}
+
 // Of the given items, which are still linked to some category other than
 // the one being deleted -- i.e. which of them would NOT be orphaned.
 export function listItemIdsLinkedElsewhere(
