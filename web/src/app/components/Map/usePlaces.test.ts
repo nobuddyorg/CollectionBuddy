@@ -5,12 +5,13 @@ import {
   partitionByCache,
   partitionByStoredCoords,
   placeFromPhotonResponse,
+  withTitles,
 } from './usePlaces';
-import type { Place } from './types';
+import type { PlaceCoords } from './types';
 import type { ItemPlaceRow } from '../../data/items';
 
-const cologne: Place = { name: 'Cologne', lat: 50.94, lng: 6.96 };
-const berlin: Place = { name: 'Berlin', lat: 52.52, lng: 13.4 };
+const cologne: PlaceCoords = { name: 'Cologne', lat: 50.94, lng: 6.96 };
+const berlin: PlaceCoords = { name: 'Berlin', lat: 52.52, lng: 13.4 };
 
 function photon(coordinates: unknown) {
   return { features: [{ geometry: { coordinates } }] };
@@ -20,8 +21,9 @@ function row(
   place: string | null,
   place_lat: number | null = null,
   place_lng: number | null = null,
+  title = 'An entry',
 ): ItemPlaceRow {
-  return { place, place_lat, place_lng };
+  return { title, place, place_lat, place_lng };
 }
 
 describe('partitionByStoredCoords', () => {
@@ -69,29 +71,26 @@ describe('partitionByStoredCoords', () => {
   });
 
   it('falls back to a lookup when only one coordinate was stored', () => {
-    expect(partitionByStoredCoords([row('Cologne', 50.94, null)])).toEqual({
-      located: [],
-      unlocated: ['Cologne'],
-    });
-    expect(partitionByStoredCoords([row('Cologne', null, 6.96)])).toEqual({
-      located: [],
-      unlocated: ['Cologne'],
-    });
+    expect(
+      partitionByStoredCoords([row('Cologne', 50.94, null)]),
+    ).toMatchObject({ located: [], unlocated: ['Cologne'] });
+    expect(partitionByStoredCoords([row('Cologne', null, 6.96)])).toMatchObject(
+      { located: [], unlocated: ['Cologne'] },
+    );
   });
 
   it('falls back to a lookup rather than pinning a non-finite coordinate', () => {
-    expect(partitionByStoredCoords([row('Broken', NaN, 6.96)])).toEqual({
+    expect(partitionByStoredCoords([row('Broken', NaN, 6.96)])).toMatchObject({
       located: [],
       unlocated: ['Broken'],
     });
-    expect(partitionByStoredCoords([row('Broken', 50.94, Infinity)])).toEqual({
-      located: [],
-      unlocated: ['Broken'],
-    });
+    expect(
+      partitionByStoredCoords([row('Broken', 50.94, Infinity)]),
+    ).toMatchObject({ located: [], unlocated: ['Broken'] });
   });
 
   it('treats zero coordinates as a real location, not a missing one', () => {
-    expect(partitionByStoredCoords([row('Null Island', 0, 0)])).toEqual({
+    expect(partitionByStoredCoords([row('Null Island', 0, 0)])).toMatchObject({
       located: [{ name: 'Null Island', lat: 0, lng: 0 }],
       unlocated: [],
     });
@@ -110,17 +109,105 @@ describe('partitionByStoredCoords', () => {
   });
 
   it('ignores rows with no place at all', () => {
-    expect(partitionByStoredCoords([row(null, 50.94, 6.96), row('')])).toEqual({
+    const { located, unlocated, titles } = partitionByStoredCoords([
+      row(null, 50.94, 6.96),
+      row(''),
+    ]);
+    expect(located).toEqual([]);
+    expect(unlocated).toEqual([]);
+    // A row with no place has nowhere to be listed, so its title is not
+    // collected either -- an unnamed key would draw a pin onto nothing.
+    expect(titles.size).toBe(0);
+  });
+
+  it('has nothing to do for an empty row list', () => {
+    expect(partitionByStoredCoords([])).toMatchObject({
       located: [],
       unlocated: [],
     });
   });
+});
 
-  it('has nothing to do for an empty row list', () => {
-    expect(partitionByStoredCoords([])).toEqual({
-      located: [],
-      unlocated: [],
+describe('partitionByStoredCoords, on the entries at each place', () => {
+  it('collects every title catalogued at a place', () => {
+    const { titles } = partitionByStoredCoords([
+      row('Cologne', 50.94, 6.96, 'Seated Dime'),
+      row('Cologne', 50.94, 6.96, 'Silver Eagle'),
+      row('Berlin', 52.52, 13.4, 'Buffalo Nickel'),
+    ]);
+    expect(titles.get('Cologne')).toEqual(['Seated Dime', 'Silver Eagle']);
+    expect(titles.get('Berlin')).toEqual(['Buffalo Nickel']);
+  });
+
+  it('keeps the order the rows came back in', () => {
+    // The query orders newest first so the popup and the list agree; that
+    // order is carried through rather than re-sorted here.
+    const { titles } = partitionByStoredCoords([
+      row('Cologne', 50.94, 6.96, 'Newest'),
+      row('Cologne', 50.94, 6.96, 'Older'),
+      row('Cologne', 50.94, 6.96, 'Oldest'),
+    ]);
+    expect(titles.get('Cologne')).toEqual(['Newest', 'Older', 'Oldest']);
+  });
+
+  it('lists an entry whose own row carried no coordinates', () => {
+    // Entered before 0015, so it has no coordinates of its own -- but it is
+    // catalogued at a place a neighbouring row does locate, and a popup
+    // that skipped it would under-report the collection.
+    const { located, titles } = partitionByStoredCoords([
+      row('Cologne', null, null, 'Older entry'),
+      row('Cologne', 50.94, 6.96, 'Newer entry'),
+    ]);
+    expect(located).toEqual([cologne]);
+    expect(titles.get('Cologne')).toEqual(['Older entry', 'Newer entry']);
+  });
+
+  it('collects titles for a place still awaiting a lookup', () => {
+    const { unlocated, titles } = partitionByStoredCoords([
+      row('Paris', null, null, 'Napoleon Franc'),
+    ]);
+    expect(unlocated).toEqual(['Paris']);
+    // The geocode has not happened yet, but the titles are already known --
+    // they come from the rows, not from the gazetteer.
+    expect(titles.get('Paris')).toEqual(['Napoleon Franc']);
+  });
+
+  it('keeps two entries that share a title', () => {
+    // Duplicates are not collapsed: two coins of the same name are two
+    // coins, and a popup showing one would be miscounting the collection.
+    const { titles } = partitionByStoredCoords([
+      row('Cologne', 50.94, 6.96, 'Seated Dime'),
+      row('Cologne', 50.94, 6.96, 'Seated Dime'),
+    ]);
+    expect(titles.get('Cologne')).toEqual(['Seated Dime', 'Seated Dime']);
+  });
+});
+
+describe('withTitles', () => {
+  it('puts a located place back together with its entries', () => {
+    expect(
+      withTitles(cologne, new Map([['Cologne', ['Seated Dime']]])),
+    ).toEqual({ ...cologne, titles: ['Seated Dime'] });
+  });
+
+  it('gives a place with no entries an empty list, not a missing one', () => {
+    expect(withTitles(cologne, new Map())).toEqual({
+      ...cologne,
+      titles: [],
     });
+  });
+
+  it('matches on the place’s own name, not on some other entry', () => {
+    expect(
+      withTitles(cologne, new Map([['Berlin', ['Buffalo Nickel']]])).titles,
+    ).toEqual([]);
+  });
+
+  it('leaves the coordinates exactly as they were', () => {
+    const place = withTitles(berlin, new Map([['Berlin', ['A coin']]]));
+    expect(place.name).toBe('Berlin');
+    expect(place.lat).toBe(52.52);
+    expect(place.lng).toBe(13.4);
   });
 });
 

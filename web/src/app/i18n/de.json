@@ -96,6 +96,7 @@
     "map_error": "Kartenstandorte konnten nicht geladen werden. Bitte erneut versuchen.",
     "map_empty": "Noch keine Standorte vorhanden.",
     "map_empty_filtered": "Keine Standorte passen zur Suche.",
+    "map_entries_count": "{count} Einträge",
     "location_denied": "Der Standortzugriff ist blockiert. Erlaube ihn für CollectionBuddy in den Geräte- oder Browsereinstellungen und versuche es erneut.",
     "location_unavailable": "Dein Standort konnte nicht ermittelt werden. Bitte erneut versuchen.",
     "pagination": "Seitennavigation",
