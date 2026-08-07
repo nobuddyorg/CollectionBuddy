@@ -43,9 +43,7 @@ function contrast(a: string, b: string): number {
 function withAlpha(hexFg: string, alpha: number, hexBg: string): string {
   const fg = [1, 3, 5].map((i) => parseInt(hexFg.slice(i, i + 2), 16));
   const bg = [1, 3, 5].map((i) => parseInt(hexBg.slice(i, i + 2), 16));
-  const blended = fg.map((f, i) =>
-    Math.round(alpha * f + (1 - alpha) * bg[i]),
-  );
+  const blended = fg.map((f, i) => Math.round(alpha * f + (1 - alpha) * bg[i]));
   return `#${blended.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
 }
 
