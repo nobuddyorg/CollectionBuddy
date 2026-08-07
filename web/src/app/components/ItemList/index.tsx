@@ -254,23 +254,27 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
       setItems((prev) => restoreAt(prev, index, snapshot));
     };
 
-    try {
-      // Storage objects before the row, still: only the Storage API can
-      // reclaim the actual bytes, and once the row is gone there is nothing
-      // left to find them by.
-      await deleteAllItemImages(id);
-    } catch (err) {
-      console.error('Failed to delete item images:', err);
-      toast.error(t('item_list.delete_images_error'));
-      restore();
-      return;
-    }
+    // The row before the objects: the storage prefix is keyed by the item's
+    // id, not derived from the row itself, so nothing is lost by deleting it
+    // last. Deleting the row first also means a failure here still means
+    // "nothing happened" -- the restore is honest, and no photograph is
+    // ever destroyed on a path that reports itself as failed.
     const { error } = await deleteItem(id);
     if (error) {
       console.error('Failed to delete item:', error);
       toast.error(t('item_list.delete_error'));
       restore();
       return;
+    }
+
+    try {
+      // The row is already gone at this point, irreversibly. A failure here
+      // is a storage leak, not data loss -- there is no entry left to
+      // restore, and nothing to gain by pretending otherwise.
+      await deleteAllItemImages(id);
+    } catch (err) {
+      console.error('Failed to delete item images:', err);
+      toast.error(t('item_list.delete_images_cleanup_error'));
     }
     // Resyncs the page silently: pulls up whatever item now belongs in the
     // freed slot and corrects the total the pagination is drawn from.

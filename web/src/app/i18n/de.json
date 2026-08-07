@@ -88,7 +88,7 @@
     "delete_error": "Eintrag konnte nicht gelöscht werden. Bitte erneut versuchen.",
     "upload_error": "Bild konnte nicht hochgeladen werden. Bitte erneut versuchen.",
     "delete_image_error": "Bild konnte nicht gelöscht werden. Bitte erneut versuchen.",
-    "delete_images_error": "Die Bilder dieses Eintrags konnten nicht gelöscht werden. Der Eintrag wurde nicht entfernt.",
+    "delete_images_cleanup_error": "Der Eintrag wurde gelöscht, aber seine Fotos konnten nicht entfernt werden und belegen möglicherweise weiterhin Speicherplatz.",
     "no_results_title": "Keine Treffer für \"{q}\"",
     "no_results_hint": "Versuche einen anderen Suchbegriff.",
     "no_items_title": "Noch keine Einträge",
