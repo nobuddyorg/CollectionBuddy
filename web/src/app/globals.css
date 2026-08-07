@@ -41,8 +41,11 @@
 
   /* The one chromatic note in the system, reserved for the wordmark. A
      burnt amber that sits warm against the ink without competing with the
-     photographs, which remain the only other colour on screen. */
-  --accent: #c2622a;
+     photographs, which remain the only other colour on screen. Darkened
+     from #c2622a to clear 4.5:1 on both background and card -- the header
+     renders "Buddy" at 16px/18px bold, which is normal text under WCAG,
+     not the large text the previous shade only cleared. */
+  --accent: #ad5725;
 
   /* The tint under a specimen tag, and the strength of the sweep across a
      photograph's held frame. Both are the page's own ink laid on thinly,
