@@ -7,6 +7,7 @@ import ReactDOM from 'react-dom';
 import { useI18n } from '../../i18n/useI18n';
 import { useEscapeToClose } from '../CenteredModal/useEscapeToClose';
 import { useFocusTrap } from '../CenteredModal/useFocusTrap';
+import { useInertBackground } from '../CenteredModal/useInertBackground';
 import { useLockBodyScroll } from '../CenteredModal/useLockBodyScroll';
 import Icon, { IconType } from '../Icon';
 
@@ -24,6 +25,7 @@ export function ModalImage({
   useLockBodyScroll(open);
   useEscapeToClose(open, onClose);
   useFocusTrap(open, panelRef);
+  useInertBackground(open);
 
   if (!url || typeof document === 'undefined') return null;
 
