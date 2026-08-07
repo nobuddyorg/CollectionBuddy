@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ModalImage } from './ModalImage';
@@ -17,9 +17,20 @@ function renderModal(url: string | null, onClose = vi.fn()) {
   return onClose;
 }
 
+function appRoot() {
+  return document.getElementById('app-root') as HTMLElement;
+}
+
 describe('ModalImage', () => {
   beforeEach(() => {
     window.localStorage.setItem('lang', 'en');
+    const root = document.createElement('div');
+    root.id = 'app-root';
+    document.body.appendChild(root);
+  });
+
+  afterEach(() => {
+    appRoot()?.remove();
   });
 
   it('renders nothing without a url', () => {
@@ -63,5 +74,31 @@ describe('ModalImage', () => {
     const onClose = renderModal(URL);
     await userEvent.click(screen.getByRole('dialog'));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  // Regression (#295): aria-modal alone is not honoured by every
+  // reader/browser pairing, and the Tab trap does not constrain a screen
+  // reader's virtual cursor at all -- the rest of the page has to come out
+  // of the accessibility tree for browse mode to actually stay inside it.
+  it('makes the app root inert while open', () => {
+    renderModal(URL);
+    expect(appRoot().inert).toBe(true);
+  });
+
+  it('restores the app root once the image closes', () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <I18nProvider>
+        <ModalImage url={URL} onClose={onClose} />
+      </I18nProvider>,
+    );
+    expect(appRoot().inert).toBe(true);
+
+    rerender(
+      <I18nProvider>
+        <ModalImage url={null} onClose={onClose} />
+      </I18nProvider>,
+    );
+    expect(appRoot().inert).toBeFalsy();
   });
 });
