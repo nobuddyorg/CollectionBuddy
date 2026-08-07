@@ -62,6 +62,7 @@ export default function Header({ user, onSignOut }: HeaderProps) {
             aria-haspopup="menu"
             aria-controls="user-menu"
             aria-expanded={menuOpen ? 'true' : 'false'}
+            aria-label={t('header.account_menu')}
             title={displayEmail || t('header.title')}
           >
             <Icon icon={IconType.Google} className="w-5 h-5" />

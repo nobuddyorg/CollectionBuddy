@@ -99,11 +99,19 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="antialiased">
-        <I18nProvider>
-          <ToastProvider>
-            <ConfirmProvider>{children}</ConfirmProvider>
-          </ToastProvider>
-        </I18nProvider>
+        {/* Dialogs portal straight to document.body (CenteredModal, ModalImage),
+            landing as siblings of this wrapper rather than inside it. That
+            makes it the one element useInertBackground needs to reach for:
+            marking it inert while a dialog is open hides the header, main
+            and footer from assistive tech without also hiding the dialog
+            portalled next to it (#295). */}
+        <div id="app-root">
+          <I18nProvider>
+            <ToastProvider>
+              <ConfirmProvider>{children}</ConfirmProvider>
+            </ToastProvider>
+          </I18nProvider>
+        </div>
       </body>
     </html>
   );

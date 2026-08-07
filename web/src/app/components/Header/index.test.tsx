@@ -33,4 +33,12 @@ describe('Header', () => {
     renderHeader();
     expect(screen.getByText('collector@example.com')).toBeVisible();
   });
+
+  // The email span is `max-sm:hidden` and the caret carries no text, so
+  // without an explicit label the button's accessible name would collapse
+  // to "▾" on narrow viewports (#297). aria-label keeps it stable.
+  it('names the account menu button for assistive tech', () => {
+    renderHeader();
+    expect(screen.getByRole('button', { name: 'Account menu' })).toBeVisible();
+  });
 });

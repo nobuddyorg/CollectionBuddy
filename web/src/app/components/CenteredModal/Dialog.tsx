@@ -32,8 +32,6 @@ export function Dialog({
           ? 'p-0'
           : 'p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]'
       } ${open ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-      aria-hidden={!open}
-      inert={!open}
     >
       <div
         ref={panelRef}
