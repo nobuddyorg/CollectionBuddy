@@ -70,13 +70,20 @@ describe.each(Object.entries(themes))('%s theme', (name, tokens) => {
     expect(contrast(tokens[fg], tokens[bg])).toBeGreaterThanOrEqual(4.5);
   });
 
-  // The accent is the wordmark and nothing else. In the dark theme it clears
-  // AA outright (7.3:1); in the light theme the burnt amber sits at 3.7:1,
-  // which is the large-text threshold and no more. That is a pre-existing
-  // property of the light palette, held here at the level it actually meets
-  // so that neither theme can quietly slip below it.
+  // The accent is the wordmark, and it is drawn at two sizes. The header's
+  // "Buddy" is 16px/18px at font-display weight 700 -- normal text under
+  // WCAG (large text starts at 18.66px bold or 24px regular), so it needs
+  // the same 4.5:1 as any other text. Only the login page's 4xl/5xl mark is
+  // genuinely large, and gets the 3:1 large-text allowance.
   it.each([['background'], ['card']])(
-    'carries the accent on %s at large-text contrast',
+    'carries the accent on %s at normal-text contrast, for the header wordmark',
+    (bg) => {
+      expect(contrast(tokens.accent, tokens[bg])).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
+  it.each([['background'], ['card']])(
+    'carries the accent on %s at large-text contrast, for the login wordmark',
     (bg) => {
       expect(contrast(tokens.accent, tokens[bg])).toBeGreaterThanOrEqual(3);
     },
