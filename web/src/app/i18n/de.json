@@ -42,6 +42,7 @@
     "loadError": "Kategorien konnten nicht geladen werden. Bitte erneut versuchen.",
     "createError": "Kategorie konnte nicht erstellt werden. Bitte erneut versuchen.",
     "deleteError": "Kategorie konnte nicht gelöscht werden. Bitte erneut versuchen.",
+    "deleteImagesCleanupError": "Diese Kategorie wurde gelöscht, aber einige ihrer Fotos konnten nicht entfernt werden und belegen möglicherweise weiterhin Speicherplatz.",
     "renameError": "Kategorie konnte nicht umbenannt werden. Bitte erneut versuchen."
   },
   "item_create": {
