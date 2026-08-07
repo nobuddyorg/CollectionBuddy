@@ -48,8 +48,9 @@ export default function GoogleSignInButton({
         aria-busy={loading ? 'true' : 'false'}
         className={cx(
           'relative flex items-center justify-center h-12 px-4 rounded-md',
-          'border border-[#747775]',
+          'border border-[#747775] dark:border-[#8e918f]',
           'bg-white hover:bg-[#f8f9fa] active:bg-[#f1f3f4]',
+          'dark:bg-[#131314] dark:hover:bg-[#1e1f20] dark:active:bg-[#282a2c]',
           'shadow-sm hover:shadow-md transition-all duration-200',
           'disabled:opacity-60 disabled:cursor-not-allowed',
           className,
@@ -57,7 +58,7 @@ export default function GoogleSignInButton({
         style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
       >
         {loading ? (
-          <span className="flex items-center gap-3 text-[#3c4043] text-sm">
+          <span className="flex items-center gap-3 text-[#3c4043] dark:text-[#e3e3e3] text-sm">
             <Spinner />
             <span>{finalLabel}</span>
           </span>
@@ -67,13 +68,15 @@ export default function GoogleSignInButton({
               icon={IconType.Google}
               className="w-5 h-5 mr-3 flex-shrink-0"
             />
-            <span className="text-[#3c4043] text-sm">{finalLabel}</span>
+            <span className="text-[#3c4043] dark:text-[#e3e3e3] text-sm">
+              {finalLabel}
+            </span>
           </span>
         )}
       </button>
 
       {withOverlay && loading && mode === 'oauth' && (
-        <LoadingOverlay label={t('item_list.loading')} />
+        <LoadingOverlay label={t('item_list.loading')} theme="auto" />
       )}
     </>
   );
