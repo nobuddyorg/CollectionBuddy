@@ -42,6 +42,7 @@
     "loadError": "Could not load categories. Please try again.",
     "createError": "Could not create category. Please try again.",
     "deleteError": "Could not delete category. Please try again.",
+    "deleteImagesCleanupError": "This category was deleted, but some of its photographs could not be removed and may still count against your storage.",
     "renameError": "Could not rename this category. Please try again."
   },
   "item_create": {
