@@ -45,7 +45,10 @@ export type ExportResult = {
   blob: Blob;
   filename: string;
   itemCount: number;
+  /** Photographs actually written to the archive -- not photographs attempted. */
   photoCount: number;
+  /** Photographs that could not be fetched after retrying, and were left out. */
+  skippedPhotoCount: number;
 };
 
 /**
@@ -119,6 +122,46 @@ async function fetchPhotoPaths(
   return new Map(listings);
 }
 
+/**
+ * How many times a photograph's fetch is retried, and the backoff between
+ * attempts. The geocoder already gets three tries with backoff for the same
+ * reason: over an export of hundreds of photographs, a radio blip, a 5xx or
+ * a rate limit is common enough that one failed request must not mean one
+ * permanently missing photograph (#414).
+ */
+const PHOTO_FETCH_ATTEMPTS = 3;
+const PHOTO_RETRY_BASE_MS = 500;
+
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+/** Distinguishes a response retrying cannot fix (a 404 is a 404 three times over). */
+class PermanentFetchError extends Error {}
+
+async function fetchPhotoBytes(url: string): Promise<Uint8Array<ArrayBuffer>> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < PHOTO_FETCH_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, PHOTO_RETRY_BASE_MS * 2 ** (attempt - 1)),
+      );
+    }
+    try {
+      const response = await fetch(url);
+      if (response.ok) return new Uint8Array(await response.arrayBuffer());
+      if (!isRetryableStatus(response.status)) {
+        throw new PermanentFetchError(`HTTP ${response.status}`);
+      }
+      lastErr = new Error(`HTTP ${response.status}`);
+    } catch (err) {
+      if (err instanceof PermanentFetchError) throw err;
+      lastErr = err;
+    }
+  }
+  throw lastErr;
+}
+
 async function signAll(paths: string[]): Promise<Map<string, string>> {
   const signed = new Map<string, string>();
   for (let i = 0; i < paths.length; i += SIGN_BATCH_SIZE) {
@@ -140,10 +183,13 @@ async function signAll(paths: string[]): Promise<Map<string, string>> {
 /**
  * Builds the archive for one category.
  *
- * A photograph that cannot be fetched is reported and skipped rather than
- * failing the export: an archive missing one picture is worth having, and
- * the manifest still names what should have been there, so the gap is
- * visible instead of silent.
+ * A photograph that still cannot be fetched after retrying is reported and
+ * skipped rather than failing the export: an archive missing one picture is
+ * worth having, and the manifest still names what should have been there,
+ * so the gap is visible in the archive itself as well as in
+ * `skippedPhotoCount` -- silently is the one way it must not go missing,
+ * since the canonical use of an export is "export, then delete the
+ * originals" (#414).
  */
 export async function exportCategory({
   category,
@@ -172,6 +218,7 @@ export async function exportCategory({
   const exportedAt = now();
   const writer = createZipWriter();
   let done = 0;
+  let skipped = 0;
   const total = storagePaths.length;
   onProgress?.({ phase: 'photos', done, total });
 
@@ -185,12 +232,11 @@ export async function exportCategory({
       const url = signed.get(stored[i]);
       try {
         if (!url) throw new Error(`Unsigned path in ${ITEM_IMAGES_BUCKET}`);
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const bytes = new Uint8Array(await response.arrayBuffer());
+        const bytes = await fetchPhotoBytes(url);
         writer.add(entry.photos[i], bytes, exportedAt);
       } catch (err) {
         console.error('Skipping photograph', stored[i], err);
+        skipped++;
       }
       onProgress?.({ phase: 'photos', done: ++done, total });
     }
@@ -211,7 +257,8 @@ export async function exportCategory({
     blob: writer.finish(),
     filename: archiveName(category.name, exportedAt),
     itemCount: items.length,
-    photoCount: total,
+    photoCount: total - skipped,
+    skippedPhotoCount: skipped,
   };
 }
 
