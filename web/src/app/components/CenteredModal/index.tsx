@@ -5,6 +5,7 @@ import { Dialog } from './Dialog';
 import { Portal } from './Portal';
 import type { CenteredModalProps } from './types';
 import { useEscapeToClose } from './useEscapeToClose';
+import { useInertBackground } from './useInertBackground';
 import { useLockBodyScroll } from './useLockBodyScroll';
 
 export default function CenteredModal({
@@ -20,6 +21,7 @@ export default function CenteredModal({
 }: CenteredModalProps) {
   useLockBodyScroll(open);
   useEscapeToClose(open && closeOnEsc, () => onOpenChange(false));
+  useInertBackground(open);
 
   if (typeof document === 'undefined' || !open) return null;
 
