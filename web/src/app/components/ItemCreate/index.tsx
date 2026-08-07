@@ -7,7 +7,11 @@ import ItemForm, { EMPTY_ITEM_FORM_VALUES, ItemFormValues } from '../ItemForm';
 import { useCreateItem } from './useCreateItem';
 import { Props } from './types';
 
-export default function ItemCreate({ categoryId, onCreated }: Props) {
+export default function ItemCreate({
+  categoryId,
+  onCreated,
+  onDirtyChange,
+}: Props) {
   const { t } = useI18n();
   const [formKey, setFormKey] = useState(0);
   const { create, isCreating } = useCreateItem(categoryId);
@@ -30,6 +34,7 @@ export default function ItemCreate({ categoryId, onCreated }: Props) {
         submitting={isCreating}
         submitLabel={t('item_create.add')}
         onSubmit={handleCreate}
+        onDirtyChange={onDirtyChange}
       />
     </section>
   );

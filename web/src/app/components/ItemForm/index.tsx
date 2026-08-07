@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { Submit } from './Submit';
@@ -24,6 +24,7 @@ export default function ItemForm({
   submitLabel,
   onSubmit,
   onCancel,
+  onDirtyChange,
 }: ItemFormProps) {
   const { t } = useI18n();
 
@@ -44,6 +45,23 @@ export default function ItemForm({
   );
   const [tags, setTags] = useState<string[]>(initial.tags ?? []);
   const [titleTouched, setTitleTouched] = useState(false);
+
+  // Compared against `initial` directly rather than a separate snapshot:
+  // `initial` doesn't change for the life of one mount (callers remount via
+  // `key` to load a different item), so it already *is* the "nothing typed
+  // yet" baseline.
+  const isDirty =
+    title !== (initial.title ?? '') ||
+    description !== (initial.description ?? '') ||
+    place !== (initial.place ?? '') ||
+    (placeCoords?.lat ?? null) !== (initial.place_lat ?? null) ||
+    (placeCoords?.lng ?? null) !== (initial.place_lng ?? null) ||
+    tags.length !== (initial.tags?.length ?? 0) ||
+    tags.some((tag, i) => tag !== initial.tags?.[i]);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const titleId = useId();
   const descriptionId = useId();
