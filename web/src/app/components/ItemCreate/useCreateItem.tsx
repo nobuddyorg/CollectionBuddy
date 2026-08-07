@@ -36,6 +36,7 @@ export function useCreateItem(categoryId: string) {
 
         if (linkError) throw linkError;
 
+        toast.announce(t('item_create.entry_added'));
         return true;
       } catch (e) {
         if (itemId) {
