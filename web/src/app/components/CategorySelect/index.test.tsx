@@ -6,8 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
+import { countItemsForCategory } from '../../data/categories';
 import CategorySelect from './index';
 import type { UseCategories } from './useCategories';
+
+vi.mock('../../data/categories', () => ({
+  countItemsForCategory: vi.fn(),
+}));
 
 const cats = [
   { id: 'a', name: 'Coins' },
@@ -188,6 +193,64 @@ describe('CategorySelect', () => {
     expect(
       screen.queryByRole('button', { name: 'Open category' }),
     ).not.toBeInTheDocument();
+  });
+
+  // Regression: the delete confirmation used to read "Confirm deletion" in
+  // full -- no category name, no entry count, no mention of photographs.
+  // The trash sits right beside the rename field, and the deletion is
+  // permanent, so the dialog now says what it is about to do.
+  describe('the delete confirmation', () => {
+    it('names the category and states the entry count when it holds entries', async () => {
+      vi.mocked(countItemsForCategory).mockResolvedValue({
+        count: 40,
+        error: null,
+      } as never);
+      renderSelect();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+      expect(
+        await screen.findByText(
+          'Delete "Coins"? Its 40 entries and all their photographs will be permanently deleted.',
+        ),
+      ).toBeVisible();
+    });
+
+    it('does not claim entries or photographs will be lost when the category is empty', async () => {
+      vi.mocked(countItemsForCategory).mockResolvedValue({
+        count: 0,
+        error: null,
+      } as never);
+      renderSelect();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+      expect(
+        await screen.findByText('Delete "Coins"? This cannot be undone.'),
+      ).toBeVisible();
+    });
+
+    it('falls back to a generic warning rather than claiming zero entries when the count is unknown', async () => {
+      vi.mocked(countItemsForCategory).mockResolvedValue({
+        count: null,
+        error: new Error('network error'),
+      } as never);
+      renderSelect();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+      expect(
+        await screen.findByText(
+          'Delete "Coins"? Its entries and all their photographs will be permanently deleted.',
+        ),
+      ).toBeVisible();
+    });
   });
 
   it('collapses onto the category picked from the tabs', async () => {
