@@ -16,7 +16,13 @@ import Icon, { IconType } from '../Icon';
 
 type ToastEntry = { id: number; message: string };
 
-type ToastApi = { error: (message: string) => void };
+type ToastApi = {
+  error: (message: string) => void;
+  /** Posts an outcome -- "entry added", "changes saved", "entry deleted" --
+   * to the app-level polite live region, for anyone not focused on (or
+   * looking at) whatever just changed. */
+  announce: (message: string) => void;
+};
 
 const ToastContext = createContext<ToastApi | undefined>(undefined);
 
@@ -35,6 +41,7 @@ const AUTO_DISMISS_MS = 6000;
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
   const [toasts, setToasts] = useState<ToastEntry[]>([]);
+  const [announcement, setAnnouncement] = useState('');
   const nextId = useRef(0);
 
   // The portal target (document.body) only exists in the browser. Gating on
@@ -61,11 +68,22 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [dismiss],
   );
 
-  const api = useMemo<ToastApi>(() => ({ error }), [error]);
+  const announce = useCallback((message: string) => {
+    setAnnouncement(message);
+  }, []);
+
+  const api = useMemo<ToastApi>(() => ({ error, announce }), [error, announce]);
 
   return (
     <ToastContext.Provider value={api}>
       {children}
+      {/* The one polite live region for the whole app: create/save/delete
+          outcomes land here so someone not focused on (or looking at) the
+          thing that just changed still gets told it happened -- unlike the
+          toasts below, this never needs to be seen. */}
+      <span className="sr-only" aria-live="polite">
+        {announcement}
+      </span>
       {mounted &&
         ReactDOM.createPortal(
           <div className="fixed inset-x-0 bottom-4 z-overlay flex flex-col items-center gap-2 px-4 pointer-events-none">
