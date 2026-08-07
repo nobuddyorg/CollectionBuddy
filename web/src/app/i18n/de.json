@@ -58,7 +58,8 @@
     "tags_count": "{count} Tags",
     "add": "Hinzufügen",
     "search_error": "Ortssuche fehlgeschlagen. Bitte erneut versuchen.",
-    "save_error": "Eintrag konnte nicht gespeichert werden. Bitte erneut versuchen."
+    "save_error": "Eintrag konnte nicht gespeichert werden. Bitte erneut versuchen.",
+    "entry_added": "Eintrag hinzugefügt."
   },
   "item_list": {
     "confirm_delete": "Diesen Eintrag löschen?",
@@ -88,7 +89,9 @@
     "frame_all_pins": "Alle Orte anzeigen",
     "search_error": "Suche fehlgeschlagen. Bitte erneut versuchen.",
     "save_error": "Änderungen konnten nicht gespeichert werden. Bitte erneut versuchen.",
+    "changes_saved": "Änderungen gespeichert.",
     "delete_error": "Eintrag konnte nicht gelöscht werden. Bitte erneut versuchen.",
+    "entry_deleted": "Eintrag gelöscht.",
     "upload_error": "Bild konnte nicht hochgeladen werden. Bitte erneut versuchen.",
     "delete_image_error": "Bild konnte nicht gelöscht werden. Bitte erneut versuchen.",
     "delete_images_cleanup_error": "Der Eintrag wurde gelöscht, aber seine Fotos konnten nicht entfernt werden und belegen möglicherweise weiterhin Speicherplatz.",
