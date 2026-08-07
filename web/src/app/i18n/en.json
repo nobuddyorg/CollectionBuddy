@@ -12,6 +12,7 @@
   },
   "header": {
     "title": "CollectionBuddy",
+    "account_menu": "Account menu",
     "sign_out": "Sign out",
     "language": "Language",
     "theme": "Appearance",
