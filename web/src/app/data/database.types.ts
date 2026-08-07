@@ -1,12 +1,11 @@
-// Hand-derived from supabase/migrations (through 0013_fix_normalize_text_trim.sql)
-// because generating this via `supabase gen types typescript --local` requires
-// a working local stack, and `supabase start` currently fails applying
-// 0012_batch_delete_triggers.sql locally ("must be owner of table objects"
-// creating an index on storage.objects) -- a local-dev-only permissions gap,
-// unrelated to this file's contents.
+// Generated from the migrations in supabase/migrations/ (0001-0007).
 //
-// Regenerate for real once that's fixed:
+// Regenerate after a schema change, against a local stack:
+//   supabase start
 //   supabase gen types typescript --local > web/src/app/data/database.types.ts
+//
+// Hand-editing is fine for a small change, but the generated output is the
+// reference -- see docs/how-to/developer-guide.md#change-the-database-schema.
 
 export type Json =
   | string
@@ -17,102 +16,82 @@ export type Json =
   | Json[];
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: '13.0.4';
+  };
+  graphql_public: {
+    Tables: {
+      [_ in never]: never;
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json;
+          operationName?: string;
+          query?: string;
+          variables?: Json;
+        };
+        Returns: Json;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
   public: {
     Tables: {
       categories: {
         Row: {
-          id: string;
-          user_id: string;
-          name: string;
           created_at: string;
+          id: string;
+          name: string;
           updated_at: string;
+          user_id: string;
         };
         Insert: {
-          id?: string;
-          user_id?: string;
-          name: string;
           created_at?: string;
+          id?: string;
+          name: string;
           updated_at?: string;
+          user_id: string;
         };
         Update: {
+          created_at?: string;
           id?: string;
-          user_id?: string;
           name?: string;
-          created_at?: string;
           updated_at?: string;
-        };
-        Relationships: [];
-      };
-      items: {
-        Row: {
-          id: string;
-          user_id: string;
-          title: string;
-          description: string | null;
-          place: string | null;
-          // Set only when `place` came from a picked Photon suggestion;
-          // null for hand-typed places and for rows predating 0015.
-          place_lat: number | null;
-          place_lng: number | null;
-          tags: string[];
-          // Generated (stored) from tags via join_tags(); read-only.
-          tags_text: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
           user_id?: string;
-          title: string;
-          description?: string | null;
-          place?: string | null;
-          place_lat?: number | null;
-          place_lng?: number | null;
-          tags?: string[];
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          title?: string;
-          description?: string | null;
-          place?: string | null;
-          place_lat?: number | null;
-          place_lng?: number | null;
-          tags?: string[];
-          created_at?: string;
-          updated_at?: string;
         };
         Relationships: [];
       };
       item_categories: {
         Row: {
-          item_id: string;
           category_id: string;
-          user_id: string;
           created_at: string;
+          item_id: string;
+          user_id: string;
         };
         Insert: {
-          item_id: string;
           category_id: string;
-          user_id?: string;
           created_at?: string;
+          item_id: string;
+          user_id: string;
         };
         Update: {
-          item_id?: string;
           category_id?: string;
-          user_id?: string;
           created_at?: string;
+          item_id?: string;
+          user_id?: string;
         };
         Relationships: [
-          {
-            foreignKeyName: 'item_categories_item_id_fkey';
-            columns: ['item_id'];
-            isOneToOne: false;
-            referencedRelation: 'items';
-            referencedColumns: ['id'];
-          },
           {
             foreignKeyName: 'item_categories_category_id_fkey';
             columns: ['category_id'];
@@ -120,25 +99,197 @@ export type Database = {
             referencedRelation: 'categories';
             referencedColumns: ['id'];
           },
+          {
+            foreignKeyName: 'item_categories_item_id_fkey';
+            columns: ['item_id'];
+            isOneToOne: false;
+            referencedRelation: 'items';
+            referencedColumns: ['id'];
+          },
         ];
       };
+      items: {
+        Row: {
+          created_at: string;
+          description: string | null;
+          id: string;
+          place: string | null;
+          place_lat: number | null;
+          place_lng: number | null;
+          tags: string[];
+          tags_text: string | null;
+          title: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          place?: string | null;
+          place_lat?: number | null;
+          place_lng?: number | null;
+          tags?: string[];
+          tags_text?: string | null;
+          title: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          place?: string | null;
+          place_lat?: number | null;
+          place_lng?: number | null;
+          tags?: string[];
+          tags_text?: string | null;
+          title?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
     };
-    Views: Record<string, never>;
+    Views: {
+      [_ in never]: never;
+    };
     Functions: {
-      normalize_text: {
-        Args: { txt: string };
-        Returns: string;
-      };
-      join_tags: {
-        Args: { tags: string[] };
-        Returns: string;
-      };
-      keepalive: {
-        Args: Record<PropertyKey, never>;
-        Returns: undefined;
-      };
+      join_tags: { Args: { tags: string[] }; Returns: string };
+      keepalive: { Args: never; Returns: undefined };
+      normalize_text: { Args: { txt: string }; Returns: string };
     };
-    Enums: Record<string, never>;
-    CompositeTypes: Record<string, never>;
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
   };
 };
+
+type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>;
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<
+  keyof Database,
+  'public'
+>];
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
+      Row: infer R;
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] &
+        DefaultSchema['Views'])
+    ? (DefaultSchema['Tables'] &
+        DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R;
+      }
+      ? R
+      : never
+    : never;
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+      Insert: infer I;
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I;
+      }
+      ? I
+      : never
+    : never;
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+      Update: infer U;
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U;
+      }
+      ? U
+      : never
+    : never;
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    keyof DefaultSchema['Enums'] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
+    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
+    : never;
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema['CompositeTypes']
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
+    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
+    : never;
+
+export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
+  public: {
+    Enums: {},
+  },
+} as const;
