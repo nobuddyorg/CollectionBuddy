@@ -55,6 +55,15 @@ const TEXT_PAIRS: [string, string][] = [
   ['destructive', 'card'],
 ];
 
+// --control-border is the only visible edge of every text input, textarea,
+// search field and outline button (CORR-A6) -- a non-text element WCAG
+// 1.4.11 holds to 3:1, not the 4.5:1 that TEXT_PAIRS checks. `card` and
+// `background` are the two surfaces those controls actually sit on.
+const CONTROL_BORDER_PAIRS: [string, string][] = [
+  ['control-border', 'card'],
+  ['control-border', 'background'],
+];
+
 describe.each(Object.entries(themes))('%s theme', (name, tokens) => {
   it('defines every colour the other theme defines', () => {
     // A token present in one theme and missing from the other is the classic
@@ -69,6 +78,15 @@ describe.each(Object.entries(themes))('%s theme', (name, tokens) => {
     expect(tokens[bg]).toBeDefined();
     expect(contrast(tokens[fg], tokens[bg])).toBeGreaterThanOrEqual(4.5);
   });
+
+  it.each(CONTROL_BORDER_PAIRS)(
+    'carries %s on %s at WCAG AA non-text contrast',
+    (fg, bg) => {
+      expect(tokens[fg]).toBeDefined();
+      expect(tokens[bg]).toBeDefined();
+      expect(contrast(tokens[fg], tokens[bg])).toBeGreaterThanOrEqual(3);
+    },
+  );
 
   // The accent is the wordmark, and it is drawn at two sizes. The header's
   // "Buddy" is 16px/18px at font-display weight 700 -- normal text under

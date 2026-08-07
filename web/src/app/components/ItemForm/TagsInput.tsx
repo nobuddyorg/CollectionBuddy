@@ -39,7 +39,7 @@ export function TagsInput({
   };
 
   return (
-    <div className="rounded-sm bg-card text-card-foreground px-2 py-1.5 min-h-11 flex flex-wrap items-center gap-1.5 ring-1 ring-inset ring-border focus-within:ring-foreground">
+    <div className="rounded-sm bg-card text-card-foreground px-2 py-1.5 min-h-11 flex flex-wrap items-center gap-1.5 ring-1 ring-inset ring-control-border focus-within:ring-foreground">
       {tags.map((tag) => (
         <span key={tag} className="fade-up tag-chip flex items-center gap-1.5">
           {tag}

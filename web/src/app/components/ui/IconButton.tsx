@@ -26,12 +26,12 @@ const SIZE_CLASSES = {
 // variants stack in a predictable order; mixing plain `hover:` overrides
 // in here would leave which rule wins up to Tailwind's sort order.
 const OUTLINE_BASE =
-  'bg-card text-muted-foreground ring-1 ring-border/60 [@media(hover:hover)]:ring-transparent';
+  'bg-card text-muted-foreground ring-1 ring-control-border/60 [@media(hover:hover)]:ring-transparent';
 
 const VARIANT_CLASSES = {
   primary: 'bg-primary text-primary-foreground hover:opacity-90',
   destructive: 'bg-destructive text-destructive-foreground hover:opacity-90',
-  outline: `${OUTLINE_BASE} hover:bg-muted hover:text-foreground [@media(hover:hover)]:hover:ring-border`,
+  outline: `${OUTLINE_BASE} hover:bg-muted hover:text-foreground [@media(hover:hover)]:hover:ring-control-border`,
   outlineDestructive: `${OUTLINE_BASE} hover:bg-destructive/10 hover:text-destructive [@media(hover:hover)]:hover:ring-destructive/40`,
 } as const;
 

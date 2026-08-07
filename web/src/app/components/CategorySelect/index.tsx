@@ -207,13 +207,13 @@ export default function CategorySelect({
                     if (e.key === 'Enter') void onRename();
                     if (e.key === 'Escape') setRenameValue(selected.name);
                   }}
-                  className="w-full min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
+                  className="w-full min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-control-border focus:ring-foreground"
                 />
                 <button
                   type="button"
                   onClick={() => void onRename()}
                   disabled={!renameIsDirty || isRenaming}
-                  className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-border hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                  className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-control-border hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
                 >
                   {t('category_select.rename')}
                 </button>

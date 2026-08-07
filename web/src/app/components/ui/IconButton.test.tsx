@@ -37,7 +37,7 @@ describe('IconButton', () => {
     (variant) => {
       const classes = iconButtonClasses({ variant });
       expect(classes).toContain('ring-1');
-      expect(classes).toContain('ring-border/60');
+      expect(classes).toContain('ring-control-border/60');
       expect(classes).toContain('[@media(hover:hover)]:ring-transparent');
     },
   );

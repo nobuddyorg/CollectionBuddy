@@ -112,7 +112,7 @@ export default function ItemForm({
             aria-required="true"
             aria-invalid={titleError}
             aria-describedby={titleError ? `${titleId}-error` : undefined}
-            className="w-full rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground"
+            className="w-full rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-control-border focus:ring-foreground"
           />
           {titleError && (
             <p id={`${titleId}-error`} className="text-xs text-destructive">
@@ -140,7 +140,7 @@ export default function ItemForm({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="w-full rounded-sm px-3 py-2 min-h-11 sm:min-h-32 sm:flex-auto bg-card text-card-foreground ring-1 ring-inset ring-border focus:ring-foreground resize-none sm:resize-y"
+            className="w-full rounded-sm px-3 py-2 min-h-11 sm:min-h-32 sm:flex-auto bg-card text-card-foreground ring-1 ring-inset ring-control-border focus:ring-foreground resize-none sm:resize-y"
           />
         </div>
 
@@ -168,7 +168,7 @@ export default function ItemForm({
           <button
             type="button"
             onClick={onCancel}
-            className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-border hover:bg-muted transition-colors"
+            className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-control-border hover:bg-muted transition-colors"
           >
             {t('common.cancel')}
           </button>
