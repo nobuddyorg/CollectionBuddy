@@ -33,7 +33,8 @@ export function ItemCard({
   onEditItem: () => void;
   onDeleteItem: () => void;
   onDeleteImage: (img: ImgEntry) => void;
-  onOpenModal: (url: string) => void;
+  /** Opens the full-size carousel at this photograph's position in `imgs`. */
+  onOpenModal: (index: number) => void;
 }) {
   const { t } = useI18n();
 
