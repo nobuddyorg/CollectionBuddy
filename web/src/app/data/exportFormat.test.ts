@@ -366,6 +366,27 @@ describe('buildCsv', () => {
     expect(row.split(',').slice(3, 5)).toEqual(['0', '0']);
   });
 
+  // Regression: the formula-injection guard matches a leading `-`, which is
+  // also how every negative number starts. Applied to a coordinate cell
+  // rather than only to user-authored text, it quoted every southern
+  // latitude and western longitude as `'-33.8688` -- text a spreadsheet (or
+  // a re-import) can't read back as a number (#413).
+  it('writes a southern/western coordinate as a plain number, not a quoted formula guard', () => {
+    const entries = exportEntries(
+      [
+        item({
+          id: 'a',
+          place: 'Sydney Opera House',
+          place_lat: -33.8688,
+          place_lng: 151.2093,
+        }),
+      ],
+      new Map(),
+    );
+    const [, row] = buildCsv(entries).split('\r\n');
+    expect(row.split(',').slice(3, 5)).toEqual(['-33.8688', '151.2093']);
+  });
+
   it('separates several photographs with a space, not the delimiter', () => {
     const entries = exportEntries(
       [item({ id: 'a', title: 'Coin' })],
