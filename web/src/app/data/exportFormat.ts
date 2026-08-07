@@ -194,22 +194,34 @@ export const CSV_COLUMNS = [
  */
 const FORMULA_LEAD = /^[=+\-@\t\r]/;
 
+/**
+ * RFC 4180 quoting alone: quote when the value contains a delimiter, a
+ * quote or a line break, and double any quote inside it. No
+ * formula-injection prefix -- for cells this app generates itself (ids,
+ * timestamps, numbers, paths), never from a user's own text, so there is no
+ * attacker-chosen leading character to guard against. Guarding these too is
+ * actively wrong for a coordinate: `FORMULA_LEAD` matches the leading `-`
+ * of any negative number, so every southern-hemisphere latitude and
+ * western-hemisphere longitude was quietly exported as text instead of a
+ * number (#413).
+ */
+function plainCell(value: string): string {
+  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/** A user-authored text cell -- quoted, and guarded against formula injection. */
 export function csvCell(value: string): string {
   const guarded = FORMULA_LEAD.test(value) ? `'${value}` : value;
-  // RFC 4180: quote when the value contains a delimiter, a quote or a line
-  // break, and double any quote inside it.
-  return /[",\r\n]/.test(guarded)
-    ? `"${guarded.replace(/"/g, '""')}"`
-    : guarded;
+  return plainCell(guarded);
 }
 
 function csvRow(values: string[]): string {
-  return values.map(csvCell).join(',');
+  return values.join(',');
 }
 
 /** A number as a cell, or an empty cell -- never the string "null". */
 function numberCell(value: number | null): string {
-  return value === null ? '' : String(value);
+  return value === null ? '' : plainCell(String(value));
 }
 
 /**
@@ -222,19 +234,21 @@ function numberCell(value: number | null): string {
 export function buildCsv(entries: ExportEntry[]): string {
   const rows = entries.map(({ item, folder, photos }) =>
     csvRow([
-      item.title,
-      item.description ?? '',
-      item.place ?? '',
+      // User-authored text: guarded against formula injection.
+      csvCell(item.title),
+      csvCell(item.description ?? ''),
+      csvCell(item.place ?? ''),
+      // This app's own output: quoted, never guarded -- see plainCell.
       numberCell(item.place_lat),
       numberCell(item.place_lng),
-      item.tags.join(', '),
-      photos.join(' '),
-      folder,
-      item.created_at,
-      item.id,
+      csvCell(item.tags.join(', ')),
+      plainCell(photos.join(' ')),
+      plainCell(folder),
+      plainCell(item.created_at),
+      plainCell(item.id),
     ]),
   );
-  return `\ufeff${[csvRow([...CSV_COLUMNS]), ...rows].join('\r\n')}\r\n`;
+  return `\ufeff${[csvRow(CSV_COLUMNS.map(plainCell)), ...rows].join('\r\n')}\r\n`;
 }
 
 /** `2026-08-06`, in the exporter's own timezone rather than UTC. */
