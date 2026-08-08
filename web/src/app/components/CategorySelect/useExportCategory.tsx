@@ -1,15 +1,17 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { TranslationKey } from '../../i18n/I18nProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import {
   downloadBlob,
+  ExportCancelledError,
   exportCategory,
   type ExportProgress,
 } from '../../data/exportCategory';
+import { ZipLimitError } from '../../data/zip';
 
 /**
  * What to say while an export runs.
@@ -49,15 +51,21 @@ export function useExportCategory() {
   // Null means "not exporting". A separate boolean would be a second
   // source of truth for the same fact, and the two could disagree.
   const [progress, setProgress] = useState<ExportProgress | null>(null);
+  // One controller per run, so Cancel always aborts whichever export is
+  // actually in flight rather than a stale one from a previous click (#418).
+  const controllerRef = useRef<AbortController | null>(null);
 
   const runExport = useCallback(
     async (category: { id: string; name: string }) => {
       if (progress) return;
+      const controller = new AbortController();
+      controllerRef.current = controller;
       setProgress({ phase: 'items', done: 0, total: 0 });
       try {
         const result = await exportCategory({
           category,
           onProgress: setProgress,
+          signal: controller.signal,
         });
         downloadBlob(result.blob, result.filename);
         // The download itself never fails on a skipped photograph -- an
@@ -65,6 +73,14 @@ export function useExportCategory() {
         // canonical use of an export is "export, then delete the
         // originals", so a silent gap here is unrecoverable data loss
         // rather than a mere inconvenience (#414).
+        if (result.skippedItemCount > 0) {
+          toast.error(
+            t('category_select.exportListingPartial').replace(
+              '{count}',
+              String(result.skippedItemCount),
+            ),
+          );
+        }
         if (result.skippedPhotoCount > 0) {
           toast.error(
             t('category_select.exportPartial')
@@ -76,20 +92,48 @@ export function useExportCategory() {
           );
         }
       } catch (e) {
-        console.error(e);
-        toast.error(t('category_select.exportError'));
+        if (e instanceof ExportCancelledError) {
+          // The user asked for this -- confirmed, not reported as a failure.
+          toast.announce(t('category_select.exportCancelled'));
+        } else if (e instanceof ZipLimitError) {
+          // Wrong to tell someone whose collection is too large for one
+          // archive to "please try again" -- retrying produces exactly the
+          // same refusal (#416).
+          toast.error(t('category_select.exportTooLarge'));
+        } else {
+          console.error(e);
+          toast.error(t('category_select.exportError'));
+        }
       } finally {
+        controllerRef.current = null;
         setProgress(null);
       }
     },
     [progress, t, toast],
   );
 
+  const cancelExport = useCallback(() => {
+    controllerRef.current?.abort();
+  }, []);
+
+  // An export can run for minutes; closing the tab mid-run would silently
+  // discard it with no way back, unlike every other action in this app
+  // (#418).
+  useEffect(() => {
+    if (!progress) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [progress]);
+
   return {
     progress,
     isExporting: progress !== null,
     message: exportProgressMessage(progress, t),
     runExport,
+    cancelExport,
   };
 }
 // Stryker restore all

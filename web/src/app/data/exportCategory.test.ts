@@ -1,13 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  ExportCancelledError,
   exportCategory,
   ITEM_PAGE_SIZE,
+  LISTING_CONCURRENCY,
+  PHOTO_DOWNLOAD_CONCURRENCY,
+  PHOTO_FETCH_TIMEOUT_MS,
   SIGN_BATCH_SIZE,
   type ExportResult,
 } from './exportCategory';
 import { CSV_NAME, MANIFEST_NAME, type ExportManifest } from './exportFormat';
 import type { ExportItem } from './exportFormat';
+import * as zipModule from './zip';
 import type { supabase } from '../supabase';
 
 // This is the file the review that opened #415 found completely untested:
@@ -203,21 +208,304 @@ describe('exportCategory', () => {
     expect(result.photoCount).toBe(0);
   });
 
-  it('throws when the photograph listing fails, rather than exporting a partial archive', async () => {
-    const listingError = { message: 'listing failed' };
-    const listImages = (async () => ({
-      data: null,
-      error: listingError,
-    })) as unknown as ListImages;
-    const failure = exportCategory({
+  // #417: one item whose listing can never succeed used to reject the
+  // `Promise.all` covering every item's listing and abort the whole export
+  // -- a shape the signing batch and the download retry loop both already
+  // avoided. It now skips just that item's photographs, the same way a
+  // photograph that cannot be fetched is skipped rather than failing
+  // everything (#414).
+  describe('a photograph listing that fails', () => {
+    it('skips only that item, counts it, and still exports the rest', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const listingError = { message: 'not found', status: 404 };
+      const listImages = (async (prefix: string) =>
+        prefix === 'uid/broken'
+          ? { data: null, error: listingError }
+          : {
+              data: [{ name: '1.webp' }],
+              error: null,
+            }) as unknown as ListImages;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => okResponse([1])),
+      );
+      try {
+        const result = await exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems([
+            item({ id: 'broken' }),
+            item({ id: 'ok' }),
+          ]),
+          listImages,
+          signUrls: fakeSignUrls(),
+        });
+
+        expect(result.skippedItemCount).toBe(1);
+        expect(result.itemCount).toBe(2);
+        expect(result.photoCount).toBe(1);
+        expect(result.skippedPhotoCount).toBe(0);
+        expect(consoleError).toHaveBeenCalledWith(
+          "Skipping item's photographs",
+          'broken',
+          listingError,
+        );
+      } finally {
+        consoleError.mockRestore();
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('is not retried when the status says so permanently, the same as a 404 photograph fetch', async () => {
+      let calls = 0;
+      const listImages = (async () => {
+        calls++;
+        return { data: null, error: { message: 'not found', status: 404 } };
+      }) as unknown as ListImages;
+      const result = await exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        getSession: fakeGetSession('uid'),
+        listItems: paginatedListItems([item({ id: 'a' })]),
+        listImages,
+        signUrls: fakeSignUrls(),
+      });
+      expect(calls).toBe(1);
+      expect(result.skippedItemCount).toBe(1);
+    });
+
+    it('retries a transient failure and includes the item once it succeeds', async () => {
+      vi.useFakeTimers();
+      let calls = 0;
+      const listImages = (async () => {
+        calls++;
+        return calls < 3
+          ? { data: null, error: { message: 'rate limited', status: 429 } }
+          : { data: [{ name: '1.webp' }], error: null };
+      }) as unknown as ListImages;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => okResponse([1])),
+      );
+      try {
+        const promise = exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems([item({ id: 'a' })]),
+          listImages,
+          signUrls: fakeSignUrls(),
+        });
+        await vi.advanceTimersByTimeAsync(10_000);
+        const result = await promise;
+        expect(calls).toBe(3);
+        expect(result.skippedItemCount).toBe(0);
+        expect(result.photoCount).toBe(1);
+      } finally {
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('gives up after exactly three attempts on a persistently retryable failure, not fewer or more', async () => {
+      vi.useFakeTimers();
+      let calls = 0;
+      const listImages = (async () => {
+        calls++;
+        return { data: null, error: { message: 'down', status: 503 } };
+      }) as unknown as ListImages;
+      try {
+        const promise = exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems([item({ id: 'a' })]),
+          listImages,
+          signUrls: fakeSignUrls(),
+        });
+        await vi.advanceTimersByTimeAsync(10_000);
+        const result = await promise;
+        expect(calls).toBe(3);
+        expect(result.skippedItemCount).toBe(1);
+        expect(result.itemCount).toBe(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    // A rejected promise (network failure) carries no `status` at all --
+    // treated as retryable, the same reasoning `fetchPhotoBytes` already
+    // applies to a `fetch` that rejects outright rather than resolving with
+    // a bad status.
+    it('retries a listing call that rejects outright, not just one that resolves with an error', async () => {
+      vi.useFakeTimers();
+      let calls = 0;
+      const listImages = (async () => {
+        calls++;
+        if (calls < 2) throw new TypeError('network error');
+        return { data: [{ name: '1.webp' }], error: null };
+      }) as unknown as ListImages;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => okResponse([1])),
+      );
+      try {
+        const promise = exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems([item({ id: 'a' })]),
+          listImages,
+          signUrls: fakeSignUrls(),
+        });
+        await vi.advanceTimersByTimeAsync(10_000);
+        const result = await promise;
+        expect(calls).toBe(2);
+        expect(result.skippedItemCount).toBe(0);
+        expect(result.photoCount).toBe(1);
+      } finally {
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+      }
+    });
+
+    // A returned `{ error }` with no `status` at all (a shape the Storage
+    // client does not promise never to produce) must not be mistaken for a
+    // permanent failure the way a real 4xx is -- it is retried, the same as
+    // the thrown-rejection case above.
+    it('retries when the returned error carries no status at all', async () => {
+      vi.useFakeTimers();
+      let calls = 0;
+      const listImages = (async () => {
+        calls++;
+        return calls < 2
+          ? { data: null, error: { message: 'unrecognised shape' } }
+          : { data: [{ name: '1.webp' }], error: null };
+      }) as unknown as ListImages;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => okResponse([1])),
+      );
+      try {
+        const promise = exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems([item({ id: 'a' })]),
+          listImages,
+          signUrls: fakeSignUrls(),
+        });
+        await vi.advanceTimersByTimeAsync(10_000);
+        const result = await promise;
+        expect(calls).toBe(2);
+        expect(result.skippedItemCount).toBe(0);
+      } finally {
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+      }
+    });
+
+    // Mirrors "waits exponentially longer between retries" for the
+    // photograph fetch below: the backoff must be 500ms, then 1000ms --
+    // not a fixed, shrinking, or off-by-one delay -- and a listing that is
+    // about to fail permanently for the last time is still logged with the
+    // error that actually happened, not a blank one.
+    it('waits exponentially longer between listing retries, and logs the exhausted error', async () => {
+      vi.useFakeTimers();
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      let calls = 0;
+      const rejection = new TypeError('network error');
+      const listImages = (async () => {
+        calls++;
+        throw rejection;
+      }) as unknown as ListImages;
+      try {
+        const promise = exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems([item({ id: 'a' })]),
+          listImages,
+          signUrls: fakeSignUrls(),
+        });
+
+        // The first attempt is immediate.
+        await vi.advanceTimersByTimeAsync(0);
+        expect(calls).toBe(1);
+
+        // The second waits LISTING_RETRY_BASE_MS (500ms) -- not less, not more.
+        await vi.advanceTimersByTimeAsync(499);
+        expect(calls).toBe(1);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(calls).toBe(2);
+
+        // The third waits twice that (1000ms): the backoff grows, it
+        // doesn't repeat or shrink.
+        await vi.advanceTimersByTimeAsync(999);
+        expect(calls).toBe(2);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(calls).toBe(3);
+
+        const result = await promise;
+        expect(result.skippedItemCount).toBe(1);
+        expect(consoleError).toHaveBeenCalledWith(
+          "Skipping item's photographs",
+          'a',
+          rejection,
+        );
+      } finally {
+        vi.useRealTimers();
+        consoleError.mockRestore();
+      }
+    });
+  });
+
+  it('lists photographs through a bounded pool, not one unbounded burst', async () => {
+    const items = Array.from({ length: LISTING_CONCURRENCY + 4 }, (_, i) =>
+      item({ id: `item-${i}` }),
+    );
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const release: Array<() => void> = [];
+    const listImages = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          inFlight++;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          release.push(() => {
+            inFlight--;
+            resolve({ data: [], error: null });
+          });
+        }),
+    ) as unknown as ListImages;
+
+    const promise = exportCategory({
       category: { id: 'cat', name: 'Coins' },
       getSession: fakeGetSession('uid'),
-      listItems: paginatedListItems([item({ id: 'a' })]),
+      listItems: paginatedListItems(items),
       listImages,
       signUrls: fakeSignUrls(),
     });
-    await expect(failure).rejects.toThrow('Could not list photographs');
-    await expect(failure).rejects.toHaveProperty('cause', listingError);
+
+    // Every runner the pool will ever start for this batch starts up
+    // front, all blocked on the same never-yet-resolved listing -- so once
+    // this many are pending, no more can appear no matter how much longer
+    // real time is given to prove it.
+    await vi.waitFor(() => expect(release.length).toBe(LISTING_CONCURRENCY));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(release.length).toBe(LISTING_CONCURRENCY);
+    expect(maxInFlight).toBe(LISTING_CONCURRENCY);
+
+    // Releasing one at a time lets the pool pull in the next item behind
+    // it, the same way real listings would resolve at their own pace --
+    // draining the whole batch at once would only prove the pool can
+    // start that many, not that it keeps replacing them one for one.
+    for (let released = 0; released < items.length; released++) {
+      await vi.waitFor(() => expect(release.length).toBeGreaterThan(0));
+      release.shift()!();
+    }
+
+    const result = await promise;
+    expect(result.itemCount).toBe(items.length);
+    expect(result.skippedItemCount).toBe(0);
   });
 
   it('throws when signing fails, rather than exporting with unreadable photo URLs', async () => {
@@ -816,6 +1104,373 @@ describe('exportCategory', () => {
       expect(String(err)).toContain('Unsigned path in');
     } finally {
       consoleError.mockRestore();
+    }
+  });
+
+  // #416: the writer's own refuse-don't-corrupt contract (`assertZipRoom`,
+  // tested directly in zip.test.ts) was nullified at its only call site --
+  // caught by the same per-photo catch meant for fetch failures, and
+  // reported as one more skipped photograph. `createZipWriter` is not one
+  // of the four raw calls this file accepts as a parameter (unlike
+  // `fetch`), so it is swapped out at the module level for the one test
+  // that needs to force it to refuse.
+  describe('a ZipLimitError from the writer', () => {
+    it('escapes the export instead of being counted as a skipped photograph', async () => {
+      const addSpy = vi.fn(() => {
+        throw new zipModule.ZipLimitError(
+          'Archive would exceed the 4 GiB ZIP limit',
+        );
+      });
+      vi.spyOn(zipModule, 'createZipWriter').mockReturnValue({
+        add: addSpy,
+        size: () => 0,
+        finish: vi.fn(),
+      });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => okResponse([1])),
+      );
+      try {
+        const failure = exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems([item({ id: 'item-1' })]),
+          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          signUrls: fakeSignUrls(),
+        });
+        await expect(failure).rejects.toBeInstanceOf(zipModule.ZipLimitError);
+      } finally {
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+      }
+    });
+
+    it('stops the pool from starting further downloads once the limit trips', async () => {
+      let addCalls = 0;
+      const addSpy = vi.fn(() => {
+        addCalls++;
+        if (addCalls === 1) {
+          throw new zipModule.ZipLimitError(
+            'Archive would exceed the 4 GiB ZIP limit',
+          );
+        }
+      });
+      vi.spyOn(zipModule, 'createZipWriter').mockReturnValue({
+        add: addSpy,
+        size: () => 0,
+        finish: vi.fn(),
+      });
+      let fetchCalls = 0;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          fetchCalls++;
+          return okResponse([1]);
+        }),
+      );
+      try {
+        // More photographs than the download pool runs at once, so a limit
+        // tripped by the first one to finish can be observed stopping the
+        // rest -- if it did not, every one of them would still be fetched.
+        const photoCount = PHOTO_DOWNLOAD_CONCURRENCY + 4;
+        const failure = exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems([item({ id: 'item-1' })]),
+          listImages: fakeListImages({
+            'uid/item-1': Array.from(
+              { length: photoCount },
+              (_, i) => `${i}.webp`,
+            ),
+          }),
+          signUrls: fakeSignUrls(),
+        });
+        await expect(failure).rejects.toBeInstanceOf(zipModule.ZipLimitError);
+        expect(fetchCalls).toBeLessThan(photoCount);
+      } finally {
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+      }
+    });
+
+    // Two photographs finishing in the pool at almost the same moment can
+    // both trip the limit -- the error reported must be the one that
+    // happened first, not whichever runner happens to reach the catch last.
+    it('reports the first failure when more than one download fails around the same time', async () => {
+      let addCalls = 0;
+      const addSpy = vi.fn(() => {
+        addCalls++;
+        throw new zipModule.ZipLimitError(`limit-${addCalls}`);
+      });
+      vi.spyOn(zipModule, 'createZipWriter').mockReturnValue({
+        add: addSpy,
+        size: () => 0,
+        finish: vi.fn(),
+      });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => okResponse([1])),
+      );
+      try {
+        const failure = exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems([item({ id: 'item-1' })]),
+          listImages: fakeListImages({ 'uid/item-1': ['0.webp', '1.webp'] }),
+          signUrls: fakeSignUrls(),
+        });
+        await expect(failure).rejects.toHaveProperty('message', 'limit-1');
+      } finally {
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+      }
+    });
+  });
+
+  // #418: no request in the export pipeline had a timeout, so a connection
+  // that black-holes mid-response left the whole export stalled forever
+  // with no way to cancel it either.
+  describe('timeout and cancellation', () => {
+    it('bounds every photograph fetch with a fresh per-attempt timeout signal', async () => {
+      const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => okResponse([1])),
+      );
+      try {
+        await exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems([item({ id: 'item-1' })]),
+          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          signUrls: fakeSignUrls(),
+        });
+        expect(timeoutSpy).toHaveBeenCalledWith(PHOTO_FETCH_TIMEOUT_MS);
+      } finally {
+        vi.unstubAllGlobals();
+        timeoutSpy.mockRestore();
+      }
+    });
+
+    // The signal handed to `fetch` has to actually be linked to the
+    // caller's own signal, not merely a timeout that looks the same --
+    // otherwise a caller's own cancel would never reach the request at all.
+    it('gives fetch a signal that reflects the caller aborting, not an inert one', async () => {
+      const controller = new AbortController();
+      let capturedSignal: AbortSignal | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (_url: string, init?: RequestInit) => {
+          capturedSignal = init?.signal ?? undefined;
+          return okResponse([1]);
+        }),
+      );
+      try {
+        await exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems([item({ id: 'item-1' })]),
+          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          signUrls: fakeSignUrls(),
+          signal: controller.signal,
+        });
+        expect(capturedSignal).toBeDefined();
+        expect(capturedSignal!.aborted).toBe(false);
+        controller.abort();
+        expect(capturedSignal!.aborted).toBe(true);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('retries a fetch that aborts on its own timeout, the same as any other transient failure', async () => {
+      vi.useFakeTimers();
+      let calls = 0;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          calls++;
+          if (calls < 2) {
+            throw new DOMException('The operation timed out.', 'TimeoutError');
+          }
+          return okResponse([9]);
+        }),
+      );
+      try {
+        const promise = exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems([item({ id: 'item-1' })]),
+          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          signUrls: fakeSignUrls(),
+        });
+        await vi.advanceTimersByTimeAsync(10_000);
+        const result = await promise;
+        expect(calls).toBe(2);
+        expect(result.skippedPhotoCount).toBe(0);
+      } finally {
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('rejects immediately with ExportCancelledError when the signal is already aborted, before any I/O', async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const listItems = vi.fn(paginatedListItems([item()]));
+      const failure = exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        getSession: fakeGetSession('uid'),
+        listItems,
+        listImages: fakeListImages({}),
+        signUrls: fakeSignUrls(),
+        signal: controller.signal,
+      });
+      await expect(failure).rejects.toBeInstanceOf(ExportCancelledError);
+      await expect(failure).rejects.toHaveProperty(
+        'name',
+        'ExportCancelledError',
+      );
+      await expect(failure).rejects.toHaveProperty(
+        'message',
+        'Export cancelled',
+      );
+      expect(listItems).not.toHaveBeenCalled();
+    });
+
+    it('stops fetching further photographs once the caller cancels mid-export', async () => {
+      const controller = new AbortController();
+      let fetchCalls = 0;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          fetchCalls++;
+          // A cancel arriving while photographs are already downloading --
+          // the ordinary case, since Cancel sits next to the progress line
+          // for exactly this phase.
+          controller.abort();
+          return okResponse([1]);
+        }),
+      );
+      try {
+        const items = Array.from({ length: 10 }, (_, i) =>
+          item({ id: `item-${i}` }),
+        );
+        const listImages = fakeListImages(
+          Object.fromEntries(items.map((it) => [`uid/${it.id}`, ['1.webp']])),
+        );
+        const failure = exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems(items),
+          listImages,
+          signUrls: fakeSignUrls(),
+          signal: controller.signal,
+        });
+        await expect(failure).rejects.toBeInstanceOf(ExportCancelledError);
+        expect(fetchCalls).toBeLessThan(items.length);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    // Without a check right after the failure that used up the very last
+    // retry, a cancellation landing on that attempt would fall through to
+    // `throw lastErr` and surface as the underlying network error -- one
+    // more silently skipped photograph -- instead of stopping the export.
+    it('reports the cancellation itself, not the network error underneath it, when cancel lands on the last retry attempt', async () => {
+      vi.useFakeTimers();
+      const controller = new AbortController();
+      let calls = 0;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          calls++;
+          if (calls === 3) controller.abort();
+          throw new Error('network error');
+        }),
+      );
+      try {
+        const promise = exportCategory({
+          category: { id: 'cat', name: 'Coins' },
+          getSession: fakeGetSession('uid'),
+          listItems: paginatedListItems([item({ id: 'item-1' })]),
+          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          signUrls: fakeSignUrls(),
+          signal: controller.signal,
+        });
+        // Attached before the timers advance and the promise settles: an
+        // assertion built afterwards would attach its handler one tick too
+        // late and have Node flag the rejection as unhandled in between.
+        const assertion =
+          expect(promise).rejects.toBeInstanceOf(ExportCancelledError);
+        await vi.advanceTimersByTimeAsync(10_000);
+        await assertion;
+        expect(calls).toBe(3);
+      } finally {
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+      }
+    });
+  });
+
+  // #420: photographs used to download strictly one at a time. A bounded
+  // pool should hold no more responses in flight than its concurrency, and
+  // must still add every one of them to the archive regardless of the order
+  // they land in.
+  it('downloads photographs through a bounded pool, not one at a time or all at once', async () => {
+    const photoCount = PHOTO_DOWNLOAD_CONCURRENCY + 4;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const release: Array<() => void> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            inFlight++;
+            maxInFlight = Math.max(maxInFlight, inFlight);
+            release.push(() => {
+              inFlight--;
+              resolve(okResponse([1]));
+            });
+          }),
+      ),
+    );
+    try {
+      const promise = exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        getSession: fakeGetSession('uid'),
+        listItems: paginatedListItems([item({ id: 'item-1' })]),
+        listImages: fakeListImages({
+          'uid/item-1': Array.from(
+            { length: photoCount },
+            (_, i) => `${i}.webp`,
+          ),
+        }),
+        signUrls: fakeSignUrls(),
+      });
+
+      await vi.waitFor(() =>
+        expect(release.length).toBe(PHOTO_DOWNLOAD_CONCURRENCY),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(maxInFlight).toBe(PHOTO_DOWNLOAD_CONCURRENCY);
+
+      for (let released = 0; released < photoCount; released++) {
+        await vi.waitFor(() => expect(release.length).toBeGreaterThan(0));
+        release.shift()!();
+      }
+
+      const result = await promise;
+      expect(result.photoCount).toBe(photoCount);
+      expect(result.skippedPhotoCount).toBe(0);
+      const entries = await readZipEntries(result.blob);
+      for (let i = 1; i <= photoCount; i++) {
+        expect(entries.has(`photos/001-item/${i}.webp`)).toBe(true);
+      }
+    } finally {
+      vi.unstubAllGlobals();
     }
   });
 });
