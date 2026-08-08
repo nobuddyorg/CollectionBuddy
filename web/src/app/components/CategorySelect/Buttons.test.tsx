@@ -67,9 +67,7 @@ describe('RenameButton', () => {
 
   it('fires onClick when enabled and clicked', async () => {
     const onClick = vi.fn();
-    render(
-      <RenameButton onClick={onClick} disabled={false} label="Rename" />,
-    );
+    render(<RenameButton onClick={onClick} disabled={false} label="Rename" />);
     await userEvent.click(screen.getByRole('button', { name: 'Rename' }));
     expect(onClick).toHaveBeenCalledOnce();
   });
