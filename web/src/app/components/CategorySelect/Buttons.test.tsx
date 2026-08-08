@@ -9,10 +9,11 @@ import {
   DeleteButtonWithLabel,
   ExpandButton,
   ExportButton,
+  RenameButton,
 } from './Buttons';
 
 describe('AddButton', () => {
-  it('keeps its label and marks itself busy while creating', () => {
+  it('names itself via aria-label and marks itself busy while creating', () => {
     render(
       <AddButton
         onClick={vi.fn()}
@@ -21,15 +22,15 @@ describe('AddButton', () => {
         label="Add"
       />,
     );
-    // The label stays put rather than being swapped for a glyph -- the
-    // spinner joins it, so the control still says what it does mid-flight.
+    // Icon-only, like DeleteButtonWithLabel -- the name is said through
+    // aria-label/title rather than visible text, so the spinner replaces
+    // the plus glyph instead of joining a label.
     const button = screen.getByRole('button', { name: 'Add' });
-    expect(button).toHaveTextContent('Add');
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button.querySelector('.animate-spin')).toBeInTheDocument();
   });
 
-  it('shows its label and fires onClick when not creating', async () => {
+  it('shows its icon and fires onClick when not creating', async () => {
     const onClick = vi.fn();
     render(
       <AddButton
@@ -40,7 +41,6 @@ describe('AddButton', () => {
       />,
     );
     const button = screen.getByRole('button', { name: 'Add' });
-    expect(button).toHaveTextContent('Add');
     expect(button.querySelector('.animate-spin')).not.toBeInTheDocument();
     await userEvent.click(button);
     expect(onClick).toHaveBeenCalledOnce();
@@ -56,6 +56,22 @@ describe('AddButton', () => {
       />,
     );
     expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+  });
+});
+
+describe('RenameButton', () => {
+  it('disables the button when disabled is true', () => {
+    render(<RenameButton onClick={vi.fn()} disabled={true} label="Rename" />);
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeDisabled();
+  });
+
+  it('fires onClick when enabled and clicked', async () => {
+    const onClick = vi.fn();
+    render(
+      <RenameButton onClick={onClick} disabled={false} label="Rename" />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    expect(onClick).toHaveBeenCalledOnce();
   });
 });
 

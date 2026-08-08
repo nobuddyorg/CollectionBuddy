@@ -123,8 +123,9 @@ describe('CategorySelect', () => {
 
   // Laid out row by row, the new-category field came out wider than the
   // rename field by exactly the delete button the rename row carries and
-  // it does not. One grid for both rows, with the add button spanning the
-  // two trailing columns, is what makes them equal.
+  // it does not. One grid for both rows -- both rows' leading column is the
+  // same track -- is what makes them equal, regardless of what each row's
+  // trailing icon buttons occupy.
   it('gives the two fields the same column', async () => {
     renderSelect();
     await userEvent.click(
@@ -136,13 +137,9 @@ describe('CategorySelect', () => {
     expect(rename.parentElement).toBe(create.parentElement);
     expect(rename.parentElement?.className).toContain('grid');
 
-    // Both fields fill a single column of it; the add button takes the two
-    // the rename row's own buttons occupy.
+    // Both fields fill a single column of it.
     expect(rename.className).toContain('w-full');
     expect(create.className).toContain('w-full');
-    expect(screen.getByRole('button', { name: 'Add' }).className).toContain(
-      'col-span-2',
-    );
   });
 
   it('offers the export under a rule of its own, away from delete', async () => {

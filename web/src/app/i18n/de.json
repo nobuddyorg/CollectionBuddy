@@ -25,6 +25,7 @@
     "select_placeholder": "Kategorie wählen oder erstellen",
     "new_category": "Neue Kategorie",
     "rename": "Umbenennen",
+    "rename_confirm": "Namen speichern",
     "open_category": "Kategorie öffnen",
     "none_selected": "Keine ausgewählt",
     "add": "Hinzufügen",
