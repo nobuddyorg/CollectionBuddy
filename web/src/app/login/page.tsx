@@ -13,18 +13,10 @@ import { fanOffsetX, fanOffsetY, fanPositions } from './collectibleFan';
 import { useAuthRedirect } from './useAuthRedirect';
 import { useGoogleSignIn } from './useGoogleSignIn';
 
-const EMOJIS = [
-  '🧸',
-  '🪙',
-  '📮',
-  '🎟️',
-  '💎',
-  '🐚',
-  '🎁',
-  '🎖️',
-  '🧩',
-  '📀',
-] as const;
+// A fixed, curated set rather than a random pull from a larger pool: the
+// same seven objects greet a visitor every time, so the medallion reads as
+// a considered display case rather than a slot machine.
+const EMOJIS = ['🪙', '📮', '🎟️', '🐚', '🎖️', '🧩', '📀'] as const;
 
 const COIN_SIZE = 420;
 

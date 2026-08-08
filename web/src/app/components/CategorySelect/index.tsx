@@ -12,6 +12,7 @@ import {
   DeleteButtonWithLabel,
   ExpandButton,
   ExportButton,
+  RenameButton,
 } from './Buttons';
 import { CategoryText } from './CategoryText';
 import { CategorySelectDropdown } from './Dropdown';
@@ -209,14 +210,11 @@ export default function CategorySelect({
                   }}
                   className="w-full min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-control-border focus:ring-foreground"
                 />
-                <button
-                  type="button"
+                <RenameButton
                   onClick={() => void onRename()}
                   disabled={!renameIsDirty || isRenaming}
-                  className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-control-border hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
-                >
-                  {t('category_select.rename')}
-                </button>
+                  label={t('category_select.rename_confirm')}
+                />
                 <DeleteButtonWithLabel
                   onClick={onDelete}
                   disabled={isDeleting}
@@ -244,7 +242,6 @@ export default function CategorySelect({
               disabled={name.trim() === '' || isCreating}
               isCreating={isCreating}
               label={t('category_select.add')}
-              className="col-span-2 w-full"
             />
           </div>
 

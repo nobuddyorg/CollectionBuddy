@@ -25,6 +25,7 @@
     "select_placeholder": "Select or create category",
     "new_category": "New category",
     "rename": "Rename",
+    "rename_confirm": "Save name",
     "open_category": "Open category",
     "none_selected": "None selected",
     "add": "Add",

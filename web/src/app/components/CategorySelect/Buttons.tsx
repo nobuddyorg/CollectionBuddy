@@ -15,23 +15,63 @@ export function AddButton({
   disabled: boolean;
   isCreating: boolean;
   label: string;
-  /** Lets the field rows size it, so their inputs come out equal. */
   className?: string;
 }) {
-  // Spelled out rather than a bare "+": a control should say what happens
-  // when it is used, and a lone glyph gave no confirmation of that.
+  // Icon-only, like DeleteButtonWithLabel beside it -- a spelled-out label
+  // on both the rename and add rows crowded the field down to a sliver on a
+  // phone-width panel; the name is still said, just via aria-label/title
+  // rather than on the button's face.
   return (
-    <button
-      type="button"
+    <IconButton
+      variant="primary"
+      size="xl"
       onClick={onClick}
       disabled={disabled}
       aria-busy={isCreating}
-      className={`min-h-11 px-4 shrink-0 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 disabled:opacity-40 transition-opacity flex items-center justify-center gap-2 ${className}`.trim()}
+      aria-label={label}
+      title={label}
+      className={className}
+    >
+      {isCreating ? (
+        <Spinner size="sm" />
+      ) : (
+        <Icon icon={IconType.Plus} className="w-5 h-5" aria-hidden="true" />
+      )}
+    </IconButton>
+  );
+}
+
+export function RenameButton({
+  onClick,
+  disabled,
+  label,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  label: string;
+}) {
+  // Icon-only, like AddButton and DeleteButtonWithLabel: a checkmark reads
+  // as "commit this edit" beside the field it applies to.
+  return (
+    <IconButton
+      variant="outline"
+      size="xl"
+      onClick={onClick}
+      disabled={disabled}
+      className="disabled:opacity-40"
+      aria-label={label}
       title={label}
     >
-      {isCreating && <Spinner size="sm" />}
-      {label}
-    </button>
+      <Icon
+        icon={IconType.Check}
+        className="w-5 h-5"
+        aria-hidden="true"
+        stroke="currentColor"
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+      />
+    </IconButton>
   );
 }
 

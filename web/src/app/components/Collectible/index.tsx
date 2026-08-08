@@ -13,10 +13,11 @@ function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ');
 }
 
-// A collected object drifting near the medallion. Styled as a plain white
-// chip with a hairline ring so the emoji itself supplies the only colour --
-// consistent with the rest of the app, where colour comes from the objects
-// and never from the interface.
+// A collected object drifting near the medallion. Grayscaled rather than
+// left in full color: a ring of cartoon-bright emoji was the interface
+// supplying its own colour, which is the one thing this achromatic system
+// never does -- the accent wordmark is the single deliberate exception, and
+// these chips competed with it instead of sitting quietly behind it.
 function CollectibleComponent({
   delay,
   emoji,
@@ -47,7 +48,7 @@ function CollectibleComponent({
       style={style}
       aria-hidden="true"
     >
-      <div className="w-full h-full rounded-full bg-card ring-1 ring-border shadow-sm flex items-center justify-center text-xl">
+      <div className="w-full h-full rounded-full bg-card ring-1 ring-border shadow-sm flex items-center justify-center text-xl grayscale contrast-125">
         {emoji}
       </div>
     </div>
