@@ -8,6 +8,7 @@ import { countItemsForCategory } from '../../data/categories';
 import type { Category } from '../../types';
 import {
   AddButton,
+  CancelExportButton,
   CollapseButton,
   DeleteButtonWithLabel,
   ExpandButton,
@@ -48,6 +49,7 @@ export default function CategorySelect({
     isExporting,
     message: exportMessage,
     runExport,
+    cancelExport,
   } = useExportCategory();
   const [name, setName] = useState('');
   const [renameValue, setRenameValue] = useState('');
@@ -212,12 +214,17 @@ export default function CategorySelect({
                 />
                 <RenameButton
                   onClick={() => void onRename()}
-                  disabled={!renameIsDirty || isRenaming}
+                  disabled={!renameIsDirty || isRenaming || isExporting}
                   label={t('category_select.rename_confirm')}
                 />
+                {/* Disabled for the whole run, not just while the delete
+                    request is in flight: an export reads storage objects a
+                    confirmed delete would remove out from under it, and the
+                    removals would only fail silently as 404s rather than
+                    stopping either action (#419). */}
                 <DeleteButtonWithLabel
                   onClick={onDelete}
-                  disabled={isDeleting}
+                  disabled={isDeleting || isExporting}
                   label={t('category_select.delete')}
                 />
               </>
@@ -258,6 +265,12 @@ export default function CategorySelect({
                 isExporting={isExporting}
                 label={t('category_select.export')}
               />
+              {isExporting && (
+                <CancelExportButton
+                  onClick={cancelExport}
+                  label={t('category_select.export_cancel')}
+                />
+              )}
               <p
                 aria-live="polite"
                 className="min-w-0 flex-1 font-label text-[0.6875rem] text-muted-foreground"

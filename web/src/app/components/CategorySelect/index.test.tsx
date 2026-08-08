@@ -9,10 +9,32 @@ import { ToastProvider } from '../Toast/ToastProvider';
 import { countItemsForCategory } from '../../data/categories';
 import CategorySelect from './index';
 import type { UseCategories } from './useCategories';
+import { useExportCategory } from './useExportCategory';
 
 vi.mock('../../data/categories', () => ({
   countItemsForCategory: vi.fn(),
 }));
+
+// The real hook drives an actual exportCategory() call, which is more than
+// this file needs to control: #419 and the Cancel affordance only depend
+// on isExporting/cancelExport, so those are mocked directly rather than
+// coaxing a real export into a mid-flight state.
+vi.mock('./useExportCategory', () => ({
+  useExportCategory: vi.fn(),
+}));
+
+function exportState(
+  overrides: Partial<ReturnType<typeof useExportCategory>> = {},
+) {
+  return {
+    progress: null,
+    isExporting: false,
+    message: null,
+    runExport: vi.fn(),
+    cancelExport: vi.fn(),
+    ...overrides,
+  } as unknown as ReturnType<typeof useExportCategory>;
+}
 
 const cats = [
   { id: 'a', name: 'Coins' },
@@ -66,6 +88,7 @@ const headerName = () => heading().parentElement?.lastElementChild;
 describe('CategorySelect', () => {
   beforeEach(() => {
     window.localStorage.setItem('lang', 'en');
+    vi.mocked(useExportCategory).mockReturnValue(exportState());
   });
 
   it('names the selected category under the section label', () => {
@@ -167,6 +190,55 @@ describe('CategorySelect', () => {
     // One line, not two: the progress messages that replace this are all
     // one line, and a hint that wrapped would shrink the row on the way in.
     expect(screen.getByText('Photos, JSON and CSV.')).toBeVisible();
+  });
+
+  // #419: Delete used to stay enabled through a running export, so
+  // confirming it removed exactly the storage objects the export was still
+  // reading -- each resulting 404 silently skipped, leaving both the
+  // originals gone and the archive quietly missing photographs.
+  describe('while an export is running', () => {
+    it('disables delete and rename, not just the export button itself', async () => {
+      vi.mocked(useExportCategory).mockReturnValue(
+        exportState({ isExporting: true, message: 'Photographs 3 of 9…' }),
+      );
+      renderSelect();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+
+      expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Save name' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
+    });
+
+    it('offers a Cancel affordance next to the progress line, absent while nothing is running', async () => {
+      const cancelExport = vi.fn();
+      vi.mocked(useExportCategory).mockReturnValue(
+        exportState({
+          isExporting: true,
+          message: 'Photographs 3 of 9…',
+          cancelExport,
+        }),
+      );
+      renderSelect();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+
+      const cancel = screen.getByRole('button', { name: 'Cancel export' });
+      await userEvent.click(cancel);
+      expect(cancelExport).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not offer Cancel while no export is running', async () => {
+      renderSelect();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+      expect(
+        screen.queryByRole('button', { name: 'Cancel export' }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   // Nothing to take a copy of yet, so the row is absent rather than
