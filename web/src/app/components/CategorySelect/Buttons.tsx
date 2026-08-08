@@ -181,6 +181,38 @@ export function ExportButton({
   );
 }
 
+// Sits next to the progress line only while an export is running: the one
+// action available for a run that can take minutes, on a connection that
+// may never come back on its own (#418).
+export function CancelExportButton({
+  onClick,
+  label,
+}: {
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid="cancel-export"
+      onClick={onClick}
+      className="rounded-sm w-9 h-9 shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+      aria-label={label}
+      title={label}
+    >
+      <Icon
+        icon={IconType.Close}
+        className="w-4 h-4"
+        aria-hidden="true"
+        stroke="currentColor"
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+      />
+    </button>
+  );
+}
+
 export function ExpandButton({
   onClick,
   label,

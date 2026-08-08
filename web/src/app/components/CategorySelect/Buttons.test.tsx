@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   AddButton,
+  CancelExportButton,
   CollapseButton,
   DeleteButtonWithLabel,
   ExpandButton,
@@ -155,6 +156,17 @@ describe('ExportButton', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
     expect(onClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('CancelExportButton', () => {
+  it('fires onClick when clicked', async () => {
+    const onClick = vi.fn();
+    render(<CancelExportButton onClick={onClick} label="Cancel export" />);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Cancel export' }),
+    );
+    expect(onClick).toHaveBeenCalledOnce();
   });
 });
 
