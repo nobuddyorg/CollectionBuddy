@@ -12,6 +12,7 @@ Categories are the top-level grouping — you always browse one at a time.
 
 - **Create**: type a name in the category picker and click **+**. Names must be non-blank and are unique per account, case-insensitively (`Coins` and `coins` collide).
 - **Switch**: open the picker (if collapsed, click the expand button next to the current category name) and pick from the dropdown.
+- **Rename**: open the picker, select the category, edit the name in the text field, and confirm. The same rules as creation apply — non-blank, and unique per account case-insensitively — and the server normalises what you typed, so the name that comes back is what gets stored.
 - **Delete**: select the category, clear the search/name field, click delete, confirm. Deleting a category also deletes any items that would be left belonging to *no* category as a result — items shared with another category survive.
 
 If you only ever have one category, the picker auto-collapses and auto-selects it on load, so you won't see the dropdown at all until you create a second one.
