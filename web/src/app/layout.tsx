@@ -122,9 +122,18 @@ const CONTENT_SECURITY_POLICY = [
   `default-src 'self'`,
   `script-src 'self' 'unsafe-inline'`,
   `style-src 'self' 'unsafe-inline'`,
-  `img-src 'self' ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org`,
+  // data: is Leaflet's own doing -- its default icon handling loads a 1x1
+  // transparent GIF as a data URI internally, not something this app
+  // constructs itself.
+  `img-src 'self' data: ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org`,
   `connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io`,
   `font-src 'self'`,
+  // browser-image-compression (the upload path's resize step) runs in a Web
+  // Worker it creates from a blob: URL. Worker script loading falls back to
+  // script-src when worker-src is unset, and script-src has no blob: in it
+  // -- every photo upload silently failed to compress at all until this was
+  // explicit.
+  `worker-src 'self' blob:`,
   `object-src 'none'`,
   `base-uri 'self'`,
   `form-action 'self'`,

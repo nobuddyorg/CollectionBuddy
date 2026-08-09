@@ -40,11 +40,28 @@ describe('the Content-Security-Policy meta tag in layout.tsx', () => {
 
   it('restricts fetches and images to self plus the services the app actually talks to', () => {
     expect(layout).toContain(
-      "img-src 'self' ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org",
+      "img-src 'self' data: ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org",
     );
     expect(layout).toContain(
       "connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io",
     );
+  });
+
+  // Regression: the first version of this policy had no worker-src, so
+  // worker creation fell back to script-src -- which has no blob: in it --
+  // and every photo upload's client-side compression (browser-image-
+  // compression, which runs in a Web Worker created from a blob: URL)
+  // silently failed under CSP alone, caught only by the signed-in e2e suite
+  // actually uploading a photograph in a real browser.
+  it('allows a worker to be created from a blob: URL', () => {
+    expect(policy).toContain(`worker-src 'self' blob:`);
+  });
+
+  // Also a regression the first version missed: Leaflet's own default icon
+  // handling loads a 1x1 transparent GIF as a data: URI internally, which a
+  // policy with no data: in img-src silently blocks.
+  it('allows a data: URI image, which Leaflet loads internally', () => {
+    expect(policy).toMatch(/img-src[^;]*\bdata:/);
   });
 
   it('blocks plugin/object embeds outright', () => {
