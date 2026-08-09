@@ -79,6 +79,30 @@ describe('ImageGrid', () => {
     }
   });
 
+  // The default: everything lazy, nothing telling the browser to hurry.
+  it('lazy-loads every plate when the card is not marked as priority', () => {
+    renderGrid([img('a'), img('b'), img('c')]);
+    for (const image of screen.getAllByRole('img')) {
+      expect(image).toHaveAttribute('loading', 'lazy');
+      expect(image).not.toHaveAttribute('fetchpriority');
+    }
+  });
+
+  // A priority card's hero is the LCP candidate -- fetched eagerly at high
+  // priority, same as next/image's old `priority` prop, instead of waiting
+  // for layout like the rest of the page's photographs.
+  it('fetches only the hero of a priority card eagerly, at high priority', () => {
+    renderGrid([img('a'), img('b'), img('c')], { priority: true });
+    const images = screen.getAllByRole('img');
+    expect(images[0]).toHaveAttribute('loading', 'eager');
+    expect(images[0]).toHaveAttribute('fetchpriority', 'high');
+    // The strip is never the LCP element, priority or not.
+    expect(images[1]).toHaveAttribute('loading', 'lazy');
+    expect(images[1]).not.toHaveAttribute('fetchpriority');
+    expect(images[2]).toHaveAttribute('loading', 'lazy');
+    expect(images[2]).not.toHaveAttribute('fetchpriority');
+  });
+
   it('renders a single image as one full-width plate', () => {
     renderGrid([img('a')]);
     const images = screen.getAllByRole('img');

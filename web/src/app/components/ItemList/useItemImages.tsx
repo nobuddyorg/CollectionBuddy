@@ -215,34 +215,44 @@ export function useItemImages() {
     });
 
     // One list() call per item is unavoidable (Supabase storage has no
-    // recursive/flat listing across prefixes), but a cached listing skips
-    // the call outright, and every remaining path is signed together in a
-    // single createSignedUrls call.
-    const perItem = await Promise.all(
+    // recursive/flat listing across prefixes) -- but each item is listed,
+    // signed and painted independently the moment its own listing lands,
+    // rather than behind a Promise.all barrier that waits for every
+    // listing in the batch before signing (or showing) any of them. The
+    // slowest of up to 9 parallel storage.list() calls used to gate the
+    // first photograph on screen even though most land well before it
+    // (#329).
+    const idSet = new Set(itemIds);
+    await Promise.all(
       itemIds.map(async (itemId) => {
         const prefix = imagePrefix(uid, itemId);
-        const cached = getCachedListing(prefix);
-        if (cached) return [itemId, cached] as const;
-
-        const { data, error } = await listAllImageObjects(prefix);
-        if (error) {
-          console.error('Failed to list images', error);
-          return [itemId, new Map<string, ImageEntryData>()] as const;
+        let entryData = getCachedListing(prefix);
+        if (!entryData) {
+          const { data, error } = await listAllImageObjects(prefix);
+          if (error) {
+            console.error('Failed to list images', error);
+            entryData = new Map<string, ImageEntryData>();
+          } else {
+            entryData = pairImageEntries(data ?? [], prefix);
+            cacheListing(prefix, entryData);
+          }
         }
-        const entryData = pairImageEntries(data ?? [], prefix);
-        cacheListing(prefix, entryData);
-        return [itemId, entryData] as const;
+
+        const signed = await signEntries([[itemId, entryData]]);
+        setImages((prev) => {
+          const kept = Object.fromEntries(
+            Object.entries(prev).filter(([id]) => idSet.has(id)),
+          );
+          return { ...kept, ...signed };
+        });
+        setLoadingItems((prev) => {
+          const next = new Set(prev);
+          next.delete(itemId);
+          return next;
+        });
       }),
     );
-
-    const newImages = await signEntries(perItem);
     lastSignedAtRef.current = Date.now();
-    setImages((prev) => ({ ...prev, ...newImages }));
-    setLoadingItems((prev) => {
-      const next = new Set(prev);
-      for (const itemId of itemIds) next.delete(itemId);
-      return next;
-    });
   }, []);
 
   // Refresh signed URLs before Supabase's 1h expiry so a long-lived tab

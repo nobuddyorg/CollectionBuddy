@@ -22,6 +22,7 @@ export function ItemCard({
   onDeleteItem,
   onDeleteImage,
   onOpenModal,
+  priority = false,
 }: {
   item: ItemLite;
   imgs: ImgEntry[];
@@ -35,6 +36,9 @@ export function ItemCard({
   onDeleteImage: (img: ImgEntry) => void;
   /** Opens the full-size carousel at this photograph's position in `imgs`. */
   onOpenModal: (index: number) => void;
+  /** This card is one of the first few on the page -- its hero photograph
+   * is likely the LCP element. */
+  priority?: boolean;
 }) {
   const { t } = useI18n();
 
@@ -77,6 +81,7 @@ export function ItemCard({
           busy={busy}
           loading={imagesLoading}
           pending={pendingUploads}
+          priority={priority}
         />
       )}
 
