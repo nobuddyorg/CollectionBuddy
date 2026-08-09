@@ -63,12 +63,13 @@ There are two sets of four policies on `storage.objects`, saying the same thing 
 
 ## Client data-access layer
 
-[`web/src/app/data/`](../../web/src/app/data/) holds the table and storage queries, plus the one other place the app talks past a UI boundary to something external — the auth client:
+[`web/src/app/data/`](../../web/src/app/data/) holds the table and storage queries, plus the two other places the app talks past a UI boundary to something external — the auth client and the Photon gazetteer:
 
 - `items.ts` — `listItems()` (paginated, category-scoped, optional search via `buildSearchFilter()`), `createItem()`, `updateItem()`, `deleteItem()`, `linkItemToCategory()`, `listItemPlaces()`.
 - `categories.ts` — `listCategories()`, `createCategory()`, `renameCategory()`, `deleteCategory()`, plus `listItemIdsForCategory()` / `countItemsForCategory()` / `listItemIdsLinkedElsewhere()` used to work out which items a category deletion would orphan, and to warn about how many before it runs.
 - `images.ts` — `listImageObjects()` / `listAllImageObjects()` / `listItemImages()`, `createSignedUrls()` (1 hour expiry), `uploadImageObject()`, `removeImageObjects()`, `removeItemImages()`, plus `imagePrefix()`, the one place the `<uid>/<itemId>` storage-path scheme is written down.
 - `auth.ts` — `currentUserId()` (reads the local session, no network round trip — the read path) and `verifiedUserId()` (round-trips to the auth server — for a caller about to write bytes under a user-derived path).
+- `photon.ts` — the one [Photon](https://photon.komoot.io/) client both geocoding surfaces (`ItemForm/usePhoton.tsx`'s autocomplete, `Map/usePlaces.tsx`'s background lookup of catalogued place names) go through: `photonSearchUrl()`, `photonLang()`, `coordsFromFeature()` and `isRetryableStatus()`. The two used to hit the endpoint independently, with two coordinate validators that disagreed on `NaN`.
 
 It is not the only code holding the client, though. Auth and session work reaches [`supabase.ts`](../../web/src/app/supabase.ts) directly — `useSession.ts`, `page.tsx`, `login/useAuthRedirect.ts`, `login/useGoogleSignIn.ts` — none of which have anywhere else to live, since there is no session-management equivalent of `data/auth.ts`. Nothing under `components/` does; an ESLint rule (`no-restricted-imports`, scoped to `components/**`) keeps it that way.
 

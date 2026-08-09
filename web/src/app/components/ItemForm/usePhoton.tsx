@@ -1,6 +1,11 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { PhotonFeature, PlaceChoice, PlaceCoords } from './types';
+import {
+  coordsFromFeature,
+  photonLang,
+  photonSearchUrl,
+} from '../../data/photon';
+import type { PhotonFeature, PlaceChoice } from './types';
 
 type RegionNames = Intl.DisplayNames | null;
 
@@ -52,27 +57,6 @@ export function isQueryLongEnough(query: string): boolean {
   return query.trim().length >= 3;
 }
 
-/**
- * The coordinates a suggestion carries, or null if it carries none usable.
- *
- * GeoJSON orders coordinates lng-first, so the pair is deliberately
- * destructured the "wrong" way round -- same reasoning as
- * `placeFromPhotonResponse` in the map's `usePlaces`. The type says this is
- * always a numeric pair; the runtime data is a third party's, so it is
- * checked rather than trusted. `Number.isFinite` does that in one step: it
- * coerces nothing, so a missing element, a string, and a NaN all fail it.
- * Storing a NaN would put a pin nowhere and, worse, suppress the geocode
- * fallback that would have found the place properly.
- */
-export function coordsFromFeature(feature: PhotonFeature): PlaceCoords | null {
-  const coordinates = (feature as { geometry?: { coordinates?: unknown } })
-    .geometry?.coordinates;
-  if (!Array.isArray(coordinates)) return null;
-  const [lng, lat] = coordinates as number[];
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return { lat, lng };
-}
-
 /* v8 ignore start -- hook internals (fetch, timers, DOM); the extracted
  * pure helpers above are what's gated and mutation-tested. */
 // Stryker disable all: hook internals aren't covered by tests, only the
@@ -90,16 +74,14 @@ export function usePhotonSearch(locale?: string) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const photonLang = useMemo(() => (locale === 'de' ? 'de' : 'en'), [locale]);
+  const lang = useMemo(() => photonLang(locale), [locale]);
 
   const DNConstructor = (Intl as { DisplayNames?: typeof Intl.DisplayNames })
     .DisplayNames;
   const regionNames: RegionNames = useMemo(
     () =>
-      DNConstructor
-        ? new DNConstructor([photonLang], { type: 'region' })
-        : null,
-    [DNConstructor, photonLang],
+      DNConstructor ? new DNConstructor([lang], { type: 'region' }) : null,
+    [DNConstructor, lang],
   );
 
   const formatDisplay = useCallback(
@@ -133,11 +115,8 @@ export function usePhotonSearch(locale?: string) {
       try {
         setLoading(true);
         setError(false);
-        const url = new URL('https://photon.komoot.io/api/');
-        url.searchParams.set('q', q);
-        url.searchParams.set('limit', '5');
-        url.searchParams.set('lang', photonLang);
-        const res = await fetch(url.toString(), { signal: ctl.signal });
+        const url = photonSearchUrl(q, { limit: 5, lang });
+        const res = await fetch(url, { signal: ctl.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: { features: PhotonFeature[] } = await res.json();
         if (abortRef.current !== ctl) return;
@@ -157,7 +136,7 @@ export function usePhotonSearch(locale?: string) {
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, focus, photonLang, regionNames]);
+  }, [query, focus, lang, regionNames]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {

@@ -1,6 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { listItemPlaces, type ItemPlaceRow } from '../../data/items';
+import {
+  coordsFromFeature,
+  isRetryableStatus,
+  photonLang,
+  photonSearchUrl,
+} from '../../data/photon';
 import { Place, PlaceCoords } from './types';
 
 // Stryker disable all: localStorage, and two try/catch wrappers whose whole
@@ -121,8 +127,9 @@ export function partitionByCache(
 }
 
 /**
- * Reads a Place out of a Photon response. GeoJSON orders coordinates
- * lng-first, so the pair is deliberately destructured the "wrong" way round.
+ * Reads a Place out of a Photon response, via the same coordinate validator
+ * the form's autocomplete uses (`data/photon.ts`) -- the two used to
+ * disagree on a NaN pair, which this one used to let through.
  */
 export function placeFromPhotonResponse(
   name: string,
@@ -135,16 +142,8 @@ export function placeFromPhotonResponse(
   // and saying so at the top reads better than discovering it three lines on.
   // Stryker disable next-line all
   if (!Array.isArray(features) || features.length === 0) return null;
-  const coordinates = (
-    features[0] as { geometry?: { coordinates?: unknown } } | undefined
-  )?.geometry?.coordinates;
-  // Same again: a one-element array leaves `lat` undefined and is refused by
-  // the type check below, so the length test only makes the intent legible.
-  // Stryker disable next-line all
-  if (!Array.isArray(coordinates) || coordinates.length < 2) return null;
-  const [lng, lat] = coordinates as number[];
-  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
-  return { name, lat, lng };
+  const coords = coordsFromFeature(features[0]);
+  return coords ? { name, ...coords } : null;
 }
 
 // Photon is a free public service with no API key, and it sheds load by
@@ -163,18 +162,6 @@ const RETRY_BASE_MS = 500;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // Stryker restore all
 
-/**
- * Whether asking again could plausibly give a different answer.
- *
- * A refusal to serve right now (429) and a service that is broken right now
- * (5xx) are worth another go. Anything else is the service having understood
- * the question and answered it, and repeating it verbatim only spends
- * someone else's quota.
- */
-export function isRetryableStatus(status: number): boolean {
-  return status === 429 || status >= 500;
-}
-
 // `enabled` gates fetching behind the map actually being open: geocoding
 // every distinct place is an unbounded number of requests to a free public
 // API, and running it on category *selection* rather than map *open* paid
@@ -191,10 +178,12 @@ export function usePlaces(
   categoryId: string,
   search: string,
   enabled: boolean,
+  locale?: string,
 ) {
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const lang = photonLang(locale);
 
   useEffect(() => {
     if (!enabled) return;
@@ -236,10 +225,8 @@ export function usePlaces(
           for (let attempt = 0; attempt < GEOCODE_ATTEMPTS; attempt += 1) {
             if (cancelled) return null;
             try {
-              const url = new URL('https://photon.komoot.io/api/');
-              url.searchParams.set('q', place);
-              url.searchParams.set('limit', '1');
-              const res = await fetch(url.toString());
+              const url = photonSearchUrl(place, { limit: 1, lang });
+              const res = await fetch(url);
               // An answer, even an empty one: a place the gazetteer does not
               // know is not going to be known on the third try.
               if (res.ok)
@@ -303,7 +290,7 @@ export function usePlaces(
     return () => {
       cancelled = true;
     };
-  }, [categoryId, search, enabled]);
+  }, [categoryId, search, enabled, lang]);
 
   return { places, loading, error };
 }
