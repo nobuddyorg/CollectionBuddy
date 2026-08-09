@@ -28,6 +28,15 @@ function Trigger({ messages }: { messages: string[] }) {
   );
 }
 
+function SuccessTrigger({ message }: { message: string }) {
+  const toast = useToast();
+  return (
+    <button type="button" onClick={() => toast.success(message)}>
+      {message}
+    </button>
+  );
+}
+
 function renderProvider(messages: string[]) {
   return render(
     <I18nProvider>
@@ -85,5 +94,23 @@ describe('ToastProvider', () => {
     expect(container.querySelectorAll('[aria-live="assertive"]')).toHaveLength(
       0,
     );
+  });
+
+  it('posts a success toast as a visible, polite status rather than an assertive alert', async () => {
+    render(
+      <I18nProvider>
+        <ToastProvider>
+          <SuccessTrigger message="Category deleted." />
+        </ToastProvider>
+      </I18nProvider>,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Category deleted.' }),
+    );
+
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent('Category deleted.');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

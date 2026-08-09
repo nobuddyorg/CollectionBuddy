@@ -84,6 +84,7 @@ export function useCategories() {
             prev.map((c) => (c.id === id ? { ...c, ...data } : c)),
           );
         }
+        toast.success(t('category_select.renameSuccess'));
         return true;
       } catch (e) {
         console.error(e);
@@ -154,6 +155,7 @@ export function useCategories() {
           }
         }
 
+        toast.success(t('category_select.deleteSuccess'));
         return true;
       } catch (e) {
         console.error(e);

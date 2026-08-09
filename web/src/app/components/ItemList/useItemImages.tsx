@@ -373,6 +373,7 @@ export function useItemImages() {
             (e) => e.pathFull !== img.pathFull,
           ),
         }));
+        toast.success(t('item_list.delete_image_success'));
       } finally {
         setDeletingPath((prev) => {
           const next = new Set(prev);

@@ -14,10 +14,15 @@ import ReactDOM from 'react-dom';
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 
-type ToastEntry = { id: number; message: string };
+type ToastKind = 'error' | 'success';
+type ToastEntry = { id: number; message: string; kind: ToastKind };
 
 type ToastApi = {
   error: (message: string) => void;
+  /** A visible, self-dismissing confirmation for actions whose only other
+   * signal is structural (a card disappearing, a button re-enabling) --
+   * deleting or renaming a category, deleting a photograph. */
+  success: (message: string) => void;
   /** Posts an outcome -- "entry added", "changes saved", "entry deleted" --
    * to the app-level polite live region, for anyone not focused on (or
    * looking at) whatever just changed. */
@@ -59,20 +64,32 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((entry) => entry.id !== id));
   }, []);
 
-  const error = useCallback(
-    (message: string) => {
+  const post = useCallback(
+    (kind: ToastKind, message: string) => {
       const id = ++nextId.current;
-      setToasts((prev) => [...prev, { id, message }]);
+      setToasts((prev) => [...prev, { id, message, kind }]);
       setTimeout(() => dismiss(id), AUTO_DISMISS_MS);
     },
     [dismiss],
+  );
+
+  const error = useCallback(
+    (message: string) => post('error', message),
+    [post],
+  );
+  const success = useCallback(
+    (message: string) => post('success', message),
+    [post],
   );
 
   const announce = useCallback((message: string) => {
     setAnnouncement(message);
   }, []);
 
-  const api = useMemo<ToastApi>(() => ({ error, announce }), [error, announce]);
+  const api = useMemo<ToastApi>(
+    () => ({ error, success, announce }),
+    [error, success, announce],
+  );
 
   return (
     <ToastContext.Provider value={api}>
@@ -90,9 +107,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             {toasts.map((entry) => (
               <div
                 key={entry.id}
-                role="alert"
-                aria-live="assertive"
-                className="pointer-events-auto max-w-sm w-full rounded-sm bg-destructive text-destructive-foreground shadow-lg px-4 py-3 flex items-start gap-3"
+                role={entry.kind === 'error' ? 'alert' : 'status'}
+                aria-live={entry.kind === 'error' ? 'assertive' : 'polite'}
+                className={`pointer-events-auto max-w-sm w-full rounded-sm shadow-lg px-4 py-3 flex items-start gap-3 ${
+                  entry.kind === 'error'
+                    ? 'bg-destructive text-destructive-foreground'
+                    : 'bg-primary text-primary-foreground'
+                }`}
               >
                 <span className="flex-1 text-sm">{entry.message}</span>
                 <button
