@@ -34,7 +34,7 @@ Save. The list jumps to page 1 so you can see your new item — items are always
 
 ## 5. Add a photo
 
-Hover the new item's card (or tap the **⋯** button on touch devices) to reveal its action row, and click the upload-image icon. Pick any image file. It's compressed client-side to WebP before upload, and a thumbnail is generated alongside the full image — this happens automatically, no size limit to think about below 5 MB.
+Hover the new item's card (or tap the **⋯** button on touch devices) to reveal its action row, and click the upload-image icon. Pick any image file. It's compressed client-side to WebP before upload, and a thumbnail is generated alongside the full image — the original never leaves your browser at full size, so there's no file size to think about.
 
 Click the uploaded thumbnail to open it full-size in a lightbox.
 
