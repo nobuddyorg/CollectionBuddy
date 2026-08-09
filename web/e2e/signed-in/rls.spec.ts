@@ -238,4 +238,94 @@ test.describe('one collection cannot reach another', () => {
     const { data } = await anon.storage.from('item-images').list(otherUserId);
     expect(data ?? []).toEqual([]);
   });
+
+  // item_categories is guarded by a trigger, not by RLS -- the insert policy
+  // only checks user_id = auth.uid(), and user_id is set by this very
+  // trigger, so RLS alone would not catch a regression here. This is the one
+  // row in the schema that references two owned rows at once, which makes it
+  // the single most interesting authorization case: a link from one of my
+  // own items into one of their categories.
+  test('an item cannot be filed into their category', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, otherToken } = context();
+
+    const { data: mine } = await apiAs(token)
+      .from('items')
+      .select('id')
+      .eq('title', SEED.items[0].title)
+      .single();
+    const { data: theirs } = await apiAs(otherToken)
+      .from('categories')
+      .select('id')
+      .eq('name', SEED.other.category)
+      .single();
+
+    const { error } = await apiAs(token)
+      .from('item_categories')
+      .insert({ item_id: mine!.id, category_id: theirs!.id });
+    expect(error).not.toBeNull();
+  });
+
+  // list() returning [] (above) is the weaker proof -- it holds even if the
+  // listing itself is merely empty. Signing a path that is known to exist is
+  // the sharper question: does the select policy actually refuse it, or does
+  // it only look that way because there was nothing to find?
+  test('a known photograph of theirs cannot be signed', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, otherToken, otherUserId } = context();
+
+    const path = `${otherUserId}/rls-signed-url-probe.webp`;
+    // The bucket restricts allowed_mime_types (0007_storage.sql) -- an
+    // untyped Blob upload would be rejected on that alone, which would prove
+    // nothing about the policy this test exists to check.
+    const { error: uploadError } = await apiAs(otherToken)
+      .storage.from('item-images')
+      .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+    expect(uploadError).toBeNull();
+
+    try {
+      const { data, error } = await apiAs(token)
+        .storage.from('item-images')
+        .createSignedUrl(path, 60);
+      expect(data).toBeNull();
+      expect(error).not.toBeNull();
+    } finally {
+      await apiAs(otherToken).storage.from('item-images').remove([path]);
+    }
+  });
+
+  // Items are refused on both update and delete (above); categories and the
+  // item_categories mapping were only ever asked the read question.
+  test('their category cannot be renamed or deleted', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, otherToken } = context();
+
+    const { data: theirs } = await apiAs(otherToken)
+      .from('categories')
+      .select('id,name')
+      .eq('name', SEED.other.category)
+      .single();
+
+    const { data: renamed } = await apiAs(token)
+      .from('categories')
+      .update({ name: 'taken over' })
+      .eq('id', theirs!.id)
+      .select('id');
+    expect(renamed).toEqual([]);
+
+    const { data: deleted } = await apiAs(token)
+      .from('categories')
+      .delete()
+      .eq('id', theirs!.id)
+      .select('id');
+    expect(deleted).toEqual([]);
+
+    // Untouched, read back as its owner.
+    const { data: after } = await apiAs(otherToken)
+      .from('categories')
+      .select('name')
+      .eq('id', theirs!.id)
+      .single();
+    expect(after!.name).toBe(theirs!.name);
+  });
 });
