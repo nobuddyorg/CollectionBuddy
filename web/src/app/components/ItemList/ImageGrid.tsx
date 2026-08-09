@@ -1,6 +1,5 @@
 'use client';
 import { useState } from 'react';
-import Image from 'next/image';
 import Icon, { IconType } from '../Icon';
 import type { ImgEntry } from './types';
 import { useI18n } from '../../i18n/useI18n';
@@ -35,12 +34,16 @@ function Plate({
   return (
     <div className={`relative bg-muted ${!loaded ? 'img-skeleton' : ''}`}>
       <button type="button" onClick={onOpen} className="block h-full w-full">
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element -- next/image
+            earns nothing here: the static export runs with
+            images.unoptimized (no resizing, no format negotiation, no
+            srcSet), so it was a plain <img> plus extra client-side runtime.
+            The dropped width/height were fiction anyway -- the real boxes
+            are aspect-square/aspect-2/3/h-20, not the declared 800x600. */}
+        <img
           src={src}
           alt={alt}
-          width={800}
-          height={600}
-          unoptimized
+          decoding="async"
           // Fetched in CORS mode with credentials omitted, which makes the
           // browser ignore Set-Cookie on the response. Cloudflare fronts
           // Supabase storage and sets `__cf_bm` scoped to `Domain=supabase.co`

@@ -1,5 +1,4 @@
 'use client';
-import Image from 'next/image';
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 import { HeaderProps } from './types';
@@ -26,13 +25,18 @@ export default function Header({ user, onSignOut }: HeaderProps) {
     >
       <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element -- next/image
+              earns nothing on this static export (images.unoptimized); a
+              plain <img> with fetchPriority replaces `priority`'s eager
+              load without the runtime. */}
+          <img
             src={withBasePath('/logo-header.png')}
             alt=""
             width={24}
             height={24}
+            decoding="async"
+            fetchPriority="high"
             className="object-contain shrink-0"
-            priority
           />
           {/* The login page's wordmark, at header scale: "Collection"
               underscored in ink, "Buddy" carrying the accent. The two

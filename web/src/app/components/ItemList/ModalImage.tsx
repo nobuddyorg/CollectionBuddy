@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
-import Image from 'next/image';
 import ReactDOM from 'react-dom';
 
 import { useI18n } from '../../i18n/useI18n';
@@ -196,16 +195,18 @@ export function ModalImage({
       )}
 
       <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element -- next/image
+            earns nothing on this static export (images.unoptimized), and
+            the width={0} height={0} sizes="100vw" it needed here was
+            already the documented workaround for "let CSS size this
+            unconstrained" -- a plain <img> does that natively. */}
+        <img
           key={current.pathFull}
           src={current.urlFull}
           alt={alt}
-          unoptimized
+          decoding="async"
           // Same reasoning as the grid: see the note in ImageGrid.tsx.
           crossOrigin="anonymous"
-          width={0}
-          height={0}
-          sizes="100vw"
           className="w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg"
         />
       </div>
