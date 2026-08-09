@@ -42,7 +42,7 @@ repos:
 
   # zizmor: security analysis of the GitHub Actions workflows
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.28.0
+    rev: v1.29.0
     hooks:
       - id: zizmor
 
@@ -55,7 +55,7 @@ repos:
 
   # markdownlint for the docs tree (config: .markdownlint-cli2.jsonc)
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.23.1
+    rev: v0.23.2
     hooks:
       - id: markdownlint-cli2
 
