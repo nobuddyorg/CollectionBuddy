@@ -48,34 +48,44 @@ test.describe('adding and removing entries', () => {
 
   test('adds an entry and puts it at the front', async ({ page }) => {
     const title = uniqueTitle('Taler');
-    await createEntry(page, title);
+    try {
+      await createEntry(page, title);
 
-    // Newest first, so a new entry belongs at the top of the first page.
-    const titles = await visibleTitles(page);
-    expect(titles[0]).toBe(title);
-
-    await deleteEntry(page, title);
+      // Newest first, so a new entry belongs at the top of the first page.
+      const titles = await visibleTitles(page);
+      expect(titles[0]).toBe(title);
+    } finally {
+      // In a finally, not after the assertions, so an entry from a failed
+      // assertion above still comes out -- left in place, it would feed
+      // straight into the next test's own count of the collection (#338).
+      await deleteEntry(page, title);
+    }
   });
 
   test('keeps what was typed into it', async ({ page }) => {
     const title = uniqueTitle('Dukat');
-    await createEntry(page, title, 'Geprägt in Venedig.');
+    try {
+      await createEntry(page, title, 'Geprägt in Venedig.');
 
-    const card = page.getByTestId('item-card').filter({ hasText: title });
-    await expect(card.getByText('Geprägt in Venedig.')).toBeVisible();
-
-    await deleteEntry(page, title);
+      const card = page.getByTestId('item-card').filter({ hasText: title });
+      await expect(card.getByText('Geprägt in Venedig.')).toBeVisible();
+    } finally {
+      await deleteEntry(page, title);
+    }
   });
 
   test('finds a new entry by searching for it', async ({ page }) => {
     const title = uniqueTitle('Dublone');
-    await createEntry(page, title);
+    try {
+      await createEntry(page, title);
 
-    await page.getByTestId('search-input').fill(title);
-    await expectTitles(page, [title]);
+      await page.getByTestId('search-input').fill(title);
+      await expectTitles(page, [title]);
 
-    await page.getByTestId('search-input').fill('');
-    await deleteEntry(page, title);
+      await page.getByTestId('search-input').fill('');
+    } finally {
+      await deleteEntry(page, title);
+    }
   });
 
   // Confirmation defaults to cancel, and cancelling has to mean it: a
@@ -85,31 +95,39 @@ test.describe('adding and removing entries', () => {
     page,
   }) => {
     const title = uniqueTitle('Sesterz');
-    await createEntry(page, title);
+    try {
+      await createEntry(page, title);
 
-    const card = page.getByTestId('item-card').filter({ hasText: title });
-    await card.getByTestId('delete-entry').click();
-    await page.getByTestId('confirm-cancel').click();
-    await expect(card).toBeVisible();
-
-    await deleteEntry(page, title);
+      const card = page.getByTestId('item-card').filter({ hasText: title });
+      await card.getByTestId('delete-entry').click();
+      await page.getByTestId('confirm-cancel').click();
+      await expect(card).toBeVisible();
+    } finally {
+      await deleteEntry(page, title);
+    }
   });
 
   test('edits an entry in place', async ({ page }) => {
     const title = uniqueTitle('Groschen');
     const renamed = `${title} (renamed)`;
-    await createEntry(page, title);
+    // Tracks whichever title the entry currently answers to, so cleanup
+    // deletes the right card whether the rename below ran or not.
+    let currentTitle = title;
+    try {
+      await createEntry(page, title);
 
-    const card = page.getByTestId('item-card').filter({ hasText: title });
-    await card.getByTestId('edit-entry').click();
-    await page.getByTestId('item-title').fill(renamed);
-    await page.getByTestId('item-submit').click();
+      const card = page.getByTestId('item-card').filter({ hasText: title });
+      await card.getByTestId('edit-entry').click();
+      await page.getByTestId('item-title').fill(renamed);
+      await page.getByTestId('item-submit').click();
 
-    await expect(
-      page.getByTestId('item-card').filter({ hasText: renamed }),
-    ).toBeVisible();
-
-    await deleteEntry(page, renamed);
+      await expect(
+        page.getByTestId('item-card').filter({ hasText: renamed }),
+      ).toBeVisible();
+      currentTitle = renamed;
+    } finally {
+      await deleteEntry(page, currentTitle);
+    }
   });
 
   // The database is the normalization authority -- it trims and collapses
@@ -117,11 +135,13 @@ test.describe('adding and removing entries', () => {
   // than a client-side guess at what was stored.
   test('stores a title as the database normalises it', async ({ page }) => {
     const title = uniqueTitle('Batzen');
-    await createEntry(page, `   ${title}   `);
+    try {
+      await createEntry(page, `   ${title}   `);
 
-    const card = page.getByTestId('item-card').filter({ hasText: title });
-    await expect(card.getByRole('heading', { level: 3 })).toHaveText(title);
-
-    await deleteEntry(page, title);
+      const card = page.getByTestId('item-card').filter({ hasText: title });
+      await expect(card.getByRole('heading', { level: 3 })).toHaveText(title);
+    } finally {
+      await deleteEntry(page, title);
+    }
   });
 });

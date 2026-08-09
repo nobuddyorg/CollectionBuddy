@@ -8,6 +8,22 @@ import { I18nProvider } from './i18n/I18nProvider';
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
+// The origin every Supabase call (REST, Auth, Storage -- all one project,
+// different path prefixes) goes to, read the same literal-expression way
+// supabase.ts reads it, so Next's static-export inliner can still resolve
+// it as a build-time constant instead of leaving it undefined in the
+// browser. Used only to build the CSP below; there is no fallback because
+// there is no offline mode -- a build missing this is already broken, and
+// failing here is no different from failing wherever supabase.ts is first
+// imported.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+if (!supabaseUrl) {
+  throw new Error(
+    'Missing NEXT_PUBLIC_SUPABASE_URL -- copy web/.env.example to web/.env.local and fill it in.',
+  );
+}
+const SUPABASE_ORIGIN = new URL(supabaseUrl).origin;
+
 // Three roles, on purpose: a grotesque with institutional-signage weight
 // for the wordmark and headings, a quiet body face for everything read at
 // length, and a tracked-out mono for object labels -- the museum-caption
@@ -81,6 +97,48 @@ export const viewport = {
 // to prevent.
 const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme');document.documentElement.setAttribute('data-theme',s==='light'||s==='dark'?s:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));}catch(e){}})();`;
 
+// GitHub Pages does not allow custom response headers, so there is no way
+// to send X-Frame-Options or a frame-ancestors CSP directive -- browsers
+// only honour frame-ancestors from a real header, never from a <meta> tag.
+// This is the fallback: if the page ever ends up in a frame, it navigates
+// the top-level frame to itself, breaking out rather than sitting there
+// invisibly under an attacker's decoy UI (clickjacking against the delete
+// flow's confirm button, e.g.). Same inline-and-blocking reasoning as the
+// theme script -- this has to run before anything is interactive, or the
+// frame it's meant to bust already had a chance to be clicked through.
+const FRAMEBUST_SCRIPT = `if(window.top!==window.self){window.top.location=window.self.location;}`;
+
+// The directives a <meta http-equiv="Content-Security-Policy"> tag can
+// actually enforce (frame-ancestors and sandbox cannot, hence the script
+// above). 'unsafe-inline' on script-src/style-src is what the theme and
+// framebusting scripts above, and every component using a React `style`
+// prop, need -- there is no server to hand out a per-request nonce for a
+// static export, so a strict CSP here would mean building a hash allowlist
+// that has to be kept in sync by hand with every inline script and style
+// in the app. Still meaningfully constrains where a script can be loaded
+// *from* and where a fetch can go, which is what actually matters if an
+// XSS sink ever shows up.
+const CONTENT_SECURITY_POLICY = [
+  `default-src 'self'`,
+  `script-src 'self' 'unsafe-inline'`,
+  `style-src 'self' 'unsafe-inline'`,
+  // data: is Leaflet's own doing -- its default icon handling loads a 1x1
+  // transparent GIF as a data URI internally, not something this app
+  // constructs itself.
+  `img-src 'self' data: ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org`,
+  `connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io`,
+  `font-src 'self'`,
+  // browser-image-compression (the upload path's resize step) runs in a Web
+  // Worker it creates from a blob: URL. Worker script loading falls back to
+  // script-src when worker-src is unset, and script-src has no blob: in it
+  // -- every photo upload silently failed to compress at all until this was
+  // explicit.
+  `worker-src 'self' blob:`,
+  `object-src 'none'`,
+  `base-uri 'self'`,
+  `form-action 'self'`,
+].join('; ');
+
 export default function RootLayout({
   children,
 }: {
@@ -96,6 +154,19 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {/* As early as possible: a CSP meta tag only covers what the
+            document parses after it. */}
+        <meta
+          httpEquiv="Content-Security-Policy"
+          content={CONTENT_SECURITY_POLICY}
+        />
+        {/* Strips the path/query when a link to this app is followed from
+            elsewhere -- a collection's contents have no business showing up
+            in another site's referrer logs. same-origin navigation (the app
+            linking to itself) keeps the full referrer, which is the one
+            case that's actually useful. */}
+        <meta name="referrer" content="strict-origin-when-cross-origin" />
+        <script dangerouslySetInnerHTML={{ __html: FRAMEBUST_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="antialiased">

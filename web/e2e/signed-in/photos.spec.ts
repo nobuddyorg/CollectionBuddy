@@ -91,30 +91,38 @@ test.describe('photographs', () => {
     page,
   }) => {
     const title = uniqueTitle('Fotografiert');
-    const card = await newEntry(page, title);
+    try {
+      const card = await newEntry(page, title);
 
-    await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
+      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
 
-    // Compression happens in the browser and the upload is two round trips,
-    // so this waits rather than assuming. What it waits for is the picture
-    // itself, not the placeholder that stood in for it.
-    await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
-    await expect(card.locator('img')).toHaveAttribute('src', /token=/);
-
-    await removeEntry(page, title);
+      // Compression happens in the browser and the upload is two round trips,
+      // so this waits rather than assuming. What it waits for is the picture
+      // itself, not the placeholder that stood in for it.
+      await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
+      await expect(card.locator('img')).toHaveAttribute('src', /token=/);
+    } finally {
+      // In a finally: a leaked entry here is worse than entries.spec.ts's,
+      // since reseed() only ever deletes database rows -- it never touches
+      // object storage, so an orphaned upload persists across every future
+      // run, not just the rest of this one (#338).
+      await removeEntry(page, title);
+    }
   });
 
   test('the photograph is still there on the next visit', async ({ page }) => {
     const title = uniqueTitle('Bleibt');
-    const card = await newEntry(page, title);
-    await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
+    try {
+      const card = await newEntry(page, title);
+      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
+      await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
 
-    await openCategory(page, SEED.photoCategory);
-    const again = page.getByTestId('item-card').filter({ hasText: title });
-    await expect(again.locator('img')).toBeVisible({ timeout: ARRIVES });
-
-    await removeEntry(page, title);
+      await openCategory(page, SEED.photoCategory);
+      const again = page.getByTestId('item-card').filter({ hasText: title });
+      await expect(again.locator('img')).toBeVisible({ timeout: ARRIVES });
+    } finally {
+      await removeEntry(page, title);
+    }
   });
 
   // Full size and thumbnail, both under the owner's own prefix -- which is
@@ -128,52 +136,58 @@ test.describe('photographs', () => {
 
     const before = await storedObjects(token, userId);
     const title = uniqueTitle('Paarweise');
-    const card = await newEntry(page, title);
-    await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
+    try {
+      const card = await newEntry(page, title);
+      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
+      await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
 
-    const added = (await storedObjects(token, userId)).filter(
-      (name) => !before.includes(name),
-    );
-    expect(added).toHaveLength(2);
-    expect(added.filter((name) => name.endsWith('.thumb.webp'))).toHaveLength(
-      1,
-    );
-    expect(
-      added.filter(
-        (name) => name.endsWith('.webp') && !name.includes('.thumb'),
-      ),
-    ).toHaveLength(1);
-
-    await removeEntry(page, title);
+      const added = (await storedObjects(token, userId)).filter(
+        (name) => !before.includes(name),
+      );
+      expect(added).toHaveLength(2);
+      expect(added.filter((name) => name.endsWith('.thumb.webp'))).toHaveLength(
+        1,
+      );
+      expect(
+        added.filter(
+          (name) => name.endsWith('.webp') && !name.includes('.thumb'),
+        ),
+      ).toHaveLength(1);
+    } finally {
+      await removeEntry(page, title);
+    }
   });
 
   test('a second photograph joins the first rather than replacing it', async ({
     page,
   }) => {
     const title = uniqueTitle('Zwei');
-    const card = await newEntry(page, title);
+    try {
+      const card = await newEntry(page, title);
 
-    await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toHaveCount(1, { timeout: ARRIVES });
+      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
+      await expect(card.locator('img')).toHaveCount(1, { timeout: ARRIVES });
 
-    await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toHaveCount(2, { timeout: ARRIVES });
-
-    await removeEntry(page, title);
+      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
+      await expect(card.locator('img')).toHaveCount(2, { timeout: ARRIVES });
+    } finally {
+      await removeEntry(page, title);
+    }
   });
 
   test('a photograph can be taken off again', async ({ page }) => {
     const title = uniqueTitle('Wieder weg');
-    const card = await newEntry(page, title);
-    await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
+    try {
+      const card = await newEntry(page, title);
+      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
+      await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
 
-    await card.getByRole('button', { name: /delete image/i }).click();
-    await page.getByTestId('confirm-accept').click();
-    await expect(card.locator('img')).toHaveCount(0);
-
-    await removeEntry(page, title);
+      await card.getByRole('button', { name: /delete image/i }).click();
+      await page.getByTestId('confirm-accept').click();
+      await expect(card.locator('img')).toHaveCount(0);
+    } finally {
+      await removeEntry(page, title);
+    }
   });
 
   // No trigger cleans these up -- SQL cannot reach object storage, so the app
@@ -186,16 +200,17 @@ test.describe('photographs', () => {
     const { token, userId } = context();
 
     const before = await storedObjects(token, userId);
-
     const title = uniqueTitle('Mit Aufräumen');
-    const card = await newEntry(page, title);
-    await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
+    try {
+      const card = await newEntry(page, title);
+      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
+      await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
 
-    const during = await storedObjects(token, userId);
-    expect(during.length).toBeGreaterThan(before.length);
-
-    await removeEntry(page, title);
+      const during = await storedObjects(token, userId);
+      expect(during.length).toBeGreaterThan(before.length);
+    } finally {
+      await removeEntry(page, title);
+    }
 
     await expect
       .poll(() => storedObjects(token, userId), { timeout: 15_000 })

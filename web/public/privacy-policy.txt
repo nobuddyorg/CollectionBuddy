@@ -19,8 +19,9 @@ This Privacy Policy explains how we collect, use, and protect your information w
 - To ensure compliance with legal obligations.
 
 3. Data Sharing
-- We do not sell, rent, or share your personal data with third parties.
-- We only share information if required by law or with service providers who support our operations (e.g., hosting).
+- We do not sell or rent your personal data.
+- We share information with service providers who support our operations, described below, or if required by law.
+- Place search and the map: when you type a place, or open the map for a collection with hand-typed (unsaved) place names, that place name is sent to Photon (photon.komoot.io), a free geocoding service operated by Komoot, to look up its coordinates. This request is unauthenticated and carries no account information — only the place name and the requesting device's IP address, which Komoot's own privacy policy governs. The map also loads its tiles from OpenStreetMap (tile.openstreetmap.org), which sees the approximate area you're viewing and your IP address.
 
 4. Data Storage & Security
 - Data is stored securely on our service providers’ infrastructure.
@@ -38,6 +39,7 @@ This Privacy Policy explains how we collect, use, and protect your information w
 - We may update this Privacy Policy. Updates will be posted in the application.
 
 Effective date: 17 August 2025
+Last updated: 9 August 2026 — added the third-party disclosures in section 3 for place search and map tiles.
 
 
 ============================================================
@@ -61,8 +63,9 @@ Diese Datenschutzerklärung erklärt, wie wir Informationen erfassen, verwenden 
 - Zur Erfüllung gesetzlicher Verpflichtungen.
 
 3. Weitergabe von Daten
-- Wir verkaufen, vermieten oder teilen Ihre personenbezogenen Daten nicht mit Dritten.
-- Eine Weitergabe erfolgt nur, wenn dies gesetzlich vorgeschrieben ist oder an Dienstleister, die unsere Arbeit unterstützen (z. B. Hosting).
+- Wir verkaufen oder vermieten Ihre personenbezogenen Daten nicht.
+- Wir teilen Informationen mit Dienstleistern, die unsere Arbeit unterstützen (siehe unten), oder wenn dies gesetzlich vorgeschrieben ist.
+- Ortssuche und Karte: Wenn Sie einen Ort eingeben oder die Karte für eine Sammlung mit handgetippten (nicht gespeicherten) Ortsnamen öffnen, wird dieser Ortsname an Photon (photon.komoot.io) gesendet, einen kostenlosen, von Komoot betriebenen Geocoding-Dienst, um dessen Koordinaten zu ermitteln. Diese Anfrage erfolgt unauthentifiziert und enthält keine Kontoinformationen — nur den Ortsnamen und die IP-Adresse des anfragenden Geräts, für die Komoots eigene Datenschutzerklärung gilt. Die Karte lädt ihre Kacheln außerdem von OpenStreetMap (tile.openstreetmap.org), das den ungefähren angezeigten Bereich sowie Ihre IP-Adresse sieht.
 
 4. Datenspeicherung & Sicherheit
 - Daten werden sicher auf den Servern unserer Dienstleister gespeichert.
@@ -80,3 +83,4 @@ Diese Datenschutzerklärung erklärt, wie wir Informationen erfassen, verwenden 
 - Wir können diese Datenschutzerklärung aktualisieren. Aktualisierungen werden in der Anwendung veröffentlicht.
 
 Gültig ab: 17. August 2025
+Zuletzt aktualisiert: 9. August 2026 — Angaben zu Dritten in Abschnitt 3 für Ortssuche und Kartenkacheln ergänzt.
