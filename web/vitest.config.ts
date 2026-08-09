@@ -155,6 +155,12 @@ export default defineConfig({
           branches: 100,
           lines: 100,
         },
+        'src/app/data/photon.ts': {
+          statements: 100,
+          functions: 100,
+          branches: 100,
+          lines: 100,
+        },
         'src/app/i18n/I18nProvider.tsx': {
           statements: 100,
           functions: 100,

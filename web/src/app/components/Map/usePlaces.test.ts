@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  isRetryableStatus,
   partitionByCache,
   partitionByStoredCoords,
   placeFromPhotonResponse,
@@ -297,23 +296,5 @@ describe('placeFromPhotonResponse', () => {
     expect(
       placeFromPhotonResponse('Odd', { features: [{ geometry: {} }] }),
     ).toBeNull();
-  });
-});
-
-describe('isRetryableStatus', () => {
-  it('asks again when the service refused to serve right now', () => {
-    expect(isRetryableStatus(429)).toBe(true);
-  });
-
-  it('asks again when the service is broken right now', () => {
-    expect(isRetryableStatus(500)).toBe(true);
-    expect(isRetryableStatus(502)).toBe(true);
-    expect(isRetryableStatus(503)).toBe(true);
-  });
-
-  it('gives up on an answered request, however unwelcome the answer', () => {
-    expect(isRetryableStatus(400)).toBe(false);
-    expect(isRetryableStatus(403)).toBe(false);
-    expect(isRetryableStatus(404)).toBe(false);
   });
 });

@@ -1,9 +1,11 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '../../supabase';
+import { currentUserId, verifiedUserId } from '../../data/auth';
 import {
   createSignedUrls,
+  imagePrefix,
   listAllImageObjects,
+  listItemImages,
   removeImageObjects,
   removeItemImages,
   uploadImageObject,
@@ -107,13 +109,9 @@ export function useItemImages() {
   }, [images]);
 
   const getItemImageEntries = useCallback(async (itemId: string) => {
-    // getSession() reads the local session, no network round trip.
-    const { data: sessionData } = await supabase.auth.getSession();
-    const uid = sessionData.session?.user.id;
-    if (!uid) return;
-
-    const prefix = `${uid}/${itemId}`;
-    const { data, error } = await listAllImageObjects(prefix);
+    const listing = await listItemImages(itemId);
+    if (!listing) return;
+    const { prefix, data, error } = listing;
 
     if (error) {
       console.error('Failed to list images', error);
@@ -165,9 +163,8 @@ export function useItemImages() {
   // go instead of letting the card render in between.
   const fetchItemImages = useCallback(
     async (itemId: string) => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const uid = sessionData.session?.user.id;
-      if (uid) invalidateListing(`${uid}/${itemId}`);
+      const uid = await currentUserId();
+      if (uid) invalidateListing(imagePrefix(uid, itemId));
 
       const entries = await getItemImageEntries(itemId);
       if (typeof entries === 'undefined') return undefined;
@@ -180,8 +177,7 @@ export function useItemImages() {
   const refreshAllImages = useCallback(async (itemIds: string[]) => {
     if (itemIds.length === 0) return;
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const uid = sessionData.session?.user.id;
+    const uid = await currentUserId();
     if (!uid) return;
 
     // Only the items we don't already hold a fresh answer for are marked
@@ -189,7 +185,7 @@ export function useItemImages() {
     setLoadingItems((prev) => {
       const next = new Set(prev);
       for (const itemId of itemIds) {
-        if (!getCachedListing(`${uid}/${itemId}`)) next.add(itemId);
+        if (!getCachedListing(imagePrefix(uid, itemId))) next.add(itemId);
       }
       return next;
     });
@@ -200,7 +196,7 @@ export function useItemImages() {
     // single createSignedUrls call.
     const perItem = await Promise.all(
       itemIds.map(async (itemId) => {
-        const prefix = `${uid}/${itemId}`;
+        const prefix = imagePrefix(uid, itemId);
         const cached = getCachedListing(prefix);
         if (cached) return [itemId, cached] as const;
 
@@ -284,8 +280,7 @@ export function useItemImages() {
           ...prev,
           [itemId]: (prev[itemId] ?? 0) + 1,
         }));
-        const { data: u } = await supabase.auth.getUser();
-        const uid = u.user?.id;
+        const uid = await verifiedUserId();
         if (!uid) throw new Error(t('item_list.no_user_session'));
 
         const { default: imageCompression } =
@@ -315,7 +310,7 @@ export function useItemImages() {
         });
 
         const base = crypto.randomUUID();
-        const pathBase = `${uid}/${itemId}/${base}`;
+        const pathBase = `${imagePrefix(uid, itemId)}/${base}`;
         const pathFull = `${pathBase}.webp`;
         const pathThumb = `${pathBase}.thumb.webp`;
 
@@ -389,7 +384,7 @@ export function useItemImages() {
     // The uid comes back from the removal rather than from a second auth
     // call: that was one more round trip on a path the user is waiting on.
     const uid = await removeItemImages(itemId);
-    if (uid) invalidateListing(`${uid}/${itemId}`);
+    if (uid) invalidateListing(imagePrefix(uid, itemId));
     setImages((prev) => {
       const next = { ...prev };
       delete next[itemId];

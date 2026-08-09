@@ -25,14 +25,14 @@ export function MapModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
 
   const {
     places,
     loading: loadingPlaces,
     error: placesError,
-  } = usePlaces(categoryId, search, open);
+  } = usePlaces(categoryId, search, open, lang);
 
   // Starts empty. The map frames the pins it has as they stream in on its
   // own; this state exists for the re-frame below, once the last place has

@@ -6,8 +6,12 @@ CollectionBuddy needs a Supabase backend (Postgres + Auth + Storage) to run
 at all -- there is no mock/offline mode. The steps below set up the local
 stack that ships in [`supabase/`](supabase/).
 
-1. Install the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)
-    and Docker (the CLI runs the local stack in containers).
+1. Prerequisites:
+    - **Node.js 22 or newer.** CI pins 22.x; the test setup relies on Node 22+ behaviour.
+    - **Docker**, running — the Supabase CLI runs the local stack in containers.
+    - **[Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)
+      2.110.0.** Both workflows pin that version, so it is the one the migrations are
+      exercised against.
 
 2. From the repository root, start the local stack and apply migrations:
 
@@ -76,18 +80,21 @@ the build job already does).
 
 ## Before opening a pull request
 
-From `web/`:
+From `web/`, in this order:
 
 ```bash
-npm run lint
-npx prettier --check .
-npm test -- --coverage
 npm run build
+npx tsc --noEmit
+npx prettier --check .
+npm run lint
+npm test -- --coverage
 npm run e2e
 npm run test:mutation
 ```
 
-These are the same checks CI runs (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+The build goes first on purpose: `next build` generates `next-env.d.ts` (gitignored), and
+both `tsc` and ESLint need it on a clean checkout. These are the same checks CI runs (see
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 Two of them are easy to skip and shouldn't be. `npm test` on its own does not
 enforce the coverage floors -- only `--coverage` does, which is what CI uses.
