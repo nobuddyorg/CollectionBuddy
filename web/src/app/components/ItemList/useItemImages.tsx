@@ -237,7 +237,18 @@ export function useItemImages() {
 
     const newImages = await signEntries(perItem);
     lastSignedAtRef.current = Date.now();
-    setImages((prev) => ({ ...prev, ...newImages }));
+    // Dropping everything outside the current set, not just merging the
+    // new answers into whatever was already held: without this, paging or
+    // searching within one category piled up every item id ever visited
+    // (#330) -- accumulated state the hourly re-sign below then read in
+    // full, request-storming storage.list() for items long off screen.
+    const idSet = new Set(itemIds);
+    setImages((prev) => {
+      const kept = Object.fromEntries(
+        Object.entries(prev).filter(([id]) => idSet.has(id)),
+      );
+      return { ...kept, ...newImages };
+    });
     setLoadingItems((prev) => {
       const next = new Set(prev);
       for (const itemId of itemIds) next.delete(itemId);
