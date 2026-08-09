@@ -46,7 +46,7 @@ An item can have any number of photos.
 
 Type into the search box above the item grid — it searches title, description, place, and tags together, starting from the third character (shorter queries show the unfiltered list rather than empty results). Clear it with the **×** button once there's text.
 
-Below 10 items, all pages show as individual numbers; beyond that, the page control collapses to first/last plus a sliding window around your current page, with `…` in between.
+Up to seven pages — 63 items, at nine per page — every page number is shown. Beyond that the control collapses to first/last plus a sliding window around your current page, with `…` in between.
 
 ## View items on a map
 
