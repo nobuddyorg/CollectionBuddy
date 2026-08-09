@@ -143,7 +143,10 @@ export default function Page() {
             <h2 id="entries-heading" className="sr-only">
               {t('page.entries')}
             </h2>
-            <ItemList key={selectedCategoryId} categoryId={selectedCategoryId} />
+            <ItemList
+              key={selectedCategoryId}
+              categoryId={selectedCategoryId}
+            />
           </section>
         ) : (
           // Reached only by a collection with no categories at all: one
