@@ -27,7 +27,11 @@ A `public.profiles` table existed in the pre-squash migrations and was dropped �
 
 ### Row Level Security
 
-Every table has symmetric `select`/`insert`/`update`/`delete` policies, all scoped to `user_id = auth.uid()` ([`0006_policies.sql`](../../supabase/migrations/0006_policies.sql)). This is the *only* authorization layer — see [Design decisions](../explanation/design-decisions.md#why-authorization-lives-entirely-in-postgres-rls).
+This is the *only* authorization layer — see [Design decisions](../explanation/design-decisions.md#why-authorization-lives-entirely-in-postgres-rls). Every policy in [`0006_policies.sql`](../../supabase/migrations/0006_policies.sql) is `user_id = (select auth.uid())` and nothing else; the scalar subquery is deliberate, so the planner evaluates it once per query rather than once per row.
+
+`categories` and `items` each carry all four of `select`/`insert`/`update`/`delete`. `item_categories` carries three: a mapping row has nothing to edit, so there is no update policy. No role is named on any of them, so they apply to every role that can reach the table — only `authenticated` is granted anything, and `auth.uid()` is null for `anon`, so the predicate is null and denies.
+
+`web/e2e/signed-in/rls.spec.ts` is the executable version of this section: it asks the questions the app never would, with a real token, against a local stack.
 
 ### Triggers and functions
 
