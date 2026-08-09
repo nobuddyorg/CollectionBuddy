@@ -27,7 +27,11 @@ A `public.profiles` table existed in the pre-squash migrations and was dropped �
 
 ### Row Level Security
 
-Every table has symmetric `select`/`insert`/`update`/`delete` policies, all scoped to `user_id = auth.uid()` ([`0006_policies.sql`](../../supabase/migrations/0006_policies.sql)). This is the *only* authorization layer — see [Design decisions](../explanation/design-decisions.md#why-authorization-lives-entirely-in-postgres-rls).
+This is the *only* authorization layer — see [Design decisions](../explanation/design-decisions.md#why-authorization-lives-entirely-in-postgres-rls). Every policy in [`0006_policies.sql`](../../supabase/migrations/0006_policies.sql) is `user_id = (select auth.uid())` and nothing else; the scalar subquery is deliberate, so the planner evaluates it once per query rather than once per row.
+
+`categories` and `items` each carry all four of `select`/`insert`/`update`/`delete`. `item_categories` carries three: a mapping row has nothing to edit, so there is no update policy. No role is named on any of them, so they apply to every role that can reach the table — only `authenticated` is granted anything, and `auth.uid()` is null for `anon`, so the predicate is null and denies.
+
+`web/e2e/signed-in/rls.spec.ts` is the executable version of this section: it asks the questions the app never would, with a real token, against a local stack.
 
 ### Triggers and functions
 
@@ -75,6 +79,9 @@ It is not the only code holding the client, though. Auth and session work reache
 | [`ci.yml`](../../.github/workflows/ci.yml) (`build_and_test`) | push/PR to `main` | Build, type-check, format check, lint, `vitest run --coverage` (gated by thresholds — see [Configuration](configuration.md#coverage-and-mutation-thresholds)), then the signed-out Playwright suite against the built export, served under the base path on desktop and a phone viewport — this replaced an earlier check that only served the export and confirmed it booted. |
 | [`ci.yml`](../../.github/workflows/ci.yml) (`e2e_local_stack`) | push/PR to `main` | Starts a Supabase stack in Docker and runs the signed-in Playwright suite against it: the catalogue, search, the map, the entry forms, photographs, and the row-level security boundary. |
 | [`ci.yml`](../../.github/workflows/ci.yml) (`mutation_test`) | push/PR to `main` | Stryker against the pure, high-risk modules listed in [`stryker.config.mjs`](../../web/stryker.config.mjs). |
-| [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) | push to `main`, manual | Builds the static export and deploys it to GitHub Pages. |
+| [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) (`migrate`) | push to `main`, manual | Applies any pending migrations to the hosted database and reloads PostgREST's schema cache, before anything that depends on the new schema is built. |
+| [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) (`build`) | push to `main`, manual | Builds the static export. |
+| [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) (`deploy`) | push to `main`, manual | Publishes the export to GitHub Pages. |
+| [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) (`smoke_test`) | push to `main`, manual | Reruns the signed-out Playwright suite against the live deployed site. |
 | [`keep-alive.yml`](../../.github/workflows/keep-alive.yml) | daily cron, manual | Calls the `keepalive()` RPC to stop a free-tier Supabase project auto-pausing. |
-| [`auto-merge.yml`](../../.github/workflows/auto-merge.yml) | PR events | Auto-approves and merges Dependabot PRs that are patch-level semver bumps only. |
+| [`auto-merge.yml`](../../.github/workflows/auto-merge.yml) | PR events | Merges Dependabot PRs for patch-level devDependency bumps only, once every required check passes (`gh pr merge --auto`) — it does not itself approve the PR, so a branch-protection rule requiring a review would still block it. |
