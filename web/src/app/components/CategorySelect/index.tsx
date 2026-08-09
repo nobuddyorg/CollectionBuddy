@@ -223,7 +223,7 @@ export default function CategorySelect({
                     removals would only fail silently as 404s rather than
                     stopping either action (#419). */}
                 <DeleteButtonWithLabel
-                  onClick={onDelete}
+                  onClick={() => void onDelete()}
                   disabled={isDeleting || isExporting}
                   label={t('category_select.delete')}
                 />
@@ -241,11 +241,11 @@ export default function CategorySelect({
             <CategoryInput
               name={name}
               setName={setName}
-              createCategory={onCreate}
+              createCategory={() => void onCreate()}
               setExpanded={setExpanded}
             />
             <AddButton
-              onClick={onCreate}
+              onClick={() => void onCreate()}
               disabled={name.trim() === '' || isCreating}
               isCreating={isCreating}
               label={t('category_select.add')}

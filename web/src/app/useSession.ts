@@ -4,8 +4,23 @@ import { useEffect, useState } from 'react';
 
 import { supabase } from './supabase';
 import { SessionUser } from './types';
+import type { User } from '@supabase/supabase-js';
 
 type SessionState = { user: SessionUser | null; loading: boolean };
+
+// user_metadata is an untyped bag from the auth provider's own response, so
+// `name` is `any` as far as the compiler knows -- narrowed here rather than
+// trusted, since Google is the one populating it and this is the only place
+// that reads it.
+function sessionUserFrom(user: User | undefined): SessionUser | null {
+  if (!user) return null;
+  const name: unknown = user.user_metadata?.name;
+  return {
+    id: user.id,
+    email: user.email ?? null,
+    name: typeof name === 'string' ? name : null,
+  };
+}
 
 export function useSession(): SessionState {
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -22,30 +37,12 @@ export function useSession(): SessionState {
       // change, including a session that turns out to be stale.
       const { data } = await supabase.auth.getSession();
       if (!active) return;
-      const u = data.session?.user;
-      setUser(
-        u
-          ? {
-              id: u.id,
-              email: u.email ?? null,
-              name: u.user_metadata?.name ?? null,
-            }
-          : null,
-      );
+      setUser(sessionUserFrom(data.session?.user));
       setLoading(false);
     };
-    load();
+    void load();
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      const u = session?.user;
-      setUser(
-        u
-          ? {
-              id: u.id,
-              email: u.email ?? null,
-              name: u.user_metadata?.name ?? null,
-            }
-          : null,
-      );
+      setUser(sessionUserFrom(session?.user));
     });
     return () => {
       active = false;

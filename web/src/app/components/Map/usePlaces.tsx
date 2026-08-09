@@ -16,7 +16,9 @@ const GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
 
 function readGeocodeCache(): Record<string, PlaceCoords> {
   try {
-    return JSON.parse(localStorage.getItem(GEOCODE_CACHE_KEY) ?? '{}');
+    return JSON.parse(
+      localStorage.getItem(GEOCODE_CACHE_KEY) ?? '{}',
+    ) as Record<string, PlaceCoords>;
   } catch {
     return {};
   }

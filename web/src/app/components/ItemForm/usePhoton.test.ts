@@ -162,17 +162,19 @@ describe('usePhotonSearch onKeyDown', () => {
 
       expect(result.current.results.length).toBe(1);
 
+      const preventDefault = vi.fn();
+      const stopPropagation = vi.fn();
       const event = {
         key: 'Escape',
-        preventDefault: vi.fn(),
-        stopPropagation: vi.fn(),
+        preventDefault,
+        stopPropagation,
       } as unknown as React.KeyboardEvent<HTMLInputElement>;
       act(() => {
         result.current.onKeyDown(event);
       });
 
-      expect(event.preventDefault).toHaveBeenCalledOnce();
-      expect(event.stopPropagation).toHaveBeenCalledOnce();
+      expect(preventDefault).toHaveBeenCalledOnce();
+      expect(stopPropagation).toHaveBeenCalledOnce();
       expect(result.current.results).toEqual([]);
     } finally {
       vi.useRealTimers();
@@ -182,16 +184,18 @@ describe('usePhotonSearch onKeyDown', () => {
 
   it('leaves Escape alone when there is no suggestion menu to dismiss', () => {
     const { result } = renderHook(() => usePhotonSearch('en'));
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
     const event = {
       key: 'Escape',
-      preventDefault: vi.fn(),
-      stopPropagation: vi.fn(),
+      preventDefault,
+      stopPropagation,
     } as unknown as React.KeyboardEvent<HTMLInputElement>;
     act(() => {
       result.current.onKeyDown(event);
     });
-    expect(event.preventDefault).not.toHaveBeenCalled();
-    expect(event.stopPropagation).not.toHaveBeenCalled();
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(stopPropagation).not.toHaveBeenCalled();
   });
 });
 
@@ -213,5 +217,14 @@ describe('isQueryLongEnough', () => {
   it('measures the trimmed length, not the raw length', () => {
     expect(isQueryLongEnough('  ab  ')).toBe(false);
     expect(isQueryLongEnough('  abc  ')).toBe(true);
+  });
+
+  // Regression: this used to hardcode 3 rather than deferring to
+  // data/items.ts's searchMinLength, so a non-ASCII query -- which carries
+  // more meaning per character -- waited for a third character here while
+  // the PostgREST filter it's meant to match already fired at two.
+  it('accepts a two-character non-ASCII query, matching the PostgREST filter', () => {
+    expect(isQueryLongEnough('京')).toBe(false);
+    expect(isQueryLongEnough('京都')).toBe(true);
   });
 });

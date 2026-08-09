@@ -83,6 +83,11 @@ export function useTheme() {
   const preference = useSyncExternalStore(
     subscribePreference,
     readPreference,
+    // Looks redundant in isolation, but useSyncExternalStore infers its
+    // return type from all three callbacks together -- drop this and the
+    // inferred type widens to plain `string`, which then fails to satisfy
+    // ThemePreference everywhere `preference` is used below.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     () => 'system' as ThemePreference,
   );
   const systemPrefersDark = useSyncExternalStore(

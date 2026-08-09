@@ -1,10 +1,9 @@
 'use client';
 import { useEffect, useId, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
-import { usePhotonSearch } from './usePhoton';
+import { isQueryLongEnough, usePhotonSearch } from './usePhoton';
 import type { PlaceCoords } from './types';
 
-const MIN_Q = 3;
 const ESTIMATED_MENU_HEIGHT = 240;
 
 // `onChange` always says what the coordinates are now, never just what the
@@ -85,15 +84,10 @@ export function PlaceAutocomplete({
           // Typed by hand, so whatever coordinates were attached belong to
           // a place that is no longer what this field says.
           onChange(v, null);
-          const len = v.trim().length;
-          if (len < MIN_Q) {
-            setFocus(false);
-          } else {
-            setFocus(true);
-          }
+          setFocus(isQueryLongEnough(v));
         }}
         onFocus={() => {
-          if (value.trim().length >= MIN_Q) setFocus(true);
+          if (isQueryLongEnough(value)) setFocus(true);
         }}
         onKeyDown={(e) => {
           const picked = onKeyDown(e);

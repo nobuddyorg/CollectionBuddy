@@ -97,9 +97,11 @@ export default function Menu({
 
       <button
         type="button"
-        onClick={async () => {
-          await onSignOut();
-          onClose();
+        onClick={() => {
+          void (async () => {
+            await onSignOut();
+            onClose();
+          })();
         }}
         className="w-full text-left px-3 min-h-11 flex items-center rounded-sm hover:bg-muted text-sm transition-colors"
       >

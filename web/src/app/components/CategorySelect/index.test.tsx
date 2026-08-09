@@ -33,7 +33,7 @@ function exportState(
     runExport: vi.fn(),
     cancelExport: vi.fn(),
     ...overrides,
-  } as unknown as ReturnType<typeof useExportCategory>;
+  };
 }
 
 const cats = [
@@ -53,7 +53,7 @@ function categories(overrides: Partial<UseCategories> = {}): UseCategories {
     renameCategory: vi.fn(),
     deleteCategory: vi.fn(),
     ...overrides,
-  } as unknown as UseCategories;
+  };
 }
 
 function renderSelect(

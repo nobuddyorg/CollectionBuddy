@@ -42,7 +42,7 @@ export default function GoogleSignInButton({
     <>
       <button
         type="button"
-        onClick={handleClick}
+        onClick={() => void handleClick()}
         disabled={disabled || loading}
         aria-label={finalLabel}
         aria-busy={loading ? 'true' : 'false'}

@@ -5,7 +5,7 @@ import { useI18n } from '../../i18n/useI18n';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { Submit } from './Submit';
 import { TagsInput } from './TagsInput';
-import type { ItemFormProps, ItemFormValues, PlaceCoords } from './types';
+import type { ItemFormProps, PlaceCoords } from './types';
 
 export type { ItemFormValues } from './types';
 export { EMPTY_ITEM_FORM_VALUES } from './types';
@@ -86,7 +86,7 @@ export default function ItemForm({
         place_lat: placeCoords?.lat ?? null,
         place_lng: placeCoords?.lng ?? null,
         tags,
-      } as ItemFormValues);
+      });
     },
     [onSubmit, title, description, place, placeCoords, tags],
   );

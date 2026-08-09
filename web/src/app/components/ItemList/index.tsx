@@ -260,7 +260,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               pendingUploads={pendingUploads[it.id] ?? 0}
               imagesLoading={loadingItems.has(it.id)}
               deletingPath={deletingPath}
-              onUpload={(f) => uploadImage(it.id, f)}
+              onUpload={(f) => void uploadImage(it.id, f)}
               onEditItem={() => openEdit(it)}
               onDeleteItem={() => void removeItem(it.id)}
               onDeleteImage={(img) => void deleteImage(it.id, img)}
@@ -295,7 +295,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
           setEditOpen(v);
           if (!v) setEditingItem(null);
         }}
-        onSubmit={handleEditSubmit}
+        onSubmit={(values) => void handleEditSubmit(values)}
       />
 
       <MapModal

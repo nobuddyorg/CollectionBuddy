@@ -6,11 +6,13 @@ import type { ReactNode } from 'react';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
 import { useItems } from './useItems';
+import type { listItems } from '../../data/items';
 
 const { listItemsMock } = vi.hoisted(() => ({ listItemsMock: vi.fn() }));
 
 vi.mock('../../data/items', () => ({
-  listItems: (...args: unknown[]) => listItemsMock(...args),
+  listItems: (...args: unknown[]) =>
+    listItemsMock(...args) as ReturnType<typeof listItems>,
 }));
 
 function wrapper({ children }: { children: ReactNode }) {

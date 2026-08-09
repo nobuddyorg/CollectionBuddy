@@ -136,6 +136,19 @@ async function mapPool<T, R>(
   return results;
 }
 
+// Every worker in this codebase only ever throws a real Error (or one of
+// its subclasses, e.g. ExportCancelledError/ZipLimitError) -- this exists
+// so a caught value that somehow isn't one still comes out as one, not
+// because the fallback is expected to fire.
+// Stryker disable all
+/* v8 ignore start */
+function throwAsError(err: unknown): never {
+  if (err instanceof Error) throw err;
+  throw new Error(String(err));
+}
+/* v8 ignore stop */
+// Stryker restore all
+
 /**
  * Same pool, but for a worker that can fail the whole run: the first
  * rejection stops every runner from picking up further items (in-flight
@@ -167,7 +180,7 @@ async function runPool<T>(
     },
   );
   await Promise.all(runners);
-  if (poolError !== undefined) throw poolError;
+  if (poolError !== undefined) throwAsError(poolError);
 }
 
 // A named reference rather than an inline arrow at the default-parameter
