@@ -56,6 +56,34 @@ async function ensureUser(email: string, password: string): Promise<string> {
 }
 
 /**
+ * Removes every stored object under this user's prefix, across every item.
+ *
+ * Deleting an item's database row never touches its photographs -- SQL
+ * cannot reach object storage, only the Storage API can, so the app deletes
+ * objects client-side before the row. A photos.spec.ts test that fails
+ * between uploading and deleting an entry leaves its objects behind with no
+ * row pointing at them, and reseed()'s own row deletes above cannot find
+ * them either. Run once per suite start, this is what stops that leak from
+ * accumulating across every run rather than just the rest of one (#338) --
+ * anything genuinely still wanted is re-uploaded by the test that wants it.
+ */
+async function sweepStorage(as: SupabaseClient, userId: string) {
+  const { data: itemPrefixes } = await as.storage
+    .from('item-images')
+    .list(userId);
+  const paths: string[] = [];
+  for (const prefix of itemPrefixes ?? []) {
+    const { data: objects } = await as.storage
+      .from('item-images')
+      .list(`${userId}/${prefix.name}`);
+    for (const object of objects ?? []) {
+      paths.push(`${userId}/${prefix.name}/${object.name}`);
+    }
+  }
+  if (paths.length) await as.storage.from('item-images').remove(paths);
+}
+
+/**
  * Puts the collection into a known state.
  *
  * Deleted and rebuilt rather than added to, so a second run sees exactly what
@@ -63,6 +91,7 @@ async function ensureUser(email: string, password: string): Promise<string> {
  * which three.
  */
 async function reseed(as: SupabaseClient, userId: string) {
+  await sweepStorage(as, userId);
   await as.from('items').delete().eq('user_id', userId);
   await as.from('categories').delete().eq('user_id', userId);
 
@@ -102,6 +131,7 @@ async function reseed(as: SupabaseClient, userId: string) {
 
 /** The other collector's one category and one entry. */
 async function reseedOther(as: SupabaseClient, userId: string) {
+  await sweepStorage(as, userId);
   await as.from('items').delete().eq('user_id', userId);
   await as.from('categories').delete().eq('user_id', userId);
 

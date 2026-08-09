@@ -141,18 +141,24 @@ test.describe('one collection cannot reach another', () => {
       .insert({ user_id: otherUserId, title: 'planted' })
       .select('id,user_id')
       .single();
-    expect(error).toBeNull();
-    expect(planted!.user_id).toBe(userId);
-    expect(planted!.user_id).not.toBe(otherUserId);
+    try {
+      expect(error).toBeNull();
+      expect(planted!.user_id).toBe(userId);
+      expect(planted!.user_id).not.toBe(otherUserId);
 
-    // And their collection never saw it.
-    const { data: theirs } = await apiAs(otherToken)
-      .from('items')
-      .select('title')
-      .eq('user_id', otherUserId);
-    expect(theirs!.map((row) => row.title)).not.toContain('planted');
-
-    await apiAs(token).from('items').delete().eq('id', planted!.id);
+      // And their collection never saw it.
+      const { data: theirs } = await apiAs(otherToken)
+        .from('items')
+        .select('title')
+        .eq('user_id', otherUserId);
+      expect(theirs!.map((row) => row.title)).not.toContain('planted');
+    } finally {
+      // In a finally: this plants a row in the seeded user's own collection
+      // (the trigger rewrites the owner), and a failed assertion above would
+      // otherwise leave it there for `entries.spec.ts` or `photos.spec.ts`
+      // to count by accident (#338).
+      if (planted) await apiAs(token).from('items').delete().eq('id', planted.id);
+    }
   });
 
   // The same trigger refuses to let an existing row change hands: on update
@@ -166,16 +172,17 @@ test.describe('one collection cannot reach another', () => {
       .insert({ user_id: userId, title: 'to be given away' })
       .select('id')
       .single();
-
-    const { data: given } = await apiAs(token)
-      .from('items')
-      .update({ user_id: otherUserId })
-      .eq('id', mine!.id)
-      .select('user_id')
-      .single();
-    expect(given!.user_id).toBe(userId);
-
-    await apiAs(token).from('items').delete().eq('id', mine!.id);
+    try {
+      const { data: given } = await apiAs(token)
+        .from('items')
+        .update({ user_id: otherUserId })
+        .eq('id', mine!.id)
+        .select('user_id')
+        .single();
+      expect(given!.user_id).toBe(userId);
+    } finally {
+      if (mine) await apiAs(token).from('items').delete().eq('id', mine.id);
+    }
   });
 
   // Storage carries its own policies, scoped by the first path segment being
