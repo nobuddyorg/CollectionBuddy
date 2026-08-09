@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { searchMinLength } from '../../data/items';
 import {
   coordsFromFeature,
   photonLang,
@@ -50,11 +51,12 @@ export function dedupePhotonFeatures(
   return deduped;
 }
 
-// Below 3 chars there's nothing worth querying Photon for -- same
-// threshold the PostgREST search filter uses, for the same trigram-index
-// reasoning.
+// Same threshold the PostgREST search filter uses (`data/items.ts`), for
+// the same trigram-index reasoning -- including the lower floor for a
+// non-ASCII query, which carries more meaning per character.
 export function isQueryLongEnough(query: string): boolean {
-  return query.trim().length >= 3;
+  const trimmed = query.trim();
+  return trimmed.length >= searchMinLength(trimmed);
 }
 
 /* v8 ignore start -- hook internals (fetch, timers, DOM); the extracted

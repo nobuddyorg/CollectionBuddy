@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
-import { SEARCH_MIN_LENGTH } from '../../data/items';
+import { searchMinLength } from '../../data/items';
 import CenteredModal from '../CenteredModal';
 import Icon, { IconType } from '../Icon';
 import { usePlaces } from '../Map/usePlaces';
@@ -128,7 +128,7 @@ export function MapModal({
         // rather than at the search box they typed in.
         <p className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70">
           {t(
-            search.length >= SEARCH_MIN_LENGTH
+            search.length >= searchMinLength(search)
               ? 'item_list.map_empty_filtered'
               : 'item_list.map_empty',
           )}

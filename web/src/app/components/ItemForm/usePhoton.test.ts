@@ -214,4 +214,13 @@ describe('isQueryLongEnough', () => {
     expect(isQueryLongEnough('  ab  ')).toBe(false);
     expect(isQueryLongEnough('  abc  ')).toBe(true);
   });
+
+  // Regression: this used to hardcode 3 rather than deferring to
+  // data/items.ts's searchMinLength, so a non-ASCII query -- which carries
+  // more meaning per character -- waited for a third character here while
+  // the PostgREST filter it's meant to match already fired at two.
+  it('accepts a two-character non-ASCII query, matching the PostgREST filter', () => {
+    expect(isQueryLongEnough('京')).toBe(false);
+    expect(isQueryLongEnough('京都')).toBe(true);
+  });
 });
