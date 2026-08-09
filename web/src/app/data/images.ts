@@ -1,6 +1,15 @@
 import { supabase } from '../supabase';
+import { currentUserId, verifiedUserId } from './auth';
 
 export const ITEM_IMAGES_BUCKET = 'item-images';
+
+// The single definition of how a storage prefix is built from a user and an
+// item -- callers construct paths through this rather than the template
+// literal by hand, so changing the scheme is a one-line edit instead of a
+// grep across the app.
+export function imagePrefix(uid: string, itemId: string): string {
+  return `${uid}/${itemId}`;
+}
 
 // Oldest photograph first, which is what puts a listing in the same order the
 // grid lays its frames out in: the first shot of an item keeps the hero slot
@@ -61,6 +70,23 @@ export function removeImageObjects(paths: string[]) {
   return supabase.storage.from(ITEM_IMAGES_BUCKET).remove(paths);
 }
 
+// Resolves the current user and lists every stored object under their
+// prefix for one item, in a single call -- the read-path counterpart of
+// removeItemImages, for callers that would otherwise have to ask the auth
+// client for the uid themselves just to build the same prefix by hand.
+export async function listItemImages(itemId: string): Promise<{
+  uid: string;
+  prefix: string;
+  data: { name: string }[] | null;
+  error: unknown;
+} | null> {
+  const uid = await currentUserId();
+  if (!uid) return null;
+  const prefix = imagePrefix(uid, itemId);
+  const { data, error } = await listAllImageObjects(prefix);
+  return { uid, prefix, data, error };
+}
+
 // Deletes every stored object (full + thumb) under an item's prefix.
 // Standalone (not part of a hook) so callers that don't otherwise need
 // image state -- e.g. category deletion, which must clean up any items it
@@ -70,11 +96,10 @@ export function removeImageObjects(paths: string[]) {
 // invalidate a cached listing, say) doesn't have to ask the auth client all
 // over again for something this function has already looked up.
 export async function removeItemImages(itemId: string): Promise<string | null> {
-  const { data: u } = await supabase.auth.getUser();
-  const uid = u.user?.id;
+  const uid = await verifiedUserId();
   if (!uid) return null;
 
-  const prefix = `${uid}/${itemId}`;
+  const prefix = imagePrefix(uid, itemId);
   const { data, error } = await listImageObjects(prefix, 100);
   if (error) throw error;
   if (!data?.length) return uid;

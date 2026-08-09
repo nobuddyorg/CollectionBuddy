@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { IMAGE_LIST_SORT } from './images';
+import { IMAGE_LIST_SORT, imagePrefix } from './images';
+
+describe('imagePrefix', () => {
+  it('joins the user and item id the same way every caller used to by hand', () => {
+    expect(imagePrefix('user-1', 'item-1')).toBe('user-1/item-1');
+  });
+});
 
 // The grid stands an upload's placeholder at the end of the arrangement,
 // because that is where the photograph is about to go. That only holds if the
