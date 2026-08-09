@@ -17,6 +17,7 @@ function Plate({
   onOpen,
   overlay,
   children,
+  priority = false,
 }: {
   src: string;
   alt: string;
@@ -28,6 +29,10 @@ function Plate({
    * separate hit target relying on `pointer-events` to fall through to it. */
   overlay?: React.ReactNode;
   children?: React.ReactNode;
+  /** This plate is (or is likely to be) the LCP element -- fetched eagerly
+   * at high priority instead of lazily, same as next/image's old `priority`
+   * prop. Only ever true for slot 0 of one of the first few cards. */
+  priority?: boolean;
 }) {
   const [loaded, setLoaded] = useState(false);
 
@@ -53,7 +58,8 @@ function Plate({
           // changes; if that ever stopped being true these would fail to
           // render rather than merely warn, which is the risk being taken.
           crossOrigin="anonymous"
-          loading="lazy"
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : undefined}
           onLoad={() => setLoaded(true)}
           onError={() => setLoaded(true)}
           className={`${ratio} w-full object-cover cursor-zoom-in transition-opacity duration-300 ${
@@ -114,6 +120,7 @@ export function ImageGrid({
   busy,
   loading = false,
   pending = 0,
+  priority = false,
 }: {
   imgs: ImgEntry[];
   itemTitle: string;
@@ -128,6 +135,10 @@ export function ImageGrid({
   loading?: boolean;
   /** Photographs handed over but not yet on the wall; each gets a frame. */
   pending?: number;
+  /** This card is one of the first few on the page, so its hero plate is
+   * likely the LCP element -- fetched eagerly at high priority rather than
+   * lazily. Never applies to the strip; only slot 0 is ever the hero. */
+  priority?: boolean;
 }) {
   const { t } = useI18n();
 
@@ -242,6 +253,7 @@ export function ImageGrid({
         alt={alt}
         ratio={ratio}
         onOpen={() => onOpenModal(index)}
+        priority={priority && index === 0}
         overlay={
           overflowCount ? (
             // aria-hidden: the accessible name already carries this via

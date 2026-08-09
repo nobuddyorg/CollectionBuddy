@@ -252,7 +252,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
           // bind a caption and its buttons to the photograph above them.
           className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-4 transition-opacity ${loading ? 'opacity-60' : ''}`}
         >
-          {items.map((it) => (
+          {items.map((it, idx) => (
             <ItemCard
               key={it.id}
               item={it}
@@ -265,6 +265,10 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               onDeleteItem={() => void removeItem(it.id)}
               onDeleteImage={(img) => void deleteImage(it.id, img)}
               onOpenModal={(index) => setModalState({ itemId: it.id, index })}
+              // The grid is up to 3 columns wide (lg:grid-cols-3), so the
+              // first row -- and the LCP candidate within it -- is always
+              // among these three regardless of viewport.
+              priority={idx < 3}
             />
           ))}
         </ul>
