@@ -168,11 +168,11 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       if (!mapRef.current || mapInstance.current) return;
       if (typeof window === 'undefined') return;
 
-      const L = (await import('leaflet')).default as Leaflet;
+      const L = (await import('leaflet')).default;
       if (cancelled) return;
       LRef.current = L;
 

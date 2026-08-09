@@ -137,16 +137,13 @@ export default function Page() {
             // category strip is expanded and that tab is actually in the
             // DOM. An id that doesn't resolve is just skipped, so the panel
             // is never left without an accessible name either way.
-            aria-labelledby={`entries-heading ${categoryTabId(selectedCategoryId!)}`}
+            aria-labelledby={`entries-heading ${categoryTabId(selectedCategoryId)}`}
             className="relative z-50 space-y-4"
           >
             <h2 id="entries-heading" className="sr-only">
               {t('page.entries')}
             </h2>
-            <ItemList
-              key={selectedCategoryId}
-              categoryId={selectedCategoryId!}
-            />
+            <ItemList key={selectedCategoryId} categoryId={selectedCategoryId} />
           </section>
         ) : (
           // Reached only by a collection with no categories at all: one

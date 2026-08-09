@@ -33,7 +33,7 @@ export default function ItemCreate({
         initial={EMPTY_ITEM_FORM_VALUES}
         submitting={isCreating}
         submitLabel={t('item_create.add')}
-        onSubmit={handleCreate}
+        onSubmit={(values) => void handleCreate(values)}
         onDirtyChange={onDirtyChange}
       />
     </section>

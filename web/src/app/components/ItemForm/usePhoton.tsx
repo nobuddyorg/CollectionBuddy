@@ -104,38 +104,40 @@ export function usePhotonSearch(locale?: string) {
       return;
     }
     const q = query.trim();
-    const timer = setTimeout(async () => {
-      abortRef.current?.abort();
-      const ctl = new AbortController();
-      abortRef.current = ctl;
-      // Guards below check `abortRef.current === ctl` rather than relying
-      // solely on AbortError: the abort() call above happens synchronously,
-      // but the aborted request's own rejection is delivered on a later
-      // microtask/turn -- often *after* this request has already reached
-      // `setLoading(true)`. Without the guard, the older request's
-      // `finally` still runs and clears `loading` out from under this one.
-      try {
-        setLoading(true);
-        setError(false);
-        const url = photonSearchUrl(q, { limit: 5, lang });
-        const res = await fetch(url, { signal: ctl.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data: { features: PhotonFeature[] } = await res.json();
-        if (abortRef.current !== ctl) return;
+    const timer = setTimeout(() => {
+      void (async () => {
+        abortRef.current?.abort();
+        const ctl = new AbortController();
+        abortRef.current = ctl;
+        // Guards below check `abortRef.current === ctl` rather than relying
+        // solely on AbortError: the abort() call above happens synchronously,
+        // but the aborted request's own rejection is delivered on a later
+        // microtask/turn -- often *after* this request has already reached
+        // `setLoading(true)`. Without the guard, the older request's
+        // `finally` still runs and clears `loading` out from under this one.
+        try {
+          setLoading(true);
+          setError(false);
+          const url = photonSearchUrl(q, { limit: 5, lang });
+          const res = await fetch(url, { signal: ctl.signal });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = (await res.json()) as { features: PhotonFeature[] };
+          if (abortRef.current !== ctl) return;
 
-        setResults(dedupePhotonFeatures(data.features, regionNames));
-        setActiveIdx(-1);
-      } catch (err) {
-        // A newer keystroke aborting this request isn't a failure -- the
-        // request that superseded it owns the resulting state.
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        if (abortRef.current !== ctl) return;
-        setResults([]);
-        setActiveIdx(-1);
-        setError(true);
-      } finally {
-        if (abortRef.current === ctl) setLoading(false);
-      }
+          setResults(dedupePhotonFeatures(data.features, regionNames));
+          setActiveIdx(-1);
+        } catch (err) {
+          // A newer keystroke aborting this request isn't a failure -- the
+          // request that superseded it owns the resulting state.
+          if (err instanceof DOMException && err.name === 'AbortError') return;
+          if (abortRef.current !== ctl) return;
+          setResults([]);
+          setActiveIdx(-1);
+          setError(true);
+        } finally {
+          if (abortRef.current === ctl) setLoading(false);
+        }
+      })();
     }, 300);
     return () => clearTimeout(timer);
   }, [query, focus, lang, regionNames]);

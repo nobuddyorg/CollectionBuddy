@@ -8,6 +8,7 @@ import {
   PHOTO_DOWNLOAD_CONCURRENCY,
   PHOTO_FETCH_TIMEOUT_MS,
   SIGN_BATCH_SIZE,
+  type ExportProgress,
   type ExportResult,
 } from './exportCategory';
 import { CSV_NAME, MANIFEST_NAME, type ExportManifest } from './exportFormat';
@@ -63,10 +64,10 @@ function paginatedListItems(allItems: ExportItem[]): ListItems {
 // Stands in for `listAllImageObjects`, keyed by the exact `${uid}/${itemId}`
 // prefix exportCategory builds.
 function fakeListImages(byPrefix: Record<string, string[]>): ListImages {
-  return (async (prefix: string) => ({
+  return async (prefix: string) => ({
     data: (byPrefix[prefix] ?? []).map((name) => ({ name })),
     error: null,
-  })) as unknown as ListImages;
+  });
 }
 
 // Stands in for `createSignedUrls`: every path signs to a deterministic URL
@@ -895,7 +896,7 @@ describe('exportCategory', () => {
       vi.fn(async () => okResponse([1])),
     );
     try {
-      const onProgress = vi.fn();
+      const onProgress = vi.fn<(progress: ExportProgress) => void>();
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
         onProgress,
@@ -971,7 +972,7 @@ describe('exportCategory', () => {
       // Names the HTTP status that caused it, not a blank message -- a
       // developer reading this log is the only diagnostic an export ever
       // gets, since the failure never reaches the UI beyond a count.
-      const [, , err] = consoleError.mock.calls[0];
+      const [, , err] = consoleError.mock.calls[0] as unknown[];
       expect(String(err)).toContain('HTTP 404');
     } finally {
       consoleError.mockRestore();
@@ -998,7 +999,7 @@ describe('exportCategory', () => {
       });
       await vi.advanceTimersByTimeAsync(10_000);
       await promise;
-      const [, , err] = consoleError.mock.calls[0];
+      const [, , err] = consoleError.mock.calls[0] as unknown[];
       expect(String(err)).toContain('HTTP 503');
     } finally {
       vi.useRealTimers();
@@ -1100,7 +1101,7 @@ describe('exportCategory', () => {
         listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
         signUrls,
       });
-      const [, , err] = consoleError.mock.calls[0];
+      const [, , err] = consoleError.mock.calls[0] as unknown[];
       expect(String(err)).toContain('Unsigned path in');
     } finally {
       consoleError.mockRestore();

@@ -7,6 +7,7 @@ import { ToastProvider } from '../Toast/ToastProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import ItemList from './index';
 import type { ItemLite } from './types';
+import type { useItems } from './useItems';
 
 // The three data hooks ItemList wires together are exercised on their own
 // (useItems.test.tsx, useItemImages/useItemMutations internals are I/O and
@@ -15,7 +16,8 @@ import type { ItemLite } from './types';
 // (items, total, loading) triple -- without a real Supabase round trip.
 const useItemsMock = vi.fn();
 vi.mock('./useItems', () => ({
-  useItems: (...args: unknown[]) => useItemsMock(...args),
+  useItems: (...args: unknown[]) =>
+    useItemsMock(...args) as ReturnType<typeof useItems>,
 }));
 
 vi.mock('./useItemImages', () => ({
