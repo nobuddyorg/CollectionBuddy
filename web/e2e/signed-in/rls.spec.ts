@@ -157,7 +157,8 @@ test.describe('one collection cannot reach another', () => {
       // (the trigger rewrites the owner), and a failed assertion above would
       // otherwise leave it there for `entries.spec.ts` or `photos.spec.ts`
       // to count by accident (#338).
-      if (planted) await apiAs(token).from('items').delete().eq('id', planted.id);
+      if (planted)
+        await apiAs(token).from('items').delete().eq('id', planted.id);
     }
   });
 

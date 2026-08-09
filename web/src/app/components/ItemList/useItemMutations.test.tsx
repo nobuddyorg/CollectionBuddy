@@ -57,7 +57,12 @@ function useHarness(
   reload: (opts?: { silent?: boolean }) => Promise<void>,
 ) {
   const [items, setItems] = useState<ItemLite[]>(initial);
-  const mutations = useItemMutations({ items, setItems, reload, deleteAllItemImages });
+  const mutations = useItemMutations({
+    items,
+    setItems,
+    reload,
+    deleteAllItemImages,
+  });
   return { items, ...mutations };
 }
 
@@ -81,7 +86,12 @@ describe('useItemMutations removeItem', () => {
     const reload = vi.fn();
 
     const { result } = renderHook(
-      () => useHarness([item('a'), item('b'), item('c')], deleteAllItemImages, reload),
+      () =>
+        useHarness(
+          [item('a'), item('b'), item('c')],
+          deleteAllItemImages,
+          reload,
+        ),
       { wrapper },
     );
 
@@ -108,12 +118,21 @@ describe('useItemMutations removeItem', () => {
   // database no longer has.
   it('does not restore the item when deleteItem succeeds but image cleanup fails', async () => {
     vi.mocked(deleteItem).mockResolvedValue({ error: null } as never);
-    const deleteAllItemImages = vi.fn().mockRejectedValue(new Error('storage down'));
+    const deleteAllItemImages = vi
+      .fn()
+      .mockRejectedValue(new Error('storage down'));
     const reload = vi.fn().mockResolvedValue(undefined);
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
 
     const { result } = renderHook(
-      () => useHarness([item('a'), item('b'), item('c')], deleteAllItemImages, reload),
+      () =>
+        useHarness(
+          [item('a'), item('b'), item('c')],
+          deleteAllItemImages,
+          reload,
+        ),
       { wrapper },
     );
 

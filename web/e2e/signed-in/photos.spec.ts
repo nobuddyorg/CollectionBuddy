@@ -145,9 +145,9 @@ test.describe('photographs', () => {
         (name) => !before.includes(name),
       );
       expect(added).toHaveLength(2);
-      expect(
-        added.filter((name) => name.endsWith('.thumb.webp')),
-      ).toHaveLength(1);
+      expect(added.filter((name) => name.endsWith('.thumb.webp'))).toHaveLength(
+        1,
+      );
       expect(
         added.filter(
           (name) => name.endsWith('.webp') && !name.includes('.thumb'),
