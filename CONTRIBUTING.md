@@ -6,8 +6,12 @@ CollectionBuddy needs a Supabase backend (Postgres + Auth + Storage) to run
 at all -- there is no mock/offline mode. The steps below set up the local
 stack that ships in [`supabase/`](supabase/).
 
-1. Install the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)
-    and Docker (the CLI runs the local stack in containers).
+1. Prerequisites:
+    - **Node.js 22 or newer.** CI pins 22.x; the test setup relies on Node 22+ behaviour.
+    - **Docker**, running — the Supabase CLI runs the local stack in containers.
+    - **[Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)
+      2.110.0.** Both workflows pin that version, so it is the one the migrations are
+      exercised against.
 
 2. From the repository root, start the local stack and apply migrations:
 
