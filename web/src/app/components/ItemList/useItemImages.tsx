@@ -80,10 +80,59 @@ export function toImgEntries(
   return entries;
 }
 
+// Signs whatever isn't already cached, then hands back every item's entries
+// keyed to the now-current signed URLs -- one item or many, the steps are
+// the same: sign the unsigned paths, cache what came back, resolve every
+// path against the cache. Used to be written out twice, once per caller
+// below, and had quietly drifted apart: the single-item path gave up and
+// returned nothing on a signing failure, the batch path fell back to
+// whatever was already cached. This keeps the more forgiving of the two --
+// showing stale-but-real photographs beats showing none.
+export async function signEntries(
+  perItem: ReadonlyArray<readonly [string, Map<string, ImageEntryData>]>,
+  // Stryker disable next-line all
+  // v8 ignore next
+  signUrls: typeof createSignedUrls = createSignedUrls,
+): Promise<Record<string, ImgEntry[]>> {
+  const allPaths = perItem.flatMap(([, entryData]) =>
+    Array.from(entryData.values()).flatMap((e) =>
+      e.pathThumb ? [e.pathFull, e.pathThumb] : [e.pathFull],
+    ),
+  );
+
+  const toSign = unsignedPaths(allPaths);
+  if (toSign.length > 0) {
+    const { data: signedUrls, error: signError } = await signUrls(toSign);
+    if (signError) {
+      console.error('Failed to create signed URLs', signError);
+    } else {
+      cacheSignedUrls(
+        signedUrls
+          .filter((s) => s.path && s.signedUrl)
+          .map((s) => [s.path as string, s.signedUrl as string] as const),
+      );
+    }
+  }
+
+  const signedUrlMap = new Map(
+    allPaths
+      .map((path) => [path, getCachedSignedUrl(path)] as const)
+      .filter((pair): pair is readonly [string, string] => !!pair[1]),
+  );
+
+  const result: Record<string, ImgEntry[]> = {};
+  for (const [itemId, entryData] of perItem) {
+    result[itemId] = toImgEntries(entryData, signedUrlMap);
+  }
+  return result;
+}
+
 /* v8 ignore start -- hook internals (Supabase I/O, timers, compression);
- * pairImageEntries/toImgEntries above are what's gated and mutation-tested. */
+ * pairImageEntries/toImgEntries/signEntries above are what's gated and
+ * mutation-tested. */
 // Stryker disable all: hook internals aren't covered by tests, only
-// pairImageEntries/toImgEntries above are -- mutants in here would only be noise.
+// pairImageEntries/toImgEntries/signEntries above are -- mutants in here
+// would only be noise.
 export function useItemImages() {
   const { t } = useI18n();
   const toast = useToast();
@@ -123,35 +172,10 @@ export function useItemImages() {
 
     const entryData = pairImageEntries(data, prefix);
     cacheListing(prefix, entryData);
+    if (entryData.size === 0) return [];
 
-    const allPaths = Array.from(entryData.values()).flatMap((e) =>
-      e.pathThumb ? [e.pathFull, e.pathThumb] : [e.pathFull],
-    );
-    if (allPaths.length === 0) return [];
-
-    const toSign = unsignedPaths(allPaths);
-    if (toSign.length > 0) {
-      const { data: signedUrls, error: signError } =
-        await createSignedUrls(toSign);
-
-      if (signError) {
-        console.error('Failed to create signed URLs', signError);
-        return [];
-      }
-
-      cacheSignedUrls(
-        signedUrls
-          .filter((s) => s.path && s.signedUrl)
-          .map((s) => [s.path as string, s.signedUrl as string] as const),
-      );
-    }
-
-    const signedUrlMap = new Map(
-      allPaths
-        .map((path) => [path, getCachedSignedUrl(path)] as const)
-        .filter((pair): pair is readonly [string, string] => !!pair[1]),
-    );
-    return toImgEntries(entryData, signedUrlMap);
+    const signed = await signEntries([[itemId, entryData]]);
+    return signed[itemId] ?? [];
   }, []);
 
   // Always re-lists: this runs right after an upload, so the cached listing
@@ -211,39 +235,7 @@ export function useItemImages() {
       }),
     );
 
-    const allPaths = perItem.flatMap(([, entryData]) =>
-      Array.from(entryData.values()).flatMap((e) =>
-        e.pathThumb ? [e.pathFull, e.pathThumb] : [e.pathFull],
-      ),
-    );
-
-    // Re-signing a path that already has a valid signature changes its URL
-    // for no reason, which throws away the browser's copy of the bytes.
-    const toSign = unsignedPaths(allPaths);
-    if (toSign.length > 0) {
-      const { data: signedUrls, error: signError } =
-        await createSignedUrls(toSign);
-      if (signError) {
-        console.error('Failed to create signed URLs', signError);
-      } else {
-        cacheSignedUrls(
-          signedUrls
-            .filter((s) => s.path && s.signedUrl)
-            .map((s) => [s.path as string, s.signedUrl as string] as const),
-        );
-      }
-    }
-
-    const signedUrlMap = new Map(
-      allPaths
-        .map((path) => [path, getCachedSignedUrl(path)] as const)
-        .filter((pair): pair is readonly [string, string] => !!pair[1]),
-    );
-
-    const newImages: Record<string, ImgEntry[]> = {};
-    for (const [itemId, entryData] of perItem) {
-      newImages[itemId] = toImgEntries(entryData, signedUrlMap);
-    }
+    const newImages = await signEntries(perItem);
     lastSignedAtRef.current = Date.now();
     setImages((prev) => ({ ...prev, ...newImages }));
     setLoadingItems((prev) => {

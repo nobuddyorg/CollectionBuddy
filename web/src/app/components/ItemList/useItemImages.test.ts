@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { pairImageEntries, toImgEntries } from './useItemImages';
+import {
+  cacheSignedUrls,
+  clearImageCache,
+  getCachedSignedUrl,
+} from './imageCache';
+import { pairImageEntries, signEntries, toImgEntries } from './useItemImages';
+import type { ImageEntryData } from './useItemImages';
 
 describe('pairImageEntries', () => {
   const prefix = 'user-1/item-1';
@@ -154,5 +160,116 @@ describe('toImgEntries', () => {
     const signed = new Map([['p/a.thumb.webp', 'https://signed/a-thumb']]);
     const result = toImgEntries(entryData, signed);
     expect(result).toEqual([]);
+  });
+});
+
+describe('signEntries', () => {
+  beforeEach(() => {
+    clearImageCache();
+  });
+
+  function entries(
+    pathFull: string,
+    pathThumb?: string,
+  ): Map<string, ImageEntryData> {
+    return new Map([['only', { pathFull, pathThumb }]]);
+  }
+
+  it('signs unsigned paths and returns each item keyed to its signed URL, including a thumbnail', async () => {
+    const signUrls = vi.fn().mockResolvedValue({
+      data: [
+        { path: 'p/1/a.webp', signedUrl: 'https://signed/a' },
+        { path: 'p/1/a.thumb.webp', signedUrl: 'https://signed/a-thumb' },
+      ],
+      error: null,
+    });
+
+    const result = await signEntries(
+      [['item-1', entries('p/1/a.webp', 'p/1/a.thumb.webp')]],
+      signUrls,
+    );
+
+    expect(signUrls).toHaveBeenCalledWith(['p/1/a.webp', 'p/1/a.thumb.webp']);
+    expect(result['item-1']).toEqual([
+      {
+        pathFull: 'p/1/a.webp',
+        urlFull: 'https://signed/a',
+        pathThumb: 'p/1/a.thumb.webp',
+        urlThumb: 'https://signed/a-thumb',
+      },
+    ]);
+    // The signature is cached, not just returned -- a second caller for the
+    // same path is one of the things this function exists to skip.
+    expect(getCachedSignedUrl('p/1/a.webp')).toBe('https://signed/a');
+  });
+
+  it('never calls signUrls when every path is already cached', async () => {
+    cacheSignedUrls([['p/2/a.webp', 'https://signed/cached']]);
+    const signUrls = vi.fn();
+
+    const result = await signEntries(
+      [['item-2', entries('p/2/a.webp')]],
+      signUrls,
+    );
+
+    expect(signUrls).not.toHaveBeenCalled();
+    expect(result['item-2']?.[0]?.urlFull).toBe('https://signed/cached');
+  });
+
+  it('logs and falls back to whatever is already cached when signing fails', async () => {
+    cacheSignedUrls([['p/3/stale.webp', 'https://signed/stale']]);
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const signUrls = vi.fn().mockResolvedValue({
+      data: null,
+      error: new Error('rate limited'),
+    });
+
+    const result = await signEntries(
+      [
+        ['item-3a', entries('p/3/stale.webp')],
+        ['item-3b', entries('p/3/new.webp')],
+      ],
+      signUrls,
+    );
+
+    expect(consoleError).toHaveBeenCalled();
+    // The item whose signature already existed keeps showing it...
+    expect(result['item-3a']?.[0]?.urlFull).toBe('https://signed/stale');
+    // ...and the one that needed a fresh signature that never arrived is
+    // dropped rather than shown with an undefined URL.
+    expect(result['item-3b']).toEqual([]);
+    consoleError.mockRestore();
+  });
+
+  it('ignores a signed-url response entry missing a path or a URL', async () => {
+    const signUrls = vi.fn().mockResolvedValue({
+      data: [
+        { path: 'p/4/a.webp', signedUrl: null },
+        { path: null, signedUrl: 'https://signed/orphan' },
+      ],
+      error: null,
+    });
+
+    const result = await signEntries(
+      [['item-4', entries('p/4/a.webp')]],
+      signUrls,
+    );
+
+    expect(result['item-4']).toEqual([]);
+    expect(getCachedSignedUrl('p/4/a.webp')).toBeUndefined();
+  });
+
+  it('gives an item with no entries an empty array rather than omitting it', async () => {
+    const signUrls = vi.fn().mockResolvedValue({ data: [], error: null });
+
+    const result = await signEntries(
+      [['item-5', new Map<string, ImageEntryData>()]],
+      signUrls,
+    );
+
+    expect(signUrls).not.toHaveBeenCalled();
+    expect(result['item-5']).toEqual([]);
   });
 });
