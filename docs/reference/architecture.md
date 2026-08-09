@@ -69,9 +69,12 @@ It is not the only code holding the client, though. Auth and session work reache
 
 ## CI/CD
 
-| Workflow | Trigger | Does |
+| Workflow (job) | Trigger | Does |
 | --- | --- | --- |
-| [`ci.yml`](../../.github/workflows/ci.yml) | push/PR to `main` | `build_and_test` job: build, type-check, format check, lint, `vitest run --coverage` (gated by thresholds — see [Configuration](configuration.md#coverage-and-mutation-thresholds)), then the signed-out Playwright suite against the built export — this replaced an earlier check that only served the export and confirmed it booted. Two more jobs run alongside it, on every PR as well as pushes to `main`: `mutation_test` runs Stryker against the pure, high-risk modules listed in [`stryker.config.mjs`](../../web/stryker.config.mjs); `e2e_local_stack` runs the signed-in Playwright suite against a local Supabase stack it starts itself. |
+| [`ci.yml`](../../.github/workflows/ci.yml) (`prek`) | push/PR to `main` | The repo-wide hooks from [`.pre-commit-config.yaml`](../../.pre-commit-config.yaml): file hygiene, spell check, shellcheck, markdownlint, and zizmor's security analysis of these workflows. |
+| [`ci.yml`](../../.github/workflows/ci.yml) (`build_and_test`) | push/PR to `main` | Build, type-check, format check, lint, `vitest run --coverage` (gated by thresholds — see [Configuration](configuration.md#coverage-and-mutation-thresholds)), then the signed-out Playwright suite against the built export, served under the base path on desktop and a phone viewport — this replaced an earlier check that only served the export and confirmed it booted. |
+| [`ci.yml`](../../.github/workflows/ci.yml) (`e2e_local_stack`) | push/PR to `main` | Starts a Supabase stack in Docker and runs the signed-in Playwright suite against it: the catalogue, search, the map, the entry forms, photographs, and the row-level security boundary. |
+| [`ci.yml`](../../.github/workflows/ci.yml) (`mutation_test`) | push/PR to `main` | Stryker against the pure, high-risk modules listed in [`stryker.config.mjs`](../../web/stryker.config.mjs). |
 | [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) | push to `main`, manual | Builds the static export and deploys it to GitHub Pages. |
 | [`keep-alive.yml`](../../.github/workflows/keep-alive.yml) | daily cron, manual | Calls the `keepalive()` RPC to stop a free-tier Supabase project auto-pausing. |
 | [`auto-merge.yml`](../../.github/workflows/auto-merge.yml) | PR events | Auto-approves and merges Dependabot PRs that are patch-level semver bumps only. |

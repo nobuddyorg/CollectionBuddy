@@ -35,7 +35,7 @@ The server trims whitespace, drops blank fields to empty, and normalizes/sorts t
 
 ## Manage photos
 
-- **Upload**: action row → upload-image icon → pick a file (any common image format, up to 5 MB). It's compressed and converted to WebP client-side before upload, with a thumbnail generated alongside it — no manual resizing needed.
+- **Upload**: action row → upload-image icon → pick a file (any image format your browser can read; a full-size phone photo is fine). It's compressed and converted to WebP client-side before upload, with a thumbnail generated alongside it — no manual resizing needed.
 - **View full size**: click a thumbnail to open it in a lightbox (Escape or the backdrop closes it).
 - **Delete**: open the lightbox or use the per-image delete control, confirm.
 

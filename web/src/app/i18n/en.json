@@ -48,7 +48,9 @@
     "createError": "Could not create category. Please try again.",
     "deleteError": "Could not delete category. Please try again.",
     "deleteImagesCleanupError": "This category was deleted, but some of its photographs could not be removed and may still count against your storage.",
-    "renameError": "Could not rename this category. Please try again."
+    "renameError": "Could not rename this category. Please try again.",
+    "renameSuccess": "Category renamed.",
+    "deleteSuccess": "Category deleted."
   },
   "item_create": {
     "new_entry": "New entry",
@@ -106,6 +108,7 @@
     "entry_deleted": "Entry deleted.",
     "upload_error": "Could not upload this image. Please try again.",
     "delete_image_error": "Could not delete this image. Please try again.",
+    "delete_image_success": "Image deleted.",
     "delete_images_cleanup_error": "This entry was deleted, but its photographs could not be removed and may still count against your storage.",
     "no_results_title": "No results for \"{q}\"",
     "no_results_hint": "Try a different search term.",
