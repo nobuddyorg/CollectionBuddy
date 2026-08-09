@@ -33,6 +33,7 @@ export function PlaceAutocomplete({
     menuRef,
     choose,
     onKeyDown,
+    formatDisplay,
   } = usePhotonSearch(lang);
   const listId = useId();
 
@@ -131,13 +132,10 @@ export function PlaceAutocomplete({
           {!loading &&
             !error &&
             results.map((hit, i) => {
-              const p = hit.properties;
-              const city =
-                p.city || p.town || p.village || p.municipality || p.name;
-              const line2 = [p.state, p.country].filter(Boolean).join(', ');
+              const { city, line2 } = formatDisplay(hit.properties);
               return (
                 <button
-                  key={p.osm_id}
+                  key={hit.properties.osm_id}
                   id={`${listId}-opt-${i}`}
                   role="option"
                   aria-selected={i === activeIdx}

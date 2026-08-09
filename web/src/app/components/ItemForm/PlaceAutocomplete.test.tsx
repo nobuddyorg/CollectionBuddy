@@ -122,6 +122,44 @@ describe('PlaceAutocomplete', () => {
     });
   });
 
+  // Regression: the dropdown row used to compute city/line2 by hand instead
+  // of through formatDisplay, and its inline copy had no countrycode
+  // fallback -- so a feature naming a countrycode but no country rendered
+  // with no country at all, while dedupe (which does go through
+  // formatDisplay) considered it distinct from one that had an explicit
+  // `country`. Picking it still worked; the row just lied about what you'd
+  // get.
+  it('falls back to the country code when a feature has no country name', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          features: [
+            {
+              properties: {
+                osm_id: 3,
+                osm_type: 'N',
+                osm_key: 'place',
+                osm_value: 'city',
+                city: 'Strasbourg',
+                countrycode: 'FR',
+              },
+              geometry: { type: 'Point', coordinates: [7.75, 48.58] },
+            },
+          ],
+        }),
+      }),
+    );
+
+    renderInDialog();
+    const input = screen.getByRole('combobox');
+    await userEvent.type(input, 'X');
+
+    const option = await screen.findByRole('option');
+    expect(option).toHaveTextContent('France');
+  });
+
   it('closes the menu on Escape without letting the keystroke escape the component', async () => {
     renderInDialog();
     const input = screen.getByRole('combobox');
