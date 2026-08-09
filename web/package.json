@@ -15,7 +15,7 @@
     "e2e:local": "node scripts/e2e-local-stack.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.110.9",
+    "@supabase/supabase-js": "^2.111.0",
     "browser-image-compression": "^2.0.2",
     "leaflet": "^1.9.4",
     "next": "16.2.12",
