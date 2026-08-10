@@ -316,7 +316,7 @@ describe('CategorySelect', () => {
 
       expect(
         await screen.findByText(
-          'Delete "Coins"? Its 40 entries and all their photographs will be permanently deleted.',
+          'Delete "Coins"? Its 40 entries and all their photographs will be permanently deleted. This cannot be undone.',
         ),
       ).toBeVisible();
     });
@@ -350,7 +350,7 @@ describe('CategorySelect', () => {
 
       expect(
         await screen.findByText(
-          'Delete "Coins"? Its entries and all their photographs will be permanently deleted.',
+          'Delete "Coins"? Its entries and all their photographs will be permanently deleted. This cannot be undone.',
         ),
       ).toBeVisible();
     });

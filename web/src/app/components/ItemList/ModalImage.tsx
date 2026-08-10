@@ -58,6 +58,43 @@ export function ModalImage({
     [count, onIndexChange],
   );
 
+  // #484: the Previous/Next buttons sit over the photograph itself, which
+  // is fine with a mouse (there's room beside a cursor-sized target) but on
+  // a narrow phone screen covers real image content. Swipe is the touch
+  // equivalent of those buttons -- a horizontal drag past the threshold
+  // steps the same way a click on them would -- so the buttons can hide on
+  // touch devices ([@media(hover:none)] below) without losing the gesture
+  // that replaces them.
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const SWIPE_THRESHOLD_PX = 50;
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = touch
+      ? { x: touch.clientX, y: touch.clientY }
+      : null;
+  }, []);
+
+  const onTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      const start = touchStartRef.current;
+      touchStartRef.current = null;
+      if (!start || count < 2 || clampedIndex === null) return;
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+      const dx = touch.clientX - start.x;
+      const dy = touch.clientY - start.y;
+      // Horizontal enough to be a swipe rather than a vertical wobble or a
+      // pinch -- the same photograph-inspection gestures #355 already had
+      // to tell apart from a dismiss tap.
+      if (Math.abs(dx) < SWIPE_THRESHOLD_PX || Math.abs(dx) < Math.abs(dy)) {
+        return;
+      }
+      goTo(dx < 0 ? clampedIndex + 1 : clampedIndex - 1);
+    },
+    [count, clampedIndex, goTo],
+  );
+
   useLockBodyScroll(open);
   useEscapeToClose(open, onClose);
   useFocusTrap(open, panelRef);
@@ -94,6 +131,8 @@ export function ModalImage({
       aria-label={t('item_list.full_size_image_alt')}
       className="fixed inset-0 z-modal bg-background/95 backdrop-blur"
       onClick={onClose}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
     >
       {/* Pinned to the corner, not stacked under the image: with the image
           free to take max-h-full, a button below it landed past the bottom
@@ -140,7 +179,10 @@ export function ModalImage({
               e.stopPropagation();
               goTo(clampedIndex - 1);
             }}
-            className="absolute top-1/2 left-3 z-10 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors"
+            // Hidden where there's no hover-capable pointer -- a touch
+            // screen already has the swipe gesture above, and the button
+            // sitting at the image's edge covers real photo content there.
+            className="absolute top-1/2 left-3 z-10 -translate-y-1/2 w-11 h-11 items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors hidden [@media(hover:hover)]:flex"
             title={t('item_list.previous_image')}
             aria-label={t('item_list.previous_image')}
           >
@@ -152,7 +194,7 @@ export function ModalImage({
               e.stopPropagation();
               goTo(clampedIndex + 1);
             }}
-            className="absolute top-1/2 right-3 z-10 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors"
+            className="absolute top-1/2 right-3 z-10 -translate-y-1/2 w-11 h-11 items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors hidden [@media(hover:hover)]:flex"
             title={t('item_list.next_image')}
             aria-label={t('item_list.next_image')}
           >

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -285,5 +285,63 @@ describe('ModalImage', () => {
         'Blue Mauritius — image 6',
       );
     });
+
+    // #484: the touch equivalent of the Previous/Next buttons, which sit
+    // over the photograph and cover real content on a narrow phone screen.
+    describe('swiping', () => {
+      function swipe(
+        from: { x: number; y: number },
+        to: { x: number; y: number },
+      ) {
+        const dialog = screen.getByRole('dialog');
+        fireEvent.touchStart(dialog, {
+          touches: [{ clientX: from.x, clientY: from.y }],
+        });
+        fireEvent.touchEnd(dialog, {
+          changedTouches: [{ clientX: to.x, clientY: to.y }],
+        });
+      }
+
+      it('advances on a leftward swipe', () => {
+        const { onIndexChange } = renderModal({ imgs, index: 0 });
+        swipe({ x: 200, y: 100 }, { x: 100, y: 100 });
+        expect(onIndexChange).toHaveBeenCalledWith(1);
+      });
+
+      it('goes back on a rightward swipe', () => {
+        const { onIndexChange } = renderModal({ imgs, index: 1 });
+        swipe({ x: 100, y: 100 }, { x: 200, y: 100 });
+        expect(onIndexChange).toHaveBeenCalledWith(0);
+      });
+
+      it('ignores a drag shorter than the threshold', () => {
+        const { onIndexChange } = renderModal({ imgs, index: 0 });
+        swipe({ x: 100, y: 100 }, { x: 90, y: 100 });
+        expect(onIndexChange).not.toHaveBeenCalled();
+      });
+
+      it('ignores a mostly-vertical drag, so it does not steal a scroll or a pinch', () => {
+        const { onIndexChange } = renderModal({ imgs, index: 0 });
+        swipe({ x: 100, y: 100 }, { x: 120, y: 300 });
+        expect(onIndexChange).not.toHaveBeenCalled();
+      });
+
+      it('does not close the modal on a swipe', () => {
+        const { onClose } = renderModal({ imgs, index: 0 });
+        swipe({ x: 200, y: 100 }, { x: 100, y: 100 });
+        expect(onClose).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  // A single photograph has nothing to swipe to.
+  it('ignores a swipe when there is only one photograph', () => {
+    const { onIndexChange } = renderModal({ imgs: [img('a')], index: 0 });
+    const dialog = screen.getByRole('dialog');
+    fireEvent.touchStart(dialog, { touches: [{ clientX: 200, clientY: 100 }] });
+    fireEvent.touchEnd(dialog, {
+      changedTouches: [{ clientX: 100, clientY: 100 }],
+    });
+    expect(onIndexChange).not.toHaveBeenCalled();
   });
 });

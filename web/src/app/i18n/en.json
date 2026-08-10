@@ -31,8 +31,8 @@
     "add": "Add",
     "delete": "Delete",
     "confirm_delete_empty": "Delete \"{name}\"? This cannot be undone.",
-    "confirm_delete_with_entries": "Delete \"{name}\"? Its {count} entries and all their photographs will be permanently deleted.",
-    "confirm_delete_generic": "Delete \"{name}\"? Its entries and all their photographs will be permanently deleted.",
+    "confirm_delete_with_entries": "Delete \"{name}\"? Its {count} entries and all their photographs will be permanently deleted. This cannot be undone.",
+    "confirm_delete_generic": "Delete \"{name}\"? Its entries and all their photographs will be permanently deleted. This cannot be undone.",
     "export": "Export",
     "export_hint": "Photos, JSON and CSV.",
     "export_reading": "Reading entries…",
@@ -73,8 +73,8 @@
     "confirm_discard": "Discard your changes?"
   },
   "item_list": {
-    "confirm_delete": "Delete this entry?",
-    "confirm_delete_image": "Delete this image?",
+    "confirm_delete": "Delete this entry? It and every one of its photographs will be permanently deleted. This cannot be undone.",
+    "confirm_delete_image": "Delete this photograph? This cannot be undone.",
     "no_user_session": "No user session",
     "previous": "Previous",
     "next": "Next",
