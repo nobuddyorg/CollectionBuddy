@@ -21,6 +21,11 @@ export function useItems(categoryId: string, q: string) {
   // state before its entries appeared.
   const [loading, setLoading] = useState(true);
   const reqSeq = useRef(0);
+  // Aborts a superseded request's own fetch, not just its effect on state:
+  // the sequence guard below already discards a late answer, but without
+  // this the response still finishes downloading for a reader that has
+  // already moved on (a debounced keystroke, a category switch).
+  const abortRef = useRef<AbortController | null>(null);
   // Counts non-silent requests currently in flight, rather than relying on
   // whichever request happens to be the one the sequence guard lets through.
   // A non-silent request superseded by a *silent* one used to return at the
@@ -57,6 +62,9 @@ export function useItems(categoryId: string, q: string) {
   const load = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
       const mySeq = ++reqSeq.current;
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       if (!silent) {
         pendingNonSilent.current += 1;
         setLoading(true);
@@ -70,6 +78,7 @@ export function useItems(categoryId: string, q: string) {
           search: q.trim(),
           from,
           to,
+          signal: controller.signal,
         });
 
         if (mySeq !== reqSeq.current) return;
@@ -106,9 +115,12 @@ export function useItems(categoryId: string, q: string) {
 
   // Fetches on mount and whenever `load`'s own dependencies change --
   // exactly what an effect is for: synchronizing component state with the
-  // database.
+  // database. The cleanup aborts whatever's still in flight when the
+  // category/search/page change again (a new `load` about to run would
+  // already abort it, but unmounting entirely never gets that chance).
   useEffect(() => {
     void load();
+    return () => abortRef.current?.abort();
   }, [load]);
 
   // `load` is recreated whenever the query/page/category change, but a

@@ -29,7 +29,7 @@ A `public.profiles` table existed in the pre-squash migrations and was dropped �
 
 This is the *only* authorization layer — see [Design decisions](../explanation/design-decisions.md#why-authorization-lives-entirely-in-postgres-rls). Every policy in [`0006_policies.sql`](../../supabase/migrations/0006_policies.sql) is `user_id = (select auth.uid())` and nothing else; the scalar subquery is deliberate, so the planner evaluates it once per query rather than once per row.
 
-`categories` and `items` each carry all four of `select`/`insert`/`update`/`delete`. `item_categories` carries three: a mapping row has nothing to edit, so there is no update policy. No role is named on any of them, so they apply to every role that can reach the table — only `authenticated` is granted anything, and `auth.uid()` is null for `anon`, so the predicate is null and denies.
+`categories` and `items` each carry all four of `select`/`insert`/`update`/`delete`. `item_categories` carries three: a mapping row has nothing to edit, so there is no update policy. No role is named on any of them, so they apply to every role that can reach the table — RLS alone would deny `anon` regardless, since `auth.uid()` is null there and every predicate is `user_id = (select auth.uid())`, but [`0008_revoke_anon.sql`](../../supabase/migrations/0008_revoke_anon.sql) also revokes `anon`'s table privileges outright, rather than relying on the RLS predicate as the only thing standing between it and these three tables.
 
 `web/e2e/signed-in/rls.spec.ts` is the executable version of this section: it asks the questions the app never would, with a real token, against a local stack.
 

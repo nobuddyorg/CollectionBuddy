@@ -123,11 +123,17 @@ export function listItems({
   search,
   from,
   to,
+  signal,
 }: {
   categoryId: string;
   search: string;
   from: number;
   to: number;
+  /** Aborts the request once a newer one (the next keystroke, a category
+   * switch) has already made this one's answer moot -- the sequence guard
+   * in useItems.tsx discards a superseded response either way, but without
+   * this the bytes still finish downloading for nothing. */
+  signal?: AbortSignal;
 }) {
   // `count: 'exact'` makes Postgres run a full COUNT over the filtered set
   // on every call, including every debounced keystroke -- genuinely free at
@@ -145,6 +151,7 @@ export function listItems({
 
   const filter = searchFilterFor(search);
   if (filter) query = query.or(filter);
+  if (signal) query = query.abortSignal(signal);
 
   return query
     .order('created_at', { ascending: false })
@@ -204,7 +211,11 @@ export function linkItemToCategory(itemId: string, categoryId: string) {
 // entries seen from above rather than a second, wider one. Not paginated,
 // though: a page is how many cards fit on a screen, which has nothing to say
 // about how many pins fit on a map.
-export function listItemPlaces(categoryId: string, search: string) {
+export function listItemPlaces(
+  categoryId: string,
+  search: string,
+  signal?: AbortSignal,
+) {
   let query = supabase
     .from('items')
     .select(`${ITEM_PLACE_FIELDS_SELECT},item_categories!inner(category_id)`)
@@ -214,6 +225,7 @@ export function listItemPlaces(categoryId: string, search: string) {
 
   const filter = searchFilterFor(search);
   if (filter) query = query.or(filter);
+  if (signal) query = query.abortSignal(signal);
 
   // Newest first, the same order the list uses. A pin's popup now names the
   // entries catalogued at that place (#404), and the two readings of one

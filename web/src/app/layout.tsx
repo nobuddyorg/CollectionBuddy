@@ -49,6 +49,14 @@ const bodyFont = Inter({
 // IBM Plex Mono has no variable version on Google Fonts, so this one still
 // has to name its weight. 400 is the only one used: `.font-label` sets no
 // weight of its own and never sits under `font-medium`.
+//
+// A measured cost, not an oversight: this is a third family on the
+// critical path (~9.8 KB of this one's preloaded woff2, ~91.2 KB across
+// all three combined). `.font-label` is only ever small captions, and
+// could in principle be served by the body face at tracked-out
+// letter-spacing instead -- kept as its own family because the
+// museum-caption motif above is a deliberate part of what the three
+// roles are for, not because the cost went unnoticed.
 const labelFont = IBM_Plex_Mono({
   subsets: ['latin'],
   weight: ['400'],

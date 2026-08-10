@@ -12,6 +12,7 @@ import {
   listItemIdsLinkedElsewhere,
   renameCategory,
 } from '../../data/categories';
+import { verifiedUserId } from '../../data/auth';
 import { removeItemImages } from '../../data/images';
 import { useCategories } from './useCategories';
 
@@ -26,6 +27,10 @@ vi.mock('../../data/categories', () => ({
 
 vi.mock('../../data/images', () => ({
   removeItemImages: vi.fn(),
+}));
+
+vi.mock('../../data/auth', () => ({
+  verifiedUserId: vi.fn(),
 }));
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -67,6 +72,7 @@ describe('useCategories deleteCategory', () => {
       error: null,
     } as never);
     vi.mocked(removeItemImages).mockResolvedValue('uid');
+    vi.mocked(verifiedUserId).mockResolvedValue('uid');
   });
 
   it('deletes the category row before touching any photograph, and cleans up on success', async () => {
@@ -80,8 +86,8 @@ describe('useCategories deleteCategory', () => {
 
     expect(outcome).toBe(true);
     expect(deleteCategoryRow).toHaveBeenCalledWith('cat-1');
-    expect(removeItemImages).toHaveBeenCalledWith('i1');
-    expect(removeItemImages).toHaveBeenCalledWith('i2');
+    expect(removeItemImages).toHaveBeenCalledWith('i1', 'uid');
+    expect(removeItemImages).toHaveBeenCalledWith('i2', 'uid');
     expect(removeItemImages).toHaveBeenCalledTimes(2);
 
     // The row delete is the first thing to actually mutate anything --
@@ -92,6 +98,23 @@ describe('useCategories deleteCategory', () => {
     }
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  // #385: removeItemImages used to resolve the uid itself, once per
+  // orphaned item -- a round trip to the auth server that couldn't have
+  // answered differently between them. It's resolved once here instead and
+  // handed to every call.
+  it('resolves the uid once and reuses it for every orphaned item, not once per item', async () => {
+    vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
+    const { result } = renderHook(() => useCategories(), { wrapper });
+
+    await act(async () => {
+      await result.current.deleteCategory('cat-1');
+    });
+
+    expect(verifiedUserId).toHaveBeenCalledTimes(1);
+    expect(removeItemImages).toHaveBeenCalledWith('i1', 'uid');
+    expect(removeItemImages).toHaveBeenCalledWith('i2', 'uid');
   });
 
   it('leaves every photograph untouched when the row delete fails, and reports the error', async () => {
@@ -153,8 +176,8 @@ describe('useCategories deleteCategory', () => {
 
     // Both orphaned items were attempted even though the first rejected --
     // a plain Promise.all would have stopped awaiting after that.
-    expect(removeItemImages).toHaveBeenCalledWith('i1');
-    expect(removeItemImages).toHaveBeenCalledWith('i2');
+    expect(removeItemImages).toHaveBeenCalledWith('i1', 'uid');
+    expect(removeItemImages).toHaveBeenCalledWith('i2', 'uid');
   });
 
   // #341: every test above sets listItemIdsLinkedElsewhere to return
@@ -187,8 +210,8 @@ describe('useCategories deleteCategory', () => {
       ['i1', 'i2'],
       'cat-1',
     );
-    expect(removeItemImages).toHaveBeenCalledWith('i2');
-    expect(removeItemImages).not.toHaveBeenCalledWith('i1');
+    expect(removeItemImages).toHaveBeenCalledWith('i2', 'uid');
+    expect(removeItemImages).not.toHaveBeenCalledWith('i1', 'uid');
     expect(removeItemImages).toHaveBeenCalledTimes(1);
   });
 
