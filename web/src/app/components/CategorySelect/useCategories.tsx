@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
@@ -31,21 +31,27 @@ export function useCategories() {
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
+  // `reload` is called for every auth event (INITIAL_SESSION,
+  // TOKEN_REFRESHED, tab focus) with no guarantee those listings resolve in
+  // the order they were sent -- gated the same way useItems guards `load`,
+  // so a slower, older response can never clobber a newer one's result.
+  const reqSeq = useRef(0);
 
   const reload = useCallback(async () => {
+    const mySeq = ++reqSeq.current;
     setIsLoading(true);
     try {
       const { data, error } = await listCategories();
       if (error) throw error;
       const list = data ?? [];
-      setCats(list);
+      if (mySeq === reqSeq.current) setCats(list);
       return list;
     } catch (e) {
       console.error(e);
-      toast.error(t('category_select.loadError'));
+      if (mySeq === reqSeq.current) toast.error(t('category_select.loadError'));
       return [];
     } finally {
-      setIsLoading(false);
+      if (mySeq === reqSeq.current) setIsLoading(false);
     }
   }, [t, toast]);
 

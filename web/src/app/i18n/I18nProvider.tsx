@@ -67,31 +67,41 @@ export const I18nContext = createContext<I18nContextType | undefined>(
 // resolveTranslationKey above is -- mutants in here would only be noise.
 const LANG_STORAGE_KEY = 'lang';
 
+// Read synchronously as the initial state itself (mirroring
+// THEME_INIT_SCRIPT's pre-paint read in layout.tsx) rather than defaulting
+// to 'de' and correcting a beat later in a mount effect -- that gap was a
+// visible flash of German for every non-German, non-returning visitor, and
+// German phonetics read over English text for anyone using a screen reader
+// during it. `window` is absent during the static export's prerender, so
+// this still resolves to 'de' there, matching the markup layout.tsx ships.
+function initialLang(): Language {
+  if (typeof window === 'undefined') return 'de';
+  try {
+    const stored = localStorage.getItem(LANG_STORAGE_KEY);
+    if (stored && stored in translations) return stored as Language;
+    const browserLang = navigator.language.split('-')[0];
+    if (browserLang in translations) return browserLang as Language;
+  } catch {
+    // localStorage can throw (private browsing, disabled storage) -- the
+    // 'de' default below is exactly what a mount-effect read would have
+    // fallen back to in that case too.
+  }
+  return 'de';
+}
+
 export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
-  const [lang, setLang] = useState<Language>('de');
+  const [lang, setLang] = useState<Language>(initialLang);
   // t reads lang through this ref instead of depending on it directly, so
-  // its identity stays stable across the language change that happens on
-  // mount for any non-German browser. Otherwise every callback/effect that
-  // lists t (or something derived from it) as a dependency -- category
-  // loading, item creation -- re-fires once right after mount.
+  // its identity stays stable across a language change from the switcher.
+  // Otherwise every callback/effect that lists t (or something derived from
+  // it) as a dependency -- category loading, item creation -- re-fires the
+  // moment someone changes the language.
   const langRef = useRef(lang);
   // Written synchronously during render (not in an effect) so `t`, called
   // by consumers during their own render, never reads a stale `lang` for
   // the one render cycle before an effect would otherwise have fired.
   // eslint-disable-next-line react-hooks/refs
   langRef.current = lang;
-
-  useEffect(() => {
-    const stored = localStorage.getItem(LANG_STORAGE_KEY);
-    if (stored && stored in translations) {
-      setLang(stored as Language);
-      return;
-    }
-    const browserLang = navigator.language.split('-')[0];
-    if (browserLang in translations) {
-      setLang(browserLang as Language);
-    }
-  }, []);
 
   const setLangAndPersist = useCallback((next: Language) => {
     setLang(next);
