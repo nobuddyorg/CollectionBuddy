@@ -225,6 +225,27 @@ body {
     animation: fade-up 500ms ease-out backwards;
   }
 
+  /* A duplicate tag is refused silently -- addTag returns before the input
+     clears, which used to be the only visible difference from a tag that
+     was accepted. A quick pulse on the chip that already covers the typed
+     value points at *why* nothing new appeared, instead of inviting a
+     second, identical Enter press. Scale rather than colour, so it reads
+     the same in both themes without a new token. */
+  @keyframes tag-flash {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+
+    50% {
+      transform: scale(1.1);
+    }
+  }
+
+  .tag-flash {
+    animation: tag-flash 350ms ease-out;
+  }
+
   /* Out from the rim, not out from the middle. The chips are placed from
      the centre of the medallion, so an animation that started at that
      centre parked every one of them on the coin -- and on the sign-in

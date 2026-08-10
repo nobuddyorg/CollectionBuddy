@@ -32,7 +32,7 @@ const prefetchMap = () => {
 import Icon, { IconType } from '../Icon';
 
 export default function ItemList({ categoryId }: { categoryId: string }) {
-  const { t } = useI18n();
+  const { t, tCount } = useI18n();
   const confirm = useConfirm();
 
   const [isCreateOpen, setCreateOpen] = useState(false);
@@ -135,7 +135,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         setEditingItem(null);
       }
     },
-    [editingItem, saveEdit],
+    [editingItem, saveEdit, setEditOpen, setEditingItem],
   );
 
   return (
@@ -191,10 +191,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         {loading
           ? ''
           : searchStatus.kind === 'active'
-            ? t('item_list.results_count').replace(
-                '{count}',
-                String(searchStatus.total),
-              )
+            ? tCount('item_list.results_count', searchStatus.total)
             : searchStatus.kind === 'tooShort'
               ? t('item_list.search_too_short')
               : ''}

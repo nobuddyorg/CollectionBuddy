@@ -92,6 +92,25 @@ describe('TagsInput', () => {
     expect(field).toHaveValue('');
   });
 
+  // Regression (#353): the field used to stay stuck with the duplicate text
+  // in it, indistinguishable from nothing having happened -- the natural
+  // response was to press Enter again.
+  it('clears the field on a duplicate too, not just a successful add', async () => {
+    const user = userEvent.setup();
+    const { field } = renderTags(['silver']);
+
+    await user.type(field, 'silver{Enter}');
+    expect(field).toHaveValue('');
+  });
+
+  it('flashes the chip that already covers a duplicate', async () => {
+    const user = userEvent.setup();
+    const { field } = renderTags(['silver']);
+
+    await user.type(field, 'silver{Enter}');
+    expect(screen.getByText('silver').closest('span')).toHaveClass('tag-flash');
+  });
+
   // Backspace on an empty field takes the last tag off, which is the
   // convention everywhere else this pattern appears.
   it('removes the last tag when Backspace is pressed on an empty field', async () => {

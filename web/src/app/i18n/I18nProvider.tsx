@@ -55,6 +55,13 @@ type I18nContextType = {
   lang: Language;
   setLang: (lang: Language) => void;
   t: (key: TranslationKey) => string;
+  /** Like `t`, but for a `{count}` string that has to agree with `count`
+   *  grammatically -- "1 tag" is a different key (`${baseKey}_one`) from
+   *  "2 tags" (`baseKey` itself), and which one applies isn't just "count
+   *  === 1" once German and English disagree on a locale's plural rule.
+   *  Falls back to `baseKey` for any category without its own `_one`
+   *  variant (German's invariant "1 Treffer"/"2 Treffer", e.g.). */
+  tCount: (baseKey: TranslationKey, count: number) => string;
 };
 
 export const I18nContext = createContext<I18nContextType | undefined>(
@@ -118,9 +125,21 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
     [],
   );
 
+  const tCount = useCallback((baseKey: TranslationKey, count: number) => {
+    const dict = translations[langRef.current];
+    const category = new Intl.PluralRules(langRef.current).select(count);
+    const template =
+      (category === 'one'
+        ? resolveTranslationKey(dict, `${baseKey}_one`)
+        : undefined) ??
+      resolveTranslationKey(dict, baseKey) ??
+      baseKey;
+    return template.replace('{count}', String(count));
+  }, []);
+
   const value = useMemo(
-    () => ({ lang, setLang: setLangAndPersist, t }),
-    [lang, setLangAndPersist, t],
+    () => ({ lang, setLang: setLangAndPersist, t, tCount }),
+    [lang, setLangAndPersist, t, tCount],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
