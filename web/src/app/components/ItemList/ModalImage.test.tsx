@@ -112,14 +112,15 @@ describe('ModalImage', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  // Regression (#355): the image wrapper didn't stop propagation, so any
-  // tap on the photo itself -- including the tail end of a pinch-zoom or
-  // drag gesture -- bubbled to the overlay's onClick and closed the
-  // lightbox at exactly the moment someone was inspecting the photo.
-  it('does not close when the photograph itself is clicked', async () => {
+  // Regression (#511): a tap/click on the photograph itself closes the
+  // modal, the same as a tap beside it -- #355's stopPropagation made the
+  // photo the one place in the overlay that never dismissed it, which read
+  // as broken rather than deliberate. The one carved-out exception is the
+  // synthetic click that follows a swipe's touchend; see 'swiping' below.
+  it('closes when the photograph itself is clicked', async () => {
     const { onClose } = renderModal();
     await userEvent.click(screen.getByRole('img'));
-    expect(onClose).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
   });
 
   // Regression (#295): aria-modal alone is not honoured by every
@@ -329,6 +330,17 @@ describe('ModalImage', () => {
       it('does not close the modal on a swipe', () => {
         const { onClose } = renderModal({ imgs, index: 0 });
         swipe({ x: 200, y: 100 }, { x: 100, y: 100 });
+        expect(onClose).not.toHaveBeenCalled();
+      });
+
+      // A real swipe ends in a browser-synthesized click on whatever was
+      // under the finger. Without the suppression this exercises, that
+      // click would hit the now-closeable image and immediately dismiss
+      // the photograph the swipe just navigated to.
+      it('does not close on the synthetic click that follows a swipe', () => {
+        const { onClose } = renderModal({ imgs, index: 0 });
+        swipe({ x: 200, y: 100 }, { x: 100, y: 100 });
+        fireEvent.click(screen.getByRole('img'));
         expect(onClose).not.toHaveBeenCalled();
       });
     });

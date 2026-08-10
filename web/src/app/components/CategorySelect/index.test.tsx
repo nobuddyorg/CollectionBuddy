@@ -69,7 +69,7 @@ function categories(overrides: Partial<UseCategories> = {}): UseCategories {
     isCreating: false,
     isDeleting: false,
     isRenaming: false,
-    reload: vi.fn(),
+    reload: vi.fn().mockResolvedValue(cats),
     createCategory: vi.fn(),
     renameCategory: vi.fn(),
     deleteCategory: vi.fn(),
@@ -303,6 +303,40 @@ describe('CategorySelect', () => {
 
       expect(runImport).toHaveBeenCalledWith(file, expect.any(Function));
       expect(onSelect).toHaveBeenCalledWith('new-cat-id');
+    });
+
+    // Regression (#510): the imported category is created out from under
+    // this component (see useImportCategory.tsx), so `cats` never picked
+    // it up on its own -- selecting it while it's still missing showed
+    // "no category selected" and stayed that way until the next login
+    // reloaded the list from scratch. reload() has to run first so the
+    // category exists to select by the time onSelect names it.
+    it('reloads the category list before selecting the imported category', async () => {
+      const calls: string[] = [];
+      const reload = vi.fn(async () => {
+        calls.push('reload');
+        return cats;
+      });
+      const runImport = vi.fn(
+        async (_file: File, onImported?: (id: string) => void) => {
+          onImported?.('new-cat-id');
+        },
+      );
+      vi.mocked(useImportCategory).mockReturnValue(importState({ runImport }));
+      const { onSelect } = renderSelect({ categories: categories({ reload }) });
+      vi.mocked(onSelect).mockImplementation(() => calls.push('select'));
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+
+      const file = new File(['zip bytes'], 'coins.zip', {
+        type: 'application/zip',
+      });
+      const input = screen.getByTestId('import-file-input');
+      await userEvent.upload(input, file);
+
+      expect(reload).toHaveBeenCalled();
+      expect(calls).toEqual(['reload', 'select']);
     });
 
     describe('while an import is running', () => {
