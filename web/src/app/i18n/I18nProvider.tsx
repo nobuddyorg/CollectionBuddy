@@ -2,6 +2,7 @@
 import {
   createContext,
   useEffect,
+  useLayoutEffect,
   useState,
   useCallback,
   useMemo,
@@ -67,13 +68,43 @@ export const I18nContext = createContext<I18nContextType | undefined>(
 // resolveTranslationKey above is -- mutants in here would only be noise.
 const LANG_STORAGE_KEY = 'lang';
 
+function detectLang(): Language {
+  try {
+    const stored = localStorage.getItem(LANG_STORAGE_KEY);
+    if (stored && stored in translations) return stored as Language;
+    const browserLang = navigator.language.split('-')[0];
+    if (browserLang in translations) return browserLang as Language;
+  } catch {
+    // localStorage can throw (private browsing, disabled storage) -- the
+    // 'de' default below is exactly what a stored-language miss falls back
+    // to anyway.
+  }
+  return 'de';
+}
+
+// useLayoutEffect on the client, a no-op on the server -- this file only
+// ever renders as a client component, but Next.js still executes it once
+// during the static export's prerender, where `useLayoutEffect` would
+// otherwise warn ("does nothing on the server").
+const useIsomorphicLayoutEffect =
+  typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
 export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
+  // Starts at 'de', matching the static export's own prerendered markup --
+  // seeding this from `detectLang()` directly (matching what a non-German
+  // browser will settle on) diverges from that markup on the very first
+  // client render, which is a hydration mismatch, not just a flash: React
+  // logs it and, in the signed-in e2e suite, that failed every test in the
+  // run (error #418). `useIsomorphicLayoutEffect` below still corrects it
+  // before the browser's next paint, same as the pre-paint theme script,
+  // just one render later -- after hydration has already committed once
+  // against markup that matches.
   const [lang, setLang] = useState<Language>('de');
   // t reads lang through this ref instead of depending on it directly, so
-  // its identity stays stable across the language change that happens on
-  // mount for any non-German browser. Otherwise every callback/effect that
-  // lists t (or something derived from it) as a dependency -- category
-  // loading, item creation -- re-fires once right after mount.
+  // its identity stays stable across a language change from the switcher.
+  // Otherwise every callback/effect that lists t (or something derived from
+  // it) as a dependency -- category loading, item creation -- re-fires the
+  // moment someone changes the language.
   const langRef = useRef(lang);
   // Written synchronously during render (not in an effect) so `t`, called
   // by consumers during their own render, never reads a stale `lang` for
@@ -81,16 +112,12 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   // eslint-disable-next-line react-hooks/refs
   langRef.current = lang;
 
-  useEffect(() => {
-    const stored = localStorage.getItem(LANG_STORAGE_KEY);
-    if (stored && stored in translations) {
-      setLang(stored as Language);
-      return;
-    }
-    const browserLang = navigator.language.split('-')[0];
-    if (browserLang in translations) {
-      setLang(browserLang as Language);
-    }
+  // Runs before the browser paints the post-hydration frame, so a non-German
+  // visitor still never sees a settled German frame -- only the one the
+  // static export itself painted before any JS ran at all, which no client
+  // fix can reach.
+  useIsomorphicLayoutEffect(() => {
+    setLang(detectLang());
   }, []);
 
   const setLangAndPersist = useCallback((next: Language) => {

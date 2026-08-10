@@ -25,13 +25,6 @@ export const IMAGE_LIST_SORT = {
   order: 'asc',
 } as const;
 
-export function listImageObjects(prefix: string, limit: number) {
-  return supabase.storage.from(ITEM_IMAGES_BUCKET).list(prefix, {
-    limit,
-    sortBy: IMAGE_LIST_SORT,
-  });
-}
-
 // Pages through the full listing under a prefix so a `.webp`/`.thumb.webp`
 // pair can never be split across a page boundary (each page is a multiple
 // of one full page, not an arbitrary object cap).
@@ -100,12 +93,19 @@ export async function removeItemImages(itemId: string): Promise<string | null> {
   if (!uid) return null;
 
   const prefix = imagePrefix(uid, itemId);
-  const { data, error } = await listImageObjects(prefix, 100);
+  const { data, error } = await listAllImageObjects(prefix);
   if (error) throw error;
   if (!data?.length) return uid;
 
   const paths = data.map((o) => `${prefix}/${o.name}`);
-  const { error: removeError } = await removeImageObjects(paths);
-  if (removeError) throw removeError;
+  // Removed in the same page size as the listing, rather than one call for
+  // however many hundreds of paths a large item has.
+  const pageSize = 100;
+  for (let i = 0; i < paths.length; i += pageSize) {
+    const { error: removeError } = await removeImageObjects(
+      paths.slice(i, i + pageSize),
+    );
+    if (removeError) throw removeError;
+  }
   return uid;
 }

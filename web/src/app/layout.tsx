@@ -99,6 +99,14 @@ export const viewport = {
 // to prevent.
 const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme');document.documentElement.setAttribute('data-theme',s==='light'||s==='dark'?s:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));}catch(e){}})();`;
 
+// The same pre-paint trick as the theme script above, but for the declared
+// language: without it, `<html lang="de">` -- the static export's baked-in
+// default -- is what a screen reader reads until I18nProvider's own mount
+// effect corrects it, so an English visitor's first frame gets German
+// phonetics on English text. Kept in exact lockstep with I18nProvider's
+// `initialLang()`, which seeds the React state the same way.
+const LANG_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('lang');var l=(s==='de'||s==='en')?s:(navigator.language||'').split('-')[0];document.documentElement.lang=(l==='de'||l==='en')?l:'de';}catch(e){}})();`;
+
 // GitHub Pages does not allow custom response headers, so there is no way
 // to send X-Frame-Options or a frame-ancestors CSP directive -- browsers
 // only honour frame-ancestors from a real header, never from a <meta> tag.
@@ -170,6 +178,7 @@ export default function RootLayout({
         <meta name="referrer" content="strict-origin-when-cross-origin" />
         <script dangerouslySetInnerHTML={{ __html: FRAMEBUST_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: LANG_INIT_SCRIPT }} />
       </head>
       <body className="antialiased">
         {/* Dialogs portal straight to document.body (CenteredModal, ModalImage),

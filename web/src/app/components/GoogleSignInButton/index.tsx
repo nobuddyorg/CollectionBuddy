@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon/index';
@@ -25,6 +25,20 @@ export default function GoogleSignInButton({
   const { t } = useI18n();
 
   const finalLabel = label ?? t('google_sign_in_button.sign_in_with_google');
+
+  // `mode: 'oauth'` deliberately never clears `loading` itself -- the
+  // redirect is meant to unmount this page. But a bfcache restore (the user
+  // presses Back from Google's consent screen) resurrects that stale
+  // `loading: true` with no redirect coming, leaving the full-screen overlay
+  // stuck with no way to dismiss it. `pageshow`'s `persisted` flag is exactly
+  // that signal.
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setLoading(false);
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
 
   const handleClick = useCallback(async () => {
     if (loading || disabled) return;
