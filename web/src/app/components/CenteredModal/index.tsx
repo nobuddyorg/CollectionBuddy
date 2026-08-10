@@ -12,12 +12,14 @@ export default function CenteredModal({
   open,
   onOpenChange,
   title,
+  description,
   closeLabel = 'Close',
   children,
   closeOnBackdrop = true,
   closeOnEsc = true,
   initialFocusRef,
   size = 'default',
+  role = 'dialog',
 }: CenteredModalProps) {
   useLockBodyScroll(open);
   useEscapeToClose(open && closeOnEsc, () => onOpenChange(false));
@@ -34,10 +36,12 @@ export default function CenteredModal({
       <Dialog
         open={open}
         title={title}
+        description={description}
         closeLabel={closeLabel}
         onClose={() => onOpenChange(false)}
         initialFocusRef={initialFocusRef}
         size={size}
+        role={role}
       >
         {children}
       </Dialog>

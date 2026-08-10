@@ -1,27 +1,38 @@
 'use client';
 
-import { useRef } from 'react';
+import { useId, useRef } from 'react';
 import Icon, { IconType } from '../Icon';
 import { useFocusTrap } from './useFocusTrap';
 
 export function Dialog({
   open,
   title,
+  description,
   closeLabel,
   onClose,
   children,
   initialFocusRef,
   size = 'default',
+  role = 'dialog',
 }: {
   open: boolean;
   title: string;
+  /** Rendered above `children`, and wired to `aria-describedby` -- for
+   *  content (a confirm's question) that isn't just the dialog's label. */
+  description?: string;
   closeLabel?: string;
   onClose: () => void;
   children: React.ReactNode;
   initialFocusRef?: React.RefObject<HTMLElement | null>;
   size?: 'default' | 'full';
+  role?: 'dialog' | 'alertdialog';
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // A constant id breaks the moment two CenteredModals are mounted at once
+  // (a confirm raised from inside another modal) -- every aria-labelledby
+  // reference would resolve to whichever dialog mounted first.
+  const titleId = useId();
+  const descriptionId = useId();
 
   useFocusTrap(open, panelRef, initialFocusRef);
 
@@ -35,9 +46,10 @@ export function Dialog({
     >
       <div
         ref={panelRef}
-        role="dialog"
+        role={role}
         aria-modal="true"
-        aria-labelledby="centered-modal-title"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
         className={`bg-card text-card-foreground ring-1 ring-border shadow-2xl w-full flex flex-col overflow-hidden transition-[opacity,transform] duration-200 ease-out ${
           size === 'full'
             ? 'h-[100dvh] max-w-none rounded-none pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
@@ -46,7 +58,7 @@ export function Dialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h3 id="centered-modal-title" className="font-display text-base">
+          <h3 id={titleId} className="font-display text-base">
             {title}
           </h3>
           <button
@@ -67,6 +79,11 @@ export function Dialog({
               : 'p-4 overflow-auto'
           }
         >
+          {description && (
+            <p id={descriptionId} className="text-sm mb-3">
+              {description}
+            </p>
+          )}
           {children}
         </div>
       </div>

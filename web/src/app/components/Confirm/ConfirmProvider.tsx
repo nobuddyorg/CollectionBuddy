@@ -48,7 +48,9 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         onOpenChange={(v) => {
           if (!v) settle(false);
         }}
-        title={message ?? ''}
+        title={t('common.confirm')}
+        description={message ?? ''}
+        role="alertdialog"
         closeLabel={t('common.close')}
         initialFocusRef={cancelRef}
       >
