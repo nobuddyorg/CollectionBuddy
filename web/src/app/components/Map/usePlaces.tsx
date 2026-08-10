@@ -191,13 +191,22 @@ export function usePlaces(
     if (!enabled) return;
 
     let cancelled = false;
+    // Aborts a superseded request's own fetch, not just its effect on
+    // state: `cancelled` already discards a late answer below, but without
+    // this the response still finishes downloading for a map that has
+    // already moved on to a different category or search term.
+    const controller = new AbortController();
 
     const fetchPlaces = async () => {
       setLoading(true);
       setError(false);
       setPlaces([]);
       try {
-        const { data: items, error } = await listItemPlaces(categoryId, search);
+        const { data: items, error } = await listItemPlaces(
+          categoryId,
+          search,
+          controller.signal,
+        );
 
         if (error) throw error;
 
@@ -291,6 +300,7 @@ export function usePlaces(
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [categoryId, search, enabled, lang]);
 

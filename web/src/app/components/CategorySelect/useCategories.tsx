@@ -12,6 +12,7 @@ import {
   listItemIdsLinkedElsewhere,
   renameCategory as renameCategoryRow,
 } from '../../data/categories';
+import { verifiedUserId } from '../../data/auth';
 import { removeItemImages } from '../../data/images';
 import type { CategorySummary } from '../../data/categories';
 
@@ -148,6 +149,10 @@ export function useCategories() {
         await reload();
 
         if (orphanedItemIds.length) {
+          // Resolved once rather than once per item: the uid can't change
+          // between them, so asking the auth server again for every one of
+          // possibly hundreds of orphaned items was pure per-item overhead.
+          const uid = await verifiedUserId();
           // The row is already gone at this point, irreversibly. A
           // failure here is a storage leak, not data loss -- there is no
           // category left to restore, and nothing to gain by letting one
@@ -155,7 +160,7 @@ export function useCategories() {
           // removal runs to completion rather than aborting on the first
           // rejection.
           const results = await Promise.allSettled(
-            orphanedItemIds.map((itemId) => removeItemImages(itemId)),
+            orphanedItemIds.map((itemId) => removeItemImages(itemId, uid)),
           );
           const failures = results.filter(
             (r): r is PromiseRejectedResult => r.status === 'rejected',

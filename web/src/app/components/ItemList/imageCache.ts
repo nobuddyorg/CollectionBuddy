@@ -8,6 +8,14 @@ import type { ImageEntryData } from './useItemImages';
 // Re-signing is not just a round trip: a fresh signature is a different
 // URL, so the browser cannot reuse the bytes it already downloaded either.
 // Holding signatures steady is what lets the HTTP cache do its job.
+//
+// Unbounded by construction: entries are only ever evicted when read past
+// their TTL (getCachedSignedUrl/getCachedListing below), so one never read
+// again outlives the tab. Not a leak worth fixing at the scale this app has
+// actually seen -- ~100 items x 2 objects x (a ~250-byte signed URL plus a
+// listing entry) is on the order of 100 KB. Worth revisiting with a
+// periodic sweep or an LRU cap only if the app stops keying ItemList by
+// category, or grows a view that walks many categories in one session.
 
 type CachedUrl = { url: string; signedAt: number };
 type CachedListing = { entries: Map<string, ImageEntryData>; listedAt: number };

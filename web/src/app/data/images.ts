@@ -88,8 +88,16 @@ export async function listItemImages(itemId: string): Promise<{
 // Returns the uid whose prefix was cleared, so a caller that needs it (to
 // invalidate a cached listing, say) doesn't have to ask the auth client all
 // over again for something this function has already looked up.
-export async function removeItemImages(itemId: string): Promise<string | null> {
-  const uid = await verifiedUserId();
+//
+// `knownUid` lets a caller that already resolved the uid skip asking again
+// -- deleting a category calls this once per orphaned item, and without it
+// every one of those was its own round trip to the auth server for an
+// answer that couldn't have changed between them.
+export async function removeItemImages(
+  itemId: string,
+  knownUid?: string | null,
+): Promise<string | null> {
+  const uid = knownUid !== undefined ? knownUid : await verifiedUserId();
   if (!uid) return null;
 
   const prefix = imagePrefix(uid, itemId);
