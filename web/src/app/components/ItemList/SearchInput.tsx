@@ -38,7 +38,7 @@ export function SearchInput({
         <button
           type="button"
           onClick={() => onChange('')}
-          className="absolute right-3 top-1/2 -translate-y-1/2"
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 -m-2"
           aria-label={t('item_list.search_clear')}
         >
           <Icon

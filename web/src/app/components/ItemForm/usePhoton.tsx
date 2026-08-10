@@ -139,7 +139,15 @@ export function usePhotonSearch(locale?: string) {
         }
       })();
     }, 300);
-    return () => clearTimeout(timer);
+    // Cancels the in-flight request too, not just the pending debounce timer
+    // -- otherwise closing the form (or the next keystroke, before the
+    // in-flight request's own abort-and-replace runs) leaves a request on
+    // the wire against a rate-limited free service for no reader left to
+    // use its result.
+    return () => {
+      clearTimeout(timer);
+      abortRef.current?.abort();
+    };
   }, [query, focus, lang, regionNames]);
 
   useEffect(() => {

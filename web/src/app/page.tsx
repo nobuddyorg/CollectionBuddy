@@ -46,6 +46,11 @@ export default function Page() {
 
   const categories = useCategories();
   const { reload } = categories;
+  // `user` is a fresh object on every onAuthStateChange event (including a
+  // tab regaining focus), so depending on it by identity re-ran this effect
+  // -- and refetched the whole category list -- far more than the session
+  // actually changed. The id is stable across those events.
+  const userId = user?.id;
 
   // False until the first listing has come back *and* a category has been
   // selected from it -- both in the same tick, so there is no render in
@@ -58,7 +63,7 @@ export default function Page() {
   // user's RLS policies, so firing this before the session resolves asks
   // the database for a list it will refuse to return.
   useEffect(() => {
-    if (loading || !user) return;
+    if (loading || !userId) return;
     void reload().then((catsData) => {
       // Whatever was last on screen, or the first category, whichever the
       // listing can honour. Auto-selecting only a lone category meant that
@@ -69,7 +74,7 @@ export default function Page() {
       );
       setCatalogueReady(true);
     });
-  }, [loading, user, reload]);
+  }, [loading, userId, reload]);
 
   const signOut = useCallback(async () => {
     try {

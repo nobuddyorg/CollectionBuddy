@@ -385,4 +385,13 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  /* Loading spinners are a "still working" cue, not decoration -- freezing
+     them under Reduce Motion removes the only visual signal sighted users
+     get, leaving just the aria-label. Exempt them from the blanket rule
+     above and keep their normal (non-reduced) rate. */
+  .animate-spin,
+  .spinner {
+    animation-duration: 0.8s !important;
+  }
 }
