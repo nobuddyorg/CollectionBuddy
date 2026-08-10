@@ -6,11 +6,11 @@ import type { TranslationKey } from '../../i18n/I18nProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import {
-  downloadBlob,
   ExportCancelledError,
   exportCategory,
   type ExportProgress,
 } from '../../data/exportCategory';
+import { downloadBlob } from './downloadBlob';
 import { ZipLimitError } from '../../data/zip';
 
 /**

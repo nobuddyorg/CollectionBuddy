@@ -6,6 +6,7 @@ import {
   buildSearchFilter,
   listItemPlaces,
   listItems,
+  listItemsForExport,
   searchFilterFor,
   searchMinLength,
 } from './items';
@@ -160,5 +161,35 @@ describe('the queries behind the list and the map', () => {
   it('does not paginate the map', () => {
     expect(mapQuery('coin').has('limit')).toBe(false);
     expect(mapQuery('coin').has('offset')).toBe(false);
+  });
+
+  const exportQuery = () => paramsOf(listItemsForExport('cat-1', 0, 499));
+
+  // Silently reversed, this would flip the order every popup lists its
+  // entries in -- invisible until read against the list it's meant to
+  // agree with (usePlaces.test.ts states this order as an assumed premise).
+  it('orders the map newest-first, the same as the list', () => {
+    expect(mapQuery('coin').get('order')).toBe(listQuery('coin').get('order'));
+    expect(listQuery('coin').get('order')).toBe('created_at.desc');
+  });
+
+  // Oldest-first, the reverse of the list and the map: the archive numbers
+  // its folders in the order it walks them, and a `created_at` tie is
+  // broken by `id` so which page a tied row lands on is never ambiguous
+  // across the .range() boundary (#424).
+  it('orders the export oldest-first with id as a tiebreaker', () => {
+    expect(exportQuery().get('order')).toBe('created_at.asc,id.asc');
+  });
+
+  // Silently dropping this would truncate every future export to whatever
+  // happened to be typed into the search box at the moment the button was
+  // pressed -- an export is of the category, not of the live filter.
+  it('never filters the export by search', () => {
+    expect(exportQuery().has('or')).toBe(false);
+  });
+
+  it('pages the export the same way range() was asked to', () => {
+    expect(exportQuery().get('offset')).toBe('0');
+    expect(exportQuery().get('limit')).toBe('500');
   });
 });

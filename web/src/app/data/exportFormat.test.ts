@@ -111,6 +111,27 @@ describe('extensionOf', () => {
   it('does not read an extension out of a directory name', () => {
     expect(extensionOf('uid/some.dir/abc')).toBe('.bin');
   });
+
+  // Folder names are slugified to [a-z0-9-], but the extension used to be
+  // copied verbatim off the storage object name into the archive path.
+  // Not exploitable as found -- this app only ever uploads
+  // `<uuid>.webp`/`.thumb.webp`, and storage RLS keys every verb on the
+  // uid prefix -- but a backslash in an entry path is a path separator to
+  // Windows Explorer's extractor, and quotes/trailing dots make the file
+  // fail to extract there even without one.
+  it('falls back for an extension containing a path separator', () => {
+    expect(extensionOf('uid/item/x.a\\..\\evil')).toBe('.bin');
+  });
+
+  it('falls back for an extension carrying a quote, space or trailing dot', () => {
+    expect(extensionOf('uid/item/a.jpg"')).toBe('.bin');
+    expect(extensionOf('uid/item/a.j pg')).toBe('.bin');
+    expect(extensionOf('uid/item/a.jpg.')).toBe('.bin');
+  });
+
+  it('falls back for an implausibly long extension', () => {
+    expect(extensionOf('uid/item/a.' + 'x'.repeat(11))).toBe('.bin');
+  });
 });
 
 describe('fullSizeObjectPaths', () => {
