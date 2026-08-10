@@ -94,9 +94,7 @@ function PendingPlate({
       aria-label={label}
     >
       <span className="absolute inset-0 grid place-items-center text-muted-foreground">
-        <span
-          className={`${small ? 'w-4 h-4' : 'w-8 h-8'} rounded-full border-2 border-current/40 border-t-current animate-spin`}
-        />
+        <Spinner size={small ? 'sm' : 'lg'} />
       </span>
     </div>
   );

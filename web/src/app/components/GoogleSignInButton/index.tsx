@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 import LoadingOverlay from '../LoadingOverlay';
-import Spinner from './Spinner';
+import { Spinner } from '../ui/Spinner';
 import type { GoogleSignInButtonProps } from './types';
 
 function cx(...xs: Array<string | false | null | undefined>) {
