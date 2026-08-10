@@ -74,8 +74,7 @@ export function useItems(categoryId: string, q: string) {
 
         if (mySeq !== reqSeq.current) return;
         if (error) {
-          console.error('Failed to load items:', error.message);
-          toast.error(t('item_list.search_error'));
+          toast.reportError('load items', error, t('item_list.search_error'));
           return;
         }
 

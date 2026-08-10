@@ -27,6 +27,11 @@ type ToastApi = {
    * to the app-level polite live region, for anyone not focused on (or
    * looking at) whatever just changed. */
   announce: (message: string) => void;
+  /** The console.error + toast.error pair every failed mutation ends with
+   * -- `scope` is a short, fixed label for the console (`'save item'`,
+   * `'delete category'`), `err` is logged in full rather than reduced to
+   * `.message`, and `message` is the translated string shown to the user. */
+  reportError: (scope: string, err: unknown, message: string) => void;
 };
 
 const ToastContext = createContext<ToastApi | undefined>(undefined);
@@ -86,9 +91,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setAnnouncement(message);
   }, []);
 
+  const reportError = useCallback(
+    (scope: string, err: unknown, message: string) => {
+      console.error(scope, err);
+      post('error', message);
+    },
+    [post],
+  );
+
   const api = useMemo<ToastApi>(
-    () => ({ error, success, announce }),
-    [error, success, announce],
+    () => ({ error, success, announce, reportError }),
+    [error, success, announce, reportError],
   );
 
   return (

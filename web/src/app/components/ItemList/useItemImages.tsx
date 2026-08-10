@@ -336,8 +336,7 @@ export function useItemImages() {
         const entries = await fetchItemImages(itemId);
         if (entries) setImages((prev) => ({ ...prev, [itemId]: entries }));
       } catch (err: unknown) {
-        console.error('Failed to upload image:', err);
-        toast.error(t('item_list.upload_error'));
+        toast.reportError('upload image', err, t('item_list.upload_error'));
       } finally {
         setPendingUploads((prev) => {
           const remaining = (prev[itemId] ?? 1) - 1;
@@ -359,8 +358,11 @@ export function useItemImages() {
         const paths = [img.pathFull, ...(img.pathThumb ? [img.pathThumb] : [])];
         const { error } = await removeImageObjects(paths);
         if (error) {
-          console.error('Failed to delete image:', error);
-          toast.error(t('item_list.delete_image_error'));
+          toast.reportError(
+            'delete image',
+            error,
+            t('item_list.delete_image_error'),
+          );
           return;
         }
         invalidateListing(img.pathFull.split('/').slice(0, 2).join('/'));

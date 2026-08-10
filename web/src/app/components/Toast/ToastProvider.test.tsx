@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ToastProvider, useToast } from './ToastProvider';
@@ -32,6 +32,24 @@ function SuccessTrigger({ message }: { message: string }) {
   const toast = useToast();
   return (
     <button type="button" onClick={() => toast.success(message)}>
+      {message}
+    </button>
+  );
+}
+
+function ReportErrorTrigger({
+  message,
+  error,
+}: {
+  message: string;
+  error: unknown;
+}) {
+  const toast = useToast();
+  return (
+    <button
+      type="button"
+      onClick={() => toast.reportError('trigger', error, message)}
+    >
       {message}
     </button>
   );
@@ -112,5 +130,31 @@ describe('ToastProvider', () => {
     const status = await screen.findByRole('status');
     expect(status).toHaveTextContent('Category deleted.');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('reportError posts an assertive alert and logs the scope and error', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const err = new Error('boom');
+    render(
+      <I18nProvider>
+        <ToastProvider>
+          <ReportErrorTrigger
+            message="Could not save this entry."
+            error={err}
+          />
+        </ToastProvider>
+      </I18nProvider>,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Could not save this entry.' }),
+    );
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Could not save this entry.');
+    expect(consoleError).toHaveBeenCalledWith('trigger', err);
+    consoleError.mockRestore();
   });
 });

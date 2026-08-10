@@ -138,6 +138,12 @@ export function MapModal({
         // spinner: Leaflet's chunk and the first tiles then load while the
         // places are still being resolved, instead of after.
         <div className="relative h-full">
+          {/* The two overlay chips below sit above the map, not above
+              anything the app's --z-index-* scale governs: `relative`
+              on this wrapper makes it their own stacking context, so
+              `z-[1000]` only has to clear Leaflet's own control layer
+              (Leaflet's `.leaflet-top`/`.leaflet-control` default to
+              z-index: 1000), not any of the app's named layers. */}
           <Map
             command={mapCommand}
             markers={mapMarkers}

@@ -42,8 +42,7 @@ export function useItemMutations({
         // can diverge from it.
         const { data, error } = await updateItem(id, values);
         if (error || !data) {
-          console.error('Failed to save item:', error);
-          toast.error(t('item_list.save_error'));
+          toast.reportError('save item', error, t('item_list.save_error'));
           return false;
         }
         setItems((prev) =>
@@ -92,8 +91,7 @@ export function useItemMutations({
       // failed.
       const { error } = await deleteItem(id);
       if (error) {
-        console.error('Failed to delete item:', error);
-        toast.error(t('item_list.delete_error'));
+        toast.reportError('delete item', error, t('item_list.delete_error'));
         restore();
         return;
       }
@@ -109,8 +107,11 @@ export function useItemMutations({
         // to restore, and nothing to gain by pretending otherwise.
         await deleteAllItemImages(id);
       } catch (err) {
-        console.error('Failed to delete item images:', err);
-        toast.error(t('item_list.delete_images_cleanup_error'));
+        toast.reportError(
+          'delete item images',
+          err,
+          t('item_list.delete_images_cleanup_error'),
+        );
       }
       // Resyncs the page silently: pulls up whatever item now belongs in
       // the freed slot and corrects the total the pagination is drawn from.
