@@ -42,6 +42,7 @@
     "export_cancelled": "Export abgebrochen.",
     "export_error": "Diese Kategorie konnte nicht exportiert werden. Bitte erneut versuchen.",
     "export_too_large": "Diese Kategorie ist zu groß, um als ein Archiv exportiert zu werden.",
+    "export_large_confirm": "Dieser Export ist etwa {size} groß — groß genug, dass manche Smartphones den Tab vorher schließen und der Fortschritt verloren geht. Trotzdem fortfahren?",
     "export_partial": "{skipped} von {total} Fotos konnten nicht in den Export aufgenommen werden.",
     "export_listing_partial": "Die Fotos von {count} Einträgen konnten nicht aufgelistet werden und fehlen im Export.",
     "load_error": "Kategorien konnten nicht geladen werden. Bitte erneut versuchen.",

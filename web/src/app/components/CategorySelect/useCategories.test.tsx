@@ -64,13 +64,13 @@ describe('useCategories deleteCategory', () => {
       error: null,
     } as never);
     vi.mocked(listItemIdsForCategory).mockResolvedValue({
-      data: [{ item_id: 'i1' }, { item_id: 'i2' }],
+      data: ['i1', 'i2'],
       error: null,
-    } as never);
+    });
     vi.mocked(listItemIdsLinkedElsewhere).mockResolvedValue({
       data: [],
       error: null,
-    } as never);
+    });
     vi.mocked(removeItemImages).mockResolvedValue('uid');
     vi.mocked(verifiedUserId).mockResolvedValue('uid');
   });
@@ -191,15 +191,15 @@ describe('useCategories deleteCategory', () => {
   it('cleans up only the items the deletion actually orphaned, leaving one still linked elsewhere untouched', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     vi.mocked(listItemIdsForCategory).mockResolvedValue({
-      data: [{ item_id: 'i1' }, { item_id: 'i2' }],
+      data: ['i1', 'i2'],
       error: null,
-    } as never);
+    });
     // i1 is still linked to some other category -- the cascade leaves it
     // in place, so it must not be reported here.
     vi.mocked(listItemIdsLinkedElsewhere).mockResolvedValue({
-      data: [{ item_id: 'i1' }],
+      data: ['i1'],
       error: null,
-    } as never);
+    });
     const { result } = renderHook(() => useCategories(), { wrapper });
 
     await act(async () => {
@@ -215,6 +215,28 @@ describe('useCategories deleteCategory', () => {
     expect(removeItemImages).toHaveBeenCalledTimes(1);
   });
 
+  // #409: pagination can only guarantee a *successful* answer is complete --
+  // an incomplete one (an error mid-page, a chunk that failed) must still
+  // stop the deletion rather than being treated as "nothing else links
+  // these items". Aborting here means the category row itself must survive,
+  // not just the photograph cleanup.
+  it('aborts the entire deletion, including the category row, when the linked-elsewhere check fails', async () => {
+    vi.mocked(listItemIdsLinkedElsewhere).mockResolvedValue({
+      data: null,
+      error: new Error('truncated page'),
+    });
+    const { result } = renderHook(() => useCategories(), { wrapper });
+
+    let outcome: boolean | undefined;
+    await act(async () => {
+      outcome = await result.current.deleteCategory('cat-1');
+    });
+
+    expect(outcome).toBe(false);
+    expect(deleteCategoryRow).not.toHaveBeenCalled();
+    expect(removeItemImages).not.toHaveBeenCalled();
+  });
+
   // The other half of the same branch: nothing to filter down at all, since
   // an empty category has no items to have been orphaned or kept.
   it('never asks which items are linked elsewhere when the category held none', async () => {
@@ -222,7 +244,7 @@ describe('useCategories deleteCategory', () => {
     vi.mocked(listItemIdsForCategory).mockResolvedValue({
       data: [],
       error: null,
-    } as never);
+    });
     const { result } = renderHook(() => useCategories(), { wrapper });
 
     await act(async () => {

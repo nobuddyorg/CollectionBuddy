@@ -129,6 +129,24 @@ export function fullSizeObjectPaths(
 }
 
 /**
+ * The total size, in bytes, of an item's full-size photographs -- thumbnails
+ * left out the same way `fullSizeObjectPaths` leaves them out, so the two
+ * agree on what "the archive's photographs" means.
+ *
+ * Storage's `list()` already returns each object's size in its metadata;
+ * this is what lets an export know its total weight before downloading a
+ * single photograph, instead of discovering it only once the tab runs out
+ * of memory (#428).
+ */
+export function fullSizeObjectBytes(
+  objects: { name: string; metadata: { size: number } | null }[],
+): number {
+  return objects
+    .filter((o) => !isThumbObject(o.name))
+    .reduce((sum, o) => sum + (o.metadata?.size ?? 0), 0);
+}
+
+/**
  * Pairs each item with its folder and its photographs, each carrying its
  * own storage path and archive path together rather than as two arrays a
  * caller has to zip back up by index (#421).
@@ -269,6 +287,13 @@ export function buildCsv(entries: ExportEntry[]): string {
     ]),
   );
   return `\ufeff${[csvRow(CSV_COLUMNS.map(plainCell)), ...rows].join('\r\n')}\r\n`;
+}
+
+/** A byte count as the rounded gigabyte figure a size warning can put in
+ * front of someone -- "about 1.6 GB", not a raw byte count nobody reads at
+ * a glance (#428). */
+export function formatExportBytes(bytes: number): string {
+  return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 }
 
 /** `2026-08-06`, in the exporter's own timezone rather than UTC. */

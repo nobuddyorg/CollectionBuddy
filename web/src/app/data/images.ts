@@ -36,12 +36,20 @@ export const IMAGE_LIST_SORT = {
   order: 'asc',
 } as const;
 
+/** What a listed storage object carries that this app reads: its name, and
+ * (when the backend returns it) the byte size an export sums up front to
+ * warn before a large archive risks a killed tab rather than after (#428). */
+export type ImageObject = {
+  name: string;
+  metadata: { size: number } | null;
+};
+
 // Pages through the full listing under a prefix so a `.webp`/`.thumb.webp`
 // pair can never be split across a page boundary (each page is a multiple
 // of one full page, not an arbitrary object cap).
 export async function listAllImageObjects(prefix: string) {
   const pageSize = 100;
-  const all: { name: string }[] = [];
+  const all: ImageObject[] = [];
   let offset = 0;
   for (;;) {
     const { data, error } = await supabase.storage
@@ -81,7 +89,7 @@ export function removeImageObjects(paths: string[]) {
 export async function listItemImages(itemId: string): Promise<{
   uid: string;
   prefix: string;
-  data: { name: string }[] | null;
+  data: ImageObject[] | null;
   error: unknown;
 } | null> {
   const uid = await currentUserId();
