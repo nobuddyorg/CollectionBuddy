@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   archiveName,
+  archiveRootFolder,
   buildCsv,
   buildManifest,
   csvCell,
@@ -149,8 +150,28 @@ describe('exportEntries', () => {
     );
     expect(entries[0].folder).toBe('001-seated-dime');
     expect(entries[0].photos).toEqual([
-      `${PHOTOS_DIR}/001-seated-dime/1.webp`,
-      `${PHOTOS_DIR}/001-seated-dime/2.webp`,
+      {
+        storagePath: 'uid/a/one.webp',
+        archivePath: `${PHOTOS_DIR}/001-seated-dime/1.webp`,
+      },
+      {
+        storagePath: 'uid/a/two.webp',
+        archivePath: `${PHOTOS_DIR}/001-seated-dime/2.webp`,
+      },
+    ]);
+  });
+
+  // #421: each photo carries its own storage path and archive path
+  // together, built once here, rather than two arrays a caller has to zip
+  // back up by index -- so there is no positional invariant left to break.
+  it('pairs each photograph with the exact storage path it came from', () => {
+    const entries = exportEntries(
+      [item({ id: 'a' })],
+      new Map([['a', ['uid/a/one.webp', 'uid/a/two.webp']]]),
+    );
+    expect(entries[0].photos.map((p) => p.storagePath)).toEqual([
+      'uid/a/one.webp',
+      'uid/a/two.webp',
     ]);
   });
 
@@ -166,7 +187,9 @@ describe('exportEntries', () => {
     expect(entries.map((e) => e.folder)).toEqual(['001-coin', '002-coin']);
     // The whole point of the numbering: neither item's photograph can land
     // on top of the other's.
-    expect(entries[0].photos[0]).not.toBe(entries[1].photos[0]);
+    expect(entries[0].photos[0].archivePath).not.toBe(
+      entries[1].photos[0].archivePath,
+    );
   });
 
   it('gives an item with no photographs an empty list, not a missing one', () => {
@@ -185,7 +208,12 @@ describe('exportEntries', () => {
       [item({ id: 'a', title: 'Coin' })],
       new Map([['a', ['uid/a/x.jpeg']]]),
     );
-    expect(entries[0].photos).toEqual([`${PHOTOS_DIR}/001-coin/1.jpeg`]);
+    expect(entries[0].photos).toEqual([
+      {
+        storagePath: 'uid/a/x.jpeg',
+        archivePath: `${PHOTOS_DIR}/001-coin/1.jpeg`,
+      },
+    ]);
   });
 });
 
@@ -437,6 +465,32 @@ describe('archiveName', () => {
   it('still produces a usable name for a category of only emoji', () => {
     expect(archiveName('🪙', new Date(2026, 7, 6))).toBe(
       'CollectionBuddy-untitled-2026-08-06.zip',
+    );
+  });
+});
+
+// #422: the module doc and both commit messages show every entry inside one
+// top-level directory, but the implementation wrote collection.json,
+// collection.csv and photos/ straight at the ZIP root -- fine for an
+// extractor that auto-wraps (macOS Archive Utility, Windows "Extract All"),
+// but CLI `unzip`/7-Zip "extract here" scatter the three entries into
+// whatever directory they're run in, and two exports extracted into the
+// same place overwrite each other's manifest and spreadsheet.
+describe('archiveRootFolder', () => {
+  it('names the one directory every entry lives under, the same way the download is named', () => {
+    const exportedAt = new Date(2026, 7, 6);
+    expect(archiveRootFolder('Coins', exportedAt)).toBe(
+      'CollectionBuddy-coins-2026-08-06',
+    );
+    expect(archiveName('Coins', exportedAt)).toBe(
+      `${archiveRootFolder('Coins', exportedAt)}.zip`,
+    );
+  });
+
+  it('slugs the category the same way the folder inside it does', () => {
+    const exportedAt = new Date(2026, 7, 6);
+    expect(archiveRootFolder('Münzen / Silber', exportedAt)).toBe(
+      'CollectionBuddy-munzen-silber-2026-08-06',
     );
   });
 });

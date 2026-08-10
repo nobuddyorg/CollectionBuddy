@@ -27,6 +27,7 @@ import {
 import { listItemsForExport } from './items';
 import {
   archiveName,
+  archiveRootFolder,
   buildCsv,
   buildManifest,
   CSV_NAME,
@@ -470,30 +471,21 @@ export async function exportCategory({
   );
   const entries = exportEntries(items, photoPathsByItemId);
 
-  // Never undefined: fetchPhotoPaths sets an entry (possibly empty) for
-  // every id in this same `items` array, so there is no id here it hasn't
-  // already accounted for.
-  const storagePaths = items.flatMap((item) =>
-    photoPathsByItemId.get(item.id)!,
+  const storagePaths = entries.flatMap((entry) =>
+    entry.photos.map((p) => p.storagePath),
   );
   const signed = await signAll(storagePaths, signUrls, signal);
 
   const exportedAt = now();
+  const archiveRoot = archiveRootFolder(category.name, exportedAt);
   const writer = createZipWriter();
   let done = 0;
   let skipped = 0;
 
-  // The archive path paired with the storage path that fills it, flattened
-  // once up front so the download pool below can pull work items off a
-  // plain array instead of re-deriving the pairing per entry.
-  const tasks = entries.flatMap((entry) => {
-    // Same guarantee as storagePaths above.
-    const stored = photoPathsByItemId.get(entry.item.id)!;
-    return stored.map((storagePath, i) => ({
-      archivePath: entry.photos[i],
-      storagePath,
-    }));
-  });
+  // Flattened once up front so the download pool below can pull work items
+  // off a plain array -- each one already the storage/archive pair
+  // `exportEntries` built, not re-derived per entry (#421).
+  const tasks = entries.flatMap((entry) => entry.photos);
   const total = tasks.length;
   onProgress?.({ phase: 'photos', done, total });
 
@@ -511,7 +503,7 @@ export async function exportCategory({
     try {
       if (!url) throw new Error(`Unsigned path in ${ITEM_IMAGES_BUCKET}`);
       const bytes = await fetchPhotoBytes(url, signal);
-      writer.add(task.archivePath, bytes, exportedAt);
+      writer.add(`${archiveRoot}/${task.archivePath}`, bytes, exportedAt);
     } catch (err) {
       if (err instanceof ZipLimitError || err instanceof ExportCancelledError) {
         throw err;
@@ -527,11 +519,15 @@ export async function exportCategory({
   const encoder = new TextEncoder();
   const manifest = buildManifest({ category, entries, exportedAt });
   writer.add(
-    MANIFEST_NAME,
+    `${archiveRoot}/${MANIFEST_NAME}`,
     encoder.encode(JSON.stringify(manifest, null, 2)),
     exportedAt,
   );
-  writer.add(CSV_NAME, encoder.encode(buildCsv(entries)), exportedAt);
+  writer.add(
+    `${archiveRoot}/${CSV_NAME}`,
+    encoder.encode(buildCsv(entries)),
+    exportedAt,
+  );
 
   return {
     blob: writer.finish(),

@@ -121,9 +121,17 @@ async function readZipEntries(blob: Blob): Promise<Map<string, Uint8Array>> {
   return entries;
 }
 
+// The one directory every entry lives under (#422), derived from the
+// result's own filename rather than recomputed from `now`/category name --
+// most of the tests below don't control `now`, so this is the only way to
+// name the root without depending on the date the test happens to run on.
+function rootFolderOf(result: ExportResult): string {
+  return result.filename.replace(/\.zip$/, '');
+}
+
 async function manifestOf(result: ExportResult): Promise<ExportManifest> {
   const entries = await readZipEntries(result.blob);
-  const bytes = entries.get(MANIFEST_NAME);
+  const bytes = entries.get(`${rootFolderOf(result)}/${MANIFEST_NAME}`);
   if (!bytes) throw new Error('collection.json missing from archive');
   return JSON.parse(new TextDecoder().decode(bytes)) as ExportManifest;
 }
@@ -696,11 +704,12 @@ describe('exportCategory', () => {
         expect(permanentFailureCalls).toBe(1);
 
         const entries = await readZipEntries(result.blob);
-        expect(entries.has('photos/001-item/1.webp')).toBe(true);
-        expect(entries.get('photos/001-item/1.webp')).toEqual(
+        const root = rootFolderOf(result);
+        expect(entries.has(`${root}/photos/001-item/1.webp`)).toBe(true);
+        expect(entries.get(`${root}/photos/001-item/1.webp`)).toEqual(
           new Uint8Array([1, 2, 3]),
         );
-        expect(entries.has('photos/001-item/2.webp')).toBe(false);
+        expect(entries.has(`${root}/photos/001-item/2.webp`)).toBe(false);
 
         // The gap is visible, not silent: the manifest still names the
         // photograph the archive itself is missing.
@@ -746,8 +755,9 @@ describe('exportCategory', () => {
         expect(result.skippedPhotoCount).toBe(1);
         expect(result.photoCount).toBe(1);
         const entries = await readZipEntries(result.blob);
-        expect(entries.has('photos/001-item/1.webp')).toBe(false);
-        expect(entries.has('photos/001-item/2.webp')).toBe(true);
+        const root = rootFolderOf(result);
+        expect(entries.has(`${root}/photos/001-item/1.webp`)).toBe(false);
+        expect(entries.has(`${root}/photos/001-item/2.webp`)).toBe(true);
       } finally {
         vi.unstubAllGlobals();
       }
@@ -779,9 +789,9 @@ describe('exportCategory', () => {
         expect(calls).toBe(3);
         expect(result.skippedPhotoCount).toBe(0);
         const entries = await readZipEntries(result.blob);
-        expect(entries.get('photos/001-item/1.webp')).toEqual(
-          new Uint8Array([9, 9]),
-        );
+        expect(
+          entries.get(`${rootFolderOf(result)}/photos/001-item/1.webp`),
+        ).toEqual(new Uint8Array([9, 9]));
       } finally {
         vi.useRealTimers();
         vi.unstubAllGlobals();
@@ -842,9 +852,9 @@ describe('exportCategory', () => {
         expect(calls).toBe(2);
         expect(result.skippedPhotoCount).toBe(0);
         const entries = await readZipEntries(result.blob);
-        expect(entries.get('photos/001-item/1.webp')).toEqual(
-          new Uint8Array([4, 2]),
-        );
+        expect(
+          entries.get(`${rootFolderOf(result)}/photos/001-item/1.webp`),
+        ).toEqual(new Uint8Array([4, 2]));
       } finally {
         vi.useRealTimers();
         vi.unstubAllGlobals();
@@ -881,10 +891,41 @@ describe('exportCategory', () => {
       expect(result.filename).toBe('CollectionBuddy-coins-2026-01-15.zip');
 
       const entries = await readZipEntries(result.blob);
-      expect(entries.has(MANIFEST_NAME)).toBe(true);
-      expect(entries.has(CSV_NAME)).toBe(true);
-      expect(entries.has('photos/001-coin-a/1.webp')).toBe(true);
-      expect(entries.has('photos/002-coin-b/1.webp')).toBe(true);
+      const root = rootFolderOf(result);
+      expect(root).toBe('CollectionBuddy-coins-2026-01-15');
+      expect(entries.has(`${root}/${MANIFEST_NAME}`)).toBe(true);
+      expect(entries.has(`${root}/${CSV_NAME}`)).toBe(true);
+      expect(entries.has(`${root}/photos/001-coin-a/1.webp`)).toBe(true);
+      expect(entries.has(`${root}/photos/002-coin-b/1.webp`)).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  // #422: every entry lives under one top-level directory, so an extractor
+  // that does not auto-wrap a ZIP (CLI `unzip`, 7-Zip "extract here") still
+  // lands a whole export in a directory of its own rather than scattering
+  // collection.json/collection.csv/photos/ into whatever directory it was
+  // run in, where a second export would overwrite the first's.
+  it('wraps every entry -- manifest, spreadsheet and every photograph -- in one root folder', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => okResponse([1])),
+    );
+    try {
+      const result = await exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        getSession: fakeGetSession('uid'),
+        listItems: paginatedListItems([item({ id: 'a' })]),
+        listImages: fakeListImages({ 'uid/a': ['1.webp'] }),
+        signUrls: fakeSignUrls(),
+      });
+      const entries = await readZipEntries(result.blob);
+      const root = rootFolderOf(result);
+      expect(entries.size).toBeGreaterThan(0);
+      for (const name of entries.keys()) {
+        expect(name.startsWith(`${root}/`)).toBe(true);
+      }
     } finally {
       vi.unstubAllGlobals();
     }
@@ -1467,8 +1508,9 @@ describe('exportCategory', () => {
       expect(result.photoCount).toBe(photoCount);
       expect(result.skippedPhotoCount).toBe(0);
       const entries = await readZipEntries(result.blob);
+      const root = rootFolderOf(result);
       for (let i = 1; i <= photoCount; i++) {
-        expect(entries.has(`photos/001-item/${i}.webp`)).toBe(true);
+        expect(entries.has(`${root}/photos/001-item/${i}.webp`)).toBe(true);
       }
     } finally {
       vi.unstubAllGlobals();
