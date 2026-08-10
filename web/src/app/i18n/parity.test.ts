@@ -40,20 +40,67 @@ function collectSourceFiles(dir: string): string[] {
   return files;
 }
 
-// Matches t('some.key') / t("some.key") call literals. Dynamic keys
-// (t(someVariable)) aren't statically checkable and are skipped, same as
-// any usage that isn't a plain string literal.
-const T_CALL_PATTERN = /\bt\(\s*['"]([a-zA-Z0-9_.]+)['"]/g;
+// Every declared key is `namespace.leaf` (flattenKeys prefixes every leaf
+// with its containing object's path), so a quoted literal that isn't
+// dot-separated can't be one -- which is what keeps this from mistaking
+// `result.reason === 'denied'`, sitting in the same parens as the ternary
+// it feeds, for a translation key.
+const KEY_LIKE = /^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)+$/;
+
+// Finds every string-literal argument passed to a `t(` or `tCount(` call,
+// however it's shaped -- including `t(cond ? 'a' : 'b')`, which a
+// first-literal-only regex would miss entirely (and then, once something
+// checks for declared-but-unused keys, misreport as dead). Walks paren
+// depth from the call's own `(` to its matching `)` and collects every
+// key-shaped quoted literal in between; a plain `t('some.key')` is just
+// the one-literal case of the same walk.
+function extractCallLiterals(content: string, name: string): string[][] {
+  const calls: string[][] = [];
+  const callOpen = new RegExp(`\\b${name}\\(`, 'g');
+  for (const start of content.matchAll(callOpen)) {
+    const literals: string[] = [];
+    let depth = 1;
+    let i = start.index + start[0].length;
+    while (depth > 0 && i < content.length) {
+      const ch = content[i];
+      if (ch === '(') depth++;
+      else if (ch === ')') depth--;
+      else if (ch === "'" || ch === '"') {
+        const quote = ch;
+        const end = content.indexOf(quote, i + 1);
+        if (end === -1) break;
+        const literal = content.slice(i + 1, end);
+        if (KEY_LIKE.test(literal)) literals.push(literal);
+        i = end;
+      }
+      i++;
+    }
+    calls.push(literals);
+  }
+  return calls;
+}
 
 function collectUsedKeys(files: string[]): Map<string, string[]> {
   const usages = new Map<string, string[]>();
+  const record = (key: string, file: string) => {
+    const existing = usages.get(key) ?? [];
+    existing.push(file);
+    usages.set(key, existing);
+  };
   for (const file of files) {
     const content = readFileSync(file, 'utf8');
-    for (const match of content.matchAll(T_CALL_PATTERN)) {
-      const key = match[1];
-      const existing = usages.get(key) ?? [];
-      existing.push(file);
-      usages.set(key, existing);
+    for (const literals of extractCallLiterals(content, 't')) {
+      for (const key of literals) record(key, file);
+    }
+    // tCount('some.key', n) resolves to `some.key` or, for a count of
+    // exactly one, `some.key_one` (see I18nProvider's tCount) -- the
+    // `_one` variant's literal never appears in source, so it has to be
+    // credited as used alongside the base key from this one call.
+    for (const literals of extractCallLiterals(content, 'tCount')) {
+      for (const key of literals) {
+        record(key, file);
+        record(`${key}_one`, file);
+      }
     }
   }
   return usages;
@@ -78,5 +125,12 @@ describe('i18n key parity', () => {
     const onlyInEn = [...enKeys].filter((k) => !deKeys.has(k));
     const onlyInDe = [...deKeys].filter((k) => !enKeys.has(k));
     expect({ onlyInEn, onlyInDe }).toEqual({ onlyInEn: [], onlyInDe: [] });
+  });
+
+  // The other three checks only ever look for keys the source is missing;
+  // none of them can catch a key nothing references any more (#373).
+  it('every key in en.json is referenced by some t(…) or tCount(…) literal', () => {
+    const unused = [...enKeys].filter((k) => !usedKeys.has(k));
+    expect(unused).toEqual([]);
   });
 });

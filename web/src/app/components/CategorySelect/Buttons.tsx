@@ -62,15 +62,7 @@ export function RenameButton({
       aria-label={label}
       title={label}
     >
-      <Icon
-        icon={IconType.Check}
-        className="w-5 h-5"
-        aria-hidden="true"
-        stroke="currentColor"
-        strokeWidth="2"
-        fill="none"
-        strokeLinecap="round"
-      />
+      <Icon icon={IconType.Check} className="w-5 h-5" aria-hidden="true" />
     </IconButton>
   );
 }
@@ -103,9 +95,7 @@ export function CollapseButton({
         icon={IconType.Close}
         className="w-5 h-5"
         aria-hidden="true"
-        stroke="currentColor"
-        strokeWidth="2"
-        fill="none"
+        // Trailing override: Close's own default draws a square cap.
         strokeLinecap="round"
       />
     </button>
@@ -133,15 +123,7 @@ export function DeleteButtonWithLabel({
       aria-label={label}
       title={label}
     >
-      <Icon
-        icon={IconType.Trash}
-        className="w-5 h-5"
-        aria-hidden="true"
-        stroke="currentColor"
-        strokeWidth="2"
-        fill="none"
-        strokeLinecap="round"
-      />
+      <Icon icon={IconType.Trash} className="w-5 h-5" aria-hidden="true" />
     </IconButton>
   );
 }
@@ -204,9 +186,7 @@ export function CancelExportButton({
         icon={IconType.Close}
         className="w-4 h-4"
         aria-hidden="true"
-        stroke="currentColor"
-        strokeWidth="2"
-        fill="none"
+        // Trailing override: Close's own default draws a square cap.
         strokeLinecap="round"
       />
     </button>
@@ -229,15 +209,7 @@ export function ExpandButton({
       aria-label={label}
       title={label}
     >
-      <Icon
-        icon={IconType.Edit}
-        className="w-5 h-5"
-        aria-hidden="true"
-        stroke="currentColor"
-        strokeWidth="2"
-        fill="none"
-        strokeLinecap="round"
-      />
+      <Icon icon={IconType.Edit} className="w-5 h-5" aria-hidden="true" />
     </button>
   );
 }

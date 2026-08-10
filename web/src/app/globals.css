@@ -289,21 +289,6 @@ body {
     will-change: transform;
   }
 
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  .spinner {
-    border: 3px solid transparent;
-    border-top-color: currentColor;
-    border-radius: 50%;
-    width: 2.5rem;
-    height: 2.5rem;
-    animation: spin 0.8s linear infinite;
-  }
-
   @keyframes shimmer {
     100% {
       transform: translateX(100%);
@@ -390,8 +375,7 @@ body {
      them under Reduce Motion removes the only visual signal sighted users
      get, leaving just the aria-label. Exempt them from the blanket rule
      above and keep their normal (non-reduced) rate. */
-  .animate-spin,
-  .spinner {
+  .animate-spin {
     animation-duration: 0.8s !important;
   }
 }

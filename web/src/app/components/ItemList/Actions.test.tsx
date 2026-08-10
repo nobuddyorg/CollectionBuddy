@@ -123,8 +123,6 @@ describe('AddPhotoPlate', () => {
     expect(input).toBeDisabled();
   });
 
-  // The shared <Spinner> is white-on-dark; on this pale plate it would be
-  // an invisible busy state.
   it('shows a visible busy indicator while uploading', () => {
     renderPlate({ busy: true });
     expect(screen.getByRole('status', { name: 'Loading…' })).toBeVisible();

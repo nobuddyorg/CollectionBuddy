@@ -6,30 +6,19 @@ import { useI18n } from '../../i18n/useI18n';
 
 type LoadingOverlayProps = {
   label: string;
-  inline?: boolean;
-  spinnerSize?: number;
-  className?: string;
-  zIndex?: number;
-  scrim?: boolean;
   // 'dark' is a hardcoded black scrim/white text, for overlays meant to
   // read as a distinct layer over real page content. 'auto' follows the
   // app's own background/foreground tokens, for overlays (like the
   // session checks) that are the only thing on screen.
   theme?: 'dark' | 'auto';
-  ariaLive?: 'polite' | 'assertive' | 'off';
 };
 
 const SLOW_THRESHOLD_MS = 8000;
+const SPINNER_SIZE = 32;
 
 export default function LoadingOverlay({
   label,
-  inline = false,
-  spinnerSize = 32,
-  className,
-  zIndex = 100,
-  scrim = true,
   theme = 'dark',
-  ariaLive = 'polite',
 }: LoadingOverlayProps) {
   const { t } = useI18n();
   const [slow, setSlow] = useState(false);
@@ -50,16 +39,10 @@ export default function LoadingOverlay({
 
   const fullscreenClasses = [
     'fixed inset-0',
-    scrim
-      ? isDark
-        ? 'bg-black/60 backdrop-blur-sm'
-        : 'bg-background/80 backdrop-blur-sm'
-      : '',
+    isDark
+      ? 'bg-black/60 backdrop-blur-sm'
+      : 'bg-background/80 backdrop-blur-sm',
   ].join(' ');
-
-  const inlineClasses = isDark
-    ? 'absolute inset-0 bg-black/40 backdrop-blur-[2px] rounded-sm'
-    : 'absolute inset-0 bg-background/60 backdrop-blur-[2px] rounded-sm';
 
   const spinnerClasses = isDark
     ? 'border-white/80 border-t-transparent'
@@ -68,18 +51,14 @@ export default function LoadingOverlay({
   return (
     <div
       role="status"
-      aria-live={ariaLive}
+      aria-live="polite"
       aria-busy="true"
-      className={[
-        base,
-        inline ? inlineClasses : fullscreenClasses,
-        className ?? '',
-      ].join(' ')}
-      style={inline ? undefined : { zIndex }}
+      className={[base, fullscreenClasses].join(' ')}
+      style={{ zIndex: 100 }}
     >
       <div
         className={`animate-spin rounded-full border-2 ${spinnerClasses}`}
-        style={{ width: spinnerSize, height: spinnerSize }}
+        style={{ width: SPINNER_SIZE, height: SPINNER_SIZE }}
         aria-hidden="true"
       />
       <span

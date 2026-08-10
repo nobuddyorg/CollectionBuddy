@@ -68,9 +68,8 @@ export function TagsInput({
             <Icon
               icon={IconType.Close}
               className="w-3 h-3"
-              stroke="currentColor"
+              // Trailing override: Close's own default is a thinner 2.
               strokeWidth="3"
-              fill="none"
             />
           </button>
         </span>

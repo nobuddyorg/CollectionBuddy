@@ -3,6 +3,7 @@
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 import { IconButton, iconButtonClasses } from '../ui/IconButton';
+import { Spinner } from '../ui/Spinner';
 
 // The file picker itself, wrapped so both the row control and the empty
 // plate can hand a chosen file straight to onUpload.
@@ -77,15 +78,10 @@ export function AddPhotoPlate({
           `text-foreground/80` carries 7.10:1 on light `--mount` and 10.65:1
           on dark, so both themes clear AA without a new token. */}
       <span className="relative flex flex-col items-center gap-2.5 text-foreground/80 transition-colors group-hover/plate:text-foreground">
-        {/* The shared <Spinner> draws in white, for the dark controls it
-            normally sits on; on this pale plate it would be invisible.
-            The `.spinner` utility inherits currentColor instead. */}
         {busy ? (
-          <span
-            className="spinner"
-            role="status"
-            aria-label={t('common.loading')}
-          />
+          <span role="status" aria-label={t('common.loading')}>
+            <Spinner size="xl" />
+          </span>
         ) : (
           <Icon icon={IconType.Photo} className="w-8 h-8" aria-hidden="true" />
         )}
@@ -99,9 +95,6 @@ export function AddPhotoPlate({
             icon={IconType.Plus}
             className="w-3.5 h-3.5"
             aria-hidden="true"
-            stroke="currentColor"
-            strokeWidth="2"
-            fill="none"
           />
           {t('item_list.add_image')}
         </span>
@@ -155,20 +148,11 @@ export function Actions({
           label={t('item_list.add_image')}
         />
         {busy ? (
-          <span
-            className="w-4 h-4 rounded-full border-2 border-current/30 border-t-current animate-spin"
-            role="status"
-            aria-label={t('common.loading')}
-          />
+          <span role="status" aria-label={t('common.loading')}>
+            <Spinner size="sm" />
+          </span>
         ) : (
-          <Icon
-            icon={IconType.Plus}
-            className="w-4 h-4"
-            aria-hidden="true"
-            stroke="currentColor"
-            strokeWidth="2"
-            fill="none"
-          />
+          <Icon icon={IconType.Plus} className="w-4 h-4" aria-hidden="true" />
         )}
       </label>
 
@@ -179,14 +163,7 @@ export function Actions({
         aria-label={t('item_list.edit')}
         title={t('item_list.edit')}
       >
-        <Icon
-          icon={IconType.Edit}
-          className="w-4 h-4"
-          aria-hidden="true"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-        />
+        <Icon icon={IconType.Edit} className="w-4 h-4" aria-hidden="true" />
       </IconButton>
 
       <IconButton
@@ -197,14 +174,7 @@ export function Actions({
         title={t('item_list.delete_entry')}
         className="ml-auto"
       >
-        <Icon
-          icon={IconType.Trash}
-          className="w-4 h-4"
-          aria-hidden="true"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-        />
+        <Icon icon={IconType.Trash} className="w-4 h-4" aria-hidden="true" />
       </IconButton>
     </div>
   );

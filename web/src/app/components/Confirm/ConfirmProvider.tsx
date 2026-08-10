@@ -10,6 +10,7 @@ import {
 
 import { useI18n } from '../../i18n/useI18n';
 import CenteredModal from '../CenteredModal';
+import { buttonClasses } from '../ui/buttonClasses';
 
 type ConfirmFn = (message: string) => Promise<boolean>;
 
@@ -60,7 +61,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             type="button"
             data-testid="confirm-cancel"
             onClick={() => settle(false)}
-            className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-control-border hover:bg-muted"
+            className={buttonClasses()}
           >
             {t('common.cancel')}
           </button>
