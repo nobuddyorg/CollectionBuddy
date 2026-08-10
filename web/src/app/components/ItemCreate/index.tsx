@@ -27,7 +27,7 @@ export default function ItemCreate({
   );
 
   return (
-    <section className="relative z-[70] p-4 sm:p-5 space-y-3">
+    <section className="relative p-4 sm:p-5 space-y-3">
       <ItemForm
         key={formKey}
         initial={EMPTY_ITEM_FORM_VALUES}

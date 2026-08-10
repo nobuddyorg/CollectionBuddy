@@ -75,7 +75,7 @@ export function useExportCategory() {
         // rather than a mere inconvenience (#414).
         if (result.skippedItemCount > 0) {
           toast.error(
-            t('category_select.exportListingPartial').replace(
+            t('category_select.export_listing_partial').replace(
               '{count}',
               String(result.skippedItemCount),
             ),
@@ -83,7 +83,7 @@ export function useExportCategory() {
         }
         if (result.skippedPhotoCount > 0) {
           toast.error(
-            t('category_select.exportPartial')
+            t('category_select.export_partial')
               .replace('{skipped}', String(result.skippedPhotoCount))
               .replace(
                 '{total}',
@@ -94,15 +94,18 @@ export function useExportCategory() {
       } catch (e) {
         if (e instanceof ExportCancelledError) {
           // The user asked for this -- confirmed, not reported as a failure.
-          toast.announce(t('category_select.exportCancelled'));
+          toast.announce(t('category_select.export_cancelled'));
         } else if (e instanceof ZipLimitError) {
           // Wrong to tell someone whose collection is too large for one
           // archive to "please try again" -- retrying produces exactly the
           // same refusal (#416).
-          toast.error(t('category_select.exportTooLarge'));
+          toast.error(t('category_select.export_too_large'));
         } else {
-          console.error(e);
-          toast.error(t('category_select.exportError'));
+          toast.reportError(
+            'export category',
+            e,
+            t('category_select.export_error'),
+          );
         }
       } finally {
         controllerRef.current = null;

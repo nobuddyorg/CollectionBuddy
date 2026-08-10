@@ -48,7 +48,8 @@ export function useCategories() {
       return list;
     } catch (e) {
       console.error(e);
-      if (mySeq === reqSeq.current) toast.error(t('category_select.loadError'));
+      if (mySeq === reqSeq.current)
+        toast.error(t('category_select.load_error'));
       return [];
     } finally {
       if (mySeq === reqSeq.current) setIsLoading(false);
@@ -65,8 +66,11 @@ export function useCategories() {
         await reload();
         return data;
       } catch (e) {
-        console.error(e);
-        toast.error(t('category_select.createError'));
+        toast.reportError(
+          'create category',
+          e,
+          t('category_select.create_error'),
+        );
         return null;
       } finally {
         setIsCreating(false);
@@ -90,11 +94,14 @@ export function useCategories() {
             prev.map((c) => (c.id === id ? { ...c, ...data } : c)),
           );
         }
-        toast.success(t('category_select.renameSuccess'));
+        toast.success(t('category_select.rename_success'));
         return true;
       } catch (e) {
-        console.error(e);
-        toast.error(t('category_select.renameError'));
+        toast.reportError(
+          'rename category',
+          e,
+          t('category_select.rename_error'),
+        );
         return false;
       } finally {
         setIsRenaming(false);
@@ -157,15 +164,18 @@ export function useCategories() {
             failures.forEach((f) =>
               console.error('Failed to clean up category images:', f.reason),
             );
-            toast.error(t('category_select.deleteImagesCleanupError'));
+            toast.error(t('category_select.delete_images_cleanup_error'));
           }
         }
 
-        toast.success(t('category_select.deleteSuccess'));
+        toast.success(t('category_select.delete_success'));
         return true;
       } catch (e) {
-        console.error(e);
-        toast.error(t('category_select.deleteError'));
+        toast.reportError(
+          'delete category',
+          e,
+          t('category_select.delete_error'),
+        );
         return false;
       } finally {
         setIsDeleting(false);

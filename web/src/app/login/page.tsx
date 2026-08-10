@@ -34,8 +34,7 @@ export default function LoginPage() {
   const positions = useMemo(() => fanPositions(EMOJIS.length), []);
 
   const handleSignInError = (err: unknown) => {
-    console.error('Google sign-in failed:', err);
-    toast.error(t('login_page.sign_in_error'));
+    toast.reportError('google sign-in', err, t('login_page.sign_in_error'));
   };
 
   if (checking)

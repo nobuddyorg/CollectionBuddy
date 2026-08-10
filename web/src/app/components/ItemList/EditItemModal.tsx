@@ -68,7 +68,7 @@ export function EditItemModal({
       title={t('item_list.edit_item')}
       closeLabel={t('common.close')}
     >
-      <section className="relative z-[50]">
+      <section className="relative">
         <ItemForm
           key={item?.id}
           initial={valuesFor(item)}

@@ -42,8 +42,7 @@ export function useCreateItem(categoryId: string) {
         if (itemId) {
           await deleteItem(itemId);
         }
-        console.error(e);
-        toast.error(t('item_create.save_error'));
+        toast.reportError('create item', e, t('item_create.save_error'));
         return false;
       } finally {
         setIsCreating(false);

@@ -124,12 +124,12 @@ export default function CategorySelect({
     if (countError) console.error(countError);
     const message =
       countError || count == null
-        ? t('category_select.confirmDeleteGeneric').replace('{name}', name)
+        ? t('category_select.confirm_delete_generic').replace('{name}', name)
         : count > 0
-          ? t('category_select.confirmDeleteWithEntries')
+          ? t('category_select.confirm_delete_with_entries')
               .replace('{name}', name)
               .replace('{count}', String(count))
-          : t('category_select.confirmDeleteEmpty').replace('{name}', name);
+          : t('category_select.confirm_delete_empty').replace('{name}', name);
 
     if (!(await confirm(message))) return;
     const ok = await deleteCategory(selectedCat);

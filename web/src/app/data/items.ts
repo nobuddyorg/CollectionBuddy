@@ -129,6 +129,15 @@ export function listItems({
   from: number;
   to: number;
 }) {
+  // `count: 'exact'` makes Postgres run a full COUNT over the filtered set
+  // on every call, including every debounced keystroke -- genuinely free at
+  // the collection sizes this app has actually seen (the trigram GIN
+  // indexes over title/description/place/tags_text, migrations/0005, keep
+  // even a filtered count fast), but a per-keystroke full count that grows
+  // with the collection. Worth revisiting with `count: 'planned'` or
+  // `'estimated'` -- an approximate page count, in exchange for dropping
+  // the per-request COUNT -- only if someone actually reports slow search
+  // on a large collection.
   let query = supabase
     .from('items')
     .select(ITEMS_SEARCH_SELECT, { count: 'exact' })
