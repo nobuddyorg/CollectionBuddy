@@ -205,12 +205,22 @@ export class ZipLimitError extends Error {
  * The check that keeps this writer inside what its 32-bit headers can
  * describe. Lifted out of the writer so it can be asserted for the entry
  * cap without actually building 65535 entries to get there.
+ *
+ * `maxBytes`/`maxEntries` default to the real 32-bit limits; a test can
+ * lower them to reach a `createZipWriter` boundary cheaply instead of
+ * allocating gigabytes or tens of thousands of entries to prove the same
+ * guard (#406).
  */
-export function assertZipRoom(totalBytes: number, entryCount: number): void {
-  if (totalBytes > MAX_ZIP_BYTES) {
+export function assertZipRoom(
+  totalBytes: number,
+  entryCount: number,
+  maxBytes = MAX_ZIP_BYTES,
+  maxEntries = MAX_ZIP_ENTRIES,
+): void {
+  if (totalBytes > maxBytes) {
     throw new ZipLimitError('Archive would exceed the 4 GiB ZIP limit');
   }
-  if (entryCount > MAX_ZIP_ENTRIES) {
+  if (entryCount > maxEntries) {
     throw new ZipLimitError('Archive would exceed 65535 ZIP entries');
   }
 }
@@ -231,7 +241,10 @@ export type ZipWriter = {
  * arrays is heap it must hold until the very end. A hundred photographs
  * therefore cost one photograph of live heap, not a hundred.
  */
-export function createZipWriter(): ZipWriter {
+export function createZipWriter({
+  maxBytes = MAX_ZIP_BYTES,
+  maxEntries = MAX_ZIP_ENTRIES,
+}: { maxBytes?: number; maxEntries?: number } = {}): ZipWriter {
   const parts: BlobPart[] = [];
   const entries: ZipEntry[] = [];
   let offset = 0;
@@ -243,11 +256,12 @@ export function createZipWriter(): ZipWriter {
       // is about to be refused. The header's length is known without it --
       // a fixed part plus the name.
       const headerLength = LOCAL_HEADER_BYTES + encodePath(path).length;
-      // Stryker disable next-line ArithmeticOperator: the caps themselves
-      // are asserted directly against assertZipRoom. Reaching either one
-      // through the writer would mean genuinely building four gigabytes or
-      // 65535 entries inside a unit test.
-      assertZipRoom(offset + headerLength + bytes.length, entries.length + 1);
+      assertZipRoom(
+        offset + headerLength + bytes.length,
+        entries.length + 1,
+        maxBytes,
+        maxEntries,
+      );
 
       const { time, date } = dosDateTime(modified);
       const entry: ZipEntry = {
@@ -269,9 +283,8 @@ export function createZipWriter(): ZipWriter {
     finish() {
       const directory = entries.map(centralDirectoryEntry);
       const directorySize = directory.reduce((sum, d) => sum + d.length, 0);
-      // Stryker disable next-line ArithmeticOperator: as in `add` above.
       const total = offset + directorySize + END_OF_CENTRAL_DIR_BYTES;
-      assertZipRoom(total, entries.length);
+      assertZipRoom(total, entries.length, maxBytes, maxEntries);
       return new Blob([
         ...parts,
         ...directory,

@@ -25,6 +25,7 @@ import {
   imagePrefix,
   listAllImageObjects,
   ITEM_IMAGES_BUCKET,
+  type ImageObject,
 } from './images';
 import { listItemsForExport } from './items';
 import {
@@ -34,6 +35,7 @@ import {
   buildManifest,
   CSV_NAME,
   exportEntries,
+  fullSizeObjectBytes,
   fullSizeObjectPaths,
   MANIFEST_NAME,
   type ExportItem,
@@ -76,6 +78,18 @@ export const ITEM_PAGE_SIZE = 500;
  * photographs down with it.
  */
 export const SIGN_BATCH_SIZE = 100;
+
+/**
+ * Above this, an archive risks the failure #428 describes: the Blob-per-entry
+ * design is fine on Chromium/Firefox, which page large blobs to disk, but on
+ * iOS/WebKit a constructed Blob stays substantially memory-resident and
+ * per-tab memory sits around 1-2 GB before the OS kills the tab outright --
+ * no toast, no console, the download simply never happens. That is far below
+ * `assertZipRoom`'s 4 GiB ZIP-format ceiling, which never gets a chance to
+ * raise its own clean error. Conservative on purpose: this is a warning
+ * threshold, not the real limit.
+ */
+export const LARGE_EXPORT_WARN_BYTES = 1.5 * 1024 ** 3;
 
 /**
  * Signed URLs last an hour by default. An export of a large collection on
@@ -253,7 +267,7 @@ async function listOnePrefix(
   prefix: string,
   listImages: typeof listAllImageObjects,
   signal?: AbortSignal,
-): Promise<{ data: { name: string }[] | null; error: unknown }> {
+): Promise<{ data: ImageObject[] | null; error: unknown }> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < LISTING_FETCH_ATTEMPTS; attempt++) {
     checkCancelled(signal);
@@ -293,8 +307,14 @@ async function fetchPhotoPaths(
 ): Promise<{
   photoPathsByItemId: Map<string, string[]>;
   skippedItemCount: number;
+  /** Summed from list()'s own metadata during this same listing pass, so the
+   * archive's total weight is known before a single photograph is
+   * downloaded (#428). An item whose listing failed contributes nothing --
+   * its photographs are already absent from the archive either way. */
+  totalBytes: number;
 }> {
   let skippedItemCount = 0;
+  let totalBytes = 0;
   const listings = await mapPool(items, LISTING_CONCURRENCY, async (item) => {
     checkCancelled(signal);
     const prefix = imagePrefix(uid, item.id);
@@ -304,9 +324,15 @@ async function fetchPhotoPaths(
       skippedItemCount++;
       return [item.id, [] as string[]] as const;
     }
-    return [item.id, fullSizeObjectPaths(prefix, data ?? [])] as const;
+    const objects = data ?? [];
+    totalBytes += fullSizeObjectBytes(objects);
+    return [item.id, fullSizeObjectPaths(prefix, objects)] as const;
   });
-  return { photoPathsByItemId: new Map(listings), skippedItemCount };
+  return {
+    photoPathsByItemId: new Map(listings),
+    skippedItemCount,
+    totalBytes,
+  };
 }
 
 /**
@@ -445,6 +471,7 @@ export async function exportCategory({
   // Stryker disable next-line all
   // v8 ignore next
   signUrls = createSignedUrls,
+  confirmLargeExport,
 }: {
   category: { id: string; name: string };
   onProgress?: (progress: ExportProgress) => void;
@@ -457,6 +484,13 @@ export async function exportCategory({
   listItems?: typeof listItemsForExport;
   listImages?: typeof listAllImageObjects;
   signUrls?: typeof createSignedUrls;
+  /** Asked once the archive's total photograph size is known -- listing
+   * already carries it in `metadata.size` -- but only when it exceeds
+   * `LARGE_EXPORT_WARN_BYTES`. Declining cancels the export the same way the
+   * user's own Cancel button does (#428). Omitted, a large export proceeds
+   * unprompted -- callers that have nowhere to show a dialog (tests, a
+   * future non-interactive caller) are not forced to supply one. */
+  confirmLargeExport?: (totalBytes: number) => Promise<boolean> | boolean;
 }): Promise<ExportResult> {
   const { data: sessionData } = await getSession();
   const uid = sessionData.session?.user.id;
@@ -465,12 +499,15 @@ export async function exportCategory({
   onProgress?.({ phase: 'items', done: 0, total: 0 });
   const items = await fetchAllItems(category.id, listItems, signal);
 
-  const { photoPathsByItemId, skippedItemCount } = await fetchPhotoPaths(
-    uid,
-    items,
-    listImages,
-    signal,
-  );
+  const { photoPathsByItemId, skippedItemCount, totalBytes } =
+    await fetchPhotoPaths(uid, items, listImages, signal);
+
+  if (totalBytes > LARGE_EXPORT_WARN_BYTES && confirmLargeExport) {
+    checkCancelled(signal);
+    const proceed = await confirmLargeExport(totalBytes);
+    if (!proceed) throw new ExportCancelledError();
+  }
+
   const entries = exportEntries(items, photoPathsByItemId);
 
   const storagePaths = entries.flatMap((entry) =>

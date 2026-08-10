@@ -208,12 +208,14 @@ export function usePlaces(
           controller.signal,
         );
 
-        if (error) throw error;
+        if (error) throw new Error('Could not list places', { cause: error });
 
         // Places entered by picking a suggestion carry their own
         // coordinates and skip the gazetteer entirely; only what's left
         // over is looked up.
-        const { located, unlocated, titles } = partitionByStoredCoords(items);
+        const { located, unlocated, titles } = partitionByStoredCoords(
+          items ?? [],
+        );
         const cache = readGeocodeCache();
         let cacheDirty = false;
 
