@@ -48,7 +48,12 @@ async function ensureUser(email: string, password: string): Promise<string> {
 
   // Already there from a previous run on the same stack -- find it rather
   // than fail, so the suite is re-runnable without tearing the stack down.
-  const { data: list, error: listError } = await admin.auth.admin.listUsers();
+  // `perPage` defaults to 50; a long-lived local stack that has
+  // accumulated more users than that would otherwise miss this one on the
+  // first (only) page requested and fail with "could not create or find".
+  const { data: list, error: listError } = await admin.auth.admin.listUsers({
+    perPage: 1000,
+  });
   if (listError) throw listError;
   const existing = list.users.find((user) => user.email === email);
   if (!existing) throw error ?? new Error(`could not create or find ${email}`);
