@@ -1,5 +1,23 @@
 import { defineConfig } from 'vitest/config';
 
+import { MUTATE_TARGETS, NO_COVERAGE_FLOOR } from './mutation-targets.mjs';
+
+const PER_FILE_FLOOR = {
+  statements: 100,
+  functions: 100,
+  branches: 100,
+  lines: 100,
+};
+
+// One floor object per mutation-tested module, minus the ones documented in
+// mutation-targets.mjs as deliberately not carrying one -- see
+// stryker.config.mjs for the shared source list this is built from.
+const perFileThresholds = Object.fromEntries(
+  MUTATE_TARGETS.filter((path) => !NO_COVERAGE_FLOOR.includes(path)).map(
+    (path) => [path, PER_FILE_FLOOR],
+  ),
+);
+
 export default defineConfig({
   test: {
     environment: 'node',
@@ -62,111 +80,13 @@ export default defineConfig({
         // config in stryker.config.mjs for that part). Each of these
         // files pairs a `/* v8 ignore start/stop */` block around
         // React/effect/I-O internals with one or more exported pure
-        // functions that carry the actual risk, so the 100% floor only
-        // has to hold for what's left instrumented -- also autoUpdated,
-        // so any future line added to these functions must be tested.
-        'src/app/data/zip.ts': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/data/exportFormat.ts': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/data/exportCategory.ts': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/components/CategorySelect/useExportCategory.tsx': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/data/items.ts': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/components/ItemList/Pagination.tsx': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/components/ItemList/useItemImages.tsx': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/useTheme.ts': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/components/ItemList/optimistic.ts': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/components/ItemList/paging.ts': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/components/ItemList/imageCache.ts': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/components/CenteredModal/getFocusable.ts': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/components/CenteredModal/useEscapeToClose.tsx': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/components/Coin/size.ts': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/components/ItemForm/usePhoton.tsx': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/data/photon.ts': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
-        'src/app/i18n/I18nProvider.tsx': {
-          statements: 100,
-          functions: 100,
-          branches: 100,
-          lines: 100,
-        },
+        // functions that carry the actual risk, so the 100% floor only has
+        // to hold for what's left instrumented -- built from
+        // mutation-targets.mjs rather than listed by hand here, so any
+        // future line added to one of these functions must be tested, and
+        // this list can't quietly drift from what stryker.config.mjs
+        // mutates the way it already had (#370).
+        ...perFileThresholds,
       },
     },
   },

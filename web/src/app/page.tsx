@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import CategorySelect from './components/CategorySelect/index';
+import CategorySelect from './components/CategorySelect';
 import {
   CATEGORY_TABPANEL_ID,
   categoryTabId,
@@ -14,10 +14,10 @@ import {
   storeSelectedCategory,
 } from './components/CategorySelect/selection';
 import { useCategories } from './components/CategorySelect/useCategories';
-import Header from './components/Header/index';
-import ItemList from './components/ItemList/index';
+import Header from './components/Header';
+import ItemList from './components/ItemList';
 import { ItemListSkeleton } from './components/ItemList/Skeleton';
-import LoadingOverlay from './components/LoadingOverlay/index';
+import LoadingOverlay from './components/LoadingOverlay';
 import { useI18n } from './i18n/useI18n';
 import { supabase } from './supabase';
 import { useSession } from './useSession';

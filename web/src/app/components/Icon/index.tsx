@@ -6,10 +6,7 @@ export enum IconType {
   Trash,
   Edit,
   Coin,
-  More,
   Close,
-  Add,
-  Pin,
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -27,12 +24,7 @@ interface IconProps extends React.SVGProps<SVGSVGElement> {
   rimId?: string;
 }
 
-export const Icon: React.FC<IconProps> = ({
-  icon,
-  rimId,
-  children,
-  ...props
-}) => {
+const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
   switch (icon) {
     case IconType.Google:
       return (
@@ -161,14 +153,6 @@ export const Icon: React.FC<IconProps> = ({
           {children}
         </svg>
       );
-    case IconType.More:
-      return (
-        <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-          <circle cx="5" cy="12" r="2" />
-          <circle cx="12" cy="12" r="2" />
-          <circle cx="19" cy="12" r="2" />
-        </svg>
-      );
     case IconType.Close:
       return (
         <svg
@@ -179,33 +163,6 @@ export const Icon: React.FC<IconProps> = ({
           {...props}
         >
           <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
-      );
-    case IconType.Add:
-      return (
-        <svg
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
-          <path d="M4 4h16v16H4z" />
-          <path d="M12 8v8M8 12h8" />
-        </svg>
-      );
-    case IconType.Pin:
-      return (
-        <svg viewBox="0 0 24 24" {...props}>
-          <path
-            d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          />
-          <circle cx="12" cy="10" r="2" fill="currentColor" />
         </svg>
       );
     case IconType.ChevronLeft:

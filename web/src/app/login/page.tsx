@@ -2,10 +2,10 @@
 
 import { useMemo, type CSSProperties } from 'react';
 
-import Coin from '../components/Coin/index';
+import Coin from '../components/Coin';
 import { coinSizeCss } from '../components/Coin/size';
-import Collectible from '../components/Collectible/index';
-import GoogleSignInButton from '../components/GoogleSignInButton/index';
+import Collectible from '../components/Collectible';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { useToast } from '../components/Toast/ToastProvider';
 import { useI18n } from '../i18n/useI18n';
