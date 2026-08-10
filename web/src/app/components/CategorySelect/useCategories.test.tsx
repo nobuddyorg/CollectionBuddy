@@ -156,4 +156,57 @@ describe('useCategories deleteCategory', () => {
     expect(removeItemImages).toHaveBeenCalledWith('i1');
     expect(removeItemImages).toHaveBeenCalledWith('i2');
   });
+
+  // #341: every test above sets listItemIdsLinkedElsewhere to return
+  // nothing, so every one of them exercises "every item this category held
+  // is orphaned" and none of them exercise the actual branch that keep/
+  // filter arithmetic exists for -- an item linked to a second category,
+  // which the cascade leaves alone and must not have its photographs
+  // removed. Wrong here reads as "wrong is invisible": no error, just an
+  // untouched item's photographs quietly deleted, or an orphan's silently
+  // kept forever.
+  it('cleans up only the items the deletion actually orphaned, leaving one still linked elsewhere untouched', async () => {
+    vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
+    vi.mocked(listItemIdsForCategory).mockResolvedValue({
+      data: [{ item_id: 'i1' }, { item_id: 'i2' }],
+      error: null,
+    } as never);
+    // i1 is still linked to some other category -- the cascade leaves it
+    // in place, so it must not be reported here.
+    vi.mocked(listItemIdsLinkedElsewhere).mockResolvedValue({
+      data: [{ item_id: 'i1' }],
+      error: null,
+    } as never);
+    const { result } = renderHook(() => useCategories(), { wrapper });
+
+    await act(async () => {
+      await result.current.deleteCategory('cat-1');
+    });
+
+    expect(listItemIdsLinkedElsewhere).toHaveBeenCalledWith(
+      ['i1', 'i2'],
+      'cat-1',
+    );
+    expect(removeItemImages).toHaveBeenCalledWith('i2');
+    expect(removeItemImages).not.toHaveBeenCalledWith('i1');
+    expect(removeItemImages).toHaveBeenCalledTimes(1);
+  });
+
+  // The other half of the same branch: nothing to filter down at all, since
+  // an empty category has no items to have been orphaned or kept.
+  it('never asks which items are linked elsewhere when the category held none', async () => {
+    vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
+    vi.mocked(listItemIdsForCategory).mockResolvedValue({
+      data: [],
+      error: null,
+    } as never);
+    const { result } = renderHook(() => useCategories(), { wrapper });
+
+    await act(async () => {
+      await result.current.deleteCategory('cat-1');
+    });
+
+    expect(listItemIdsLinkedElsewhere).not.toHaveBeenCalled();
+    expect(removeItemImages).not.toHaveBeenCalled();
+  });
 });

@@ -15,6 +15,8 @@ A web-app catalog for your collected items 🗂️
 [![Last commit](https://img.shields.io/github/last-commit/nobuddyorg/CollectionBuddy)](https://github.com/nobuddyorg/CollectionBuddy/commits/main)
 [![License: MIT](https://img.shields.io/github/license/nobuddyorg/CollectionBuddy)](LICENSE)
 
+<sub>The mutation testing badge scores a hand-picked subset of pure logic — the files listed in [`web/stryker.config.mjs`](web/stryker.config.mjs)'s `mutate` array, chosen because their I/O is already walled off from the logic worth mutating. 100% means every mutant _in that subset_ died, not that the whole codebase is mutation-tested; see the file for which modules are in scope and why.</sub>
+
 ## Motivation
 
 This project was created to provide a simple and elegant solution for cataloging personal collections. Whether it's stamps, coins, or any other collectible, CollectionBuddy helps you keep track of your items in an organized manner.
@@ -30,31 +32,31 @@ Google OAuth credentials it needs. The short version, once that's done:
 
 1. Navigate to the `web` directory:
 
-    ```bash
-    cd web
-    ```
+   ```bash
+   cd web
+   ```
 
 2. Copy the environment template and fill in `NEXT_PUBLIC_SUPABASE_URL` /
-    `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the defaults in `web/.env.example`
-    match a local `supabase start`):
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the defaults in `web/.env.example`
+   match a local `supabase start`):
 
-    ```bash
-    cp .env.example .env.local
-    ```
+   ```bash
+   cp .env.example .env.local
+   ```
 
 3. Install the dependencies:
 
-    ```bash
-    npm install
-    ```
+   ```bash
+   npm install
+   ```
 
 4. Start the development server:
 
-    ```bash
-    npm run dev
-    ```
+   ```bash
+   npm run dev
+   ```
 
-    The application will be available at `http://localhost:3000`.
+   The application will be available at `http://localhost:3000`.
 
 ### Building for Production
 
