@@ -344,9 +344,9 @@ describe('createZipWriter', () => {
   // this assertion in milliseconds instead of timing out.
   it('refuses an entry through the writer once a lowered byte limit is reached', () => {
     const writer = createZipWriter({ maxBytes: 39 });
-    expect(() =>
-      writer.add('a.txt', encoder.encode('hello')),
-    ).toThrow(ZipLimitError);
+    expect(() => writer.add('a.txt', encoder.encode('hello'))).toThrow(
+      ZipLimitError,
+    );
   });
 
   // Same reasoning for the entry-count guard, and the only test that reaches
@@ -356,9 +356,9 @@ describe('createZipWriter', () => {
   it('refuses an entry through the writer once a lowered entry-count limit is reached', () => {
     const writer = createZipWriter({ maxEntries: 1 });
     writer.add('a.txt', encoder.encode('x'), modified);
-    expect(() =>
-      writer.add('b.txt', encoder.encode('y'), modified),
-    ).toThrow(ZipLimitError);
+    expect(() => writer.add('b.txt', encoder.encode('y'), modified)).toThrow(
+      ZipLimitError,
+    );
   });
 
   // Every add() fits under the limit on its own; only the central directory
