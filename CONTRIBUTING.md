@@ -76,7 +76,8 @@ Most of it is file hygiene and spell checking, plus:
   before it is made rather than after CI says so.
 
 CI runs the same config (minus the three `web/` hooks, which duplicate what
-the build job already does).
+the build job already does, and `no-commit-to-branch`, which is meaningless
+off a working copy).
 
 ## Before opening a pull request
 

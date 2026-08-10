@@ -87,7 +87,7 @@ cd web
 npm run test:mutation
 ```
 
-CI runs this on **every** PR as well as on pushes to `main` (about a minute for ~270 mutants). The score has been 100% throughout; the break threshold is 90. Only main publishes to the [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main), so the badge keeps tracking one branch — locally, without `STRYKER_DASHBOARD_API_KEY`, it writes an HTML report to `web/reports/mutation/index.html`.
+CI runs this on **every** PR as well as on pushes to `main` (about a minute for ~273 mutants). The score has been 100% throughout; the break threshold is 90. That is 100% of the roughly one-third of mutants left after the `Stryker disable` regions — the `disable` blocks are load-bearing, so a score read without them is not the number you think it is. Only main publishes to the [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main), so the badge keeps tracking one branch — locally, without `STRYKER_DASHBOARD_API_KEY`, it writes an HTML report to `web/reports/mutation/index.html`.
 
 Adding a file to `mutate` in [`stryker.config.mjs`](../../web/stryker.config.mjs) means first drawing a line inside it: every file in that list pairs pure exported logic with a `// Stryker disable all` region around whatever I/O it sits beside. Mutating a `fetch` call scores how elaborately the network was faked, which is not worth a number. Where a mutant is genuinely equivalent — a check the type system needs but the runtime does not — say so with `// Stryker disable next-line all` and a comment explaining why, rather than writing a test that cannot fail.
 
