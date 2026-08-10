@@ -144,6 +144,40 @@ describe('CategorySelect', () => {
     expect(screen.getByLabelText('New category')).toBeVisible();
   });
 
+  // Regression (#356): Escape in the rename field used to only ever reset
+  // the value, with no way to reach the panel-closing behaviour the
+  // new-category field's Escape already had -- so the two adjacent fields
+  // did different things for the same key, and the second one just ate
+  // whatever was typed. Both fields now take the same two Escapes: first
+  // clears the edit, second (nothing left to discard) closes the panel.
+  describe('Escape in the rename field', () => {
+    async function openAndEdit(text: string) {
+      renderSelect();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+      const rename = screen.getByLabelText('Rename');
+      await userEvent.clear(rename);
+      await userEvent.type(rename, text);
+      return rename;
+    }
+
+    it('resets an edit on the first Escape, without closing the panel', async () => {
+      const rename = await openAndEdit('Coinage');
+      await userEvent.type(rename, '{Escape}');
+
+      expect(rename).toHaveValue('Coins');
+      expect(screen.getByRole('tablist')).toBeVisible();
+    });
+
+    it('closes the panel on a second Escape, once the field already matches', async () => {
+      const rename = await openAndEdit('Coinage');
+      await userEvent.type(rename, '{Escape}{Escape}');
+
+      expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    });
+  });
+
   // Laid out row by row, the new-category field came out wider than the
   // rename field by exactly the delete button the rename row carries and
   // it does not. One grid for both rows -- both rows' leading column is the

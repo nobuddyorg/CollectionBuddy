@@ -42,11 +42,23 @@ describe('CategoryInput', () => {
     expect(props.setExpanded).not.toHaveBeenCalled();
   });
 
-  it('collapses the panel on Escape without creating anything', async () => {
+  // Regression (#356): Escape used to collapse the whole panel in one
+  // press, discarding whatever was typed -- inconsistent with the rename
+  // field right above it, where Escape only ever resets the value. A first
+  // Escape here now does the same: clear the field, nothing more.
+  it('clears what was typed on the first Escape, without collapsing', async () => {
     const props = renderInput({ name: 'Stamps' });
     await userEvent.type(screen.getByRole('textbox'), '{Escape}');
-    expect(props.setExpanded).toHaveBeenCalledWith(false);
+    expect(props.setName).toHaveBeenCalledWith('');
+    expect(props.setExpanded).not.toHaveBeenCalled();
     expect(props.createCategory).not.toHaveBeenCalled();
+  });
+
+  it('collapses the panel on a second Escape, once the field is already empty', async () => {
+    const props = renderInput({ name: '' });
+    await userEvent.type(screen.getByRole('textbox'), '{Escape}');
+    expect(props.setExpanded).toHaveBeenCalledWith(false);
+    expect(props.setName).not.toHaveBeenCalled();
   });
 
   it('is labelled for assistive tech via its placeholder text', () => {

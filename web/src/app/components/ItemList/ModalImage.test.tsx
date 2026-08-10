@@ -112,6 +112,16 @@ describe('ModalImage', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  // Regression (#355): the image wrapper didn't stop propagation, so any
+  // tap on the photo itself -- including the tail end of a pinch-zoom or
+  // drag gesture -- bubbled to the overlay's onClick and closed the
+  // lightbox at exactly the moment someone was inspecting the photo.
+  it('does not close when the photograph itself is clicked', async () => {
+    const { onClose } = renderModal();
+    await userEvent.click(screen.getByRole('img'));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   // Regression (#295): aria-modal alone is not honoured by every
   // reader/browser pairing, and the Tab trap does not constrain a screen
   // reader's virtual cursor at all -- the rest of the page has to come out

@@ -208,7 +208,18 @@ export default function CategorySelect({
                   onChange={(e) => setRenameValue(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void onRename();
-                    if (e.key === 'Escape') setRenameValue(selected.name);
+                    if (e.key === 'Escape') {
+                      // First Escape discards the edit; only a second one
+                      // (nothing left to discard) closes the panel -- the
+                      // same two-step the new-category field below now
+                      // takes, rather than this field swallowing whatever
+                      // was typed the moment the key is pressed once.
+                      if (renameValue !== selected.name) {
+                        setRenameValue(selected.name);
+                      } else {
+                        setExpanded(false);
+                      }
+                    }
                   }}
                   className="w-full min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-control-border focus:ring-foreground"
                 />

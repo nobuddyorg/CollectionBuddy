@@ -14,14 +14,23 @@ export function TagsInput({
   tags: string[];
   setTags: (tags: string[]) => void;
 }) {
-  const { t } = useI18n();
+  const { t, tCount } = useI18n();
   const [tagInput, setTagInput] = useState('');
+  // Names the chip to flash when Enter repeats a tag already on the entry
+  // -- the field clearing with nothing new appearing looked identical to a
+  // tag being silently accepted, so the natural response was to press
+  // Enter again. The flash points at the chip that already covers it.
+  const [flashedTag, setFlashedTag] = useState<string | null>(null);
 
   const addTag = useCallback(() => {
     const v = tagInput.trim();
-    if (!v || tags.includes(v)) return;
-    setTags([...tags, v]);
+    if (!v) return;
     setTagInput('');
+    if (tags.includes(v)) {
+      setFlashedTag(v);
+      return;
+    }
+    setTags([...tags, v]);
   }, [tagInput, tags, setTags]);
 
   const removeTag = useCallback(
@@ -41,7 +50,13 @@ export function TagsInput({
   return (
     <div className="rounded-sm bg-card text-card-foreground px-2 py-1.5 min-h-11 flex flex-wrap items-center gap-1.5 ring-1 ring-inset ring-control-border focus-within:ring-foreground">
       {tags.map((tag) => (
-        <span key={tag} className="fade-up tag-chip flex items-center gap-1.5">
+        <span
+          key={tag}
+          className={`fade-up tag-chip flex items-center gap-1.5 ${tag === flashedTag ? 'tag-flash' : ''}`}
+          onAnimationEnd={() => {
+            if (tag === flashedTag) setFlashedTag(null);
+          }}
+        >
           {tag}
           <button
             type="button"
@@ -71,7 +86,7 @@ export function TagsInput({
         className="flex-1 min-w-[100px] bg-transparent py-1 text-sm"
       />
       <span role="status" className="sr-only">
-        {t('item_create.tags_count').replace('{count}', String(tags.length))}
+        {tCount('item_create.tags_count', tags.length)}
       </span>
     </div>
   );

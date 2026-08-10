@@ -65,6 +65,7 @@
     "remove_tag": "Remove tag {tag}",
     "tags_placeholder": "Enter tags… (Enter/Comma)",
     "tags_count": "{count} tags",
+    "tags_count_one": "{count} tag",
     "add": "Add",
     "search_error": "Place search failed. Please try again.",
     "save_error": "Could not save this entry. Please try again.",
@@ -123,6 +124,7 @@
     "pagination": "Pagination",
     "page": "Page {n}",
     "results_count": "{count} results",
+    "results_count_one": "{count} result",
     "search_too_short": "Keep typing to search"
   },
   "google_sign_in_button": {

@@ -208,6 +208,12 @@ export function ModalImage({
           // Same reasoning as the grid: see the note in ImageGrid.tsx.
           crossOrigin="anonymous"
           className="w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg"
+          // Without this, any tap on the photo itself -- including the tail
+          // end of a pinch-zoom or drag gesture -- bubbles to the overlay's
+          // onClose and dismisses the lightbox at exactly the moment the
+          // photo is being inspected. The surrounding backdrop, not covered
+          // by the image, stays the dismiss area.
+          onClick={(e) => e.stopPropagation()}
         />
       </div>
     </div>,
