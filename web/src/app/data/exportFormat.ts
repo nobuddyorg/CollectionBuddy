@@ -24,13 +24,19 @@ import type { ExportItemRow } from './items';
 /** The item fields an export carries, plus when it was catalogued. */
 export type ExportItem = ExportItemRow;
 
-/** An item paired with the archive-relative paths of its photographs. */
+/** One photograph: where it lives in storage, and where it belongs in the archive. */
+export type ExportPhoto = {
+  storagePath: string;
+  archivePath: string;
+};
+
+/** An item paired with its photographs, storage and archive path together. */
 export type ExportEntry = {
   item: ExportItem;
   /** Directory name under `photos/`, unique within the archive. */
   folder: string;
-  /** Full archive paths, in the order the app hangs the photographs in. */
-  photos: string[];
+  /** In the order the app hangs the photographs in. */
+  photos: ExportPhoto[];
 };
 
 export const EXPORT_FORMAT = 'collectionbuddy-category-export';
@@ -110,8 +116,9 @@ export function fullSizeObjectPaths(
 }
 
 /**
- * Pairs each item with its folder and the archive path of every
- * photograph, numbering both.
+ * Pairs each item with its folder and its photographs, each carrying its
+ * own storage path and archive path together rather than as two arrays a
+ * caller has to zip back up by index (#421).
  *
  * The number prefix is not decoration: two items may legitimately share a
  * title, and an export that quietly merged their photographs into one
@@ -126,10 +133,10 @@ export function exportEntries(
   return items.map((item, index) => {
     const folder = `${indexPrefix(index, items.length)}-${slugify(item.title)}`;
     const stored = photoPathsByItemId.get(item.id) ?? [];
-    const photos = stored.map(
-      (storagePath, i) =>
-        `${PHOTOS_DIR}/${folder}/${i + 1}${extensionOf(storagePath)}`,
-    );
+    const photos = stored.map((storagePath, i) => ({
+      storagePath,
+      archivePath: `${PHOTOS_DIR}/${folder}/${i + 1}${extensionOf(storagePath)}`,
+    }));
     return { item, folder, photos };
   });
 }
@@ -167,7 +174,7 @@ export function buildManifest({
     items: entries.map(({ item, folder, photos }) => ({
       ...item,
       folder,
-      photos,
+      photos: photos.map((p) => p.archivePath),
     })),
   };
 }
@@ -242,7 +249,7 @@ export function buildCsv(entries: ExportEntry[]): string {
       numberCell(item.place_lat),
       numberCell(item.place_lng),
       csvCell(item.tags.join(', ')),
-      plainCell(photos.join(' ')),
+      plainCell(photos.map((p) => p.archivePath).join(' ')),
       plainCell(folder),
       plainCell(item.created_at),
       plainCell(item.id),
@@ -258,10 +265,31 @@ export function localDateStamp(date: Date): string {
 }
 
 /**
+ * Shared by `archiveName` and `archiveRootFolder`: the download is named
+ * after this, and it is also the one directory every entry in the archive
+ * lives under (#422) -- so an extractor that does not auto-wrap (CLI
+ * `unzip`, 7-Zip "extract here") still lands each export in its own
+ * directory instead of scattering three top-level entries into whatever
+ * directory it was extracted into, where a second export would overwrite
+ * the first's `collection.json`/`collection.csv`.
+ */
+function archiveBaseName(categoryName: string, exportedAt: Date): string {
+  return `CollectionBuddy-${slugify(categoryName)}-${localDateStamp(exportedAt)}`;
+}
+
+/**
  * What the download is called. The category name is slugged the same way a
  * folder is, because this string ends up as a file name on the same range
  * of filesystems.
  */
 export function archiveName(categoryName: string, exportedAt: Date): string {
-  return `CollectionBuddy-${slugify(categoryName)}-${localDateStamp(exportedAt)}.zip`;
+  return `${archiveBaseName(categoryName, exportedAt)}.zip`;
+}
+
+/** The one top-level directory every entry in the archive is written under. */
+export function archiveRootFolder(
+  categoryName: string,
+  exportedAt: Date,
+): string {
+  return archiveBaseName(categoryName, exportedAt);
 }

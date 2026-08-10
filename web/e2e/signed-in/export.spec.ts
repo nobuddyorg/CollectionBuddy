@@ -58,9 +58,13 @@ test.describe('exporting a category', () => {
     expect(listing).toContain('collection.csv');
     expect(listing).toMatch(/photos\/\d+-[^/]+\/1\.\w+/);
 
+    // Every entry lives under one root folder (#422), so the member name is
+    // matched with a wildcard rather than the bare file name -- unzip's own
+    // globbing spans `/`, so `*/collection.json` matches the one nesting
+    // level the archive actually has.
     const manifestJson = execFileSync(
       'unzip',
-      ['-p', zipPath, 'collection.json'],
+      ['-p', zipPath, '*/collection.json'],
       { encoding: 'utf8' },
     );
     const manifest: {
@@ -70,7 +74,7 @@ test.describe('exporting a category', () => {
     expect(entry).toBeTruthy();
     expect(entry?.photos).toHaveLength(1);
 
-    const csv = execFileSync('unzip', ['-p', zipPath, 'collection.csv'], {
+    const csv = execFileSync('unzip', ['-p', zipPath, '*/collection.csv'], {
       encoding: 'utf8',
     });
     expect(csv).toContain(title);
