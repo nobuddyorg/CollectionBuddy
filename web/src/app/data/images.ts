@@ -11,6 +11,17 @@ export function imagePrefix(uid: string, itemId: string): string {
   return `${uid}/${itemId}`;
 }
 
+// A thumbnail is a derivative this app generated for its own contact strip
+// (see useItemImages), not a second photograph the user took -- the single
+// definition of what marks an object as one, for the same reason as
+// `imagePrefix` above: naming/pairing logic and the export path both need
+// to agree on it, and previously each restated the suffix as its own
+// string literal.
+export const THUMB_SUFFIX = '.thumb.webp';
+export function isThumbObject(name: string): boolean {
+  return name.endsWith(THUMB_SUFFIX);
+}
+
 // Oldest photograph first, which is what puts a listing in the same order the
 // grid lays its frames out in: the first shot of an item keeps the hero slot
 // however many more are added, and a new one lands at the end -- exactly where

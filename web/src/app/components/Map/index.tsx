@@ -184,7 +184,13 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     markers.forEach((m) => {
       L.marker([m.lat, m.lng])
         .addTo(layersRef.current!)
-        .bindPopup(popupContent(m.popupText, m.titles, m.countLabel));
+        // A function, not a built element: at most one popup is ever open,
+        // but every geocode landing rebuilds every marker on the map (this
+        // effect re-runs per streamed-in place, not once at the end), so
+        // constructing the content eagerly meant building the full titles
+        // list for every pin on every one of those rebuilds instead of only
+        // the one a reader actually opens.
+        .bindPopup(() => popupContent(m.popupText, m.titles, m.countLabel));
     });
   }, [markers, ready]);
 
@@ -210,8 +216,10 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
         fillOpacity: 1,
         pane: 'currentLocation',
       }).addTo(currentLocationLayerRef.current);
-      if (currentLocation.popupText)
-        here.bindPopup(popupContent(currentLocation.popupText));
+      const { popupText } = currentLocation;
+      // Narrowed to a local const: TS can't carry the `if` guard's
+      // narrowing of `currentLocation.popupText` through the closure below.
+      if (popupText) here.bindPopup(() => popupContent(popupText));
     }
   }, [currentLocation, ready]);
 

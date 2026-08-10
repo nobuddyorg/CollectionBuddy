@@ -7,20 +7,22 @@
  * signed URLs, zipped by `./zip` and handed to the browser as a download.
  *
  * The shape of what comes out is `./exportFormat`'s business, and the ZIP
- * bytes are `./zip`'s. What is left here is the I/O and the order it
- * happens in -- the pagination boundary, the batching, the skip-on-failure
- * loop and the retry/backoff around it -- which used to be exempt from
- * every gate wholesale. It no longer is: the four Supabase/storage calls
- * are accepted as parameters (the file already did this for `now`), so
+ * bytes are `./zip`'s. The download itself -- the DOM anchor click -- is
+ * presentation, not data, and lives in `CategorySelect/downloadBlob.ts`
+ * instead of here. What is left here is the I/O and the order it happens
+ * in -- the pagination boundary, the batching, the skip-on-failure loop and
+ * the retry/backoff around it -- which used to be exempt from every gate
+ * wholesale. It no longer is: the four Supabase/storage calls are accepted
+ * as parameters (the file already did this for `now`), so
  * exportCategory.test.ts can drive the logic with fakes. Only the raw calls
- * themselves -- the real Supabase client, `fetch`, and the DOM anchor
- * `downloadBlob` clicks -- stay outside the gate; see the individual
- * `v8 ignore` / `Stryker disable` markers below.
+ * themselves -- the real Supabase client and `fetch` -- stay outside the
+ * gate; see the individual `v8 ignore` / `Stryker disable` markers below.
  */
 
 import { supabase } from '../supabase';
 import {
   createSignedUrls,
+  imagePrefix,
   listAllImageObjects,
   ITEM_IMAGES_BUCKET,
 } from './images';
@@ -295,7 +297,7 @@ async function fetchPhotoPaths(
   let skippedItemCount = 0;
   const listings = await mapPool(items, LISTING_CONCURRENCY, async (item) => {
     checkCancelled(signal);
-    const prefix = `${uid}/${item.id}`;
+    const prefix = imagePrefix(uid, item.id);
     const { data, error } = await listOnePrefix(prefix, listImages, signal);
     if (error) {
       console.error("Skipping item's photographs", item.id, error);
@@ -538,23 +540,3 @@ export async function exportCategory({
     skippedItemCount,
   };
 }
-
-/* v8 ignore start -- DOM anchor click, not logic; exercised by the
- * signed-in e2e export spec, not by a unit test. */
-// Stryker disable all: DOM plumbing only.
-/** Hands a finished archive to the browser as a download. */
-export function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  // Revoked on the next turn rather than immediately: Safari has been known
-  // to cancel a download whose object URL is released in the same tick as
-  // the click that started it.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-// Stryker restore all
-/* v8 ignore stop */

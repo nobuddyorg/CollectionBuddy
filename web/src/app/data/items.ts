@@ -243,6 +243,13 @@ export function listItemPlaces(
 // numbers its folders in the order it walks them -- and a collection
 // should be numbered from its first entry, so that exporting it again next
 // year leaves 001 where it was instead of renumbering everything.
+//
+// `created_at` alone is not unique -- rows written in the same transaction
+// or bulk operation can share a timestamp, and Postgres makes no stability
+// guarantee for ties, so which page a tied row lands on (or whether it
+// lands on either) was unspecified across a .range() boundary. `id` as a
+// secondary sort gives every row a fixed position regardless of how many
+// others share its `created_at`.
 export function listItemsForExport(
   categoryId: string,
   from: number,
@@ -255,6 +262,7 @@ export function listItemsForExport(
     )
     .eq('item_categories.category_id', categoryId)
     .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
     .range(from, to)
     .returns<ExportItemRow[]>();
 }

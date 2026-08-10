@@ -20,6 +20,7 @@
  */
 
 import type { ExportItemRow } from './items';
+import { isThumbObject } from './images';
 
 /** The item fields an export carries, plus when it was catalogued. */
 export type ExportItem = ExportItemRow;
@@ -91,11 +92,23 @@ export function indexPrefix(index: number, total: number): string {
   return String(index + 1).padStart(width, '0');
 }
 
-/** `.webp`, `.jpg`, ... taken off a storage object name, `.bin` if it has none. */
+/** Only what a real extension ever looks like -- letters and digits, short.
+ * Rejects anything a storage object name could smuggle through unescaped
+ * (backslashes, quotes, spaces, a trailing dot): none of those are
+ * reachable today (this app only ever uploads `<uuid>.webp`/`.thumb.webp`,
+ * and storage RLS keys every verb on the uid prefix), but the extension
+ * itself was copied into the archive path verbatim, with nothing checking
+ * it stayed that way. */
+const SAFE_EXTENSION = /^\.[A-Za-z0-9]{1,10}$/;
+
+/** `.webp`, `.jpg`, ... taken off a storage object name, `.bin` if it has
+ * none or if what follows the last dot isn't a plausible extension. */
 export function extensionOf(path: string): string {
   const name = path.slice(path.lastIndexOf('/') + 1);
   const dot = name.lastIndexOf('.');
-  return dot > 0 ? name.slice(dot) : '.bin';
+  if (dot <= 0) return '.bin';
+  const ext = name.slice(dot);
+  return SAFE_EXTENSION.test(ext) ? ext : '.bin';
 }
 
 /**
@@ -111,7 +124,7 @@ export function fullSizeObjectPaths(
   objects: { name: string }[],
 ): string[] {
   return objects
-    .filter((o) => !o.name.endsWith('.thumb.webp'))
+    .filter((o) => !isThumbObject(o.name))
     .map((o) => `${prefix}/${o.name}`);
 }
 
