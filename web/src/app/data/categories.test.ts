@@ -9,6 +9,7 @@ import {
   listItemIdsForCategory,
   listItemIdsLinkedElsewhere,
   renameCategory,
+  uniqueCategoryName,
 } from './categories';
 
 // #341: these build the query that decides which items a category deletion
@@ -284,5 +285,31 @@ describe('listItemIdsLinkedElsewhere', () => {
 
     expect(data).toBeNull();
     expect(error).toBeInstanceOf(Error);
+  });
+});
+
+describe('uniqueCategoryName', () => {
+  it('returns the base name unchanged when nothing collides', () => {
+    expect(uniqueCategoryName('Coins', ['Stamps'])).toBe('Coins');
+  });
+
+  it('appends (2) on the first collision', () => {
+    expect(uniqueCategoryName('Coins', ['Coins'])).toBe('Coins (2)');
+  });
+
+  it('collides case-insensitively, matching the database constraint', () => {
+    expect(uniqueCategoryName('Coins', ['coins'])).toBe('Coins (2)');
+  });
+
+  it('keeps counting past an existing (2) to the next free number', () => {
+    expect(uniqueCategoryName('Coins', ['Coins', 'Coins (2)'])).toBe(
+      'Coins (3)',
+    );
+  });
+
+  it('does not get stuck by a gap -- (2) free but (3) taken', () => {
+    expect(uniqueCategoryName('Coins', ['Coins', 'Coins (3)'])).toBe(
+      'Coins (2)',
+    );
   });
 });

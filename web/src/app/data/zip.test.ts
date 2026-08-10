@@ -12,7 +12,9 @@ import {
   localFileHeader,
   MAX_ZIP_BYTES,
   MAX_ZIP_ENTRIES,
+  readZipEntries,
   ZipLimitError,
+  ZipReadError,
   type ZipEntry,
 } from './zip';
 
@@ -30,7 +32,7 @@ function entry(overrides: Partial<ZipEntry> = {}): ZipEntry {
   };
 }
 
-async function bytesOf(blob: Blob): Promise<Uint8Array> {
+async function bytesOf(blob: Blob): Promise<Uint8Array<ArrayBuffer>> {
   return new Uint8Array(await blob.arrayBuffer());
 }
 
@@ -396,5 +398,100 @@ describe('assertZipRoom', () => {
   it('names its errors, so a caller can tell them from an I/O failure', () => {
     expect(new ZipLimitError('x').name).toBe('ZipLimitError');
     expect(new ZipLimitError('x')).toBeInstanceOf(Error);
+  });
+});
+
+// The counterpart to createZipWriter's own tests: every archive read back
+// here was itself produced by that writer, so a round trip is what proves
+// the two agree on the format rather than each independently claiming to.
+describe('readZipEntries', () => {
+  it('reads back every entry a writer produced, byte for byte', async () => {
+    const writer = createZipWriter();
+    writer.add('collection.json', encoder.encode('{"a":1}'));
+    writer.add('photos/1.webp', new Uint8Array([1, 2, 3, 4, 5]));
+    const entries = await readZipEntries(writer.finish());
+
+    expect(entries.size).toBe(2);
+    expect(new TextDecoder().decode(entries.get('collection.json'))).toBe(
+      '{"a":1}',
+    );
+    expect(entries.get('photos/1.webp')).toEqual(
+      new Uint8Array([1, 2, 3, 4, 5]),
+    );
+  });
+
+  it('reads an empty archive as an empty map, not an error', async () => {
+    const entries = await readZipEntries(createZipWriter().finish());
+    expect(entries.size).toBe(0);
+  });
+
+  it('keeps entries with the same name apart by path, not by basename', async () => {
+    const writer = createZipWriter();
+    writer.add('a/1.webp', new Uint8Array([1]));
+    writer.add('b/1.webp', new Uint8Array([2]));
+    const entries = await readZipEntries(writer.finish());
+
+    expect(entries.get('a/1.webp')).toEqual(new Uint8Array([1]));
+    expect(entries.get('b/1.webp')).toEqual(new Uint8Array([2]));
+  });
+
+  it('rejects a file too small to hold even the end-of-central-directory record', async () => {
+    await expect(
+      readZipEntries(new Blob([new Uint8Array(10)])),
+    ).rejects.toThrow(ZipReadError);
+  });
+
+  it('rejects a file with no end-of-central-directory signature at all', async () => {
+    const junk = new Uint8Array(30);
+    await expect(readZipEntries(new Blob([junk]))).rejects.toThrow(
+      /end-of-central-directory/,
+    );
+  });
+
+  it('rejects a directory entry claiming a size that runs past the file', async () => {
+    const writer = createZipWriter();
+    writer.add('a.txt', new Uint8Array([1, 2, 3]));
+    const bytes = await bytesOf(writer.finish());
+    // The central directory's size field for the one entry is at a fixed
+    // offset from the end: EOCD(22) back to the start of the directory,
+    // plus 24 into that record.
+    const directoryAt = bytes.length - 22 - (46 + 'a.txt'.length);
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    dv.setUint32(directoryAt + 24, 0xffffff, true);
+    await expect(readZipEntries(new Blob([bytes]))).rejects.toThrow(
+      /runs past the file/,
+    );
+  });
+
+  it('rejects when the end-of-central-directory record claims more entries than the file actually holds', async () => {
+    const writer = createZipWriter();
+    writer.add('a.txt', new Uint8Array([1, 2, 3]));
+    const bytes = await bytesOf(writer.finish());
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const eocd = bytes.length - 22;
+    // Both entry-count fields say 2; there is only one real entry, so the
+    // second iteration's directory pointer runs past the end of the file.
+    dv.setUint16(eocd + 8, 2, true);
+    dv.setUint16(eocd + 10, 2, true);
+    await expect(readZipEntries(new Blob([bytes]))).rejects.toThrow(
+      /central directory runs past the file/,
+    );
+  });
+
+  it('rejects a central directory entry with the wrong signature', async () => {
+    const writer = createZipWriter();
+    writer.add('a.txt', new Uint8Array([1, 2, 3]));
+    const bytes = await bytesOf(writer.finish());
+    const directoryAt = bytes.length - 22 - (46 + 'a.txt'.length);
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    dv.setUint32(directoryAt, 0xdeadbeef, true);
+    await expect(readZipEntries(new Blob([bytes]))).rejects.toThrow(
+      /malformed central directory entry/,
+    );
+  });
+
+  it('names its errors, so a caller can tell them from any other failure', () => {
+    expect(new ZipReadError('x').name).toBe('ZipReadError');
+    expect(new ZipReadError('x')).toBeInstanceOf(Error);
   });
 });

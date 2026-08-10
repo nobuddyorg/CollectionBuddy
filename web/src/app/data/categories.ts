@@ -4,6 +4,29 @@ import type { Database } from './database.types';
 export type CategoryRow = Database['public']['Tables']['categories']['Row'];
 export type CategorySummary = Pick<CategoryRow, 'id' | 'name'>;
 
+/**
+ * `base`, or `base (2)`, `base (3)`, ... once far enough to clear every name
+ * in `existingNames` -- case-insensitively, the same way the database's own
+ * uniqueness constraint on `categories.name` is (`categories_user_lower_name_idx`,
+ * `supabase/migrations/0005_indexes.sql`), so an import can't be handed a
+ * name the insert would then reject as a duplicate anyway.
+ *
+ * The base name comes back unchanged when nothing collides -- an import
+ * into an account with no category of that name yet should not gain a
+ * "(2)" it never needed.
+ */
+export function uniqueCategoryName(
+  base: string,
+  existingNames: string[],
+): string {
+  const taken = new Set(existingNames.map((n) => n.toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let n = 2; ; n++) {
+    const candidate = `${base} (${n})`;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
+}
+
 export function listCategories() {
   return supabase
     .from('categories')
