@@ -67,6 +67,11 @@ export function ModalImage({
   // that replaces them.
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const SWIPE_THRESHOLD_PX = 50;
+  // Set only when a touch just navigated -- so the synthetic click that
+  // follows a swipe's touchend doesn't also close the modal it just
+  // paged. Any other tap (touch or mouse) falls through to the image's
+  // onClick below, which lets it close like a tap beside it (#511).
+  const suppressImageClickRef = useRef(false);
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -79,6 +84,7 @@ export function ModalImage({
     (e: React.TouchEvent) => {
       const start = touchStartRef.current;
       touchStartRef.current = null;
+      suppressImageClickRef.current = false;
       if (!start || count < 2 || clampedIndex === null) return;
       const touch = e.changedTouches[0];
       if (!touch) return;
@@ -90,6 +96,7 @@ export function ModalImage({
       if (Math.abs(dx) < SWIPE_THRESHOLD_PX || Math.abs(dx) < Math.abs(dy)) {
         return;
       }
+      suppressImageClickRef.current = true;
       goTo(dx < 0 ? clampedIndex + 1 : clampedIndex - 1);
     },
     [count, clampedIndex, goTo],
@@ -203,11 +210,26 @@ export function ModalImage({
 
           <div
             aria-live="polite"
-            className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 rounded-sm bg-card px-2.5 py-1 font-label text-[0.6875rem] text-card-foreground ring-1 ring-border shadow-sm"
+            className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 flex items-center gap-1 rounded-sm bg-card px-2.5 py-1 font-label text-[0.6875rem] text-card-foreground ring-1 ring-border shadow-sm"
           >
+            {/* Decorative, not a second pair of controls -- the real
+                Previous/Next buttons already sit at the edges (mouse) and
+                the swipe gesture already covers touch. This just makes that
+                gesture discoverable: nothing on a touch screen otherwise
+                hints that the count next to it means "swipe" (#511). */}
+            <Icon
+              icon={IconType.ChevronLeft}
+              className="w-3 h-3 opacity-50"
+              aria-hidden="true"
+            />
             {t('item_list.image_position')
               .replace('{current}', String(clampedIndex + 1))
               .replace('{total}', String(count))}
+            <Icon
+              icon={IconType.ChevronRight}
+              className="w-3 h-3 opacity-50"
+              aria-hidden="true"
+            />
           </div>
         </>
       )}
@@ -226,12 +248,16 @@ export function ModalImage({
           // Same reasoning as the grid: see the note in ImageGrid.tsx.
           crossOrigin="anonymous"
           className="w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg"
-          // Without this, any tap on the photo itself -- including the tail
-          // end of a pinch-zoom or drag gesture -- bubbles to the overlay's
-          // onClose and dismisses the lightbox at exactly the moment the
-          // photo is being inspected. The surrounding backdrop, not covered
-          // by the image, stays the dismiss area.
-          onClick={(e) => e.stopPropagation()}
+          // A tap on the photo closes the modal, same as tapping the
+          // backdrop beside it (#511) -- except the tail end of a swipe that
+          // just paged to another photograph, which onTouchEnd above flags
+          // so that gesture doesn't also dismiss the thing it just changed.
+          onClick={(e) => {
+            if (suppressImageClickRef.current) {
+              suppressImageClickRef.current = false;
+              e.stopPropagation();
+            }
+          }}
         />
       </div>
     </div>,

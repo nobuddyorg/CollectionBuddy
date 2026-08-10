@@ -45,6 +45,7 @@ export default function CategorySelect({
     isCreating,
     isDeleting,
     isRenaming,
+    reload,
     createCategory,
     renameCategory,
     deleteCategory,
@@ -124,9 +125,15 @@ export default function CategorySelect({
 
   const onImportFile = useCallback(
     async (file: File) => {
-      await runImport(file, (categoryId) => onSelect(categoryId));
+      // createCategory reloads before handing back the new row (see
+      // useCategories.tsx); import created its category the same way, out
+      // from under this component, so `cats` never picked it up and
+      // selecting it here found nothing to select (#510).
+      await runImport(file, (categoryId) => {
+        void reload().then(() => onSelect(categoryId));
+      });
     },
-    [runImport, onSelect],
+    [runImport, reload, onSelect],
   );
 
   const onDelete = useCallback(async () => {
