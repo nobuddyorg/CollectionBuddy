@@ -44,7 +44,7 @@ Project-level storage limit is 50 MiB (`[storage]`), though the `item-images` bu
 Defined in [`web/vitest.config.ts`](../../web/vitest.config.ts) (`test.coverage.thresholds`) and [`web/stryker.config.mjs`](../../web/stryker.config.mjs):
 
 - Global coverage floor is raised **by hand** (`autoUpdate: false`) as real coverage improves, and never edited down — so a regression fails CI. It auto-ratcheted once and was turned off: it wrote the local measurement straight back into the file after every run, including values CI could not reach, so a green local run kept producing a red PR.
-- The pure, high-risk modules (see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files)) additionally have a 100% per-file coverage floor and a mutation-score break threshold of 90.
+- Most of the pure, high-risk modules (see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files)) additionally have a 100% per-file coverage floor and a mutation-score break threshold of 90 (the two `Map/` hooks, `usePlaces.tsx` and `useCurrentLocation.ts`, are mutation-tested without a per-file floor).
 - Mutation testing runs on every PR, not only on `main`. Only `main` publishes to the dashboard, so the badge tracks one branch.
 
 ## End-to-end tests
