@@ -77,4 +77,35 @@ describe('getFocusable', () => {
     );
     expect(namesIn(element)).toEqual(['deep']);
   });
+
+  // A file input hidden via Tailwind's `.hidden` (display: none) is a real
+  // shape in this app; `getFocusable(...)[0]?.focus()` on one silently fails,
+  // leaving focus outside the dialog.
+  it('skips a display:none element', () => {
+    const element = container(
+      '<button style="display:none" data-name="a">press</button><button data-name="b">press</button>',
+    );
+    expect(namesIn(element)).toEqual(['b']);
+  });
+
+  it('skips a visibility:hidden element', () => {
+    const element = container(
+      '<button style="visibility:hidden" data-name="a">press</button><button data-name="b">press</button>',
+    );
+    expect(namesIn(element)).toEqual(['b']);
+  });
+
+  it('skips an element with the hidden attribute', () => {
+    const element = container(
+      '<button hidden data-name="a">press</button><button data-name="b">press</button>',
+    );
+    expect(namesIn(element)).toEqual(['b']);
+  });
+
+  it('skips a hidden input even though it has no disabled attribute', () => {
+    const element = container(
+      '<input type="hidden" data-name="a"><button data-name="b">press</button>',
+    );
+    expect(namesIn(element)).toEqual(['b']);
+  });
 });
