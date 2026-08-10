@@ -41,6 +41,14 @@ additional_redirect_urls = ["http://localhost:3000", "http://127.0.0.1:3000"]
 jwt_expiry = 3600
 enable_signup = true
 enable_anonymous_sign_ins = false
+# Explicit rather than relying on GoTrue's own defaults (#476): a used
+# refresh token is retired and reissuing it is treated as token theft,
+# which is what makes a stolen refresh token a one-time-use risk rather
+# than a standing one. Matches the hosted project's actual settings
+# (checked via the management API's /config/auth endpoint) -- this makes
+# that already-true fact visible in the repo instead of implicit.
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
 
 [auth.external.google]
 enabled   = true
