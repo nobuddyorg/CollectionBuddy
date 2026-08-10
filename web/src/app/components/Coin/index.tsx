@@ -3,7 +3,7 @@
 import React, { useId, useMemo } from 'react';
 
 import type { CoinProps } from '../Coin/types';
-import { Icon, IconType } from '../Icon/index';
+import Icon, { IconType } from '../Icon';
 import { coinSizeCss } from './size';
 import { TextRing } from './TextRing';
 

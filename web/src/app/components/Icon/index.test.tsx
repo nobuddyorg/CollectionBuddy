@@ -2,7 +2,7 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { Icon, IconType } from './index';
+import Icon, { IconType } from './index';
 
 describe('Icon', () => {
   it.each(

@@ -1,3 +1,5 @@
+import { MUTATE_TARGETS } from './mutation-targets.mjs';
+
 // Publish to the Stryker dashboard only when the API key is available (CI on
 // nobuddyorg/CollectionBuddy). Local runs and key-less CI keep the offline reporters.
 const reporters = ['html', 'clear-text', 'progress'];
@@ -30,30 +32,9 @@ const config = {
     'test-results',
     'playwright-report',
   ],
-  // Every file here pairs pure exported logic with a `Stryker disable all`
-  // region around whatever I/O it sits next to, so what is scored is the part
-  // that carries the risk. Adding a file means first drawing that line in it.
-  mutate: [
-    'src/app/data/items.ts',
-    'src/app/data/zip.ts',
-    'src/app/data/exportFormat.ts',
-    'src/app/data/exportCategory.ts',
-    'src/app/data/photon.ts',
-    'src/app/components/CategorySelect/useExportCategory.tsx',
-    'src/app/components/ItemList/Pagination.tsx',
-    'src/app/components/ItemList/useItemImages.tsx',
-    'src/app/components/ItemList/optimistic.ts',
-    'src/app/components/ItemList/paging.ts',
-    'src/app/components/ItemList/imageCache.ts',
-    'src/app/components/Map/usePlaces.tsx',
-    'src/app/components/Map/useCurrentLocation.ts',
-    'src/app/components/Coin/size.ts',
-    'src/app/components/CenteredModal/getFocusable.ts',
-    'src/app/components/CenteredModal/useEscapeToClose.tsx',
-    'src/app/useTheme.ts',
-    'src/app/components/ItemForm/usePhoton.tsx',
-    'src/app/i18n/I18nProvider.tsx',
-  ],
+  // See mutation-targets.mjs for what's in this list and why -- shared with
+  // vitest.config.ts's per-file coverage floors so the two can't drift.
+  mutate: MUTATE_TARGETS,
   thresholds: {
     high: 100,
     low: 90,

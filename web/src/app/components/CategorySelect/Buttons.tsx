@@ -1,6 +1,6 @@
 'use client';
 
-import Icon, { IconType } from '../Icon/index';
+import Icon, { IconType } from '../Icon';
 import { IconButton } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
 

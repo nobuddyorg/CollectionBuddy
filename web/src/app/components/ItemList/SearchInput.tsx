@@ -1,7 +1,7 @@
 'use client';
 
 import { useI18n } from '../../i18n/useI18n';
-import { Icon, IconType } from '../Icon';
+import Icon, { IconType } from '../Icon';
 
 export function SearchInput({
   value,

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
-import Icon, { IconType } from '../Icon/index';
+import Icon, { IconType } from '../Icon';
 import LoadingOverlay from '../LoadingOverlay';
 import Spinner from './Spinner';
 import type { GoogleSignInButtonProps } from './types';
