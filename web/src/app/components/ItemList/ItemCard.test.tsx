@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
-import { ItemCard } from './ItemCard';
-import type { ItemLite } from './types';
+import { ItemCard, itemCardPropsAreEqual } from './ItemCard';
+import type { ItemLite, ImgEntry } from './types';
 
 const item: ItemLite = {
   id: '1',
@@ -218,5 +218,52 @@ describe('ItemCard', () => {
       </I18nProvider>,
     );
     expect(container.querySelector('input[type="file"]')).toBeDisabled();
+  });
+});
+
+// Regression for #369: `deletingPath` is one Set shared by every card, so
+// deleting a photo on one card gives every other card's props a new Set
+// identity too. Without scoping the comparison to this card's own images,
+// that identity change alone would fail a naive reference-equality memo
+// check and force every card on the page to re-render.
+describe('itemCardPropsAreEqual', () => {
+  const imgs: ImgEntry[] = [{ pathFull: 'u/1/a.webp', urlFull: 'a.jpg' }];
+
+  function baseProps(overrides: Partial<Parameters<typeof ItemCard>[0]> = {}) {
+    return {
+      item,
+      imgs,
+      deletingPath: new Set<string>(),
+      onUpload: vi.fn(),
+      onEditItem: vi.fn(),
+      onDeleteItem: vi.fn(),
+      onDeleteImage: vi.fn(),
+      onOpenModal: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  it('treats a new, unrelated deletingPath Set as equal', () => {
+    const prev = baseProps({ deletingPath: new Set(['u/2/other.webp']) });
+    const next = baseProps({ deletingPath: new Set(['u/3/another.webp']) });
+    expect(itemCardPropsAreEqual(prev, next)).toBe(true);
+  });
+
+  it("treats a deletingPath change touching this card's own image as unequal", () => {
+    const prev = baseProps({ deletingPath: new Set() });
+    const next = baseProps({ deletingPath: new Set(['u/1/a.webp']) });
+    expect(itemCardPropsAreEqual(prev, next)).toBe(false);
+  });
+
+  it('treats a different item reference as unequal', () => {
+    const prev = baseProps();
+    const next = baseProps({ item: { ...item } });
+    expect(itemCardPropsAreEqual(prev, next)).toBe(false);
+  });
+
+  it('ignores handler identity changes', () => {
+    const prev = baseProps();
+    const next = baseProps({ onUpload: vi.fn(), onDeleteImage: vi.fn() });
+    expect(itemCardPropsAreEqual(prev, next)).toBe(true);
   });
 });

@@ -31,6 +31,12 @@ const prefetchMap = () => {
 };
 import Icon, { IconType } from '../Icon';
 
+// A stable identity for entries with no photographs yet, so a card that
+// hasn't been given one doesn't get a fresh `[]` -- and therefore a forced
+// re-render -- every time this component runs for an unrelated reason
+// (ItemCard is memoized against exactly this; see ItemCard.tsx).
+const EMPTY_IMAGES: ImgEntry[] = [];
+
 export default function ItemList({ categoryId }: { categoryId: string }) {
   const { t, tCount } = useI18n();
   const confirm = useConfirm();
@@ -247,7 +253,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
             <ItemCard
               key={it.id}
               item={it}
-              imgs={images[it.id] ?? ([] as ImgEntry[])}
+              imgs={images[it.id] ?? EMPTY_IMAGES}
               pendingUploads={pendingUploads[it.id] ?? 0}
               imagesLoading={loadingItems.has(it.id)}
               deletingPath={deletingPath}

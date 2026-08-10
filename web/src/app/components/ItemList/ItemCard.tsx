@@ -1,29 +1,11 @@
 'use client';
+import { memo } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import type { ItemLite, ImgEntry } from './types';
 import { Actions, AddPhotoPlate } from './Actions';
 import { ImageGrid } from './ImageGrid';
 
-// A specimen mount: the object leads, the label sits underneath. Photos are
-// what a collector actually recognises an item by, so they get the top of
-// the card and the full width of it.
-//
-// Entry actions live in the label area rather than floating over the photo:
-// a photo carries its own delete control, and two identical trash icons in
-// the same corner gave no way to tell which one removed which thing.
-export function ItemCard({
-  item,
-  imgs,
-  pendingUploads = 0,
-  imagesLoading = false,
-  deletingPath,
-  onUpload,
-  onEditItem,
-  onDeleteItem,
-  onDeleteImage,
-  onOpenModal,
-  priority = false,
-}: {
+type ItemCardProps = {
   item: ItemLite;
   imgs: ImgEntry[];
   /** Photographs handed over for this entry that have not landed yet. */
@@ -39,7 +21,28 @@ export function ItemCard({
   /** This card is one of the first few on the page -- its hero photograph
    * is likely the LCP element. */
   priority?: boolean;
-}) {
+};
+
+// A specimen mount: the object leads, the label sits underneath. Photos are
+// what a collector actually recognises an item by, so they get the top of
+// the card and the full width of it.
+//
+// Entry actions live in the label area rather than floating over the photo:
+// a photo carries its own delete control, and two identical trash icons in
+// the same corner gave no way to tell which one removed which thing.
+function ItemCardComponent({
+  item,
+  imgs,
+  pendingUploads = 0,
+  imagesLoading = false,
+  deletingPath,
+  onUpload,
+  onEditItem,
+  onDeleteItem,
+  onDeleteImage,
+  onOpenModal,
+  priority = false,
+}: ItemCardProps) {
   const { t } = useI18n();
 
   const busy = pendingUploads > 0;
@@ -131,3 +134,45 @@ export function ItemCard({
     </li>
   );
 }
+
+// `deletingPath` is one Set shared by every card on the page (ItemList holds
+// a single in-flight-deletions set, not one per item), so removing any
+// card's photograph anywhere in the grid gives it a new identity and would
+// otherwise re-render all of them. Compare only the membership that could
+// actually change this card's own render: whether *this card's* image paths
+// are in the set, not whether the set itself is the same object.
+//
+// The handler props (onUpload, onEditItem, ...) are deliberately left out
+// of the comparison: ItemList recreates them as fresh closures on every
+// render, but each one only ever closes over `item.id` and the stable
+// functions from the data hooks, so an old closure behaves identically to a
+// new one as long as `item` itself hasn't changed.
+function deletingPathIsRelevantlyEqual(
+  prev: Set<string>,
+  next: Set<string>,
+  imgs: ImgEntry[],
+): boolean {
+  if (prev === next) return true;
+  return imgs.every((img) => prev.has(img.pathFull) === next.has(img.pathFull));
+}
+
+export function itemCardPropsAreEqual(
+  prev: ItemCardProps,
+  next: ItemCardProps,
+): boolean {
+  return (
+    prev.item === next.item &&
+    prev.imgs === next.imgs &&
+    prev.pendingUploads === next.pendingUploads &&
+    prev.imagesLoading === next.imagesLoading &&
+    prev.priority === next.priority &&
+    deletingPathIsRelevantlyEqual(
+      prev.deletingPath,
+      next.deletingPath,
+      next.imgs,
+    )
+  );
+}
+
+export const ItemCard = memo(ItemCardComponent, itemCardPropsAreEqual);
+ItemCard.displayName = 'ItemCard';
