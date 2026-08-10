@@ -16,6 +16,7 @@ export enum IconType {
   Frame,
   Photo,
   Download,
+  Upload,
 }
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
@@ -305,6 +306,24 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
               the upload it would be with the arrowhead reversed. */}
           <path d="M12 3v11" />
           <path d="m7 10 5 5 5-5" />
+          <path d="M4 19h16" />
+        </svg>
+      );
+    case IconType.Upload:
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          {...props}
+        >
+          {/* The same tray as Download, arrow reversed: "into here and up
+              onto your collection" rather than out of it. */}
+          <path d="M12 14V3" />
+          <path d="m7 8 5-5 5 5" />
           <path d="M4 19h16" />
         </svg>
       );

@@ -173,7 +173,7 @@ function throwAsError(err: unknown): never {
  * used where one failure means the export itself must stop, not skip one
  * entry and carry on (ZipLimitError, ExportCancelledError).
  */
-async function runPool<T>(
+export async function runPool<T>(
   items: T[],
   concurrency: number,
   worker: (item: T) => Promise<void>,

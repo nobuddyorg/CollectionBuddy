@@ -193,6 +193,69 @@ export function CancelExportButton({
   );
 }
 
+// Same shape as ExportButton, its counterpart: a quiet full-width action
+// under its own rule rather than a third verb in the rename row.
+export function ImportButton({
+  onClick,
+  disabled,
+  isImporting,
+  label,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  isImporting: boolean;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid="import-category"
+      onClick={onClick}
+      disabled={disabled}
+      aria-busy={isImporting}
+      className="min-h-11 px-4 shrink-0 rounded-sm font-label text-xs ring-1 ring-inset ring-control-border hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent transition-colors flex items-center justify-center gap-2"
+      title={label}
+    >
+      {isImporting ? (
+        <Spinner size="sm" />
+      ) : (
+        <Icon icon={IconType.Upload} className="w-4 h-4" aria-hidden="true" />
+      )}
+      {label}
+    </button>
+  );
+}
+
+// Sits next to the progress line only while an import is running, the same
+// as CancelExportButton -- an import of a large archive re-uploads every
+// photograph and can run for minutes too.
+export function CancelImportButton({
+  onClick,
+  label,
+}: {
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid="cancel-import"
+      onClick={onClick}
+      className="rounded-sm w-9 h-9 shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+      aria-label={label}
+      title={label}
+    >
+      <Icon
+        icon={IconType.Close}
+        className="w-4 h-4"
+        aria-hidden="true"
+        // Trailing override: Close's own default draws a square cap.
+        strokeLinecap="round"
+      />
+    </button>
+  );
+}
+
 export function ExpandButton({
   onClick,
   label,

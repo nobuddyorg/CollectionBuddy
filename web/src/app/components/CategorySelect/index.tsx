@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useI18n } from '../../i18n/useI18n';
@@ -9,10 +9,12 @@ import type { Category } from '../../types';
 import {
   AddButton,
   CancelExportButton,
+  CancelImportButton,
   CollapseButton,
   DeleteButtonWithLabel,
   ExpandButton,
   ExportButton,
+  ImportButton,
   RenameButton,
 } from './Buttons';
 import { CategoryText } from './CategoryText';
@@ -21,6 +23,7 @@ import { CategoryInput } from './Input';
 import { sortCategories } from './selection';
 import type { UseCategories } from './useCategories';
 import { useExportCategory } from './useExportCategory';
+import { useImportCategory } from './useImportCategory';
 import { fieldClasses } from '../ui/fieldClasses';
 
 type Props = {
@@ -52,6 +55,14 @@ export default function CategorySelect({
     runExport,
     cancelExport,
   } = useExportCategory();
+  const existingCategoryNames = useMemo(() => cats.map((c) => c.name), [cats]);
+  const {
+    isImporting,
+    message: importMessage,
+    runImport,
+    cancelImport,
+  } = useImportCategory(existingCategoryNames);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [renameValue, setRenameValue] = useState('');
   const [expanded, setExpanded] = useState(!selectedCat);
@@ -110,6 +121,13 @@ export default function CategorySelect({
       setExpanded(false);
     }
   }, [name, createCategory, onSelect]);
+
+  const onImportFile = useCallback(
+    async (file: File) => {
+      await runImport(file, (categoryId) => onSelect(categoryId));
+    },
+    [runImport, onSelect],
+  );
 
   const onDelete = useCallback(async () => {
     if (!selectedCat) return;
@@ -262,6 +280,42 @@ export default function CategorySelect({
               isCreating={isCreating}
               label={t('category_select.add')}
             />
+          </div>
+
+          {/* A category from a file, not a category to select first --
+              independent of `selected`, unlike Export below, which needs
+              something already there to take a copy of. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3">
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".zip"
+              data-testid="import-file-input"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) void onImportFile(file);
+              }}
+            />
+            <ImportButton
+              onClick={() => importInputRef.current?.click()}
+              disabled={isImporting}
+              isImporting={isImporting}
+              label={t('category_select.import')}
+            />
+            {isImporting && (
+              <CancelImportButton
+                onClick={cancelImport}
+                label={t('category_select.import_cancel')}
+              />
+            )}
+            <p
+              aria-live="polite"
+              className="min-w-0 flex-1 font-label text-[0.6875rem] text-muted-foreground"
+            >
+              {importMessage ?? t('category_select.import_hint')}
+            </p>
           </div>
 
           {/* Below its own rule, and only once there is a category to take

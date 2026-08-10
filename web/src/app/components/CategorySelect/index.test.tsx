@@ -10,6 +10,7 @@ import { countItemsForCategory } from '../../data/categories';
 import CategorySelect from './index';
 import type { UseCategories } from './useCategories';
 import { useExportCategory } from './useExportCategory';
+import { useImportCategory } from './useImportCategory';
 
 vi.mock('../../data/categories', () => ({
   countItemsForCategory: vi.fn(),
@@ -23,6 +24,13 @@ vi.mock('./useExportCategory', () => ({
   useExportCategory: vi.fn(),
 }));
 
+// Same reasoning as useExportCategory above: the real hook reads a ZIP and
+// drives an actual importCategory() call, more than this file needs to
+// control the button/progress wiring.
+vi.mock('./useImportCategory', () => ({
+  useImportCategory: vi.fn(),
+}));
+
 function exportState(
   overrides: Partial<ReturnType<typeof useExportCategory>> = {},
 ) {
@@ -32,6 +40,19 @@ function exportState(
     message: null,
     runExport: vi.fn(),
     cancelExport: vi.fn(),
+    ...overrides,
+  };
+}
+
+function importState(
+  overrides: Partial<ReturnType<typeof useImportCategory>> = {},
+) {
+  return {
+    progress: null,
+    isImporting: false,
+    message: null,
+    runImport: vi.fn(),
+    cancelImport: vi.fn(),
     ...overrides,
   };
 }
@@ -89,6 +110,7 @@ describe('CategorySelect', () => {
   beforeEach(() => {
     window.localStorage.setItem('lang', 'en');
     vi.mocked(useExportCategory).mockReturnValue(exportState());
+    vi.mocked(useImportCategory).mockReturnValue(importState());
   });
 
   it('names the selected category under the section label', () => {
@@ -224,6 +246,99 @@ describe('CategorySelect', () => {
     // One line, not two: the progress messages that replace this are all
     // one line, and a hint that wrapped would shrink the row on the way in.
     expect(screen.getByText('Photos, JSON and CSV.')).toBeVisible();
+  });
+
+  describe('import', () => {
+    it('offers import independently of a category being selected', async () => {
+      // No selection at all -- the panel starts expanded in this state
+      // (nothing to collapse to), so there's no "Open category" toggle to
+      // click first.
+      renderSelect({ selectedCat: null, categories: categories({ cats }) });
+
+      const importButton = screen.getByRole('button', { name: 'Import' });
+      expect(importButton).toBeVisible();
+      expect(importButton).toBeEnabled();
+    });
+
+    it('says what a file needs to be while nothing is running', async () => {
+      renderSelect();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+      expect(
+        screen.getByText('A .zip archive exported from CollectionBuddy.'),
+      ).toBeVisible();
+    });
+
+    it('opens the file picker when Import is clicked, not on page load', async () => {
+      renderSelect();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+      const input = screen.getByTestId('import-file-input');
+      const click = vi.spyOn(input, 'click');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Import' }));
+
+      expect(click).toHaveBeenCalledTimes(1);
+    });
+
+    it('runs the import with the picked file, and switches to the new category', async () => {
+      const runImport = vi.fn(
+        async (_file: File, onImported?: (id: string) => void) => {
+          onImported?.('new-cat-id');
+        },
+      );
+      vi.mocked(useImportCategory).mockReturnValue(importState({ runImport }));
+      const { onSelect } = renderSelect();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+
+      const file = new File(['zip bytes'], 'coins.zip', {
+        type: 'application/zip',
+      });
+      const input = screen.getByTestId('import-file-input');
+      await userEvent.upload(input, file);
+
+      expect(runImport).toHaveBeenCalledWith(file, expect.any(Function));
+      expect(onSelect).toHaveBeenCalledWith('new-cat-id');
+    });
+
+    describe('while an import is running', () => {
+      it('disables the import button and shows its progress message', async () => {
+        vi.mocked(useImportCategory).mockReturnValue(
+          importState({ isImporting: true, message: 'Photographs 3 of 9…' }),
+        );
+        renderSelect();
+        await userEvent.click(
+          screen.getByRole('button', { name: 'Open category' }),
+        );
+
+        expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled();
+        expect(screen.getByText('Photographs 3 of 9…')).toBeVisible();
+      });
+
+      it('offers a Cancel affordance, absent while nothing is running', async () => {
+        const cancelImport = vi.fn();
+        vi.mocked(useImportCategory).mockReturnValue(
+          importState({
+            isImporting: true,
+            message: 'Photographs 3 of 9…',
+            cancelImport,
+          }),
+        );
+        renderSelect();
+        await userEvent.click(
+          screen.getByRole('button', { name: 'Open category' }),
+        );
+
+        const cancel = screen.getByRole('button', { name: 'Cancel import' });
+        expect(cancel).toBeVisible();
+        await userEvent.click(cancel);
+        expect(cancelImport).toHaveBeenCalledOnce();
+      });
+    });
   });
 
   // #419: Delete used to stay enabled through a running export, so

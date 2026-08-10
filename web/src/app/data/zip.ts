@@ -194,6 +194,81 @@ export function endOfCentralDirectory({
   return bytes;
 }
 
+export class ZipReadError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ZipReadError';
+  }
+}
+
+/**
+ * The counterpart to `createZipWriter`: reads an archive this writer
+ * produced back into its entries, keyed by path.
+ *
+ * Walks the central directory rather than the local headers that precede
+ * each entry's bytes -- the central directory is what a real extractor
+ * trusts too, and it is the one place every entry's size and offset are
+ * recorded without having to sum the local entries first. Store-only, same
+ * as the writer: there is no deflate to invert.
+ */
+export async function readZipEntries(
+  blob: Blob,
+): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  if (bytes.length < END_OF_CENTRAL_DIR_BYTES) {
+    throw new ZipReadError('Not a ZIP archive: file is too small');
+  }
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const eocd = bytes.length - END_OF_CENTRAL_DIR_BYTES;
+  if (dv.getUint32(eocd, true) !== END_OF_CENTRAL_DIR_SIGNATURE) {
+    // A real extractor scans backward for this signature to allow for an
+    // archive comment after it; this reader never writes one (`createZipWriter`
+    // always leaves the comment length at 0), so requiring it at the very
+    // end is exact for anything this app itself produced -- and a clear
+    // refusal for anything else, rather than reading garbage as a directory.
+    throw new ZipReadError(
+      'Not a ZIP archive: no end-of-central-directory record',
+    );
+  }
+
+  const entryCount = dv.getUint16(eocd + 8, true);
+  let directoryAt = dv.getUint32(eocd + 16, true);
+
+  const entries = new Map<string, Uint8Array<ArrayBuffer>>();
+  const decoder = new TextDecoder();
+  for (let i = 0; i < entryCount; i++) {
+    if (directoryAt + CENTRAL_HEADER_BYTES > bytes.length) {
+      throw new ZipReadError(
+        'Corrupt archive: central directory runs past the file',
+      );
+    }
+    if (dv.getUint32(directoryAt, true) !== CENTRAL_HEADER_SIGNATURE) {
+      throw new ZipReadError(
+        'Corrupt archive: malformed central directory entry',
+      );
+    }
+    const size = dv.getUint32(directoryAt + 24, true);
+    const nameLength = dv.getUint16(directoryAt + 28, true);
+    const localOffset = dv.getUint32(directoryAt + 42, true);
+    const name = decoder.decode(
+      bytes.slice(
+        directoryAt + CENTRAL_HEADER_BYTES,
+        directoryAt + CENTRAL_HEADER_BYTES + nameLength,
+      ),
+    );
+
+    const localNameLength = dv.getUint16(localOffset + 26, true);
+    const dataStart = localOffset + LOCAL_HEADER_BYTES + localNameLength;
+    if (dataStart + size > bytes.length) {
+      throw new ZipReadError(`Corrupt archive: "${name}" runs past the file`);
+    }
+    entries.set(name, bytes.slice(dataStart, dataStart + size));
+
+    directoryAt += CENTRAL_HEADER_BYTES + nameLength;
+  }
+  return entries;
+}
+
 export class ZipLimitError extends Error {
   constructor(message: string) {
     super(message);
