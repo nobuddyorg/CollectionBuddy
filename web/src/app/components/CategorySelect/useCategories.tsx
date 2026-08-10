@@ -124,17 +124,28 @@ export function useCategories() {
         // the last point those links can still be read.
         const { data: links, error: linksError } =
           await listItemIdsForCategory(id);
-        if (linksError) throw linksError;
+        if (linksError) {
+          throw new Error('Could not list items for category', {
+            cause: linksError,
+          });
+        }
 
-        const itemIds = Array.from(
-          new Set((links ?? []).map((l) => l.item_id)),
-        );
+        const itemIds = Array.from(new Set(links ?? []));
         let orphanedItemIds = itemIds;
         if (itemIds.length) {
           const { data: stillLinked, error: linkedError } =
             await listItemIdsLinkedElsewhere(itemIds, id);
-          if (linkedError) throw linkedError;
-          const keep = new Set((stillLinked ?? []).map((l) => l.item_id));
+          if (linkedError) {
+            // #409: an incomplete answer here (a truncated page, a failed
+            // chunk) must abort the whole deletion -- including the
+            // category row itself -- rather than being treated as "nothing
+            // else links these items" and silently orphaning the wrong
+            // photographs.
+            throw new Error('Could not check items linked elsewhere', {
+              cause: linkedError,
+            });
+          }
+          const keep = new Set(stillLinked ?? []);
           orphanedItemIds = itemIds.filter((itemId) => !keep.has(itemId));
         }
 

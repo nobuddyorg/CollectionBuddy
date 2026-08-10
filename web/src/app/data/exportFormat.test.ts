@@ -12,6 +12,8 @@ import {
   EXPORT_FORMAT_VERSION,
   exportEntries,
   extensionOf,
+  formatExportBytes,
+  fullSizeObjectBytes,
   fullSizeObjectPaths,
   indexPrefix,
   localDateStamp,
@@ -160,6 +162,52 @@ describe('fullSizeObjectPaths', () => {
 
   it('is empty for an item with no photographs', () => {
     expect(fullSizeObjectPaths('uid/item', [])).toEqual([]);
+  });
+});
+
+// #428: known up front from list()'s metadata, so an export can warn before
+// downloading a single photograph rather than discovering its total weight
+// only once the tab has run out of memory.
+describe('fullSizeObjectBytes', () => {
+  it('sums the size of every full-size object', () => {
+    expect(
+      fullSizeObjectBytes([
+        { name: 'a.webp', metadata: { size: 100 } },
+        { name: 'b.webp', metadata: { size: 250 } },
+      ]),
+    ).toBe(350);
+  });
+
+  it('leaves thumbnails out of the total', () => {
+    expect(
+      fullSizeObjectBytes([
+        { name: 'a.webp', metadata: { size: 1000 } },
+        { name: 'a.thumb.webp', metadata: { size: 50 } },
+      ]),
+    ).toBe(1000);
+  });
+
+  it('treats a missing size as zero rather than throwing', () => {
+    expect(fullSizeObjectBytes([{ name: 'a.webp', metadata: null }])).toBe(0);
+  });
+
+  it('is zero for an item with no photographs', () => {
+    expect(fullSizeObjectBytes([])).toBe(0);
+  });
+});
+
+describe('formatExportBytes', () => {
+  it('renders one decimal place of gigabytes', () => {
+    expect(formatExportBytes(1.5 * 1024 ** 3)).toBe('1.5 GB');
+  });
+
+  it('rounds rather than truncating', () => {
+    expect(formatExportBytes(1.55 * 1024 ** 3)).toBe('1.6 GB');
+    expect(formatExportBytes(1.96 * 1024 ** 3)).toBe('2.0 GB');
+  });
+
+  it('is zero for no bytes at all', () => {
+    expect(formatExportBytes(0)).toBe('0.0 GB');
   });
 });
 

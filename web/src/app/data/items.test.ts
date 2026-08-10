@@ -1,12 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
+  ITEM_PLACE_PAGE_SIZE,
   SEARCH_MIN_LENGTH,
   SEARCH_MIN_LENGTH_NON_ASCII,
   buildSearchFilter,
   listItemPlaces,
   listItems,
   listItemsForExport,
+  rawListItemPlaces,
   searchFilterFor,
   searchMinLength,
 } from './items';
@@ -130,7 +132,7 @@ describe('the queries behind the list and the map', () => {
   const listQuery = (search: string) =>
     paramsOf(listItems({ categoryId: 'cat-1', search, from: 0, to: 8 }));
   const mapQuery = (search: string) =>
-    paramsOf(listItemPlaces('cat-1', search));
+    paramsOf(rawListItemPlaces('cat-1', search, 0, ITEM_PLACE_PAGE_SIZE - 1));
 
   it('narrows the map by the same search as the list, character for character', () => {
     // Not merely "both have a filter": the same term has to produce the same
@@ -157,10 +159,12 @@ describe('the queries behind the list and the map', () => {
   });
 
   // A page is how many cards fit on a screen; it has nothing to say about how
-  // many pins fit on a map. The list pages, the map does not.
-  it('does not paginate the map', () => {
-    expect(mapQuery('coin').has('limit')).toBe(false);
-    expect(mapQuery('coin').has('offset')).toBe(false);
+  // many pins fit on a map -- but the map still wants every row, and
+  // PostgREST caps an unranged request the same as any other, so each
+  // request the map makes is ranged the same way the export's are (#411).
+  it('pages the map the same way the export pages', () => {
+    expect(mapQuery('coin').get('offset')).toBe('0');
+    expect(mapQuery('coin').get('limit')).toBe(String(ITEM_PLACE_PAGE_SIZE));
   });
 
   const exportQuery = () => paramsOf(listItemsForExport('cat-1', 0, 499));
@@ -191,5 +195,97 @@ describe('the queries behind the list and the map', () => {
   it('pages the export the same way range() was asked to', () => {
     expect(exportQuery().get('offset')).toBe('0');
     expect(exportQuery().get('limit')).toBe('500');
+  });
+});
+
+// #411: an unranged listItemPlaces silently truncated at PostgREST's row
+// cap, so a category above it drew (and counted, in a pin's popup) at most
+// max_rows entries' worth of pins. The loop below is the same shape
+// exportCategory.ts's fetchAllItems is tested with -- a fake page sequence
+// standing in for the database.
+describe('listItemPlaces', () => {
+  it('pages past a full page and concatenates the rows', async () => {
+    const fullPage = Array.from({ length: ITEM_PLACE_PAGE_SIZE }, (_, i) => ({
+      title: `item-${i}`,
+      place: 'Berlin',
+      place_lat: 52.5,
+      place_lng: 13.4,
+    }));
+    const shortPage = [
+      { title: 'last', place: 'Berlin', place_lat: 52.5, place_lng: 13.4 },
+    ];
+    const listPage = vi
+      .fn()
+      .mockResolvedValueOnce({ data: fullPage, error: null })
+      .mockResolvedValueOnce({ data: shortPage, error: null });
+
+    const { data, error } = await listItemPlaces(
+      'cat-1',
+      '',
+      undefined,
+      listPage,
+    );
+
+    expect(error).toBeNull();
+    expect(data).toHaveLength(ITEM_PLACE_PAGE_SIZE + 1);
+    expect(listPage).toHaveBeenCalledTimes(2);
+    expect(listPage).toHaveBeenNthCalledWith(
+      1,
+      'cat-1',
+      '',
+      0,
+      ITEM_PLACE_PAGE_SIZE - 1,
+      undefined,
+    );
+    expect(listPage).toHaveBeenNthCalledWith(
+      2,
+      'cat-1',
+      '',
+      ITEM_PLACE_PAGE_SIZE,
+      2 * ITEM_PLACE_PAGE_SIZE - 1,
+      undefined,
+    );
+  });
+
+  it('stops on the first page that errors, returning no partial data', async () => {
+    const listPage = vi
+      .fn()
+      .mockResolvedValue({ data: null, error: new Error('boom') });
+
+    const { data, error } = await listItemPlaces(
+      'cat-1',
+      '',
+      undefined,
+      listPage,
+    );
+
+    expect(data).toBeNull();
+    expect(error).toBeInstanceOf(Error);
+    expect(listPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops after a single short page without a second request', async () => {
+    const listPage = vi
+      .fn()
+      .mockResolvedValue({ data: [{ title: 'only' }], error: null });
+
+    const { data } = await listItemPlaces('cat-1', '', undefined, listPage);
+
+    expect(data).toHaveLength(1);
+    expect(listPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops rather than crashing when a page comes back with no data and no error', async () => {
+    const listPage = vi.fn().mockResolvedValue({ data: null, error: null });
+
+    const { data, error } = await listItemPlaces(
+      'cat-1',
+      '',
+      undefined,
+      listPage,
+    );
+
+    expect(error).toBeNull();
+    expect(data).toEqual([]);
   });
 });

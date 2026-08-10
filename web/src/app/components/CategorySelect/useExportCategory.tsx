@@ -10,7 +10,9 @@ import {
   exportCategory,
   type ExportProgress,
 } from '../../data/exportCategory';
+import { formatExportBytes } from '../../data/exportFormat';
 import { downloadBlob } from './downloadBlob';
+import { useConfirm } from '../Confirm/ConfirmProvider';
 import { ZipLimitError } from '../../data/zip';
 
 /**
@@ -48,6 +50,7 @@ export type UseExportCategory = ReturnType<typeof useExportCategory>;
 export function useExportCategory() {
   const { t } = useI18n();
   const toast = useToast();
+  const confirm = useConfirm();
   // Null means "not exporting". A separate boolean would be a second
   // source of truth for the same fact, and the two could disagree.
   const [progress, setProgress] = useState<ExportProgress | null>(null);
@@ -66,6 +69,16 @@ export function useExportCategory() {
           category,
           onProgress: setProgress,
           signal: controller.signal,
+          // Asked only once the listing has totalled the photographs'
+          // real size -- declining reads as a cancel, the same as the
+          // button (#428).
+          confirmLargeExport: (totalBytes) =>
+            confirm(
+              t('category_select.export_large_confirm').replace(
+                '{size}',
+                formatExportBytes(totalBytes),
+              ),
+            ),
         });
         downloadBlob(result.blob, result.filename);
         // The download itself never fails on a skipped photograph -- an
@@ -112,7 +125,7 @@ export function useExportCategory() {
         setProgress(null);
       }
     },
-    [progress, t, toast],
+    [progress, t, toast, confirm],
   );
 
   const cancelExport = useCallback(() => {

@@ -335,6 +335,42 @@ describe('createZipWriter', () => {
     } as unknown as Uint8Array<ArrayBuffer>;
     expect(() => writer.add('big.bin', huge, modified)).toThrow(ZipLimitError);
   });
+
+  // #406: a mutant that removes assertZipRoom's byte guard entirely used to
+  // be killed only by the huge-stand-in test above hanging until Stryker's
+  // own timeout -- add() would fall through to crc32(bytes), iterating four
+  // billion times over an array that isn't really there. `maxBytes` reaches
+  // the same guard with a handful of real bytes, so a removed guard fails
+  // this assertion in milliseconds instead of timing out.
+  it('refuses an entry through the writer once a lowered byte limit is reached', () => {
+    const writer = createZipWriter({ maxBytes: 39 });
+    expect(() => writer.add('a.txt', encoder.encode('hello'))).toThrow(
+      ZipLimitError,
+    );
+  });
+
+  // Same reasoning for the entry-count guard, and the only test that reaches
+  // the `entries.length + 1` projection in add() rather than exercising
+  // assertZipRoom's own arithmetic directly -- previously Stryker-disabled
+  // as unreachable without genuinely building 65535 entries.
+  it('refuses an entry through the writer once a lowered entry-count limit is reached', () => {
+    const writer = createZipWriter({ maxEntries: 1 });
+    writer.add('a.txt', encoder.encode('x'), modified);
+    expect(() => writer.add('b.txt', encoder.encode('y'), modified)).toThrow(
+      ZipLimitError,
+    );
+  });
+
+  // Every add() fits under the limit on its own; only the central directory
+  // and end-of-central-directory trailer that finish() appends push the
+  // total over it. The only test that reaches the `offset + directorySize +
+  // END_OF_CENTRAL_DIR_BYTES` projection in finish() -- previously
+  // Stryker-disabled for the same reason as the entry-count projection above.
+  it('refuses at finish() when the directory and trailer push the total past a lowered byte limit', () => {
+    const writer = createZipWriter({ maxBytes: 100 });
+    writer.add('a.txt', encoder.encode('x'), modified);
+    expect(() => writer.finish()).toThrow(ZipLimitError);
+  });
 });
 
 describe('assertZipRoom', () => {

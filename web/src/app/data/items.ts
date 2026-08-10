@@ -208,12 +208,17 @@ export function linkItemToCategory(itemId: string, categoryId: string) {
 }
 
 // Narrowed by the same search as the list, so the map is the same set of
-// entries seen from above rather than a second, wider one. Not paginated,
-// though: a page is how many cards fit on a screen, which has nothing to say
-// about how many pins fit on a map.
-export function listItemPlaces(
+// entries seen from above rather than a second, wider one. The map wants
+// every row, not a screenful -- a page is how many cards fit on a screen,
+// which has nothing to say about how many pins fit on a map -- so this pages
+// past PostgREST's row cap the same way listItemsForExport already does,
+// rather than asking once and taking whatever `max_rows` happens to hand
+// back (#411).
+export function rawListItemPlaces(
   categoryId: string,
   search: string,
+  from: number,
+  to: number,
   signal?: AbortSignal,
 ) {
   let query = supabase
@@ -232,6 +237,7 @@ export function listItemPlaces(
   // collection should not disagree about which of them comes first.
   return query
     .order('created_at', { ascending: false })
+    .range(from, to)
     .returns<ItemPlaceRow[]>();
 }
 
@@ -270,3 +276,44 @@ export function listItemsForExport(
 /* v8 ignore stop */
 
 export type ExportItemRow = ItemFields & { created_at: string };
+
+// PostgREST caps an unranged request at max_rows (supabase/config.toml,
+// 1000 -- confirmed the same on the hosted project's API settings, #408
+// step 0) and truncates silently, so the same page size the export uses is
+// what one map request is allowed to ask for.
+export const ITEM_PLACE_PAGE_SIZE = 1000;
+
+/**
+ * Walks every page of a category's places, one call per
+ * `ITEM_PLACE_PAGE_SIZE`, the same paging shape `fetchAllItems` in
+ * exportCategory.ts already tests. Unlike that function this one lives here
+ * rather than beside its caller (`usePlaces.tsx`) because the raw builder it
+ * pages is private to this module.
+ *
+ * `listPage` is accepted as a parameter, same reason as
+ * `exportCategory.ts`'s injectable raw calls: the pagination boundary can be
+ * driven with a fake page sequence instead of a real database.
+ */
+export async function listItemPlaces(
+  categoryId: string,
+  search: string,
+  signal?: AbortSignal,
+  listPage: typeof rawListItemPlaces = rawListItemPlaces,
+): Promise<{ data: ItemPlaceRow[] | null; error: unknown }> {
+  const rows: ItemPlaceRow[] = [];
+  for (let page = 0; ; page++) {
+    const from = page * ITEM_PLACE_PAGE_SIZE;
+    const { data, error } = await listPage(
+      categoryId,
+      search,
+      from,
+      from + ITEM_PLACE_PAGE_SIZE - 1,
+      signal,
+    );
+    if (error) return { data: null, error };
+    if (!data?.length) break;
+    rows.push(...data);
+    if (data.length < ITEM_PLACE_PAGE_SIZE) break;
+  }
+  return { data: rows, error: null };
+}
