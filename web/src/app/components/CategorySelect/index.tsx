@@ -21,6 +21,7 @@ import { CategoryInput } from './Input';
 import { sortCategories } from './selection';
 import type { UseCategories } from './useCategories';
 import { useExportCategory } from './useExportCategory';
+import { fieldClasses } from '../ui/fieldClasses';
 
 type Props = {
   selectedCat: string | null;
@@ -221,7 +222,7 @@ export default function CategorySelect({
                       }
                     }
                   }}
-                  className="w-full min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-control-border focus:ring-foreground"
+                  className={fieldClasses('min-w-0')}
                 />
                 <RenameButton
                   onClick={() => void onRename()}

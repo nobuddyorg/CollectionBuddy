@@ -308,8 +308,14 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
           <path d="M4 19h16" />
         </svg>
       );
-    default:
+    default: {
+      // `IconType` is a numeric enum: an unhandled member falls through to
+      // here and renders nothing with no compile error, unless this
+      // assignment forces the exhaustiveness check.
+      const exhaustive: never = icon;
+      void exhaustive;
       return null;
+    }
   }
 };
 

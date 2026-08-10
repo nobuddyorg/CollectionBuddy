@@ -99,9 +99,6 @@ export function AddPhotoPlate({
             icon={IconType.Plus}
             className="w-3.5 h-3.5"
             aria-hidden="true"
-            stroke="currentColor"
-            strokeWidth="2"
-            fill="none"
           />
           {t('item_list.add_image')}
         </span>
@@ -161,14 +158,7 @@ export function Actions({
             aria-label={t('common.loading')}
           />
         ) : (
-          <Icon
-            icon={IconType.Plus}
-            className="w-4 h-4"
-            aria-hidden="true"
-            stroke="currentColor"
-            strokeWidth="2"
-            fill="none"
-          />
+          <Icon icon={IconType.Plus} className="w-4 h-4" aria-hidden="true" />
         )}
       </label>
 
@@ -179,14 +169,7 @@ export function Actions({
         aria-label={t('item_list.edit')}
         title={t('item_list.edit')}
       >
-        <Icon
-          icon={IconType.Edit}
-          className="w-4 h-4"
-          aria-hidden="true"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-        />
+        <Icon icon={IconType.Edit} className="w-4 h-4" aria-hidden="true" />
       </IconButton>
 
       <IconButton
@@ -197,14 +180,7 @@ export function Actions({
         title={t('item_list.delete_entry')}
         className="ml-auto"
       >
-        <Icon
-          icon={IconType.Trash}
-          className="w-4 h-4"
-          aria-hidden="true"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-        />
+        <Icon icon={IconType.Trash} className="w-4 h-4" aria-hidden="true" />
       </IconButton>
     </div>
   );

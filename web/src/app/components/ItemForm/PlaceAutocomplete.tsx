@@ -3,6 +3,7 @@ import { useEffect, useId, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import { isQueryLongEnough, usePhotonSearch } from './usePhoton';
 import type { PlaceCoords } from './types';
+import { fieldClasses } from '../ui/fieldClasses';
 
 const ESTIMATED_MENU_HEIGHT = 240;
 
@@ -97,7 +98,7 @@ export function PlaceAutocomplete({
           }
         }}
         placeholder={t('item_create.place_placeholder')}
-        className="w-full rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-control-border focus:ring-foreground"
+        className={fieldClasses()}
         autoComplete="off"
         autoCapitalize="words"
       />

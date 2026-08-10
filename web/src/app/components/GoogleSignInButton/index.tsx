@@ -14,24 +14,18 @@ function cx(...xs: Array<string | false | null | undefined>) {
 
 export default function GoogleSignInButton({
   onClick,
-  className,
-  disabled,
-  withOverlay = true,
-  mode = 'oauth',
-  label,
   onError,
 }: GoogleSignInButtonProps) {
   const [loading, setLoading] = useState(false);
   const { t } = useI18n();
 
-  const finalLabel = label ?? t('google_sign_in_button.sign_in_with_google');
+  const label = t('google_sign_in_button.sign_in_with_google');
 
-  // `mode: 'oauth'` deliberately never clears `loading` itself -- the
-  // redirect is meant to unmount this page. But a bfcache restore (the user
-  // presses Back from Google's consent screen) resurrects that stale
-  // `loading: true` with no redirect coming, leaving the full-screen overlay
-  // stuck with no way to dismiss it. `pageshow`'s `persisted` flag is exactly
-  // that signal.
+  // `loading` is deliberately never cleared on success -- the redirect is
+  // meant to unmount this page. But a bfcache restore (the user presses Back
+  // from Google's consent screen) resurrects that stale `loading: true` with
+  // no redirect coming, leaving the full-screen overlay stuck with no way to
+  // dismiss it. `pageshow`'s `persisted` flag is exactly that signal.
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) setLoading(false);
@@ -41,24 +35,23 @@ export default function GoogleSignInButton({
   }, []);
 
   const handleClick = useCallback(async () => {
-    if (loading || disabled) return;
+    if (loading) return;
     setLoading(true);
     try {
       await onClick();
-      if (mode === 'inline') setLoading(false);
     } catch (err) {
       setLoading(false);
       onError?.(err);
     }
-  }, [loading, disabled, onClick, onError, mode]);
+  }, [loading, onClick, onError]);
 
   return (
     <>
       <button
         type="button"
         onClick={() => void handleClick()}
-        disabled={disabled || loading}
-        aria-label={finalLabel}
+        disabled={loading}
+        aria-label={label}
         aria-busy={loading ? 'true' : 'false'}
         className={cx(
           'relative flex items-center justify-center h-12 px-4 rounded-md',
@@ -67,14 +60,13 @@ export default function GoogleSignInButton({
           'dark:bg-[#131314] dark:hover:bg-[#1e1f20] dark:active:bg-[#282a2c]',
           'shadow-sm hover:shadow-md transition-all duration-200',
           'disabled:opacity-60 disabled:cursor-not-allowed',
-          className,
         )}
         style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
       >
         {loading ? (
           <span className="flex items-center gap-3 text-[#3c4043] dark:text-[#e3e3e3] text-sm">
             <Spinner />
-            <span>{finalLabel}</span>
+            <span>{label}</span>
           </span>
         ) : (
           <span className="flex items-center">
@@ -83,13 +75,13 @@ export default function GoogleSignInButton({
               className="w-5 h-5 mr-3 flex-shrink-0"
             />
             <span className="text-[#3c4043] dark:text-[#e3e3e3] text-sm">
-              {finalLabel}
+              {label}
             </span>
           </span>
         )}
       </button>
 
-      {withOverlay && loading && mode === 'oauth' && (
+      {loading && (
         <LoadingOverlay label={t('item_list.loading')} theme="auto" />
       )}
     </>

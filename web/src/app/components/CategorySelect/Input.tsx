@@ -1,5 +1,6 @@
 'use client';
 import { useI18n } from '../../i18n/useI18n';
+import { fieldClasses } from '../ui/fieldClasses';
 
 type Props = {
   name: string;
@@ -36,7 +37,7 @@ export function CategoryInput({
       }}
       // Sized by its grid column, which it shares with the rename field
       // above so the two come out the same width.
-      className="w-full min-w-0 rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-control-border focus:ring-foreground"
+      className={fieldClasses('min-w-0')}
     />
   );
 }

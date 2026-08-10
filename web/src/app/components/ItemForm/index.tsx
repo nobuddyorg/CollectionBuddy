@@ -6,6 +6,8 @@ import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { Submit } from './Submit';
 import { TagsInput } from './TagsInput';
 import type { ItemFormProps, PlaceCoords } from './types';
+import { fieldClasses } from '../ui/fieldClasses';
+import { buttonClasses } from '../ui/buttonClasses';
 
 export type { ItemFormValues } from './types';
 export { EMPTY_ITEM_FORM_VALUES } from './types';
@@ -130,7 +132,7 @@ export default function ItemForm({
             aria-required="true"
             aria-invalid={titleError}
             aria-describedby={titleError ? `${titleId}-error` : undefined}
-            className="w-full rounded-sm px-3 py-2 min-h-11 bg-card text-card-foreground ring-1 ring-inset ring-control-border focus:ring-foreground"
+            className={fieldClasses()}
           />
           {titleError && (
             <p id={`${titleId}-error`} className="text-xs text-destructive">
@@ -158,7 +160,9 @@ export default function ItemForm({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="w-full rounded-sm px-3 py-2 min-h-11 sm:min-h-32 sm:flex-auto bg-card text-card-foreground ring-1 ring-inset ring-control-border focus:ring-foreground resize-none sm:resize-y"
+            className={fieldClasses(
+              'sm:min-h-32 sm:flex-auto resize-none sm:resize-y',
+            )}
           />
         </div>
 
@@ -183,11 +187,7 @@ export default function ItemForm({
 
       <div className="flex justify-end gap-2 pt-1">
         {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="min-h-11 px-4 rounded-sm font-label text-xs ring-1 ring-inset ring-control-border hover:bg-muted transition-colors"
-          >
+          <button type="button" onClick={onCancel} className={buttonClasses()}>
             {t('common.cancel')}
           </button>
         )}

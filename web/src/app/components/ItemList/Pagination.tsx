@@ -59,13 +59,7 @@ export function Pagination({
         aria-label={t('item_list.previous')}
         title={t('item_list.previous')}
       >
-        <Icon
-          icon={IconType.ChevronLeft}
-          className="w-5 h-5"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-        />
+        <Icon icon={IconType.ChevronLeft} className="w-5 h-5" />
       </button>
 
       {paginationItems.map((item, index) =>
@@ -103,13 +97,7 @@ export function Pagination({
         aria-label={t('item_list.next')}
         title={t('item_list.next')}
       >
-        <Icon
-          icon={IconType.ChevronRight}
-          className="w-5 h-5"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-        />
+        <Icon icon={IconType.ChevronRight} className="w-5 h-5" />
       </button>
     </nav>
   );

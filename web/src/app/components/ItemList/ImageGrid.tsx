@@ -195,9 +195,8 @@ export function ImageGrid({
         <Icon
           icon={IconType.Close}
           className={small ? 'w-3.5 h-3.5' : 'w-4 h-4'}
-          stroke="currentColor"
+          // Trailing override: Close's own default is a thinner 2.
           strokeWidth="2.5"
-          fill="none"
         />
       )}
     </button>

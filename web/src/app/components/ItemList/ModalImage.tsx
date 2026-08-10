@@ -107,13 +107,7 @@ export function ModalImage({
         title={t('item_list.close_modal')}
         aria-label={t('item_list.close_modal')}
       >
-        <Icon
-          icon={IconType.Close}
-          className="w-5 h-5"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-        />
+        <Icon icon={IconType.Close} className="w-5 h-5" />
       </button>
 
       {/* Deliberately Trash rather than the strip's small X: this sits in
@@ -135,13 +129,7 @@ export function ModalImage({
         {deleting ? (
           <Spinner size="sm" />
         ) : (
-          <Icon
-            icon={IconType.Trash}
-            className="w-5 h-5"
-            stroke="currentColor"
-            strokeWidth="2"
-            fill="none"
-          />
+          <Icon icon={IconType.Trash} className="w-5 h-5" />
         )}
       </button>
 
@@ -156,13 +144,7 @@ export function ModalImage({
             title={t('item_list.previous_image')}
             aria-label={t('item_list.previous_image')}
           >
-            <Icon
-              icon={IconType.ChevronLeft}
-              className="w-5 h-5"
-              stroke="currentColor"
-              strokeWidth="2"
-              fill="none"
-            />
+            <Icon icon={IconType.ChevronLeft} className="w-5 h-5" />
           </button>
 
           <button
@@ -174,13 +156,7 @@ export function ModalImage({
             title={t('item_list.next_image')}
             aria-label={t('item_list.next_image')}
           >
-            <Icon
-              icon={IconType.ChevronRight}
-              className="w-5 h-5"
-              stroke="currentColor"
-              strokeWidth="2"
-              fill="none"
-            />
+            <Icon icon={IconType.ChevronRight} className="w-5 h-5" />
           </button>
 
           <div
