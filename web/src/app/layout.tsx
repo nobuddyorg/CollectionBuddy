@@ -5,6 +5,8 @@ import './globals.css';
 import { ConfirmProvider } from './components/Confirm/ConfirmProvider';
 import { ToastProvider } from './components/Toast/ToastProvider';
 import { I18nProvider } from './i18n/I18nProvider';
+import { ServiceWorkerRegistration } from './ServiceWorkerRegistration';
+import { SupabaseWarmup } from './SupabaseWarmup';
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
@@ -177,6 +179,8 @@ export default function RootLayout({
             and footer from assistive tech without also hiding the dialog
             portalled next to it (#295). */}
         <div id="app-root">
+          <SupabaseWarmup />
+          <ServiceWorkerRegistration />
           <I18nProvider>
             <ToastProvider>
               <ConfirmProvider>{children}</ConfirmProvider>
