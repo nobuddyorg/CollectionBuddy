@@ -17,6 +17,7 @@ export enum IconType {
   Photo,
   Download,
   Upload,
+  Share,
 }
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
@@ -325,6 +326,27 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
           <path d="M12 14V3" />
           <path d="m7 8 5-5 5 5" />
           <path d="M4 19h16" />
+        </svg>
+      );
+    case IconType.Share:
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          {...props}
+        >
+          {/* Three nodes, two spokes: the shared-category marker in
+              CategorySelect (Dropdown.tsx) -- reads as "this one connects to
+              someone else" without needing a caption at tab-strip size. */}
+          <circle cx="18" cy="5" r="3" />
+          <circle cx="6" cy="12" r="3" />
+          <circle cx="18" cy="19" r="3" />
+          <path d="M8.59 13.51 15.42 17.49" />
+          <path d="M15.41 6.51 8.59 10.49" />
         </svg>
       );
     default: {

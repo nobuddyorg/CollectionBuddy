@@ -1,13 +1,28 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
 import CategorySelect from './index';
 import type { UseCategories } from './useCategories';
+
+// Not what this file is testing (see the comment below) -- mocked to keep
+// the panel's expand-on-open from firing a real, unmocked Supabase call
+// the same way index.test.tsx does.
+vi.mock('./useShares', () => ({
+  useShares: vi.fn().mockReturnValue({
+    shares: [],
+    isLoading: false,
+    isSharing: false,
+    isRevoking: false,
+    reload: vi.fn().mockResolvedValue([]),
+    createShare: vi.fn(),
+    deleteShare: vi.fn(),
+  }),
+}));
 
 // #423: neither the catch->toast.error path nor the finally->reset in
 // useExportCategory, nor the wiring that hands the click to it, was
@@ -21,7 +36,7 @@ import type { UseCategories } from './useCategories';
 
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   return {
-    cats: [{ id: 'a', name: 'Coins' }],
+    cats: [{ id: 'a', name: 'Coins', user_id: 'owner-1' }],
     isLoading: false,
     isCreating: false,
     isDeleting: false,
@@ -43,6 +58,7 @@ function renderSelect() {
             selectedCat="a"
             onSelect={() => {}}
             categories={categories()}
+            userId="owner-1"
           />
         </ConfirmProvider>
       </ToastProvider>

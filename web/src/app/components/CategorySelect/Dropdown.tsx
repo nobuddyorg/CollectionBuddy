@@ -2,13 +2,17 @@
 import { useCallback, useRef } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useI18n } from '../../i18n/useI18n';
+import Icon, { IconType } from '../Icon';
+
+type CategoryTab = { id: string; name: string; user_id: string };
 
 type Props = {
   selectedCat: string | null;
   onSelect: (id: string | null) => void;
-  sortedCats: { id: string; name: string }[];
+  sortedCats: CategoryTab[];
   isLoading: boolean;
   setExpanded: (v: boolean) => void;
+  userId: string | null;
 };
 
 // Shared with page.tsx, which owns the entries section this tablist
@@ -29,6 +33,7 @@ export function CategorySelectDropdown({
   sortedCats,
   isLoading,
   setExpanded,
+  userId,
 }: Props) {
   const { t } = useI18n();
 
@@ -64,6 +69,7 @@ export function CategorySelectDropdown({
       sortedCats={sortedCats}
       setExpanded={setExpanded}
       ariaLabel={t('category_select.select_placeholder')}
+      userId={userId}
     />
   );
 }
@@ -71,9 +77,10 @@ export function CategorySelectDropdown({
 type TablistProps = {
   selectedCat: string | null;
   onSelect: (id: string | null) => void;
-  sortedCats: { id: string; name: string }[];
+  sortedCats: CategoryTab[];
   setExpanded: (v: boolean) => void;
   ariaLabel: string;
+  userId: string | null;
 };
 
 // Roving tabindex: only the selected tab is a Tab stop, and ArrowLeft/
@@ -88,7 +95,9 @@ function CategoryTablist({
   sortedCats,
   setExpanded,
   ariaLabel,
+  userId,
 }: TablistProps) {
+  const { t } = useI18n();
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const activeIndex = sortedCats.findIndex((c) => c.id === selectedCat);
@@ -161,7 +170,22 @@ function CategoryTablist({
                 : 'border-transparent text-muted-foreground hover:text-foreground',
             ].join(' ')}
           >
-            {c.name}
+            <span className="inline-flex items-center gap-1">
+              {c.user_id !== userId && (
+                <span
+                  className="inline-flex shrink-0"
+                  title={t('category_select.shared_marker_label')}
+                >
+                  <Icon
+                    icon={IconType.Share}
+                    role="img"
+                    aria-label={t('category_select.shared_marker_label')}
+                    className="w-3 h-3"
+                  />
+                </span>
+              )}
+              {c.name}
+            </span>
           </button>
         );
       })}

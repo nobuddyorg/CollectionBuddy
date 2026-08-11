@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useConfirm } from '../Confirm/ConfirmProvider';
+import { useToast } from '../Toast/ToastProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { countItemsForCategory } from '../../data/categories';
 import type { Category } from '../../types';
@@ -21,24 +22,29 @@ import { CategoryText } from './CategoryText';
 import { CategorySelectDropdown } from './Dropdown';
 import { CategoryInput } from './Input';
 import { sortCategories } from './selection';
+import { SharingSection } from './Sharing';
 import type { UseCategories } from './useCategories';
 import { useExportCategory } from './useExportCategory';
 import { useImportCategory } from './useImportCategory';
+import { useShares } from './useShares';
 import { fieldClasses } from '../ui/fieldClasses';
 
 type Props = {
   selectedCat: string | null;
   onSelect: (id: string | null) => void;
   categories: UseCategories;
+  userId: string | null;
 };
 
 export default function CategorySelect({
   selectedCat,
   onSelect,
   categories,
+  userId,
 }: Props) {
   const { t } = useI18n();
   const confirm = useConfirm();
+  const toast = useToast();
   const {
     cats,
     isLoading,
@@ -92,6 +98,23 @@ export default function CategorySelect({
     [cats, selectedCat],
   );
 
+  // listCategories() (data/categories.ts) now returns both owned and
+  // shared-with-me rows under the RLS extension in 0011_category_shares.sql
+  // -- user_id is the only thing in the response that says which is which.
+  const isShared = !!selected && !!userId && selected.user_id !== userId;
+
+  // One instance per open panel. For an owned category this lists every
+  // grant the owner has made (for SharingSection, below); for a shared one
+  // it resolves to the viewer's own single grant row, which is what
+  // onDelete needs to leave it. Either way, the "select own or invited
+  // category_shares" policy already decided which rows come back -- this
+  // never filters by ownership itself.
+  const shares = useShares(selectedCat);
+  const { reload: reloadShares } = shares;
+  useEffect(() => {
+    if (expanded && selectedCat) void reloadShares();
+  }, [expanded, selectedCat, reloadShares]);
+
   // Keeps the rename field showing the selected category, including when
   // the selection changes underneath it or a rename normalises server-side.
   // Done as a render-time transition rather than an effect so the field is
@@ -135,6 +158,34 @@ export default function CategorySelect({
     },
     [runImport, reload, onSelect],
   );
+
+  // Same button, same position, two different operations underneath it:
+  // owning this category means the trash destroys it, being a grantee means
+  // it only ends *this viewer's* access (deleteShare, on their own grant
+  // row -- shares.shares[0], the one row "select own or invited
+  // category_shares" (0011) ever hands back to a non-owner). Either way the
+  // selection falls through to what's left, so leaving a category doesn't
+  // strand the viewer on a chooser any more than deleting one does.
+  const onLeave = useCallback(async () => {
+    if (!selectedCat || !selected) return;
+    const myShareId = shares.shares[0]?.id;
+    if (!myShareId) return;
+
+    const message = t('category_select.confirm_leave').replace(
+      '{name}',
+      selected.name,
+    );
+    if (!(await confirm(message))) return;
+
+    const ok = await shares.deleteShare(myShareId);
+    if (ok) {
+      toast.success(t('category_select.leave_success'));
+      const remaining = sortedCats.filter((c) => c.id !== selectedCat);
+      onSelect(remaining[0]?.id ?? null);
+    } else {
+      toast.error(t('category_select.leave_error'));
+    }
+  }, [selectedCat, selected, shares, t, confirm, toast, onSelect, sortedCats]);
 
   const onDelete = useCallback(async () => {
     if (!selectedCat) return;
@@ -207,6 +258,7 @@ export default function CategorySelect({
             sortedCats={sortedCats}
             isLoading={isLoading}
             setExpanded={setExpanded}
+            userId={userId}
           />
 
           {/* Rename and create are separate rows with their own field and
@@ -231,6 +283,18 @@ export default function CategorySelect({
                 <input
                   id="rename-category"
                   value={renameValue}
+                  // Shared categories keep this field in the same slot
+                  // rather than hiding it -- read-only, not absent, so the
+                  // panel's shape doesn't change depending on who owns
+                  // what's open. Renaming someone else's category would
+                  // fail RLS's "update own categories" policy anyway; this
+                  // just doesn't offer the round trip.
+                  readOnly={isShared}
+                  title={
+                    isShared
+                      ? t('category_select.shared_marker_label')
+                      : undefined
+                  }
                   onChange={(e) => setRenameValue(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void onRename();
@@ -251,17 +315,26 @@ export default function CategorySelect({
                 />
                 <RenameButton
                   onClick={() => void onRename()}
-                  disabled={!renameIsDirty || isRenaming || isExporting}
+                  disabled={
+                    !renameIsDirty || isRenaming || isExporting || isShared
+                  }
                   label={t('category_select.rename_confirm')}
                 />
                 {/* Disabled for the whole run, not just while the delete
                     request is in flight: an export reads storage objects a
                     confirmed delete would remove out from under it, and the
                     removals would only fail silently as 404s rather than
-                    stopping either action (#419). */}
+                    stopping either action (#419). A shared category's
+                    grants haven't loaded yet is the same kind of window --
+                    onLeave needs shares.shares[0] to exist before the click
+                    can do anything. */}
                 <DeleteButtonWithLabel
-                  onClick={() => void onDelete()}
-                  disabled={isDeleting || isExporting}
+                  onClick={() => void (isShared ? onLeave() : onDelete())}
+                  disabled={
+                    isDeleting ||
+                    isExporting ||
+                    (isShared && (shares.isLoading || shares.isRevoking))
+                  }
                   label={t('category_select.delete')}
                 />
               </>
@@ -288,6 +361,12 @@ export default function CategorySelect({
               label={t('category_select.add')}
             />
           </div>
+
+          {/* Only for a category this viewer owns -- a grantee manages
+              their own access through the Delete button above (onLeave),
+              not from here, and never sees who else a category is shared
+              with. */}
+          {selected && !isShared && <SharingSection shares={shares} />}
 
           {/* A category from a file, not a category to select first --
               independent of `selected`, unlike Export below, which needs

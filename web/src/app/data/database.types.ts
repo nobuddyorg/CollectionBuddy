@@ -67,6 +67,41 @@ export type Database = {
         };
         Relationships: [];
       };
+      category_shares: {
+        Row: {
+          category_id: string;
+          created_at: string;
+          expires_at: string | null;
+          id: string;
+          invited_email: string;
+          owner_user_id: string;
+        };
+        Insert: {
+          category_id: string;
+          created_at?: string;
+          expires_at?: string | null;
+          id?: string;
+          invited_email: string;
+          owner_user_id: string;
+        };
+        Update: {
+          category_id?: string;
+          created_at?: string;
+          expires_at?: string | null;
+          id?: string;
+          invited_email?: string;
+          owner_user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'category_shares_category_id_fkey';
+            columns: ['category_id'];
+            isOneToOne: false;
+            referencedRelation: 'categories';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       item_categories: {
         Row: {
           category_id: string;

@@ -22,6 +22,7 @@ Keeping that true is a maintenance job, not a property. The first sixteen migrat
 | `categories` | `id`, `user_id`, `name`, `created_at`, `updated_at` | Name must be non-blank after normalization; unique per user, case-insensitively (`(user_id, lower(name))`). |
 | `items` | `id`, `user_id`, `title`, `description`, `place`, `place_lat`, `place_lng`, `tags text[]`, `tags_text` (generated), `created_at`, `updated_at` | Title must be non-blank. `tags_text` is a space-joined copy of `tags`, generated purely so tag search can share the same `ILIKE` filter as the other text columns. `place_lat`/`place_lng` are captured when the user picks a place suggestion, so the map draws those pins without geocoding; they are null for hand-typed places and for rows written before the columns existed, which fall back to a lookup. |
 | `item_categories` | `item_id`, `category_id`, `user_id`, `created_at` | Join table, composite primary key `(item_id, category_id)`. An item *can* belong to more than one category, though the UI only ever browses one at a time. |
+| `category_shares` | `id`, `category_id`, `owner_user_id`, `invited_email`, `expires_at`, `created_at` | Account-based, read-only category sharing (#483), added in [`0011_category_shares.sql`](../../supabase/migrations/0011_category_shares.sql). One row per (category, invited email); see "Sharing" below. |
 
 A `public.profiles` table existed in the pre-squash migrations and was dropped — never populated, never queried. Don't recreate it without a reason; it was dead weight, not a placeholder for something planned.
 
@@ -31,7 +32,19 @@ This is the *only* authorization layer — see [Design decisions](../explanation
 
 `categories` and `items` each carry all four of `select`/`insert`/`update`/`delete`. `item_categories` carries three: a mapping row has nothing to edit, so there is no update policy. No role is named on any of them, so they apply to every role that can reach the table — RLS alone would deny `anon` regardless, since `auth.uid()` is null there and every predicate is `user_id = (select auth.uid())`, but [`0008_revoke_anon.sql`](../../supabase/migrations/0008_revoke_anon.sql) also revokes `anon`'s table privileges outright, rather than relying on the RLS predicate as the only thing standing between it and these three tables.
 
+[`0011_category_shares.sql`](../../supabase/migrations/0011_category_shares.sql) redeclares the `select` policy on all three of those tables to also allow a row visible via an active `category_shares` grant — see "Sharing" below. Nothing else about them changed: insert/update/delete are still `user_id = (select auth.uid())` only, which is what makes a shared category read-only for its grantee without a separate flag anywhere saying so.
+
 `web/e2e/signed-in/rls.spec.ts` is the executable version of this section: it asks the questions the app never would, with a real token, against a local stack.
+
+### Sharing
+
+Account-based, one category at a time, read-only, added in [`0011_category_shares.sql`](../../supabase/migrations/0011_category_shares.sql) (#483). No public/anonymous links — see [Design decisions](../explanation/design-decisions.md#why-sharing-has-no-public-link) for why that was ruled out.
+
+- An owner invites by email; there is no separate accept step and no trigger resolving the invite against `auth.users`. The RLS predicate compares `category_shares.invited_email` directly against `(select auth.jwt() ->> 'email')`, so a grant simply starts working the moment its invited email signs in — including the first time, if the invite was sent before that email had an account.
+- `tg_category_shares_enforce()` (in the same migration) re-derives `owner_user_id` from the category being shared, rejects sharing a category the caller doesn't own, rejects sharing with oneself, and normalizes the email to lowercase — the same shape as `tg_item_categories_enforce()`'s cross-tenant guard.
+- Ending a grant is a `delete` on `category_shares`, from either side: the owner revoking and the grantee leaving are the same operation, permitted by the same policy, on the same row. Nothing tracks a "left" or "revoked" state — once the row is gone, it's gone for both.
+- `expires_at` is optional and, when set, is checked both at creation (a `check` constraint rejects a grant that's already expired) and on every read (the extended `select` policies above ignore an expired grant rather than deleting it).
+- Photos are explicitly out of scope of this migration. `storage.objects` policies are still keyed on `split_part(name, '/', 1) = auth.uid()::text` ([`0007_storage.sql`](../../supabase/migrations/0007_storage.sql)) with no `category_shares` exception, so a grantee sees an owned category's items and metadata but not its photographs.
 
 ### Triggers and functions
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,6 +11,7 @@ import CategorySelect from './index';
 import type { UseCategories } from './useCategories';
 import { useExportCategory } from './useExportCategory';
 import { useImportCategory } from './useImportCategory';
+import { useShares } from './useShares';
 
 vi.mock('../../data/categories', () => ({
   countItemsForCategory: vi.fn(),
@@ -29,6 +30,14 @@ vi.mock('./useExportCategory', () => ({
 // control the button/progress wiring.
 vi.mock('./useImportCategory', () => ({
   useImportCategory: vi.fn(),
+}));
+
+// Same reasoning again: the real hook round-trips through Supabase
+// (data/shares.ts), which this file has no client configured for. What's
+// under test here is the owned/shared branch in index.tsx, not the CRUD
+// calls useShares.test.tsx already covers.
+vi.mock('./useShares', () => ({
+  useShares: vi.fn(),
 }));
 
 function exportState(
@@ -57,9 +66,26 @@ function importState(
   };
 }
 
+function sharesState(overrides: Partial<ReturnType<typeof useShares>> = {}) {
+  return {
+    shares: [],
+    isLoading: false,
+    isSharing: false,
+    isRevoking: false,
+    reload: vi.fn().mockResolvedValue([]),
+    createShare: vi.fn(),
+    deleteShare: vi.fn(),
+    ...overrides,
+  };
+}
+
+// user_id 'owner-1' matches renderSelect's default userId prop, so these
+// two read as owned by the viewer unless a test overrides one or the
+// other -- the same "shared" branch (index.tsx's isShared) a mismatch
+// between the two would otherwise trigger by accident.
 const cats = [
-  { id: 'a', name: 'Coins' },
-  { id: 'b', name: 'Stamps' },
+  { id: 'a', name: 'Coins', user_id: 'owner-1' },
+  { id: 'b', name: 'Stamps', user_id: 'owner-1' },
 ];
 
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
@@ -91,6 +117,7 @@ function renderSelect(
             selectedCat="a"
             onSelect={onSelect}
             categories={categories()}
+            userId="owner-1"
             {...props}
           />
         </ConfirmProvider>
@@ -111,6 +138,7 @@ describe('CategorySelect', () => {
     window.localStorage.setItem('lang', 'en');
     vi.mocked(useExportCategory).mockReturnValue(exportState());
     vi.mocked(useImportCategory).mockReturnValue(importState());
+    vi.mocked(useShares).mockReturnValue(sharesState());
   });
 
   it('names the selected category under the section label', () => {
@@ -503,6 +531,107 @@ describe('CategorySelect', () => {
         ),
       ).toBeVisible();
     });
+  });
+
+  // #483: a category shown here can now be someone else's, shared read-only
+  // rather than created by the viewer. user_id -- the one field
+  // listCategories() (data/categories.ts) added specifically so the client
+  // can tell the two apart -- is what every test below turns to make "a" a
+  // category owned by someone other than renderSelect's default userId.
+  describe('a shared category', () => {
+    const sharedCats = [
+      { id: 'a', name: 'Coins', user_id: 'other-owner' },
+      { id: 'b', name: 'Stamps', user_id: 'owner-1' },
+    ];
+
+    it('marks the shared tab, but not one the viewer owns', async () => {
+      renderSelect({ categories: categories({ cats: sharedCats }) });
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+
+      const sharedTab = screen.getByRole('tab', { name: /Coins/ });
+      expect(
+        within(sharedTab).getByRole('img', { name: 'Shared with you' }),
+      ).toBeInTheDocument();
+
+      const ownedTab = screen.getByRole('tab', { name: 'Stamps' });
+      expect(
+        within(ownedTab).queryByRole('img', { name: 'Shared with you' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows the name read-only rather than offering to rename it', async () => {
+      renderSelect({ categories: categories({ cats: sharedCats }) });
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+
+      const rename = screen.getByLabelText('Rename');
+      expect(rename).toHaveValue('Coins');
+      expect(rename).toHaveAttribute('readonly');
+      expect(screen.getByRole('button', { name: 'Save name' })).toBeDisabled();
+    });
+
+    it('does not offer sharing controls for a category the viewer does not own', async () => {
+      renderSelect({ categories: categories({ cats: sharedCats }) });
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+      expect(
+        screen.queryByLabelText('Share with (email)'),
+      ).not.toBeInTheDocument();
+    });
+
+    // Delete stays in the same slot for a shared category, but ends only
+    // the viewer's own access (deleteShare on their own grant row) rather
+    // than the category itself (deleteCategory) -- and says so before it
+    // happens, with different copy from the owned-category confirmation
+    // tested above.
+    it('leaves instead of deleting, with different confirm copy, and falls through to what is left', async () => {
+      const deleteShare = vi.fn().mockResolvedValue(true);
+      const deleteCategory = vi.fn();
+      vi.mocked(useShares).mockReturnValue(
+        sharesState({
+          shares: [
+            {
+              id: 'share-1',
+              invited_email: 'me@example.com',
+              expires_at: null,
+              owner_user_id: 'other-owner',
+            },
+          ],
+          deleteShare,
+        }),
+      );
+      const { onSelect } = renderSelect({
+        categories: categories({ cats: sharedCats, deleteCategory }),
+      });
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+      expect(
+        await screen.findByText(
+          'Leave "Coins"? You\'ll stop seeing it — the owner\'s copy is unaffected.',
+        ),
+      ).toBeVisible();
+
+      await userEvent.click(screen.getByTestId('confirm-accept'));
+
+      expect(deleteShare).toHaveBeenCalledWith('share-1');
+      expect(deleteCategory).not.toHaveBeenCalled();
+      expect(onSelect).toHaveBeenCalledWith('b');
+    });
+  });
+
+  it('offers sharing controls for a category the viewer owns', async () => {
+    renderSelect();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Open category' }),
+    );
+    expect(screen.getByLabelText('Share with (email)')).toBeVisible();
   });
 
   it('collapses onto the category picked from the tabs', async () => {
