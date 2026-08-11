@@ -39,8 +39,12 @@ export type ItemSearchRow = ItemFields & {
  *
  * The title rides along because a pin is not just a dot on a city: it
  * stands for the entries catalogued there, and the popup names them (#404).
+ * The id rides along too, so a place the map has to geocode (#512) can be
+ * written back onto the rows it came from -- without it, the same free
+ * gazetteer lookup would repeat on every map open forever.
  */
 export const ITEM_PLACE_FIELD_KEYS = [
+  'id',
   'title',
   'place',
   'place_lat',
