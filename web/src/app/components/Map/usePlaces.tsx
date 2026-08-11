@@ -1,6 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { listItemPlaces, type ItemPlaceRow } from '../../data/items';
+import {
+  listItemPlaces,
+  updateItem,
+  type ItemPlaceRow,
+} from '../../data/items';
 import {
   coordsFromFeature,
   isRetryableStatus,
@@ -49,11 +53,13 @@ export function partitionByStoredCoords(rows: ItemPlaceRow[]): {
   located: PlaceCoords[];
   unlocated: string[];
   titles: Map<string, string[]>;
+  ids: Map<string, string[]>;
 } {
   const byName = new Map<string, PlaceCoords>();
   const titles = new Map<string, string[]>();
+  const ids = new Map<string, string[]>();
   for (const row of rows) {
-    const { place, title, place_lat: lat, place_lng: lng } = row;
+    const { id, place, title, place_lat: lat, place_lng: lng } = row;
     if (!place) continue;
 
     // Every entry at this place is named in its popup, including the ones
@@ -62,6 +68,14 @@ export function partitionByStoredCoords(rows: ItemPlaceRow[]): {
     const at = titles.get(place);
     if (at) at.push(title);
     else titles.set(place, [title]);
+
+    // Every row catalogued at this place, kept regardless of whether *this*
+    // row has coordinates -- once the place is geocoded, every row named
+    // here gets the answer written back, the same rows the titles above
+    // came from.
+    const idsAt = ids.get(place);
+    if (idsAt) idsAt.push(id);
+    else ids.set(place, [id]);
 
     if (byName.has(place)) continue;
     // Null is the normal state of older and hand-typed rows. Checked
@@ -90,7 +104,7 @@ export function partitionByStoredCoords(rows: ItemPlaceRow[]): {
     if (hit) located.push(hit);
     else unlocated.push(place);
   }
-  return { located, unlocated, titles };
+  return { located, unlocated, titles, ids };
 }
 
 /**
@@ -213,7 +227,7 @@ export function usePlaces(
         // Places entered by picking a suggestion carry their own
         // coordinates and skip the gazetteer entirely; only what's left
         // over is looked up.
-        const { located, unlocated, titles } = partitionByStoredCoords(
+        const { located, unlocated, titles, ids } = partitionByStoredCoords(
           items ?? [],
         );
         const cache = readGeocodeCache();
@@ -271,6 +285,21 @@ export function usePlaces(
             resolvedCount += 1;
             if (!cancelled)
               setPlaces((prev) => [...prev, withTitles(entry, titles)]);
+
+            // Written back onto every row this place came from, so the next
+            // person to open this map -- including this one, next time --
+            // reads it from `listItemPlaces` instead of asking the
+            // gazetteer again. Best effort and not awaited: a failed write
+            // just leaves the place unlocated for one more lookup, same as
+            // it is right now. The builder only sends its request once
+            // `.then()` is called, so this has to hang a handler off it
+            // rather than merely `void`-ing the call.
+            for (const id of ids.get(place) ?? []) {
+              void updateItem(id, {
+                place_lat: entry.lat,
+                place_lng: entry.lng,
+              }).then(() => {});
+            }
           }
         };
 

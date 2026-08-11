@@ -8,6 +8,7 @@ import { useToast } from '../Toast/ToastProvider';
 import { searchMinLength } from '../../data/items';
 import CenteredModal from '../CenteredModal';
 import Icon, { IconType } from '../Icon';
+import { Spinner } from '../ui/Spinner';
 import { usePlaces } from '../Map/usePlaces';
 import { useCurrentLocation } from '../Map/useCurrentLocation';
 import type { MapCommand, MapCommandKind } from '../Map/types';
@@ -138,12 +139,12 @@ export function MapModal({
         // spinner: Leaflet's chunk and the first tiles then load while the
         // places are still being resolved, instead of after.
         <div className="relative h-full">
-          {/* The two overlay chips below sit above the map, not above
-              anything the app's --z-index-* scale governs: `relative`
-              on this wrapper makes it their own stacking context, so
-              `z-[1000]` only has to clear Leaflet's own control layer
-              (Leaflet's `.leaflet-top`/`.leaflet-control` default to
-              z-index: 1000), not any of the app's named layers. */}
+          {/* The overlay chips below sit above the map, not above anything
+              the app's --z-index-* scale governs: `relative` on this
+              wrapper makes it their own stacking context, so `z-[1000]`
+              only has to clear Leaflet's own control layer (Leaflet's
+              `.leaflet-top`/`.leaflet-control` default to z-index: 1000),
+              not any of the app's named layers. */}
           <Map
             command={mapCommand}
             markers={mapMarkers}
@@ -158,7 +159,18 @@ export function MapModal({
             }
           />
           {loadingPlaces && (
-            <div className="absolute top-2 left-2 z-[1000] rounded-lg border bg-card/80 px-3 py-1.5 text-xs text-card-foreground shadow-sm backdrop-blur">
+            // Fixed light colours and a solid (not translucent) plate,
+            // same reasoning as the button chip below plus one more: this
+            // one used to ride the theme's card colours at 80% opacity,
+            // which on the light theme is a pale chip on pale tiles --
+            // exactly the "barely there" the theme swap was meant to
+            // avoid, just arrived at from the other direction (#512).
+            <div
+              role="status"
+              aria-label={t('common.loading')}
+              className="absolute top-2 left-2 z-[1000] flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-900 shadow-md"
+            >
+              <Spinner size="sm" />
               {t('common.loading')}
             </div>
           )}

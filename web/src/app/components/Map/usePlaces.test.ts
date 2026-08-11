@@ -21,8 +21,9 @@ function row(
   place_lat: number | null = null,
   place_lng: number | null = null,
   title = 'An entry',
+  id = 'row-id',
 ): ItemPlaceRow {
-  return { title, place, place_lat, place_lng };
+  return { id, title, place, place_lat, place_lng };
 }
 
 describe('partitionByStoredCoords', () => {
@@ -169,6 +170,27 @@ describe('partitionByStoredCoords, on the entries at each place', () => {
     // The geocode has not happened yet, but the titles are already known --
     // they come from the rows, not from the gazetteer.
     expect(titles.get('Paris')).toEqual(['Napoleon Franc']);
+  });
+
+  // The write-back a resolved geocode does (#512) needs to know which rows
+  // to correct -- every row catalogued at a place, the same rows the
+  // titles above are collected from.
+  it('collects the id of every row catalogued at a place', () => {
+    const { ids } = partitionByStoredCoords([
+      row('Paris', null, null, 'Napoleon Franc', 'item-1'),
+      row('Paris', null, null, 'Louis Franc', 'item-2'),
+      row('Berlin', 52.52, 13.4, 'Buffalo Nickel', 'item-3'),
+    ]);
+    expect(ids.get('Paris')).toEqual(['item-1', 'item-2']);
+    expect(ids.get('Berlin')).toEqual(['item-3']);
+  });
+
+  it('collects a row’s id even when that row itself carries no coordinates', () => {
+    const { ids } = partitionByStoredCoords([
+      row('Cologne', null, null, 'Older entry', 'item-old'),
+      row('Cologne', 50.94, 6.96, 'Newer entry', 'item-new'),
+    ]);
+    expect(ids.get('Cologne')).toEqual(['item-old', 'item-new']);
   });
 
   it('keeps two entries that share a title', () => {
