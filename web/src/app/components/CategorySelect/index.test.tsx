@@ -561,7 +561,7 @@ describe('CategorySelect', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('shows the name read-only rather than offering to rename it', async () => {
+    it('shows the name disabled rather than offering to rename it', async () => {
       renderSelect({ categories: categories({ cats: sharedCats }) });
       await userEvent.click(
         screen.getByRole('button', { name: 'Open category' }),
@@ -569,7 +569,7 @@ describe('CategorySelect', () => {
 
       const rename = screen.getByLabelText('Rename');
       expect(rename).toHaveValue('Coins');
-      expect(rename).toHaveAttribute('readonly');
+      expect(rename).toBeDisabled();
       expect(screen.getByRole('button', { name: 'Save name' })).toBeDisabled();
     });
 
