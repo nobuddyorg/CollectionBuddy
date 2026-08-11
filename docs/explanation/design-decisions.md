@@ -8,6 +8,16 @@ CollectionBuddy is a static export ([`web/next.config.ts`](../../web/next.config
 
 The practical consequence for contributors: never treat a client-side check (e.g. "only show the delete button if...") as a security boundary. It's UX, not authorization. The real check is the RLS policy, and any new query needs to be covered by one.
 
+## Why sharing has no public link
+
+Issue #483 asked for three things: share a whole category, share a single entry, share a filtered list — with other users or via a public link. What shipped first ([`0011_category_shares.sql`](../../supabase/migrations/0011_category_shares.sql)) is only the first of those three, account-based only, and that scope cut wasn't arbitrary.
+
+A public link means an anonymous, unauthenticated reader. Every RLS predicate in this project is `user_id = (select auth.uid())` or, since 0011, an `exists` against a grant keyed on `(select auth.jwt() ->> 'email')` — both resolve to nothing for `anon`, by design (see "Why authorization lives entirely in Postgres RLS", above). Actually authorizing an anonymous reader would mean either a new RLS policy that grants `anon` something for the first time in this project's history, keyed on an unguessable token instead of an identity, or a server-side component (an Edge Function) validating that token — the first server-side code this otherwise-static app would ever have. Either is real, separable work, and a materially larger attack surface than extending an existing owner-only predicate to also match a second known identity, on a project whose issue history already includes several RLS-correctness bugs (#292, #387, #335, #290, #386).
+
+There's also no real revocation story for a link once it's been handed out: unlike an account-based grant, which a delete on `category_shares` ends immediately for a specific person, a link already seen (or screenshotted, or forwarded) can't actually be taken back — "revoking" it only stops *new* requests through the app's own token check.
+
+Account-based sharing needed none of that: a recipient is already an authenticated user, so RLS just gets a second predicate to check, `select`-only, no new role and no new grant to `anon` anywhere. If public links are still wanted after this ships, they're a deliberately separate, explicitly higher-risk piece of work — not a rider on this migration.
+
 ## Why images are deleted client-side before the database row
 
 Only the Storage API (`supabase.storage.remove()`, called from `data/images.ts`) can delete the actual file bytes; SQL reaches the `storage.objects` metadata row and nothing more. So the app always deletes storage objects from the client *first*, then deletes the item/category row — `useItemImages.tsx` and the category-deletion flow in `ItemList/index.tsx` both follow this order deliberately. If you're adding a new place where items or categories get deleted, keep this order: deleting the row first would orphan the actual image files in storage with no way to find and remove them afterward.

@@ -9,7 +9,7 @@ import {
   storeSelectedCategory,
 } from './selection';
 
-const cat = (id: string, name: string) => ({ id, name });
+const cat = (id: string, name: string) => ({ id, name, user_id: 'owner-1' });
 
 describe('sortCategories', () => {
   it('orders by name, ignoring case and accents', () => {

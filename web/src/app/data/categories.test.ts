@@ -61,11 +61,11 @@ function mockFrom() {
 }
 
 describe('listCategories', () => {
-  it('selects id and name from categories', () => {
+  it('selects id, name and user_id from categories', () => {
     const { from, calls } = mockFrom();
     listCategories();
     expect(from).toHaveBeenCalledWith('categories');
-    expect(calls[0]).toEqual({ method: 'select', args: ['id,name'] });
+    expect(calls[0]).toEqual({ method: 'select', args: ['id,name,user_id'] });
   });
 });
 
@@ -75,7 +75,7 @@ describe('createCategory', () => {
     createCategory('Coins');
     expect(from).toHaveBeenCalledWith('categories');
     expect(calls[0]).toEqual({ method: 'insert', args: [{ name: 'Coins' }] });
-    expect(calls[1]).toEqual({ method: 'select', args: ['id,name'] });
+    expect(calls[1]).toEqual({ method: 'select', args: ['id,name,user_id'] });
     expect(calls[2].method).toBe('single');
   });
 });

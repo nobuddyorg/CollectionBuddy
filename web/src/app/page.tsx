@@ -126,6 +126,7 @@ export default function Page() {
           selectedCat={selectedCategoryId}
           onSelect={selectCategory}
           categories={categories}
+          userId={userId ?? null}
         />
 
         {!catalogueReady ? (

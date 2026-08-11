@@ -2,7 +2,11 @@ import { supabase } from '../supabase';
 import type { Database } from './database.types';
 
 export type CategoryRow = Database['public']['Tables']['categories']['Row'];
-export type CategorySummary = Pick<CategoryRow, 'id' | 'name'>;
+// user_id rides along so the UI can tell "mine" from "shared with me" --
+// listCategories() (below) now returns both under the RLS extension in
+// 0011_category_shares.sql, and nothing else in the response says which is
+// which.
+export type CategorySummary = Pick<CategoryRow, 'id' | 'name' | 'user_id'>;
 
 /**
  * `base`, or `base (2)`, `base (3)`, ... once far enough to clear every name
@@ -30,7 +34,7 @@ export function uniqueCategoryName(
 export function listCategories() {
   return supabase
     .from('categories')
-    .select('id,name')
+    .select('id,name,user_id')
     .returns<CategorySummary[]>();
 }
 
@@ -44,7 +48,7 @@ export function createCategory(name: string) {
       // client never sends it, on purpose: RLS plus that trigger is what
       // makes it impossible to hand a row to another user.
       .insert({ name } as Database['public']['Tables']['categories']['Insert'])
-      .select('id,name')
+      .select('id,name,user_id')
       .single<CategorySummary>()
   );
 }
@@ -57,7 +61,7 @@ export function renameCategory(id: string, name: string) {
     .from('categories')
     .update({ name })
     .eq('id', id)
-    .select('id,name')
+    .select('id,name,user_id')
     .single<CategorySummary>();
 }
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,10 +10,12 @@ import {
   categoryTabId,
 } from './Dropdown';
 
+// user_id 'owner-1' throughout, matching renderDropdown's default userId
+// prop -- none of these read as shared unless a test overrides one.
 const sortedCats = [
-  { id: 'a', name: 'Coins' },
-  { id: 'b', name: 'Stamps' },
-  { id: 'c', name: 'Cards' },
+  { id: 'a', name: 'Coins', user_id: 'owner-1' },
+  { id: 'b', name: 'Stamps', user_id: 'owner-1' },
+  { id: 'c', name: 'Cards', user_id: 'owner-1' },
 ];
 
 function renderDropdown(
@@ -29,6 +31,7 @@ function renderDropdown(
         sortedCats={sortedCats}
         isLoading={false}
         setExpanded={setExpanded}
+        userId="owner-1"
         {...props}
       />
     </I18nProvider>,
@@ -144,5 +147,26 @@ describe('CategorySelectDropdown', () => {
 
     await user.keyboard('{ArrowRight}');
     expect(screen.getByRole('tab', { name: 'Stamps' })).toHaveFocus();
+  });
+
+  // #483: user_id is the only thing distinguishing a shared tab from an
+  // owned one -- there is no separate "kind" field anywhere in this data.
+  it('marks a tab whose user_id does not match the viewer, and no other', () => {
+    renderDropdown({
+      sortedCats: [
+        { id: 'a', name: 'Coins', user_id: 'someone-else' },
+        { id: 'b', name: 'Stamps', user_id: 'owner-1' },
+      ],
+    });
+
+    const shared = screen.getByRole('tab', { name: /Coins/ });
+    expect(
+      within(shared).getByRole('img', { name: 'Shared with you' }),
+    ).toBeInTheDocument();
+
+    const owned = screen.getByRole('tab', { name: 'Stamps' });
+    expect(
+      within(owned).queryByRole('img', { name: 'Shared with you' }),
+    ).not.toBeInTheDocument();
   });
 });
