@@ -61,12 +61,18 @@ export function AddPhotoPlate({
       <UploadInput onUpload={onUpload} busy={busy} />
 
       {/* A hairline mount rule inset from the edge -- the empty frame in a
-          specimen case, rather than a flat grey rectangle. Drawn in tinted
-          ink, not `--border`: the deeper plate is now that exact colour, so
-          a `border-border` rule vanished into its own background. */}
+          specimen case, rather than a flat grey rectangle. Still the page's
+          own ink laid on thin rather than `--border` (which is now the
+          exact colour of the plate it would sit on), but at 60% rather than
+          20%: the fainter tint measured 1.76:1 in dark / 1.47:1 in light
+          against `--mount`, well under the 3:1 WCAG floor for a non-text
+          boundary, so the "hollow cut" had no visible edge in either theme
+          (#516). 60% clears it with room in both (3.92:1 / 6.43:1) without
+          reading as a harsh outline the way full-strength `--foreground`
+          would have. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-3 rounded-sm border border-dashed border-foreground/20"
+        className="pointer-events-none absolute inset-3 rounded-sm border border-dashed border-foreground/60"
       />
 
       {/* States the condition, then offers the way out of it -- the band

@@ -101,6 +101,15 @@ describe.each(Object.entries(themes))('%s theme', (name, tokens) => {
     expect(contrast(composite, tokens.mount)).toBeGreaterThanOrEqual(4.5);
   });
 
+  // The empty mount's dashed rule (AddPhotoPlate, ItemList/Actions.tsx) is a
+  // non-text boundary, so it's held to 1.4.11's 3:1 rather than the 4.5:1
+  // text pairs above. It used to draw at 20%, which measured 1.76:1 in dark
+  // and 1.47:1 in light -- an edge nobody could actually see (#516).
+  it('carries foreground/60 on mount at WCAG AA non-text contrast', () => {
+    const composite = withAlpha(tokens.foreground, 0.6, tokens.mount);
+    expect(contrast(composite, tokens.mount)).toBeGreaterThanOrEqual(3);
+  });
+
   it.each(CONTROL_BORDER_PAIRS)(
     'carries %s on %s at WCAG AA non-text contrast',
     (fg, bg) => {
