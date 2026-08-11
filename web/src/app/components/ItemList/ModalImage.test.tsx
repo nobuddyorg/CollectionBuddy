@@ -231,6 +231,17 @@ describe('ModalImage', () => {
       expect(screen.getByText('2 of 3')).toBeInTheDocument();
     });
 
+    // #515: the buttons used to carry `hidden [@media(hover:hover)]:flex`,
+    // so a touch screen -- unable to satisfy that query -- had no click
+    // alternative to swiping at all. They render unconditionally now.
+    it('keeps the previous/next buttons visible regardless of pointer type', () => {
+      renderModal({ imgs, index: 1 });
+      const prev = screen.getByRole('button', { name: 'Previous image' });
+      const next = screen.getByRole('button', { name: 'Next image' });
+      expect(prev.className).not.toMatch(/hidden|hover:hover/);
+      expect(next.className).not.toMatch(/hidden|hover:hover/);
+    });
+
     it('advances to the next photograph', async () => {
       const { onIndexChange } = renderModal({ imgs, index: 0 });
       await userEvent.click(screen.getByRole('button', { name: 'Next image' }));
