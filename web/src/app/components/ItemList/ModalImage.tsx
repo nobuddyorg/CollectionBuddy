@@ -197,14 +197,17 @@ export function ModalImage({
               e.stopPropagation();
               goTo(clampedIndex - 1);
             }}
-            className="w-11 h-11 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors"
+            // h-8 rather than the usual h-11 touch target: matched to the
+            // counter chip beside it so the bar reads as one strip instead
+            // of a tall button either side of a short pill (#515 follow-up).
+            className="h-8 w-8 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors"
             title={t('item_list.previous_image')}
             aria-label={t('item_list.previous_image')}
           >
-            <Icon icon={IconType.ChevronLeft} className="w-5 h-5" />
+            <Icon icon={IconType.ChevronLeft} className="w-4 h-4" />
           </button>
 
-          <span className="flex items-center rounded-sm bg-card px-2.5 py-1 font-label text-[0.6875rem] text-card-foreground ring-1 ring-border shadow-sm">
+          <span className="flex h-8 items-center rounded-sm bg-card px-2.5 font-label text-[0.6875rem] text-card-foreground ring-1 ring-border shadow-sm">
             {t('item_list.image_position')
               .replace('{current}', String(clampedIndex + 1))
               .replace('{total}', String(count))}
@@ -215,21 +218,21 @@ export function ModalImage({
               e.stopPropagation();
               goTo(clampedIndex + 1);
             }}
-            className="w-11 h-11 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors"
+            className="h-8 w-8 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors"
             title={t('item_list.next_image')}
             aria-label={t('item_list.next_image')}
           >
-            <Icon icon={IconType.ChevronRight} className="w-5 h-5" />
+            <Icon icon={IconType.ChevronRight} className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* pb reserves room for the bottom bar above (44px button + its
+      {/* pb reserves room for the bottom bar above (32px row + its
           12px/safe-area offset) the same way pt already reserves the top
           buttons' row -- fixed rather than measured, so a tall portrait
           photo's rendered edge sits above the bar instead of under it,
           on every device including one with a safe-area home indicator. */}
-      <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-[calc(4rem+env(safe-area-inset-bottom))]">
+      <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
         {/* eslint-disable-next-line @next/next/no-img-element -- next/image
             earns nothing on this static export (images.unoptimized), and
             the width={0} height={0} sizes="100vw" it needed here was
