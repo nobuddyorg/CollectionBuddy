@@ -180,61 +180,56 @@ export function ModalImage({
       </button>
 
       {count > 1 && (
-        <>
+        // One bar, on every pointer type, rather than edge buttons that
+        // only showed on hover (#484) plus a separate floating counter.
+        // The edge buttons sat over the photograph itself on a touch
+        // screen -- fine beside a mouse cursor, but the reason they were
+        // hidden there rather than just left in place. Pinning Previous,
+        // the count and Next together at the bottom, inside the padding
+        // reserved below, gives touch the same click-to-page affordance
+        // (#515) without that overlap, and swipe still works alongside it.
+        <div
+          aria-live="polite"
+          className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 flex items-center gap-2"
+        >
           <button
             onClick={(e) => {
               e.stopPropagation();
               goTo(clampedIndex - 1);
             }}
-            // Hidden where there's no hover-capable pointer -- a touch
-            // screen already has the swipe gesture above, and the button
-            // sitting at the image's edge covers real photo content there.
-            className="absolute top-1/2 left-3 z-10 -translate-y-1/2 w-11 h-11 items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors hidden [@media(hover:hover)]:flex"
+            className="w-11 h-11 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors"
             title={t('item_list.previous_image')}
             aria-label={t('item_list.previous_image')}
           >
             <Icon icon={IconType.ChevronLeft} className="w-5 h-5" />
           </button>
 
+          <span className="flex items-center rounded-sm bg-card px-2.5 py-1 font-label text-[0.6875rem] text-card-foreground ring-1 ring-border shadow-sm">
+            {t('item_list.image_position')
+              .replace('{current}', String(clampedIndex + 1))
+              .replace('{total}', String(count))}
+          </span>
+
           <button
             onClick={(e) => {
               e.stopPropagation();
               goTo(clampedIndex + 1);
             }}
-            className="absolute top-1/2 right-3 z-10 -translate-y-1/2 w-11 h-11 items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors hidden [@media(hover:hover)]:flex"
+            className="w-11 h-11 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors"
             title={t('item_list.next_image')}
             aria-label={t('item_list.next_image')}
           >
             <Icon icon={IconType.ChevronRight} className="w-5 h-5" />
           </button>
-
-          <div
-            aria-live="polite"
-            className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 flex items-center gap-1 rounded-sm bg-card px-2.5 py-1 font-label text-[0.6875rem] text-card-foreground ring-1 ring-border shadow-sm"
-          >
-            {/* Decorative, not a second pair of controls -- the real
-                Previous/Next buttons already sit at the edges (mouse) and
-                the swipe gesture already covers touch. This just makes that
-                gesture discoverable: nothing on a touch screen otherwise
-                hints that the count next to it means "swipe" (#511). */}
-            <Icon
-              icon={IconType.ChevronLeft}
-              className="w-3 h-3 opacity-50"
-              aria-hidden="true"
-            />
-            {t('item_list.image_position')
-              .replace('{current}', String(clampedIndex + 1))
-              .replace('{total}', String(count))}
-            <Icon
-              icon={IconType.ChevronRight}
-              className="w-3 h-3 opacity-50"
-              aria-hidden="true"
-            />
-          </div>
-        </>
+        </div>
       )}
 
-      <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      {/* pb reserves room for the bottom bar above (44px button + its
+          12px/safe-area offset) the same way pt already reserves the top
+          buttons' row -- fixed rather than measured, so a tall portrait
+          photo's rendered edge sits above the bar instead of under it,
+          on every device including one with a safe-area home indicator. */}
+      <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-[calc(4rem+env(safe-area-inset-bottom))]">
         {/* eslint-disable-next-line @next/next/no-img-element -- next/image
             earns nothing on this static export (images.unoptimized), and
             the width={0} height={0} sizes="100vw" it needed here was
