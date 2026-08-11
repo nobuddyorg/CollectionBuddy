@@ -21,6 +21,7 @@ export function ModalImage({
   onDelete,
   deletingPath,
   busy = false,
+  readOnly = false,
 }: {
   /** The full set of photographs for the entry this modal was opened from
    * -- not just the ones a strip cell had room for (#304). */
@@ -33,6 +34,9 @@ export function ModalImage({
   onDelete: (img: ImgEntry) => void;
   deletingPath: Set<string>;
   busy?: boolean;
+  /** A category shared with, not owned by, the viewer (#483 follow-up): no
+   * delete control in the carousel either. */
+  readOnly?: boolean;
 }) {
   const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -161,23 +165,27 @@ export function ModalImage({
           read as another way to dismiss the modal instead of the photo
           underneath it. Reachable here because the strip's own delete
           button only exists on a rendered Plate -- photographs past the
-          strip limit never had one (#304). */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete(current);
-        }}
-        disabled={deleting || busy}
-        className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted disabled:opacity-60 transition-colors"
-        title={t('item_list.delete_image')}
-        aria-label={t('item_list.delete_image')}
-      >
-        {deleting ? (
-          <Spinner size="sm" />
-        ) : (
-          <Icon icon={IconType.Trash} className="w-5 h-5" />
-        )}
-      </button>
+          strip limit never had one (#304). Absent, not disabled, for a
+          shared category (#483 follow-up) -- RLS already refuses the
+          delete, this just doesn't offer it. */}
+      {!readOnly && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(current);
+          }}
+          disabled={deleting || busy}
+          className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted disabled:opacity-60 transition-colors"
+          title={t('item_list.delete_image')}
+          aria-label={t('item_list.delete_image')}
+        >
+          {deleting ? (
+            <Spinner size="sm" />
+          ) : (
+            <Icon icon={IconType.Trash} className="w-5 h-5" />
+          )}
+        </button>
+      )}
 
       {count > 1 && (
         // One bar, on every pointer type, rather than edge buttons that

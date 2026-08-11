@@ -101,6 +101,15 @@ export default function Page() {
   const hasCategory = !!selectedCategoryId;
   const headerUser = { ...user, email: user.email ?? '' };
 
+  // Not memoized: cats is short, and this only ever runs on a render this
+  // component was already re-doing for its own reasons (selection change,
+  // categories reloading) -- a dependency array here would cost more to
+  // read than the .find() it would be guarding.
+  const selectedCategory =
+    categories.cats.find((c) => c.id === selectedCategoryId) ?? null;
+  const isSharedSelected =
+    !!selectedCategory && selectedCategory.user_id !== userId;
+
   return (
     <div className="min-h-[100dvh] bg-background text-foreground">
       <a
@@ -152,6 +161,8 @@ export default function Page() {
             <ItemList
               key={selectedCategoryId}
               categoryId={selectedCategoryId}
+              ownerUserId={selectedCategory?.user_id ?? ''}
+              isShared={isSharedSelected}
             />
           </section>
         ) : (

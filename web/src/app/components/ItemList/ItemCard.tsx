@@ -21,6 +21,9 @@ type ItemCardProps = {
   /** This card is one of the first few on the page -- its hero photograph
    * is likely the LCP element. */
   priority?: boolean;
+  /** A category shared with, not owned by, the viewer (#483 follow-up):
+   * no edit, delete, or upload control anywhere on the card. */
+  readOnly?: boolean;
 };
 
 // A specimen mount: the object leads, the label sits underneath. Photos are
@@ -42,6 +45,7 @@ function ItemCardComponent({
   onDeleteImage,
   onOpenModal,
   priority = false,
+  readOnly = false,
 }: ItemCardProps) {
   const { t } = useI18n();
 
@@ -73,7 +77,7 @@ function ItemCardComponent({
       className="fade-up group relative flex h-full flex-col overflow-hidden rounded-sm bg-card text-card-foreground ring-1 ring-border card-lift card-lift-hover transition-shadow"
     >
       {awaitingPhoto ? (
-        <AddPhotoPlate onUpload={onUpload} busy={busy} />
+        <AddPhotoPlate onUpload={onUpload} busy={busy} readOnly={readOnly} />
       ) : (
         <ImageGrid
           imgs={imgs}
@@ -85,6 +89,7 @@ function ItemCardComponent({
           loading={imagesLoading}
           pending={pendingUploads}
           priority={priority}
+          readOnly={readOnly}
         />
       )}
 
@@ -120,12 +125,14 @@ function ItemCardComponent({
           </div>
         )}
 
-        <Actions
-          onEdit={onEditItem}
-          onDelete={onDeleteItem}
-          onUpload={onUpload}
-          busy={busy}
-        />
+        {!readOnly && (
+          <Actions
+            onEdit={onEditItem}
+            onDelete={onDeleteItem}
+            onUpload={onUpload}
+            busy={busy}
+          />
+        )}
 
         <span className="sr-only" aria-live="polite">
           {busy ? t('item_list.uploading') : ''}
@@ -166,6 +173,7 @@ export function itemCardPropsAreEqual(
     prev.pendingUploads === next.pendingUploads &&
     prev.imagesLoading === next.imagesLoading &&
     prev.priority === next.priority &&
+    prev.readOnly === next.readOnly &&
     deletingPathIsRelevantlyEqual(
       prev.deletingPath,
       next.deletingPath,

@@ -68,12 +68,17 @@ function defaultState() {
   };
 }
 
-function renderList() {
+function renderList(props: Partial<Parameters<typeof ItemList>[0]> = {}) {
   return render(
     <I18nProvider>
       <ToastProvider>
         <ConfirmProvider>
-          <ItemList categoryId="cat-1" />
+          <ItemList
+            categoryId="cat-1"
+            ownerUserId="owner-1"
+            isShared={false}
+            {...props}
+          />
         </ConfirmProvider>
       </ToastProvider>
     </I18nProvider>,
@@ -139,5 +144,49 @@ describe('ItemList empty state', () => {
     expect(screen.queryByText('No entries yet')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Item 1' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Item 2' })).toBeVisible();
+  });
+});
+
+// #483 follow-up: a shared category is browsable but not editable. RLS
+// already refuses the writes (see design-decisions.md's RLS section) --
+// this only checks that the controls offering them are gone, not merely
+// disabled, the same way CategorySelect's owned/shared tests do.
+describe('ItemList on a shared category', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('lang', 'en');
+    useItemsMock.mockReset();
+    useItemsMock.mockReturnValue(
+      itemsState({ items: [item('1')], total: 1 }),
+    );
+  });
+
+  it('hides the New entry button', () => {
+    renderList({ isShared: true });
+    expect(
+      screen.queryByTestId('new-entry'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the New entry button for an owned category', () => {
+    renderList({ isShared: false });
+    expect(screen.getByTestId('new-entry')).toBeVisible();
+  });
+
+  it('offers no edit, delete, or upload control on an entry', () => {
+    renderList({ isShared: true });
+    expect(screen.queryByTestId('edit-entry')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('delete-entry')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('upload-photo')).not.toBeInTheDocument();
+    expect(screen.queryByText('Add image')).not.toBeInTheDocument();
+    expect(screen.getAllByText('No images').length).toBeGreaterThan(0);
+  });
+
+  it('still shows those controls for an owned category', () => {
+    renderList({ isShared: false });
+    expect(screen.getByTestId('edit-entry')).toBeVisible();
+    expect(screen.getByTestId('delete-entry')).toBeVisible();
+    // Two: the empty-mount plate's own upload input and the action row's,
+    // both real for an item with no photographs yet.
+    expect(screen.getAllByTestId('upload-photo').length).toBe(2);
   });
 });

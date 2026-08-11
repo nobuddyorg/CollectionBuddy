@@ -46,19 +46,28 @@ function UploadInput({
 export function AddPhotoPlate({
   onUpload,
   busy,
+  readOnly = false,
 }: {
   onUpload: (file: File) => void;
   busy: boolean;
+  /** A shared category's own empty mount (#483 follow-up): the same frame,
+   * with no invitation to fill it -- there is nothing here for a grantee
+   * to upload into. Rendered as a `div`, not the interactive `label` below,
+   * so nothing about it reads as clickable. */
+  readOnly?: boolean;
 }) {
   const { t } = useI18n();
+  const Frame = readOnly ? 'div' : 'label';
   return (
-    <label
-      className={`group/plate relative flex aspect-4/3 w-full cursor-pointer items-center justify-center bg-mount transition-colors hover:bg-mount-hover peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-foreground ${
-        busy ? 'pointer-events-none opacity-60' : ''
+    <Frame
+      className={`group/plate relative flex aspect-4/3 w-full items-center justify-center bg-mount transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-foreground ${
+        readOnly
+          ? ''
+          : `cursor-pointer hover:bg-mount-hover ${busy ? 'pointer-events-none opacity-60' : ''}`
       }`}
-      title={t('item_list.add_image')}
+      title={readOnly ? undefined : t('item_list.add_image')}
     >
-      <UploadInput onUpload={onUpload} busy={busy} />
+      {!readOnly && <UploadInput onUpload={onUpload} busy={busy} />}
 
       {/* A hairline mount rule inset from the edge -- the empty frame in a
           specimen case, rather than a flat grey rectangle. Still the page's
@@ -77,14 +86,15 @@ export function AddPhotoPlate({
 
       {/* States the condition, then offers the way out of it -- the band
           only ever named the action, which said nothing about why the
-          frame was empty. */}
+          frame was empty. Read-only drops that "way out": there is one
+          fewer line here (no CTA chip), not a disabled copy of it. */}
       {/* `text-muted-foreground` on `bg-mount` reads at 3.85:1 in the light
           theme, below the 4.5:1 AA floor for this 11px label -- and the
           resting state is the one read, since touch has no hover.
           `text-foreground/80` carries 7.10:1 on light `--mount` and 10.65:1
           on dark, so both themes clear AA without a new token. */}
       <span className="relative flex flex-col items-center gap-2.5 text-foreground/80 transition-colors group-hover/plate:text-foreground">
-        {busy ? (
+        {busy && !readOnly ? (
           <span role="status" aria-label={t('common.loading')}>
             <Spinner size="xl" />
           </span>
@@ -96,16 +106,18 @@ export function AddPhotoPlate({
           {t('item_list.no_images')}
         </span>
 
-        <span className="inline-flex items-center gap-1.5 rounded-sm bg-card px-2.5 py-1.5 font-label text-[0.6875rem] text-foreground ring-1 ring-border">
-          <Icon
-            icon={IconType.Plus}
-            className="w-3.5 h-3.5"
-            aria-hidden="true"
-          />
-          {t('item_list.add_image')}
-        </span>
+        {!readOnly && (
+          <span className="inline-flex items-center gap-1.5 rounded-sm bg-card px-2.5 py-1.5 font-label text-[0.6875rem] text-foreground ring-1 ring-border">
+            <Icon
+              icon={IconType.Plus}
+              className="w-3.5 h-3.5"
+              aria-hidden="true"
+            />
+            {t('item_list.add_image')}
+          </span>
+        )}
       </span>
-    </label>
+    </Frame>
   );
 }
 
