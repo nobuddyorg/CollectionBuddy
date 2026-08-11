@@ -284,12 +284,18 @@ export default function CategorySelect({
                   id="rename-category"
                   value={renameValue}
                   // Shared categories keep this field in the same slot
-                  // rather than hiding it -- read-only, not absent, so the
+                  // rather than hiding it -- inert, not absent, so the
                   // panel's shape doesn't change depending on who owns
                   // what's open. Renaming someone else's category would
                   // fail RLS's "update own categories" policy anyway; this
                   // just doesn't offer the round trip.
-                  readOnly={isShared}
+                  //
+                  // disabled, not readOnly: readOnly still focuses, still
+                  // shows a text cursor and a selection caret -- every visual
+                  // cue of an editable field except the one thing (typing)
+                  // that would actually change it. disabled looks as inert
+                  // as it is.
+                  disabled={isShared}
                   title={
                     isShared
                       ? t('category_select.shared_marker_label')
@@ -311,7 +317,7 @@ export default function CategorySelect({
                       }
                     }
                   }}
-                  className={fieldClasses('min-w-0')}
+                  className={fieldClasses('min-w-0 disabled:opacity-50')}
                 />
                 <RenameButton
                   onClick={() => void onRename()}
