@@ -155,16 +155,12 @@ describe('ItemList on a shared category', () => {
   beforeEach(() => {
     window.localStorage.setItem('lang', 'en');
     useItemsMock.mockReset();
-    useItemsMock.mockReturnValue(
-      itemsState({ items: [item('1')], total: 1 }),
-    );
+    useItemsMock.mockReturnValue(itemsState({ items: [item('1')], total: 1 }));
   });
 
   it('hides the New entry button', () => {
     renderList({ isShared: true });
-    expect(
-      screen.queryByTestId('new-entry'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('new-entry')).not.toBeInTheDocument();
   });
 
   it('shows the New entry button for an owned category', () => {

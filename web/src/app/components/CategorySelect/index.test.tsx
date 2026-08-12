@@ -583,6 +583,18 @@ describe('CategorySelect', () => {
       ).not.toBeInTheDocument();
     });
 
+    // #483 follow-up: exportCategory() (data/exportCategory.ts) resolves
+    // the *caller's own* uid to build each item's storage prefix -- for a
+    // grantee that's the wrong prefix entirely, not the owner's. Disabled
+    // rather than absent, same slot as everything else in this panel.
+    it('disables export rather than offering a broken one', async () => {
+      renderSelect({ categories: categories({ cats: sharedCats }) });
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open category' }),
+      );
+      expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
+    });
+
     // Delete stays in the same slot for a shared category, but ends only
     // the viewer's own access (deleteShare on their own grant row) rather
     // than the category itself (deleteCategory) -- and says so before it

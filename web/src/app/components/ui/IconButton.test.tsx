@@ -42,6 +42,16 @@ describe('IconButton', () => {
     },
   );
 
+  // A disabled button still receives its hover:* classes -- :hover doesn't
+  // consult the disabled attribute -- so a merely-dimmed disabled control
+  // looked interactive under the cursor (reported live, on the shared
+  // category rename button (#483 follow-up) once it was disabled rather
+  // than absent). pointer-events-none is what actually stops that.
+  it('kills pointer events -- and therefore hover -- when disabled', () => {
+    const classes = iconButtonClasses();
+    expect(classes).toContain('disabled:pointer-events-none');
+  });
+
   it('forwards click handling and other button props', async () => {
     const onClick = vi.fn();
     render(
