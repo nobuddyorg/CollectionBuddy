@@ -133,7 +133,7 @@ describe('useCategories deleteCategory', () => {
     // touched, let alone all of them.
     expect(removeItemImages).not.toHaveBeenCalled();
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Could not delete category. Please try again.',
+      'Could not delete collection. Please try again.',
     );
   });
 
@@ -157,7 +157,7 @@ describe('useCategories deleteCategory', () => {
     expect(outcome).toBe(true);
     expect(removeItemImages).toHaveBeenCalledTimes(2);
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'This category was deleted, but some of its photographs could not be removed and may still count against your storage.',
+      'This collection was deleted, but some of its photographs could not be removed and may still count against your storage.',
     );
     consoleError.mockRestore();
   });

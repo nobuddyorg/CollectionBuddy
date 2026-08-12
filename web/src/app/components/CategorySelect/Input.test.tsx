@@ -63,6 +63,6 @@ describe('CategoryInput', () => {
 
   it('is labelled for assistive tech via its placeholder text', () => {
     renderInput();
-    expect(screen.getByPlaceholderText('New category')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('New collection')).toBeInTheDocument();
   });
 });

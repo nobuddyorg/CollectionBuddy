@@ -46,60 +46,83 @@ export function Pagination({
 
   if (totalPages <= 1) return null;
 
-  return (
-    <nav
-      aria-label={t('item_list.pagination')}
-      className="flex flex-wrap gap-1.5 items-center justify-center pt-2"
+  const prevButton = (
+    <button
+      type="button"
+      disabled={page === 1}
+      onClick={() => setPage(page - 1)}
+      className="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+      aria-label={t('item_list.previous')}
+      title={t('item_list.previous')}
     >
-      <button
-        type="button"
-        disabled={page === 1}
-        onClick={() => setPage(page - 1)}
-        className="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-        aria-label={t('item_list.previous')}
-        title={t('item_list.previous')}
-      >
-        <Icon icon={IconType.ChevronLeft} className="w-5 h-5" />
-      </button>
+      <Icon icon={IconType.ChevronLeft} className="w-5 h-5" />
+    </button>
+  );
 
-      {paginationItems.map((item, index) =>
-        typeof item === 'string' ? (
-          <span
-            key={`ellipsis-${index}`}
-            aria-hidden="true"
-            className="w-5 h-9 flex items-center justify-center text-muted-foreground"
-          >
-            {item}
-          </span>
-        ) : (
-          <button
-            key={item}
-            onClick={() => setPage(item)}
-            className={
-              'min-w-11 min-h-11 sm:min-w-9 sm:min-h-9 px-2 flex items-center justify-center rounded-sm font-label text-xs transition-colors ' +
-              (item === page
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted')
-            }
-            aria-label={t('item_list.page').replace('{n}', String(item))}
-            aria-current={item === page ? 'page' : undefined}
-          >
-            {item}
-          </button>
-        ),
-      )}
+  const nextButton = (
+    <button
+      type="button"
+      disabled={page === totalPages}
+      onClick={() => setPage(page + 1)}
+      className="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+      aria-label={t('item_list.next')}
+      title={t('item_list.next')}
+    >
+      <Icon icon={IconType.ChevronRight} className="w-5 h-5" />
+    </button>
+  );
 
-      <button
-        type="button"
-        disabled={page === totalPages}
-        onClick={() => setPage(page + 1)}
-        className="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-        aria-label={t('item_list.next')}
-        title={t('item_list.next')}
+  return (
+    <>
+      <nav
+        aria-label={t('item_list.pagination')}
+        className="hidden sm:flex flex-wrap gap-1.5 items-center justify-center pt-2"
       >
-        <Icon icon={IconType.ChevronRight} className="w-5 h-5" />
-      </button>
-    </nav>
+        {prevButton}
+
+        {paginationItems.map((item, index) =>
+          typeof item === 'string' ? (
+            <span
+              key={`ellipsis-${index}`}
+              aria-hidden="true"
+              className="w-5 h-9 flex items-center justify-center text-muted-foreground"
+            >
+              {item}
+            </span>
+          ) : (
+            <button
+              key={item}
+              onClick={() => setPage(item)}
+              className={
+                'min-w-9 min-h-9 px-2 flex items-center justify-center rounded-sm font-label text-xs transition-colors ' +
+                (item === page
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted')
+              }
+              aria-label={t('item_list.page').replace('{n}', String(item))}
+              aria-current={item === page ? 'page' : undefined}
+            >
+              {item}
+            </button>
+          ),
+        )}
+
+        {nextButton}
+      </nav>
+
+      <nav
+        aria-label={t('item_list.pagination')}
+        className="flex sm:hidden gap-3 items-center justify-center pt-2"
+      >
+        {prevButton}
+        <span className="font-label text-xs text-muted-foreground">
+          {t('item_list.page_of')
+            .replace('{n}', String(page))
+            .replace('{total}', String(totalPages))}
+        </span>
+        {nextButton}
+      </nav>
+    </>
   );
 }
 // Stryker restore all
