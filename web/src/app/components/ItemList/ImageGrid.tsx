@@ -119,6 +119,7 @@ export function ImageGrid({
   loading = false,
   pending = 0,
   priority = false,
+  readOnly = false,
 }: {
   imgs: ImgEntry[];
   itemTitle: string;
@@ -137,6 +138,9 @@ export function ImageGrid({
    * likely the LCP element -- fetched eagerly at high priority rather than
    * lazily. Never applies to the strip; only slot 0 is ever the hero. */
   priority?: boolean;
+  /** A category shared with, not owned by, the viewer (#483 follow-up): no
+   * per-photograph delete control on any plate. */
+  readOnly?: boolean;
 }) {
   const { t } = useI18n();
 
@@ -267,7 +271,7 @@ export function ImageGrid({
           ) : undefined
         }
       >
-        {deleteButton(img, small)}
+        {!readOnly && deleteButton(img, small)}
       </Plate>
     );
   };

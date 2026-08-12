@@ -414,12 +414,19 @@ export default function CategorySelect({
               a copy of. The line beside the button is where the export
               reports from: it runs for as long as the photographs take,
               which on a large collection is long enough that a button
-              which only dimmed would read as broken. */}
+              which only dimmed would read as broken.
+
+              Disabled, not absent, for a shared category -- same slot as
+              everything else in this panel, same reason: exportCategory()
+              (data/exportCategory.ts) resolves the *caller's own* uid to
+              build each item's storage prefix, which for a grantee is the
+              wrong prefix entirely, not the owner's, so this has to stay
+              blocked regardless of "view only" scope. */}
           {selected && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3">
               <ExportButton
                 onClick={() => void runExport(selected)}
-                disabled={isExporting}
+                disabled={isExporting || isShared}
                 isExporting={isExporting}
                 label={t('category_select.export')}
               />

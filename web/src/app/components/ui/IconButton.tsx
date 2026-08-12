@@ -48,7 +48,12 @@ export function iconButtonClasses({
   size?: IconButtonSize;
   className?: string;
 } = {}) {
-  return `${SIZE_CLASSES[size]} flex items-center justify-center rounded-sm transition ${VARIANT_CLASSES[variant]} ${className}`.trim();
+  // disabled:pointer-events-none, not just a caller's own disabled:opacity:
+  // every hover:* class above still fires on a merely-dimmed disabled
+  // button, since :hover doesn't care about the disabled attribute --
+  // stopping pointer events from reaching it at all is what actually keeps
+  // a disabled control from looking interactive under the cursor.
+  return `${SIZE_CLASSES[size]} flex items-center justify-center rounded-sm transition disabled:pointer-events-none ${VARIANT_CLASSES[variant]} ${className}`.trim();
 }
 
 type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {

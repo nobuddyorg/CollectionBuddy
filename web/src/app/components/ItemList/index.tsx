@@ -37,7 +37,23 @@ import Icon, { IconType } from '../Icon';
 // (ItemCard is memoized against exactly this; see ItemCard.tsx).
 const EMPTY_IMAGES: ImgEntry[] = [];
 
-export default function ItemList({ categoryId }: { categoryId: string }) {
+export default function ItemList({
+  categoryId,
+  ownerUserId,
+  isShared,
+}: {
+  categoryId: string;
+  /** Owner of the currently open category -- for an owned category, this is
+   * the viewer's own uid; for a shared one, someone else's. The only thing
+   * that decides the storage prefix photographs live under (#483 follow-up),
+   * since a grantee's own uid never appears in a shared item's path. */
+  ownerUserId: string;
+  /** True for a category shared with, not owned by, the viewer. Every
+   * write control (new entry, edit, delete, upload) is hidden rather than
+   * merely disabled -- RLS already refuses the writes themselves, so this
+   * is UX, not the boundary (see design-decisions.md's RLS section). */
+  isShared: boolean;
+}) {
   const { t, tCount } = useI18n();
   const confirm = useConfirm();
 
@@ -98,7 +114,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
     deleteAllItemImages,
     pendingUploads,
     deletingPath,
-  } = useItemImages();
+  } = useItemImages(ownerUserId);
 
   const itemIdsKey = items.map((i) => i.id).join(',');
   useEffect(() => {
@@ -154,16 +170,25 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         </div>
 
         <div className="flex gap-2 sm:shrink-0">
-          <button
-            type="button"
-            // Named for the end-to-end suite: its label is translated.
-            data-testid="new-entry"
-            onClick={() => setCreateOpen(true)}
-            className="flex-1 sm:flex-none min-h-11 px-4 flex items-center justify-center gap-2 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 transition-opacity"
-          >
-            <Icon icon={IconType.Plus} className="w-4 h-4" aria-hidden="true" />
-            {t('item_create.new_entry')}
-          </button>
+          {/* Absent, not disabled, same as everything else RLS already
+              refuses on a shared category -- there is nothing this button
+              could open that wouldn't immediately fail to save. */}
+          {!isShared && (
+            <button
+              type="button"
+              // Named for the end-to-end suite: its label is translated.
+              data-testid="new-entry"
+              onClick={() => setCreateOpen(true)}
+              className="flex-1 sm:flex-none min-h-11 px-4 flex items-center justify-center gap-2 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 transition-opacity"
+            >
+              <Icon
+                icon={IconType.Plus}
+                className="w-4 h-4"
+                aria-hidden="true"
+              />
+              {t('item_create.new_entry')}
+            </button>
+          )}
 
           <button
             type="button"
@@ -266,6 +291,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
               // first row -- and the LCP candidate within it -- is always
               // among these three regardless of viewport.
               priority={idx < 3}
+              readOnly={isShared}
             />
           ))}
         </ul>
@@ -286,6 +312,7 @@ export default function ItemList({ categoryId }: { categoryId: string }) {
         }}
         deletingPath={deletingPath}
         busy={modalState ? (pendingUploads[modalState.itemId] ?? 0) > 0 : false}
+        readOnly={isShared}
       />
 
       <EditItemModal

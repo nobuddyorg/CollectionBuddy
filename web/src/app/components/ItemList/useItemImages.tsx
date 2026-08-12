@@ -133,7 +133,15 @@ export async function signEntries(
 // Stryker disable all: hook internals aren't covered by tests, only
 // pairImageEntries/toImgEntries/signEntries above are -- mutants in here
 // would only be noise.
-export function useItemImages() {
+// ownerUserId is the category's owner, not necessarily the viewer's own uid
+// (#483 follow-up): for a category shared with the caller, the storage
+// prefix photographs live under is still `<owner_uid>/...` (0007_storage.sql)
+// -- there is no viewer-uid prefix to read at all. Taken once, at the hook
+// level, rather than per call: every item a given ItemList mount ever asks
+// this hook about belongs to the one category it was opened for, and every
+// item in a category shares that category's owner
+// (tg_item_categories_enforce, 0002_functions.sql).
+export function useItemImages(ownerUserId: string) {
   const { t } = useI18n();
   const toast = useToast();
   const confirm = useConfirm();
@@ -198,62 +206,63 @@ export function useItemImages() {
     [getItemImageEntries],
   );
 
-  const refreshAllImages = useCallback(async (itemIds: string[]) => {
-    if (itemIds.length === 0) return;
+  const refreshAllImages = useCallback(
+    async (itemIds: string[]) => {
+      if (itemIds.length === 0 || !ownerUserId) return;
 
-    const uid = await currentUserId();
-    if (!uid) return;
-
-    // Only the items we don't already hold a fresh answer for are marked
-    // as loading; a cached category switch should not flash skeletons.
-    setLoadingItems((prev) => {
-      const next = new Set(prev);
-      for (const itemId of itemIds) {
-        if (!getCachedListing(imagePrefix(uid, itemId))) next.add(itemId);
-      }
-      return next;
-    });
-
-    // One list() call per item is unavoidable (Supabase storage has no
-    // recursive/flat listing across prefixes) -- but each item is listed,
-    // signed and painted independently the moment its own listing lands,
-    // rather than behind a Promise.all barrier that waits for every
-    // listing in the batch before signing (or showing) any of them. The
-    // slowest of up to 9 parallel storage.list() calls used to gate the
-    // first photograph on screen even though most land well before it
-    // (#329).
-    const idSet = new Set(itemIds);
-    await Promise.all(
-      itemIds.map(async (itemId) => {
-        const prefix = imagePrefix(uid, itemId);
-        let entryData = getCachedListing(prefix);
-        if (!entryData) {
-          const { data, error } = await listAllImageObjects(prefix);
-          if (error) {
-            console.error('Failed to list images', error);
-            entryData = new Map<string, ImageEntryData>();
-          } else {
-            entryData = pairImageEntries(data ?? [], prefix);
-            cacheListing(prefix, entryData);
-          }
+      // Only the items we don't already hold a fresh answer for are marked
+      // as loading; a cached category switch should not flash skeletons.
+      setLoadingItems((prev) => {
+        const next = new Set(prev);
+        for (const itemId of itemIds) {
+          if (!getCachedListing(imagePrefix(ownerUserId, itemId)))
+            next.add(itemId);
         }
+        return next;
+      });
 
-        const signed = await signEntries([[itemId, entryData]]);
-        setImages((prev) => {
-          const kept = Object.fromEntries(
-            Object.entries(prev).filter(([id]) => idSet.has(id)),
-          );
-          return { ...kept, ...signed };
-        });
-        setLoadingItems((prev) => {
-          const next = new Set(prev);
-          next.delete(itemId);
-          return next;
-        });
-      }),
-    );
-    lastSignedAtRef.current = Date.now();
-  }, []);
+      // One list() call per item is unavoidable (Supabase storage has no
+      // recursive/flat listing across prefixes) -- but each item is listed,
+      // signed and painted independently the moment its own listing lands,
+      // rather than behind a Promise.all barrier that waits for every
+      // listing in the batch before signing (or showing) any of them. The
+      // slowest of up to 9 parallel storage.list() calls used to gate the
+      // first photograph on screen even though most land well before it
+      // (#329).
+      const idSet = new Set(itemIds);
+      await Promise.all(
+        itemIds.map(async (itemId) => {
+          const prefix = imagePrefix(ownerUserId, itemId);
+          let entryData = getCachedListing(prefix);
+          if (!entryData) {
+            const { data, error } = await listAllImageObjects(prefix);
+            if (error) {
+              console.error('Failed to list images', error);
+              entryData = new Map<string, ImageEntryData>();
+            } else {
+              entryData = pairImageEntries(data ?? [], prefix);
+              cacheListing(prefix, entryData);
+            }
+          }
+
+          const signed = await signEntries([[itemId, entryData]]);
+          setImages((prev) => {
+            const kept = Object.fromEntries(
+              Object.entries(prev).filter(([id]) => idSet.has(id)),
+            );
+            return { ...kept, ...signed };
+          });
+          setLoadingItems((prev) => {
+            const next = new Set(prev);
+            next.delete(itemId);
+            return next;
+          });
+        }),
+      );
+      lastSignedAtRef.current = Date.now();
+    },
+    [ownerUserId],
+  );
 
   // Refresh signed URLs before Supabase's 1h expiry so a long-lived tab
   // doesn't turn every thumbnail into a broken-image placeholder.

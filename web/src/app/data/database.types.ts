@@ -188,6 +188,7 @@ export type Database = {
       join_tags: { Args: { tags: string[] }; Returns: string };
       keepalive: { Args: never; Returns: undefined };
       normalize_text: { Args: { txt: string }; Returns: string };
+      storage_item_id: { Args: { path: string }; Returns: string };
     };
     Enums: {
       [_ in never]: never;
