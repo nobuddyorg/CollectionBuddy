@@ -127,7 +127,7 @@ function renderSelect(
   return { onSelect };
 }
 
-const heading = () => screen.getByRole('heading', { name: 'Category' });
+const heading = () => screen.getByRole('heading', { name: 'Collection' });
 
 // The name line of the header, as distinct from the same name appearing
 // on a tab or in the rename field once the panel is open.
@@ -165,7 +165,7 @@ describe('CategorySelect', () => {
     const before = heading().parentElement?.parentElement;
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Open category' }),
+      screen.getByRole('button', { name: 'Open collection' }),
     );
 
     // Same heading, same name, same enclosing row -- only the glyph in the
@@ -175,13 +175,13 @@ describe('CategorySelect', () => {
     expect(heading().parentElement?.parentElement).toBe(before);
     expect(screen.getByRole('button', { name: 'Close' })).toBeVisible();
     expect(
-      screen.queryByRole('button', { name: 'Open category' }),
+      screen.queryByRole('button', { name: 'Open collection' }),
     ).not.toBeInTheDocument();
   });
 
   it('draws the two toggles to the same box', async () => {
     renderSelect();
-    const open = screen.getByRole('button', { name: 'Open category' });
+    const open = screen.getByRole('button', { name: 'Open collection' });
     const openClasses = open.className;
     await userEvent.click(open);
     const close = screen.getByRole('button', { name: 'Close' });
@@ -196,11 +196,11 @@ describe('CategorySelect', () => {
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Open category' }),
+      screen.getByRole('button', { name: 'Open collection' }),
     );
     expect(screen.getByRole('tablist')).toBeVisible();
     expect(screen.getByLabelText('Rename')).toHaveValue('Coins');
-    expect(screen.getByLabelText('New category')).toBeVisible();
+    expect(screen.getByLabelText('New collection')).toBeVisible();
   });
 
   // Regression (#356): Escape in the rename field used to only ever reset
@@ -213,7 +213,7 @@ describe('CategorySelect', () => {
     async function openAndEdit(text: string) {
       renderSelect();
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
       const rename = screen.getByLabelText('Rename');
       await userEvent.clear(rename);
@@ -245,11 +245,11 @@ describe('CategorySelect', () => {
   it('gives the two fields the same column', async () => {
     renderSelect();
     await userEvent.click(
-      screen.getByRole('button', { name: 'Open category' }),
+      screen.getByRole('button', { name: 'Open collection' }),
     );
 
     const rename = screen.getByLabelText('Rename');
-    const create = screen.getByLabelText('New category');
+    const create = screen.getByLabelText('New collection');
     expect(rename.parentElement).toBe(create.parentElement);
     expect(rename.parentElement?.className).toContain('grid');
 
@@ -261,7 +261,7 @@ describe('CategorySelect', () => {
   it('offers the export under a rule of its own, away from delete', async () => {
     renderSelect();
     await userEvent.click(
-      screen.getByRole('button', { name: 'Open category' }),
+      screen.getByRole('button', { name: 'Open collection' }),
     );
 
     const exportButton = screen.getByRole('button', { name: 'Export' });
@@ -278,7 +278,7 @@ describe('CategorySelect', () => {
   it('says what the export contains while it is not running', async () => {
     renderSelect();
     await userEvent.click(
-      screen.getByRole('button', { name: 'Open category' }),
+      screen.getByRole('button', { name: 'Open collection' }),
     );
     // One line, not two: the progress messages that replace this are all
     // one line, and a hint that wrapped would shrink the row on the way in.
@@ -288,7 +288,7 @@ describe('CategorySelect', () => {
   describe('import', () => {
     it('offers import independently of a category being selected', async () => {
       // No selection at all -- the panel starts expanded in this state
-      // (nothing to collapse to), so there's no "Open category" toggle to
+      // (nothing to collapse to), so there's no "Open collection" toggle to
       // click first.
       renderSelect({ selectedCat: null, categories: categories({ cats }) });
 
@@ -300,7 +300,7 @@ describe('CategorySelect', () => {
     it('says what a file needs to be while nothing is running', async () => {
       renderSelect();
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
       expect(
         screen.getByText('A .zip archive exported from CollectionBuddy.'),
@@ -310,7 +310,7 @@ describe('CategorySelect', () => {
     it('opens the file picker when Import is clicked, not on page load', async () => {
       renderSelect();
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
       const input = screen.getByTestId('import-file-input');
       const click = vi.spyOn(input, 'click');
@@ -329,7 +329,7 @@ describe('CategorySelect', () => {
       vi.mocked(useImportCategory).mockReturnValue(importState({ runImport }));
       const { onSelect } = renderSelect();
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
 
       const file = new File(['zip bytes'], 'coins.zip', {
@@ -363,7 +363,7 @@ describe('CategorySelect', () => {
       const { onSelect } = renderSelect({ categories: categories({ reload }) });
       vi.mocked(onSelect).mockImplementation(() => calls.push('select'));
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
 
       const file = new File(['zip bytes'], 'coins.zip', {
@@ -383,7 +383,7 @@ describe('CategorySelect', () => {
         );
         renderSelect();
         await userEvent.click(
-          screen.getByRole('button', { name: 'Open category' }),
+          screen.getByRole('button', { name: 'Open collection' }),
         );
 
         expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled();
@@ -401,7 +401,7 @@ describe('CategorySelect', () => {
         );
         renderSelect();
         await userEvent.click(
-          screen.getByRole('button', { name: 'Open category' }),
+          screen.getByRole('button', { name: 'Open collection' }),
         );
 
         const cancel = screen.getByRole('button', { name: 'Cancel import' });
@@ -423,7 +423,7 @@ describe('CategorySelect', () => {
       );
       renderSelect();
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
 
       expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
@@ -442,7 +442,7 @@ describe('CategorySelect', () => {
       );
       renderSelect();
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
 
       const cancel = screen.getByRole('button', { name: 'Cancel export' });
@@ -453,7 +453,7 @@ describe('CategorySelect', () => {
     it('does not offer Cancel while no export is running', async () => {
       renderSelect();
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
       expect(
         screen.queryByRole('button', { name: 'Cancel export' }),
@@ -480,7 +480,7 @@ describe('CategorySelect', () => {
       screen.queryByRole('button', { name: 'Close' }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Open category' }),
+      screen.queryByRole('button', { name: 'Open collection' }),
     ).not.toBeInTheDocument();
   });
 
@@ -496,7 +496,7 @@ describe('CategorySelect', () => {
       } as never);
       renderSelect();
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
       await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
@@ -514,7 +514,7 @@ describe('CategorySelect', () => {
       } as never);
       renderSelect();
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
       await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
@@ -530,7 +530,7 @@ describe('CategorySelect', () => {
       } as never);
       renderSelect();
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
       await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
@@ -556,7 +556,7 @@ describe('CategorySelect', () => {
     it('marks the shared tab, but not one the viewer owns', async () => {
       renderSelect({ categories: categories({ cats: sharedCats }) });
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
 
       const sharedTab = screen.getByRole('tab', { name: /Coins/ });
@@ -573,7 +573,7 @@ describe('CategorySelect', () => {
     it('shows the name disabled rather than offering to rename it', async () => {
       renderSelect({ categories: categories({ cats: sharedCats }) });
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
 
       const rename = screen.getByLabelText('Rename');
@@ -585,7 +585,7 @@ describe('CategorySelect', () => {
     it('does not offer sharing controls for a category the viewer does not own', async () => {
       renderSelect({ categories: categories({ cats: sharedCats }) });
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
       expect(
         screen.queryByLabelText('Share with (email)'),
@@ -599,7 +599,7 @@ describe('CategorySelect', () => {
     it('disables export rather than offering a broken one', async () => {
       renderSelect({ categories: categories({ cats: sharedCats }) });
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
       expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
     });
@@ -629,7 +629,7 @@ describe('CategorySelect', () => {
         categories: categories({ cats: sharedCats, deleteCategory }),
       });
       await userEvent.click(
-        screen.getByRole('button', { name: 'Open category' }),
+        screen.getByRole('button', { name: 'Open collection' }),
       );
       await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
@@ -650,7 +650,7 @@ describe('CategorySelect', () => {
   it('offers sharing controls for a category the viewer owns', async () => {
     renderSelect();
     await userEvent.click(
-      screen.getByRole('button', { name: 'Open category' }),
+      screen.getByRole('button', { name: 'Open collection' }),
     );
     expect(screen.getByLabelText('Share with (email)')).toBeVisible();
   });
@@ -658,7 +658,7 @@ describe('CategorySelect', () => {
   it('collapses onto the category picked from the tabs', async () => {
     const { onSelect } = renderSelect();
     await userEvent.click(
-      screen.getByRole('button', { name: 'Open category' }),
+      screen.getByRole('button', { name: 'Open collection' }),
     );
     await userEvent.click(screen.getByRole('tab', { name: 'Stamps' }));
     expect(onSelect).toHaveBeenCalledWith('b');

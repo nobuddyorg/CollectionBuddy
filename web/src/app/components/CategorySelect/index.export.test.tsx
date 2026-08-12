@@ -79,7 +79,7 @@ describe('exporting with no session', () => {
   it('reports the failure and re-enables the button, without hanging as "exporting" forever', async () => {
     renderSelect();
     await userEvent.click(
-      screen.getByRole('button', { name: 'Open category' }),
+      screen.getByRole('button', { name: 'Open collection' }),
     );
 
     const exportButton = screen.getByRole('button', { name: 'Export' });
@@ -88,7 +88,7 @@ describe('exporting with no session', () => {
 
     expect(
       await screen.findByText(
-        'Could not export this category. Please try again.',
+        'Could not export this collection. Please try again.',
       ),
     ).toBeVisible();
     expect(exportButton).toBeEnabled();

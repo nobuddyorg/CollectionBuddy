@@ -130,7 +130,7 @@ describe('SharingSection', () => {
 
     expect(
       await screen.findByText(
-        'Stop sharing with grantee@example.com? They will no longer be able to see this category.',
+        'Stop sharing with grantee@example.com? They will no longer be able to see this collection.',
       ),
     ).toBeVisible();
     await userEvent.click(screen.getByTestId('confirm-accept'));
