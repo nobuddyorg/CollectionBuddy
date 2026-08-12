@@ -38,7 +38,12 @@ export function SearchInput({
         <button
           type="button"
           onClick={() => onChange('')}
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 -m-2 inline-flex items-center justify-center"
+          // -mr-2 only, not -m-2: it cancels the padding's push against
+          // `right-3` (no transform on that axis to do it automatically).
+          // Vertically, top-1/2 -translate-y-1/2 already recentres the
+          // padded box on its own -- a matching -mt-2 stacked a second,
+          // uncancelled shift on top of that and pushed the icon 8px high.
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 -mr-2 inline-flex items-center justify-center"
           aria-label={t('item_list.search_clear')}
         >
           <Icon

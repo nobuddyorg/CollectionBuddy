@@ -139,61 +139,53 @@ export default function Page() {
           ready={catalogueReady}
         />
 
-        {/* A ruled line, not a gap: the category strip below opens onto
-            rename/import/export controls of its own, drawn with the same
-            border-t hairlines this line borrows -- without one here, that
-            expanded panel's last row and the search bar right after it
-            read as two rows of the same list rather than settings versus
-            data. */}
-        <div className="border-t border-border pt-5 sm:pt-7">
-          {!catalogueReady ? (
-            // Sign-in lands here before the categories are back, and the
-            // entries of the category it opens on are the next thing to
-            // appear. Holding their shape means the page fills in rather
-            // than assembling itself in three visible steps.
-            <ItemListSkeleton />
-          ) : hasCategory ? (
-            <section
-              role="tabpanel"
-              id={CATEGORY_TABPANEL_ID}
-              // Both ids: the heading always resolves, the tab only while the
-              // category strip is expanded and that tab is actually in the
-              // DOM. An id that doesn't resolve is just skipped, so the panel
-              // is never left without an accessible name either way.
-              aria-labelledby={`entries-heading ${categoryTabId(selectedCategoryId)}`}
-              className="relative z-50 space-y-4"
-            >
-              <h2 id="entries-heading" className="sr-only">
-                {t('page.entries')}
-              </h2>
-              <ItemList
-                key={selectedCategoryId}
-                categoryId={selectedCategoryId}
-                ownerUserId={selectedCategory?.user_id ?? ''}
-                isShared={isSharedSelected}
-              />
-            </section>
-          ) : (
-            // Reached only by a collection with no categories at all: one
-            // that has any opens on one of them. The prompt names that,
-            // rather than asking for a choice there is nothing to make.
-            <section className="py-16 grid place-items-center text-center">
-              <div className="flex flex-col items-center gap-4 max-w-xs">
-                <div className="h-16 w-16 bg-card ring-1 ring-border grid place-items-center text-3xl">
-                  🧺
-                </div>
-                <div className="space-y-1.5">
-                  <h3 className="font-display text-lg">
-                    {t('page.no_categories')}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {t('page.name_first_category')}
-                  </p>
-                </div>
+        {!catalogueReady ? (
+          // Sign-in lands here before the categories are back, and the
+          // entries of the category it opens on are the next thing to
+          // appear. Holding their shape means the page fills in rather
+          // than assembling itself in three visible steps.
+          <ItemListSkeleton />
+        ) : hasCategory ? (
+          <section
+            role="tabpanel"
+            id={CATEGORY_TABPANEL_ID}
+            // Both ids: the heading always resolves, the tab only while the
+            // category strip is expanded and that tab is actually in the
+            // DOM. An id that doesn't resolve is just skipped, so the panel
+            // is never left without an accessible name either way.
+            aria-labelledby={`entries-heading ${categoryTabId(selectedCategoryId)}`}
+            className="relative z-50 space-y-4"
+          >
+            <h2 id="entries-heading" className="sr-only">
+              {t('page.entries')}
+            </h2>
+            <ItemList
+              key={selectedCategoryId}
+              categoryId={selectedCategoryId}
+              ownerUserId={selectedCategory?.user_id ?? ''}
+              isShared={isSharedSelected}
+            />
+          </section>
+        ) : (
+          // Reached only by a collection with no categories at all: one
+          // that has any opens on one of them. The prompt names that,
+          // rather than asking for a choice there is nothing to make.
+          <section className="py-16 grid place-items-center text-center">
+            <div className="flex flex-col items-center gap-4 max-w-xs">
+              <div className="h-16 w-16 bg-card ring-1 ring-border grid place-items-center text-3xl">
+                🧺
               </div>
-            </section>
-          )}
-        </div>
+              <div className="space-y-1.5">
+                <h3 className="font-display text-lg">
+                  {t('page.no_categories')}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {t('page.name_first_category')}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
       </main>
 
       <footer className="px-4 py-10 pb-[calc(2.5rem+env(safe-area-inset-bottom))] text-center font-label text-[0.6875rem] text-muted-foreground">
