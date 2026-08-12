@@ -34,6 +34,17 @@ const FIT_MAX_ZOOM = 12;
 // regional view, so the surrounding pins stay in the picture.
 const CURRENT_LOCATION_SPAN_M = 100000;
 
+// The dot used to be an L.circleMarker, a vector path whose radius is
+// pixels rather than a projected distance. Leaflet's zoom animation scales
+// the whole overlay pane by CSS transform for the gesture's duration and
+// only re-projects paths at zoomend, so a pixel-radius circle visibly
+// ballooned or shrank mid-zoom before snapping back. A divIcon marker is
+// repositioned by translate only during that same animation -- its size
+// never moves -- so it holds a constant 16px dot throughout the gesture.
+const CURRENT_LOCATION_DIAMETER = 16;
+const CURRENT_LOCATION_STROKE = '#b91c1c';
+const CURRENT_LOCATION_FILL = '#ef4444';
+
 // Every automatic fit frames the pins' *coordinates*, but a marker is a
 // 25x41 icon hanging above the point it marks, so a pin on the edge of the
 // bounds had its head cut off by the viewport -- 8px of padding could not
@@ -208,12 +219,18 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
 
     if (currentLocation) {
       const { lat, lng } = currentLocation;
-      const here = L.circleMarker([lat, lng], {
-        radius: 8,
-        weight: 2,
-        color: '#b91c1c',
-        fillColor: '#ef4444',
-        fillOpacity: 1,
+      const here = L.marker([lat, lng], {
+        // className: '' strips Leaflet's default divIcon box (a white
+        // square with its own border) so only the dot below is drawn.
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="width:100%;height:100%;box-sizing:border-box;border-radius:9999px;background:${CURRENT_LOCATION_FILL};border:2px solid ${CURRENT_LOCATION_STROKE};"></div>`,
+          iconSize: [CURRENT_LOCATION_DIAMETER, CURRENT_LOCATION_DIAMETER],
+          iconAnchor: [
+            CURRENT_LOCATION_DIAMETER / 2,
+            CURRENT_LOCATION_DIAMETER / 2,
+          ],
+        }),
         pane: 'currentLocation',
       }).addTo(currentLocationLayerRef.current);
       const { popupText } = currentLocation;

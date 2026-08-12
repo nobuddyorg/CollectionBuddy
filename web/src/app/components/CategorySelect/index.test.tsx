@@ -147,6 +147,15 @@ describe('CategorySelect', () => {
     expect(headerName()).toHaveTextContent('Coins');
   });
 
+  // Regression: the header used to read `cats`/`selectedCat` immediately,
+  // so it showed "None selected" for one render before the page's own
+  // initial load had resolved a real selection.
+  it('holds the header on a placeholder instead of "None selected" while not ready', () => {
+    renderSelect({ ready: false });
+    expect(heading()).toBeVisible();
+    expect(screen.queryByText('None selected')).not.toBeInTheDocument();
+  });
+
   // Regression: opening the panel used to drop the collection's name and
   // draw the close button at a different height from the pencil, so every
   // toggle moved the heading down, the button up, and everything below by

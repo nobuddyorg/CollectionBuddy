@@ -34,6 +34,11 @@ type Props = {
   onSelect: (id: string | null) => void;
   categories: UseCategories;
   userId: string | null;
+  /** False until the page's own initial load has resolved -- see the
+   *  `catalogueReady` comment in page.tsx. Held here only long enough to
+   *  keep the header from showing "None selected" for the one render
+   *  before the real selection lands. */
+  ready?: boolean;
 };
 
 export default function CategorySelect({
@@ -41,6 +46,7 @@ export default function CategorySelect({
   onSelect,
   categories,
   userId,
+  ready = true,
 }: Props) {
   const { t } = useI18n();
   const confirm = useConfirm();
@@ -232,6 +238,7 @@ export default function CategorySelect({
           title={t('category_select.title')}
           name={selected ? selected.name : t('category_select.none_selected')}
           placeholder={!selected}
+          loading={!ready}
         />
         {/* Nothing to collapse to until a category exists, so on first run
             the slot stays empty rather than offering a way back to no

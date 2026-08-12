@@ -68,6 +68,16 @@ describe('SearchInput', () => {
     expect(clearButton()).toHaveAccessibleName(/clear/i);
   });
 
+  // Regression: the button's own box was centred in the field, but its
+  // icon was not centred within the button, so the × sat off the field's
+  // vertical centre.
+  it('centres the clear icon within its button', () => {
+    renderSearch('coin');
+    for (const cls of ['items-center', 'justify-center']) {
+      expect(clearButton()!.className).toContain(cls);
+    }
+  });
+
   it('names the field itself, which has no visible label', () => {
     const { field } = renderSearch();
     expect(field).toHaveAccessibleName(/search/i);
