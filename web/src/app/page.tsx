@@ -136,6 +136,7 @@ export default function Page() {
           onSelect={selectCategory}
           categories={categories}
           userId={userId ?? null}
+          ready={catalogueReady}
         />
 
         {!catalogueReady ? (
