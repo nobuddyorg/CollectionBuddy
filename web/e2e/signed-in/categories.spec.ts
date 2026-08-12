@@ -21,7 +21,7 @@ test.describe('managing categories', () => {
     // rename/delete controls at all.
     await page.getByTestId('expand-categories').click();
 
-    await page.getByLabel('New category').fill(name);
+    await page.getByLabel('New collection').fill(name);
     await page.getByRole('button', { name: 'Add', exact: true }).click();
 
     // Creating a category selects it and collapses the panel back down
