@@ -635,7 +635,7 @@ describe('CategorySelect', () => {
 
       expect(
         await screen.findByText(
-          'Leave "Coins"? You\'ll stop seeing it — the owner\'s copy is unaffected.',
+          'Leave "Coins"? You\'ll stop seeing it. The owner\'s copy is unaffected.',
         ),
       ).toBeVisible();
 

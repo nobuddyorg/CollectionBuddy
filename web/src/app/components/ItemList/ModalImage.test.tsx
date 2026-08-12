@@ -76,7 +76,7 @@ describe('ModalImage', () => {
   it('names the photograph with the entry title and its position', () => {
     renderModal({ imgs: [img('a'), img('b')], index: 1 });
     expect(screen.getByRole('img')).toHaveAccessibleName(
-      'Blue Mauritius — image 2',
+      'Blue Mauritius, image 2',
     );
   });
 
@@ -189,12 +189,12 @@ describe('ModalImage', () => {
         index: 1,
       });
       expect(screen.getByRole('img')).toHaveAccessibleName(
-        'Blue Mauritius — image 2',
+        'Blue Mauritius, image 2',
       );
 
       rerender({ imgs: [img('a')], index: 1 });
       expect(screen.getByRole('img')).toHaveAccessibleName(
-        'Blue Mauritius — image 1',
+        'Blue Mauritius, image 1',
       );
     });
   });
@@ -294,7 +294,7 @@ describe('ModalImage', () => {
       const many = [img('a'), img('b'), img('c'), img('d'), img('e'), img('f')];
       renderModal({ imgs: many, index: 5 });
       expect(screen.getByRole('img')).toHaveAccessibleName(
-        'Blue Mauritius — image 6',
+        'Blue Mauritius, image 6',
       );
     });
 

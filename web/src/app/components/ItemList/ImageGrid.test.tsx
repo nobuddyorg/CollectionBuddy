@@ -107,7 +107,7 @@ describe('ImageGrid', () => {
     renderGrid([img('a')]);
     const images = screen.getAllByRole('img');
     expect(images).toHaveLength(1);
-    expect(images[0]).toHaveAccessibleName('Blue Mauritius — image 1');
+    expect(images[0]).toHaveAccessibleName('Blue Mauritius, image 1');
     expect(images[0]).toHaveClass('aspect-4/3');
   });
 
@@ -170,8 +170,8 @@ describe('ImageGrid', () => {
     renderGrid([img('a'), img('b'), img('c')]);
     const images = screen.getAllByRole('img');
     expect(images).toHaveLength(3);
-    expect(images[1]).toHaveAccessibleName('Blue Mauritius — image 2');
-    expect(images[2]).toHaveAccessibleName('Blue Mauritius — image 3');
+    expect(images[1]).toHaveAccessibleName('Blue Mauritius, image 2');
+    expect(images[2]).toHaveAccessibleName('Blue Mauritius, image 3');
   });
 
   it('caps the contact strip at four thumbnails', () => {

@@ -148,7 +148,7 @@ export function SharingSection({ shares }: Props) {
               <span className="truncate min-w-0">
                 {s.invited_email}
                 <span className="text-muted-foreground">
-                  {' — '}
+                  {' · '}
                   {s.expires_at
                     ? t('category_select.share_expires_on').replace(
                         '{date}',

@@ -23,6 +23,28 @@ const toUrl = (mod: unknown): string => {
 
 const BOUNDS_PAD_RATIO = 0.015;
 
+// worldCopyJump (below) keeps the view within one world-width of the
+// primary copy, but a marker is only ever placed at its one true
+// coordinate -- so panning onto a repeated copy of the tile layer showed
+// an empty repeat until the jump snapped back. Rendering each marker once
+// per visible world copy, recomputed from the map's own bounds rather than
+// a fixed count, keeps a pin on screen at whatever pan position the viewer
+// is looking at, and scales itself if the viewport ever spans more than
+// three copies (a very wide window at a low zoom).
+const WORLD_WIDTH_DEG = 360;
+
+const visibleCopyRange = (
+  bounds: import('leaflet').LatLngBounds,
+): [number, number] => [
+  Math.floor(bounds.getWest() / WORLD_WIDTH_DEG),
+  Math.floor(bounds.getEast() / WORLD_WIDTH_DEG),
+];
+
+const sameRange = (
+  a: [number, number] | null,
+  b: [number, number],
+): boolean => a !== null && a[0] === b[0] && a[1] === b[1];
+
 // A ceiling for every automatic fit. Pins are geocoded from a place *name*
 // ("Cologne"), so they are only ever city-accurate -- and fitBounds, left
 // alone, frames a single pin or a tight cluster at the tile layer's maximum
@@ -188,56 +210,85 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
 
   useEffect(() => {
     const L = LRef.current;
-    if (!ready || !L || !mapInstance.current || !layersRef.current) return;
+    const map = mapInstance.current;
+    const layer = layersRef.current;
+    if (!ready || !L || !map || !layer) return;
 
-    layersRef.current.clearLayers();
+    const copyRangeRef = { current: null as [number, number] | null };
 
-    markers.forEach((m) => {
-      L.marker([m.lat, m.lng])
-        .addTo(layersRef.current!)
-        // A function, not a built element: at most one popup is ever open,
-        // but every geocode landing rebuilds every marker on the map (this
-        // effect re-runs per streamed-in place, not once at the end), so
-        // constructing the content eagerly meant building the full titles
-        // list for every pin on every one of those rebuilds instead of only
-        // the one a reader actually opens.
-        .bindPopup(() => popupContent(m.popupText, m.titles, m.countLabel));
-    });
+    const render = () => {
+      const range = visibleCopyRange(map.getBounds());
+      if (sameRange(copyRangeRef.current, range)) return;
+      copyRangeRef.current = range;
+
+      layer.clearLayers();
+      const [copyMin, copyMax] = range;
+      for (let copy = copyMin; copy <= copyMax; copy++) {
+        markers.forEach((m) => {
+          L.marker([m.lat, m.lng + copy * WORLD_WIDTH_DEG])
+            .addTo(layer)
+            // A function, not a built element: at most one popup is ever
+            // open, but every geocode landing rebuilds every marker on the
+            // map (this effect re-runs per streamed-in place, not once at
+            // the end), so constructing the content eagerly meant building
+            // the full titles list for every pin on every one of those
+            // rebuilds instead of only the one a reader actually opens.
+            .bindPopup(() => popupContent(m.popupText, m.titles, m.countLabel));
+        });
+      }
+    };
+
+    render();
+    map.on('moveend zoomend', render);
+    return () => {
+      map.off('moveend zoomend', render);
+    };
   }, [markers, ready]);
 
   useEffect(() => {
     const L = LRef.current;
-    if (
-      !ready ||
-      !L ||
-      !mapInstance.current ||
-      !currentLocationLayerRef.current
-    )
-      return;
+    const map = mapInstance.current;
+    const layer = currentLocationLayerRef.current;
+    if (!ready || !L || !map || !layer) return;
 
-    currentLocationLayerRef.current.clearLayers();
+    const copyRangeRef = { current: null as [number, number] | null };
 
-    if (currentLocation) {
-      const { lat, lng } = currentLocation;
-      const here = L.marker([lat, lng], {
-        // className: '' strips Leaflet's default divIcon box (a white
-        // square with its own border) so only the dot below is drawn.
-        icon: L.divIcon({
-          className: '',
-          html: `<div style="width:100%;height:100%;box-sizing:border-box;border-radius:9999px;background:${CURRENT_LOCATION_FILL};border:2px solid ${CURRENT_LOCATION_STROKE};"></div>`,
-          iconSize: [CURRENT_LOCATION_DIAMETER, CURRENT_LOCATION_DIAMETER],
-          iconAnchor: [
-            CURRENT_LOCATION_DIAMETER / 2,
-            CURRENT_LOCATION_DIAMETER / 2,
-          ],
-        }),
-        pane: 'currentLocation',
-      }).addTo(currentLocationLayerRef.current);
-      const { popupText } = currentLocation;
-      // Narrowed to a local const: TS can't carry the `if` guard's
-      // narrowing of `currentLocation.popupText` through the closure below.
-      if (popupText) here.bindPopup(() => popupContent(popupText));
-    }
+    const render = () => {
+      const range = visibleCopyRange(map.getBounds());
+      if (sameRange(copyRangeRef.current, range)) return;
+      copyRangeRef.current = range;
+
+      layer.clearLayers();
+      if (!currentLocation) return;
+
+      const { lat, lng, popupText } = currentLocation;
+      const [copyMin, copyMax] = range;
+      for (let copy = copyMin; copy <= copyMax; copy++) {
+        const here = L.marker([lat, lng + copy * WORLD_WIDTH_DEG], {
+          // className: '' strips Leaflet's default divIcon box (a white
+          // square with its own border) so only the dot below is drawn.
+          icon: L.divIcon({
+            className: '',
+            html: `<div style="width:100%;height:100%;box-sizing:border-box;border-radius:9999px;background:${CURRENT_LOCATION_FILL};border:2px solid ${CURRENT_LOCATION_STROKE};"></div>`,
+            iconSize: [CURRENT_LOCATION_DIAMETER, CURRENT_LOCATION_DIAMETER],
+            iconAnchor: [
+              CURRENT_LOCATION_DIAMETER / 2,
+              CURRENT_LOCATION_DIAMETER / 2,
+            ],
+          }),
+          pane: 'currentLocation',
+        }).addTo(layer);
+        // Narrowed to a local const: TS can't carry the `if` guard's
+        // narrowing of `currentLocation.popupText` through the closure below.
+        if (popupText) here.bindPopup(() => popupContent(popupText));
+      }
+    };
+
+    render();
+    map.on('moveend zoomend', render);
+    return () => {
+      map.off('moveend zoomend', render);
+    };
   }, [currentLocation, ready]);
 
   // The opening frame, so the map does not sit on a world view while the
