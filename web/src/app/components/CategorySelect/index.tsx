@@ -458,10 +458,7 @@ export default function CategorySelect({
               help; open, this panel's last row would otherwise butt
               straight up against that content with only a spacing gap
               between them. */}
-          <div
-            aria-hidden="true"
-            className="border-t border-border pt-3"
-          />
+          <div aria-hidden="true" className="border-t border-border pt-3" />
         </>
       )}
     </section>
