@@ -106,17 +106,20 @@ describe('ModalImage', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('closes on a backdrop click', async () => {
+  // A near-miss on Previous/Next/the counter used to fall through to a
+  // backdrop click and close the modal instead of stepping it. Only the
+  // photograph itself and the explicit Close button dismiss now.
+  it('does not close on a backdrop click away from the image', async () => {
     const { onClose } = renderModal();
     await userEvent.click(screen.getByRole('dialog'));
-    expect(onClose).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   // Regression (#511): a tap/click on the photograph itself closes the
-  // modal, the same as a tap beside it -- #355's stopPropagation made the
-  // photo the one place in the overlay that never dismissed it, which read
-  // as broken rather than deliberate. The one carved-out exception is the
-  // synthetic click that follows a swipe's touchend; see 'swiping' below.
+  // modal -- #355's stopPropagation made the photo the one place in the
+  // overlay that never dismissed it, which read as broken rather than
+  // deliberate. The one carved-out exception is the synthetic click that
+  // follows a swipe's touchend; see 'swiping' below.
   it('closes when the photograph itself is clicked', async () => {
     const { onClose } = renderModal();
     await userEvent.click(screen.getByRole('img'));

@@ -72,9 +72,12 @@ export function ModalImage({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const SWIPE_THRESHOLD_PX = 50;
   // Set only when a touch just navigated -- so the synthetic click that
-  // follows a swipe's touchend doesn't also close the modal it just
-  // paged. Any other tap (touch or mouse) falls through to the image's
-  // onClick below, which lets it close like a tap beside it (#511).
+  // follows a swipe's touchend doesn't also close the modal it just paged.
+  // Any other tap on the photograph closes it, via the image's own onClick
+  // below rather than a backdrop click: the backdrop and the strip of
+  // controls around the image no longer dismiss on their own, since a
+  // near-miss on Previous/Next/the counter used to close the modal instead
+  // of stepping it.
   const suppressImageClickRef = useRef(false);
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
@@ -141,7 +144,6 @@ export function ModalImage({
       aria-modal="true"
       aria-label={t('item_list.full_size_image_alt')}
       className="fixed inset-0 z-modal bg-background/95 backdrop-blur"
-      onClick={onClose}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
@@ -149,10 +151,7 @@ export function ModalImage({
           free to take max-h-full, a button below it landed past the bottom
           of a fixed, unscrollable overlay and could not be reached. */}
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
+        onClick={onClose}
         className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-control-border shadow-sm hover:bg-muted transition-colors"
         title={t('item_list.close_modal')}
         aria-label={t('item_list.close_modal')}
@@ -170,10 +169,7 @@ export function ModalImage({
           delete, this just doesn't offer it. */}
       {!readOnly && (
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(current);
-          }}
+          onClick={() => onDelete(current)}
           disabled={deleting || busy}
           className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted disabled:opacity-60 transition-colors"
           title={t('item_list.delete_image')}
@@ -198,35 +194,26 @@ export function ModalImage({
         // (#515) without that overlap, and swipe still works alongside it.
         <div
           aria-live="polite"
-          className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 flex items-center gap-2"
+          className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 flex items-center gap-3"
         >
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              goTo(clampedIndex - 1);
-            }}
-            // h-8 rather than the usual h-11 touch target: matched to the
-            // counter chip beside it so the bar reads as one strip instead
-            // of a tall button either side of a short pill (#515 follow-up).
-            className="h-8 w-8 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors"
+            onClick={() => goTo(clampedIndex - 1)}
+            className="min-w-11 min-h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
             title={t('item_list.previous_image')}
             aria-label={t('item_list.previous_image')}
           >
             <Icon icon={IconType.ChevronLeft} className="w-4 h-4" />
           </button>
 
-          <span className="flex h-8 items-center rounded-sm bg-card px-2.5 font-label text-[0.6875rem] text-card-foreground ring-1 ring-border shadow-sm">
+          <span className="font-label text-xs text-muted-foreground">
             {t('item_list.image_position')
               .replace('{current}', String(clampedIndex + 1))
               .replace('{total}', String(count))}
           </span>
 
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              goTo(clampedIndex + 1);
-            }}
-            className="h-8 w-8 flex items-center justify-center rounded-sm bg-card text-card-foreground ring-1 ring-border shadow-sm hover:bg-muted transition-colors"
+            onClick={() => goTo(clampedIndex + 1)}
+            className="min-w-11 min-h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
             title={t('item_list.next_image')}
             aria-label={t('item_list.next_image')}
           >
@@ -235,7 +222,7 @@ export function ModalImage({
         </div>
       )}
 
-      {/* pb reserves room for the bottom bar above (32px row + its
+      {/* pb reserves room for the bottom bar above (44px row + its
           12px/safe-area offset) the same way pt already reserves the top
           buttons' row -- fixed rather than measured, so a tall portrait
           photo's rendered edge sits above the bar instead of under it,
@@ -254,15 +241,16 @@ export function ModalImage({
           // Same reasoning as the grid: see the note in ImageGrid.tsx.
           crossOrigin="anonymous"
           className="w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg"
-          // A tap on the photo closes the modal, same as tapping the
-          // backdrop beside it (#511) -- except the tail end of a swipe that
-          // just paged to another photograph, which onTouchEnd above flags
-          // so that gesture doesn't also dismiss the thing it just changed.
-          onClick={(e) => {
+          // A tap on the photo closes the modal (#511) -- except the tail
+          // end of a swipe that just paged to another photograph, which
+          // onTouchEnd above flags so that gesture doesn't also dismiss the
+          // thing it just changed.
+          onClick={() => {
             if (suppressImageClickRef.current) {
               suppressImageClickRef.current = false;
-              e.stopPropagation();
+              return;
             }
+            onClose();
           }}
         />
       </div>
