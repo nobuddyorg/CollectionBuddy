@@ -40,10 +40,8 @@ const visibleCopyRange = (
   Math.floor(bounds.getEast() / WORLD_WIDTH_DEG),
 ];
 
-const sameRange = (
-  a: [number, number] | null,
-  b: [number, number],
-): boolean => a !== null && a[0] === b[0] && a[1] === b[1];
+const sameRange = (a: [number, number] | null, b: [number, number]): boolean =>
+  a !== null && a[0] === b[0] && a[1] === b[1];
 
 // A ceiling for every automatic fit. Pins are geocoded from a place *name*
 // ("Cologne"), so they are only ever city-accurate -- and fitBounds, left
