@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from './test';
 import { createClient } from '@supabase/supabase-js';
 
-import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
+import { CONTEXT_PATH, SEED, itemsIn, type SeedContext } from './fixtures';
 import { openCategory, visibleTitles } from './helpers';
 
 // The app's only authorization layer.
@@ -34,6 +34,44 @@ function apiAs(token: string) {
       global: { headers: { Authorization: `Bearer ${token}` } },
     },
   );
+}
+
+/** Grants `invitedEmail` read access to `categoryId`, as the category's owner. */
+async function share(
+  token: string,
+  categoryId: string,
+  invitedEmail: string,
+  window?: { createdAt: string; expiresAt: string },
+) {
+  const { data, error } = await apiAs(token)
+    .from('category_shares')
+    .insert({
+      category_id: categoryId,
+      invited_email: invitedEmail,
+      ...(window && {
+        created_at: window.createdAt,
+        expires_at: window.expiresAt,
+      }),
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+async function unshare(token: string, shareId: string) {
+  await apiAs(token).from('category_shares').delete().eq('id', shareId);
+}
+
+async function mineCategoryId(token: string, userId: string, name: string) {
+  const { data, error } = await apiAs(token)
+    .from('categories')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('name', name)
+    .single();
+  if (error) throw error;
+  return data.id;
 }
 
 test.describe('one collection cannot reach another', () => {
@@ -335,5 +373,191 @@ test.describe('one collection cannot reach another', () => {
       .eq('id', theirs!.id)
       .single();
     expect(after!.name).toBe(theirs!.name);
+  });
+});
+
+// Sharing (0011_category_shares.sql, 0012_shared_photos.sql, #483/#531) is
+// the one place this file's boundary runs the other way: not "can a
+// stranger reach my collection" but "can the person I deliberately let in
+// reach exactly as far as I said, and no further." Münzen is otherwise a
+// read-only fixture across the whole suite, so each test creates and tears
+// down its own grant rather than relying on one left in place by another.
+test.describe('a category shared with another collector', () => {
+  test('an active grant opens the category, its items, and their links -- nothing more', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const shareId = await share(token, categoryId, SEED.other.email);
+
+    try {
+      const { data: seen } = await apiAs(otherToken)
+        .from('categories')
+        .select('id')
+        .eq('id', categoryId);
+      expect(seen).toHaveLength(1);
+
+      const { data: items } = await apiAs(otherToken)
+        .from('items')
+        .select('title')
+        .eq('user_id', userId);
+      const titles = items!.map((row) => row.title);
+      for (const item of itemsIn('Münzen'))
+        expect(titles).toContain(item.title);
+
+      const { data: links } = await apiAs(otherToken)
+        .from('item_categories')
+        .select('item_id')
+        .eq('category_id', categoryId);
+      expect(links!.length).toBe(itemsIn('Münzen').length);
+
+      // A second, unshared category of the same owner stays out of reach --
+      // the grant is scoped to the one category, not to the owner as a
+      // whole.
+      const { data: unshared } = await apiAs(otherToken)
+        .from('categories')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('name', 'Briefmarken');
+      expect(unshared).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
+  test('an expired grant is refused, exactly like no grant at all', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+
+    // The check constraint only demands expires_at > created_at, not that
+    // either sits in the future -- so a grant that was already over the
+    // moment it was written is a legal row, and the sharper question is
+    // whether the access policies re-check the clock or only the row's own
+    // shape.
+    const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const shareId = await share(token, categoryId, SEED.other.email, {
+      createdAt,
+      expiresAt,
+    });
+
+    try {
+      const { data: seen } = await apiAs(otherToken)
+        .from('categories')
+        .select('id')
+        .eq('id', categoryId);
+      expect(seen).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
+  test('a grant addressed to someone else does not open the category to a bystander', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const shareId = await share(
+      token,
+      categoryId,
+      'nobody-invited@collectionbuddy.test',
+    );
+
+    try {
+      const { data: seen } = await apiAs(otherToken)
+        .from('categories')
+        .select('id')
+        .eq('id', categoryId);
+      expect(seen).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
+  // 0011/0012 add select and nothing else -- the grant is meant to be
+  // view-only. Asserted directly rather than assumed from the absence of an
+  // insert/update/delete policy, the same reasoning as the owner-side write
+  // tests above: a permissive policy added anywhere else in the chain would
+  // pass silently if this only checked that reads worked.
+  test('the grant does not extend to writing', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const shareId = await share(token, categoryId, SEED.other.email);
+
+    try {
+      const { data: renamed } = await apiAs(otherToken)
+        .from('categories')
+        .update({ name: 'taken over' })
+        .eq('id', categoryId)
+        .select('id');
+      expect(renamed).toEqual([]);
+
+      const { data: mine } = await apiAs(otherToken)
+        .from('items')
+        .select('id')
+        .eq('user_id', userId)
+        .limit(1)
+        .single();
+      const { data: updated } = await apiAs(otherToken)
+        .from('items')
+        .update({ title: 'taken over' })
+        .eq('id', mine!.id)
+        .select('id');
+      expect(updated).toEqual([]);
+
+      // Untouched, read back as the owner.
+      const { data: after } = await apiAs(token)
+        .from('categories')
+        .select('name')
+        .eq('id', categoryId)
+        .single();
+      expect(after!.name).toBe('Münzen');
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
+  // Photos extend the same grant one hop further (0012): through
+  // item_categories, not through the object's own owner-prefixed path, which
+  // never contains the grantee's uid at all.
+  test('a shared photograph can be read through the grant, and stops the moment it is revoked', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const { data: item } = await apiAs(token)
+      .from('items')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('title', itemsIn('Münzen')[0].title)
+      .single();
+    const path = `${userId}/${item!.id}/rls-share-probe.webp`;
+
+    const { error: uploadError } = await apiAs(token)
+      .storage.from('item-images')
+      .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+    expect(uploadError).toBeNull();
+
+    try {
+      const shareId = await share(token, categoryId, SEED.other.email);
+      try {
+        const { data, error } = await apiAs(otherToken)
+          .storage.from('item-images')
+          .createSignedUrl(path, 60);
+        expect(error).toBeNull();
+        expect(data).not.toBeNull();
+      } finally {
+        await unshare(token, shareId);
+      }
+
+      // The grant is gone; the object is not -- so this is the revocation
+      // itself being checked, not just an object that stopped existing.
+      const { data: after, error: afterError } = await apiAs(otherToken)
+        .storage.from('item-images')
+        .createSignedUrl(path, 60);
+      expect(after).toBeNull();
+      expect(afterError).not.toBeNull();
+    } finally {
+      await apiAs(token).storage.from('item-images').remove([path]);
+    }
   });
 });
