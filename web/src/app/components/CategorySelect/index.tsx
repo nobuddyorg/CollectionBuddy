@@ -451,6 +451,17 @@ export default function CategorySelect({
               </p>
             </div>
           )}
+
+          {/* Closes the panel off from whatever the page renders next
+              (search bar, data). Collapsed, the header's own border-b
+              already sits at the bottom of this component and needs no
+              help; open, this panel's last row would otherwise butt
+              straight up against that content with only a spacing gap
+              between them. */}
+          <div
+            aria-hidden="true"
+            className="border-t border-border pt-3"
+          />
         </>
       )}
     </section>
