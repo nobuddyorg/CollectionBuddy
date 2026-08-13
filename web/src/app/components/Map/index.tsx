@@ -30,14 +30,24 @@ const BOUNDS_PAD_RATIO = 0.015;
 // per visible world copy, recomputed from the map's own bounds rather than
 // a fixed count, keeps a pin on screen at whatever pan position the viewer
 // is looking at, and scales itself if the viewport ever spans more than
-// three copies (a very wide window at a low zoom).
+// three copies (a very wide window at a low zoom). The range is padded by
+// one extra copy either side of what the bounds strictly require, so at
+// least three copies are always drawn (a pin doesn't wait for a moveend
+// after it's already needed) and a marker right at the boundary of the
+// visible bounds isn't dropped by it.
 const WORLD_WIDTH_DEG = 360;
+const COPY_PAD = 1;
 
+// A copy's longitude span is centred on its multiple of 360 -- copy `c`
+// covers [c*360 - 180, c*360 + 180] -- so classifying a raw longitude by
+// `Math.floor(lng / 360)` alone is off by one across roughly the upper half
+// of that span. The +180 phase shift is what actually lines the floor up
+// with Leaflet's own copy boundaries.
 const visibleCopyRange = (
   bounds: import('leaflet').LatLngBounds,
 ): [number, number] => [
-  Math.floor(bounds.getWest() / WORLD_WIDTH_DEG),
-  Math.floor(bounds.getEast() / WORLD_WIDTH_DEG),
+  Math.floor((bounds.getWest() + 180) / WORLD_WIDTH_DEG) - COPY_PAD,
+  Math.floor((bounds.getEast() + 180) / WORLD_WIDTH_DEG) + COPY_PAD,
 ];
 
 const sameRange = (a: [number, number] | null, b: [number, number]): boolean =>
