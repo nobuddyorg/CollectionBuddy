@@ -13,9 +13,23 @@ Categories are the top-level grouping — you always browse one at a time.
 - **Create**: type a name in the category picker and click **+**. Names must be non-blank and are unique per account, case-insensitively (`Coins` and `coins` collide).
 - **Switch**: open the picker (if collapsed, click the expand button next to the current category name) and pick from the dropdown.
 - **Rename**: open the picker, select the category, edit the name in the text field, and confirm. The same rules as creation apply — non-blank, and unique per account case-insensitively — and the server normalises what you typed, so the name that comes back is what gets stored.
-- **Delete**: select the category, clear the search/name field, click delete, confirm. Deleting a category also deletes any items that would be left belonging to *no* category as a result — items shared with another category survive.
+- **Delete**: select the category, clear the search/name field, click delete, confirm. Deleting a category also deletes any items that would be left belonging to _no_ category as a result — items shared with another category survive.
 
-If you only ever have one category, the picker auto-collapses and auto-selects it on load, so you won't see the dropdown at all until you create a second one.
+The picker opens collapsed, on whichever category you had selected last, so you won't see the dropdown at all unless you open it yourself or haven't picked one before.
+
+## Share a category
+
+Sharing gives another CollectionBuddy account read-only access to a category: its items, tags, places, and photographs, but no ability to add, edit, or delete anything. There's no public-link option — only an existing account can be granted access.
+
+- **Share**: open the category picker, select the category, and enter the other person's email in the share field. Optionally pick an expiry date. Click the share icon. There's no separate accept step — the grant starts working the moment that email signs in, even if it's the first time.
+- **Set an expiry**: pick a date before sharing; access ends at the end of that day. Leave it blank for no expiry.
+- **Revoke access**: find the person in the shared-with list and click the trash icon beside their email, confirm.
+- **Leave a category shared with you**: a category someone else shared with you shows the same delete control as your own categories — for a shared one it leaves it instead, and doesn't affect the owner's copy.
+
+## Import and export a category
+
+- **Export**: select a category, click **Export**. Downloads a `.zip` archive containing every item's metadata and photographs. Large categories can take a while — the button reports progress, and **Cancel** stops it mid-run.
+- **Import**: click **Import** and pick a `.zip` file previously exported from CollectionBuddy. Creates a new category from its contents. If the name is already taken, it's suffixed automatically (`Coins (2)`) rather than overwriting or failing.
 
 ## Add, edit, and delete items
 
@@ -25,12 +39,12 @@ If you only ever have one category, the picker auto-collapses and auto-selects i
 
 Fields:
 
-| Field | Notes |
-| --- | --- |
-| Title | Required. |
-| Description | Optional, free text. |
-| Place | Optional. Autocompletes after 3 characters via the [Photon](https://photon.komoot.io/) geocoding API — pick a suggestion rather than typing free text if you want the item to show up on the map. |
-| Tags | Optional. Type a word, press Enter or comma to add it as a chip; Backspace on an empty tag field removes the last chip. Duplicates are ignored. |
+| Field       | Notes                                                                                                                                                                                             |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Title       | Required.                                                                                                                                                                                         |
+| Description | Optional, free text.                                                                                                                                                                              |
+| Place       | Optional. Autocompletes after 3 characters via the [Photon](https://photon.komoot.io/) geocoding API — pick a suggestion rather than typing free text if you want the item to show up on the map. |
+| Tags        | Optional. Type a word, press Enter or comma to add it as a chip; Backspace on an empty tag field removes the last chip. Duplicates are ignored.                                                   |
 
 The server trims whitespace, drops blank fields to empty, and normalizes/sorts tags — what you see after saving may be tidied up slightly from what you typed.
 
@@ -60,8 +74,8 @@ Only items with a **place** set appear — an item without one simply won't show
 
 Open the user menu (click your email in the header) for two independent toggles:
 
-- **Language** (*Sprache*): Deutsch / English. Auto-detected from your browser on first visit, then remembered.
-- **Appearance** (*Darstellung*): System / Light / Dark. The default is System, which tracks your OS setting live — including a change made while the app is open. Picking Light or Dark overrides the OS until you switch back to System. Either way the page changes as you click, and the choice is remembered on the next visit.
+- **Language** (_Sprache_): Deutsch / English. Auto-detected from your browser on first visit, then remembered.
+- **Appearance** (_Darstellung_): System / Light / Dark. The default is System, which tracks your OS setting live — including a change made while the app is open. Picking Light or Dark overrides the OS until you switch back to System. Either way the page changes as you click, and the choice is remembered on the next visit.
 
 ## Accessibility
 
