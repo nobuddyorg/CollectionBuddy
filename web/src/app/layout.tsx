@@ -165,7 +165,10 @@ export default function RootLayout({
           sizes="32x32"
           type="image/png"
         />
-        <link rel="apple-touch-icon" href={`${basePath}/apple-touch-icon.png`} />
+        <link
+          rel="apple-touch-icon"
+          href={`${basePath}/apple-touch-icon.png`}
+        />
         <link rel="shortcut icon" href={`${basePath}/favicon.ico`} />
         {/* The browser chrome around the page -- the address bar on
             Android, the status bar area of an installed app. Two entries so
