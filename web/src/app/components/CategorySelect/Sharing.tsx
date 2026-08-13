@@ -114,7 +114,17 @@ export function SharingSection({ shares }: Props) {
             className={fieldClasses('min-w-0 sm:flex-1')}
           />
           <div className="flex items-center gap-2">
-            <div className="w-44 shrink-0">
+            {/* `.ios-calendar-icon` (globals.css) is the platform gate, not
+                a breakpoint: iOS Safari is the one browser that never
+                draws `::-webkit-calendar-picker-indicator`, and it does
+                that at every viewport width (an iPad in landscape is
+                already past `sm`), so the stand-in has to key off the
+                platform, not the screen. `pointer-events-none` keeps it
+                from shadowing the tap the field already handles itself.
+                The extra `pr-9` is reserved unconditionally, since it's a
+                harmless few px of empty space on browsers that don't
+                render the icon there. */}
+            <div className="relative w-44 shrink-0">
               <input
                 id="share-expiry"
                 type="date"
@@ -123,7 +133,12 @@ export function SharingSection({ shares }: Props) {
                 onChange={(e) => setExpiryDate(e.target.value)}
                 aria-label={t('category_select.share_expiry_label')}
                 title={t('category_select.share_expiry_label')}
-                className={fieldClasses()}
+                className={fieldClasses('pr-9')}
+              />
+              <Icon
+                icon={IconType.Calendar}
+                aria-hidden="true"
+                className="ios-calendar-icon pointer-events-none absolute right-3 top-1/2 w-4 h-4 -translate-y-1/2 text-muted-foreground"
               />
             </div>
             <IconButton
