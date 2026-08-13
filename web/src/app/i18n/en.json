@@ -102,7 +102,8 @@
     "search_error": "Place search failed. Please try again.",
     "save_error": "Could not save this entry. Please try again.",
     "entry_added": "Entry added.",
-    "confirm_discard": "Discard your changes?"
+    "confirm_discard": "Discard your changes?",
+    "new_entry_disabled_shared": "Only the owner can add entries to a shared collection."
   },
   "item_list": {
     "confirm_delete": "Delete this entry? It and every one of its photographs will be permanently deleted. This cannot be undone.",

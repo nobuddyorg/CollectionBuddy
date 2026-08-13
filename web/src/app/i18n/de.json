@@ -102,7 +102,8 @@
     "search_error": "Ortssuche fehlgeschlagen. Bitte erneut versuchen.",
     "save_error": "Eintrag konnte nicht gespeichert werden. Bitte erneut versuchen.",
     "entry_added": "Eintrag hinzugefügt.",
-    "confirm_discard": "Änderungen verwerfen?"
+    "confirm_discard": "Änderungen verwerfen?",
+    "new_entry_disabled_shared": "Nur der Eigentümer kann Einträge zu einer geteilten Sammlung hinzufügen."
   },
   "item_list": {
     "confirm_delete": "Diesen Eintrag löschen? Er und alle zugehörigen Fotos werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",

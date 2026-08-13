@@ -91,15 +91,16 @@ export function SharingSection({ shares }: Props) {
             fixed by its className alone -- it swings with its value (an
             empty input draws narrower than a filled one), which used to
             fight an `auto` grid track and squeeze the email field on every
-            date pick. The `w-32` wrapper below pins the track so that swing
+            date pick. The `w-44` wrapper below pins the track so that swing
             can't propagate -- putting the width on a wrapper instead of the
             input itself, since `fieldClasses` already bakes in `w-full` and
             two same-specificity width utilities don't reliably resolve by
-            their order in the className string. `w-36` is wide enough for
-            the full `mm/dd/yyyy` rendering with the field's own padding;
-            narrower clips the month. Stacking here also gives the email
-            field room to breathe on a phone instead of the three controls
-            fighting over one row. */}
+            their order in the className string. `w-36` clipped the date on
+            desktop, where the browser's own calendar-icon affordance eats
+            into the same padded box that `mm/dd/yyyy` needs (#549); `w-44`
+            leaves it room. Stacking here also gives the email field room to
+            breathe on a phone instead of the three controls fighting over
+            one row. */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
             id="share-email"
@@ -113,7 +114,7 @@ export function SharingSection({ shares }: Props) {
             className={fieldClasses('min-w-0 sm:flex-1')}
           />
           <div className="flex items-center gap-2">
-            <div className="w-36 shrink-0">
+            <div className="w-44 shrink-0">
               <input
                 id="share-expiry"
                 type="date"
