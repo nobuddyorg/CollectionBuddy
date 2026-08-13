@@ -53,7 +53,13 @@ async function acceptDeleteConfirmation() {
 // on setItems would let a stale closure pass by never observing it.
 function useHarness(
   initial: ItemLite[],
-  deleteAllItemImages: (itemId: string) => Promise<void>,
+  captureItemImagePaths: (
+    itemId: string,
+  ) => Promise<{ path_full: string; path_thumb: string | null }[]>,
+  removeImageBytes: (
+    itemId: string,
+    paths: { path_full: string; path_thumb: string | null }[],
+  ) => Promise<void>,
   reload: (opts?: { silent?: boolean }) => Promise<void>,
 ) {
   const [items, setItems] = useState<ItemLite[]>(initial);
@@ -61,7 +67,8 @@ function useHarness(
     items,
     setItems,
     reload,
-    deleteAllItemImages,
+    captureItemImagePaths,
+    removeImageBytes,
   });
   return { items, ...mutations };
 }
@@ -82,14 +89,16 @@ describe('useItemMutations removeItem', () => {
     vi.mocked(deleteItem).mockResolvedValue({
       error: new Error('offline'),
     } as never);
-    const deleteAllItemImages = vi.fn();
+    const captureItemImagePaths = vi.fn().mockResolvedValue([]);
+    const removeImageBytes = vi.fn();
     const reload = vi.fn();
 
     const { result } = renderHook(
       () =>
         useHarness(
           [item('a'), item('b'), item('c')],
-          deleteAllItemImages,
+          captureItemImagePaths,
+          removeImageBytes,
           reload,
         ),
       { wrapper },
@@ -105,20 +114,24 @@ describe('useItemMutations removeItem', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Could not delete this entry. Please try again.',
     );
-    // The row was never actually deleted, so nothing past it should have
-    // run: no image cleanup, no resync of the page.
-    expect(deleteAllItemImages).not.toHaveBeenCalled();
+    // The paths were captured (a read, harmless either way), but the row
+    // was never actually deleted, so nothing that acts on them should have
+    // run: no byte removal, no resync of the page.
+    expect(captureItemImagePaths).toHaveBeenCalledWith('b');
+    expect(removeImageBytes).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
   });
 
   // deleteItem succeeding is the point of no return: the row is gone,
-  // irreversibly, before deleteAllItemImages is ever called. A cleanup
+  // irreversibly, before removeImageBytes is ever called. A cleanup
   // failure here is a storage leak, not data loss -- there is no entry
   // left to restore, and restoring one would resurrect a card the
   // database no longer has.
   it('does not restore the item when deleteItem succeeds but image cleanup fails', async () => {
     vi.mocked(deleteItem).mockResolvedValue({ error: null } as never);
-    const deleteAllItemImages = vi
+    const capturedPaths = [{ path_full: 'b/a.webp', path_thumb: null }];
+    const captureItemImagePaths = vi.fn().mockResolvedValue(capturedPaths);
+    const removeImageBytes = vi
       .fn()
       .mockRejectedValue(new Error('storage down'));
     const reload = vi.fn().mockResolvedValue(undefined);
@@ -130,7 +143,8 @@ describe('useItemMutations removeItem', () => {
       () =>
         useHarness(
           [item('a'), item('b'), item('c')],
-          deleteAllItemImages,
+          captureItemImagePaths,
+          removeImageBytes,
           reload,
         ),
       { wrapper },
@@ -146,20 +160,28 @@ describe('useItemMutations removeItem', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'This entry was deleted, but its photographs could not be removed and may still count against your storage.',
     );
+    expect(removeImageBytes).toHaveBeenCalledWith('b', capturedPaths);
     expect(reload).toHaveBeenCalledWith({ silent: true });
     consoleError.mockRestore();
   });
 
   // The index is captured before the optimistic removal specifically so a
   // cancelled confirmation -- which never removes anything -- has nothing
-  // to undo. Guards the early return actually being early: neither the
-  // network call nor the optimistic removal should fire at all.
+  // to undo. Guards the early return actually being early: no read, no
+  // network call, and no optimistic removal should fire at all.
   it('removes nothing and calls deleteItem for nothing when the confirmation is declined', async () => {
-    const deleteAllItemImages = vi.fn();
+    const captureItemImagePaths = vi.fn();
+    const removeImageBytes = vi.fn();
     const reload = vi.fn();
 
     const { result } = renderHook(
-      () => useHarness([item('a'), item('b')], deleteAllItemImages, reload),
+      () =>
+        useHarness(
+          [item('a'), item('b')],
+          captureItemImagePaths,
+          removeImageBytes,
+          reload,
+        ),
       { wrapper },
     );
 
@@ -169,6 +191,7 @@ describe('useItemMutations removeItem', () => {
     await userEvent.click(await screen.findByTestId('confirm-cancel'));
 
     expect(result.current.items.map((i) => i.id)).toEqual(['a', 'b']);
+    expect(captureItemImagePaths).not.toHaveBeenCalled();
     expect(deleteItem).not.toHaveBeenCalled();
   });
 });

@@ -5,7 +5,6 @@ import {
   exportCategory,
   ITEM_PAGE_SIZE,
   LARGE_EXPORT_WARN_BYTES,
-  LISTING_CONCURRENCY,
   PHOTO_DOWNLOAD_CONCURRENCY,
   PHOTO_FETCH_TIMEOUT_MS,
   SIGN_BATCH_SIZE,
@@ -62,27 +61,38 @@ function paginatedListItems(allItems: ExportItem[]): ListItems {
   })) as unknown as ListItems;
 }
 
-// Stands in for `listAllImageObjects`, keyed by the exact `${uid}/${itemId}`
-// prefix exportCategory builds. `metadata: null` the same as a real object
-// with no size reported -- the tests below that care about size use
-// fakeListImagesWithSizes instead.
-function fakeListImages(byPrefix: Record<string, string[]>): ListImages {
-  return async (prefix: string) => ({
-    data: (byPrefix[prefix] ?? []).map((name) => ({ name, metadata: null })),
+// Stands in for `listExportImagesForItems`, keyed by item id -- the table
+// this replaced Storage listing with already carries the full `uid/itemId/
+// name` path on every row, so the fake builds the same path shape a real
+// row would rather than requiring the caller to construct one. `size_bytes:
+// null` the same as a real row with no size reported -- the tests below
+// that care about size use fakeListImagesWithSizes instead.
+function fakeListImages(byItemId: Record<string, string[]>): ListImages {
+  return async (itemIds: string[]) => ({
+    data: itemIds.flatMap((itemId) =>
+      (byItemId[itemId] ?? []).map((name) => ({
+        item_id: itemId,
+        path_full: `uid/${itemId}/${name}`,
+        size_bytes: null,
+      })),
+    ),
     error: null,
   });
 }
 
 // Same shape, but each name carries the byte size #428's total-size check
-// reads out of `metadata.size`.
+// reads out of `size_bytes`.
 function fakeListImagesWithSizes(
-  byPrefix: Record<string, { name: string; size: number }[]>,
+  byItemId: Record<string, { name: string; size: number }[]>,
 ): ListImages {
-  return async (prefix: string) => ({
-    data: (byPrefix[prefix] ?? []).map(({ name, size }) => ({
-      name,
-      metadata: { size },
-    })),
+  return async (itemIds: string[]) => ({
+    data: itemIds.flatMap((itemId) =>
+      (byItemId[itemId] ?? []).map(({ name, size }) => ({
+        item_id: itemId,
+        path_full: `uid/${itemId}/${name}`,
+        size_bytes: size,
+      })),
+    ),
     error: null,
   });
 }
@@ -227,311 +237,11 @@ describe('exportCategory', () => {
       category: { id: 'cat', name: 'Coins' },
       getSession: fakeGetSession('uid'),
       listItems: paginatedListItems([item({ id: 'a' })]),
-      listImages: fakeListImages({ 'uid/a': ['1.webp'] }),
+      listImages: fakeListImages({ 'a': ['1.webp'] }),
       signUrls,
     });
     expect(result.skippedPhotoCount).toBe(1);
     expect(result.photoCount).toBe(0);
-  });
-
-  // #417: one item whose listing can never succeed used to reject the
-  // `Promise.all` covering every item's listing and abort the whole export
-  // -- a shape the signing batch and the download retry loop both already
-  // avoided. It now skips just that item's photographs, the same way a
-  // photograph that cannot be fetched is skipped rather than failing
-  // everything (#414).
-  describe('a photograph listing that fails', () => {
-    it('skips only that item, counts it, and still exports the rest', async () => {
-      const consoleError = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-      const listingError = { message: 'not found', status: 404 };
-      const listImages = (async (prefix: string) =>
-        prefix === 'uid/broken'
-          ? { data: null, error: listingError }
-          : {
-              data: [{ name: '1.webp' }],
-              error: null,
-            }) as unknown as ListImages;
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async () => okResponse([1])),
-      );
-      try {
-        const result = await exportCategory({
-          category: { id: 'cat', name: 'Coins' },
-          getSession: fakeGetSession('uid'),
-          listItems: paginatedListItems([
-            item({ id: 'broken' }),
-            item({ id: 'ok' }),
-          ]),
-          listImages,
-          signUrls: fakeSignUrls(),
-        });
-
-        expect(result.skippedItemCount).toBe(1);
-        expect(result.itemCount).toBe(2);
-        expect(result.photoCount).toBe(1);
-        expect(result.skippedPhotoCount).toBe(0);
-        expect(consoleError).toHaveBeenCalledWith(
-          "Skipping item's photographs",
-          'broken',
-          listingError,
-        );
-      } finally {
-        consoleError.mockRestore();
-        vi.unstubAllGlobals();
-      }
-    });
-
-    it('is not retried when the status says so permanently, the same as a 404 photograph fetch', async () => {
-      let calls = 0;
-      const listImages = (async () => {
-        calls++;
-        return { data: null, error: { message: 'not found', status: 404 } };
-      }) as unknown as ListImages;
-      const result = await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages,
-        signUrls: fakeSignUrls(),
-      });
-      expect(calls).toBe(1);
-      expect(result.skippedItemCount).toBe(1);
-    });
-
-    it('retries a transient failure and includes the item once it succeeds', async () => {
-      vi.useFakeTimers();
-      let calls = 0;
-      const listImages = (async () => {
-        calls++;
-        return calls < 3
-          ? { data: null, error: { message: 'rate limited', status: 429 } }
-          : { data: [{ name: '1.webp' }], error: null };
-      }) as unknown as ListImages;
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async () => okResponse([1])),
-      );
-      try {
-        const promise = exportCategory({
-          category: { id: 'cat', name: 'Coins' },
-          getSession: fakeGetSession('uid'),
-          listItems: paginatedListItems([item({ id: 'a' })]),
-          listImages,
-          signUrls: fakeSignUrls(),
-        });
-        await vi.advanceTimersByTimeAsync(10_000);
-        const result = await promise;
-        expect(calls).toBe(3);
-        expect(result.skippedItemCount).toBe(0);
-        expect(result.photoCount).toBe(1);
-      } finally {
-        vi.useRealTimers();
-        vi.unstubAllGlobals();
-      }
-    });
-
-    it('gives up after exactly three attempts on a persistently retryable failure, not fewer or more', async () => {
-      vi.useFakeTimers();
-      let calls = 0;
-      const listImages = (async () => {
-        calls++;
-        return { data: null, error: { message: 'down', status: 503 } };
-      }) as unknown as ListImages;
-      try {
-        const promise = exportCategory({
-          category: { id: 'cat', name: 'Coins' },
-          getSession: fakeGetSession('uid'),
-          listItems: paginatedListItems([item({ id: 'a' })]),
-          listImages,
-          signUrls: fakeSignUrls(),
-        });
-        await vi.advanceTimersByTimeAsync(10_000);
-        const result = await promise;
-        expect(calls).toBe(3);
-        expect(result.skippedItemCount).toBe(1);
-        expect(result.itemCount).toBe(1);
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-
-    // A rejected promise (network failure) carries no `status` at all --
-    // treated as retryable, the same reasoning `fetchPhotoBytes` already
-    // applies to a `fetch` that rejects outright rather than resolving with
-    // a bad status.
-    it('retries a listing call that rejects outright, not just one that resolves with an error', async () => {
-      vi.useFakeTimers();
-      let calls = 0;
-      const listImages = (async () => {
-        calls++;
-        if (calls < 2) throw new TypeError('network error');
-        return { data: [{ name: '1.webp' }], error: null };
-      }) as unknown as ListImages;
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async () => okResponse([1])),
-      );
-      try {
-        const promise = exportCategory({
-          category: { id: 'cat', name: 'Coins' },
-          getSession: fakeGetSession('uid'),
-          listItems: paginatedListItems([item({ id: 'a' })]),
-          listImages,
-          signUrls: fakeSignUrls(),
-        });
-        await vi.advanceTimersByTimeAsync(10_000);
-        const result = await promise;
-        expect(calls).toBe(2);
-        expect(result.skippedItemCount).toBe(0);
-        expect(result.photoCount).toBe(1);
-      } finally {
-        vi.useRealTimers();
-        vi.unstubAllGlobals();
-      }
-    });
-
-    // A returned `{ error }` with no `status` at all (a shape the Storage
-    // client does not promise never to produce) must not be mistaken for a
-    // permanent failure the way a real 4xx is -- it is retried, the same as
-    // the thrown-rejection case above.
-    it('retries when the returned error carries no status at all', async () => {
-      vi.useFakeTimers();
-      let calls = 0;
-      const listImages = (async () => {
-        calls++;
-        return calls < 2
-          ? { data: null, error: { message: 'unrecognised shape' } }
-          : { data: [{ name: '1.webp' }], error: null };
-      }) as unknown as ListImages;
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async () => okResponse([1])),
-      );
-      try {
-        const promise = exportCategory({
-          category: { id: 'cat', name: 'Coins' },
-          getSession: fakeGetSession('uid'),
-          listItems: paginatedListItems([item({ id: 'a' })]),
-          listImages,
-          signUrls: fakeSignUrls(),
-        });
-        await vi.advanceTimersByTimeAsync(10_000);
-        const result = await promise;
-        expect(calls).toBe(2);
-        expect(result.skippedItemCount).toBe(0);
-      } finally {
-        vi.useRealTimers();
-        vi.unstubAllGlobals();
-      }
-    });
-
-    // Mirrors "waits exponentially longer between retries" for the
-    // photograph fetch below: the backoff must be 500ms, then 1000ms --
-    // not a fixed, shrinking, or off-by-one delay -- and a listing that is
-    // about to fail permanently for the last time is still logged with the
-    // error that actually happened, not a blank one.
-    it('waits exponentially longer between listing retries, and logs the exhausted error', async () => {
-      vi.useFakeTimers();
-      const consoleError = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-      let calls = 0;
-      const rejection = new TypeError('network error');
-      const listImages = (async () => {
-        calls++;
-        throw rejection;
-      }) as unknown as ListImages;
-      try {
-        const promise = exportCategory({
-          category: { id: 'cat', name: 'Coins' },
-          getSession: fakeGetSession('uid'),
-          listItems: paginatedListItems([item({ id: 'a' })]),
-          listImages,
-          signUrls: fakeSignUrls(),
-        });
-
-        // The first attempt is immediate.
-        await vi.advanceTimersByTimeAsync(0);
-        expect(calls).toBe(1);
-
-        // The second waits LISTING_RETRY_BASE_MS (500ms) -- not less, not more.
-        await vi.advanceTimersByTimeAsync(499);
-        expect(calls).toBe(1);
-        await vi.advanceTimersByTimeAsync(1);
-        expect(calls).toBe(2);
-
-        // The third waits twice that (1000ms): the backoff grows, it
-        // doesn't repeat or shrink.
-        await vi.advanceTimersByTimeAsync(999);
-        expect(calls).toBe(2);
-        await vi.advanceTimersByTimeAsync(1);
-        expect(calls).toBe(3);
-
-        const result = await promise;
-        expect(result.skippedItemCount).toBe(1);
-        expect(consoleError).toHaveBeenCalledWith(
-          "Skipping item's photographs",
-          'a',
-          rejection,
-        );
-      } finally {
-        vi.useRealTimers();
-        consoleError.mockRestore();
-      }
-    });
-  });
-
-  it('lists photographs through a bounded pool, not one unbounded burst', async () => {
-    const items = Array.from({ length: LISTING_CONCURRENCY + 4 }, (_, i) =>
-      item({ id: `item-${i}` }),
-    );
-    let inFlight = 0;
-    let maxInFlight = 0;
-    const release: Array<() => void> = [];
-    const listImages = vi.fn(
-      () =>
-        new Promise((resolve) => {
-          inFlight++;
-          maxInFlight = Math.max(maxInFlight, inFlight);
-          release.push(() => {
-            inFlight--;
-            resolve({ data: [], error: null });
-          });
-        }),
-    ) as unknown as ListImages;
-
-    const promise = exportCategory({
-      category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
-      listItems: paginatedListItems(items),
-      listImages,
-      signUrls: fakeSignUrls(),
-    });
-
-    // Every runner the pool will ever start for this batch starts up
-    // front, all blocked on the same never-yet-resolved listing -- so once
-    // this many are pending, no more can appear no matter how much longer
-    // real time is given to prove it.
-    await vi.waitFor(() => expect(release.length).toBe(LISTING_CONCURRENCY));
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(release.length).toBe(LISTING_CONCURRENCY);
-    expect(maxInFlight).toBe(LISTING_CONCURRENCY);
-
-    // Releasing one at a time lets the pool pull in the next item behind
-    // it, the same way real listings would resolve at their own pace --
-    // draining the whole batch at once would only prove the pool can
-    // start that many, not that it keeps replacing them one for one.
-    for (let released = 0; released < items.length; released++) {
-      await vi.waitFor(() => expect(release.length).toBeGreaterThan(0));
-      release.shift()!();
-    }
-
-    const result = await promise;
-    expect(result.itemCount).toBe(items.length);
-    expect(result.skippedItemCount).toBe(0);
   });
 
   it('throws when signing fails, rather than exporting with unreadable photo URLs', async () => {
@@ -544,7 +254,7 @@ describe('exportCategory', () => {
       category: { id: 'cat', name: 'Coins' },
       getSession: fakeGetSession('uid'),
       listItems: paginatedListItems([item({ id: 'a' })]),
-      listImages: fakeListImages({ 'uid/a': ['1.webp'] }),
+      listImages: fakeListImages({ 'a': ['1.webp'] }),
       signUrls,
     });
     await expect(failure).rejects.toThrow('Could not sign photograph URLs');
@@ -572,7 +282,7 @@ describe('exportCategory', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImages({
-          'uid/a': paths.map((p) => p.split('/').at(-1)!),
+          'a': paths.map((p) => p.split('/').at(-1)!),
         }),
         signUrls: signUrls as unknown as SignUrls,
       });
@@ -606,7 +316,7 @@ describe('exportCategory', () => {
         category: { id: 'cat', name: 'Coins' },
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImages({ 'uid/a': paths }),
+        listImages: fakeListImages({ 'a': paths }),
         signUrls: signUrls as unknown as SignUrls,
       });
       // A count exactly at the boundary looks identical to one past it
@@ -709,7 +419,7 @@ describe('exportCategory', () => {
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
           listImages: fakeListImages({
-            'uid/item-1': ['1.webp', '2.webp'],
+            'item-1': ['1.webp', '2.webp'],
           }),
           signUrls: fakeSignUrls(),
         });
@@ -764,7 +474,7 @@ describe('exportCategory', () => {
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
           listImages: fakeListImages({
-            'uid/item-1': ['1.webp', '2.webp'],
+            'item-1': ['1.webp', '2.webp'],
           }),
           signUrls,
         });
@@ -796,7 +506,7 @@ describe('exportCategory', () => {
           category: { id: 'cat', name: 'Coins' },
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
-          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          listImages: fakeListImages({ 'item-1': ['1.webp'] }),
           signUrls: fakeSignUrls(),
         });
         // Two backoff waits stand between the first attempt and the third.
@@ -826,7 +536,7 @@ describe('exportCategory', () => {
           category: { id: 'cat', name: 'Coins' },
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
-          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          listImages: fakeListImages({ 'item-1': ['1.webp'] }),
           signUrls: fakeSignUrls(),
         });
         await vi.advanceTimersByTimeAsync(10_000);
@@ -860,7 +570,7 @@ describe('exportCategory', () => {
           category: { id: 'cat', name: 'Coins' },
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
-          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          listImages: fakeListImages({ 'item-1': ['1.webp'] }),
           signUrls: fakeSignUrls(),
         });
         await vi.advanceTimersByTimeAsync(10_000);
@@ -896,8 +606,8 @@ describe('exportCategory', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems(items),
         listImages: fakeListImages({
-          'uid/a': ['1.webp'],
-          'uid/b': ['1.webp'],
+          'a': ['1.webp'],
+          'b': ['1.webp'],
         }),
         signUrls: fakeSignUrls(),
       });
@@ -934,7 +644,7 @@ describe('exportCategory', () => {
         category: { id: 'cat', name: 'Coins' },
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImages({ 'uid/a': ['1.webp'] }),
+        listImages: fakeListImages({ 'a': ['1.webp'] }),
         signUrls: fakeSignUrls(),
       });
       const entries = await readZipEntries(result.blob);
@@ -961,8 +671,8 @@ describe('exportCategory', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' }), item({ id: 'b' })]),
         listImages: fakeListImages({
-          'uid/a': ['1.webp'],
-          'uid/b': ['1.webp'],
+          'a': ['1.webp'],
+          'b': ['1.webp'],
         }),
         signUrls: fakeSignUrls(),
       });
@@ -995,7 +705,7 @@ describe('exportCategory', () => {
         category: { id: 'cat', name: 'Coins' },
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImages({ 'uid/a': ['1.webp'] }),
+        listImages: fakeListImages({ 'a': ['1.webp'] }),
         signUrls: signUrls as unknown as SignUrls,
       });
       // 6 hours, not 6 seconds -- a large export on a slow connection can
@@ -1019,7 +729,7 @@ describe('exportCategory', () => {
         category: { id: 'cat', name: 'Coins' },
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
       });
       expect(consoleError).toHaveBeenCalledWith(
@@ -1052,7 +762,7 @@ describe('exportCategory', () => {
         category: { id: 'cat', name: 'Coins' },
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
       });
       await vi.advanceTimersByTimeAsync(10_000);
@@ -1081,7 +791,7 @@ describe('exportCategory', () => {
         category: { id: 'cat', name: 'Coins' },
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
       });
 
@@ -1129,7 +839,7 @@ describe('exportCategory', () => {
           category: { id: 'cat', name: 'Coins' },
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
-          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          listImages: fakeListImages({ 'item-1': ['1.webp'] }),
           signUrls: fakeSignUrls(),
         });
         await vi.advanceTimersByTimeAsync(10_000);
@@ -1156,7 +866,7 @@ describe('exportCategory', () => {
         category: { id: 'cat', name: 'Coins' },
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls,
       });
       const [, , err] = consoleError.mock.calls[0] as unknown[];
@@ -1194,7 +904,7 @@ describe('exportCategory', () => {
           category: { id: 'cat', name: 'Coins' },
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
-          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          listImages: fakeListImages({ 'item-1': ['1.webp'] }),
           signUrls: fakeSignUrls(),
         });
         await expect(failure).rejects.toBeInstanceOf(zipModule.ZipLimitError);
@@ -1237,7 +947,7 @@ describe('exportCategory', () => {
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
           listImages: fakeListImages({
-            'uid/item-1': Array.from(
+            'item-1': Array.from(
               { length: photoCount },
               (_, i) => `${i}.webp`,
             ),
@@ -1275,7 +985,7 @@ describe('exportCategory', () => {
           category: { id: 'cat', name: 'Coins' },
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
-          listImages: fakeListImages({ 'uid/item-1': ['0.webp', '1.webp'] }),
+          listImages: fakeListImages({ 'item-1': ['0.webp', '1.webp'] }),
           signUrls: fakeSignUrls(),
         });
         await expect(failure).rejects.toHaveProperty('message', 'limit-1');
@@ -1301,7 +1011,7 @@ describe('exportCategory', () => {
           category: { id: 'cat', name: 'Coins' },
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
-          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          listImages: fakeListImages({ 'item-1': ['1.webp'] }),
           signUrls: fakeSignUrls(),
         });
         expect(timeoutSpy).toHaveBeenCalledWith(PHOTO_FETCH_TIMEOUT_MS);
@@ -1329,7 +1039,7 @@ describe('exportCategory', () => {
           category: { id: 'cat', name: 'Coins' },
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
-          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          listImages: fakeListImages({ 'item-1': ['1.webp'] }),
           signUrls: fakeSignUrls(),
           signal: controller.signal,
         });
@@ -1360,7 +1070,7 @@ describe('exportCategory', () => {
           category: { id: 'cat', name: 'Coins' },
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
-          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          listImages: fakeListImages({ 'item-1': ['1.webp'] }),
           signUrls: fakeSignUrls(),
         });
         await vi.advanceTimersByTimeAsync(10_000);
@@ -1416,7 +1126,7 @@ describe('exportCategory', () => {
           item({ id: `item-${i}` }),
         );
         const listImages = fakeListImages(
-          Object.fromEntries(items.map((it) => [`uid/${it.id}`, ['1.webp']])),
+          Object.fromEntries(items.map((it) => [it.id, ['1.webp']])),
         );
         const failure = exportCategory({
           category: { id: 'cat', name: 'Coins' },
@@ -1454,7 +1164,7 @@ describe('exportCategory', () => {
           category: { id: 'cat', name: 'Coins' },
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
-          listImages: fakeListImages({ 'uid/item-1': ['1.webp'] }),
+          listImages: fakeListImages({ 'item-1': ['1.webp'] }),
           signUrls: fakeSignUrls(),
           signal: controller.signal,
         });
@@ -1502,7 +1212,7 @@ describe('exportCategory', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({
-          'uid/item-1': Array.from(
+          'item-1': Array.from(
             { length: photoCount },
             (_, i) => `${i}.webp`,
           ),
@@ -1548,7 +1258,7 @@ describe('confirmLargeExport', () => {
       getSession: fakeGetSession('uid'),
       listItems: paginatedListItems([item({ id: 'a' })]),
       listImages: fakeListImagesWithSizes({
-        'uid/a': [{ name: '1.webp', size: 1024 }],
+        'a': [{ name: '1.webp', size: 1024 }],
       }),
       signUrls: fakeSignUrls(),
       confirmLargeExport,
@@ -1569,7 +1279,7 @@ describe('confirmLargeExport', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImagesWithSizes({
-          'uid/a': [{ name: '1.webp', size: bigSize }],
+          'a': [{ name: '1.webp', size: bigSize }],
         }),
         signUrls: fakeSignUrls(),
         confirmLargeExport,
@@ -1592,7 +1302,7 @@ describe('confirmLargeExport', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImagesWithSizes({
-          'uid/a': [{ name: '1.webp', size: bigSize }],
+          'a': [{ name: '1.webp', size: bigSize }],
         }),
         signUrls: fakeSignUrls(),
         confirmLargeExport,
@@ -1616,7 +1326,7 @@ describe('confirmLargeExport', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImagesWithSizes({
-          'uid/a': [{ name: '1.webp', size: bigSize }],
+          'a': [{ name: '1.webp', size: bigSize }],
         }),
         signUrls: fakeSignUrls(),
       });
@@ -1626,7 +1336,11 @@ describe('confirmLargeExport', () => {
     }
   });
 
-  it('sums sizes across every item, and leaves thumbnails out of the total', async () => {
+  // Unlike the old Storage-listing shape, there is no separate "thumbnail
+  // object" for this query to filter out of the total: listExportImagesForItems
+  // only ever selects path_full/size_bytes, never path_thumb, so a
+  // thumbnail's size structurally cannot reach this sum in the first place.
+  it('sums sizes across every item', async () => {
     const confirmLargeExport = vi.fn().mockResolvedValue(true);
     const half = LARGE_EXPORT_WARN_BYTES / 2 + 1;
     vi.stubGlobal(
@@ -1639,14 +1353,8 @@ describe('confirmLargeExport', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' }), item({ id: 'b' })]),
         listImages: fakeListImagesWithSizes({
-          'uid/a': [
-            { name: '1.webp', size: half },
-            // A thumbnail this large would tip the total over the
-            // threshold too -- proving it is genuinely excluded, not just
-            // small enough not to matter.
-            { name: '1.thumb.webp', size: LARGE_EXPORT_WARN_BYTES },
-          ],
-          'uid/b': [{ name: '1.webp', size: half }],
+          a: [{ name: '1.webp', size: half }],
+          b: [{ name: '1.webp', size: half }],
         }),
         signUrls: fakeSignUrls(),
         confirmLargeExport,

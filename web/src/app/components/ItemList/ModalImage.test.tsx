@@ -8,6 +8,7 @@ import { ModalImage } from './ModalImage';
 import type { ImgEntry } from './types';
 
 const img = (n: string): ImgEntry => ({
+  id: `id-${n}`,
   pathFull: `${n}.webp`,
   urlFull: `https://example.test/${n}.webp`,
 });

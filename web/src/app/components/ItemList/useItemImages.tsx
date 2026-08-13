@@ -1,65 +1,46 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { currentUserId, verifiedUserId } from '../../data/auth';
+import { verifiedUserId } from '../../data/auth';
 import {
+  createImageRow,
   createSignedUrls,
+  deleteImageRow,
   imagePrefix,
-  listAllImageObjects,
-  listItemImages,
+  listImagePathsForItems,
+  listImagesForItems,
   removeImageObjects,
-  removeItemImages,
   uploadImageObject,
+  type ImageListRow,
 } from '../../data/images';
 import type { ImgEntry } from './types';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
 import { useI18n } from '../../i18n/useI18n';
-import {
-  cacheListing,
-  cacheSignedUrls,
-  getCachedListing,
-  getCachedSignedUrl,
-  invalidateListing,
-  unsignedPaths,
-} from './imageCache';
+import { cacheSignedUrls, getCachedSignedUrl, unsignedPaths } from './imageCache';
 
-export type StorageObjectRow = { name: string };
-export type ImageEntryData = { pathFull: string; pathThumb?: string };
+export type ImageEntryData = { id: string; pathFull: string; pathThumb?: string };
 
-// Groups a flat listing of `<base>.webp` / `<base>.thumb.webp` objects into
-// full+thumb pairs, keyed by base name, with paths prefixed for signing.
-//
-// Listing order is carried through to the returned map, and from there to the
-// order the grid hangs its photographs in, so it is load-bearing rather than
-// incidental -- see IMAGE_LIST_SORT for what that order has to be and why.
-export function pairImageEntries(
-  data: StorageObjectRow[],
-  prefix: string,
-): Map<string, ImageEntryData> {
-  const pairs = new Map<
-    string,
-    { full?: { name: string }; thumb?: { name: string } }
-  >();
-  for (const o of data) {
-    const name = o.name;
-    const base = name.endsWith('.thumb.webp')
-      ? name.replace(/\.thumb\.webp$/, '')
-      : name.replace(/\.webp$/, '');
-    const slot = pairs.get(base) ?? {};
-    if (name.endsWith('.thumb.webp')) slot.thumb = { name };
-    else slot.full = { name };
-    pairs.set(base, slot);
-  }
-
-  const entryData = new Map<string, ImageEntryData>();
-  for (const [base, { full, thumb }] of pairs) {
-    if (!full) continue;
-    entryData.set(base, {
-      pathFull: `${prefix}/${full.name}`,
-      pathThumb: thumb ? `${prefix}/${thumb.name}` : undefined,
+// A DB row already is a full/thumb pair -- no filename-derived grouping
+// needed, unlike the old storage.list()-based pairing this replaced. Groups
+// a flat multi-item row set into one entry map per item, keyed by the row's
+// own id, and keeps rows in the order the query returned them (oldest
+// first, per item -- see listImagesForItems), which is what puts the
+// grid's photographs in the right order: the first shot of an item keeps
+// the hero slot however many more are added (#265).
+export function groupImageRows(
+  rows: ImageListRow[],
+): Map<string, Map<string, ImageEntryData>> {
+  const byItem = new Map<string, Map<string, ImageEntryData>>();
+  for (const row of rows) {
+    const entryData = byItem.get(row.item_id) ?? new Map<string, ImageEntryData>();
+    entryData.set(row.id, {
+      id: row.id,
+      pathFull: row.path_full,
+      pathThumb: row.path_thumb ?? undefined,
     });
+    byItem.set(row.item_id, entryData);
   }
-  return entryData;
+  return byItem;
 }
 
 export function toImgEntries(
@@ -71,6 +52,7 @@ export function toImgEntries(
     const urlFull = signedUrlMap.get(data.pathFull);
     if (!urlFull) continue;
     entries.push({
+      id: data.id,
       pathFull: data.pathFull,
       urlFull,
       pathThumb: data.pathThumb,
@@ -128,20 +110,12 @@ export async function signEntries(
 }
 
 /* v8 ignore start -- hook internals (Supabase I/O, timers, compression);
- * pairImageEntries/toImgEntries/signEntries above are what's gated and
+ * groupImageRows/toImgEntries/signEntries above are what's gated and
  * mutation-tested. */
 // Stryker disable all: hook internals aren't covered by tests, only
-// pairImageEntries/toImgEntries/signEntries above are -- mutants in here
+// groupImageRows/toImgEntries/signEntries above are -- mutants in here
 // would only be noise.
-// ownerUserId is the category's owner, not necessarily the viewer's own uid
-// (#483 follow-up): for a category shared with the caller, the storage
-// prefix photographs live under is still `<owner_uid>/...` (0007_storage.sql)
-// -- there is no viewer-uid prefix to read at all. Taken once, at the hook
-// level, rather than per call: every item a given ItemList mount ever asks
-// this hook about belongs to the one category it was opened for, and every
-// item in a category shares that category's owner
-// (tg_item_categories_enforce, 0002_functions.sql).
-export function useItemImages(ownerUserId: string) {
+export function useItemImages() {
   const { t } = useI18n();
   const toast = useToast();
   const confirm = useConfirm();
@@ -153,9 +127,9 @@ export function useItemImages(ownerUserId: string) {
   );
   const [deletingPath, setDeletingPath] = useState<Set<string>>(new Set());
   const [images, setImages] = useState<Record<string, ImgEntry[]>>({});
-  // Items whose listing/signatures are still in flight. Distinct from "has
-  // no images": both used to look like an empty array, so a card rendered
-  // with no image region at all and then grew one, shoving its caption and
+  // Items whose signatures are still in flight. Distinct from "has no
+  // images": both used to look like an empty array, so a card rendered with
+  // no image region at all and then grew one, shoving its caption and
   // buttons down the moment the pictures arrived.
   const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
   const imagesRef = useRef(images);
@@ -165,104 +139,62 @@ export function useItemImages(ownerUserId: string) {
     imagesRef.current = images;
   }, [images]);
 
-  const getItemImageEntries = useCallback(async (itemId: string) => {
-    const listing = await listItemImages(itemId);
-    if (!listing) return;
-    const { prefix, data, error } = listing;
-
-    if (error) {
-      console.error('Failed to list images', error);
-      return [];
-    }
-    if (!data?.length) {
-      return [];
-    }
-
-    const entryData = pairImageEntries(data, prefix);
-    cacheListing(prefix, entryData);
-    if (entryData.size === 0) return [];
-
-    const signed = await signEntries([[itemId, entryData]]);
-    return signed[itemId] ?? [];
-  }, []);
-
-  // Always re-lists: this runs right after an upload, so the cached listing
-  // for that item is exactly the thing that just went stale.
+  // Always re-queries: this runs right after an upload, so the answer this
+  // item's row just changed is exactly the thing that just went stale.
   //
   // Hands the entries back rather than storing them, so a caller that has
   // other state to settle at the same moment -- an upload, which owes the
   // grid a placeholder until the picture takes over -- can apply both in one
   // go instead of letting the card render in between.
-  const fetchItemImages = useCallback(
-    async (itemId: string) => {
-      const uid = await currentUserId();
-      if (uid) invalidateListing(imagePrefix(uid, itemId));
+  const fetchItemImages = useCallback(async (itemId: string) => {
+    const { data, error } = await listImagesForItems([itemId]);
+    if (error) {
+      console.error('Failed to list images', error);
+      return undefined;
+    }
+    const entryData = groupImageRows(data ?? []).get(itemId) ?? new Map();
+    const signed = await signEntries([[itemId, entryData]]);
+    lastSignedAtRef.current = Date.now();
+    return signed[itemId] ?? [];
+  }, []);
 
-      const entries = await getItemImageEntries(itemId);
-      if (typeof entries === 'undefined') return undefined;
-      lastSignedAtRef.current = Date.now();
-      return entries;
-    },
-    [getItemImageEntries],
-  );
+  // One query for the whole page, replacing what used to be one
+  // storage.list() call per item -- up to nine separate Storage round trips
+  // gating the first photograph on screen even though most of them landed
+  // well before the slowest one (#329). A single indexed query for every
+  // item on the page removes that wait outright rather than just
+  // pipelining around it, so there is no per-item progressive reveal left
+  // to preserve here.
+  const refreshAllImages = useCallback(async (itemIds: string[]) => {
+    if (itemIds.length === 0) return;
 
-  const refreshAllImages = useCallback(
-    async (itemIds: string[]) => {
-      if (itemIds.length === 0 || !ownerUserId) return;
+    setLoadingItems((prev) => new Set([...prev, ...itemIds]));
 
-      // Only the items we don't already hold a fresh answer for are marked
-      // as loading; a cached category switch should not flash skeletons.
-      setLoadingItems((prev) => {
-        const next = new Set(prev);
-        for (const itemId of itemIds) {
-          if (!getCachedListing(imagePrefix(ownerUserId, itemId)))
-            next.add(itemId);
-        }
-        return next;
-      });
+    const { data, error } = await listImagesForItems(itemIds);
+    const grouped = error
+      ? new Map<string, Map<string, ImageEntryData>>()
+      : groupImageRows(data ?? []);
+    if (error) console.error('Failed to list images', error);
 
-      // One list() call per item is unavoidable (Supabase storage has no
-      // recursive/flat listing across prefixes) -- but each item is listed,
-      // signed and painted independently the moment its own listing lands,
-      // rather than behind a Promise.all barrier that waits for every
-      // listing in the batch before signing (or showing) any of them. The
-      // slowest of up to 9 parallel storage.list() calls used to gate the
-      // first photograph on screen even though most land well before it
-      // (#329).
-      const idSet = new Set(itemIds);
-      await Promise.all(
-        itemIds.map(async (itemId) => {
-          const prefix = imagePrefix(ownerUserId, itemId);
-          let entryData = getCachedListing(prefix);
-          if (!entryData) {
-            const { data, error } = await listAllImageObjects(prefix);
-            if (error) {
-              console.error('Failed to list images', error);
-              entryData = new Map<string, ImageEntryData>();
-            } else {
-              entryData = pairImageEntries(data ?? [], prefix);
-              cacheListing(prefix, entryData);
-            }
-          }
+    const perItem = itemIds.map(
+      (itemId) => [itemId, grouped.get(itemId) ?? new Map()] as const,
+    );
+    const signed = await signEntries(perItem);
 
-          const signed = await signEntries([[itemId, entryData]]);
-          setImages((prev) => {
-            const kept = Object.fromEntries(
-              Object.entries(prev).filter(([id]) => idSet.has(id)),
-            );
-            return { ...kept, ...signed };
-          });
-          setLoadingItems((prev) => {
-            const next = new Set(prev);
-            next.delete(itemId);
-            return next;
-          });
-        }),
+    const idSet = new Set(itemIds);
+    setImages((prev) => {
+      const kept = Object.fromEntries(
+        Object.entries(prev).filter(([id]) => !idSet.has(id)),
       );
-      lastSignedAtRef.current = Date.now();
-    },
-    [ownerUserId],
-  );
+      return { ...kept, ...signed };
+    });
+    setLoadingItems((prev) => {
+      const next = new Set(prev);
+      for (const itemId of itemIds) next.delete(itemId);
+      return next;
+    });
+    lastSignedAtRef.current = Date.now();
+  }, []);
 
   // Refresh signed URLs before Supabase's 1h expiry so a long-lived tab
   // doesn't turn every thumbnail into a broken-image placeholder.
@@ -329,11 +261,20 @@ export function useItemImages(ownerUserId: string) {
         if (upFull.error) throw upFull.error;
 
         const upThumb = await uploadImageObject(pathThumb, thumbFile);
-        if (upThumb.error) {
+        const thumbUploaded = !upThumb.error;
+        if (!thumbUploaded) {
           console.warn('Thumbnail upload failed:', upThumb.error);
         }
 
-        // Held until the listing has come back: the placeholder is meant to
+        const { error: rowError } = await createImageRow({
+          item_id: itemId,
+          path_full: pathFull,
+          path_thumb: thumbUploaded ? pathThumb : null,
+          size_bytes: fullFile.size,
+        });
+        if (rowError) throw rowError;
+
+        // Held until the row has come back: the placeholder is meant to
         // stand in for the photograph until the photograph itself is there
         // to replace it, not until the bytes have merely been accepted.
         //
@@ -359,13 +300,19 @@ export function useItemImages(ownerUserId: string) {
     [fetchItemImages, t, toast],
   );
 
+  // The row before the bytes: deleting the images row first, then the
+  // Storage objects it named, means a failure in the first step still means
+  // "nothing happened" -- same reasoning as removeItem (useItemMutations.tsx)
+  // and deleteCategory (useCategories.tsx) applying it to a whole item's
+  // photographs. Here it is one row, deleted by its own id rather than
+  // captured ahead of some other row's cascade, since nothing else is
+  // racing to take it away first.
   const deleteImage = useCallback(
     async (itemId: string, img: ImgEntry) => {
       if (!(await confirm(t('item_list.confirm_delete_image')))) return;
       try {
         setDeletingPath((prev) => new Set(prev).add(img.pathFull));
-        const paths = [img.pathFull, ...(img.pathThumb ? [img.pathThumb] : [])];
-        const { error } = await removeImageObjects(paths);
+        const { data, error } = await deleteImageRow(img.id);
         if (error) {
           toast.reportError(
             'delete image',
@@ -374,14 +321,29 @@ export function useItemImages(ownerUserId: string) {
           );
           return;
         }
-        invalidateListing(img.pathFull.split('/').slice(0, 2).join('/'));
+
         setImages((prev) => ({
           ...prev,
-          [itemId]: (prev[itemId] || []).filter(
-            (e) => e.pathFull !== img.pathFull,
-          ),
+          [itemId]: (prev[itemId] || []).filter((e) => e.id !== img.id),
         }));
         toast.success(t('item_list.delete_image_success'));
+
+        // The row is already gone at this point, irreversibly. A failure
+        // here is a storage leak, not data loss -- the photograph is
+        // already off the wall, and nothing is gained by leaving it there
+        // to match bytes that outlived the row naming them.
+        const paths = [
+          data.path_full,
+          ...(data.path_thumb ? [data.path_thumb] : []),
+        ];
+        const { error: removeError } = await removeImageObjects(paths);
+        if (removeError) {
+          toast.reportError(
+            'remove image bytes',
+            removeError,
+            t('item_list.delete_image_cleanup_error'),
+          );
+        }
       } finally {
         setDeletingPath((prev) => {
           const next = new Set(prev);
@@ -393,17 +355,39 @@ export function useItemImages(ownerUserId: string) {
     [confirm, t, toast],
   );
 
-  const deleteAllItemImages = useCallback(async (itemId: string) => {
-    // The uid comes back from the removal rather than from a second auth
-    // call: that was one more round trip on a path the user is waiting on.
-    const uid = await removeItemImages(itemId);
-    if (uid) invalidateListing(imagePrefix(uid, itemId));
-    setImages((prev) => {
-      const next = { ...prev };
-      delete next[itemId];
-      return next;
-    });
+  // Read-only capture, not a delete: the caller (removeItem/deleteCategory)
+  // is about to delete a row that will cascade this item's images rows
+  // away, and needs the paths beforehand to clean up the Storage bytes
+  // afterward. See 0013_images.sql's note on the FK-cascade-timing design.
+  const captureItemImagePaths = useCallback(async (itemId: string) => {
+    const { data, error } = await listImagePathsForItems([itemId]);
+    if (error) {
+      console.error('Failed to read image paths before delete', error);
+      return [];
+    }
+    return data ?? [];
   }, []);
+
+  const removeImageBytes = useCallback(
+    async (
+      itemId: string,
+      paths: { path_full: string; path_thumb: string | null }[],
+    ) => {
+      const flat = paths.flatMap((p) =>
+        p.path_thumb ? [p.path_full, p.path_thumb] : [p.path_full],
+      );
+      if (flat.length) {
+        const { error } = await removeImageObjects(flat);
+        if (error) throw error;
+      }
+      setImages((prev) => {
+        const next = { ...prev };
+        delete next[itemId];
+        return next;
+      });
+    },
+    [],
+  );
 
   return {
     images,
@@ -411,7 +395,8 @@ export function useItemImages(ownerUserId: string) {
     refreshAllImages,
     uploadImage,
     deleteImage,
-    deleteAllItemImages,
+    captureItemImagePaths,
+    removeImageBytes,
     pendingUploads,
     deletingPath,
   };

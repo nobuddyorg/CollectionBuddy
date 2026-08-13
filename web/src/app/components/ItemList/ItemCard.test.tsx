@@ -137,7 +137,7 @@ describe('ItemCard', () => {
   });
 
   it('offers the row control alone once the entry has a photo', () => {
-    renderCard({}, { imgs: [{ pathFull: 'a', urlFull: 'a.jpg' }] });
+    renderCard({}, { imgs: [{ id: 'a', pathFull: 'a', urlFull: 'a.jpg' }] });
     expect(screen.getAllByTitle('Add image')).toHaveLength(1);
   });
 
@@ -180,7 +180,7 @@ describe('ItemCard', () => {
   it('keeps the photographs it already has while another uploads', () => {
     renderCard(
       {},
-      { imgs: [{ pathFull: 'a', urlFull: 'a.jpg' }], pendingUploads: 1 },
+      { imgs: [{ id: 'a', pathFull: 'a', urlFull: 'a.jpg' }], pendingUploads: 1 },
     );
     expect(screen.getByRole('img')).toBeInTheDocument();
     expect(
@@ -227,7 +227,9 @@ describe('ItemCard', () => {
 // that identity change alone would fail a naive reference-equality memo
 // check and force every card on the page to re-render.
 describe('itemCardPropsAreEqual', () => {
-  const imgs: ImgEntry[] = [{ pathFull: 'u/1/a.webp', urlFull: 'a.jpg' }];
+  const imgs: ImgEntry[] = [
+    { id: 'a', pathFull: 'u/1/a.webp', urlFull: 'a.jpg' },
+  ];
 
   function baseProps(overrides: Partial<Parameters<typeof ItemCard>[0]> = {}) {
     return {

@@ -13,8 +13,6 @@ import {
   exportEntries,
   extensionOf,
   formatExportBytes,
-  fullSizeObjectBytes,
-  fullSizeObjectPaths,
   indexPrefix,
   localDateStamp,
   MANIFEST_NAME,
@@ -133,66 +131,6 @@ describe('extensionOf', () => {
 
   it('falls back for an implausibly long extension', () => {
     expect(extensionOf('uid/item/a.' + 'x'.repeat(11))).toBe('.bin');
-  });
-});
-
-describe('fullSizeObjectPaths', () => {
-  it('prefixes the names it keeps', () => {
-    expect(fullSizeObjectPaths('uid/item', [{ name: 'a.webp' }])).toEqual([
-      'uid/item/a.webp',
-    ]);
-  });
-
-  it('leaves the app’s own thumbnails out of the archive', () => {
-    expect(
-      fullSizeObjectPaths('uid/item', [
-        { name: 'a.webp' },
-        { name: 'a.thumb.webp' },
-        { name: 'b.webp' },
-        { name: 'b.thumb.webp' },
-      ]),
-    ).toEqual(['uid/item/a.webp', 'uid/item/b.webp']);
-  });
-
-  it('keeps the listing order it was given', () => {
-    expect(
-      fullSizeObjectPaths('p', [{ name: 'z.webp' }, { name: 'a.webp' }]),
-    ).toEqual(['p/z.webp', 'p/a.webp']);
-  });
-
-  it('is empty for an item with no photographs', () => {
-    expect(fullSizeObjectPaths('uid/item', [])).toEqual([]);
-  });
-});
-
-// #428: known up front from list()'s metadata, so an export can warn before
-// downloading a single photograph rather than discovering its total weight
-// only once the tab has run out of memory.
-describe('fullSizeObjectBytes', () => {
-  it('sums the size of every full-size object', () => {
-    expect(
-      fullSizeObjectBytes([
-        { name: 'a.webp', metadata: { size: 100 } },
-        { name: 'b.webp', metadata: { size: 250 } },
-      ]),
-    ).toBe(350);
-  });
-
-  it('leaves thumbnails out of the total', () => {
-    expect(
-      fullSizeObjectBytes([
-        { name: 'a.webp', metadata: { size: 1000 } },
-        { name: 'a.thumb.webp', metadata: { size: 50 } },
-      ]),
-    ).toBe(1000);
-  });
-
-  it('treats a missing size as zero rather than throwing', () => {
-    expect(fullSizeObjectBytes([{ name: 'a.webp', metadata: null }])).toBe(0);
-  });
-
-  it('is zero for an item with no photographs', () => {
-    expect(fullSizeObjectBytes([])).toBe(0);
   });
 });
 

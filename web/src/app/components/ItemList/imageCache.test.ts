@@ -1,22 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
-  LISTING_TTL_MS,
   SIGNED_URL_MARGIN_MS,
   SIGNED_URL_TTL_MS,
-  cacheListing,
   cacheSignedUrls,
   clearImageCache,
-  getCachedListing,
   getCachedSignedUrl,
-  invalidateListing,
   unsignedPaths,
 } from './imageCache';
-import type { ImageEntryData } from './useItemImages';
 
 const T0 = 1_000_000;
-const entry = (n: string): Map<string, ImageEntryData> =>
-  new Map([[n, { pathFull: `${n}.webp` }]]);
 
 describe('signed URL cache', () => {
   beforeEach(clearImageCache);
@@ -103,34 +96,5 @@ describe('unsignedPaths', () => {
     expect(unsignedPaths(['a.webp'], T0 + SIGNED_URL_TTL_MS)).toEqual([
       'a.webp',
     ]);
-  });
-});
-
-describe('listing cache', () => {
-  beforeEach(clearImageCache);
-
-  it('returns a listing within its window', () => {
-    cacheListing('uid/item', entry('a'), T0);
-    expect(getCachedListing('uid/item', T0 + 1000)).toEqual(entry('a'));
-  });
-
-  it('expires a listing after its window', () => {
-    cacheListing('uid/item', entry('a'), T0);
-    expect(getCachedListing('uid/item', T0 + LISTING_TTL_MS)).toBeUndefined();
-  });
-
-  // Uploads and deletes change what exists, so the cached answer for that
-  // item is exactly the thing that just went stale.
-  it('drops a listing on demand', () => {
-    cacheListing('uid/item', entry('a'), T0);
-    invalidateListing('uid/item');
-    expect(getCachedListing('uid/item', T0)).toBeUndefined();
-  });
-
-  it('keeps other items when one is invalidated', () => {
-    cacheListing('uid/one', entry('a'), T0);
-    cacheListing('uid/two', entry('b'), T0);
-    invalidateListing('uid/one');
-    expect(getCachedListing('uid/two', T0)).toEqual(entry('b'));
   });
 });

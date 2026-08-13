@@ -39,15 +39,9 @@ const EMPTY_IMAGES: ImgEntry[] = [];
 
 export default function ItemList({
   categoryId,
-  ownerUserId,
   isShared,
 }: {
   categoryId: string;
-  /** Owner of the currently open category -- for an owned category, this is
-   * the viewer's own uid; for a shared one, someone else's. The only thing
-   * that decides the storage prefix photographs live under (#483 follow-up),
-   * since a grantee's own uid never appears in a shared item's path. */
-  ownerUserId: string;
   /** True for a category shared with, not owned by, the viewer. Every
    * write control (new entry, edit, delete, upload) is hidden rather than
    * merely disabled -- RLS already refuses the writes themselves, so this
@@ -111,10 +105,11 @@ export default function ItemList({
     refreshAllImages,
     uploadImage,
     deleteImage,
-    deleteAllItemImages,
+    captureItemImagePaths,
+    removeImageBytes,
     pendingUploads,
     deletingPath,
-  } = useItemImages(ownerUserId);
+  } = useItemImages();
 
   const itemIdsKey = items.map((i) => i.id).join(',');
   useEffect(() => {
@@ -126,7 +121,8 @@ export default function ItemList({
     items,
     setItems,
     reload,
-    deleteAllItemImages,
+    captureItemImagePaths,
+    removeImageBytes,
   });
 
   const [editOpen, setEditOpen] = useState(false);
