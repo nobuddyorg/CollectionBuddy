@@ -15,89 +15,32 @@ A web-app catalog for your collected items 🗂️
 [![Last commit](https://img.shields.io/github/last-commit/nobuddyorg/CollectionBuddy)](https://github.com/nobuddyorg/CollectionBuddy/commits/main)
 [![License: MIT](https://img.shields.io/github/license/nobuddyorg/CollectionBuddy)](LICENSE)
 
-<sub>The mutation testing badge scores a hand-picked subset of pure logic — the files listed in [`web/stryker.config.mjs`](web/stryker.config.mjs)'s `mutate` array, chosen because their I/O is already walled off from the logic worth mutating. 100% means every mutant _in that subset_ died, not that the whole codebase is mutation-tested; see the file for which modules are in scope and why.</sub>
-
 ## Motivation
 
-This project was created to provide a simple and elegant solution for cataloging personal collections. Whether it's stamps, coins, or any other collectible, CollectionBuddy helps you keep track of your items in an organized manner.
+Spreadsheets don't have room for a photograph, and social apps don't care about provenance. CollectionBuddy is neither: a quiet, photo-first catalog for the things you collect, whether that's coins, stamps, records, or cameras. Every entry leads with a picture, carries a place and a few tags, and stays searchable once the shelf outgrows memory.
 
-## Usage
+![CollectionBuddy: a grid of catalogued collectible items, each with a photo, title, place, and tags](docs/assets/screenshot.jpg)
 
-### Development
+## Features
 
-CollectionBuddy needs a Supabase backend to run -- see
-[CONTRIBUTING.md](CONTRIBUTING.md) for the full local setup, including
-starting the local Supabase stack in [`supabase/`](supabase/) and the
-Google OAuth credentials it needs. The short version, once that's done:
+- **Photo-first entries**: one photo, a pair, or a whole strip. Phone photos are compressed to WebP in the browser before upload, so there's no manual resizing.
+- **Categories** to keep collections apart, with **sharing** so someone else can browse (read-only) yours.
+- **Place and map**: give an item a location, then see your whole collection pinned on a map.
+- **Tags and search** across title, description, place, and tags at once.
+- **Import/export** a category as a portable archive.
+- **Bilingual, themeable**: German/English and light/dark/system, both remembered per visitor.
+- Built to work with a keyboard and a screen reader, not just a mouse.
 
-1. Navigate to the `web` directory:
-
-   ```bash
-   cd web
-   ```
-
-2. Copy the environment template and fill in `NEXT_PUBLIC_SUPABASE_URL` /
-   `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the defaults in `web/.env.example`
-   match a local `supabase start`):
-
-   ```bash
-   cp .env.example .env.local
-   ```
-
-3. Install the dependencies:
-
-   ```bash
-   npm install
-   ```
-
-4. Start the development server:
-
-   ```bash
-   npm run dev
-   ```
-
-   The application will be available at `http://localhost:3000`.
-
-### Building for Production
-
-To build the application for production, run the `build.sh` script from the root directory:
-
-```bash
-./build.sh
-```
-
-**Note:** A production build requires the `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` environment variables to be set. These can be obtained from your Supabase project dashboard.
-
-The static files will be generated locally, ready for deployment. The script demonstrates how it's done, but real deployment should happen in your pipeline.
+See the [user guide](docs/how-to/user-guide.md) for the full rundown.
 
 ## Documentation
 
 Full docs live in [`docs/`](docs/README.md), organised by [Diátaxis](https://diataxis.fr):
 
-- **Tutorial** — [Getting started](docs/tutorials/getting-started.md)
-- **How-to** — [User guide](docs/how-to/user-guide.md) · [Developer guide](docs/how-to/developer-guide.md) (checks, migrations, new environments, deploy)
-- **Reference** — [Architecture](docs/reference/architecture.md) · [Configuration](docs/reference/configuration.md)
-- **Explanation** — [Design decisions](docs/explanation/design-decisions.md)
-
-## Technology Stack
-
-### Frontend
-
-- **[Next.js](https://nextjs.org/)**: A React framework, used here in **static export mode** (`output: 'export'`) -- there is no server runtime or route handlers, and Server Components only ever render at build time, before any user session exists. See [CONTRIBUTING.md](CONTRIBUTING.md) for what that means for contributors.
-- **[React](https://reactjs.org/)**: A JavaScript library for building user interfaces.
-- **[TypeScript](https://www.typescriptlang.org/)**: A typed superset of JavaScript that compiles to plain JavaScript.
-- **[Tailwind CSS](https://tailwindcss.com/)**: A utility-first CSS framework for rapidly building custom designs.
-
-### Backend
-
-- **[Supabase](https://supabase.io/)**: An open-source Firebase alternative that provides a suite of tools for building applications, including:
-  - **Authentication**: For managing user sign-ups and logins.
-  - **PostgreSQL Database**: For storing application data.
-  - **Storage**: For managing user-uploaded files, such as images of collected items.
-
-### Deployment
-
-The application is built as a static site and can be deployed on any static hosting service, such as GitHub Pages, Vercel, or Netlify. The `build.sh` script prepares the application for deployment.
+- **Tutorial**: [Getting started](docs/tutorials/getting-started.md)
+- **How-to**: [User guide](docs/how-to/user-guide.md) · [Developer guide](docs/how-to/developer-guide.md) (checks, migrations, new environments, deploy)
+- **Reference**: [Architecture](docs/reference/architecture.md) · [Configuration](docs/reference/configuration.md)
+- **Explanation**: [Design decisions](docs/explanation/design-decisions.md)
 
 ## Technology Map
 
@@ -135,7 +78,7 @@ The application is built as a static site and can be deployed on any static host
 
 ## Contributing
 
-Contributions are welcome! Whether it's a bug fix, new feature, or just improving the docs—open an issue or submit a pull request.
+Contributions are welcome. Whether it's a bug fix, a new feature, or just improving the docs, open an issue or submit a pull request.
 
 Before contributing, please check out [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and the checks CI runs.
 

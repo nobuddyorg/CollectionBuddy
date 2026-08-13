@@ -80,7 +80,7 @@ Prefer `expectTitles(page, [...])` over reading the grid once: the search box de
 
 ## Run mutation testing
 
-Line coverage counts lines that *ran*; mutation testing counts lines that are actually *checked*. It is the number worth reading — see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files) for why it's scoped the way it is.
+Line coverage counts lines that _ran_; mutation testing counts lines that are actually _checked_. It is the number worth reading — see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files) for why it's scoped the way it is.
 
 ```bash
 cd web
@@ -120,15 +120,13 @@ Every schema change goes through a new migration file, never an edit to an exist
 
 If you ever apply a migration outside the pipeline (SQL editor, `db push` by hand), send `notify pgrst, 'reload schema'` afterwards. PostgREST serves from a cached schema, so until it reloads, every write naming a newly added column fails with `PGRST204: Could not find the 'x' column of 'items' in the schema cache` — the table is fine, the API just hasn't noticed. Most Supabase projects have a `pgrst_ddl_watch` event trigger that does this automatically; this one doesn't, and can't, since creating an event trigger needs superuser and `postgres` isn't. The `migrate` job sends it on every run, so migrations that go through `main` are covered.
 
-A migration that touches `storage.objects` can create and drop *policies* on it, but not indexes or anything else needing ownership: hosted Supabase owns that table as `supabase_storage_admin` and never grants it to `postgres`, so `create index` on it raises `42501` for every role available to us. An earlier migration carried such an index for a year, which meant that file — one transaction — had never applied anywhere, locally or in production, while the repo and its docs described it as live.
+A migration that touches `storage.objects` can create and drop _policies_ on it, but not indexes or anything else needing ownership: hosted Supabase owns that table as `supabase_storage_admin` and never grants it to `postgres`, so `create index` on it raises `42501` for every role available to us. An earlier migration carried such an index for a year, which meant that file — one transaction — had never applied anywhere, locally or in production, while the repo and its docs described it as live.
 
-### Migrations
+### Squashing migrations again
 
-The seven files in `supabase/migrations/` are a squashed baseline, taken on 2026-08-06 and replacing the sixteen that came before. Those sixteen had reached the point where a third of their statements existed only to undo an earlier file: a table created and dropped, two full-text-search columns added and removed, one trigger written three times and then deleted. Reading them told you the history but not the schema.
+`supabase/migrations/` was squashed once already, down to a seven-file baseline (`0001` to `0007`); six more have been added on top of it since (`0008` to `0013`). See [Design decisions](../explanation/design-decisions.md#why-the-migrations-were-squashed) for why the original sixteen were squashed and how that baseline was verified. Squashing again is a deliberate, occasional act, not routine, and it folds the whole current set, not just the original seven.
 
-The baseline was verified rather than asserted: the local stack was reset from it, both databases were introspected down to column defaults, constraint expressions, index definitions, function bodies, trigger timing, policy predicates and grants, and the two were diffed. The only differences left were local-stack platform defaults that no migration here sets.
-
-Squashing again is a deliberate, occasional act, not routine. It needs the same verification, and it needs `supabase_migrations.schema_migrations` on the hosted project cleared so the new files are recorded as themselves. That table is the only reason the chain can't simply be rewritten in place.
+If you do it: verify it the same way, by introspecting both databases down to column defaults, constraint expressions, index definitions, function bodies, trigger timing, policy predicates and grants, and diffing them. Afterward, clear `supabase_migrations.schema_migrations` on the hosted project so the new files are recorded as themselves. That table is the only reason the chain can't simply be rewritten in place.
 
 ## Set up a new Supabase environment (e.g. for a fork, or production)
 

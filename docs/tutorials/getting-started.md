@@ -1,6 +1,6 @@
 # Getting started
 
-This walks through a first run of CollectionBuddy end to end: sign in, create a collection, add an item with a photo and a place, then find it again through search, pagination, and the map. By the end you'll have touched every major feature once.
+This walks through a first run of CollectionBuddy end to end: sign in, create a collection, add an item with a photo and a place, then find it again through search and the map. By the end you'll have touched most of the app's major features.
 
 ## 1. Set up the local stack
 
@@ -19,7 +19,7 @@ CollectionBuddy organises items into categories (e.g. "Coins", "Stamps", "Vinyl"
 1. Type a name (e.g. `Coins`) into the text field.
 2. Click the **+** button to create it.
 
-The category becomes selected automatically. If you ever end up with exactly one category, the picker auto-collapses on future visits and auto-selects it — there's no picking step once you only collect one kind of thing.
+The category becomes selected automatically, and the picker collapses down to just its name. On future visits it opens straight back on whichever category you had selected last, so there's no picking step to repeat.
 
 ## 4. Add an item
 
@@ -52,7 +52,7 @@ Add one or two more items (different titles/places), then:
 
 - **Edit**: pencil icon on a card's action row, same form as creation, pre-filled.
 - **Delete an item**: trash icon, confirm — this also removes its uploaded images.
-- **Delete a category**: expand the category picker, select the category, clear the text field, click delete. Any items that would be left with *no* category at all are deleted along with it (items that also belong to other categories are kept).
+- **Delete a category**: expand the category picker, select the category, clear the text field, click delete. Any items that would be left with _no_ category at all are deleted along with it (items that also belong to other categories are kept).
 - **Language / theme**: click your email in the header to open the user menu — German/English and System/Light/Dark are independent toggles there.
 
 ## What's next
