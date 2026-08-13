@@ -54,7 +54,7 @@ describe('EditItemModal — discarding unsaved changes', () => {
     const user = userEvent.setup();
     const { onOpenChange } = renderModal();
 
-    await user.type(screen.getByTestId('item-title'), '!');
+    await user.type(await screen.findByTestId('item-title'), '!');
     await user.keyboard('{Escape}');
 
     expect(
@@ -67,7 +67,7 @@ describe('EditItemModal — discarding unsaved changes', () => {
     const user = userEvent.setup();
     const { onOpenChange } = renderModal();
 
-    await user.type(screen.getByTestId('item-title'), '!');
+    await user.type(await screen.findByTestId('item-title'), '!');
     await user.keyboard('{Escape}');
     await user.click(await screen.findByTestId('confirm-accept'));
 
@@ -78,7 +78,7 @@ describe('EditItemModal — discarding unsaved changes', () => {
     const user = userEvent.setup();
     const { onOpenChange } = renderModal();
 
-    const title = screen.getByTestId('item-title');
+    const title = await screen.findByTestId('item-title');
     await user.type(title, '!');
     await user.keyboard('{Escape}');
     await user.click(await screen.findByTestId('confirm-cancel'));
@@ -91,7 +91,7 @@ describe('EditItemModal — discarding unsaved changes', () => {
     const user = userEvent.setup();
     const { onOpenChange } = renderModal();
 
-    await user.type(screen.getByTestId('item-title'), '!');
+    await user.type(await screen.findByTestId('item-title'), '!');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(

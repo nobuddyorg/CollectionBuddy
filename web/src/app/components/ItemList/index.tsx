@@ -29,6 +29,13 @@ const prefetchMap = () => {
   // import when the map actually opens, and surfaces the error there.
   void import('../Map').catch(() => {});
 };
+
+// Same reasoning, for the create form's own dynamic() import (see
+// ItemCreate/index.tsx) -- PlaceAutocomplete's geocoder is the weight this
+// one is warming ahead of.
+const prefetchItemForm = () => {
+  void import('../ItemForm').catch(() => {});
+};
 import Icon, { IconType } from '../Icon';
 
 // A stable identity for entries with no photographs yet, so a card that
@@ -175,6 +182,9 @@ export default function ItemList({
               // Named for the end-to-end suite: its label is translated.
               data-testid="new-entry"
               onClick={() => setCreateOpen(true)}
+              onPointerEnter={prefetchItemForm}
+              onPointerDown={prefetchItemForm}
+              onFocus={prefetchItemForm}
               className="flex-1 sm:flex-none min-h-11 px-4 flex items-center justify-center gap-2 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 transition-opacity"
             >
               <Icon
