@@ -5,6 +5,13 @@ import Icon, { IconType } from '../Icon';
 import { IconButton, iconButtonClasses } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
 
+// Warms the edit modal's own dynamic() import of ItemForm ahead of the
+// click that opens it -- same reasoning as ItemList/index.tsx's
+// prefetchItemForm (this is the other button that opens that form).
+const prefetchItemForm = () => {
+  void import('../ItemForm').catch(() => {});
+};
+
 // The file picker itself, wrapped so both the row control and the empty
 // plate can hand a chosen file straight to onUpload.
 function UploadInput({
@@ -178,6 +185,9 @@ export function Actions({
         variant="outline"
         data-testid="edit-entry"
         onClick={onEdit}
+        onPointerEnter={prefetchItemForm}
+        onPointerDown={prefetchItemForm}
+        onFocus={prefetchItemForm}
         aria-label={t('item_list.edit')}
         title={t('item_list.edit')}
       >

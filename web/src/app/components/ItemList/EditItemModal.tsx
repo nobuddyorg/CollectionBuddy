@@ -1,12 +1,16 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import dynamic from 'next/dynamic';
 
 import CenteredModal from '../CenteredModal';
-import ItemForm, { EMPTY_ITEM_FORM_VALUES, ItemFormValues } from '../ItemForm';
+import { EMPTY_ITEM_FORM_VALUES, ItemFormValues } from '../ItemForm/types';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useI18n } from '../../i18n/useI18n';
 import type { ItemLite } from './types';
+
+// See ItemCreate/index.tsx: same form, same reason to split it out.
+const ItemForm = dynamic(() => import('../ItemForm'), { ssr: false });
 
 // The entry passed in is a snapshot taken when the card's edit button was
 // pressed, not a live lookup by id -- so what the form opens onto cannot
