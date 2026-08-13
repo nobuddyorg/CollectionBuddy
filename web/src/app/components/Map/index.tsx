@@ -30,14 +30,24 @@ const BOUNDS_PAD_RATIO = 0.015;
 // per visible world copy, recomputed from the map's own bounds rather than
 // a fixed count, keeps a pin on screen at whatever pan position the viewer
 // is looking at, and scales itself if the viewport ever spans more than
-// three copies (a very wide window at a low zoom).
+// three copies (a very wide window at a low zoom) -- or fewer, at a single
+// city's zoom, which is why this can't just pad out to a fixed three: the
+// e2e suite counts rendered pins per place, and a copy that isn't actually
+// on screen has no business existing in the DOM.
 const WORLD_WIDTH_DEG = 360;
 
+// A copy's longitude span is centred on its multiple of 360 -- copy `c`
+// covers [c*360 - 180, c*360 + 180] -- so classifying a raw longitude by
+// `Math.floor(lng / 360)` alone is off by one across roughly the upper half
+// of that span, which could compute a range that excludes a copy actually
+// intersecting the bounds and silently drop every marker in it. The +180
+// phase shift lines the floor up with Leaflet's own copy boundaries, so the
+// range always covers exactly what's visible -- no more, no less.
 const visibleCopyRange = (
   bounds: import('leaflet').LatLngBounds,
 ): [number, number] => [
-  Math.floor(bounds.getWest() / WORLD_WIDTH_DEG),
-  Math.floor(bounds.getEast() / WORLD_WIDTH_DEG),
+  Math.floor((bounds.getWest() + 180) / WORLD_WIDTH_DEG),
+  Math.floor((bounds.getEast() + 180) / WORLD_WIDTH_DEG),
 ];
 
 const sameRange = (a: [number, number] | null, b: [number, number]): boolean =>
