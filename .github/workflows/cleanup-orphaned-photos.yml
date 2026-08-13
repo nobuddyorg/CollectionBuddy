@@ -1,0 +1,91 @@
+name: Clean up orphaned photographs
+# Storage objects can outlive the item they belonged to: removeItem/deleteCategory
+# (web/src/app/components/ItemList/useItemMutations.tsx,
+# CategorySelect/useCategories.tsx) delete the database row first and the
+# Storage bytes after, on purpose -- a failure in the second step is treated
+# as a storage leak, not data loss, and never blocks or undoes the deletion
+# the user actually asked for. This is the other half of that trade-off:
+# sweeping up what the leak leaves behind, on a schedule, so it isn't left
+# to accumulate forever or need a human to notice.
+#
+# 48h grace period: an object with no matching item is only ever orphaned
+# (the item is really gone) or mid-upload (uploadImage in useItemImages.tsx
+# writes the Storage object before the item exists to reference in some
+# import/edge-case ordering) -- 48h is comfortably past any real upload,
+# so nothing in flight can be mistaken for abandoned.
+on:
+  schedule:
+    - cron: "30 4 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find and remove orphaned Storage objects
+        run: |
+          set -euo pipefail
+
+          # Left join, not `not in (select id from items)` with a uuid cast:
+          # a malformed path (never produced by this app, but not something
+          # SQL should trust either) fails a cast outright, which would abort
+          # the whole query rather than just not matching -- see
+          # storage_item_id() in 0012_shared_photos.sql for the same
+          # reasoning applied to an RLS policy instead of this query.
+          read -r -d '' QUERY <<'SQL' || true
+          select
+            json_agg(o.name) as paths,
+            count(*) as object_count,
+            coalesce(sum((o.metadata->>'size')::bigint), 0) as total_bytes
+          from storage.objects o
+          left join public.items i on i.id::text = split_part(o.name, '/', 2)
+          where o.bucket_id = 'item-images'
+            and i.id is null
+            and o.created_at < now() - interval '48 hours';
+          SQL
+
+          payload=$(jq -n --arg q "$QUERY" '{query: $q}')
+          result=$(curl -sS --fail-with-body -X POST \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$payload")
+
+          count=$(echo "$result" | jq -r '.[0].object_count')
+          bytes=$(echo "$result" | jq -r '.[0].total_bytes')
+
+          if [ "$count" = "0" ]; then
+            echo "Nothing orphaned older than 48h. Nothing to do." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "Found $count orphaned object(s), $bytes bytes." | tee -a "$GITHUB_STEP_SUMMARY"
+
+          # The Storage API is the only way to actually remove object bytes
+          # (SQL cannot: see 0004_triggers.sql's note on storage.objects'
+          # prevent-direct-deletes guard) -- and removing another user's
+          # object needs service_role, since Storage RLS only ever grants a
+          # user their own prefix. Fetched fresh each run rather than stored
+          # as its own secret, so there is one fewer long-lived credential to
+          # rotate if this job is ever removed.
+          service_role_key=$(curl -sS --fail-with-body \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            | jq -r '.[] | select(.name == "service_role") | .api_key')
+
+          paths=$(echo "$result" | jq -c '.[0].paths')
+          remove_payload=$(jq -n --argjson prefixes "$paths" '{prefixes: $prefixes}')
+          curl -sS --fail-with-body -X DELETE \
+            "$NEXT_PUBLIC_SUPABASE_URL/storage/v1/object/item-images" \
+            -H "apikey: $service_role_key" \
+            -H "Authorization: Bearer $service_role_key" \
+            -H "Content-Type: application/json" \
+            --data "$remove_payload" > /dev/null
+
+          echo "Removed $count orphaned object(s), reclaiming $bytes bytes." | tee -a "$GITHUB_STEP_SUMMARY"
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
