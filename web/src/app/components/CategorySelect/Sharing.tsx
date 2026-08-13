@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import { useConfirm } from '../Confirm/ConfirmProvider';
@@ -45,6 +45,25 @@ export function SharingSection({ shares }: Props) {
   } = shares;
   const [email, setEmail] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
+  const expiryInputRef = useRef<HTMLInputElement>(null);
+
+  // Delegates to the native picker instead of reimplementing one: this
+  // button exists to give the *trigger* a consistent look across engines
+  // (see the block comment below), not to replace the OS's own calendar
+  // dialog, its keyboard handling or its mobile affordance. `showPicker`
+  // is unsupported in older Safari/Firefox and doesn't exist in jsdom
+  // (hence the `typeof` guard rather than an `in` check, which jsdom's
+  // stub would still pass) -- focusing the field is what a plain click on
+  // it would have done anyway on those.
+  const openDatePicker = useCallback(() => {
+    const el = expiryInputRef.current;
+    if (!el) return;
+    if (typeof el.showPicker === 'function') {
+      el.showPicker();
+    } else {
+      el.focus();
+    }
+  }, []);
 
   const onShare = useCallback(async () => {
     const trimmed = email.trim();
@@ -87,20 +106,20 @@ export function SharingSection({ shares }: Props) {
         >
           {t('category_select.share_invite_label')}
         </label>
-        {/* Own row below `sm`: a native date input's rendered width isn't
-            fixed by its className alone -- it swings with its value (an
-            empty input draws narrower than a filled one), which used to
-            fight an `auto` grid track and squeeze the email field on every
-            date pick. The `w-44` wrapper below pins the track so that swing
-            can't propagate -- putting the width on a wrapper instead of the
-            input itself, since `fieldClasses` already bakes in `w-full` and
-            two same-specificity width utilities don't reliably resolve by
-            their order in the className string. `w-36` clipped the date on
-            desktop, where the browser's own calendar-icon affordance eats
-            into the same padded box that `mm/dd/yyyy` needs (#549); `w-44`
-            leaves it room. Stacking here also gives the email field room to
-            breathe on a phone instead of the three controls fighting over
-            one row. */}
+        {/* `sm:max-w-64` on the email field, not `sm:flex-1`: a
+            grantee's address is short enough that giving it the whole
+            row's leftover width just starved the date field next to it.
+            `<input type="date">` renders its text-and-icon cluster
+            completely differently per engine -- flush-right and
+            stretched to fill in Blink, left-aligned and content-sized in
+            Gecko, clipped at narrow widths -- and none of it is
+            reachable from our CSS (#549, #550, this follow-up, confirmed
+            against screenshots from three real browsers). The actual
+            `<input>` is `sr-only` now, driven by a button that opens its
+            picker via `showPicker()`, so the "Expires {date}" chip is
+            ours to size once and have it hold, in every engine, in
+            German's longer phrasing too (`w-56` was sized against that,
+            the wider of the two locales). */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
             id="share-email"
@@ -111,36 +130,59 @@ export function SharingSection({ shares }: Props) {
               if (e.key === 'Enter') void onShare();
             }}
             placeholder={t('category_select.share_invite_placeholder')}
-            className={fieldClasses('min-w-0 sm:flex-1')}
+            className={fieldClasses('min-w-0 sm:max-w-64')}
           />
           <div className="flex items-center gap-2">
-            {/* `.ios-calendar-icon` (globals.css) is the platform gate, not
-                a breakpoint: iOS Safari is the one browser that never
-                draws `::-webkit-calendar-picker-indicator`, and it does
-                that at every viewport width (an iPad in landscape is
-                already past `sm`), so the stand-in has to key off the
-                platform, not the screen. `pointer-events-none` keeps it
-                from shadowing the tap the field already handles itself.
-                The extra `pr-9` is reserved unconditionally, since it's a
-                harmless few px of empty space on browsers that don't
-                render the icon there. */}
-            <div className="relative w-44 shrink-0">
-              <input
-                id="share-expiry"
-                type="date"
-                value={expiryDate}
-                min={todayDateStr()}
-                onChange={(e) => setExpiryDate(e.target.value)}
-                aria-label={t('category_select.share_expiry_label')}
+            <div className="flex min-h-11 w-56 shrink-0 items-center rounded-sm bg-card ring-1 ring-inset ring-control-border focus-within:ring-foreground">
+              <button
+                type="button"
+                onClick={openDatePicker}
                 title={t('category_select.share_expiry_label')}
-                className={fieldClasses('pr-9')}
-              />
-              <Icon
-                icon={IconType.Calendar}
-                aria-hidden="true"
-                className="ios-calendar-icon pointer-events-none absolute right-3 top-1/2 w-4 h-4 -translate-y-1/2 text-muted-foreground"
-              />
+                className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-sm py-2 pl-3 pr-2 text-left hover:bg-muted transition-colors"
+              >
+                <Icon
+                  icon={IconType.Calendar}
+                  className="w-4 h-4 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <span
+                  className={`truncate ${expiryDate ? '' : 'text-muted-foreground'}`}
+                >
+                  {expiryDate
+                    ? t('category_select.share_expiry_chip').replace(
+                        '{date}',
+                        new Date(`${expiryDate}T00:00:00`).toLocaleDateString(),
+                      )
+                    : t('category_select.share_no_expiry')}
+                </span>
+              </button>
+              {expiryDate && (
+                <button
+                  type="button"
+                  onClick={() => setExpiryDate('')}
+                  aria-label={t('category_select.share_expiry_clear')}
+                  title={t('category_select.share_expiry_clear')}
+                  className="mr-1.5 shrink-0 rounded-sm p-1 hover:bg-muted transition-colors"
+                >
+                  <Icon
+                    icon={IconType.Close}
+                    className="w-3.5 h-3.5"
+                    aria-hidden="true"
+                  />
+                </button>
+              )}
             </div>
+            <input
+              ref={expiryInputRef}
+              id="share-expiry"
+              type="date"
+              value={expiryDate}
+              min={todayDateStr()}
+              onChange={(e) => setExpiryDate(e.target.value)}
+              aria-label={t('category_select.share_expiry_label')}
+              className="sr-only"
+              tabIndex={-1}
+            />
             <IconButton
               variant="primary"
               size="xl"
