@@ -231,7 +231,7 @@ describe('ModalImage', () => {
 
     it('shows a position counter', () => {
       renderModal({ imgs, index: 1 });
-      expect(screen.getByText('2 of 3')).toBeInTheDocument();
+      expect(screen.getByText('2 / 3')).toBeInTheDocument();
     });
 
     // #515: the buttons used to carry `hidden [@media(hover:hover)]:flex`,

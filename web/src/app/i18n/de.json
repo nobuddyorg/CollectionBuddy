@@ -112,7 +112,7 @@
     "next": "Weiter",
     "previous_image": "Vorheriges Bild",
     "next_image": "Nächstes Bild",
-    "image_position": "{current} von {total}",
+    "image_position": "{current} / {total}",
     "more_images": "+{count} weitere",
     "image_alt": "{title}, Bild {idx}",
     "full_size_image_alt": "Vollbild",
