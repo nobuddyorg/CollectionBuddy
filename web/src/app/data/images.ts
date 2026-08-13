@@ -40,7 +40,10 @@ export type ImageListRow = Pick<
 // both callers act on a whole item's photographs via the item's own id
 // (the images rows are about to be cascade-deleted along with it), never on
 // one photograph by its own id.
-export type ImagePathRow = Pick<ImageRow, 'item_id' | 'path_full' | 'path_thumb'>;
+export type ImagePathRow = Pick<
+  ImageRow,
+  'item_id' | 'path_full' | 'path_thumb'
+>;
 
 // What exportCategory.ts needs: the full-size path an export writes to the
 // archive, and its byte size (LARGE_EXPORT_WARN_BYTES warns before a large
@@ -48,7 +51,10 @@ export type ImagePathRow = Pick<ImageRow, 'item_id' | 'path_full' | 'path_thumb'
 // built from full-size paths (exportEntries, exportFormat.ts), so there is
 // nothing to filter out of this afterward the way fullSizeObjectPaths used
 // to filter thumbnails out of a Storage listing.
-export type ExportImageRow = Pick<ImageRow, 'item_id' | 'path_full' | 'size_bytes'>;
+export type ExportImageRow = Pick<
+  ImageRow,
+  'item_id' | 'path_full' | 'size_bytes'
+>;
 
 // Written once both Storage uploads have landed -- see uploadImage in
 // useItemImages.tsx. user_id is never sent: tg_images_enforce

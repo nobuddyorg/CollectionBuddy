@@ -237,7 +237,7 @@ describe('exportCategory', () => {
       category: { id: 'cat', name: 'Coins' },
       getSession: fakeGetSession('uid'),
       listItems: paginatedListItems([item({ id: 'a' })]),
-      listImages: fakeListImages({ 'a': ['1.webp'] }),
+      listImages: fakeListImages({ a: ['1.webp'] }),
       signUrls,
     });
     expect(result.skippedPhotoCount).toBe(1);
@@ -254,7 +254,7 @@ describe('exportCategory', () => {
       category: { id: 'cat', name: 'Coins' },
       getSession: fakeGetSession('uid'),
       listItems: paginatedListItems([item({ id: 'a' })]),
-      listImages: fakeListImages({ 'a': ['1.webp'] }),
+      listImages: fakeListImages({ a: ['1.webp'] }),
       signUrls,
     });
     await expect(failure).rejects.toThrow('Could not sign photograph URLs');
@@ -282,7 +282,7 @@ describe('exportCategory', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImages({
-          'a': paths.map((p) => p.split('/').at(-1)!),
+          a: paths.map((p) => p.split('/').at(-1)!),
         }),
         signUrls: signUrls as unknown as SignUrls,
       });
@@ -316,7 +316,7 @@ describe('exportCategory', () => {
         category: { id: 'cat', name: 'Coins' },
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImages({ 'a': paths }),
+        listImages: fakeListImages({ a: paths }),
         signUrls: signUrls as unknown as SignUrls,
       });
       // A count exactly at the boundary looks identical to one past it
@@ -606,8 +606,8 @@ describe('exportCategory', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems(items),
         listImages: fakeListImages({
-          'a': ['1.webp'],
-          'b': ['1.webp'],
+          a: ['1.webp'],
+          b: ['1.webp'],
         }),
         signUrls: fakeSignUrls(),
       });
@@ -644,7 +644,7 @@ describe('exportCategory', () => {
         category: { id: 'cat', name: 'Coins' },
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImages({ 'a': ['1.webp'] }),
+        listImages: fakeListImages({ a: ['1.webp'] }),
         signUrls: fakeSignUrls(),
       });
       const entries = await readZipEntries(result.blob);
@@ -671,8 +671,8 @@ describe('exportCategory', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' }), item({ id: 'b' })]),
         listImages: fakeListImages({
-          'a': ['1.webp'],
-          'b': ['1.webp'],
+          a: ['1.webp'],
+          b: ['1.webp'],
         }),
         signUrls: fakeSignUrls(),
       });
@@ -705,7 +705,7 @@ describe('exportCategory', () => {
         category: { id: 'cat', name: 'Coins' },
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImages({ 'a': ['1.webp'] }),
+        listImages: fakeListImages({ a: ['1.webp'] }),
         signUrls: signUrls as unknown as SignUrls,
       });
       // 6 hours, not 6 seconds -- a large export on a slow connection can
@@ -947,10 +947,7 @@ describe('exportCategory', () => {
           getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
           listImages: fakeListImages({
-            'item-1': Array.from(
-              { length: photoCount },
-              (_, i) => `${i}.webp`,
-            ),
+            'item-1': Array.from({ length: photoCount }, (_, i) => `${i}.webp`),
           }),
           signUrls: fakeSignUrls(),
         });
@@ -1212,10 +1209,7 @@ describe('exportCategory', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({
-          'item-1': Array.from(
-            { length: photoCount },
-            (_, i) => `${i}.webp`,
-          ),
+          'item-1': Array.from({ length: photoCount }, (_, i) => `${i}.webp`),
         }),
         signUrls: fakeSignUrls(),
       });
@@ -1258,7 +1252,7 @@ describe('confirmLargeExport', () => {
       getSession: fakeGetSession('uid'),
       listItems: paginatedListItems([item({ id: 'a' })]),
       listImages: fakeListImagesWithSizes({
-        'a': [{ name: '1.webp', size: 1024 }],
+        a: [{ name: '1.webp', size: 1024 }],
       }),
       signUrls: fakeSignUrls(),
       confirmLargeExport,
@@ -1279,7 +1273,7 @@ describe('confirmLargeExport', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImagesWithSizes({
-          'a': [{ name: '1.webp', size: bigSize }],
+          a: [{ name: '1.webp', size: bigSize }],
         }),
         signUrls: fakeSignUrls(),
         confirmLargeExport,
@@ -1302,7 +1296,7 @@ describe('confirmLargeExport', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImagesWithSizes({
-          'a': [{ name: '1.webp', size: bigSize }],
+          a: [{ name: '1.webp', size: bigSize }],
         }),
         signUrls: fakeSignUrls(),
         confirmLargeExport,
@@ -1326,7 +1320,7 @@ describe('confirmLargeExport', () => {
         getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImagesWithSizes({
-          'a': [{ name: '1.webp', size: bigSize }],
+          a: [{ name: '1.webp', size: bigSize }],
         }),
         signUrls: fakeSignUrls(),
       });

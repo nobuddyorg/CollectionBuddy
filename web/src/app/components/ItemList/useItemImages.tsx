@@ -16,9 +16,17 @@ import type { ImgEntry } from './types';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
 import { useI18n } from '../../i18n/useI18n';
-import { cacheSignedUrls, getCachedSignedUrl, unsignedPaths } from './imageCache';
+import {
+  cacheSignedUrls,
+  getCachedSignedUrl,
+  unsignedPaths,
+} from './imageCache';
 
-export type ImageEntryData = { id: string; pathFull: string; pathThumb?: string };
+export type ImageEntryData = {
+  id: string;
+  pathFull: string;
+  pathThumb?: string;
+};
 
 // A DB row already is a full/thumb pair -- no filename-derived grouping
 // needed, unlike the old storage.list()-based pairing this replaced. Groups
@@ -32,7 +40,8 @@ export function groupImageRows(
 ): Map<string, Map<string, ImageEntryData>> {
   const byItem = new Map<string, Map<string, ImageEntryData>>();
   for (const row of rows) {
-    const entryData = byItem.get(row.item_id) ?? new Map<string, ImageEntryData>();
+    const entryData =
+      byItem.get(row.item_id) ?? new Map<string, ImageEntryData>();
     entryData.set(row.id, {
       id: row.id,
       pathFull: row.path_full,

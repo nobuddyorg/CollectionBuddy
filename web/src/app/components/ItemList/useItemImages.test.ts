@@ -9,7 +9,7 @@ import { groupImageRows, signEntries, toImgEntries } from './useItemImages';
 import type { ImageEntryData } from './useItemImages';
 
 describe('groupImageRows', () => {
-  it('groups a row by item, keyed by the row\'s own id', () => {
+  it("groups a row by item, keyed by the row's own id", () => {
     const result = groupImageRows([
       {
         id: 'img-1',
@@ -27,7 +27,12 @@ describe('groupImageRows', () => {
 
   it('leaves pathThumb undefined for a row with none', () => {
     const result = groupImageRows([
-      { id: 'img-1', item_id: 'item-1', path_full: 'p/1/a.webp', path_thumb: null },
+      {
+        id: 'img-1',
+        item_id: 'item-1',
+        path_full: 'p/1/a.webp',
+        path_thumb: null,
+      },
     ]);
     expect(result.get('item-1')?.get('img-1')?.pathThumb).toBeUndefined();
   });

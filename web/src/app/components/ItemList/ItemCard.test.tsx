@@ -180,7 +180,10 @@ describe('ItemCard', () => {
   it('keeps the photographs it already has while another uploads', () => {
     renderCard(
       {},
-      { imgs: [{ id: 'a', pathFull: 'a', urlFull: 'a.jpg' }], pendingUploads: 1 },
+      {
+        imgs: [{ id: 'a', pathFull: 'a', urlFull: 'a.jpg' }],
+        pendingUploads: 1,
+      },
     );
     expect(screen.getByRole('img')).toBeInTheDocument();
     expect(

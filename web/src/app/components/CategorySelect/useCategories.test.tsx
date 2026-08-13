@@ -121,7 +121,7 @@ describe('useCategories deleteCategory', () => {
   // item's storage.list() call (#385); this table-backed design has no uid
   // to resolve at all -- one batched query for every orphaned item's paths
   // replaces what used to be N Storage round trips.
-  it('reads every orphaned item\'s image paths in one batched query, not once per item', async () => {
+  it("reads every orphaned item's image paths in one batched query, not once per item", async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     const { result } = renderHook(() => useCategories(), { wrapper });
 
