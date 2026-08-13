@@ -193,6 +193,27 @@ describe('exportCategory', () => {
     await expect(failure).rejects.toHaveProperty('cause', readError);
   });
 
+  // A single batched images query replaced the old per-item listing pool
+  // (see fetchPhotoPaths) -- there is no more per-item failure to isolate,
+  // so a failure here aborts the whole export the same way a failed items
+  // page already does above, rather than being skipped and counted.
+  it('throws when the photograph listing fails, rather than exporting an incomplete collection', async () => {
+    const listingError = { message: 'read failed' };
+    const listImages = (async () => ({
+      data: null,
+      error: listingError,
+    })) as unknown as ListImages;
+    const failure = exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      getSession: fakeGetSession('uid'),
+      listItems: paginatedListItems([item({ id: 'a' })]),
+      listImages,
+      signUrls: fakeSignUrls(),
+    });
+    await expect(failure).rejects.toThrow('Could not list photographs');
+    await expect(failure).rejects.toHaveProperty('cause', listingError);
+  });
+
   it('stops paging rather than crashing when a page comes back with no data and no error', async () => {
     // A defensive case Supabase's types allow (`data: null, error: null`)
     // even though a real empty page is `[]`: treated the same as an empty
