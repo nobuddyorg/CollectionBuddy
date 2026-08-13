@@ -106,10 +106,7 @@ export function SharingSection({ shares }: Props) {
         >
           {t('category_select.share_invite_label')}
         </label>
-        {/* `sm:max-w-64` on the email field, not `sm:flex-1`: a
-            grantee's address is short enough that giving it the whole
-            row's leftover width just starved the date field next to it.
-            `<input type="date">` renders its text-and-icon cluster
+        {/* `<input type="date">` renders its text-and-icon cluster
             completely differently per engine -- flush-right and
             stretched to fill in Blink, left-aligned and content-sized in
             Gecko, clipped at narrow widths -- and none of it is
@@ -119,7 +116,13 @@ export function SharingSection({ shares }: Props) {
             picker via `showPicker()`, so the "Expires {date}" chip is
             ours to size once and have it hold, in every engine, in
             German's longer phrasing too (`w-56` was sized against that,
-            the wider of the two locales). */}
+            the wider of the two locales). The date group and Share
+            button are both `shrink-0`, so email's `sm:flex-1` only ever
+            claims what's left after they've taken their fixed width --
+            capping it as well (tried in an earlier round of this same
+            fix) left it looking cramped for no reason on any container
+            wide enough to hold both fields comfortably, which is every
+            real one. */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
             id="share-email"
@@ -130,7 +133,7 @@ export function SharingSection({ shares }: Props) {
               if (e.key === 'Enter') void onShare();
             }}
             placeholder={t('category_select.share_invite_placeholder')}
-            className={fieldClasses('min-w-0 sm:max-w-64')}
+            className={fieldClasses('min-w-0 sm:flex-1')}
           />
           <div className="flex items-center gap-2">
             <div className="flex min-h-11 w-56 shrink-0 items-center rounded-sm bg-card ring-1 ring-inset ring-control-border focus-within:ring-foreground">

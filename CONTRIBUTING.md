@@ -3,12 +3,12 @@
 ## Local development
 
 CollectionBuddy needs a Supabase backend (Postgres + Auth + Storage) to run
-at all -- there is no mock/offline mode. The steps below set up the local
+at all. There is no mock/offline mode. The steps below set up the local
 stack that ships in [`supabase/`](supabase/).
 
 1. Prerequisites:
     - **Node.js 22 or newer.** CI pins 22.x; the test setup relies on Node 22+ behaviour.
-    - **Docker**, running — the Supabase CLI runs the local stack in containers.
+    - **Docker**, running: the Supabase CLI runs the local stack in containers.
     - **[Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)
       2.110.0.** Both workflows pin that version, so it is the one the migrations are
       exercised against.
@@ -21,11 +21,11 @@ stack that ships in [`supabase/`](supabase/).
     ```
 
     This runs Postgres, Auth (GoTrue), Storage, Studio, and Inbucket. `supabase start`
-    prints the local API URL and anon key -- they match the defaults in
+    prints the local API URL and anon key. They match the defaults in
     `web/.env.example`, so you normally don't need to change anything.
 
     Google is the only sign-in provider, and it needs OAuth credentials even
-    for local development -- without them, sign-in fails silently on an
+    for local development. Without them, sign-in fails silently on an
     otherwise-normal-looking dev server. Export these before `supabase start`
     (a [Google OAuth client](https://console.cloud.google.com/apis/credentials)
     with `http://127.0.0.1:54321/auth/v1/callback` as an authorized redirect URI works):
@@ -49,35 +49,21 @@ stack that ships in [`supabase/`](supabase/).
 ## Commit hooks
 
 [prek](https://github.com/j178/prek) runs the checks in
-[`.pre-commit-config.yaml`](.pre-commit-config.yaml) against each commit.
-Install it once, then install the hook:
+[`.pre-commit-config.yaml`](.pre-commit-config.yaml) against each commit:
+file hygiene, spell checking, and (for `web/`) the same lint/format/type
+checks CI runs. Install it once, then install the hook:
 
 ```bash
 prek install
 ```
 
-`pre-commit` works too — the config is the standard format, and prek is just
-a faster runner for it.
-
-To run everything over the whole repo without committing:
+`pre-commit` works too. The config is the standard format, and prek is just
+a faster runner for it. To run everything over the whole repo without
+committing:
 
 ```bash
 prek run --all-files
 ```
-
-Most of it is file hygiene and spell checking, plus:
-
-- **[zizmor](https://docs.zizmor.sh/)** — security analysis of the GitHub
-  Actions workflows. This is why every action is pinned to a commit hash
-  rather than a tag: a tag can be repointed at new code, a hash cannot.
-  Dependabot moves the hashes.
-- **markdownlint** and **shellcheck** for the docs and `build.sh`.
-- **ESLint / Prettier / TypeScript** for `web/`, so a commit is checked
-  before it is made rather than after CI says so.
-
-CI runs the same config (minus the three `web/` hooks, which duplicate what
-the build job already does, and `no-commit-to-branch`, which is meaningless
-off a working copy).
 
 ## Before opening a pull request
 
@@ -93,14 +79,9 @@ npm run e2e
 npm run test:mutation
 ```
 
-The build goes first on purpose: `next build` generates `next-env.d.ts` (gitignored), and
-both `tsc` and ESLint need it on a clean checkout. These are the same checks CI runs (see
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
-
-Two of them are easy to skip and shouldn't be. `npm test` on its own does not
-enforce the coverage floors -- only `--coverage` does, which is what CI uses.
-And `npm run e2e` needs `npm run build` first: it drives the built export, not
-the dev server.
+These are the same checks CI runs. See the [developer
+guide](docs/how-to/developer-guide.md#run-the-checks-ci-runs-locally) for why
+the order matters and what each one catches.
 
 If your change touches the catalogue, search, the map, the entry forms,
 photographs, exporting, or any row-level security policy, also run the
@@ -111,13 +92,6 @@ supabase start   # from the repository root
 cd web && npm run e2e:local
 ```
 
-## Architecture constraints worth knowing
-
-- The app is a **static export** (`output: 'export'` in `next.config.ts`).
-  There is no server runtime and no route handlers -- almost every
-  component is a client component, and `layout.tsx` is the only server
-  component; it renders once at build time, before any user session
-  exists. Authorization is enforced entirely by Postgres Row Level
-  Security, not by server code.
-- Database changes go through a migration in `supabase/migrations/`, applied
-  locally with `supabase db reset`.
+For anything past this checklist (changing the database schema, deploying,
+setting up a new Supabase environment), see the [developer
+guide](docs/how-to/developer-guide.md).
