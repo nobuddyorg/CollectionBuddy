@@ -1,4 +1,3 @@
-import type { Metadata } from 'next';
 import { Archivo, IBM_Plex_Mono, Inter } from 'next/font/google';
 
 import './globals.css';
@@ -63,39 +62,20 @@ const labelFont = IBM_Plex_Mono({
   variable: '--font-label-family',
 });
 
-export const metadata: Metadata = {
-  title: 'CollectionBuddy',
-  description: 'Sammeln • Ordnen • Behalten',
-  icons: {
-    icon: [
-      { url: `${basePath}/favicon.ico` },
-      {
-        url: `${basePath}/favicon-32x32.png`,
-        sizes: '32x32',
-        type: 'image/png',
-      },
-    ],
-    apple: [{ url: `${basePath}/apple-touch-icon.png` }],
-    shortcut: [{ url: `${basePath}/favicon.ico` }],
-  },
-  manifest: `${basePath}/site.webmanifest`,
-};
-
-export const viewport = {
-  // The browser chrome around the page -- the address bar on Android, the
-  // status bar area of an installed app. Two entries rather than one so it
-  // matches whichever theme the page settles on; a paper-coloured bar over
-  // a near-black page is the seam that gives a retrofitted dark mode away.
-  //
-  // These follow the OS, not the in-app control, because that is the whole
-  // of what a meta tag can express. A visitor who overrides the OS keeps a
-  // bar from the other theme, which is a smaller wrong than no dark bar at
-  // all for the many who don't.
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f4f3ef' },
-    { media: '(prefers-color-scheme: dark)', color: '#191815' },
-  ],
-};
+// Title, description, icons, manifest and theme-color used to be declared
+// through Next's `metadata`/`viewport` exports instead of as tags below.
+// In this static export, that machinery re-inserts a second copy of every
+// tag it manages during client hydration -- the exported HTML already has
+// them, then React mounts and adds another set on top instead of adopting
+// what's there, leaving two of everything in <head> a moment after load.
+// Chrome shrugs it off; Firefox desktop's favicon picks up on the
+// duplicate and stops resolving one at all (#540). Hand-written tags below,
+// like the CSP and referrer ones already were, don't go through that
+// mechanism and never duplicate.
+const THEME_COLORS = [
+  { media: '(prefers-color-scheme: light)', color: '#f4f3ef' },
+  { media: '(prefers-color-scheme: dark)', color: '#191815' },
+];
 
 // Runs before the first paint, so the page is already the right colour when
 // it arrives rather than flashing paper and correcting itself a beat later.
@@ -172,6 +152,30 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <title>CollectionBuddy</title>
+        {/* I18nProvider keeps this in step with the active language via
+            `meta[name="description"]` -- the selector has to keep matching
+            this exact tag. */}
+        <meta name="description" content="Sammeln • Ordnen • Behalten" />
+        <link rel="manifest" href={`${basePath}/site.webmanifest`} />
+        <link rel="icon" href={`${basePath}/favicon.ico`} />
+        <link
+          rel="icon"
+          href={`${basePath}/favicon-32x32.png`}
+          sizes="32x32"
+          type="image/png"
+        />
+        <link rel="apple-touch-icon" href={`${basePath}/apple-touch-icon.png`} />
+        <link rel="shortcut icon" href={`${basePath}/favicon.ico`} />
+        {/* The browser chrome around the page -- the address bar on
+            Android, the status bar area of an installed app. Two entries so
+            it matches whichever theme the page settles on; a paper-coloured
+            bar over a near-black page is the seam that gives a retrofitted
+            dark mode away. These follow the OS, not the in-app control,
+            because that is the whole of what a meta tag can express. */}
+        {THEME_COLORS.map(({ media, color }) => (
+          <meta key={media} name="theme-color" content={color} media={media} />
+        ))}
         {/* As early as possible: a CSP meta tag only covers what the
             document parses after it. */}
         <meta
