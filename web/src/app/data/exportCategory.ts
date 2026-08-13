@@ -22,10 +22,8 @@
 import { supabase } from '../supabase';
 import {
   createSignedUrls,
-  imagePrefix,
-  listAllImageObjects,
+  listExportImagesForItems,
   ITEM_IMAGES_BUCKET,
-  type ImageObject,
 } from './images';
 import { listItemsForExport } from './items';
 import {
@@ -35,8 +33,6 @@ import {
   buildManifest,
   CSV_NAME,
   exportEntries,
-  fullSizeObjectBytes,
-  fullSizeObjectPaths,
   MANIFEST_NAME,
   type ExportItem,
 } from './exportFormat';
@@ -60,9 +56,11 @@ export type ExportResult = {
   photoCount: number;
   /** Photographs that could not be fetched after retrying, and were left out. */
   skippedPhotoCount: number;
-  /** Items whose photographs could not even be listed after retrying, so
-   * none of them made it into `skippedPhotoCount` -- they were never
-   * counted among the attempts at all (#417). */
+  /** Always 0 -- kept for API stability. Used to count items whose
+   * photographs couldn't even be listed after retrying a flaky per-item
+   * storage.list() call (#417); a single batched `images` query has no
+   * equivalent per-item failure to count, and aborts the export outright
+   * on error instead (see fetchPhotoPaths). */
   skippedItemCount: number;
 };
 
@@ -119,38 +117,6 @@ export class ExportCancelledError extends Error {
 
 function checkCancelled(signal?: AbortSignal): void {
   if (signal?.aborted) throw new ExportCancelledError();
-}
-
-/**
- * Runs `worker` over `items` through a fixed-size pool of concurrent
- * runners, in place of either the whole array at once or one at a time.
- * Results land at the same index the input item held, regardless of which
- * runner finished it or in what order -- callers that care about order (the
- * ZIP does not, but a human reading a diff might) get it for free.
- */
-async function mapPool<T, R>(
-  items: T[],
-  concurrency: number,
-  worker: (item: T) => Promise<R>,
-): Promise<R[]> {
-  // Stryker disable next-line ArrayDeclaration: pre-sizing is an allocation
-  // hint, not a length assertion -- `results[i] = ...` grows a shorter (or
-  // zero-length) array exactly the same way, so there is no behavior here
-  // for a test to observe either way.
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const runners = Array.from(
-    { length: Math.min(concurrency, items.length) },
-    async () => {
-      for (;;) {
-        const i = next++;
-        if (i >= items.length) return;
-        results[i] = await worker(items[i]);
-      }
-    },
-  );
-  await Promise.all(runners);
-  return results;
 }
 
 // Every worker in this codebase only ever throws a real Error (or one of
@@ -235,104 +201,46 @@ async function fetchAllItems(
   return items;
 }
 
-/**
- * How many listings run at once. Storage has no listing that crosses
- * prefixes, so this is one call per item however it is written -- but a
- * category of 500 items firing 500 simultaneous requests is exactly the
- * self-inflicted 429 burst the signing batch above and the geocoder queue
- * (`usePlaces.tsx`'s `GEOCODE_CONCURRENCY`) already learned to avoid (#417).
- */
-export const LISTING_CONCURRENCY = 16;
-
-/**
- * Retried the same way a photograph fetch is (#414): a listing is one
- * Storage API call, and a radio blip or a rate limit is exactly as likely
- * to hit it as any other request in this export.
- */
-const LISTING_FETCH_ATTEMPTS = 3;
-const LISTING_RETRY_BASE_MS = 500;
-
 function isRetryableStatus(status: number): boolean {
   return status === 429 || status >= 500;
 }
 
 /**
- * Lists one item's photographs, retrying a transient failure the same way
- * `fetchPhotoBytes` does. A `status` the Storage client didn't attach at all
- * (a network failure rather than an HTTP response) is treated as retryable,
- * on the same reasoning as a rejected `fetch` below -- there is no response
- * to say otherwise.
- */
-async function listOnePrefix(
-  prefix: string,
-  listImages: typeof listAllImageObjects,
-  signal?: AbortSignal,
-): Promise<{ data: ImageObject[] | null; error: unknown }> {
-  let lastErr: unknown;
-  for (let attempt = 0; attempt < LISTING_FETCH_ATTEMPTS; attempt++) {
-    checkCancelled(signal);
-    if (attempt > 0) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, LISTING_RETRY_BASE_MS * 2 ** (attempt - 1)),
-      );
-    }
-    try {
-      const { data, error } = await listImages(prefix);
-      if (!error) return { data, error: null };
-      const status = (error as { status?: number }).status;
-      if (status !== undefined && !isRetryableStatus(status)) {
-        return { data: null, error };
-      }
-      lastErr = error;
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-  return { data: null, error: lastErr };
-}
-
-/**
- * Lists every item's photographs through a bounded pool rather than one
- * unbounded burst (#417). An item whose listing still fails after retrying
- * is not allowed to abort the whole export -- it is logged and counted
- * (`skippedItemCount`, reported the same way a skipped photograph already
- * is per #414) and its photographs are simply absent, the same shape as an
- * item that genuinely has none.
+ * Every fetched item's full-size photograph paths and total byte weight, in
+ * one batched `images` query (listExportImagesForItems, data/images.ts)
+ * rather than one storage.list() call per item -- this used to need its own
+ * concurrency pool and retry/backoff (#417, #414) purely because per-item
+ * Storage listing was slow and flaky at export scale; a single indexed
+ * Postgres query has neither problem, so there is no per-item failure mode
+ * left to isolate. A failure here aborts the export the same way a failed
+ * items page does (fetchAllItems above) -- there is no longer a natural
+ * per-item boundary to blame a partial failure on.
  */
 async function fetchPhotoPaths(
-  uid: string,
   items: ExportItem[],
-  listImages: typeof listAllImageObjects,
+  listImages: typeof listExportImagesForItems,
   signal?: AbortSignal,
 ): Promise<{
   photoPathsByItemId: Map<string, string[]>;
-  skippedItemCount: number;
-  /** Summed from list()'s own metadata during this same listing pass, so the
-   * archive's total weight is known before a single photograph is
-   * downloaded (#428). An item whose listing failed contributes nothing --
-   * its photographs are already absent from the archive either way. */
+  /** Summed from the query's own size_bytes column, so the archive's total
+   * weight is known before a single photograph is downloaded (#428). */
   totalBytes: number;
 }> {
-  let skippedItemCount = 0;
+  checkCancelled(signal);
+  const { data, error } = await listImages(items.map((item) => item.id));
+  if (error) {
+    throw new ExportError('Could not list photographs', { cause: error });
+  }
+
+  const photoPathsByItemId = new Map<string, string[]>();
   let totalBytes = 0;
-  const listings = await mapPool(items, LISTING_CONCURRENCY, async (item) => {
-    checkCancelled(signal);
-    const prefix = imagePrefix(uid, item.id);
-    const { data, error } = await listOnePrefix(prefix, listImages, signal);
-    if (error) {
-      console.error("Skipping item's photographs", item.id, error);
-      skippedItemCount++;
-      return [item.id, [] as string[]] as const;
-    }
-    const objects = data ?? [];
-    totalBytes += fullSizeObjectBytes(objects);
-    return [item.id, fullSizeObjectPaths(prefix, objects)] as const;
-  });
-  return {
-    photoPathsByItemId: new Map(listings),
-    skippedItemCount,
-    totalBytes,
-  };
+  for (const row of data ?? []) {
+    const paths = photoPathsByItemId.get(row.item_id) ?? [];
+    paths.push(row.path_full);
+    photoPathsByItemId.set(row.item_id, paths);
+    totalBytes += row.size_bytes ?? 0;
+  }
+  return { photoPathsByItemId, totalBytes };
 }
 
 /**
@@ -467,7 +375,7 @@ export async function exportCategory({
   listItems = listItemsForExport,
   // Stryker disable next-line all
   // v8 ignore next
-  listImages = listAllImageObjects,
+  listImages = listExportImagesForItems,
   // Stryker disable next-line all
   // v8 ignore next
   signUrls = createSignedUrls,
@@ -482,7 +390,7 @@ export async function exportCategory({
   signal?: AbortSignal;
   getSession?: () => ReturnType<typeof supabase.auth.getSession>;
   listItems?: typeof listItemsForExport;
-  listImages?: typeof listAllImageObjects;
+  listImages?: typeof listExportImagesForItems;
   signUrls?: typeof createSignedUrls;
   /** Asked once the archive's total photograph size is known -- listing
    * already carries it in `metadata.size` -- but only when it exceeds
@@ -493,14 +401,20 @@ export async function exportCategory({
   confirmLargeExport?: (totalBytes: number) => Promise<boolean> | boolean;
 }): Promise<ExportResult> {
   const { data: sessionData } = await getSession();
-  const uid = sessionData.session?.user.id;
-  if (!uid) throw new ExportError('No user session');
+  if (!sessionData.session?.user.id) throw new ExportError('No user session');
 
   onProgress?.({ phase: 'items', done: 0, total: 0 });
   const items = await fetchAllItems(category.id, listItems, signal);
 
-  const { photoPathsByItemId, skippedItemCount, totalBytes } =
-    await fetchPhotoPaths(uid, items, listImages, signal);
+  // Fully-qualified paths straight from the images table -- unlike the old
+  // storage.list()-based listing, there is no per-item owner prefix to
+  // build here, so this needs nothing from the session beyond the guard
+  // above.
+  const { photoPathsByItemId, totalBytes } = await fetchPhotoPaths(
+    items,
+    listImages,
+    signal,
+  );
 
   if (totalBytes > LARGE_EXPORT_WARN_BYTES && confirmLargeExport) {
     checkCancelled(signal);
@@ -574,6 +488,11 @@ export async function exportCategory({
     itemCount: items.length,
     photoCount: total - skipped,
     skippedPhotoCount: skipped,
-    skippedItemCount,
+    // Always 0: a photo-listing failure now aborts the whole export
+    // (fetchPhotoPaths throws) rather than skipping the one item whose
+    // storage.list() call failed -- there is no per-item listing left to
+    // fail independently. Kept in the result shape rather than removed, so
+    // useExportCategory.tsx's `skippedItemCount > 0` check needs no change.
+    skippedItemCount: 0,
   };
 }

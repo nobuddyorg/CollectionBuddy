@@ -5,132 +5,88 @@ import {
   clearImageCache,
   getCachedSignedUrl,
 } from './imageCache';
-import { pairImageEntries, signEntries, toImgEntries } from './useItemImages';
+import { groupImageRows, signEntries, toImgEntries } from './useItemImages';
 import type { ImageEntryData } from './useItemImages';
 
-describe('pairImageEntries', () => {
-  const prefix = 'user-1/item-1';
-
-  it('pairs a full image with its thumbnail', () => {
-    const result = pairImageEntries(
-      [{ name: 'abc.webp' }, { name: 'abc.thumb.webp' }],
-      prefix,
-    );
-    expect(result.get('abc')).toEqual({
-      pathFull: `${prefix}/abc.webp`,
-      pathThumb: `${prefix}/abc.thumb.webp`,
+describe('groupImageRows', () => {
+  it("groups a row by item, keyed by the row's own id", () => {
+    const result = groupImageRows([
+      {
+        id: 'img-1',
+        item_id: 'item-1',
+        path_full: 'p/1/a.webp',
+        path_thumb: 'p/1/a.thumb.webp',
+      },
+    ]);
+    expect(result.get('item-1')?.get('img-1')).toEqual({
+      id: 'img-1',
+      pathFull: 'p/1/a.webp',
+      pathThumb: 'p/1/a.thumb.webp',
     });
   });
 
-  it('keeps a full image with no thumbnail, with pathThumb undefined', () => {
-    const result = pairImageEntries([{ name: 'solo.webp' }], prefix);
-    expect(result.get('solo')).toEqual({
-      pathFull: `${prefix}/solo.webp`,
-      pathThumb: undefined,
-    });
+  it('leaves pathThumb undefined for a row with none', () => {
+    const result = groupImageRows([
+      {
+        id: 'img-1',
+        item_id: 'item-1',
+        path_full: 'p/1/a.webp',
+        path_thumb: null,
+      },
+    ]);
+    expect(result.get('item-1')?.get('img-1')?.pathThumb).toBeUndefined();
   });
 
-  it('drops an orphaned thumbnail with no matching full image', () => {
-    const result = pairImageEntries([{ name: 'orphan.thumb.webp' }], prefix);
-    expect(result.has('orphan')).toBe(false);
-    expect(result.size).toBe(0);
+  // The grid hangs its photographs in the order the query returned them, and
+  // stands an upload's placeholder at the end -- so the row order coming in
+  // has to survive grouping unchanged (#265).
+  it("carries row order through to each item's entries", () => {
+    const result = groupImageRows([
+      {
+        id: 'oldest',
+        item_id: 'item-1',
+        path_full: 'p/1/oldest.webp',
+        path_thumb: null,
+      },
+      {
+        id: 'middle',
+        item_id: 'item-1',
+        path_full: 'p/1/middle.webp',
+        path_thumb: null,
+      },
+      {
+        id: 'newest',
+        item_id: 'item-1',
+        path_full: 'p/1/newest.webp',
+        path_thumb: null,
+      },
+    ]);
+    expect(Array.from(result.get('item-1')?.keys() ?? [])).toEqual([
+      'oldest',
+      'middle',
+      'newest',
+    ]);
   });
 
-  it('is unaffected by listing order', () => {
-    const thumbFirst = pairImageEntries(
-      [{ name: 'xyz.thumb.webp' }, { name: 'xyz.webp' }],
-      prefix,
-    );
-    expect(thumbFirst.get('xyz')).toEqual({
-      pathFull: `${prefix}/xyz.webp`,
-      pathThumb: `${prefix}/xyz.thumb.webp`,
-    });
-  });
-
-  it('strips only a trailing .thumb.webp, not an earlier occurrence of the same text', () => {
-    const result = pairImageEntries(
-      [
-        { name: 'photo.thumb.webp-1.webp' },
-        { name: 'photo.thumb.webp-1.thumb.webp' },
-      ],
-      prefix,
-    );
-    expect(result.get('photo.thumb.webp-1')).toEqual({
-      pathFull: `${prefix}/photo.thumb.webp-1.webp`,
-      pathThumb: `${prefix}/photo.thumb.webp-1.thumb.webp`,
-    });
-  });
-
-  it('strips only a trailing .webp, not an earlier occurrence of the same text', () => {
-    const result = pairImageEntries([{ name: 'photo.webp-1.webp' }], prefix);
-    expect(result.has('photo.webp-1')).toBe(true);
-  });
-
-  it('treats an object with neither suffix as a full image, keyed by its whole name', () => {
-    const result = pairImageEntries([{ name: 'unexpected-name' }], prefix);
-    expect(result.get('unexpected-name')).toEqual({
-      pathFull: `${prefix}/unexpected-name`,
-      pathThumb: undefined,
-    });
-  });
-
-  // The grid hangs its photographs in this order and stands an upload's
-  // placeholder at the end, so a listing that arrives oldest-first has to stay
-  // oldest-first through here -- otherwise the new picture lands somewhere
-  // other than the frame that was held for it (#265).
-  it('carries listing order through to the paired entries', () => {
-    const result = pairImageEntries(
-      [
-        { name: 'oldest.webp' },
-        { name: 'oldest.thumb.webp' },
-        { name: 'middle.webp' },
-        { name: 'middle.thumb.webp' },
-        { name: 'newest.webp' },
-        { name: 'newest.thumb.webp' },
-      ],
-      prefix,
-    );
-    expect(Array.from(result.keys())).toEqual(['oldest', 'middle', 'newest']);
-  });
-
-  // A card can be given a second photograph while the first is still
-  // compressing, so two uploads can interleave their full and thumb objects in
-  // the listing. Each image still takes its place from where its full-size
-  // object falls -- the one uploaded first of the pair, and so the first of
-  // that base the listing shows.
-  it('keeps each image in place when two uploads interleave', () => {
-    const result = pairImageEntries(
-      [
-        { name: 'first.webp' },
-        { name: 'second.webp' },
-        { name: 'second.thumb.webp' },
-        { name: 'first.thumb.webp' },
-      ],
-      prefix,
-    );
-    expect(Array.from(result.keys())).toEqual(['first', 'second']);
-  });
-
-  it('pairs multiple independent images from one flat listing', () => {
-    const result = pairImageEntries(
-      [
-        { name: 'a.webp' },
-        { name: 'a.thumb.webp' },
-        { name: 'b.webp' },
-        { name: 'b.thumb.webp' },
-      ],
-      prefix,
-    );
+  it('separates rows belonging to different items', () => {
+    const result = groupImageRows([
+      { id: 'a', item_id: 'item-1', path_full: 'p/1/a.webp', path_thumb: null },
+      { id: 'b', item_id: 'item-2', path_full: 'p/2/b.webp', path_thumb: null },
+    ]);
     expect(result.size).toBe(2);
-    expect(result.get('a')?.pathThumb).toBe(`${prefix}/a.thumb.webp`);
-    expect(result.get('b')?.pathThumb).toBe(`${prefix}/b.thumb.webp`);
+    expect(result.get('item-1')?.size).toBe(1);
+    expect(result.get('item-2')?.size).toBe(1);
+  });
+
+  it('returns an empty map for an empty row list', () => {
+    expect(groupImageRows([]).size).toBe(0);
   });
 });
 
 describe('toImgEntries', () => {
   const entryData = new Map([
-    ['a', { pathFull: 'p/a.webp', pathThumb: 'p/a.thumb.webp' }],
-    ['b', { pathFull: 'p/b.webp', pathThumb: undefined }],
+    ['a', { id: 'a', pathFull: 'p/a.webp', pathThumb: 'p/a.thumb.webp' }],
+    ['b', { id: 'b', pathFull: 'p/b.webp', pathThumb: undefined }],
   ]);
 
   it('attaches signed URLs to both full and thumb paths', () => {
@@ -142,12 +98,14 @@ describe('toImgEntries', () => {
     const result = toImgEntries(entryData, signed);
     expect(result).toEqual([
       {
+        id: 'a',
         pathFull: 'p/a.webp',
         urlFull: 'https://signed/a',
         pathThumb: 'p/a.thumb.webp',
         urlThumb: 'https://signed/a-thumb',
       },
       {
+        id: 'b',
         pathFull: 'p/b.webp',
         urlFull: 'https://signed/b',
         pathThumb: undefined,
@@ -172,7 +130,7 @@ describe('signEntries', () => {
     pathFull: string,
     pathThumb?: string,
   ): Map<string, ImageEntryData> {
-    return new Map([['only', { pathFull, pathThumb }]]);
+    return new Map([['only', { id: 'only', pathFull, pathThumb }]]);
   }
 
   it('signs unsigned paths and returns each item keyed to its signed URL, including a thumbnail', async () => {
@@ -192,6 +150,7 @@ describe('signEntries', () => {
     expect(signUrls).toHaveBeenCalledWith(['p/1/a.webp', 'p/1/a.thumb.webp']);
     expect(result['item-1']).toEqual([
       {
+        id: 'only',
         pathFull: 'p/1/a.webp',
         urlFull: 'https://signed/a',
         pathThumb: 'p/1/a.thumb.webp',

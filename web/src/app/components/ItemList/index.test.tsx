@@ -73,12 +73,7 @@ function renderList(props: Partial<Parameters<typeof ItemList>[0]> = {}) {
     <I18nProvider>
       <ToastProvider>
         <ConfirmProvider>
-          <ItemList
-            categoryId="cat-1"
-            ownerUserId="owner-1"
-            isShared={false}
-            {...props}
-          />
+          <ItemList categoryId="cat-1" isShared={false} {...props} />
         </ConfirmProvider>
       </ToastProvider>
     </I18nProvider>,

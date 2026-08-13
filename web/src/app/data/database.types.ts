@@ -1,4 +1,4 @@
-// Generated from the migrations in supabase/migrations/ (0001-0007).
+// Generated from the migrations in supabase/migrations/ (0001-0013).
 //
 // Regenerate after a schema change, against a local stack:
 //   supabase start
@@ -98,6 +98,44 @@ export type Database = {
             columns: ['category_id'];
             isOneToOne: false;
             referencedRelation: 'categories';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      images: {
+        Row: {
+          created_at: string;
+          id: string;
+          item_id: string;
+          path_full: string;
+          path_thumb: string | null;
+          size_bytes: number | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          item_id: string;
+          path_full: string;
+          path_thumb?: string | null;
+          size_bytes?: number | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          item_id?: string;
+          path_full?: string;
+          path_thumb?: string | null;
+          size_bytes?: number | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'images_item_id_fkey';
+            columns: ['item_id'];
+            isOneToOne: false;
+            referencedRelation: 'items';
             referencedColumns: ['id'];
           },
         ];

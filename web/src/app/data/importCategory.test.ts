@@ -24,6 +24,7 @@ type DeleteCategoryRow = ImportParams['deleteCategoryRow'];
 type CreateItemRow = ImportParams['createItemRow'];
 type LinkItemToCategoryRow = ImportParams['linkItemToCategoryRow'];
 type UploadImage = ImportParams['uploadImage'];
+type CreateImage = ImportParams['createImage'];
 type CompressThumb = ImportParams['compressThumb'];
 
 function item(overrides: Partial<ExportItem> = {}): ExportItem {
@@ -119,6 +120,13 @@ function fakeUploadImage(): UploadImage {
   return vi.fn(async () => ({ error: null })) as unknown as UploadImage;
 }
 
+function fakeCreateImage(): CreateImage {
+  return vi.fn(async () => ({
+    data: { id: 'img-1', item_id: 'item', path_full: 'a', path_thumb: null },
+    error: null,
+  })) as unknown as CreateImage;
+}
+
 function fakeCompressThumb(): CompressThumb {
   return vi.fn(async () => new Blob(['thumb']));
 }
@@ -131,6 +139,7 @@ function baseFakes() {
     createItemRow: fakeCreateItem(),
     linkItemToCategoryRow: fakeLinkItemToCategory(),
     uploadImage: fakeUploadImage(),
+    createImage: fakeCreateImage(),
     compressThumb: fakeCompressThumb(),
   };
 }

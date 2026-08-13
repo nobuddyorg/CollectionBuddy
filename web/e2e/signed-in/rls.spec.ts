@@ -246,6 +246,69 @@ test.describe('one collection cannot reach another', () => {
     expect(error).not.toBeNull();
   });
 
+  // The images table (0013_images.sql) is additive surface storage.objects'
+  // own policies never had to cover: a row that names an object, not the
+  // object's bytes. Self-contained, the same way the Storage probes above
+  // are -- no seed fixture plants an images row, so the test inserts and
+  // tears down its own.
+  test('their photograph records cannot be listed', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, otherToken, otherUserId } = context();
+
+    const { data: theirItem } = await apiAs(otherToken)
+      .from('items')
+      .select('id')
+      .eq('title', SEED.other.item)
+      .single();
+
+    const { data: planted, error: insertError } = await apiAs(otherToken)
+      .from('images')
+      .insert({
+        item_id: theirItem!.id,
+        path_full: `${otherUserId}/${theirItem!.id}/rls-images-probe.webp`,
+      })
+      .select('id')
+      .single();
+    expect(insertError).toBeNull();
+
+    try {
+      const { data } = await apiAs(token)
+        .from('images')
+        .select('id')
+        .eq('item_id', theirItem!.id);
+      expect(data).toEqual([]);
+    } finally {
+      await apiAs(otherToken).from('images').delete().eq('id', planted!.id);
+    }
+  });
+
+  // tg_images_enforce (0013_images.sql) is the same shape as
+  // tg_item_categories_enforce: it re-derives ownership from the item
+  // itself rather than trusting the client, so an insert addressed at
+  // someone else's item is refused outright, not merely filed under the
+  // wrong owner the way a planted item is (#C1 above) -- there is no
+  // "their item, my row" shape for this table to produce.
+  test('an images row cannot be inserted for their item', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, otherToken } = context();
+
+    const { data: theirItem } = await apiAs(otherToken)
+      .from('items')
+      .select('id')
+      .eq('title', SEED.other.item)
+      .single();
+
+    const { data, error } = await apiAs(token)
+      .from('images')
+      .insert({
+        item_id: theirItem!.id,
+        path_full: 'planted/planted.webp',
+      })
+      .select('id');
+    expect(data).toBeNull();
+    expect(error).not.toBeNull();
+  });
+
   // Signed out is the other boundary, and it is refused a step earlier than
   // the rest: `anon` holds no grant on these tables at all, so the request is
   // turned away before any policy predicate is evaluated. 42501 is what that
@@ -558,6 +621,56 @@ test.describe('a category shared with another collector', () => {
       expect(afterError).not.toBeNull();
     } finally {
       await apiAs(token).storage.from('item-images').remove([path]);
+    }
+  });
+
+  // The images table's own select policy (0013_images.sql) joins through
+  // item_categories/category_shares directly, rather than parsing an
+  // itemId back out of a path the way storage.objects' equivalent policy
+  // has to -- a native item_id column carries it already. Same grant,
+  // same revocation, checked against the row instead of the bytes.
+  test('a shared photograph record can be read through the grant, and stops the moment it is revoked', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const { data: item } = await apiAs(token)
+      .from('items')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('title', itemsIn('Münzen')[0].title)
+      .single();
+
+    const { data: planted, error: insertError } = await apiAs(token)
+      .from('images')
+      .insert({
+        item_id: item!.id,
+        path_full: `${userId}/${item!.id}/rls-share-images-probe.webp`,
+      })
+      .select('id')
+      .single();
+    expect(insertError).toBeNull();
+
+    try {
+      const shareId = await share(token, categoryId, SEED.other.email);
+      try {
+        const { data } = await apiAs(otherToken)
+          .from('images')
+          .select('id')
+          .eq('id', planted!.id);
+        expect(data).toHaveLength(1);
+      } finally {
+        await unshare(token, shareId);
+      }
+
+      // The grant is gone; the row is not -- so this is the revocation
+      // itself being checked, not just a row that stopped existing.
+      const { data: after } = await apiAs(otherToken)
+        .from('images')
+        .select('id')
+        .eq('id', planted!.id);
+      expect(after).toEqual([]);
+    } finally {
+      await apiAs(token).from('images').delete().eq('id', planted!.id);
     }
   });
 });

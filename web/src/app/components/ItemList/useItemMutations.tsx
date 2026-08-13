@@ -19,12 +19,23 @@ export function useItemMutations({
   items,
   setItems,
   reload,
-  deleteAllItemImages,
+  captureItemImagePaths,
+  removeImageBytes,
 }: {
   items: ItemLite[];
   setItems: Dispatch<SetStateAction<ItemLite[]>>;
   reload: (opts?: { silent?: boolean }) => Promise<void>;
-  deleteAllItemImages: (itemId: string) => Promise<void>;
+  /** Read-only: the item's photograph paths, captured before `deleteItem`
+   * below -- the images rows they name are gone (cascaded away with the
+   * item row) by the time anything could act on them afterward. See
+   * 0013_images.sql's note on the FK-cascade-timing design. */
+  captureItemImagePaths: (
+    itemId: string,
+  ) => Promise<{ path_full: string; path_thumb: string | null }[]>;
+  removeImageBytes: (
+    itemId: string,
+    paths: { path_full: string; path_thumb: string | null }[],
+  ) => Promise<void>;
 }) {
   const { t } = useI18n();
   const toast = useToast();
@@ -83,12 +94,19 @@ export function useItemMutations({
         setItems((prev) => restoreAt(prev, index, snapshot));
       };
 
-      // The row before the objects: the storage prefix is keyed by the
-      // item's id, not derived from the row itself, so nothing is lost by
-      // deleting it last. Deleting the row first also means a failure here
-      // still means "nothing happened" -- the restore is honest, and no
-      // photograph is ever destroyed on a path that reports itself as
-      // failed.
+      // Read-only, and has to run before deleteItem below: once the item
+      // row is gone, its images rows go with it (on delete cascade,
+      // 0013_images.sql) -- this is the last point their paths can still be
+      // read, the same reasoning deleteCategory (useCategories.tsx) already
+      // applies to the item_categories rows a category delete cascades away.
+      const imagePaths = await captureItemImagePaths(id);
+
+      // The row before the objects: deleting the item row first means a
+      // failure here still means "nothing happened" -- the restore is
+      // honest, and no photograph is ever destroyed on a path that reports
+      // itself as failed. Capturing the paths above doesn't change that:
+      // it's a read, not a mutation, so it leaves nothing to undo if this
+      // fails.
       const { error } = await deleteItem(id);
       if (error) {
         toast.reportError('delete item', error, t('item_list.delete_error'));
@@ -105,7 +123,7 @@ export function useItemMutations({
         // The row is already gone at this point, irreversibly. A failure
         // here is a storage leak, not data loss -- there is no entry left
         // to restore, and nothing to gain by pretending otherwise.
-        await deleteAllItemImages(id);
+        await removeImageBytes(id, imagePaths);
       } catch (err) {
         toast.reportError(
           'delete item images',
@@ -117,7 +135,16 @@ export function useItemMutations({
       // the freed slot and corrects the total the pagination is drawn from.
       void reload({ silent: true });
     },
-    [items, setItems, confirm, t, toast, deleteAllItemImages, reload],
+    [
+      items,
+      setItems,
+      confirm,
+      t,
+      toast,
+      captureItemImagePaths,
+      removeImageBytes,
+      reload,
+    ],
   );
 
   return { saveEdit, isSaving, removeItem };

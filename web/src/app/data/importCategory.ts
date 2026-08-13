@@ -31,7 +31,7 @@ import {
   type ItemEditableFieldKey,
   type ItemInsert,
 } from './items';
-import { imagePrefix, uploadImageObject } from './images';
+import { createImageRow, imagePrefix, uploadImageObject } from './images';
 import {
   findManifestPath,
   ImportFormatError,
@@ -90,8 +90,9 @@ const PHOTO_UPLOAD_RETRY_BASE_MS = 500;
 /**
  * Regenerates the 600px thumbnail from a photograph's already-compressed
  * full-size bytes -- the archive only ever carries the full size (thumbnails
- * are the app's own derivative, left out of the export on purpose, see
- * exportFormat.ts's fullSizeObjectPaths), so importing has to make a new one
+ * are the app's own derivative, left out of the export on purpose -- see
+ * exportCategory.ts's fetchPhotoPaths, which never selects path_thumb), so
+ * importing has to make a new one
  * the same way `useItemImages.tsx`'s upload path does: from the already-sized
  * image, not a second pass over some larger original that no longer exists.
  */
@@ -203,6 +204,7 @@ export async function importCategory({
   createItemRow = createItem,
   linkItemToCategoryRow = linkItemToCategory,
   uploadImage = uploadImageObject,
+  createImage = createImageRow,
   compressThumb = realCompressThumb,
 }: {
   file: Blob;
@@ -219,6 +221,7 @@ export async function importCategory({
   createItemRow?: typeof createItem;
   linkItemToCategoryRow?: typeof linkItemToCategory;
   uploadImage?: typeof uploadImageObject;
+  createImage?: typeof createImageRow;
   compressThumb?: (bytes: Uint8Array<ArrayBuffer>) => Promise<Blob>;
 }): Promise<ImportResult> {
   onProgress?.({ phase: 'reading', done: 0, total: 0 });
@@ -336,6 +339,16 @@ export async function importCategory({
         );
         if (thumbError) {
           console.warn('Thumbnail upload failed:', thumbError);
+        }
+
+        const { error: rowError } = await createImage({
+          item_id: task.itemId,
+          path_full: `${pathBase}.webp`,
+          path_thumb: thumbError ? null : `${pathBase}.thumb.webp`,
+          size_bytes: bytes.length,
+        });
+        if (rowError) {
+          throw new Error('Could not record photograph', { cause: rowError });
         }
         photoCount++;
       } catch (err) {

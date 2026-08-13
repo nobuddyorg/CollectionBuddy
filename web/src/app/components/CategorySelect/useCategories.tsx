@@ -12,8 +12,7 @@ import {
   listItemIdsLinkedElsewhere,
   renameCategory as renameCategoryRow,
 } from '../../data/categories';
-import { verifiedUserId } from '../../data/auth';
-import { removeItemImages } from '../../data/images';
+import { listImagePathsForItems, removeImageObjects } from '../../data/images';
 import type { CategorySummary } from '../../data/categories';
 
 export type UseCategories = ReturnType<typeof useCategories>;
@@ -149,21 +148,51 @@ export function useCategories() {
           orphanedItemIds = itemIds.filter((itemId) => !keep.has(itemId));
         }
 
-        // The row before the bytes: the storage prefix is keyed by each
-        // item's id, not derived from the row itself, so nothing is lost
-        // by deleting it last. Deleting the row first also means a
+        // Read-only, and has to run before deleteCategoryRow below, for the
+        // same reason listItemIdsForCategory/listItemIdsLinkedElsewhere
+        // above already do: once the category row is gone, item_categories
+        // cascades away with it, delete_item_if_orphan removes the orphaned
+        // items, and their images rows go with THEM in turn (on delete
+        // cascade, 0013_images.sql) -- this is the last point their paths
+        // can still be read. One batched query rather than one per item.
+        //
+        // Unlike listItemIdsLinkedElsewhere above, a failure here does not
+        // abort the deletion: getting *that* wrong misclassifies which
+        // items are orphaned at all -- an active correctness bug. Getting
+        // *this* wrong only means fewer paths to clean up afterward, the
+        // same "storage leak, not data loss" shape as removeImageObjects
+        // itself failing below -- logged, not fatal to the category the
+        // user actually asked to delete.
+        const orphanedImagePaths = new Map<
+          string,
+          { path_full: string; path_thumb: string | null }[]
+        >();
+        if (orphanedItemIds.length) {
+          const { data: imageRows, error: imagesError } =
+            await listImagePathsForItems(orphanedItemIds);
+          if (imagesError) {
+            console.error(
+              'Could not read images for orphaned items:',
+              imagesError,
+            );
+          }
+          for (const row of imageRows ?? []) {
+            const list = orphanedImagePaths.get(row.item_id) ?? [];
+            list.push({ path_full: row.path_full, path_thumb: row.path_thumb });
+            orphanedImagePaths.set(row.item_id, list);
+          }
+        }
+
+        // The row before the bytes: deleting the category row first means a
         // failure here still means "nothing happened" -- no photograph is
         // ever destroyed on a path that reports itself as failed (#306),
-        // same as a direct item delete.
+        // same as a direct item delete. Capturing the paths above doesn't
+        // change that: it's a read, not a mutation.
         const { error } = await deleteCategoryRow(id);
         if (error) throw error;
         await reload();
 
         if (orphanedItemIds.length) {
-          // Resolved once rather than once per item: the uid can't change
-          // between them, so asking the auth server again for every one of
-          // possibly hundreds of orphaned items was pure per-item overhead.
-          const uid = await verifiedUserId();
           // The row is already gone at this point, irreversibly. A
           // failure here is a storage leak, not data loss -- there is no
           // category left to restore, and nothing to gain by letting one
@@ -171,7 +200,15 @@ export function useCategories() {
           // removal runs to completion rather than aborting on the first
           // rejection.
           const results = await Promise.allSettled(
-            orphanedItemIds.map((itemId) => removeItemImages(itemId, uid)),
+            orphanedItemIds.map(async (itemId) => {
+              const paths = orphanedImagePaths.get(itemId) ?? [];
+              const flat = paths.flatMap((p) =>
+                p.path_thumb ? [p.path_full, p.path_thumb] : [p.path_full],
+              );
+              if (!flat.length) return;
+              const { error: removeError } = await removeImageObjects(flat);
+              if (removeError) throw removeError;
+            }),
           );
           const failures = results.filter(
             (r): r is PromiseRejectedResult => r.status === 'rejected',

@@ -162,7 +162,6 @@ export default function Page() {
             <ItemList
               key={selectedCategoryId}
               categoryId={selectedCategoryId}
-              ownerUserId={selectedCategory?.user_id ?? ''}
               isShared={isSharedSelected}
             />
           </section>

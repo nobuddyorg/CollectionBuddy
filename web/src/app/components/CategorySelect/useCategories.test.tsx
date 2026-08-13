@@ -12,8 +12,7 @@ import {
   listItemIdsLinkedElsewhere,
   renameCategory,
 } from '../../data/categories';
-import { verifiedUserId } from '../../data/auth';
-import { removeItemImages } from '../../data/images';
+import { listImagePathsForItems, removeImageObjects } from '../../data/images';
 import { useCategories } from './useCategories';
 
 vi.mock('../../data/categories', () => ({
@@ -26,11 +25,8 @@ vi.mock('../../data/categories', () => ({
 }));
 
 vi.mock('../../data/images', () => ({
-  removeItemImages: vi.fn(),
-}));
-
-vi.mock('../../data/auth', () => ({
-  verifiedUserId: vi.fn(),
+  listImagePathsForItems: vi.fn(),
+  removeImageObjects: vi.fn(),
 }));
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -41,12 +37,20 @@ function wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
+const IMAGE_ROWS = [
+  { item_id: 'i1', path_full: 'u/i1/a.webp', path_thumb: null },
+  { item_id: 'i2', path_full: 'u/i2/b.webp', path_thumb: 'u/i2/b.thumb.webp' },
+];
+
 // Regression (#306): the category delete used to remove every orphaned
 // item's photographs *before* deleting the category row. A failed row
 // delete (offline, 5xx) then left the category and its entries in place --
 // with every photograph already, and irrecoverably, gone. Same shape as
 // #C1 (item delete), fixed the same way: the row/cascade goes first, and
 // storage bytes are only ever touched once that has actually succeeded.
+// Reading the paths ahead of the row delete is a separate concern -- it's a
+// read, not a mutation, so it's safe to run regardless of what the row
+// delete goes on to do (see the "leaves every photograph untouched" test).
 describe('useCategories deleteCategory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -71,8 +75,14 @@ describe('useCategories deleteCategory', () => {
       data: [],
       error: null,
     });
-    vi.mocked(removeItemImages).mockResolvedValue('uid');
-    vi.mocked(verifiedUserId).mockResolvedValue('uid');
+    vi.mocked(listImagePathsForItems).mockResolvedValue({
+      data: IMAGE_ROWS,
+      error: null,
+    });
+    vi.mocked(removeImageObjects).mockResolvedValue({
+      data: [],
+      error: null,
+    });
   });
 
   it('deletes the category row before touching any photograph, and cleans up on success', async () => {
@@ -86,25 +96,32 @@ describe('useCategories deleteCategory', () => {
 
     expect(outcome).toBe(true);
     expect(deleteCategoryRow).toHaveBeenCalledWith('cat-1');
-    expect(removeItemImages).toHaveBeenCalledWith('i1', 'uid');
-    expect(removeItemImages).toHaveBeenCalledWith('i2', 'uid');
-    expect(removeItemImages).toHaveBeenCalledTimes(2);
+    expect(removeImageObjects).toHaveBeenCalledWith(['u/i1/a.webp']);
+    expect(removeImageObjects).toHaveBeenCalledWith([
+      'u/i2/b.webp',
+      'u/i2/b.thumb.webp',
+    ]);
+    expect(removeImageObjects).toHaveBeenCalledTimes(2);
 
     // The row delete is the first thing to actually mutate anything --
-    // every image removal is ordered strictly after it.
+    // every byte removal is ordered strictly after it. Reading the paths is
+    // not a mutation, so it's the one thing allowed to run before.
+    const readOrder = vi.mocked(listImagePathsForItems).mock
+      .invocationCallOrder[0];
     const rowOrder = vi.mocked(deleteCategoryRow).mock.invocationCallOrder[0];
-    for (const call of vi.mocked(removeItemImages).mock.invocationCallOrder) {
+    expect(readOrder).toBeLessThan(rowOrder);
+    for (const call of vi.mocked(removeImageObjects).mock.invocationCallOrder) {
       expect(call).toBeGreaterThan(rowOrder);
     }
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  // #385: removeItemImages used to resolve the uid itself, once per
-  // orphaned item -- a round trip to the auth server that couldn't have
-  // answered differently between them. It's resolved once here instead and
-  // handed to every call.
-  it('resolves the uid once and reuses it for every orphaned item, not once per item', async () => {
+  // The old design resolved a uid once and reused it for every orphaned
+  // item's storage.list() call (#385); this table-backed design has no uid
+  // to resolve at all -- one batched query for every orphaned item's paths
+  // replaces what used to be N Storage round trips.
+  it("reads every orphaned item's image paths in one batched query, not once per item", async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     const { result } = renderHook(() => useCategories(), { wrapper });
 
@@ -112,9 +129,8 @@ describe('useCategories deleteCategory', () => {
       await result.current.deleteCategory('cat-1');
     });
 
-    expect(verifiedUserId).toHaveBeenCalledTimes(1);
-    expect(removeItemImages).toHaveBeenCalledWith('i1', 'uid');
-    expect(removeItemImages).toHaveBeenCalledWith('i2', 'uid');
+    expect(listImagePathsForItems).toHaveBeenCalledTimes(1);
+    expect(listImagePathsForItems).toHaveBeenCalledWith(['i1', 'i2']);
   });
 
   it('leaves every photograph untouched when the row delete fails, and reports the error', async () => {
@@ -129,9 +145,10 @@ describe('useCategories deleteCategory', () => {
     });
 
     expect(outcome).toBe(false);
-    // Nothing was removed: not a single orphaned item's images were
-    // touched, let alone all of them.
-    expect(removeItemImages).not.toHaveBeenCalled();
+    // The read still happened -- harmless either way -- but nothing that
+    // acts on it did: not a single orphaned item's bytes were removed.
+    expect(listImagePathsForItems).toHaveBeenCalledWith(['i1', 'i2']);
+    expect(removeImageObjects).not.toHaveBeenCalled();
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not delete collection. Please try again.',
     );
@@ -139,8 +156,8 @@ describe('useCategories deleteCategory', () => {
 
   it('reports a cleanup failure without undoing the already-successful row delete', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
-    vi.mocked(removeItemImages)
-      .mockResolvedValueOnce('uid')
+    vi.mocked(removeImageObjects)
+      .mockResolvedValueOnce({ data: [], error: null })
       .mockRejectedValueOnce(new Error('storage down'));
     const consoleError = vi
       .spyOn(console, 'error')
@@ -155,7 +172,7 @@ describe('useCategories deleteCategory', () => {
     // The row is already gone, irreversibly -- a cleanup failure is a
     // storage leak, not data loss, so the deletion still reports success.
     expect(outcome).toBe(true);
-    expect(removeItemImages).toHaveBeenCalledTimes(2);
+    expect(removeImageObjects).toHaveBeenCalledTimes(2);
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This collection was deleted, but some of its photographs could not be removed and may still count against your storage.',
     );
@@ -164,9 +181,9 @@ describe('useCategories deleteCategory', () => {
 
   it('does not let one failed image removal stop the rest from being attempted', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
-    vi.mocked(removeItemImages)
+    vi.mocked(removeImageObjects)
       .mockRejectedValueOnce(new Error('storage down'))
-      .mockResolvedValueOnce('uid');
+      .mockResolvedValueOnce({ data: [], error: null });
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const { result } = renderHook(() => useCategories(), { wrapper });
 
@@ -176,8 +193,11 @@ describe('useCategories deleteCategory', () => {
 
     // Both orphaned items were attempted even though the first rejected --
     // a plain Promise.all would have stopped awaiting after that.
-    expect(removeItemImages).toHaveBeenCalledWith('i1', 'uid');
-    expect(removeItemImages).toHaveBeenCalledWith('i2', 'uid');
+    expect(removeImageObjects).toHaveBeenCalledWith(['u/i1/a.webp']);
+    expect(removeImageObjects).toHaveBeenCalledWith([
+      'u/i2/b.webp',
+      'u/i2/b.thumb.webp',
+    ]);
   });
 
   // #341: every test above sets listItemIdsLinkedElsewhere to return
@@ -210,9 +230,12 @@ describe('useCategories deleteCategory', () => {
       ['i1', 'i2'],
       'cat-1',
     );
-    expect(removeItemImages).toHaveBeenCalledWith('i2', 'uid');
-    expect(removeItemImages).not.toHaveBeenCalledWith('i1', 'uid');
-    expect(removeItemImages).toHaveBeenCalledTimes(1);
+    expect(listImagePathsForItems).toHaveBeenCalledWith(['i2']);
+    expect(removeImageObjects).toHaveBeenCalledWith([
+      'u/i2/b.webp',
+      'u/i2/b.thumb.webp',
+    ]);
+    expect(removeImageObjects).toHaveBeenCalledTimes(1);
   });
 
   // #409: pagination can only guarantee a *successful* answer is complete --
@@ -234,7 +257,8 @@ describe('useCategories deleteCategory', () => {
 
     expect(outcome).toBe(false);
     expect(deleteCategoryRow).not.toHaveBeenCalled();
-    expect(removeItemImages).not.toHaveBeenCalled();
+    expect(listImagePathsForItems).not.toHaveBeenCalled();
+    expect(removeImageObjects).not.toHaveBeenCalled();
   });
 
   // The other half of the same branch: nothing to filter down at all, since
@@ -252,6 +276,7 @@ describe('useCategories deleteCategory', () => {
     });
 
     expect(listItemIdsLinkedElsewhere).not.toHaveBeenCalled();
-    expect(removeItemImages).not.toHaveBeenCalled();
+    expect(listImagePathsForItems).not.toHaveBeenCalled();
+    expect(removeImageObjects).not.toHaveBeenCalled();
   });
 });

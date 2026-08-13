@@ -20,7 +20,6 @@
  */
 
 import type { ExportItemRow } from './items';
-import { isThumbObject } from './images';
 
 /** The item fields an export carries, plus when it was catalogued. */
 export type ExportItem = ExportItemRow;
@@ -109,41 +108,6 @@ export function extensionOf(path: string): string {
   if (dot <= 0) return '.bin';
   const ext = name.slice(dot);
   return SAFE_EXTENSION.test(ext) ? ext : '.bin';
-}
-
-/**
- * The storage paths of an item's photographs, thumbnails left behind.
- *
- * A thumbnail is a 400px derivative this app generated for its own contact
- * strip -- see useItemImages -- not a second picture the user took. Putting
- * both in the archive would double its weight to deliver every photograph
- * twice, once at a size nobody asked for.
- */
-export function fullSizeObjectPaths(
-  prefix: string,
-  objects: { name: string }[],
-): string[] {
-  return objects
-    .filter((o) => !isThumbObject(o.name))
-    .map((o) => `${prefix}/${o.name}`);
-}
-
-/**
- * The total size, in bytes, of an item's full-size photographs -- thumbnails
- * left out the same way `fullSizeObjectPaths` leaves them out, so the two
- * agree on what "the archive's photographs" means.
- *
- * Storage's `list()` already returns each object's size in its metadata;
- * this is what lets an export know its total weight before downloading a
- * single photograph, instead of discovering it only once the tab runs out
- * of memory (#428).
- */
-export function fullSizeObjectBytes(
-  objects: { name: string; metadata: { size: number } | null }[],
-): number {
-  return objects
-    .filter((o) => !isThumbObject(o.name))
-    .reduce((sum, o) => sum + (o.metadata?.size ?? 0), 0);
 }
 
 /**
