@@ -144,8 +144,10 @@ describe('ItemList empty state', () => {
 
 // #483 follow-up: a shared category is browsable but not editable. RLS
 // already refuses the writes (see design-decisions.md's RLS section) --
-// this only checks that the controls offering them are gone, not merely
-// disabled, the same way CategorySelect's owned/shared tests do.
+// this checks that the controls offering them are gone, not merely
+// disabled, the same way CategorySelect's owned/shared tests do. "New
+// entry" is the one exception (#549): it stays mounted and disabled so the
+// toolbar doesn't shrink to just the Map button.
 describe('ItemList on a shared category', () => {
   beforeEach(() => {
     window.localStorage.setItem('lang', 'en');
@@ -153,14 +155,16 @@ describe('ItemList on a shared category', () => {
     useItemsMock.mockReturnValue(itemsState({ items: [item('1')], total: 1 }));
   });
 
-  it('hides the New entry button', () => {
+  it('disables, but does not hide, the New entry button', () => {
     renderList({ isShared: true });
-    expect(screen.queryByTestId('new-entry')).not.toBeInTheDocument();
+    expect(screen.getByTestId('new-entry')).toBeVisible();
+    expect(screen.getByTestId('new-entry')).toBeDisabled();
   });
 
-  it('shows the New entry button for an owned category', () => {
+  it('shows an enabled New entry button for an owned category', () => {
     renderList({ isShared: false });
     expect(screen.getByTestId('new-entry')).toBeVisible();
+    expect(screen.getByTestId('new-entry')).toBeEnabled();
   });
 
   it('offers no edit, delete, or upload control on an entry', () => {
