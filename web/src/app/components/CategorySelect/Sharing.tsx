@@ -80,53 +80,72 @@ export function SharingSection({ shares }: Props) {
         {t('category_select.share_section_title')}
       </p>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1.5">
+      <div className="flex flex-col gap-1.5">
         <label
           htmlFor="share-email"
-          className="col-span-3 font-label text-[0.6875rem] text-muted-foreground"
+          className="font-label text-[0.6875rem] text-muted-foreground"
         >
           {t('category_select.share_invite_label')}
         </label>
-        <input
-          id="share-email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void onShare();
-          }}
-          placeholder={t('category_select.share_invite_placeholder')}
-          className={fieldClasses('min-w-0')}
-        />
-        <input
-          id="share-expiry"
-          type="date"
-          value={expiryDate}
-          min={todayDateStr()}
-          onChange={(e) => setExpiryDate(e.target.value)}
-          aria-label={t('category_select.share_expiry_label')}
-          title={t('category_select.share_expiry_label')}
-          className={fieldClasses('min-w-0')}
-        />
-        <IconButton
-          variant="primary"
-          size="xl"
-          onClick={() => void onShare()}
-          disabled={email.trim() === '' || isSharing}
-          aria-busy={isSharing}
-          aria-label={t('category_select.share_confirm')}
-          title={t('category_select.share_confirm')}
-        >
-          {isSharing ? (
-            <Spinner size="sm" />
-          ) : (
-            <Icon
-              icon={IconType.Share}
-              className="w-5 h-5"
-              aria-hidden="true"
-            />
-          )}
-        </IconButton>
+        {/* Own row below `sm`: a native date input's rendered width isn't
+            fixed by its className alone -- it swings with its value (an
+            empty input draws narrower than a filled one), which used to
+            fight an `auto` grid track and squeeze the email field on every
+            date pick. The `w-32` wrapper below pins the track so that swing
+            can't propagate -- putting the width on a wrapper instead of the
+            input itself, since `fieldClasses` already bakes in `w-full` and
+            two same-specificity width utilities don't reliably resolve by
+            their order in the className string. `w-36` is wide enough for
+            the full `mm/dd/yyyy` rendering with the field's own padding;
+            narrower clips the month. Stacking here also gives the email
+            field room to breathe on a phone instead of the three controls
+            fighting over one row. */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            id="share-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void onShare();
+            }}
+            placeholder={t('category_select.share_invite_placeholder')}
+            className={fieldClasses('min-w-0 sm:flex-1')}
+          />
+          <div className="flex items-center gap-2">
+            <div className="w-36 shrink-0">
+              <input
+                id="share-expiry"
+                type="date"
+                value={expiryDate}
+                min={todayDateStr()}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                aria-label={t('category_select.share_expiry_label')}
+                title={t('category_select.share_expiry_label')}
+                className={fieldClasses()}
+              />
+            </div>
+            <IconButton
+              variant="primary"
+              size="xl"
+              onClick={() => void onShare()}
+              disabled={email.trim() === '' || isSharing}
+              aria-busy={isSharing}
+              aria-label={t('category_select.share_confirm')}
+              title={t('category_select.share_confirm')}
+            >
+              {isSharing ? (
+                <Spinner size="sm" />
+              ) : (
+                <Icon
+                  icon={IconType.Share}
+                  className="w-5 h-5"
+                  aria-hidden="true"
+                />
+              )}
+            </IconButton>
+          </div>
+        </div>
       </div>
 
       {!isLoading && list.length === 0 && (
