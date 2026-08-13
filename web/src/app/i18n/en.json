@@ -71,6 +71,8 @@
     "share_invite_label": "Share with (email)",
     "share_invite_placeholder": "name@example.com",
     "share_expiry_label": "Expires (optional)",
+    "share_expiry_chip": "Expires {date}",
+    "share_expiry_clear": "Clear expiry date",
     "share_confirm": "Share",
     "share_success": "Collection shared.",
     "share_error": "Could not share this collection. Please try again.",

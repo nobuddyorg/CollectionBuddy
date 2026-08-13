@@ -85,6 +85,41 @@ describe('SharingSection', () => {
     expect(screen.getByRole('button', { name: 'Share' })).toBeDisabled();
   });
 
+  it('shows "No expiry" until a date is picked, with no clear button', () => {
+    renderSection(sharesState());
+    expect(screen.getByText('No expiry')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Clear expiry date' }),
+    ).not.toBeInTheDocument();
+  });
+
+  // jsdom has no `showPicker`, so the trigger button falls back to
+  // focusing the underlying (sr-only) date input -- the same thing a
+  // plain click on that field does natively where `showPicker` is
+  // unsupported (older Safari/Firefox).
+  it('focuses the date field when its trigger button is clicked', async () => {
+    renderSection(sharesState());
+    await userEvent.click(screen.getByTitle('Expires (optional)'));
+    expect(screen.getByLabelText('Expires (optional)')).toHaveFocus();
+  });
+
+  it('shows the picked date and clears it back to "No expiry"', async () => {
+    renderSection(sharesState());
+    fireEvent.change(screen.getByLabelText('Expires (optional)'), {
+      target: { value: '2026-08-20' },
+    });
+
+    const expected = `Expires ${new Date('2026-08-20T00:00:00').toLocaleDateString()}`;
+    expect(screen.getByText(expected)).toBeVisible();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Clear expiry date' }),
+    );
+
+    expect(screen.getByText('No expiry')).toBeVisible();
+    expect(screen.getByLabelText('Expires (optional)')).toHaveValue('');
+  });
+
   it('lists an existing grant with its expiry', () => {
     const expiresAt = '2026-12-31T23:59:59.000Z';
     renderSection(

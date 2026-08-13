@@ -71,6 +71,8 @@
     "share_invite_label": "Teilen mit (E-Mail)",
     "share_invite_placeholder": "name@beispiel.de",
     "share_expiry_label": "Läuft ab (optional)",
+    "share_expiry_chip": "Bis {date}",
+    "share_expiry_clear": "Ablaufdatum löschen",
     "share_confirm": "Teilen",
     "share_success": "Sammlung geteilt.",
     "share_error": "Sammlung konnte nicht geteilt werden. Bitte erneut versuchen.",

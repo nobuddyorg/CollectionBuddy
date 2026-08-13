@@ -196,25 +196,6 @@ body {
   input[type='search']::-webkit-search-decoration {
     -webkit-appearance: none;
   }
-
-  /* iOS Safari (and every other iOS browser -- Apple requires them all to
-     run on WebKit) never draws `::-webkit-calendar-picker-indicator` on a
-     date input; the whole field is tappable instead, with no visual cue
-     that it opens a picker. Desktop Safari, desktop Chrome and Android
-     Chrome all render that native indicator, so a stand-in icon shown by
-     screen width alone doubles up with it there. `-webkit-touch-callout`
-     is recognized only by WebKit-on-iOS, not desktop Safari or Blink, so
-     `@supports` on it is the scalpel that reaches iOS specifically
-     (#549). */
-  .ios-calendar-icon {
-    display: none;
-  }
-
-  @supports (-webkit-touch-callout: none) {
-    .ios-calendar-icon {
-      display: block;
-    }
-  }
 }
 
 @layer utilities {
