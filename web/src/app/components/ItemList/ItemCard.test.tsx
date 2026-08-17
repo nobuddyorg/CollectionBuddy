@@ -184,7 +184,9 @@ describe('ItemCard', () => {
   // showed its title before the photograph behind it had actually painted.
   it('holds the caption back until the hero photograph has settled', () => {
     renderCard({}, { imgs: [{ id: 'a', pathFull: 'a', urlFull: 'a.jpg' }] });
-    expect(screen.queryByRole('heading', { name: 'Item' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Item' }),
+    ).not.toBeInTheDocument();
     fireEvent.load(screen.getByRole('img'));
     expect(screen.getByRole('heading', { name: 'Item' })).toBeVisible();
   });
