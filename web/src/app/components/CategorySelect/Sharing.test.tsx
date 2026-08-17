@@ -56,29 +56,7 @@ describe('SharingSection', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Share' }));
 
-    expect(createShare).toHaveBeenCalledWith(
-      'grantee@example.com',
-      null,
-      'viewer',
-    );
-  });
-
-  it('shares as editor when the "Can edit" checkbox is checked', async () => {
-    const createShare = vi.fn().mockResolvedValue(true);
-    renderSection(sharesState({ createShare }));
-
-    await userEvent.type(
-      screen.getByLabelText('Share with (email)'),
-      'grantee@example.com',
-    );
-    await userEvent.click(screen.getByLabelText('Can edit'));
-    await userEvent.click(screen.getByRole('button', { name: 'Share' }));
-
-    expect(createShare).toHaveBeenCalledWith(
-      'grantee@example.com',
-      null,
-      'editor',
-    );
+    expect(createShare).toHaveBeenCalledWith('grantee@example.com', null);
   });
 
   it("converts a picked date to that day's end rather than its start", async () => {
@@ -101,7 +79,6 @@ describe('SharingSection', () => {
     expect(createShare).toHaveBeenCalledWith(
       'grantee@example.com',
       new Date('2026-08-20T23:59:59').toISOString(),
-      'viewer',
     );
   });
 
@@ -205,12 +182,7 @@ describe('SharingSection', () => {
       }),
     );
 
-    // Two "Can edit" checkboxes exist once a grant is listed: the creation
-    // form's own, and this row's -- scoped to the row so the click lands on
-    // the one that toggles an existing grant, not the one that would share
-    // with a brand new email.
-    const row = screen.getByText('grantee@example.com').closest('li')!;
-    await userEvent.click(within(row).getByLabelText('Can edit'));
+    await userEvent.click(screen.getByLabelText('Can edit'));
 
     expect(updateShareRole).toHaveBeenCalledWith('share-1', 'editor');
   });
