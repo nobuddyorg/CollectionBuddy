@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
+import CenteredModal from '../CenteredModal';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
 import Icon, { IconType } from '../Icon';
@@ -10,6 +11,7 @@ import { IconButton } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
 import { fieldClasses } from '../ui/fieldClasses';
 import type { UseShares } from './useShares';
+import type { CategoryShareSummary } from '../../data/shares';
 
 type Props = {
   shares: UseShares;
@@ -48,6 +50,11 @@ export function SharingSection({ shares }: Props) {
   const [email, setEmail] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const expiryInputRef = useRef<HTMLInputElement>(null);
+  // Below `sm` a share row has no room left for "Can edit" next to the
+  // email, expiry and revoke controls it already carries -- the checkbox
+  // and its label are swapped for a pen icon there, which opens this share
+  // in a modal roomy enough for the same checkbox and its full label.
+  const [roleModalShareId, setRoleModalShareId] = useState<string | null>(null);
 
   // Delegates to the native picker instead of reimplementing one: this
   // button exists to give the *trigger* a consistent look across engines
@@ -92,6 +99,28 @@ export function SharingSection({ shares }: Props) {
       await updateShareRole(shareId, canEdit ? 'editor' : 'viewer');
     },
     [confirm, t, updateShareRole],
+  );
+
+  // Shared by the inline row (sm and up) and the mobile modal below, so the
+  // control itself -- checkbox, label, disabled state -- can't drift
+  // between the two places it's shown. `className` is the label's whole
+  // class list, display utilities included: mixing a hardcoded `flex` in
+  // here with a caller's `hidden ... sm:flex` would put two unconditional
+  // display utilities on the same element with no defined winner between
+  // them.
+  const roleCheckbox = (s: CategoryShareSummary, className: string) => (
+    <label className={className}>
+      <input
+        type="checkbox"
+        checked={s.role === 'editor'}
+        onChange={(e) =>
+          void onToggleRole(s.id, s.invited_email, e.target.checked)
+        }
+        disabled={isUpdatingRole}
+        className="h-4 w-4 rounded-sm ring-1 ring-inset ring-control-border accent-foreground"
+      />
+      {t('category_select.share_can_edit')}
+    </label>
   );
 
   const onRevoke = useCallback(
@@ -267,18 +296,24 @@ export function SharingSection({ shares }: Props) {
                       : t('category_select.share_no_expiry')}
                   </span>
                 </span>
-                <label className="flex shrink-0 items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={s.role === 'editor'}
-                    onChange={(e) =>
-                      void onToggleRole(s.id, s.invited_email, e.target.checked)
-                    }
-                    disabled={isUpdatingRole}
-                    className="h-4 w-4 rounded-sm ring-1 ring-inset ring-control-border accent-foreground"
+                {roleCheckbox(
+                  s,
+                  'hidden shrink-0 items-center gap-1.5 sm:flex',
+                )}
+                <IconButton
+                  variant={s.role === 'editor' ? 'primary' : 'outline'}
+                  size="md"
+                  className="sm:hidden"
+                  onClick={() => setRoleModalShareId(s.id)}
+                  aria-label={t('category_select.share_edit_access')}
+                  title={t('category_select.share_edit_access')}
+                >
+                  <Icon
+                    icon={IconType.Edit}
+                    className="w-4 h-4"
+                    aria-hidden="true"
                   />
-                  {t('category_select.share_can_edit')}
-                </label>
+                </IconButton>
                 <IconButton
                   variant="outlineDestructive"
                   size="md"
@@ -298,6 +333,41 @@ export function SharingSection({ shares }: Props) {
           })}
         </ul>
       )}
+
+      <RoleModal
+        share={list.find((s) => s.id === roleModalShareId) ?? null}
+        onOpenChange={(open) => !open && setRoleModalShareId(null)}
+        renderCheckbox={roleCheckbox}
+      />
     </div>
+  );
+}
+
+// Split out so the modal only exists while a share is actually being
+// edited on mobile -- `CenteredModal` renders null once `open` is false,
+// but this keeps the "which share" lookup and the title string next to
+// each other rather than inline in the middle of the list's JSX.
+function RoleModal({
+  share,
+  onOpenChange,
+  renderCheckbox,
+}: {
+  share: CategoryShareSummary | null;
+  onOpenChange: (open: boolean) => void;
+  renderCheckbox: (
+    s: CategoryShareSummary,
+    className: string,
+  ) => React.ReactNode;
+}) {
+  const { t } = useI18n();
+  return (
+    <CenteredModal
+      open={!!share}
+      onOpenChange={onOpenChange}
+      title={share?.invited_email ?? ''}
+      closeLabel={t('common.close')}
+    >
+      {share && renderCheckbox(share, 'flex items-center gap-1.5')}
+    </CenteredModal>
   );
 }

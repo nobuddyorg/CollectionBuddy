@@ -265,6 +265,42 @@ describe('SharingSection', () => {
     expect(updateShareRole).toHaveBeenCalledWith('share-1', 'viewer');
   });
 
+  // #556 follow-up: "Can edit" has no room next to the email, expiry chip
+  // and revoke button on a narrow screen, so it's a pen icon there instead
+  // that opens the same checkbox in a modal roomy enough for its label.
+  it('opens the role toggle in a modal from the mobile pen button', async () => {
+    const updateShareRole = vi.fn().mockResolvedValue(true);
+    renderSection(
+      sharesState({
+        shares: [
+          {
+            id: 'share-1',
+            invited_email: 'grantee@example.com',
+            expires_at: null,
+            owner_user_id: 'owner-1',
+            role: 'viewer',
+          },
+        ],
+        updateShareRole,
+      }),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit access' }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('grantee@example.com')).toBeVisible();
+    await userEvent.click(within(dialog).getByLabelText('Can edit'));
+
+    expect(
+      await screen.findByText(
+        'Give grantee@example.com full edit access to this collection, including adding, changing and deleting entries and photographs?',
+      ),
+    ).toBeVisible();
+    await userEvent.click(screen.getByTestId('confirm-accept'));
+
+    expect(updateShareRole).toHaveBeenCalledWith('share-1', 'editor');
+  });
+
   it('revokes only after the confirmation is accepted', async () => {
     const deleteShare = vi.fn().mockResolvedValue(true);
     renderSection(
