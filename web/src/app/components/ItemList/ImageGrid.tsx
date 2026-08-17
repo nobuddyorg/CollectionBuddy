@@ -18,6 +18,7 @@ function Plate({
   overlay,
   children,
   priority = false,
+  onReady,
 }: {
   src: string;
   alt: string;
@@ -33,8 +34,17 @@ function Plate({
    * at high priority instead of lazily, same as next/image's old `priority`
    * prop. Only ever true for slot 0 of one of the first few cards. */
   priority?: boolean;
+  /** Told once this plate's own photograph has settled (loaded or failed).
+   * Only ever wired up for the hero slot -- see `ItemCard`, which holds the
+   * caption back until its card's hero plate reports in (#556). */
+  onReady?: () => void;
 }) {
   const [loaded, setLoaded] = useState(false);
+
+  const settle = () => {
+    setLoaded(true);
+    onReady?.();
+  };
 
   return (
     <div className={`relative bg-muted ${!loaded ? 'img-skeleton' : ''}`}>
@@ -60,8 +70,8 @@ function Plate({
           crossOrigin="anonymous"
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : undefined}
-          onLoad={() => setLoaded(true)}
-          onError={() => setLoaded(true)}
+          onLoad={settle}
+          onError={settle}
           className={`${ratio} w-full object-cover cursor-zoom-in transition-opacity duration-300 ${
             loaded ? 'opacity-100' : 'opacity-0'
           }`}
@@ -120,6 +130,7 @@ export function ImageGrid({
   pending = 0,
   priority = false,
   readOnly = false,
+  onHeroReady,
 }: {
   imgs: ImgEntry[];
   itemTitle: string;
@@ -141,6 +152,10 @@ export function ImageGrid({
   /** A category shared with, not owned by, the viewer (#483 follow-up): no
    * per-photograph delete control on any plate. */
   readOnly?: boolean;
+  /** The hero plate (slot 0) has settled -- loaded or failed. Only fires
+   * when slot 0 holds an actual photograph; a still-uploading placeholder
+   * there has nothing to report (#556). */
+  onHeroReady?: () => void;
 }) {
   const { t } = useI18n();
 
@@ -255,6 +270,7 @@ export function ImageGrid({
         ratio={ratio}
         onOpen={() => onOpenModal(index)}
         priority={priority && index === 0}
+        onReady={index === 0 ? onHeroReady : undefined}
         overlay={
           overflowCount ? (
             // aria-hidden: the accessible name already carries this via

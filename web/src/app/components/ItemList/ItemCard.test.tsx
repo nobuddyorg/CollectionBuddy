@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -138,6 +138,9 @@ describe('ItemCard', () => {
 
   it('offers the row control alone once the entry has a photo', () => {
     renderCard({}, { imgs: [{ id: 'a', pathFull: 'a', urlFull: 'a.jpg' }] });
+    // The caption -- and the row control living in it -- waits for the
+    // hero plate to settle (#556).
+    fireEvent.load(screen.getByRole('img'));
     expect(screen.getAllByTitle('Add image')).toHaveLength(1);
   });
 
@@ -175,6 +178,23 @@ describe('ItemCard', () => {
     // Not the empty mount: inviting a photograph is the wrong thing to say
     // to someone who has just handed one over.
     expect(screen.queryByText('No images')).not.toBeInTheDocument();
+  });
+
+  // #556: the caption used to render alongside the photo plate, so a card
+  // showed its title before the photograph behind it had actually painted.
+  it('holds the caption back until the hero photograph has settled', () => {
+    renderCard({}, { imgs: [{ id: 'a', pathFull: 'a', urlFull: 'a.jpg' }] });
+    expect(
+      screen.queryByRole('heading', { name: 'Item' }),
+    ).not.toBeInTheDocument();
+    fireEvent.load(screen.getByRole('img'));
+    expect(screen.getByRole('heading', { name: 'Item' })).toBeVisible();
+  });
+
+  it('shows the caption straight away when a photograph fails to load', () => {
+    renderCard({}, { imgs: [{ id: 'a', pathFull: 'a', urlFull: 'a.jpg' }] });
+    fireEvent.error(screen.getByRole('img'));
+    expect(screen.getByRole('heading', { name: 'Item' })).toBeVisible();
   });
 
   it('keeps the photographs it already has while another uploads', () => {
