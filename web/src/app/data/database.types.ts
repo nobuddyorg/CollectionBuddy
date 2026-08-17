@@ -226,6 +226,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      has_category_write_access: { Args: { cat_id: string }; Returns: boolean };
       join_tags: { Args: { tags: string[] }; Returns: string };
       keepalive: { Args: never; Returns: undefined };
       normalize_text: { Args: { txt: string }; Returns: string };
