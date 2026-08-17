@@ -8,8 +8,9 @@ import {
   createShare as createShareRow,
   deleteShare as deleteShareRow,
   listSharesForCategory,
+  updateShareRole as updateShareRoleRow,
 } from '../../data/shares';
-import type { CategoryShareSummary } from '../../data/shares';
+import type { CategoryShareSummary, ShareRole } from '../../data/shares';
 
 export type UseShares = ReturnType<typeof useShares>;
 
@@ -25,6 +26,7 @@ export function useShares(categoryId: string | null) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isRevoking, setIsRevoking] = useState(false);
+  const [isUpdatingRole, setIsUpdatingRole] = useState(false);
 
   const reload = useCallback(async () => {
     if (!categoryId) {
@@ -48,7 +50,7 @@ export function useShares(categoryId: string | null) {
   }, [categoryId, t, toast]);
 
   const createShare = useCallback(
-    async (invitedEmail: string, expiresAt: string | null) => {
+    async (invitedEmail: string, expiresAt: string | null, role: ShareRole) => {
       if (!categoryId || isSharing) return false;
       setIsSharing(true);
       try {
@@ -56,6 +58,7 @@ export function useShares(categoryId: string | null) {
           categoryId,
           invitedEmail,
           expiresAt,
+          role,
         );
         if (error) throw error;
         if (data) setShares((prev) => [...prev, data]);
@@ -69,6 +72,35 @@ export function useShares(categoryId: string | null) {
       }
     },
     [categoryId, isSharing, t, toast],
+  );
+
+  // Owner-only toggle between viewer and editor on an existing grant -- the
+  // "update own category_shares role" RLS policy (0014_editor_shares.sql)
+  // is what actually limits this to the owner; the grantee's own panel
+  // never renders the control that calls this.
+  const updateShareRole = useCallback(
+    async (shareId: string, role: ShareRole) => {
+      if (isUpdatingRole) return false;
+      setIsUpdatingRole(true);
+      try {
+        const { data, error } = await updateShareRoleRow(shareId, role);
+        if (error) throw error;
+        if (data) {
+          setShares((prev) => prev.map((s) => (s.id === shareId ? data : s)));
+        }
+        return true;
+      } catch (e) {
+        toast.reportError(
+          'update share role',
+          e,
+          t('category_select.share_role_update_error'),
+        );
+        return false;
+      } finally {
+        setIsUpdatingRole(false);
+      }
+    },
+    [isUpdatingRole, t, toast],
   );
 
   // Backs both a grant the owner revokes and the caller's own grant when
@@ -99,8 +131,10 @@ export function useShares(categoryId: string | null) {
     isLoading,
     isSharing,
     isRevoking,
+    isUpdatingRole,
     reload,
     createShare,
     deleteShare,
+    updateShareRole,
   };
 }

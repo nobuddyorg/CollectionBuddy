@@ -61,11 +61,14 @@ function mockFrom() {
 }
 
 describe('listCategories', () => {
-  it('selects id, name and user_id from categories', () => {
+  it("selects id, name, user_id and the caller's own share role from categories", () => {
     const { from, calls } = mockFrom();
     listCategories();
     expect(from).toHaveBeenCalledWith('categories');
-    expect(calls[0]).toEqual({ method: 'select', args: ['id,name,user_id'] });
+    expect(calls[0]).toEqual({
+      method: 'select',
+      args: ['id,name,user_id,category_shares(role)'],
+    });
   });
 });
 

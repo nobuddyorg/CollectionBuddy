@@ -46,16 +46,17 @@ const EMPTY_IMAGES: ImgEntry[] = [];
 
 export default function ItemList({
   categoryId,
-  isShared,
+  canEdit,
 }: {
   categoryId: string;
-  /** True for a category shared with, not owned by, the viewer. Every
-   * write control but "new entry" (edit, delete, upload) is hidden rather
-   * than merely disabled -- RLS already refuses the writes themselves, so
-   * this is UX, not the boundary (see design-decisions.md's RLS section).
+  /** False for a category shared read-only with, not owned or edited by,
+   * the viewer (0014_editor_shares.sql's 'viewer' role). Every write
+   * control but "new entry" (edit, delete, upload) is hidden rather than
+   * merely disabled -- RLS already refuses the writes themselves, so this
+   * is UX, not the boundary (see design-decisions.md's RLS section).
    * "New entry" stays mounted and disabled instead so the toolbar's width
    * doesn't jump when the Map button is its only sibling (#549). */
-  isShared: boolean;
+  canEdit: boolean;
 }) {
   const { t, tCount } = useI18n();
   const confirm = useConfirm();
@@ -175,21 +176,21 @@ export default function ItemList({
         </div>
 
         <div className="flex gap-2 sm:shrink-0">
-          {/* Disabled, not absent, on a shared category: RLS already
-              refuses the write, but dropping the button from the layout
-              shifted the toolbar and left the Map button looking stranded
-              on its own (#549). */}
+          {/* Disabled, not absent, when read-only: RLS already refuses the
+              write, but dropping the button from the layout shifted the
+              toolbar and left the Map button looking stranded on its own
+              (#549). */}
           <button
             type="button"
             // Named for the end-to-end suite: its label is translated.
             data-testid="new-entry"
             onClick={() => setCreateOpen(true)}
-            onPointerEnter={isShared ? undefined : prefetchItemForm}
-            onPointerDown={isShared ? undefined : prefetchItemForm}
-            onFocus={isShared ? undefined : prefetchItemForm}
-            disabled={isShared}
+            onPointerEnter={canEdit ? prefetchItemForm : undefined}
+            onPointerDown={canEdit ? prefetchItemForm : undefined}
+            onFocus={canEdit ? prefetchItemForm : undefined}
+            disabled={!canEdit}
             title={
-              isShared ? t('item_create.new_entry_disabled_shared') : undefined
+              canEdit ? undefined : t('item_create.new_entry_disabled_shared')
             }
             className="flex-1 sm:flex-none min-h-11 px-4 flex items-center justify-center gap-2 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 disabled:opacity-40 disabled:hover:opacity-40 disabled:cursor-not-allowed transition-opacity"
           >
@@ -298,7 +299,7 @@ export default function ItemList({
               // first row -- and the LCP candidate within it -- is always
               // among these three regardless of viewport.
               priority={idx < 3}
-              readOnly={isShared}
+              readOnly={!canEdit}
             />
           ))}
         </ul>
@@ -319,7 +320,7 @@ export default function ItemList({
         }}
         deletingPath={deletingPath}
         busy={modalState ? (pendingUploads[modalState.itemId] ?? 0) > 0 : false}
-        readOnly={isShared}
+        readOnly={!canEdit}
       />
 
       <EditItemModal

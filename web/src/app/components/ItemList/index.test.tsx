@@ -73,7 +73,7 @@ function renderList(props: Partial<Parameters<typeof ItemList>[0]> = {}) {
     <I18nProvider>
       <ToastProvider>
         <ConfirmProvider>
-          <ItemList categoryId="cat-1" isShared={false} {...props} />
+          <ItemList categoryId="cat-1" canEdit={true} {...props} />
         </ConfirmProvider>
       </ToastProvider>
     </I18nProvider>,
@@ -156,19 +156,19 @@ describe('ItemList on a shared category', () => {
   });
 
   it('disables, but does not hide, the New entry button', () => {
-    renderList({ isShared: true });
+    renderList({ canEdit: false });
     expect(screen.getByTestId('new-entry')).toBeVisible();
     expect(screen.getByTestId('new-entry')).toBeDisabled();
   });
 
-  it('shows an enabled New entry button for an owned category', () => {
-    renderList({ isShared: false });
+  it('shows an enabled New entry button for an owned or editor-shared category', () => {
+    renderList({ canEdit: true });
     expect(screen.getByTestId('new-entry')).toBeVisible();
     expect(screen.getByTestId('new-entry')).toBeEnabled();
   });
 
   it('offers no edit, delete, or upload control on an entry', () => {
-    renderList({ isShared: true });
+    renderList({ canEdit: false });
     expect(screen.queryByTestId('edit-entry')).not.toBeInTheDocument();
     expect(screen.queryByTestId('delete-entry')).not.toBeInTheDocument();
     expect(screen.queryByTestId('upload-photo')).not.toBeInTheDocument();
@@ -176,8 +176,8 @@ describe('ItemList on a shared category', () => {
     expect(screen.getAllByText('No images').length).toBeGreaterThan(0);
   });
 
-  it('still shows those controls for an owned category', () => {
-    renderList({ isShared: false });
+  it('still shows those controls for an owned or editor-shared category', () => {
+    renderList({ canEdit: true });
     expect(screen.getByTestId('edit-entry')).toBeVisible();
     expect(screen.getByTestId('delete-entry')).toBeVisible();
     // Two: the empty-mount plate's own upload input and the action row's,

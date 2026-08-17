@@ -1,4 +1,4 @@
-// Generated from the migrations in supabase/migrations/ (0001-0013).
+// Generated from the migrations in supabase/migrations/ (0001-0014).
 //
 // Regenerate after a schema change, against a local stack:
 //   supabase start
@@ -75,6 +75,7 @@ export type Database = {
           id: string;
           invited_email: string;
           owner_user_id: string;
+          role: string;
         };
         Insert: {
           category_id: string;
@@ -83,6 +84,7 @@ export type Database = {
           id?: string;
           invited_email: string;
           owner_user_id: string;
+          role?: string;
         };
         Update: {
           category_id?: string;
@@ -91,6 +93,7 @@ export type Database = {
           id?: string;
           invited_email?: string;
           owner_user_id?: string;
+          role?: string;
         };
         Relationships: [
           {
@@ -223,6 +226,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      has_category_write_access: { Args: { cat_id: string }; Returns: boolean };
       join_tags: { Args: { tags: string[] }; Returns: string };
       keepalive: { Args: never; Returns: undefined };
       normalize_text: { Args: { txt: string }; Returns: string };

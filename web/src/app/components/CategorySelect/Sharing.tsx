@@ -9,6 +9,7 @@ import Icon, { IconType } from '../Icon';
 import { IconButton } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
 import { fieldClasses } from '../ui/fieldClasses';
+import type { ShareRole } from '../../data/shares';
 import type { UseShares } from './useShares';
 
 type Props = {
@@ -40,11 +41,14 @@ export function SharingSection({ shares }: Props) {
     isLoading,
     isSharing,
     isRevoking,
+    isUpdatingRole,
     createShare,
     deleteShare,
+    updateShareRole,
   } = shares;
   const [email, setEmail] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
+  const [role, setRole] = useState<ShareRole>('viewer');
   const expiryInputRef = useRef<HTMLInputElement>(null);
 
   // Delegates to the native picker instead of reimplementing one: this
@@ -69,12 +73,20 @@ export function SharingSection({ shares }: Props) {
     const trimmed = email.trim();
     if (!trimmed || isSharing) return;
     const expiresAt = expiryDate ? endOfDayIso(expiryDate) : null;
-    const ok = await createShare(trimmed, expiresAt);
+    const ok = await createShare(trimmed, expiresAt, role);
     if (ok) {
       setEmail('');
       setExpiryDate('');
+      setRole('viewer');
     }
-  }, [email, expiryDate, isSharing, createShare]);
+  }, [email, expiryDate, role, isSharing, createShare]);
+
+  const onToggleRole = useCallback(
+    async (shareId: string, canEdit: boolean) => {
+      await updateShareRole(shareId, canEdit ? 'editor' : 'viewer');
+    },
+    [updateShareRole],
+  );
 
   const onRevoke = useCallback(
     async (shareId: string, invitedEmail: string) => {
@@ -207,6 +219,20 @@ export function SharingSection({ shares }: Props) {
             </IconButton>
           </div>
         </div>
+
+        {/* Its own line, not squeezed into the row above: that row's width
+            budget is already spoken for by email/date/button (see the
+            comment above it), and a two-value toggle reads fine on its own
+            line beneath. */}
+        <label className="flex min-h-11 w-fit items-center gap-2 text-sm text-foreground">
+          <input
+            type="checkbox"
+            checked={role === 'editor'}
+            onChange={(e) => setRole(e.target.checked ? 'editor' : 'viewer')}
+            className="h-4 w-4 rounded-sm ring-1 ring-inset ring-control-border accent-foreground"
+          />
+          {t('category_select.share_can_edit')}
+        </label>
       </div>
 
       {!isLoading && list.length === 0 && (
@@ -237,6 +263,16 @@ export function SharingSection({ shares }: Props) {
                     : t('category_select.share_no_expiry')}
                 </span>
               </span>
+              <label className="flex shrink-0 items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={s.role === 'editor'}
+                  onChange={(e) => void onToggleRole(s.id, e.target.checked)}
+                  disabled={isUpdatingRole}
+                  className="h-4 w-4 rounded-sm ring-1 ring-inset ring-control-border accent-foreground"
+                />
+                {t('category_select.share_can_edit')}
+              </label>
               <IconButton
                 variant="outlineDestructive"
                 size="md"

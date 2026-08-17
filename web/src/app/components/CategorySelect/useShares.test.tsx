@@ -8,6 +8,7 @@ import {
   createShare as createShareRow,
   deleteShare as deleteShareRow,
   listSharesForCategory,
+  updateShareRole as updateShareRoleRow,
 } from '../../data/shares';
 import { useShares } from './useShares';
 
@@ -15,6 +16,7 @@ vi.mock('../../data/shares', () => ({
   createShare: vi.fn(),
   deleteShare: vi.fn(),
   listSharesForCategory: vi.fn(),
+  updateShareRole: vi.fn(),
 }));
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -30,6 +32,7 @@ const grant = {
   invited_email: 'grantee@example.com',
   expires_at: null,
   owner_user_id: 'owner-1',
+  role: 'viewer' as const,
 };
 
 describe('useShares', () => {
@@ -93,7 +96,11 @@ describe('useShares', () => {
 
       let ok: boolean | undefined;
       await act(async () => {
-        ok = await result.current.createShare('grantee@example.com', null);
+        ok = await result.current.createShare(
+          'grantee@example.com',
+          null,
+          'viewer',
+        );
       });
 
       expect(ok).toBe(true);
@@ -101,6 +108,7 @@ describe('useShares', () => {
         'cat-1',
         'grantee@example.com',
         null,
+        'viewer',
       );
       expect(result.current.shares).toEqual([grant]);
     });
@@ -114,11 +122,65 @@ describe('useShares', () => {
 
       let ok: boolean | undefined;
       await act(async () => {
-        ok = await result.current.createShare('owner@example.com', null);
+        ok = await result.current.createShare(
+          'owner@example.com',
+          null,
+          'viewer',
+        );
       });
 
       expect(ok).toBe(false);
       expect(result.current.shares).toEqual([]);
+    });
+  });
+
+  describe('updateShareRole', () => {
+    it("replaces the grant with the server's row on success", async () => {
+      vi.mocked(listSharesForCategory).mockResolvedValue({
+        data: [grant],
+        error: null,
+      } as never);
+      const updated = { ...grant, role: 'editor' as const };
+      vi.mocked(updateShareRoleRow).mockResolvedValue({
+        data: updated,
+        error: null,
+      } as never);
+      const { result } = renderHook(() => useShares('cat-1'), { wrapper });
+      await act(async () => {
+        await result.current.reload();
+      });
+
+      let ok: boolean | undefined;
+      await act(async () => {
+        ok = await result.current.updateShareRole('share-1', 'editor');
+      });
+
+      expect(ok).toBe(true);
+      expect(updateShareRoleRow).toHaveBeenCalledWith('share-1', 'editor');
+      expect(result.current.shares).toEqual([updated]);
+    });
+
+    it('leaves the list untouched when the update fails', async () => {
+      vi.mocked(listSharesForCategory).mockResolvedValue({
+        data: [grant],
+        error: null,
+      } as never);
+      vi.mocked(updateShareRoleRow).mockResolvedValue({
+        data: null,
+        error: new Error('boom'),
+      } as never);
+      const { result } = renderHook(() => useShares('cat-1'), { wrapper });
+      await act(async () => {
+        await result.current.reload();
+      });
+
+      let ok: boolean | undefined;
+      await act(async () => {
+        ok = await result.current.updateShareRole('share-1', 'editor');
+      });
+
+      expect(ok).toBe(false);
+      expect(result.current.shares).toEqual([grant]);
     });
   });
 

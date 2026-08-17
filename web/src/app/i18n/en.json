@@ -77,6 +77,8 @@
     "share_success": "Collection shared.",
     "share_error": "Could not share this collection. Please try again.",
     "share_load_error": "Could not load sharing. Please try again.",
+    "share_can_edit": "Can edit",
+    "share_role_update_error": "Could not update this share's access. Please try again.",
     "share_list_title": "Currently shared with",
     "share_list_empty": "Not shared with anyone yet.",
     "share_expires_on": "Expires {date}",
@@ -105,7 +107,7 @@
     "save_error": "Could not save this entry. Please try again.",
     "entry_added": "Entry added.",
     "confirm_discard": "Discard your changes?",
-    "new_entry_disabled_shared": "Only the owner can add entries to a shared collection."
+    "new_entry_disabled_shared": "You don't have permission to add entries to this shared collection."
   },
   "item_list": {
     "confirm_delete": "Delete this entry? It and every one of its photographs will be permanently deleted. This cannot be undone.",
