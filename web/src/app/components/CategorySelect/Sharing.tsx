@@ -79,10 +79,19 @@ export function SharingSection({ shares }: Props) {
   }, [email, expiryDate, isSharing, createShare]);
 
   const onToggleRole = useCallback(
-    async (shareId: string, canEdit: boolean) => {
+    async (shareId: string, invitedEmail: string, canEdit: boolean) => {
+      // Only granting needs a confirmation -- taking edit access back away
+      // is the safe direction and matches the un-warned revoke below.
+      if (canEdit) {
+        const message = t('category_select.share_editor_confirm').replace(
+          '{email}',
+          invitedEmail,
+        );
+        if (!(await confirm(message))) return;
+      }
       await updateShareRole(shareId, canEdit ? 'editor' : 'viewer');
     },
-    [updateShareRole],
+    [confirm, t, updateShareRole],
   );
 
   const onRevoke = useCallback(
@@ -229,49 +238,64 @@ export function SharingSection({ shares }: Props) {
           <li className="font-label text-[0.6875rem] text-muted-foreground">
             {t('category_select.share_list_title')}
           </li>
-          {list.map((s) => (
-            <li
-              key={s.id}
-              className="flex items-center justify-between gap-2 text-sm"
-            >
-              <span className="truncate min-w-0">
-                {s.invited_email}
-                <span className="text-muted-foreground">
-                  {' · '}
-                  {s.expires_at
-                    ? t('category_select.share_expires_on').replace(
-                        '{date}',
-                        new Date(s.expires_at).toLocaleDateString(),
-                      )
-                    : t('category_select.share_no_expiry')}
-                </span>
-              </span>
-              <label className="flex shrink-0 items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={s.role === 'editor'}
-                  onChange={(e) => void onToggleRole(s.id, e.target.checked)}
-                  disabled={isUpdatingRole}
-                  className="h-4 w-4 rounded-sm ring-1 ring-inset ring-control-border accent-foreground"
-                />
-                {t('category_select.share_can_edit')}
-              </label>
-              <IconButton
-                variant="outlineDestructive"
-                size="md"
-                onClick={() => void onRevoke(s.id, s.invited_email)}
-                disabled={isRevoking}
-                aria-label={t('category_select.share_revoke')}
-                title={t('category_select.share_revoke')}
+          {list.map((s) => {
+            const isExpired =
+              !!s.expires_at &&
+              new Date(s.expires_at).getTime() <= new Date().getTime();
+            return (
+              <li
+                key={s.id}
+                className="flex items-center justify-between gap-2 text-sm"
               >
-                <Icon
-                  icon={IconType.Trash}
-                  className="w-4 h-4"
-                  aria-hidden="true"
-                />
-              </IconButton>
-            </li>
-          ))}
+                <span className="truncate min-w-0">
+                  {s.invited_email}
+                  <span
+                    className={
+                      isExpired ? 'text-destructive' : 'text-muted-foreground'
+                    }
+                  >
+                    {' · '}
+                    {s.expires_at
+                      ? t(
+                          isExpired
+                            ? 'category_select.share_expired_on'
+                            : 'category_select.share_expires_on',
+                        ).replace(
+                          '{date}',
+                          new Date(s.expires_at).toLocaleDateString(),
+                        )
+                      : t('category_select.share_no_expiry')}
+                  </span>
+                </span>
+                <label className="flex shrink-0 items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={s.role === 'editor'}
+                    onChange={(e) =>
+                      void onToggleRole(s.id, s.invited_email, e.target.checked)
+                    }
+                    disabled={isUpdatingRole}
+                    className="h-4 w-4 rounded-sm ring-1 ring-inset ring-control-border accent-foreground"
+                  />
+                  {t('category_select.share_can_edit')}
+                </label>
+                <IconButton
+                  variant="outlineDestructive"
+                  size="md"
+                  onClick={() => void onRevoke(s.id, s.invited_email)}
+                  disabled={isRevoking}
+                  aria-label={t('category_select.share_revoke')}
+                  title={t('category_select.share_revoke')}
+                >
+                  <Icon
+                    icon={IconType.Trash}
+                    className="w-4 h-4"
+                    aria-hidden="true"
+                  />
+                </IconButton>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

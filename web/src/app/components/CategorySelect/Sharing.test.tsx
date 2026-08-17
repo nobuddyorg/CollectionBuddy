@@ -147,6 +147,30 @@ describe('SharingSection', () => {
     );
   });
 
+  it('marks a lapsed grant as expired, in red, rather than showing a past "Expires" date', () => {
+    const expiresAt = '2020-01-01T00:00:00.000Z';
+    renderSection(
+      sharesState({
+        shares: [
+          {
+            id: 'share-1',
+            invited_email: 'grantee@example.com',
+            expires_at: expiresAt,
+            owner_user_id: 'owner-1',
+            role: 'viewer',
+          },
+        ],
+      }),
+    );
+    const row = screen.getByText('grantee@example.com').closest('li')!;
+    expect(row).toHaveTextContent(
+      `Expired ${new Date(expiresAt).toLocaleDateString()}`,
+    );
+    const expirySpan = row.querySelector('.text-destructive');
+    expect(expirySpan).not.toBeNull();
+    expect(expirySpan).toHaveTextContent('Expired');
+  });
+
   it("reflects an existing grant's role in its checkbox", () => {
     renderSection(
       sharesState({
@@ -165,7 +189,7 @@ describe('SharingSection', () => {
     expect(within(row).getByLabelText('Can edit')).toBeChecked();
   });
 
-  it('toggles an existing grant between viewer and editor', async () => {
+  it('warns before granting edit access, and only applies it once accepted', async () => {
     const updateShareRole = vi.fn().mockResolvedValue(true);
     renderSection(
       sharesState({
@@ -183,8 +207,62 @@ describe('SharingSection', () => {
     );
 
     await userEvent.click(screen.getByLabelText('Can edit'));
+    expect(updateShareRole).not.toHaveBeenCalled();
+
+    expect(
+      await screen.findByText(
+        'Give grantee@example.com full edit access to this collection, including adding, changing and deleting entries and photographs?',
+      ),
+    ).toBeVisible();
+    await userEvent.click(screen.getByTestId('confirm-accept'));
 
     expect(updateShareRole).toHaveBeenCalledWith('share-1', 'editor');
+  });
+
+  it('does not grant edit access if the warning is declined', async () => {
+    const updateShareRole = vi.fn().mockResolvedValue(true);
+    renderSection(
+      sharesState({
+        shares: [
+          {
+            id: 'share-1',
+            invited_email: 'grantee@example.com',
+            expires_at: null,
+            owner_user_id: 'owner-1',
+            role: 'viewer',
+          },
+        ],
+        updateShareRole,
+      }),
+    );
+
+    await userEvent.click(screen.getByLabelText('Can edit'));
+    await screen.findByTestId('confirm-cancel');
+    await userEvent.click(screen.getByTestId('confirm-cancel'));
+
+    expect(updateShareRole).not.toHaveBeenCalled();
+  });
+
+  it('revokes edit access with no warning', async () => {
+    const updateShareRole = vi.fn().mockResolvedValue(true);
+    renderSection(
+      sharesState({
+        shares: [
+          {
+            id: 'share-1',
+            invited_email: 'grantee@example.com',
+            expires_at: null,
+            owner_user_id: 'owner-1',
+            role: 'editor',
+          },
+        ],
+        updateShareRole,
+      }),
+    );
+
+    await userEvent.click(screen.getByLabelText('Can edit'));
+
+    expect(updateShareRole).toHaveBeenCalledWith('share-1', 'viewer');
   });
 
   it('revokes only after the confirmation is accepted', async () => {
