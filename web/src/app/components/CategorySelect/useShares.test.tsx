@@ -96,11 +96,7 @@ describe('useShares', () => {
 
       let ok: boolean | undefined;
       await act(async () => {
-        ok = await result.current.createShare(
-          'grantee@example.com',
-          null,
-          'viewer',
-        );
+        ok = await result.current.createShare('grantee@example.com', null);
       });
 
       expect(ok).toBe(true);
@@ -108,7 +104,6 @@ describe('useShares', () => {
         'cat-1',
         'grantee@example.com',
         null,
-        'viewer',
       );
       expect(result.current.shares).toEqual([grant]);
     });
@@ -122,11 +117,7 @@ describe('useShares', () => {
 
       let ok: boolean | undefined;
       await act(async () => {
-        ok = await result.current.createShare(
-          'owner@example.com',
-          null,
-          'viewer',
-        );
+        ok = await result.current.createShare('owner@example.com', null);
       });
 
       expect(ok).toBe(false);

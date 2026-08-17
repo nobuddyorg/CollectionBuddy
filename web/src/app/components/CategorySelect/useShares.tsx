@@ -49,8 +49,11 @@ export function useShares(categoryId: string | null) {
     }
   }, [categoryId, t, toast]);
 
+  // Always viewer: a share can only be promoted to editor afterward, via
+  // updateShareRole below, once it exists as a row the owner can see and
+  // toggle -- not chosen up front at invite time.
   const createShare = useCallback(
-    async (invitedEmail: string, expiresAt: string | null, role: ShareRole) => {
+    async (invitedEmail: string, expiresAt: string | null) => {
       if (!categoryId || isSharing) return false;
       setIsSharing(true);
       try {
@@ -58,7 +61,6 @@ export function useShares(categoryId: string | null) {
           categoryId,
           invitedEmail,
           expiresAt,
-          role,
         );
         if (error) throw error;
         if (data) setShares((prev) => [...prev, data]);
