@@ -17,20 +17,30 @@ import { useI18n } from '../../i18n/useI18n';
 // bars as well turned a quiet placeholder into six blinking cards.
 const bar = 'rounded-sm bg-muted';
 
+// The label's own shape, held while its card is still waiting on a
+// photograph -- shared with `ItemCard` (#556), which shows this in place
+// of the real caption until the hero photograph has actually loaded, so a
+// card never shows its title before it has a picture to go with it.
+export function CaptionSkeleton() {
+  return (
+    <div className="flex flex-1 flex-col gap-2 p-4">
+      <div className={`h-4 w-2/3 ${bar}`} />
+      <div className={`h-3 w-full ${bar}`} />
+      <div className="mt-auto flex gap-2 border-t border-border pt-2.5">
+        <div className={`h-8 w-16 ${bar}`} />
+        <div className={`h-8 w-16 ${bar}`} />
+      </div>
+    </div>
+  );
+}
+
 function CardSkeleton() {
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-sm bg-card ring-1 ring-border card-lift">
       {/* 4:3, the ratio a single photograph gets on a real card. */}
       <div className="img-skeleton aspect-4/3 w-full" />
 
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <div className={`h-4 w-2/3 ${bar}`} />
-        <div className={`h-3 w-full ${bar}`} />
-        <div className="mt-auto flex gap-2 border-t border-border pt-2.5">
-          <div className={`h-8 w-16 ${bar}`} />
-          <div className={`h-8 w-16 ${bar}`} />
-        </div>
-      </div>
+      <CaptionSkeleton />
     </div>
   );
 }

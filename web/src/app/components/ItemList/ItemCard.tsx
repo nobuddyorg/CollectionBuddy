@@ -1,9 +1,10 @@
 'use client';
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import type { ItemLite, ImgEntry } from './types';
 import { Actions, AddPhotoPlate } from './Actions';
 import { ImageGrid } from './ImageGrid';
+import { CaptionSkeleton } from './Skeleton';
 
 type ItemCardProps = {
   item: ItemLite;
@@ -58,6 +59,18 @@ function ItemCardComponent({
   // photograph is the wrong thing to show to someone who just did.
   const awaitingPhoto = !imgs.length && !imagesLoading && !busy;
 
+  // Held until the hero photograph has actually settled, so the label
+  // never appears before the picture it describes. A card with nothing to
+  // wait on -- no photo coming, or one still mid-upload with only a
+  // placeholder frame so far -- has nothing to gate on and shows its label
+  // straight away; once a real photograph is on the wire, this stays false
+  // until that plate reports in. Deliberately one-way: an edit made after
+  // the card has already settled once (swapping the photo, say) fades the
+  // new plate in on its own rather than hiding the label again (#556).
+  const [heroLoaded, setHeroLoaded] = useState(false);
+  const captionReady =
+    awaitingPhoto || (busy && !imgs.length && !imagesLoading) || heroLoaded;
+
   // h-full so cards in a desktop row share a height -- ragged card bottoms
   // read as a broken grid. The caption grows and the action row is pushed
   // to the bottom, so those rows line up across the row and the extra space
@@ -90,54 +103,59 @@ function ItemCardComponent({
           pending={pendingUploads}
           priority={priority}
           readOnly={readOnly}
+          onHeroReady={() => setHeroLoaded(true)}
         />
       )}
 
       {/* The object label. */}
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <h3 className="font-display text-[0.95rem] leading-snug">
-          {item.title}
-        </h3>
+      {captionReady ? (
+        <div className="flex flex-1 flex-col gap-2 p-4">
+          <h3 className="font-display text-[0.95rem] leading-snug">
+            {item.title}
+          </h3>
 
-        {item.description && (
-          <p className="text-sm leading-relaxed text-muted-foreground line-clamp-2">
-            {item.description}
-          </p>
-        )}
+          {item.description && (
+            <p className="text-sm leading-relaxed text-muted-foreground line-clamp-2">
+              {item.description}
+            </p>
+          )}
 
-        {(item.place || !!item.tags.length) && (
-          <div className="flex flex-col gap-2 border-t border-border pt-2.5 mt-0.5">
-            {item.place && (
-              <div className="font-label text-[0.6875rem] text-muted-foreground truncate">
-                {item.place}
-              </div>
-            )}
+          {(item.place || !!item.tags.length) && (
+            <div className="flex flex-col gap-2 border-t border-border pt-2.5 mt-0.5">
+              {item.place && (
+                <div className="font-label text-[0.6875rem] text-muted-foreground truncate">
+                  {item.place}
+                </div>
+              )}
 
-            {!!item.tags.length && (
-              <div className="flex flex-wrap gap-1">
-                {item.tags.map((tag) => (
-                  <span key={tag} className="tag-chip">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+              {!!item.tags.length && (
+                <div className="flex flex-wrap gap-1">
+                  {item.tags.map((tag) => (
+                    <span key={tag} className="tag-chip">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-        {!readOnly && (
-          <Actions
-            onEdit={onEditItem}
-            onDelete={onDeleteItem}
-            onUpload={onUpload}
-            busy={busy}
-          />
-        )}
+          {!readOnly && (
+            <Actions
+              onEdit={onEditItem}
+              onDelete={onDeleteItem}
+              onUpload={onUpload}
+              busy={busy}
+            />
+          )}
 
-        <span className="sr-only" aria-live="polite">
-          {busy ? t('item_list.uploading') : ''}
-        </span>
-      </div>
+          <span className="sr-only" aria-live="polite">
+            {busy ? t('item_list.uploading') : ''}
+          </span>
+        </div>
+      ) : (
+        <CaptionSkeleton />
+      )}
     </li>
   );
 }
