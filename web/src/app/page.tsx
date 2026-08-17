@@ -107,8 +107,14 @@ export default function Page() {
   // read than the .find() it would be guarding.
   const selectedCategory =
     categories.cats.find((c) => c.id === selectedCategoryId) ?? null;
-  const isSharedSelected =
-    !!selectedCategory && selectedCategory.user_id !== userId;
+  // Owner, or an active editor grant (0014_editor_shares.sql) -- a viewer
+  // grant, or no grant at all, both fall through to false the same way.
+  const canEditSelected =
+    !!selectedCategory &&
+    (selectedCategory.user_id === userId ||
+      (selectedCategory.category_shares ?? []).some(
+        (s) => s.role === 'editor',
+      ));
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground">
@@ -162,7 +168,7 @@ export default function Page() {
             <ItemList
               key={selectedCategoryId}
               categoryId={selectedCategoryId}
-              isShared={isSharedSelected}
+              canEdit={canEditSelected}
             />
           </section>
         ) : (

@@ -77,6 +77,8 @@
     "share_success": "Sammlung geteilt.",
     "share_error": "Sammlung konnte nicht geteilt werden. Bitte erneut versuchen.",
     "share_load_error": "Freigaben konnten nicht geladen werden. Bitte erneut versuchen.",
+    "share_can_edit": "Darf bearbeiten",
+    "share_role_update_error": "Zugriff konnte nicht geändert werden. Bitte erneut versuchen.",
     "share_list_title": "Aktuell geteilt mit",
     "share_list_empty": "Noch mit niemandem geteilt.",
     "share_expires_on": "Läuft ab am {date}",
@@ -105,7 +107,7 @@
     "save_error": "Eintrag konnte nicht gespeichert werden. Bitte erneut versuchen.",
     "entry_added": "Eintrag hinzugefügt.",
     "confirm_discard": "Änderungen verwerfen?",
-    "new_entry_disabled_shared": "Nur der Eigentümer kann Einträge zu einer geteilten Sammlung hinzufügen."
+    "new_entry_disabled_shared": "Du hast keine Berechtigung, Einträge zu dieser geteilten Sammlung hinzuzufügen."
   },
   "item_list": {
     "confirm_delete": "Diesen Eintrag löschen? Er und alle zugehörigen Fotos werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",

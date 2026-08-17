@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,9 +15,11 @@ function sharesState(overrides: Partial<UseShares> = {}): UseShares {
     isLoading: false,
     isSharing: false,
     isRevoking: false,
+    isUpdatingRole: false,
     reload: vi.fn().mockResolvedValue([]),
     createShare: vi.fn().mockResolvedValue(true),
     deleteShare: vi.fn().mockResolvedValue(true),
+    updateShareRole: vi.fn().mockResolvedValue(true),
     ...overrides,
   };
 }
@@ -54,7 +56,29 @@ describe('SharingSection', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Share' }));
 
-    expect(createShare).toHaveBeenCalledWith('grantee@example.com', null);
+    expect(createShare).toHaveBeenCalledWith(
+      'grantee@example.com',
+      null,
+      'viewer',
+    );
+  });
+
+  it('shares as editor when the "Can edit" checkbox is checked', async () => {
+    const createShare = vi.fn().mockResolvedValue(true);
+    renderSection(sharesState({ createShare }));
+
+    await userEvent.type(
+      screen.getByLabelText('Share with (email)'),
+      'grantee@example.com',
+    );
+    await userEvent.click(screen.getByLabelText('Can edit'));
+    await userEvent.click(screen.getByRole('button', { name: 'Share' }));
+
+    expect(createShare).toHaveBeenCalledWith(
+      'grantee@example.com',
+      null,
+      'editor',
+    );
   });
 
   it("converts a picked date to that day's end rather than its start", async () => {
@@ -77,6 +101,7 @@ describe('SharingSection', () => {
     expect(createShare).toHaveBeenCalledWith(
       'grantee@example.com',
       new Date('2026-08-20T23:59:59').toISOString(),
+      'viewer',
     );
   });
 
@@ -130,6 +155,7 @@ describe('SharingSection', () => {
             invited_email: 'grantee@example.com',
             expires_at: expiresAt,
             owner_user_id: 'owner-1',
+            role: 'viewer',
           },
         ],
       }),
@@ -144,6 +170,51 @@ describe('SharingSection', () => {
     );
   });
 
+  it("reflects an existing grant's role in its checkbox", () => {
+    renderSection(
+      sharesState({
+        shares: [
+          {
+            id: 'share-1',
+            invited_email: 'grantee@example.com',
+            expires_at: null,
+            owner_user_id: 'owner-1',
+            role: 'editor',
+          },
+        ],
+      }),
+    );
+    const row = screen.getByText('grantee@example.com').closest('li')!;
+    expect(within(row).getByLabelText('Can edit')).toBeChecked();
+  });
+
+  it('toggles an existing grant between viewer and editor', async () => {
+    const updateShareRole = vi.fn().mockResolvedValue(true);
+    renderSection(
+      sharesState({
+        shares: [
+          {
+            id: 'share-1',
+            invited_email: 'grantee@example.com',
+            expires_at: null,
+            owner_user_id: 'owner-1',
+            role: 'viewer',
+          },
+        ],
+        updateShareRole,
+      }),
+    );
+
+    // Two "Can edit" checkboxes exist once a grant is listed: the creation
+    // form's own, and this row's -- scoped to the row so the click lands on
+    // the one that toggles an existing grant, not the one that would share
+    // with a brand new email.
+    const row = screen.getByText('grantee@example.com').closest('li')!;
+    await userEvent.click(within(row).getByLabelText('Can edit'));
+
+    expect(updateShareRole).toHaveBeenCalledWith('share-1', 'editor');
+  });
+
   it('revokes only after the confirmation is accepted', async () => {
     const deleteShare = vi.fn().mockResolvedValue(true);
     renderSection(
@@ -154,6 +225,7 @@ describe('SharingSection', () => {
             invited_email: 'grantee@example.com',
             expires_at: null,
             owner_user_id: 'owner-1',
+            role: 'viewer',
           },
         ],
         deleteShare,

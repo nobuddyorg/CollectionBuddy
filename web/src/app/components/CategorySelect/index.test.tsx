@@ -72,9 +72,11 @@ function sharesState(overrides: Partial<ReturnType<typeof useShares>> = {}) {
     isLoading: false,
     isSharing: false,
     isRevoking: false,
+    isUpdatingRole: false,
     reload: vi.fn().mockResolvedValue([]),
     createShare: vi.fn(),
     deleteShare: vi.fn(),
+    updateShareRole: vi.fn(),
     ...overrides,
   };
 }
@@ -620,6 +622,7 @@ describe('CategorySelect', () => {
               invited_email: 'me@example.com',
               expires_at: null,
               owner_user_id: 'other-owner',
+              role: 'viewer',
             },
           ],
           deleteShare,

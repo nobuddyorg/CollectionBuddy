@@ -3,12 +3,13 @@ import type { Database } from './database.types';
 
 export type CategoryShareRow =
   Database['public']['Tables']['category_shares']['Row'];
+export type ShareRole = 'viewer' | 'editor';
 export type CategoryShareSummary = Pick<
   CategoryShareRow,
   'id' | 'invited_email' | 'expires_at' | 'owner_user_id'
->;
+> & { role: ShareRole };
 
-const SHARE_COLUMNS = 'id,invited_email,expires_at,owner_user_id';
+const SHARE_COLUMNS = 'id,invited_email,expires_at,owner_user_id,role';
 
 // One query, two readers: the RLS policy on category_shares (0011) only
 // ever returns rows where the caller is the owner or the invited grantee,
@@ -33,6 +34,7 @@ export function createShare(
   categoryId: string,
   invitedEmail: string,
   expiresAt: string | null,
+  role: ShareRole = 'viewer',
 ) {
   return supabase
     .from('category_shares')
@@ -40,7 +42,21 @@ export function createShare(
       category_id: categoryId,
       invited_email: invitedEmail,
       expires_at: expiresAt,
+      role,
     } as Database['public']['Tables']['category_shares']['Insert'])
+    .select(SHARE_COLUMNS)
+    .single<CategoryShareSummary>();
+}
+
+// Toggles an existing grant between viewer and editor. tg_category_shares_enforce
+// (0014_editor_shares.sql) rejects any other column changing in the same
+// update, and the "update own category_shares role" policy limits this to
+// the owner -- nothing left for this function to decide beyond which row.
+export function updateShareRole(id: string, role: ShareRole) {
+  return supabase
+    .from('category_shares')
+    .update({ role })
+    .eq('id', id)
     .select(SHARE_COLUMNS)
     .single<CategoryShareSummary>();
 }

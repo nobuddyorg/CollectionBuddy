@@ -1,12 +1,25 @@
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
+import type { ShareRole } from './shares';
 
 export type CategoryRow = Database['public']['Tables']['categories']['Row'];
 // user_id rides along so the UI can tell "mine" from "shared with me" --
 // listCategories() (below) now returns both under the RLS extension in
 // 0011_category_shares.sql, and nothing else in the response says which is
 // which.
-export type CategorySummary = Pick<CategoryRow, 'id' | 'name' | 'user_id'>;
+//
+// category_shares is the caller's own role on a category they don't own --
+// PostgREST's embed of the child table, scoped by category_shares' own
+// "select own or invited" policy (0011) to exactly the caller's single
+// invited row for a shared category (or every grant the owner made, for an
+// owned one, which nothing here reads). Optional, not just empty-by-default:
+// createCategory/renameCategory below don't ask for it (nothing they touch
+// needs a role), and callers reading it treat a missing array the same as
+// an empty one -- see page.tsx's canEditSelected.
+export type CategorySummary = Pick<CategoryRow, 'id' | 'name' | 'user_id'> & {
+  category_shares?: { role: ShareRole }[];
+};
+type CategoryCore = Pick<CategoryRow, 'id' | 'name' | 'user_id'>;
 
 /**
  * `base`, or `base (2)`, `base (3)`, ... once far enough to clear every name
@@ -34,7 +47,7 @@ export function uniqueCategoryName(
 export function listCategories() {
   return supabase
     .from('categories')
-    .select('id,name,user_id')
+    .select('id,name,user_id,category_shares(role)')
     .returns<CategorySummary[]>();
 }
 
@@ -49,20 +62,23 @@ export function createCategory(name: string) {
       // makes it impossible to hand a row to another user.
       .insert({ name } as Database['public']['Tables']['categories']['Insert'])
       .select('id,name,user_id')
-      .single<CategorySummary>()
+      .single<CategoryCore>()
   );
 }
 
 // Permitted by the "update own categories" RLS policy; a trigger keeps
 // updated_at current and normalises the name, so the returned row -- not
-// the value sent -- is what should be merged into local state.
+// the value sent -- is what should be merged into local state. No
+// category_shares in the select: useCategories.tsx's merge spreads this
+// over the existing row, and a key this response never carries at all
+// leaves whatever the caller already had untouched.
 export function renameCategory(id: string, name: string) {
   return supabase
     .from('categories')
     .update({ name })
     .eq('id', id)
     .select('id,name,user_id')
-    .single<CategorySummary>();
+    .single<CategoryCore>();
 }
 
 export function deleteCategory(id: string) {
