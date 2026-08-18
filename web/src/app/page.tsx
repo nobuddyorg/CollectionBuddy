@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 import CategorySelect from './components/CategorySelect';
@@ -8,26 +8,19 @@ import {
   CATEGORY_TABPANEL_ID,
   categoryTabId,
 } from './components/CategorySelect/Dropdown';
-import {
-  pickInitialCategory,
-  readStoredCategory,
-  storeSelectedCategory,
-} from './components/CategorySelect/selection';
-import { useCategories } from './components/CategorySelect/useCategories';
 import Header from './components/Header';
 import ItemList from './components/ItemList';
 import { ItemListSkeleton } from './components/ItemList/Skeleton';
 import LoadingOverlay from './components/LoadingOverlay';
-import { useToast } from './components/Toast/ToastProvider';
 import { useI18n } from './i18n/useI18n';
-import { supabase } from './supabase';
+import { useCatalogue } from './useCatalogue';
 import { useSession } from './useSession';
+import { useSignOut } from './useSignOut';
 
 export default function Page() {
   const { user, loading } = useSession();
   const router = useRouter();
   const { t } = useI18n();
-  const toast = useToast();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -35,68 +28,13 @@ export default function Page() {
     }
   }, [loading, user, router]);
 
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
-    null,
-  );
-
-  // Every selection is remembered, so the next visit opens where this one
-  // left off rather than on a chooser.
-  const selectCategory = useCallback((id: string | null) => {
-    setSelectedCategoryId(id);
-    storeSelectedCategory(id);
-  }, []);
-
-  const categories = useCategories();
-  const { reload } = categories;
   // `user` is a fresh object on every onAuthStateChange event, so depending
   // on it by identity re-ran this effect far more than the session actually
   // changed. The id is stable across those events.
   const userId = user?.id;
-
-  // True only once the first listing is back *and* a category is selected,
-  // in the same tick -- otherwise there's a render with categories loaded
-  // but nothing selected, which used to flash the "choose a category"
-  // prompt unnecessarily.
-  const [catalogueReady, setCatalogueReady] = useState(false);
-
-  // These rows are only readable under the signed-in user's RLS policies,
-  // so firing before the session resolves just asks for a list Postgres
-  // will refuse to return.
-  useEffect(() => {
-    if (loading || !userId) return;
-    void reload().then((catsData) => {
-      // Whatever was last on screen, or the first category. Auto-selecting
-      // only a lone category meant owning a second one turned every
-      // sign-in into a decision.
-      setSelectedCategoryId(
-        (current) =>
-          current ?? pickInitialCategory(catsData, readStoredCategory()),
-      );
-      setCatalogueReady(true);
-    });
-  }, [loading, userId, reload]);
-
-  const signOut = useCallback(async () => {
-    try {
-      // Global scope revokes the refresh token server-side; fall back to a
-      // local clear on failure so a network error can't leave the user
-      // signed in on this device.
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        toast.reportError('sign out failed', error, t('header.sign_out_error'));
-        await supabase.auth.signOut({ scope: 'local' });
-      }
-    } catch (err) {
-      toast.reportError(
-        'sign out unexpected error',
-        err,
-        t('header.sign_out_error'),
-      );
-      await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
-    } finally {
-      router.replace('/login');
-    }
-  }, [router, t, toast]);
+  const { categories, selectedCategoryId, selectCategory, catalogueReady } =
+    useCatalogue(loading, userId);
+  const signOut = useSignOut();
 
   if (loading)
     return <LoadingOverlay label={t('item_list.loading')} theme="auto" />;
