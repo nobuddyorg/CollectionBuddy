@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   SELECTED_CATEGORY_KEY,
+  nextAfterRemoving,
   pickInitialCategory,
   readStoredCategory,
   sortCategories,
@@ -51,6 +52,22 @@ describe('pickInitialCategory', () => {
   it('opens a lone category whether or not it was the remembered one', () => {
     expect(pickInitialCategory([cat('a', 'Coins')], null)).toBe('a');
     expect(pickInitialCategory([cat('a', 'Coins')], 'a')).toBe('a');
+  });
+});
+
+describe('nextAfterRemoving', () => {
+  it('falls to the next in sorted order', () => {
+    const cats = [cat('a', 'Coins'), cat('b', 'Stamps'), cat('c', 'Teddies')];
+    expect(nextAfterRemoving(cats, 'a')).toBe('b');
+  });
+
+  it('has nothing left once the last category is removed', () => {
+    expect(nextAfterRemoving([cat('a', 'Coins')], 'a')).toBeNull();
+  });
+
+  it('leaves the choice alone when the removed id is not among them', () => {
+    const cats = [cat('a', 'Coins'), cat('b', 'Stamps')];
+    expect(nextAfterRemoving(cats, 'gone')).toBe('a');
   });
 });
 

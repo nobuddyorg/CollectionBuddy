@@ -29,6 +29,18 @@ export function pickInitialCategory(
   return sortCategories(cats)[0].id;
 }
 
+/**
+ * What to select after `removedId` is gone (deleted, or left): whatever is
+ * first among what's left, sorted the same way the tab strip is -- or
+ * nothing, if that was the last category.
+ */
+export function nextAfterRemoving<T extends { id: string }>(
+  sortedCats: readonly T[],
+  removedId: string,
+): string | null {
+  return sortedCats.find((c) => c.id !== removedId)?.id ?? null;
+}
+
 // Storage can throw (Safari private mode, cookies blocked); losing the
 // preference is a smaller failure than failing to render the catalogue.
 export function readStoredCategory(): string | null {
