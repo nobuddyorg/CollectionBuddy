@@ -20,6 +20,12 @@ const eslintConfig = [
   },
   ...nextCoreWebVitals,
   ...nextTypescript,
+  // eslint-plugin-react's auto-detection calls a context.getFilename() that
+  // ESLint 10 removed, crashing react/display-name on every file. Setting
+  // the version explicitly skips that detection path.
+  {
+    settings: { react: { version: '19.2.8' } },
+  },
   // Type-aware linting, scoped to source -- type-checking e2e/ too would
   // mean a second tsconfig. no-floating-promises/no-misused-promises catch
   // an event handler or effect that drops an async rejection on the floor.
