@@ -11,6 +11,7 @@ import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
 import { useItemMutations } from './useItemMutations';
 import { searchStatusFor } from './searchStatus';
+import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { EditItemModal } from './EditItemModal';
 import { MapModal } from './MapModal';
 import CenteredModal from '../CenteredModal';
@@ -73,11 +74,7 @@ export default function ItemList({
   // Declared up here, ahead of the map, because the map is filtered by the
   // same term the list is: they are one filtered set drawn two ways.
   const [q, setQ] = useState('');
-  const [qDebounced, setQDebounced] = useState('');
-  useEffect(() => {
-    const id = setTimeout(() => setQDebounced(q.trim()), 200);
-    return () => clearTimeout(id);
-  }, [q]);
+  const qDebounced = useDebouncedValue(q, 200).trim();
 
   const [mapOpen, setMapOpen] = useState(false);
 

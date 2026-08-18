@@ -6,6 +6,7 @@ import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { listItems } from '../../data/items';
 import { clampPage, pageCount, pageRange } from './paging';
+import { useRequestSequence } from '../../lib/useRequestSequence';
 import type { ItemLite } from './types';
 
 export function useItems(categoryId: string, q: string) {
@@ -17,7 +18,7 @@ export function useItems(categoryId: string, q: string) {
   // Starts true: mounting always fetches, and starting false gave one
   // render that looked exactly like "No entries yet" before data arrived.
   const [loading, setLoading] = useState(true);
-  const reqSeq = useRef(0);
+  const { next, isCurrent } = useRequestSequence();
   // Aborts a superseded request's own fetch, not just its effect on state
   // -- otherwise the response still finishes downloading after the sequence
   // guard below has already discarded it.
@@ -50,7 +51,7 @@ export function useItems(categoryId: string, q: string) {
   // grid the user has already seen the result in.
   const load = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
-      const mySeq = ++reqSeq.current;
+      const mySeq = next();
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -70,7 +71,7 @@ export function useItems(categoryId: string, q: string) {
           signal: controller.signal,
         });
 
-        if (mySeq !== reqSeq.current) return;
+        if (!isCurrent(mySeq)) return;
         if (error) {
           toast.reportError('load items', error, t('item_list.search_error'));
           return;
@@ -97,7 +98,7 @@ export function useItems(categoryId: string, q: string) {
         }
       }
     },
-    [categoryId, currentPage, q, t, toast],
+    [categoryId, currentPage, q, t, toast, next, isCurrent],
   );
 
   // Cleanup aborts whatever's still in flight on unmount -- a new `load`

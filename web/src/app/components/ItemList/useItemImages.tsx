@@ -21,6 +21,7 @@ import {
   getCachedSignedUrl,
   unsignedPaths,
 } from './imageCache';
+import { WEBP_COMPRESSION_OPTIONS } from '../../lib/imageCompression';
 
 export type ImageEntryData = {
   id: string;
@@ -190,14 +191,20 @@ export function useItemImages() {
     lastSignedAtRef.current = Date.now();
   }, []);
 
-  // Refresh signed URLs before Supabase's 1h expiry so a long-lived tab
-  // doesn't turn every thumbnail into a broken-image placeholder.
+  // Refresh signed URLs before Supabase's own 1h server-side expiry so a
+  // long-lived tab doesn't turn every thumbnail into a broken-image
+  // placeholder. Distinct from exportCategory.ts's SIGNED_URL_TTL_SECONDS,
+  // which asks for a longer-lived URL for a different purpose (a slow
+  // export download outliving it) rather than mirroring this default.
   useEffect(() => {
-    const EXPIRY_MS = 3600_000;
+    const SIGNED_URL_SERVER_TTL_MS = 3600_000;
     const REFRESH_MARGIN_MS = 5 * 60_000;
     const maybeRefresh = () => {
       if (!lastSignedAtRef.current) return;
-      if (Date.now() - lastSignedAtRef.current < EXPIRY_MS - REFRESH_MARGIN_MS)
+      if (
+        Date.now() - lastSignedAtRef.current <
+        SIGNED_URL_SERVER_TTL_MS - REFRESH_MARGIN_MS
+      )
         return;
       const itemIds = Object.keys(imagesRef.current);
       if (itemIds.length) void refreshAllImages(itemIds);
@@ -224,9 +231,7 @@ export function useItemImages() {
           await import('browser-image-compression');
         const fullFile = await imageCompression(file, {
           maxWidthOrHeight: 1000,
-          initialQuality: 0.8,
-          fileType: 'image/webp',
-          useWebWorker: true,
+          ...WEBP_COMPRESSION_OPTIONS,
         });
         // Derived from the already-downscaled 1000px image, not the
         // original -- decoding and resizing a 12MP phone JPEG twice roughly
@@ -236,9 +241,7 @@ export function useItemImages() {
         // two-up pair's ~178px half at up to 3x pixel density.
         const thumbFile = await imageCompression(fullFile, {
           maxWidthOrHeight: 600,
-          initialQuality: 0.8,
-          fileType: 'image/webp',
-          useWebWorker: true,
+          ...WEBP_COMPRESSION_OPTIONS,
         });
 
         const base = crypto.randomUUID();

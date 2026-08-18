@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
+import { useRequestSequence } from '../../lib/useRequestSequence';
 import { useToast } from '../Toast/ToastProvider';
 import {
   createCategory as createCategoryRow,
@@ -33,26 +34,25 @@ export function useCategories() {
   // `reload` is called for every auth event with no guarantee those
   // listings resolve in the order they were sent -- gated so a slower,
   // older response can never clobber a newer one's result.
-  const reqSeq = useRef(0);
+  const { next, isCurrent } = useRequestSequence();
 
   const reload = useCallback(async () => {
-    const mySeq = ++reqSeq.current;
+    const mySeq = next();
     setIsLoading(true);
     try {
       const { data, error } = await listCategories();
       if (error) throw error;
       const list = data ?? [];
-      if (mySeq === reqSeq.current) setCats(list);
+      if (isCurrent(mySeq)) setCats(list);
       return list;
     } catch (e) {
       console.error(e);
-      if (mySeq === reqSeq.current)
-        toast.error(t('category_select.load_error'));
+      if (isCurrent(mySeq)) toast.error(t('category_select.load_error'));
       return [];
     } finally {
-      if (mySeq === reqSeq.current) setIsLoading(false);
+      if (isCurrent(mySeq)) setIsLoading(false);
     }
-  }, [t, toast]);
+  }, [t, toast, next, isCurrent]);
 
   const createCategory = useCallback(
     async (name: string) => {

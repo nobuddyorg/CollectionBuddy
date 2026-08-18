@@ -11,6 +11,7 @@ import {
   photonLang,
   photonSearchUrl,
 } from '../../data/photon';
+import { backoffDelayMs } from '../../lib/backoff';
 import { Place, PlaceCoords } from './types';
 
 // Stryker disable all: localStorage, and two try/catch wrappers whose whole
@@ -221,7 +222,7 @@ export function usePlaces(
             } catch {
               // A network error is worth another go, same as a refusal.
             }
-            await delay(RETRY_BASE_MS * 2 ** attempt);
+            await delay(backoffDelayMs(RETRY_BASE_MS, attempt));
           }
           return null;
         };
