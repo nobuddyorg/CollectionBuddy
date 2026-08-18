@@ -267,9 +267,18 @@ export function SharingSection({ shares }: Props) {
                 // second line's own box at `sm` and up, promoting its two
                 // children back to being direct flex items of this `<li>`
                 // so the row returns to one line where there's room for it.
-                className="flex flex-col gap-1.5 py-2 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2"
+                //
+                // No `justify-between` here: with three items (email,
+                // expiry, controls) it pins only the first and last to the
+                // edges and free-floats the middle one, so the expiry date
+                // drifted sideways row to row depending on how much of the
+                // row a given email ate. `sm:flex-1` below makes email the
+                // one item that absorbs the leftover space instead, so
+                // expiry and controls stay a fixed unit flush at the end
+                // on every row regardless of email length.
+                className="flex flex-col gap-1.5 py-2 pl-2 text-sm sm:flex-row sm:items-center sm:gap-2"
               >
-                <div className="flex min-w-0 items-center gap-1.5">
+                <div className="flex min-w-0 items-center gap-1.5 sm:flex-1">
                   <span className="truncate min-w-0">{s.invited_email}</span>
                   {/* The role itself carries this now, not the pen button's
                       colour -- a row is scannable without opening anything,
