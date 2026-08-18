@@ -13,9 +13,6 @@ afterEach(() => {
   document.body.style.overflow = '';
 });
 
-// Without this, scrolling inside an open dialog scrolls the page behind it
-// once the dialog's own content runs out -- and on a phone the page is then
-// somewhere else when the dialog closes.
 describe('useLockBodyScroll', () => {
   it('locks the page while it is active', () => {
     render(<Harness active />);

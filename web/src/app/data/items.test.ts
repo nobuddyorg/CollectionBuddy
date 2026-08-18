@@ -13,10 +13,9 @@ import {
   searchMinLength,
 } from './items';
 
-// Pulls the quoted value back out of `title.ilike."<value>"` and undoes
-// PostgREST's own quoted-string escaping, i.e. simulates what the server
-// sees after parsing the or=() filter string -- not what SQL sees after
-// LIKE pattern matching (that layer still has its own \% / \_ escapes).
+// Simulates what the server sees after parsing the or=() filter string, not
+// what SQL sees after LIKE pattern matching (that layer has its own \% / \_
+// escapes).
 function unwrapQuotedValue(filter: string): string {
   const match = filter.match(/title\.ilike\."(.*?)",description\.ilike\./);
   if (!match) throw new Error(`Could not find quoted value in: ${filter}`);
@@ -60,9 +59,8 @@ describe('buildSearchFilter', () => {
 
   it('escapes a literal backslash for both the LIKE and quoting layers', () => {
     const filter = buildSearchFilter('a\\b');
-    // After undoing PostgREST's own quoted-string escaping, what's left
-    // must be the SQL-level LIKE escape sequence for one literal
-    // backslash: escape-char (\) + literal backslash = "\\".
+    // The SQL-level LIKE escape sequence for one literal backslash:
+    // escape-char (\) + literal backslash = "\\".
     expect(unwrapQuotedValue(filter)).toBe('%a\\\\b%');
   });
 });
@@ -72,15 +70,11 @@ describe('searchFilterFor', () => {
     expect(searchFilterFor('coin')).toBe(buildSearchFilter('coin'));
   });
 
-  // The boundary itself: at exactly the minimum a term earns its filter.
   it('filters at exactly the minimum length', () => {
     const term = 'a'.repeat(SEARCH_MIN_LENGTH);
     expect(searchFilterFor(term)).toBe(buildSearchFilter(term));
   });
 
-  // Not "no filter, so no narrowing" as an oversight -- a 1-2 character term
-  // cannot seed a trigram scan, so filtering on it would cost a sequential
-  // scan per keystroke and buy nothing.
   it('declines a term one short of the minimum', () => {
     expect(searchFilterFor('a'.repeat(SEARCH_MIN_LENGTH - 1))).toBeNull();
   });
@@ -89,10 +83,8 @@ describe('searchFilterFor', () => {
     expect(searchFilterFor('')).toBeNull();
   });
 
-  // A CJK ideograph, a Cyrillic letter, a currency symbol -- each carries
-  // more of a search term's meaning than a Latin letter does, so the floor
-  // is lower (#307). Two characters already earns a filter here, where the
-  // same length declines for a plain ASCII term above.
+  // Two characters earns a filter here, where the same length declines for
+  // a plain ASCII term above.
   it('filters a two-character non-ASCII term', () => {
     expect(searchFilterFor('日本')).toBe(buildSearchFilter('日本'));
     expect(searchFilterFor('日本')).not.toBeNull();
@@ -117,14 +109,8 @@ describe('searchMinLength', () => {
   });
 });
 
-// The list and the map are two views of one filtered set, built by two
-// different queries. What follows reads the request each builder has composed
-// -- a PostgREST builder holds its URL and only goes to the network when it is
-// awaited, so this asks what would be sent without sending it.
-//
-// Worth the trouble because the failure it guards is silent: the map used to
-// narrow by category and nothing else, so it showed pins for entries the list
-// was hiding, and both views looked perfectly sensible on their own (#241).
+// A PostgREST builder holds its URL and only hits the network when awaited,
+// so this reads what request each builder composed without sending it.
 describe('the queries behind the list and the map', () => {
   const paramsOf = (builder: unknown) =>
     (builder as { url: URL }).url.searchParams;
@@ -135,8 +121,6 @@ describe('the queries behind the list and the map', () => {
     paramsOf(rawListItemPlaces('cat-1', search, 0, ITEM_PLACE_PAGE_SIZE - 1));
 
   it('narrows the map by the same search as the list, character for character', () => {
-    // Not merely "both have a filter": the same term has to produce the same
-    // filter, or the two views disagree about what matches.
     expect(mapQuery('coin').get('or')).toBe(listQuery('coin').get('or'));
     expect(mapQuery('coin').get('or')).toContain('coin');
   });
@@ -147,8 +131,6 @@ describe('the queries behind the list and the map', () => {
     );
   });
 
-  // Same threshold, or a 2-character search filters one view and not the
-  // other -- which is the same bug in a narrower window.
   it('leaves both unfiltered for a term below the minimum length', () => {
     expect(mapQuery('ab').has('or')).toBe(false);
     expect(listQuery('ab').has('or')).toBe(false);
@@ -158,10 +140,6 @@ describe('the queries behind the list and the map', () => {
     expect(mapQuery('').getAll('place')).toEqual(['not.is.null', 'neq.']);
   });
 
-  // A page is how many cards fit on a screen; it has nothing to say about how
-  // many pins fit on a map -- but the map still wants every row, and
-  // PostgREST caps an unranged request the same as any other, so each
-  // request the map makes is ranged the same way the export's are (#411).
   it('pages the map the same way the export pages', () => {
     expect(mapQuery('coin').get('offset')).toBe('0');
     expect(mapQuery('coin').get('limit')).toBe(String(ITEM_PLACE_PAGE_SIZE));
@@ -169,25 +147,15 @@ describe('the queries behind the list and the map', () => {
 
   const exportQuery = () => paramsOf(listItemsForExport('cat-1', 0, 499));
 
-  // Silently reversed, this would flip the order every popup lists its
-  // entries in -- invisible until read against the list it's meant to
-  // agree with (usePlaces.test.ts states this order as an assumed premise).
   it('orders the map newest-first, the same as the list', () => {
     expect(mapQuery('coin').get('order')).toBe(listQuery('coin').get('order'));
     expect(listQuery('coin').get('order')).toBe('created_at.desc');
   });
 
-  // Oldest-first, the reverse of the list and the map: the archive numbers
-  // its folders in the order it walks them, and a `created_at` tie is
-  // broken by `id` so which page a tied row lands on is never ambiguous
-  // across the .range() boundary (#424).
   it('orders the export oldest-first with id as a tiebreaker', () => {
     expect(exportQuery().get('order')).toBe('created_at.asc,id.asc');
   });
 
-  // Silently dropping this would truncate every future export to whatever
-  // happened to be typed into the search box at the moment the button was
-  // pressed -- an export is of the category, not of the live filter.
   it('never filters the export by search', () => {
     expect(exportQuery().has('or')).toBe(false);
   });
@@ -198,11 +166,6 @@ describe('the queries behind the list and the map', () => {
   });
 });
 
-// #411: an unranged listItemPlaces silently truncated at PostgREST's row
-// cap, so a category above it drew (and counted, in a pin's popup) at most
-// max_rows entries' worth of pins. The loop below is the same shape
-// exportCategory.ts's fetchAllItems is tested with -- a fake page sequence
-// standing in for the database.
 describe('listItemPlaces', () => {
   it('pages past a full page and concatenates the rows', async () => {
     const fullPage = Array.from({ length: ITEM_PLACE_PAGE_SIZE }, (_, i) => ({

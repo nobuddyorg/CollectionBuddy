@@ -9,9 +9,8 @@ import { ToastProvider } from '../Toast/ToastProvider';
 import CategorySelect from './index';
 import type { UseCategories } from './useCategories';
 
-// Not what this file is testing (see the comment below) -- mocked to keep
-// the panel's expand-on-open from firing a real, unmocked Supabase call
-// the same way index.test.tsx does.
+// Mocked to keep the panel's expand-on-open from firing a real, unmocked
+// Supabase call, the same way index.test.tsx does.
 vi.mock('./useShares', () => ({
   useShares: vi.fn().mockReturnValue({
     shares: [],
@@ -24,15 +23,11 @@ vi.mock('./useShares', () => ({
   }),
 }));
 
-// #423: neither the catch->toast.error path nor the finally->reset in
-// useExportCategory, nor the wiring that hands the click to it, was
-// asserted anywhere -- index.test.tsx mocks the hook away entirely to keep
-// the rest of that file's tests from having to coax a real export into a
-// mid-flight state. This is the one test that runs the real hook instead:
-// with no signed-in session, `exportCategory` rejects with "No user
-// session" before any Supabase/storage call, which is enough to exercise
-// the click -> catch -> error toast -> button re-enabled path with zero new
-// mocks.
+// index.test.tsx mocks useExportCategory away entirely, so the catch ->
+// toast.error -> reset path was never exercised. This is the one test that
+// runs the real hook: with no signed-in session, exportCategory rejects
+// before any Supabase/storage call, which is enough to cover that path
+// with zero new mocks.
 
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   return {
@@ -68,10 +63,8 @@ function renderSelect() {
 
 describe('exporting with no session', () => {
   beforeEach(() => {
-    // Cleared rather than assumed empty: what makes the real client's
-    // `getSession()` resolve with no session -- and so the export fail --
-    // is that no session is persisted under it, not just the absence of one
-    // set by this test file itself.
+    // Cleared, not assumed empty: `getSession()` resolves with no session
+    // (and the export fails) only if nothing is persisted under it.
     window.localStorage.clear();
     window.localStorage.setItem('lang', 'en');
   });

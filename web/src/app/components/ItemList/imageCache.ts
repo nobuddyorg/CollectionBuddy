@@ -1,26 +1,18 @@
-// Module-level so it outlives the components that read it. ItemList is
-// keyed by category id, so switching category unmounts and remounts the
-// whole tree -- anything held in hook state is thrown away and every
-// signature is fetched again.
+// Module-level so it outlives components: ItemList is keyed by category id,
+// so switching category unmounts the whole tree and hook state is thrown
+// away. Holding signatures steady here also lets the HTTP cache reuse
+// bytes -- a fresh signature is a different URL.
 //
-// Re-signing is not just a round trip: a fresh signature is a different
-// URL, so the browser cannot reuse the bytes it already downloaded either.
-// Holding signatures steady is what lets the HTTP cache do its job.
-//
-// Unbounded by construction: entries are only ever evicted when read past
-// their TTL (getCachedSignedUrl below), so one never read again outlives
-// the tab. Not a leak worth fixing at the scale this app has actually seen
-// -- ~100 items x 2 objects x a ~250-byte signed URL is on the order of
-// 25 KB. Worth revisiting with a periodic sweep or an LRU cap only if the
-// app stops keying ItemList by category, or grows a view that walks many
-// categories in one session.
+// Unbounded by construction: entries only evict when read past their TTL.
+// Not a leak worth fixing at this app's actual scale (~25 KB for ~100
+// items) -- revisit only if ItemList stops being keyed by category.
 
 type CachedUrl = { url: string; signedAt: number };
 
 const signedUrls = new Map<string, CachedUrl>();
 
 // Supabase signs for an hour; stop trusting a signature before then so an
-// image never resolves to an expired URL mid-render.
+// image never resolves to an expired URL.
 export const SIGNED_URL_TTL_MS = 3600_000;
 export const SIGNED_URL_MARGIN_MS = 5 * 60_000;
 

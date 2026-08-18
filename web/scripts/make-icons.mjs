@@ -3,15 +3,11 @@
 //
 // Usage: node scripts/make-icons.mjs
 //
-// Run by hand and the results committed, not wired into the build: it needs a
-// browser download, and the artwork changes about once a project.
+// Run by hand and the results committed, not wired into the build.
 //
-// Every icon it writes is the artwork scaled *down*, never up. logo.png is
-// 414px across, so that is the ceiling on how sharp any of this can be -- the
-// blur being fixed here came from a launcher taking the 180px apple-touch
-// icon, the largest the manifest offered, and stretching it to fill a 512px
-// splash screen (#266). A vector source would lift the ceiling; nothing else
-// will.
+// Every icon is the artwork scaled *down*, never up -- logo.png is 414px
+// across, the ceiling on how sharp any of this can be. Only a vector
+// source would lift that.
 import { chromium } from 'playwright';
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -25,19 +21,13 @@ const sourceWidth = source.readUInt32BE(16);
 const sourceHeight = source.readUInt32BE(20);
 const aspect = sourceWidth / sourceHeight;
 
-// The paper the rest of the app is printed on -- `themeColor` in layout.tsx
-// and `background_color` in the manifest. Opaque on purpose, twice over: iOS
-// composites a transparent home-screen icon onto black, which all but erases
-// artwork drawn in dark brown ink, and an opaque icon matching the splash
-// screen's own background makes the two read as one surface rather than a
-// tile sitting on it.
+// `themeColor` in layout.tsx / `background_color` in the manifest. Opaque
+// on purpose: iOS composites a transparent home-screen icon onto black,
+// erasing artwork drawn in dark brown ink.
 const PAPER = '#f4f3ef';
 
-// How much of the tile the artwork spans. `square` is the plain icon, framed
-// with a margin the way an exhibit is. `circle` is for a maskable icon: the
-// launcher may crop the tile to anything inside its inner 80% circle, so what
-// has to fit that circle is the artwork's *diagonal*, which is a good deal
-// less generous than it sounds.
+// `circle` is for a maskable icon: the launcher may crop to anything inside
+// the inner 80% circle, so what has to fit is the artwork's *diagonal*.
 const SQUARE_SPAN = 0.78;
 const SAFE_CIRCLE = 0.8;
 
@@ -55,12 +45,9 @@ const targets = [
   // iOS asks for exactly 180 and scales it itself; there is no larger size
   // to give it.
   { file: 'apple-touch-icon.png', size: 180, fit: 'square' },
-  // The header's own copy of the mark, rendered at roughly 2x a 24px slot
-  // so it's sharp on a standard display. `raw`, not `square`: the header
-  // draws the artwork directly (transparent background, its own aspect,
-  // no paper tile), so what it needs is a small crop of the same PNG the
-  // full-size logo already is -- not the 212 KB source scaled down by the
-  // browser at render time (#288).
+  // `raw`, not `square`: the header draws the artwork directly (transparent
+  // background, no paper tile), so it needs a small crop of the logo, not
+  // the full source scaled down by the browser at render time.
   { file: 'logo-header.png', size: 48, fit: 'raw' },
 ];
 
@@ -69,10 +56,8 @@ const dataUri = `data:image/png;base64,${source.toString('base64')}`;
 const browser = await chromium.launch();
 const page = await browser.newPage({ deviceScaleFactor: 1 });
 
-// `raw` takes `size` as a target width (this artwork is wider than it is
-// tall) and returns the PNG buffer directly, rather than writing it --
-// favicon.ico below needs one at 16px that has no reason to also exist as
-// its own committed file.
+// Returns the PNG buffer directly rather than writing it -- favicon.ico
+// below needs a 16px render with no reason to also exist as its own file.
 async function renderRaw(width) {
   const height = Math.round(width / aspect);
   await page.setViewportSize({ width, height });
@@ -126,12 +111,9 @@ for (const { file, size, fit } of targets) {
 }
 
 // favicon.ico: a plain ICONDIR header followed by one ICONDIRENTRY per
-// image, then the images themselves, raw PNG bytes and all -- valid since
-// Vista, and what every browser and OS in current use expects. Built from a
-// fresh 16px render plus the 32px favicon already in public/ (itself framed
-// by hand, not by this script, so it's read back rather than re-derived).
-// The file this replaces was a single 256x256 32-bit bitmap at 217 KB; nothing
-// on a browser tab or bookmarks bar draws an icon anywhere near that size.
+// image, then the raw PNG bytes. Built from a fresh 16px render plus the
+// 32px favicon already in public/ (framed by hand, read back not
+// re-derived).
 function buildIco(images) {
   const header = Buffer.alloc(6);
   header.writeUInt16LE(0, 0); // reserved

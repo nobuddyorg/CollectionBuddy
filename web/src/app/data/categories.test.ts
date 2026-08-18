@@ -12,22 +12,16 @@ import {
   uniqueCategoryName,
 } from './categories';
 
-// #341: these build the query that decides which items a category deletion
-// would orphan -- set arithmetic with a real data-loss consequence if
-// `.neq()` were flipped to `.eq()`, or the `.in()` list built from the wrong
-// array. 0% covered, so nothing would have caught either. Each function here
-// only builds a query and hands it back for the caller to await, so what's
-// worth asserting is which table, columns and filters it built -- not a
-// resolved value, which would just be echoing the mock back at itself.
+// These tests assert the query shape (table, columns, filters), since each
+// function just builds a query and hands it back; asserting a resolved
+// value would just echo the mock.
 
 type Call = { method: string; args: unknown[] };
 
 /**
- * A chainable stand-in for postgrest-js's query builder: every method
- * records itself and returns the same object, so a call like
- * `.select('item_id').in(...).neq(...)` can be read back afterwards as an
- * ordered list of (method, args) pairs -- the actual shape of the query,
- * not just that some method was called with some argument somewhere.
+ * Chainable stand-in for postgrest-js's query builder: every method records
+ * itself and returns the same object, so a call chain can be read back as an
+ * ordered list of (method, args) pairs.
  */
 function mockQueryBuilder() {
   const calls: Call[] = [];
@@ -116,9 +110,8 @@ describe('listItemIdsForCategory', () => {
     expect(calls[2]).toEqual({ method: 'range', args: [0, 999] });
   });
 
-  // #409: an unpaginated read here silently undercounted a category above
-  // PostgREST's row cap, and the ids that fell off the end came out the
-  // other end of listItemIdsLinkedElsewhere looking orphaned.
+  // Regression: an unpaginated read here undercounted a category above
+  // PostgREST's row cap, silently orphaning ids past the cutoff.
   it('pages past a full page and concatenates the ids', async () => {
     const fullPage = Array.from({ length: 1000 }, (_, i) => ({
       item_id: `id-${i}`,
@@ -169,11 +162,8 @@ describe('countItemsForCategory', () => {
   });
 });
 
-// The one query in this file a flipped operator silently corrupts: `.in()`
-// has to carry exactly the candidate ids, and `.neq()` -- not `.eq()` -- is
-// what makes the result "still linked elsewhere" rather than "linked to the
-// category being deleted". Getting either wrong doesn't error; it just
-// orphans or preserves the wrong items.
+// A flipped `.neq()`/`.eq()` here wouldn't error; it would silently orphan
+// or preserve the wrong items.
 describe('listItemIdsLinkedElsewhere', () => {
   it('filters to the given item ids, excluding the category being deleted', async () => {
     const { from, calls } = mockFrom();
@@ -196,14 +186,13 @@ describe('listItemIdsLinkedElsewhere', () => {
     const ids = ['a', 'b', 'c'];
     await listItemIdsLinkedElsewhere(ids, 'cat-1');
     const inCall = calls.find((c) => c.method === 'in')!;
-    // A chunked slice, not the original array reference -- chunking (#409)
-    // means even a list under the chunk size passes through `.slice()`.
+    // A chunked slice, not the original array reference: even a list under
+    // the chunk size passes through `.slice()`.
     expect(inCall.args[1]).toEqual(ids);
   });
 
-  // #409: `.in()` puts every id in the query string -- a few thousand UUIDs
-  // hits a URL length limit before the row cap does, so the list has to be
-  // chunked the same way exportCategory.ts's SIGN_BATCH_SIZE chunks paths.
+  // `.in()` puts every id in the query string; thousands of UUIDs would hit
+  // a URL length limit before the row cap does, hence chunking.
   it('chunks a candidate list over 100 ids into multiple .in() calls', async () => {
     const ids = Array.from({ length: 250 }, (_, i) => `id-${i}`);
     const page1 = [{ item_id: 'id-0' }];

@@ -8,11 +8,9 @@ import {
   updateShareRole,
 } from './shares';
 
-// Same reasoning as categories.test.ts: each function here only builds a
-// query and hands it back for the caller to await, so what's worth
-// asserting is the shape of the query it built -- which table, which
-// columns, which filters -- not a resolved value that would just echo the
-// mock back at itself.
+// Each function here only builds a query and hands it back for the caller
+// to await, so what's worth asserting is the shape of the query it built,
+// not a resolved value that would just echo the mock back at itself.
 
 type Call = { method: string; args: unknown[] };
 

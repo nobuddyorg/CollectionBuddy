@@ -40,20 +40,14 @@ function collectSourceFiles(dir: string): string[] {
   return files;
 }
 
-// Every declared key is `namespace.leaf` (flattenKeys prefixes every leaf
-// with its containing object's path), so a quoted literal that isn't
-// dot-separated can't be one -- which is what keeps this from mistaking
-// `result.reason === 'denied'`, sitting in the same parens as the ternary
-// it feeds, for a translation key.
+// Every declared key is dot-separated (`namespace.leaf`), so this is what
+// keeps a non-key literal like `result.reason === 'denied'` from being
+// mistaken for a translation key.
 const KEY_LIKE = /^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)+$/;
 
-// Finds every string-literal argument passed to a `t(` or `tCount(` call,
-// however it's shaped -- including `t(cond ? 'a' : 'b')`, which a
-// first-literal-only regex would miss entirely (and then, once something
-// checks for declared-but-unused keys, misreport as dead). Walks paren
-// depth from the call's own `(` to its matching `)` and collects every
-// key-shaped quoted literal in between; a plain `t('some.key')` is just
-// the one-literal case of the same walk.
+// Walks paren depth from a call's `(` to its matching `)`, collecting every
+// key-shaped literal in between -- so `t(cond ? 'a' : 'b')` is caught, not
+// just the plain single-literal case.
 function extractCallLiterals(content: string, name: string): string[][] {
   const calls: string[][] = [];
   const callOpen = new RegExp(`\\b${name}\\(`, 'g');
@@ -92,10 +86,9 @@ function collectUsedKeys(files: string[]): Map<string, string[]> {
     for (const literals of extractCallLiterals(content, 't')) {
       for (const key of literals) record(key, file);
     }
-    // tCount('some.key', n) resolves to `some.key` or, for a count of
-    // exactly one, `some.key_one` (see I18nProvider's tCount) -- the
-    // `_one` variant's literal never appears in source, so it has to be
-    // credited as used alongside the base key from this one call.
+    // tCount also resolves to `${key}_one` for a count of one (see
+    // I18nProvider's tCount), but that literal never appears in source, so
+    // it's credited as used alongside the base key.
     for (const literals of extractCallLiterals(content, 'tCount')) {
       for (const key of literals) {
         record(key, file);
@@ -127,8 +120,8 @@ describe('i18n key parity', () => {
     expect({ onlyInEn, onlyInDe }).toEqual({ onlyInEn: [], onlyInDe: [] });
   });
 
-  // The other three checks only ever look for keys the source is missing;
-  // none of them can catch a key nothing references any more (#373).
+  // The other three checks only look for keys the source is missing; this
+  // one catches a key nothing references any more.
   it('every key in en.json is referenced by some t(…) or tCount(…) literal', () => {
     const unused = [...enKeys].filter((k) => !usedKeys.has(k));
     expect(unused).toEqual([]);

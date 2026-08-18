@@ -1,19 +1,11 @@
--- The images table: one row per photograph (full + optional thumbnail),
--- replacing per-item storage.list() as how the app discovers what
--- photographs an item has. Bundled as one file, the same shape as
--- 0008-0010 -- one concern (table, trigger, indexes, policies, grants)
--- together, not split the way the 0002-0006 baseline was.
+-- One row per photograph (full + optional thumbnail), replacing per-item
+-- storage.list() as how the app discovers an item's photographs. Storage
+-- still holds the bytes and is the authority on what exists; this table is
+-- a queryable index of it, written at upload time and cleared at delete.
 --
--- Storage still holds the bytes and is still the authority on what
--- actually exists -- this table is a queryable index of it, written by
--- the client at upload time and read/cleared at delete time.
---
--- One row per photograph, not one row per pair-with-a-position: there is
--- no reorder feature, and IMAGE_LIST_SORT (web/src/app/data/images.ts)
--- already established created_at ascending as the order that keeps a
--- freshly uploaded photograph from displacing the hero slot (#265) -- a
--- table that already carries created_at needs no separate position column
--- to reproduce that ordering.
+-- No position column: there's no reorder feature, and created_at ascending
+-- already keeps a freshly uploaded photograph from displacing the hero
+-- slot (IMAGE_LIST_SORT, images.ts).
 begin;
 
 create table if not exists public.images (

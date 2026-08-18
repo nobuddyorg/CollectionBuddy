@@ -3,34 +3,18 @@ import type { Database } from './database.types';
 import type { ShareRole } from './shares';
 
 export type CategoryRow = Database['public']['Tables']['categories']['Row'];
-// user_id rides along so the UI can tell "mine" from "shared with me" --
-// listCategories() (below) now returns both under the RLS extension in
-// 0011_category_shares.sql, and nothing else in the response says which is
-// which.
-//
-// category_shares is the caller's own role on a category they don't own --
-// PostgREST's embed of the child table, scoped by category_shares' own
-// "select own or invited" policy (0011) to exactly the caller's single
-// invited row for a shared category (or every grant the owner made, for an
-// owned one, which nothing here reads). Optional, not just empty-by-default:
-// createCategory/renameCategory below don't ask for it (nothing they touch
-// needs a role), and callers reading it treat a missing array the same as
-// an empty one -- see page.tsx's canEditSelected.
+// user_id distinguishes "mine" from "shared with me". category_shares is
+// scoped by RLS to the caller's own role; treat a missing array the same as
+// an empty one, see page.tsx's canEditSelected.
 export type CategorySummary = Pick<CategoryRow, 'id' | 'name' | 'user_id'> & {
   category_shares?: { role: ShareRole }[];
 };
 type CategoryCore = Pick<CategoryRow, 'id' | 'name' | 'user_id'>;
 
 /**
- * `base`, or `base (2)`, `base (3)`, ... once far enough to clear every name
- * in `existingNames` -- case-insensitively, the same way the database's own
- * uniqueness constraint on `categories.name` is (`categories_user_lower_name_idx`,
- * `supabase/migrations/0005_indexes.sql`), so an import can't be handed a
- * name the insert would then reject as a duplicate anyway.
- *
- * The base name comes back unchanged when nothing collides -- an import
- * into an account with no category of that name yet should not gain a
- * "(2)" it never needed.
+ * Returns `base`, or `base (2)`, `base (3)`, ... past every name in
+ * `existingNames`, matching case-insensitively like the database's unique
+ * index on `categories.name` so an import can't collide on insert.
  */
 export function uniqueCategoryName(
   base: string,
@@ -55,23 +39,18 @@ export function createCategory(name: string) {
   return (
     supabase
       .from('categories')
-      // The generated Insert type requires user_id because the column is
-      // `not null` with no default -- it doesn't know enforce_user_id()
-      // (0002_functions.sql) fills it in from the JWT on every insert. The
-      // client never sends it, on purpose: RLS plus that trigger is what
-      // makes it impossible to hand a row to another user.
+      // user_id is required by the generated Insert type, but the client
+      // never sends it: enforce_user_id() fills it from the JWT, so RLS
+      // can't be handed another user's id.
       .insert({ name } as Database['public']['Tables']['categories']['Insert'])
       .select('id,name,user_id')
       .single<CategoryCore>()
   );
 }
 
-// Permitted by the "update own categories" RLS policy; a trigger keeps
-// updated_at current and normalises the name, so the returned row -- not
-// the value sent -- is what should be merged into local state. No
-// category_shares in the select: useCategories.tsx's merge spreads this
-// over the existing row, and a key this response never carries at all
-// leaves whatever the caller already had untouched.
+// A trigger normalises the name and updates updated_at, so merge the
+// returned row, not the sent value. No category_shares in the select: the
+// merge treats a missing key as unchanged, not cleared.
 export function renameCategory(id: string, name: string) {
   return supabase
     .from('categories')
@@ -85,15 +64,12 @@ export function deleteCategory(id: string) {
   return supabase.from('categories').delete().eq('id', id);
 }
 
-// PostgREST caps an unranged request at max_rows (supabase/config.toml,
-// 1000 -- confirmed the same on the hosted project's API settings, #408
-// step 0) and truncates silently. This table carries one id per row, so a
-// page already asks for as much as one request can return.
+// PostgREST caps an unranged request at max_rows (1000, supabase/config.toml)
+// and truncates silently.
 const ITEM_LINK_PAGE_SIZE = 1000;
 
-// How many ids ride in one `.in()` filter's query string. Same precedent as
-// exportCategory.ts's SIGN_BATCH_SIZE: a few thousand UUIDs would hit a URL
-// length limit long before the row cap did.
+// Ids per `.in()` filter; more risks hitting a URL length limit before the
+// row cap does.
 const ID_FILTER_CHUNK_SIZE = 100;
 
 function rawListItemIdsForCategory(
@@ -110,14 +86,9 @@ function rawListItemIdsForCategory(
 
 /**
  * Every item id linked to this category, used to find what a category
- * deletion would orphan. Paged past PostgREST's row cap -- unpaginated, this
- * silently undercounted a category above the cap, and the missing ids came
- * out the other end of `listItemIdsLinkedElsewhere` looking orphaned when
- * they were not (#409).
- *
- * `listPage` is accepted as a parameter, same shape as exportCategory.ts's
- * `fetchAllItems`, so the paging loop can be driven with a fake instead of a
- * real database.
+ * deletion would orphan. Paged past PostgREST's row cap to avoid silently
+ * undercounting. `listPage` is a parameter so the paging loop can be driven
+ * with a fake instead of a real database.
  */
 export async function listItemIdsForCategory(
   categoryId: string,
@@ -139,9 +110,8 @@ export async function listItemIdsForCategory(
   return { data: ids, error: null };
 }
 
-// An exact count with no rows fetched, so the delete-confirmation dialog can
-// name the number of entries at risk without paying for the full listing
-// `listItemIdsForCategory` above returns once the deletion is confirmed.
+// Exact count with no rows fetched, so the confirmation dialog can show the
+// number at risk without the full scan listItemIdsForCategory does.
 export function countItemsForCategory(categoryId: string) {
   return supabase
     .from('item_categories')
@@ -165,16 +135,10 @@ function rawListItemIdsLinkedElsewhere(
 
 /**
  * Of the given items, which are still linked to some category other than the
- * one being deleted -- i.e. which of them would NOT be orphaned.
- *
- * Chunks the id list (a URL-length concern) and pages each chunk (a row-cap
- * concern) so neither truncates the answer. Pagination alone is not the
- * whole fix for #409: the caller still has to treat an `error` here as a
- * reason to abort the deletion rather than act on a partial `keep` set --
- * this only guarantees that a *successful* answer is a complete one.
- *
- * `listPage` is accepted the same way `listItemIdsForCategory` above accepts
- * `listPage`, for the same testing reason.
+ * one being deleted, i.e. which would NOT be orphaned. Chunks the id list
+ * (URL length) and pages each chunk (row cap) so neither truncates the
+ * answer. Callers must still treat an `error` as a reason to abort the
+ * deletion rather than act on a partial `keep` set.
  */
 export async function listItemIdsLinkedElsewhere(
   itemIds: string[],

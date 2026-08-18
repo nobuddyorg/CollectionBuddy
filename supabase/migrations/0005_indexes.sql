@@ -1,15 +1,8 @@
--- Indexes.
---
 -- Search is substring ILIKE across four text columns OR'd together
--- (ITEMS_SEARCH_SELECT in web/src/app/data/items.ts), so all four need a
--- trigram index: Postgres can only combine the branches with a BitmapOr if
--- every one of them is indexable, and a single unindexed branch collapses
--- the whole query onto a sequential scan. That is why tags_text exists at
--- all -- it turns the one array column into a fourth ILIKE-able branch.
---
--- There is no full-text search here. Two tsvector columns and their GIN
--- indexes used to exist and nothing ever queried them; they cost a
--- to_tsvector on every write and were dropped.
+-- (ITEMS_SEARCH_SELECT, items.ts), so all four need a trigram index: one
+-- unindexed branch collapses the whole query onto a sequential scan.
+-- tags_text exists solely to give the tags array a fourth ILIKE-able
+-- branch.
 begin;
 
 -- Case-insensitive uniqueness of category names, per user.

@@ -16,17 +16,10 @@ import { useConfirm } from '../Confirm/ConfirmProvider';
 import { ZipLimitError } from '../../data/zip';
 
 /**
- * What to say while an export runs.
- *
- * An export is the one action in this panel that can take minutes, so the
- * button has to keep reporting rather than just spin: reading the rows and
- * packing the archive are short and get a word each, but fetching the
- * photographs is the long part and is the only phase that can be counted,
- * so that is the one that shows a count.
- *
- * A photo phase with nothing to fetch would otherwise read "0 of 0", which
- * looks like a stall; a category of items without pictures falls back to
- * the packing wording instead.
+ * What to say while an export runs. Reading rows and packing the archive
+ * are short and get a word each; fetching photographs is the long part and
+ * the only phase worth a count. A photo phase with nothing to fetch falls
+ * back to the packing wording instead of reading "0 of 0".
  */
 export function exportProgressMessage(
   progress: ExportProgress | null,
@@ -51,11 +44,11 @@ export function useExportCategory() {
   const { t } = useI18n();
   const toast = useToast();
   const confirm = useConfirm();
-  // Null means "not exporting". A separate boolean would be a second
-  // source of truth for the same fact, and the two could disagree.
+  // Null means "not exporting" -- a separate boolean would be a second
+  // source of truth that could disagree.
   const [progress, setProgress] = useState<ExportProgress | null>(null);
-  // One controller per run, so Cancel always aborts whichever export is
-  // actually in flight rather than a stale one from a previous click (#418).
+  // One controller per run, so Cancel always aborts the export actually in
+  // flight, not a stale one from a previous click.
   const controllerRef = useRef<AbortController | null>(null);
 
   const runExport = useCallback(
@@ -69,9 +62,8 @@ export function useExportCategory() {
           category,
           onProgress: setProgress,
           signal: controller.signal,
-          // Asked only once the listing has totalled the photographs'
-          // real size -- declining reads as a cancel, the same as the
-          // button (#428).
+          // Asked once the listing has totalled the photographs' real
+          // size; declining reads as a cancel.
           confirmLargeExport: (totalBytes) =>
             confirm(
               t('category_select.export_large_confirm').replace(
@@ -81,11 +73,9 @@ export function useExportCategory() {
             ),
         });
         downloadBlob(result.blob, result.filename);
-        // The download itself never fails on a skipped photograph -- an
-        // archive missing a few pictures is still worth having -- but the
-        // canonical use of an export is "export, then delete the
-        // originals", so a silent gap here is unrecoverable data loss
-        // rather than a mere inconvenience (#414).
+        // The download never fails on a skipped photograph -- an archive
+        // missing a few is still worth having -- but export-then-delete is
+        // a canonical use, so a silent gap here is unrecoverable data loss.
         if (result.skippedItemCount > 0) {
           toast.error(
             t('category_select.export_listing_partial').replace(
@@ -106,12 +96,10 @@ export function useExportCategory() {
         }
       } catch (e) {
         if (e instanceof ExportCancelledError) {
-          // The user asked for this -- confirmed, not reported as a failure.
+          // Confirmed, not a failure.
           toast.announce(t('category_select.export_cancelled'));
         } else if (e instanceof ZipLimitError) {
-          // Wrong to tell someone whose collection is too large for one
-          // archive to "please try again" -- retrying produces exactly the
-          // same refusal (#416).
+          // Retrying produces the same refusal, so this isn't "try again".
           toast.error(t('category_select.export_too_large'));
         } else {
           toast.reportError(
@@ -133,8 +121,7 @@ export function useExportCategory() {
   }, []);
 
   // An export can run for minutes; closing the tab mid-run would silently
-  // discard it with no way back, unlike every other action in this app
-  // (#418).
+  // discard it with no way back.
   useEffect(() => {
     if (!progress) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {

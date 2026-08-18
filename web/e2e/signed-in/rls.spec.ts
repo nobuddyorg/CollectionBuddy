@@ -6,19 +6,12 @@ import { createClient } from '@supabase/supabase-js';
 import { CONTEXT_PATH, SEED, itemsIn, type SeedContext } from './fixtures';
 import { openCategory, visibleTitles } from './helpers';
 
-// The app's only authorization layer.
-//
-// It is a static export: no server, no route handlers, nowhere else a check
-// could live. Every request reaches Postgres carrying the user's own JWT, and
-// the policies in 0006 and 0007 are the whole of what stands between one
-// collection and another. If they stopped holding, the interface would look
-// exactly the same -- it would simply show somebody else's things.
-//
-// Which is why half of what follows does not go through the interface at all.
-// The app only ever asks the questions the policies are meant to allow; the
-// dangerous questions are the ones it would never think to ask, and those
-// have to be asked directly, with a real token, the way anyone reading the
-// bundle could ask them.
+// This app is a static export: no server, no route handlers, so Postgres
+// row-level security is the entire authorization layer. If a policy stopped
+// holding, the interface would look identical -- it would simply show
+// somebody else's things. Which is why half of what follows bypasses the
+// interface entirely and asks Postgres the dangerous questions directly, with
+// a real token, the way anyone reading the bundle could.
 test.use({ locale: 'en-GB' });
 
 const context = () =>
@@ -93,8 +86,8 @@ test.describe('one collection cannot reach another', () => {
     expect(error).toBeNull();
     expect(data!.map((row) => row.title)).not.toContain(SEED.other.item);
 
-    // Asking for them by owner is the sharper version of the same question:
-    // the filter is satisfiable, and only the policy makes it return nothing.
+    // Sharper than the check above: this filter is satisfiable, so only the
+    // policy makes it return nothing.
     const { data: theirs } = await apiAs(token)
       .from('items')
       .select('id')
@@ -113,8 +106,8 @@ test.describe('one collection cannot reach another', () => {
     expect(data).toEqual([]);
   });
 
-  // A policy that lets a row through on write while hiding it on read is the
-  // worst of both: the owner cannot see what happened to their own entry.
+  // A policy that let a row through on write while hiding it on read would
+  // be the worst of both: the owner couldn't see what happened to their entry.
   test('their entries cannot be edited', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, otherToken, otherUserId } = context();
@@ -165,11 +158,9 @@ test.describe('one collection cannot reach another', () => {
     expect(after!.length).toBe(before!.length);
   });
 
-  // Not refused -- ignored, which is stronger. `enforce_user_id()` is a
-  // BEFORE trigger that overwrites whatever the client claimed with
-  // auth.uid(), so an entry addressed to someone else is simply filed under
-  // the sender. There is no request a client can make that puts a row in
-  // another collection, rather than there being one that gets turned down.
+  // Not refused -- ignored, which is stronger: `enforce_user_id()` is a
+  // BEFORE trigger that overwrites the claimed owner with auth.uid(), so
+  // there is no request that can put a row in another collection at all.
   test('an entry addressed to their collection lands in your own', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, userId, otherToken, otherUserId } = context();
@@ -191,17 +182,16 @@ test.describe('one collection cannot reach another', () => {
         .eq('user_id', otherUserId);
       expect(theirs!.map((row) => row.title)).not.toContain('planted');
     } finally {
-      // In a finally: this plants a row in the seeded user's own collection
-      // (the trigger rewrites the owner), and a failed assertion above would
-      // otherwise leave it there for `entries.spec.ts` or `photos.spec.ts`
-      // to count by accident (#338).
+      // In `finally`: the trigger rewrites the owner, so this plants a row in
+      // the seeded user's own collection -- a failed assertion above must
+      // not leave it for entries.spec.ts or photos.spec.ts to count.
       if (planted)
         await apiAs(token).from('items').delete().eq('id', planted.id);
     }
   });
 
   // The same trigger refuses to let an existing row change hands: on update
-  // it puts the old owner back rather than taking the new one.
+  // it restores the old owner rather than accepting the new one.
   test('an entry cannot be handed to them either', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, userId, otherUserId } = context();
@@ -224,8 +214,7 @@ test.describe('one collection cannot reach another', () => {
     }
   });
 
-  // Storage carries its own policies, scoped by the first path segment being
-  // the owner's id -- photographs are the private part of a collection.
+  // Storage has its own policies, scoped by the first path segment (owner id).
   test('their photographs cannot be listed', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, otherUserId } = context();
@@ -246,11 +235,10 @@ test.describe('one collection cannot reach another', () => {
     expect(error).not.toBeNull();
   });
 
-  // The images table (0013_images.sql) is additive surface storage.objects'
-  // own policies never had to cover: a row that names an object, not the
-  // object's bytes. Self-contained, the same way the Storage probes above
-  // are -- no seed fixture plants an images row, so the test inserts and
-  // tears down its own.
+  // The images table is a separate authorization surface from storage.objects
+  // (a row naming an object vs. the object's bytes), so it needs its own
+  // check. No seed fixture plants an images row, so this inserts and tears
+  // down its own.
   test('their photograph records cannot be listed', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, otherToken, otherUserId } = context();
@@ -282,12 +270,10 @@ test.describe('one collection cannot reach another', () => {
     }
   });
 
-  // tg_images_enforce (0013_images.sql) is the same shape as
-  // tg_item_categories_enforce: it re-derives ownership from the item
-  // itself rather than trusting the client, so an insert addressed at
-  // someone else's item is refused outright, not merely filed under the
-  // wrong owner the way a planted item is (#C1 above) -- there is no
-  // "their item, my row" shape for this table to produce.
+  // tg_images_enforce re-derives ownership from the item itself rather than
+  // trusting the client, so an insert against someone else's item is refused
+  // outright -- unlike a planted item, it is not silently refiled under the
+  // sender.
   test('an images row cannot be inserted for their item', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, otherToken } = context();
@@ -309,15 +295,12 @@ test.describe('one collection cannot reach another', () => {
     expect(error).not.toBeNull();
   });
 
-  // Signed out is the other boundary, and it is refused a step earlier than
-  // the rest: `anon` holds no grant on these tables at all, so the request is
-  // turned away before any policy predicate is evaluated. 42501 is what that
-  // looks like -- an empty result would mean the grant had been given and the
-  // policy was doing the work, which is a weaker place to be standing.
-  //
-  // Asserted on the code rather than on "there was an error", because the
-  // first version of this test read `expect(error ?? {}).toBeTruthy()`, and
-  // an object is always truthy: it passed whether the boundary held or not.
+  // Signed out is a step earlier than the rest: `anon` holds no grant on
+  // these tables at all, so the request is refused (42501) before any policy
+  // predicate runs -- an empty result would instead mean the grant existed
+  // and the policy was doing the work. Asserted on the error code, not just
+  // truthiness: `expect(error ?? {}).toBeTruthy()` would pass either way,
+  // since an object is always truthy.
   for (const table of ['items', 'categories']) {
     test(`a visitor with no session is refused ${table} outright`, async ({}, testInfo) => {
       testInfo.skip(!process.env.E2E_SUPABASE_URL);
@@ -348,12 +331,9 @@ test.describe('one collection cannot reach another', () => {
     expect(data ?? []).toEqual([]);
   });
 
-  // item_categories is guarded by a trigger, not by RLS -- the insert policy
-  // only checks user_id = auth.uid(), and user_id is set by this very
-  // trigger, so RLS alone would not catch a regression here. This is the one
-  // row in the schema that references two owned rows at once, which makes it
-  // the single most interesting authorization case: a link from one of my
-  // own items into one of their categories.
+  // item_categories is guarded by a trigger, not by RLS: the insert policy
+  // only checks user_id = auth.uid(), and that column is set by the same
+  // trigger, so RLS alone would not catch a regression here.
   test('an item cannot be filed into their category', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, otherToken } = context();
@@ -375,18 +355,16 @@ test.describe('one collection cannot reach another', () => {
     expect(error).not.toBeNull();
   });
 
-  // list() returning [] (above) is the weaker proof -- it holds even if the
-  // listing itself is merely empty. Signing a path that is known to exist is
-  // the sharper question: does the select policy actually refuse it, or does
-  // it only look that way because there was nothing to find?
+  // Stronger than list() returning []: that could just mean nothing was
+  // there. Signing a path known to exist tests whether the policy actually
+  // refuses it.
   test('a known photograph of theirs cannot be signed', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, otherToken, otherUserId } = context();
 
     const path = `${otherUserId}/rls-signed-url-probe.webp`;
-    // The bucket restricts allowed_mime_types (0007_storage.sql) -- an
-    // untyped Blob upload would be rejected on that alone, which would prove
-    // nothing about the policy this test exists to check.
+    // The bucket restricts allowed_mime_types; an untyped Blob would be
+    // rejected on that alone, proving nothing about the policy under test.
     const { error: uploadError } = await apiAs(otherToken)
       .storage.from('item-images')
       .upload(path, new Blob(['probe'], { type: 'image/webp' }));
@@ -403,8 +381,6 @@ test.describe('one collection cannot reach another', () => {
     }
   });
 
-  // Items are refused on both update and delete (above); categories and the
-  // item_categories mapping were only ever asked the read question.
   test('their category cannot be renamed or deleted', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, otherToken } = context();
@@ -439,12 +415,10 @@ test.describe('one collection cannot reach another', () => {
   });
 });
 
-// Sharing (0011_category_shares.sql, 0012_shared_photos.sql, #483/#531) is
-// the one place this file's boundary runs the other way: not "can a
-// stranger reach my collection" but "can the person I deliberately let in
-// reach exactly as far as I said, and no further." Münzen is otherwise a
-// read-only fixture across the whole suite, so each test creates and tears
-// down its own grant rather than relying on one left in place by another.
+// Sharing runs this file's boundary the other way: not "can a stranger reach
+// my collection" but "can someone deliberately let in reach exactly as far as
+// granted, and no further." Münzen is a read-only fixture elsewhere in the
+// suite, so each test creates and tears down its own grant.
 test.describe('a category shared with another collector', () => {
   test('an active grant opens the category, its items, and their links -- nothing more', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
@@ -473,9 +447,7 @@ test.describe('a category shared with another collector', () => {
         .eq('category_id', categoryId);
       expect(links!.length).toBe(itemsIn('Münzen').length);
 
-      // A second, unshared category of the same owner stays out of reach --
-      // the grant is scoped to the one category, not to the owner as a
-      // whole.
+      // The grant is scoped to this one category, not to the owner as a whole.
       const { data: unshared } = await apiAs(otherToken)
         .from('categories')
         .select('id')
@@ -493,10 +465,8 @@ test.describe('a category shared with another collector', () => {
     const categoryId = await mineCategoryId(token, userId, 'Münzen');
 
     // The check constraint only demands expires_at > created_at, not that
-    // either sits in the future -- so a grant that was already over the
-    // moment it was written is a legal row, and the sharper question is
-    // whether the access policies re-check the clock or only the row's own
-    // shape.
+    // either sits in the future, so an already-expired grant is a legal row;
+    // this checks whether the policy re-checks the clock.
     const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     const expiresAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const shareId = await share(token, categoryId, SEED.other.email, {
@@ -536,11 +506,9 @@ test.describe('a category shared with another collector', () => {
     }
   });
 
-  // 0011/0012 add select and nothing else -- the grant is meant to be
-  // view-only. Asserted directly rather than assumed from the absence of an
-  // insert/update/delete policy, the same reasoning as the owner-side write
-  // tests above: a permissive policy added anywhere else in the chain would
-  // pass silently if this only checked that reads worked.
+  // The grant is meant to be view-only. Asserted directly rather than
+  // assumed from the absence of a write policy, so a permissive policy added
+  // elsewhere in the chain can't pass silently.
   test('the grant does not extend to writing', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, userId, otherToken } = context();
@@ -580,9 +548,9 @@ test.describe('a category shared with another collector', () => {
     }
   });
 
-  // Photos extend the same grant one hop further (0012): through
-  // item_categories, not through the object's own owner-prefixed path, which
-  // never contains the grantee's uid at all.
+  // Photos extend the grant one hop further, through item_categories, not
+  // through the object's own owner-prefixed path (which never contains the
+  // grantee's uid).
   test('a shared photograph can be read through the grant, and stops the moment it is revoked', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, userId, otherToken } = context();
@@ -624,11 +592,10 @@ test.describe('a category shared with another collector', () => {
     }
   });
 
-  // The images table's own select policy (0013_images.sql) joins through
-  // item_categories/category_shares directly, rather than parsing an
-  // itemId back out of a path the way storage.objects' equivalent policy
-  // has to -- a native item_id column carries it already. Same grant,
-  // same revocation, checked against the row instead of the bytes.
+  // The images table's select policy joins through item_categories directly
+  // via its own item_id column, rather than parsing one back out of a path
+  // the way storage.objects has to. Same grant and revocation, checked
+  // against the row instead of the bytes.
   test('a shared photograph record can be read through the grant, and stops the moment it is revoked', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, userId, otherToken } = context();

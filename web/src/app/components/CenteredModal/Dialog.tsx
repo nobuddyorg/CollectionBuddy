@@ -17,8 +17,8 @@ export function Dialog({
 }: {
   open: boolean;
   title: string;
-  /** Rendered above `children`, and wired to `aria-describedby` -- for
-   *  content (a confirm's question) that isn't just the dialog's label. */
+  /** Rendered above `children` and wired to `aria-describedby`, for content
+   *  that isn't just the dialog's label (e.g. a confirm's question). */
   description?: string;
   closeLabel?: string;
   onClose: () => void;
@@ -28,9 +28,9 @@ export function Dialog({
   role?: 'dialog' | 'alertdialog';
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
-  // A constant id breaks the moment two CenteredModals are mounted at once
-  // (a confirm raised from inside another modal) -- every aria-labelledby
-  // reference would resolve to whichever dialog mounted first.
+  // A constant id breaks once two CenteredModals are mounted at once (a
+  // confirm raised from inside another modal): aria-labelledby would
+  // resolve to whichever dialog mounted first.
   const titleId = useId();
   const descriptionId = useId();
 
@@ -69,9 +69,8 @@ export function Dialog({
             <Icon icon={IconType.Close} className="w-5 h-5" />
           </button>
         </div>
-        {/* Fullscreen drops the padding and lets the body claim the
-            remaining height, so content sized to 100% (the map) fills the
-            screen rather than collapsing to nothing. */}
+        {/* Fullscreen drops the padding so content sized to 100% (the map)
+            fills the screen rather than collapsing to nothing. */}
         <div
           className={
             size === 'full'

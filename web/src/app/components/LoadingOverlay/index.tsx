@@ -6,10 +6,9 @@ import { useI18n } from '../../i18n/useI18n';
 
 type LoadingOverlayProps = {
   label: string;
-  // 'dark' is a hardcoded black scrim/white text, for overlays meant to
-  // read as a distinct layer over real page content. 'auto' follows the
-  // app's own background/foreground tokens, for overlays (like the
-  // session checks) that are the only thing on screen.
+  // 'dark' is a black scrim for overlays over real page content. 'auto'
+  // follows the app's own tokens, for overlays that are the only thing on
+  // screen.
   theme?: 'dark' | 'auto';
 };
 
@@ -23,10 +22,8 @@ export default function LoadingOverlay({
   const { t } = useI18n();
   const [slow, setSlow] = useState(false);
 
-  // Subscribes state to an external timer -- the canonical use of an effect.
-  // The synchronous reset covers `label` changing while already slow (a new
-  // wait starting without the overlay unmounting), so the message doesn't
-  // stay stuck in the "slow" state for the new wait's first 8s.
+  // Resets synchronously so a new wait starting while already slow (label
+  // changed, overlay didn't unmount) doesn't stay stuck in "slow" state.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSlow(false);

@@ -6,11 +6,9 @@ const source = readFileSync(
   'utf8',
 );
 
-// The service worker (#333) runs outside any bundler -- a plain script
-// GitHub Pages serves as-is, with no import path back into this suite. Its
-// two decision functions take nothing but plain strings, though, so
-// they're pulled out of the raw source and evaluated in isolation here
-// rather than left to a browser to prove.
+// sw.js runs outside any bundler as a plain script, with no import path
+// back into this suite, so its two decision functions are pulled out of
+// the raw source and evaluated in isolation here.
 function extractFunction(name: string): string {
   const start = source.indexOf(`function ${name}(`);
   if (start === -1) throw new Error(`${name} not found in sw.js`);
@@ -75,11 +73,9 @@ describe('the fetch handler', () => {
     expect(source).toContain("request.method !== 'GET'");
   });
 
-  // #333 explicitly excludes Supabase from caching: PostgREST/Auth
-  // responses must never be served stale, and Storage's signed photograph
-  // URLs expire in an hour (data/images.ts), so caching one by its own
-  // address would fill the cache with entries already dead. There is no
-  // Supabase-specific allowlist to keep in sync with that host, though --
+  // Supabase must be excluded from caching: PostgREST/Auth responses must
+  // never be served stale, and Storage's signed URLs expire in an hour
+  // (data/images.ts). There's no Supabase-specific allowlist for that --
   // this same-origin check excludes every cross-origin request outright,
   // and every Supabase call is cross-origin by construction.
   it('never intercepts a cross-origin request, which is what excludes Supabase', () => {

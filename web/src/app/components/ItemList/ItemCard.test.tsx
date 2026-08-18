@@ -44,9 +44,8 @@ function renderCard(
 
 describe('ItemCard', () => {
   beforeEach(() => {
-    // I18nProvider falls back to navigator.language ('en-US' in jsdom) on
-    // mount unless a stored preference says otherwise; pin it so the
-    // labels below don't depend on that incidental default.
+    // Pins the locale so the labels below don't depend on jsdom's
+    // navigator.language default.
     window.localStorage.setItem('lang', 'en');
   });
 
@@ -77,8 +76,7 @@ describe('ItemCard', () => {
   });
 
   // Regression: entry actions used to float as bare icons over the photo,
-  // colliding with the image's own delete control. They now sit in the
-  // label area and name what they act on.
+  // colliding with the image's own delete control.
   it('names the entry-level delete so it cannot be read as the image one', () => {
     renderCard();
     expect(
@@ -103,9 +101,6 @@ describe('ItemCard', () => {
     expect(handlers.onDeleteItem).toHaveBeenCalledOnce();
   });
 
-  // Cards with no photograph used to open straight onto the caption, so a
-  // scrolling stack of them had no repeating shape to break on. They now
-  // lead with an empty mount that holds the same frame a photo would.
   it('leads an unphotographed entry with an empty mount', () => {
     render(
       <I18nProvider>
@@ -124,10 +119,6 @@ describe('ItemCard', () => {
     expect(screen.getByText('No images')).toBeVisible();
   });
 
-  // The action row is identical on every card, so an unphotographed one
-  // carries both the mount's own call to action and the row control. Two
-  // ways into the same picker is fine; two *different-looking* action rows
-  // depending on whether an entry has been photographed is not.
   it('keeps the same action row whether or not the entry has photos', () => {
     renderCard();
     // The mount's own call to action, plus the row control.
@@ -138,15 +129,14 @@ describe('ItemCard', () => {
 
   it('offers the row control alone once the entry has a photo', () => {
     renderCard({}, { imgs: [{ id: 'a', pathFull: 'a', urlFull: 'a.jpg' }] });
-    // The caption -- and the row control living in it -- waits for the
-    // hero plate to settle (#556).
+    // The caption, and the row control living in it, wait for the hero
+    // plate to settle.
     fireEvent.load(screen.getByRole('img'));
     expect(screen.getAllByTitle('Add image')).toHaveLength(1);
   });
 
-  // Regression: the mount is the *resolved* empty state. Showing it while
-  // the signed URLs are still in flight flashes "no images" on an entry
-  // that has them, then swaps it for a photograph.
+  // The mount is the *resolved* empty state; showing it while signed URLs
+  // are still in flight would flash "no images" on an entry that has them.
   it('waits for the image listing before declaring an entry empty', () => {
     render(
       <I18nProvider>
@@ -166,22 +156,14 @@ describe('ItemCard', () => {
     expect(screen.queryByText('No images')).not.toBeInTheDocument();
   });
 
-  // An upload takes seconds -- compression, then two objects over the
-  // wire. The entry showed nothing of that beyond a spinner on a button,
-  // so the photograph arrived by shoving the caption down, and a second
-  // tap on "add" was the only way to check the first had registered.
   it('holds a frame for a photograph that is still being uploaded', () => {
     renderCard({}, { pendingUploads: 1 });
     expect(
       screen.getByRole('status', { name: 'Uploading image…' }),
     ).toBeInTheDocument();
-    // Not the empty mount: inviting a photograph is the wrong thing to say
-    // to someone who has just handed one over.
     expect(screen.queryByText('No images')).not.toBeInTheDocument();
   });
 
-  // #556: the caption used to render alongside the photo plate, so a card
-  // showed its title before the photograph behind it had actually painted.
   it('holds the caption back until the hero photograph has settled', () => {
     renderCard({}, { imgs: [{ id: 'a', pathFull: 'a', urlFull: 'a.jpg' }] });
     expect(
@@ -211,10 +193,8 @@ describe('ItemCard', () => {
     ).toBeInTheDocument();
   });
 
-  // Regression: the file input was hidden with `display: none`, which pulls
-  // it out of the tab order entirely -- the label wrapping it is never a
-  // tab stop either. That left "Add image" reachable by mouse or touch
-  // only, with no other way to attach a photograph.
+  // Regression: `display: none` pulled the file input out of the tab order
+  // entirely, leaving "Add image" reachable by mouse or touch only.
   it('keeps the add-image controls reachable by keyboard', async () => {
     renderCard();
     const inputs = screen.getAllByTestId('upload-photo');
@@ -244,11 +224,10 @@ describe('ItemCard', () => {
   });
 });
 
-// Regression for #369: `deletingPath` is one Set shared by every card, so
-// deleting a photo on one card gives every other card's props a new Set
-// identity too. Without scoping the comparison to this card's own images,
-// that identity change alone would fail a naive reference-equality memo
-// check and force every card on the page to re-render.
+// `deletingPath` is one Set shared by every card, so deleting a photo on
+// one card gives every other card's props a new Set identity too. Without
+// scoping the comparison to this card's own images, a naive
+// reference-equality memo check would re-render every card on the page.
 describe('itemCardPropsAreEqual', () => {
   const imgs: ImgEntry[] = [
     { id: 'a', pathFull: 'u/1/a.webp', urlFull: 'a.jpg' },

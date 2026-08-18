@@ -6,11 +6,6 @@ import { supabase } from './supabase';
 import { useSession } from './useSession';
 import type { Session, User } from '@supabase/supabase-js';
 
-// #340: useSession decides whether a visitor is signed in, and the comment
-// at its own top (getSession over getUser, for first-paint speed) trades
-// revalidation for local trust -- which makes onAuthStateChange's null path
-// the *only* thing that catches a stale session. None of it had a test.
-
 type GetSessionResult = Awaited<ReturnType<typeof supabase.auth.getSession>>;
 type AuthChangeHandler = Parameters<typeof supabase.auth.onAuthStateChange>[0];
 
@@ -27,9 +22,8 @@ function sessionWith(user: User): Session {
   return { user } as Session;
 }
 
-// The real onAuthStateChange returns a subscription object; captured here so
-// a test can fire the callback itself, the way a sign-out or a token expiry
-// would.
+// Captures the handler so a test can fire it directly, as sign-out or
+// token expiry would.
 function mockAuthStateChange() {
   const unsubscribe = vi.fn();
   let handler: AuthChangeHandler | null = null;
@@ -107,9 +101,6 @@ describe('useSession', () => {
     });
   });
 
-  // A non-string user_metadata.name (absent, or some other provider's shape)
-  // must not be trusted as-is -- sessionUserFrom narrows it explicitly
-  // rather than casting whatever Google's response happened to contain.
   it('discards a non-string name rather than passing it through', async () => {
     vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
       data: {
@@ -128,9 +119,8 @@ describe('useSession', () => {
     expect(result.current.user?.name).toBeNull();
   });
 
-  // The one path the getSession-over-getUser tradeoff leaves to catch a
-  // stale session: sign-out and token expiry both surface as
-  // onAuthStateChange firing with session: null.
+  // Sign-out and token expiry both surface as onAuthStateChange firing
+  // with session: null.
   it('clears the user when onAuthStateChange later fires with no session', async () => {
     vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
       data: { session: sessionWith(userWith()) },
@@ -162,9 +152,8 @@ describe('useSession', () => {
     expect(result.current.user?.id).toBe('user-4');
   });
 
-  // Unmounting before getSession resolves must not update state React can no
-  // longer own -- the `active` guard is what stands between this and a
-  // "state update on an unmounted component" warning.
+  // The `active` guard is what stops a getSession that resolves after
+  // unmount from updating state React no longer owns.
   it('does not update state from a getSession that resolves after unmount', async () => {
     const consoleError = vi
       .spyOn(console, 'error')

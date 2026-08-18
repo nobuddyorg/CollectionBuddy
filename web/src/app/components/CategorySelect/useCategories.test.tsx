@@ -42,15 +42,11 @@ const IMAGE_ROWS = [
   { item_id: 'i2', path_full: 'u/i2/b.webp', path_thumb: 'u/i2/b.thumb.webp' },
 ];
 
-// Regression (#306): the category delete used to remove every orphaned
-// item's photographs *before* deleting the category row. A failed row
-// delete (offline, 5xx) then left the category and its entries in place --
-// with every photograph already, and irrecoverably, gone. Same shape as
-// #C1 (item delete), fixed the same way: the row/cascade goes first, and
-// storage bytes are only ever touched once that has actually succeeded.
-// Reading the paths ahead of the row delete is a separate concern -- it's a
-// read, not a mutation, so it's safe to run regardless of what the row
-// delete goes on to do (see the "leaves every photograph untouched" test).
+// The row/cascade must delete first; storage bytes are only touched once
+// that has actually succeeded -- otherwise a failed row delete (offline,
+// 5xx) could leave the category in place with its photographs already,
+// irrecoverably, gone. Reading the paths ahead of the row delete is safe
+// regardless, since it's a read, not a mutation.
 describe('useCategories deleteCategory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -104,8 +100,7 @@ describe('useCategories deleteCategory', () => {
     expect(removeImageObjects).toHaveBeenCalledTimes(2);
 
     // The row delete is the first thing to actually mutate anything --
-    // every byte removal is ordered strictly after it. Reading the paths is
-    // not a mutation, so it's the one thing allowed to run before.
+    // every byte removal is ordered strictly after it.
     const readOrder = vi.mocked(listImagePathsForItems).mock
       .invocationCallOrder[0];
     const rowOrder = vi.mocked(deleteCategoryRow).mock.invocationCallOrder[0];
@@ -117,10 +112,6 @@ describe('useCategories deleteCategory', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  // The old design resolved a uid once and reused it for every orphaned
-  // item's storage.list() call (#385); this table-backed design has no uid
-  // to resolve at all -- one batched query for every orphaned item's paths
-  // replaces what used to be N Storage round trips.
   it("reads every orphaned item's image paths in one batched query, not once per item", async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     const { result } = renderHook(() => useCategories(), { wrapper });
@@ -200,14 +191,11 @@ describe('useCategories deleteCategory', () => {
     ]);
   });
 
-  // #341: every test above sets listItemIdsLinkedElsewhere to return
-  // nothing, so every one of them exercises "every item this category held
-  // is orphaned" and none of them exercise the actual branch that keep/
-  // filter arithmetic exists for -- an item linked to a second category,
-  // which the cascade leaves alone and must not have its photographs
-  // removed. Wrong here reads as "wrong is invisible": no error, just an
-  // untouched item's photographs quietly deleted, or an orphan's silently
-  // kept forever.
+  // Every test above sets listItemIdsLinkedElsewhere to return nothing, so
+  // none of them exercise the branch the keep/filter arithmetic exists
+  // for -- an item linked to a second category, which the cascade leaves
+  // alone. Wrong here is invisible: no error, just a photograph silently
+  // deleted or kept when it shouldn't be.
   it('cleans up only the items the deletion actually orphaned, leaving one still linked elsewhere untouched', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     vi.mocked(listItemIdsForCategory).mockResolvedValue({
@@ -238,11 +226,9 @@ describe('useCategories deleteCategory', () => {
     expect(removeImageObjects).toHaveBeenCalledTimes(1);
   });
 
-  // #409: pagination can only guarantee a *successful* answer is complete --
-  // an incomplete one (an error mid-page, a chunk that failed) must still
-  // stop the deletion rather than being treated as "nothing else links
-  // these items". Aborting here means the category row itself must survive,
-  // not just the photograph cleanup.
+  // An incomplete answer (error mid-page, a failed chunk) must still stop
+  // the deletion, including the category row itself, rather than being
+  // treated as "nothing else links these items".
   it('aborts the entire deletion, including the category row, when the linked-elsewhere check fails', async () => {
     vi.mocked(listItemIdsLinkedElsewhere).mockResolvedValue({
       data: null,

@@ -64,8 +64,8 @@ describe('slugify', () => {
   });
 
   it('never ends on the separator the cap cut it at', () => {
-    // 'ab ' repeated puts a separator on exactly the 60th character, so
-    // the cut lands mid-word and leaves one dangling.
+    // 'ab ' repeated puts a separator on the 60th character, so the cut
+    // lands mid-word and leaves one dangling.
     const slug = slugify('ab '.repeat(40));
     expect(slug).toBe('ab-'.repeat(19) + 'ab');
     expect(slug).toHaveLength(59);
@@ -112,13 +112,9 @@ describe('extensionOf', () => {
     expect(extensionOf('uid/some.dir/abc')).toBe('.bin');
   });
 
-  // Folder names are slugified to [a-z0-9-], but the extension used to be
-  // copied verbatim off the storage object name into the archive path.
-  // Not exploitable as found -- this app only ever uploads
-  // `<uuid>.webp`/`.thumb.webp`, and storage RLS keys every verb on the
-  // uid prefix -- but a backslash in an entry path is a path separator to
-  // Windows Explorer's extractor, and quotes/trailing dots make the file
-  // fail to extract there even without one.
+  // A backslash in an entry path is a path separator to Windows Explorer's
+  // extractor, and quotes/trailing dots make the file fail to extract even
+  // without one.
   it('falls back for an extension containing a path separator', () => {
     expect(extensionOf('uid/item/x.a\\..\\evil')).toBe('.bin');
   });
@@ -168,9 +164,6 @@ describe('exportEntries', () => {
     ]);
   });
 
-  // #421: each photo carries its own storage path and archive path
-  // together, built once here, rather than two arrays a caller has to zip
-  // back up by index -- so there is no positional invariant left to break.
   it('pairs each photograph with the exact storage path it came from', () => {
     const entries = exportEntries(
       [item({ id: 'a' })],
@@ -192,8 +185,6 @@ describe('exportEntries', () => {
     );
     expect(entries[0].folder).not.toBe(entries[1].folder);
     expect(entries.map((e) => e.folder)).toEqual(['001-coin', '002-coin']);
-    // The whole point of the numbering: neither item's photograph can land
-    // on top of the other's.
     expect(entries[0].photos[0].archivePath).not.toBe(
       entries[1].photos[0].archivePath,
     );
@@ -233,9 +224,8 @@ describe('buildManifest', () => {
       entries: [],
       exportedAt,
     });
-    // Spelled out rather than compared to the constant: this string is
-    // what a future importer would key off, so a test that only says "it
-    // equals whatever it is" would let it be renamed silently.
+    // Spelled out, not just compared to the constant: a future importer
+    // keys off this exact string, so a rename here must break this test.
     expect(manifest.format).toBe('collectionbuddy-category-export');
     expect(manifest.format).toBe(EXPORT_FORMAT);
     expect(manifest.version).toBe(1);
@@ -265,8 +255,6 @@ describe('buildManifest', () => {
       exportedAt,
     }).items;
 
-    // Numbers stay numbers and tags stay a list -- the two things the CSV
-    // has to flatten and this file exists not to.
     expect(row.place_lat).toBe(50.9);
     expect(row.tags).toEqual(['silver', 'us']);
     expect(row.id).toBe('a');
@@ -314,8 +302,6 @@ describe('csvCell', () => {
   });
 
   it('defuses a value a spreadsheet would run as a formula', () => {
-    // The app stores what the user typed; handing it to Excel as something
-    // to evaluate is the injection this guard exists for.
     expect(csvCell('=1+1')).toBe("'=1+1");
     expect(csvCell('+49 221')).toBe("'+49 221");
     expect(csvCell('-5')).toBe("'-5");
@@ -402,10 +388,9 @@ describe('buildCsv', () => {
   });
 
   // Regression: the formula-injection guard matches a leading `-`, which is
-  // also how every negative number starts. Applied to a coordinate cell
-  // rather than only to user-authored text, it quoted every southern
-  // latitude and western longitude as `'-33.8688` -- text a spreadsheet (or
-  // a re-import) can't read back as a number (#413).
+  // also how every negative number starts. Applied to a coordinate cell, it
+  // quoted every southern/western coordinate as text a re-import couldn't
+  // read back as a number.
   it('writes a southern/western coordinate as a plain number, not a quoted formula guard', () => {
     const entries = exportEntries(
       [
@@ -450,8 +435,8 @@ describe('localDateStamp', () => {
   });
 
   it('reads the date the exporter is having, not the one in UTC', () => {
-    // Late enough in the day that any timezone west of UTC would otherwise
-    // stamp this file with yesterday.
+    // Late enough that a timezone west of UTC would otherwise stamp
+    // yesterday.
     expect(localDateStamp(new Date(2026, 7, 6, 23, 30))).toBe('2026-08-06');
   });
 });
@@ -476,13 +461,6 @@ describe('archiveName', () => {
   });
 });
 
-// #422: the module doc and both commit messages show every entry inside one
-// top-level directory, but the implementation wrote collection.json,
-// collection.csv and photos/ straight at the ZIP root -- fine for an
-// extractor that auto-wraps (macOS Archive Utility, Windows "Extract All"),
-// but CLI `unzip`/7-Zip "extract here" scatter the three entries into
-// whatever directory they're run in, and two exports extracted into the
-// same place overwrite each other's manifest and spreadsheet.
 describe('archiveRootFolder', () => {
   it('names the one directory every entry lives under, the same way the download is named', () => {
     const exportedAt = new Date(2026, 7, 6);

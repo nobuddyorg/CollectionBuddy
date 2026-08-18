@@ -2,9 +2,8 @@
 
 import { Spinner } from '../ui/Spinner';
 
-// Always a labelled button. This used to render as a bare "+" icon in the
-// create and edit modals, which gave no indication of what confirming
-// would do -- an action should say exactly what happens when it is used.
+// Always shows its label; a bare icon gave no indication of what confirming
+// would do.
 export function Submit({
   submitting,
   disabled,

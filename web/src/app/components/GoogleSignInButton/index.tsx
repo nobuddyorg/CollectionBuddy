@@ -21,11 +21,10 @@ export default function GoogleSignInButton({
 
   const label = t('google_sign_in_button.sign_in_with_google');
 
-  // `loading` is deliberately never cleared on success -- the redirect is
-  // meant to unmount this page. But a bfcache restore (the user presses Back
-  // from Google's consent screen) resurrects that stale `loading: true` with
-  // no redirect coming, leaving the full-screen overlay stuck with no way to
-  // dismiss it. `pageshow`'s `persisted` flag is exactly that signal.
+  // `loading` is never cleared on success -- the redirect unmounts this
+  // page. A bfcache restore (Back from Google's consent screen) resurrects
+  // that stale `loading: true` with no redirect coming, so `pageshow`'s
+  // `persisted` flag is what clears the stuck overlay.
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) setLoading(false);

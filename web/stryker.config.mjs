@@ -18,11 +18,9 @@ const config = {
   dashboard: {
     reportType: 'full',
   },
-  // Stryker copies the project into a sandbox before mutating it, and a
-  // symlink is not a file it can copy -- so the directory the end-to-end
-  // server builds to put out/ under the base path has to be excluded, or a
-  // mutation run started while that server is up dies on ENOTSUP. The rest is
-  // output nobody needs a copy of.
+  // Stryker copies the project into a sandbox before mutating it, and can't
+  // copy a symlink -- the e2e server's out/ symlink has to be excluded or a
+  // run started while that server is up dies on ENOTSUP.
   ignorePatterns: [
     '.e2e-serve',
     'out',

@@ -22,9 +22,6 @@ describe('TextRing', () => {
     expect(container.querySelector('text')).toHaveAttribute('opacity', '0.5');
   });
 
-  // Regression: without a textLength the string ran past the end of the rim
-  // path and wrapped over its own start, clipping the overlap mid-glyph and
-  // leaving a stray half-letter engraved on the coin.
   it('fits the text to exactly one turn of the rim', () => {
     const { container } = render(
       <TextRing

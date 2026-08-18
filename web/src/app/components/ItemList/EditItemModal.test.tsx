@@ -35,10 +35,9 @@ function renderModal(onOpenChange = vi.fn()) {
   return { onOpenChange };
 }
 
-// #308: a stray backdrop tap or Escape used to drop an edit with no prompt.
-// The dialog's own X and the form's Cancel button funnel through the same
-// guard, so all four are covered by exercising Escape (easiest to fire in
-// jsdom) and the Cancel button directly.
+// A stray backdrop tap or Escape used to drop an edit with no prompt. The
+// dialog's X and the form's Cancel button funnel through the same guard, so
+// exercising Escape and Cancel here covers all four dismissal paths.
 describe('EditItemModal — discarding unsaved changes', () => {
   it('closes immediately on Escape when the form has not been touched', async () => {
     const user = userEvent.setup();

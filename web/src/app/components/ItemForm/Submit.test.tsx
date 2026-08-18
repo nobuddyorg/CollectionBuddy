@@ -13,8 +13,6 @@ describe('Submit', () => {
     );
   });
 
-  // Regression: this used to render as a bare "+" icon in the create and
-  // edit modals, giving no indication of what confirming would do.
   it('always shows its label rather than a bare glyph', () => {
     render(<Submit submitting={false} disabled={false} label="Save" />);
     const button = screen.getByRole('button', { name: 'Save' });

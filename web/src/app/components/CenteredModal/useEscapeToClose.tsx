@@ -6,9 +6,9 @@ export function useEscapeToClose(enabled: boolean, onClose: () => void) {
   useEffect(() => {
     if (!enabled) return;
     const onKey = (e: KeyboardEvent) => {
-      // A nested widget (the place autocomplete's suggestion menu) may
-      // already have handled its own Escape and called preventDefault() to
-      // say so -- that keystroke is not meant to close the modal around it.
+      // A nested widget (e.g. the place autocomplete) may already have
+      // handled its own Escape via preventDefault(); that keystroke isn't
+      // meant to close the modal around it.
       if (e.key === 'Escape' && !e.defaultPrevented) onClose();
     };
     window.addEventListener('keydown', onKey);

@@ -12,19 +12,17 @@ import type { ItemLite } from './types';
 // See ItemCreate/index.tsx: same form, same reason to split it out.
 const ItemForm = dynamic(() => import('../ItemForm'), { ssr: false });
 
-// The entry passed in is a snapshot taken when the card's edit button was
-// pressed, not a live lookup by id -- so what the form opens onto cannot
-// shift out from under the user if the underlying list changes while the
-// modal is up.
+// The entry is a snapshot taken when edit was pressed, not a live lookup by
+// id, so the form can't shift under the user if the list changes while the
+// modal is open.
 function valuesFor(item: ItemLite | null): ItemFormValues {
   if (!item) return EMPTY_ITEM_FORM_VALUES;
   return {
     title: item.title,
     description: item.description ?? '',
     place: item.place ?? '',
-    // Round-tripped rather than dropped: the form only replaces these when
-    // the place field itself is edited, so an item edited for any other
-    // reason keeps the pin it already had.
+    // Round-tripped rather than dropped: only replaced when the place field
+    // itself is edited, so other edits keep the existing pin.
     place_lat: item.place_lat,
     place_lng: item.place_lng,
     tags: item.tags ?? [],
@@ -48,10 +46,9 @@ export function EditItemModal({
   const confirm = useConfirm();
   const [isDirty, setIsDirty] = useState(false);
 
-  // The single path every dismissal goes through -- backdrop tap, Escape,
-  // the dialog's own X, and the form's Cancel button all resolve to this
-  // (see the wiring below), so a stray tap doesn't lose an edit any more
-  // easily than tapping Cancel on purpose would (#308).
+  // Single path every dismissal goes through (backdrop, Escape, dialog X,
+  // Cancel), so a stray tap can't lose an edit any more easily than
+  // deliberate Cancel would.
   const guardedClose = useCallback(() => {
     if (!isDirty) {
       onOpenChange(false);

@@ -13,15 +13,12 @@ import { fanOffsetX, fanOffsetY, fanPositions } from './collectibleFan';
 import { useAuthRedirect } from './useAuthRedirect';
 import { useGoogleSignIn } from './useGoogleSignIn';
 
-// A fixed, curated set rather than a random pull from a larger pool: the
-// same seven objects greet a visitor every time, so the medallion reads as
-// a considered display case rather than a slot machine.
 const EMOJIS = ['🪙', '📮', '🎟️', '🐚', '🎖️', '🧩', '📀'] as const;
 
 const COIN_SIZE = 420;
 
-// Published to the fan as a custom property, so the chips are laid out in
-// units of the coin they have to clear.
+// Sets --coin-size, which fanPositions/fanOffsetX/fanOffsetY read to size
+// chip offsets relative to the coin.
 const COIN_BOX = {
   ['--coin-size']: coinSizeCss(COIN_SIZE),
 } as CSSProperties;
@@ -42,9 +39,6 @@ export default function LoginPage() {
 
   return (
     <main className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden px-6 bg-background text-foreground pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-      {/* "Collection" is underscored in ink and "Buddy" carries the accent,
-          so the two halves of the name read as two things joined -- the
-          catalogue and the companion. */}
       <h1 className="font-display text-4xl sm:text-5xl mb-3 text-center">
         <span className="border-b-[3px] border-foreground pb-0.5">
           {t('brand.collection')}
@@ -56,12 +50,8 @@ export default function LoginPage() {
         {t('page.footer')}
       </p>
 
-      {/* The engraved medallion is the one piece of ornament on the page,
-          and the sign-in sits at its centre -- the single thing to do.
-          The chips are positioned against this box rather than against the
-          page, so "around the coin" is measured from the coin: centred on
-          the page, they orbited a point the medallion had drifted away
-          from and settled on top of it. */}
+      {/* Chips are positioned against this box, not the page, so their
+          offsets stay relative to the coin wherever it drifts on screen. */}
       <div className="relative" style={COIN_BOX}>
         <Coin
           size={COIN_SIZE}

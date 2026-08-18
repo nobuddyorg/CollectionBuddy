@@ -1,8 +1,7 @@
 // offsetParent/getClientRects reflect real layout, which jsdom (this
-// project's test environment) never computes -- both come back empty for
-// every element regardless of visibility, so a layout-based filter is
-// untestable here. getComputedStyle needs no layout pass to resolve
-// display/visibility, so it works the same under jsdom and a real browser.
+// project's test environment) never computes, so a layout-based filter is
+// untestable here. getComputedStyle needs no layout pass, so it works the
+// same under jsdom and a real browser.
 function isVisible(el: HTMLElement): boolean {
   if (el.hidden) return false;
   const style = window.getComputedStyle(el);

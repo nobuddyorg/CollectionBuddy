@@ -17,23 +17,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The database is deployed before the bundle that depends on it, because
-  # that is the only order that can't break the live site: a frontend
-  # referencing a column the database doesn't have yet makes PostgREST
-  # reject the query outright. Nothing downstream runs if this fails, so a
-  # rejected migration leaves the old (working) bundle deployed against the
-  # old schema rather than a new one against a schema it doesn't match.
+  # The database is deployed before the bundle that depends on it: a
+  # frontend referencing a column the database doesn't have yet makes
+  # PostgREST reject the query outright, and nothing downstream runs if
+  # this fails, so a rejected migration leaves the old bundle deployed
+  # against the old schema.
   #
-  # This job exists because the alternative -- applying migrations by hand
-  # -- silently stopped happening: 0009 through 0014 sat unapplied in
-  # production for months while the repo and its docs described them as
-  # live, including the storage restrictions in 0009.
-  #
-  # Note the workflow-level `cancel-in-progress` above can cancel this
-  # mid-push. That is survivable rather than good: each migration file is
-  # its own transaction and is recorded as it lands, so an interrupted push
-  # leaves a prefix applied and the rest pending, which the next run
-  # continues. It cannot leave a half-applied file behind.
+  # The workflow-level `cancel-in-progress` above can cancel this mid-push.
+  # Survivable, not good: each migration is its own transaction, so an
+  # interrupted push leaves a prefix applied and the rest pending for the
+  # next run -- never a half-applied file.
   migrate:
     runs-on: ubuntu-latest
     steps:
@@ -43,26 +36,20 @@ jobs:
 
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3
         with:
-          # Pinned deliberately: this is the version the migration chain was
-          # verified against, and an unattended `db push` against production
-          # is not the place to discover a CLI behaviour change.
+          # Pinned: an unattended `db push` against production is not the
+          # place to discover a CLI behaviour change.
           version: 2.110.0
 
-      # `supabase link` + `--linked` is the documented path and it does not
-      # work here: link reports success but leaves no usable connection
-      # behind, and the push then resolves db.<ref>.supabase.co, which has
-      # only an AAAA record. GitHub runners have no IPv6, so the first real
-      # run of this job died on "IPv6 is not supported on your current
-      # network" -- pointing at `supabase link` as the fix, having just run
-      # it. The session pooler is reachable over IPv4, so the connection is
-      # given explicitly instead of being discovered.
+      # `supabase link` + `--linked` doesn't work here: the push then
+      # resolves db.<ref>.supabase.co, which has only an AAAA record, and
+      # GitHub runners have no IPv6. The session pooler is reachable over
+      # IPv4, so the connection is given explicitly instead.
       #
-      # The whole URL is one secret rather than assembled here from a
-      # password: it keeps GitHub's log masking over the credential (a
-      # string composed in a step is not masked), and the password needs
-      # percent-encoding that YAML is the wrong place to be doing.
-      # Dry run first, so the log names what is about to be applied even on
-      # the runs where the push itself turns out to be a no-op.
+      # The whole URL is one secret, not assembled from a password here,
+      # so GitHub's log masking covers it (a composed string isn't masked)
+      # and the password's percent-encoding isn't YAML's problem.
+      # Dry run first, so the log names what's about to apply even on a
+      # no-op push.
       - name: Show pending migrations
         run: supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
         env:
@@ -73,20 +60,16 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
-      # PostgREST answers from a cached copy of the schema, and a migration
-      # that adds a column is invisible to it until that cache is reloaded:
-      # every write naming the new column comes back as PGRST204 "Could not
-      # find the 'x' column of 'items' in the schema cache", which is what
-      # broke adding items after 0015 (#239). Normally a `pgrst_ddl_watch`
-      # event trigger reloads it automatically -- this project has no such
-      # trigger, and cannot be given one, because creating an event trigger
-      # requires superuser and `postgres` here is not one.
+      # PostgREST answers from a cached schema; a migration that adds a
+      # column is invisible until that cache is reloaded. Normally a
+      # `pgrst_ddl_watch` event trigger does this automatically -- this
+      # project has none, since creating one needs superuser and `postgres`
+      # here isn't one.
       #
-      # So the reload is sent by hand, over the management API rather than
-      # the pooler, because NOTIFY needs a session and `supabase db push`
-      # doesn't leave one open. Unconditional: it is cheap, and it is not
-      # worth reasoning about which migrations changed a shape PostgREST
-      # cares about.
+      # Sent by hand, over the management API rather than the pooler
+      # (NOTIFY needs a session `db push` doesn't leave open). Unconditional
+      # since it's cheap and not worth reasoning about which migration
+      # needed it.
       - name: Reload the PostgREST schema cache
         run: |
           curl -sS --fail-with-body -X POST \
@@ -145,16 +128,12 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
 
-  # Runs the end-to-end suite against the *live* deployed site. A successful
-  # build isn't enough proof the site works: prerendering runs in Node with
-  # real env vars, which can mask client code that silently breaks once it's
-  # just a JS bundle in a browser with no Node underneath.
-  #
-  # It is the same suite CI runs against the local export (#246), pointed at
-  # another origin -- so it also catches what only production can get wrong:
-  # a base path that doesn't match, an icon that 404s once deployed, a stale
-  # asset served by the CDN. Everything in it holds for a signed-out visitor,
-  # which is what keeps a run against production read-only.
+  # Runs the end-to-end suite against the *live* deployed site: prerendering
+  # runs in Node with real env vars, which can mask client code that breaks
+  # once it's just a JS bundle in a browser. Same suite as CI's local
+  # export, pointed at another origin -- catches a mismatched base path, a
+  # 404'ing icon, a stale CDN asset. Everything in it holds for a
+  # signed-out visitor, keeping the run against production read-only.
   smoke_test:
     runs-on: ubuntu-latest
     needs: deploy
@@ -174,11 +153,9 @@ jobs:
 
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      # Through the environment rather than expanded into the command line:
-      # `${{ }}` is substituted before the shell ever sees it, so anything
-      # quote-like in the value would be parsed as shell rather than passed
-      # as an argument. E2E_BASE_URL is also what tells the config there is a
-      # deployed site to point at, so it starts no server of its own.
+      # Through the environment, not the command line: `${{ }}` substitutes
+      # before the shell sees it, so a quote-like value would be parsed as
+      # shell. E2E_BASE_URL also tells the config not to start its own server.
       - run: npm run e2e
         env:
           E2E_BASE_URL: ${{ needs.deploy.outputs.page_url }}

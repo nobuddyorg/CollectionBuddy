@@ -32,10 +32,9 @@ type FlattenKeys<T, Prefix extends string = ''> = T extends string
 
 export type TranslationKey = FlattenKeys<typeof en>;
 
-// Resolves a dotted key path against a translation tree. Returns
-// undefined on any miss (unknown segment, or the path bottoms out on a
-// sub-object instead of a string) rather than falling back to the key
-// itself, so callers can decide what a miss means.
+// Returns undefined on any miss -- unknown segment, or a sub-object
+// instead of a string -- rather than the key itself, so callers decide
+// what a miss means.
 export function resolveTranslationKey(
   dict: TranslationValue,
   key: string,
@@ -56,12 +55,9 @@ type I18nContextType = {
   lang: Language;
   setLang: (lang: Language) => void;
   t: (key: TranslationKey) => string;
-  /** Like `t`, but for a `{count}` string that has to agree with `count`
-   *  grammatically -- "1 tag" is a different key (`${baseKey}_one`) from
-   *  "2 tags" (`baseKey` itself), and which one applies isn't just "count
-   *  === 1" once German and English disagree on a locale's plural rule.
-   *  Falls back to `baseKey` for any category without its own `_one`
-   *  variant (German's invariant "1 Treffer"/"2 Treffer", e.g.). */
+  /** Like `t`, but picks `${baseKey}_one` vs `baseKey` by the locale's
+   *  plural rule, not a naive `count === 1`, since German and English
+   *  disagree on it. Falls back to `baseKey` if no `_one` variant exists. */
   tCount: (baseKey: TranslationKey, count: number) => string;
 };
 
@@ -82,47 +78,32 @@ function detectLang(): Language {
     const browserLang = navigator.language.split('-')[0];
     if (browserLang in translations) return browserLang as Language;
   } catch {
-    // localStorage can throw (private browsing, disabled storage) -- the
-    // 'de' default below is exactly what a stored-language miss falls back
-    // to anyway.
+    // localStorage can throw (private browsing, disabled storage); falls
+    // through to the 'de' default below, same as a stored-language miss.
   }
   return 'de';
 }
 
-// useLayoutEffect on the client, a no-op on the server -- this file only
-// ever renders as a client component, but Next.js still executes it once
-// during the static export's prerender, where `useLayoutEffect` would
-// otherwise warn ("does nothing on the server").
+// A no-op on the server: Next still executes this once during the static
+// export's prerender, where useLayoutEffect would otherwise warn.
 const useIsomorphicLayoutEffect =
   typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
-  // Starts at 'de', matching the static export's own prerendered markup --
-  // seeding this from `detectLang()` directly (matching what a non-German
-  // browser will settle on) diverges from that markup on the very first
-  // client render, which is a hydration mismatch, not just a flash: React
-  // logs it and, in the signed-in e2e suite, that failed every test in the
-  // run (error #418). `useIsomorphicLayoutEffect` below still corrects it
-  // before the browser's next paint, same as the pre-paint theme script,
-  // just one render later -- after hydration has already committed once
-  // against markup that matches.
+  // Must start at 'de' to match the static export's prerendered markup --
+  // seeding from detectLang() directly causes a hydration mismatch on the
+  // first client render. useIsomorphicLayoutEffect below corrects it
+  // before the next paint.
   const [lang, setLang] = useState<Language>('de');
-  // t reads lang through this ref instead of depending on it directly, so
-  // its identity stays stable across a language change from the switcher.
-  // Otherwise every callback/effect that lists t (or something derived from
-  // it) as a dependency -- category loading, item creation -- re-fires the
-  // moment someone changes the language.
+  // t reads lang through this ref, not directly, so its identity stays
+  // stable across a language change -- otherwise every callback/effect
+  // depending on it re-fires whenever someone switches language.
   const langRef = useRef(lang);
-  // Written synchronously during render (not in an effect) so `t`, called
-  // by consumers during their own render, never reads a stale `lang` for
-  // the one render cycle before an effect would otherwise have fired.
+  // Written synchronously during render, not in an effect, so `t` never
+  // reads a stale `lang` during that same render cycle.
   // eslint-disable-next-line react-hooks/refs
   langRef.current = lang;
 
-  // Runs before the browser paints the post-hydration frame, so a non-German
-  // visitor still never sees a settled German frame -- only the one the
-  // static export itself painted before any JS ran at all, which no client
-  // fix can reach.
   useIsomorphicLayoutEffect(() => {
     setLang(detectLang());
   }, []);
@@ -132,10 +113,9 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.setItem(LANG_STORAGE_KEY, next);
   }, []);
 
-  // Keeps the document's declared language and description in sync with
-  // the active UI language -- screen readers otherwise pronounce the
-  // other language with the wrong phonetics, and browsers offer to
-  // "translate" a page that's already in the visitor's language.
+  // Keeps <html lang> and the meta description in sync with the active
+  // language -- otherwise screen readers use the wrong phonetics and
+  // browsers offer to "translate" an already-matching page.
   useEffect(() => {
     document.documentElement.lang = lang;
     document

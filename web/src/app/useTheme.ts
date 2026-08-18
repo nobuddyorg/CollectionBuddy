@@ -14,12 +14,10 @@ export const THEME_PREFERENCES: readonly ThemePreference[] = [
 ];
 
 /**
- * What a stored value means. Anything that isn't one of the two explicit
- * choices means "no choice on record" and lands on system -- including the
- * string 'system' itself, which is never written (see setThemePreference:
- * choosing system removes the key rather than storing a third value, so
- * that a visitor who has never touched the control and one who has
- * deliberately gone back to system are the same visitor).
+ * Anything that isn't 'light' or 'dark' lands on 'system', including the
+ * literal string 'system' -- setThemePreference never writes it, removing
+ * the key instead, so a visitor who never touched the control and one who
+ * went back to system are indistinguishable.
  */
 export function normalizePreference(stored: string | null): ThemePreference {
   return stored === 'light' || stored === 'dark' ? stored : 'system';
@@ -34,16 +32,12 @@ export function resolveTheme(
   return preference;
 }
 
-/* v8 ignore start -- store plumbing and the hook (localStorage, matchMedia,
- * the DOM attribute); normalizePreference/resolveTheme above are what's
- * gated and mutation-tested. */
-// Stryker disable all: this half isn't covered by tests, only
-// normalizePreference/resolveTheme above are -- mutants in here would only
-// be noise.
+/* v8 ignore start -- store plumbing and the hook; only
+ * normalizePreference/resolveTheme above are gated and mutation-tested. */
+// Stryker disable all
 
 // localStorage fires `storage` in *other* tabs, never in the one that did
-// the writing, so a same-tab change needs its own announcement. Without it
-// the control would be updating a value nothing is listening to.
+// the writing, so a same-tab change needs its own announcement.
 const THEME_CHANGE_EVENT = 'collectionbuddy:theme';
 
 function subscribePreference(onChange: () => void) {
@@ -60,8 +54,6 @@ function readPreference(): ThemePreference {
 }
 
 function subscribeSystem(onChange: () => void) {
-  // While the preference is `system`, the OS switching over at sunset has to
-  // carry the page with it -- that is the whole meaning of the option.
   const media = window.matchMedia(THEME_MEDIA_QUERY);
   media.addEventListener('change', onChange);
   return () => media.removeEventListener('change', onChange);
@@ -71,22 +63,18 @@ function readSystemPrefersDark(): boolean {
   return window.matchMedia(THEME_MEDIA_QUERY).matches;
 }
 
-// The answer lives in localStorage and in the OS, not in React -- so it is
-// read as an external store rather than copied into state on mount. That
-// also means two mounted copies of the control can never disagree, and a
-// change made in another tab arrives on its own.
+// The answer lives in localStorage and in the OS, not in React, so it is
+// read as an external store rather than copied into state on mount -- two
+// mounted copies of the control can then never disagree.
 //
-// The server snapshots are what the prerendered HTML is built from. They are
-// not what the visitor sees first: the inline script in layout.tsx has
-// already put the real answer on <html> before anything paints.
+// The server snapshots feed the prerendered HTML only; the inline script in
+// layout.tsx has already put the real answer on <html> before first paint.
 export function useTheme() {
   const preference = useSyncExternalStore(
     subscribePreference,
     readPreference,
-    // Looks redundant in isolation, but useSyncExternalStore infers its
-    // return type from all three callbacks together -- drop this and the
-    // inferred type widens to plain `string`, which then fails to satisfy
-    // ThemePreference everywhere `preference` is used below.
+    // useSyncExternalStore infers its return type from all three callbacks
+    // together -- drop this assertion and the type widens to `string`.
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     () => 'system' as ThemePreference,
   );

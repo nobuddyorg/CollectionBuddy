@@ -82,17 +82,15 @@ describe('ModalImage', () => {
   });
 
   // Matches the grid: fetched without credentials so the browser never
-  // processes Cloudflare's public-suffix-scoped Set-Cookie (#258).
+  // processes Cloudflare's public-suffix-scoped Set-Cookie.
   it('fetches the full-size image without credentials', () => {
     renderModal();
     expect(screen.getByRole('img')).toHaveAttribute('crossorigin', 'anonymous');
   });
 
-  // Regression: the close button used to sit *below* the image in a flex
-  // column. With the image free to take max-h-full, it was pushed past the
-  // bottom of a fixed, unscrollable overlay and could not be reached at all
-  // on a portrait image -- Escape or a backdrop click were the only ways
-  // out. It must stay a sibling of the image wrapper, not stacked after it.
+  // Regression: the close button used to sit below the image; with the
+  // image free to take max-h-full, it was pushed past the bottom of the
+  // fixed overlay and unreachable on a portrait image.
   it('keeps the close button outside the image wrapper so it cannot be pushed offscreen', () => {
     renderModal();
     const closeButton = screen.getByRole('button', { name: 'Close' });
@@ -108,29 +106,26 @@ describe('ModalImage', () => {
   });
 
   // A near-miss on Previous/Next/the counter used to fall through to a
-  // backdrop click and close the modal instead of stepping it. Only the
-  // photograph itself and the explicit Close button dismiss now.
+  // backdrop click and close the modal instead of stepping it.
   it('does not close on a backdrop click away from the image', async () => {
     const { onClose } = renderModal();
     await userEvent.click(screen.getByRole('dialog'));
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  // Regression (#511): a tap/click on the photograph itself closes the
-  // modal -- #355's stopPropagation made the photo the one place in the
-  // overlay that never dismissed it, which read as broken rather than
-  // deliberate. The one carved-out exception is the synthetic click that
-  // follows a swipe's touchend; see 'swiping' below.
+  // Regression: a tap on the photograph itself closes the modal;
+  // stopPropagation previously made the photo the one place that never
+  // dismissed it. The synthetic click after a swipe is the one exception;
+  // see 'swiping' below.
   it('closes when the photograph itself is clicked', async () => {
     const { onClose } = renderModal();
     await userEvent.click(screen.getByRole('img'));
     expect(onClose).toHaveBeenCalled();
   });
 
-  // Regression (#295): aria-modal alone is not honoured by every
-  // reader/browser pairing, and the Tab trap does not constrain a screen
-  // reader's virtual cursor at all -- the rest of the page has to come out
-  // of the accessibility tree for browse mode to actually stay inside it.
+  // aria-modal alone isn't honoured by every reader/browser, and the Tab
+  // trap doesn't constrain a screen reader's virtual cursor, so the rest
+  // of the page has to go inert too.
   it('makes the app root inert while open', () => {
     renderModal();
     expect(appRoot().inert).toBe(true);
@@ -144,11 +139,9 @@ describe('ModalImage', () => {
     expect(appRoot().inert).toBeFalsy();
   });
 
-  // The bug this closes (#304): a photograph past the strip's limit had no
-  // rendered Plate at all, so it had no delete control either -- it was
-  // unreachable, yet still billed against storage. The modal is now
-  // reachable for every photograph in `imgs`, so its own delete control
-  // covers the ones the strip never rendered.
+  // A photograph past the strip's limit had no rendered Plate, so no
+  // delete control either. The modal is reachable for every photograph in
+  // `imgs`, covering the ones the strip never rendered.
   describe('deleting the current photograph', () => {
     it('passes the photograph currently shown to onDelete', async () => {
       const { onDelete } = renderModal({
@@ -183,10 +176,9 @@ describe('ModalImage', () => {
       expect(onClose).not.toHaveBeenCalled();
     });
 
-    // Deleting shrinks `imgs` under the same numeric index -- the array
-    // closes over the gap, so without reclamping the index would point past
-    // the end and the modal would go blank instead of showing what is now
-    // there.
+    // Deleting shrinks `imgs` under the same numeric index; without
+    // reclamping, the index would point past the end and the modal would
+    // go blank.
     it('falls back to the new last photograph when the last one is deleted', () => {
       const { rerender } = renderModal({
         imgs: [img('a'), img('b')],
@@ -224,9 +216,8 @@ describe('ModalImage', () => {
     });
   });
 
-  // Reachability is the point of this modal existing at all (#304): every
-  // photograph in `imgs`, including the ones past the strip's limit, has to
-  // be one click or keypress away from whichever one is currently shown.
+  // Every photograph in `imgs`, including ones past the strip's limit, has
+  // to be one click or keypress away from whichever is currently shown.
   describe('navigating a multi-photograph entry', () => {
     const imgs = [img('a'), img('b'), img('c')];
 
@@ -235,9 +226,9 @@ describe('ModalImage', () => {
       expect(screen.getByText('2 / 3')).toBeInTheDocument();
     });
 
-    // #515: the buttons used to carry `hidden [@media(hover:hover)]:flex`,
-    // so a touch screen -- unable to satisfy that query -- had no click
-    // alternative to swiping at all. They render unconditionally now.
+    // The buttons used to carry `hidden [@media(hover:hover)]:flex`, so
+    // touch screens had no click alternative to swiping. They render
+    // unconditionally now.
     it('keeps the previous/next buttons visible regardless of pointer type', () => {
       renderModal({ imgs, index: 1 });
       const prev = screen.getByRole('button', { name: 'Previous image' });
@@ -293,7 +284,7 @@ describe('ModalImage', () => {
     });
 
     // The whole point of a carousel here: a photograph past the strip's
-    // limit (index 3+) was previously never rendered by anything at all.
+    // limit was previously never rendered by anything.
     it('reaches a photograph beyond the strip limit by index alone', () => {
       const many = [img('a'), img('b'), img('c'), img('d'), img('e'), img('f')];
       renderModal({ imgs: many, index: 5 });
@@ -302,8 +293,8 @@ describe('ModalImage', () => {
       );
     });
 
-    // #484: the touch equivalent of the Previous/Next buttons, which sit
-    // over the photograph and cover real content on a narrow phone screen.
+    // The touch equivalent of the Previous/Next buttons, which sit over
+    // the photograph and cover content on a narrow phone screen.
     describe('swiping', () => {
       function swipe(
         from: { x: number; y: number },
@@ -349,9 +340,9 @@ describe('ModalImage', () => {
       });
 
       // A real swipe ends in a browser-synthesized click on whatever was
-      // under the finger. Without the suppression this exercises, that
-      // click would hit the now-closeable image and immediately dismiss
-      // the photograph the swipe just navigated to.
+      // under the finger; without the suppression this exercises, that
+      // click would immediately dismiss the photograph the swipe just
+      // navigated to.
       it('does not close on the synthetic click that follows a swipe', () => {
         const { onClose } = renderModal({ imgs, index: 0 });
         swipe({ x: 200, y: 100 }, { x: 100, y: 100 });

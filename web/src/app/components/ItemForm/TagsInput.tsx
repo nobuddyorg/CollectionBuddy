@@ -16,10 +16,8 @@ export function TagsInput({
 }) {
   const { t, tCount } = useI18n();
   const [tagInput, setTagInput] = useState('');
-  // Names the chip to flash when Enter repeats a tag already on the entry
-  // -- the field clearing with nothing new appearing looked identical to a
-  // tag being silently accepted, so the natural response was to press
-  // Enter again. The flash points at the chip that already covers it.
+  // Flashes the chip already covering a repeated tag, since the field
+  // clearing on Enter otherwise looks identical to nothing happening.
   const [flashedTag, setFlashedTag] = useState<string | null>(null);
 
   const addTag = useCallback(() => {

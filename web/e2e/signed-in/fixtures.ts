@@ -6,11 +6,7 @@ export const AUTH_STATE_PATH = resolve(
   '.e2e-auth/signed-in.json',
 );
 
-/**
- * Where the setup leaves the ids and access tokens of both users, for the
- * tests that ask the database questions the interface cannot ask -- whether
- * one visitor's token can reach another's rows.
- */
+/** Ids and access tokens of both users, for tests that check cross-user RLS directly. */
 export const CONTEXT_PATH = resolve(process.cwd(), '.e2e-auth/context.json');
 
 export type SeedContext = {
@@ -23,13 +19,9 @@ export type SeedContext = {
 /**
  * The collection every signed-in test looks at.
  *
- * Small enough to assert on exactly, and shaped around what the tests need to
- * tell apart: two categories, so switching between them is visible; places on
- * some items and not others, because the map only draws the ones that have
- * one; and a search term that matches exactly one entry through a *different*
- * column each time -- title, description, place, tag -- since the search
- * covers all four and a term that only ever matched titles would not notice
- * three of them going missing.
+ * Small enough to assert on exactly. Search terms are chosen so each matches
+ * exactly one entry through a different column (title, description, place,
+ * tag), so the search test notices a broken column rather than just one match.
  */
 export const SEED = {
   email: 'e2e@collectionbuddy.test',
@@ -38,12 +30,11 @@ export const SEED = {
   /**
    * A second collector, with a collection of their own.
    *
-   * Row-level security is the whole of this app's authorization -- there is
-   * no server to check anything, so a policy that stopped holding would show
-   * one visitor another's collection with nothing else standing in the way.
-   * A single-user suite cannot notice that: every query it makes is one the
-   * policies are supposed to allow. Somebody else's rows have to exist before
-   * "cannot see them" means anything.
+   * Row-level security is this app's whole authorization boundary (no server
+   * exists to check anything else). A single-user suite can't notice a broken
+   * policy, since every query it makes is one policies are supposed to allow
+   * anyway; another user's rows have to exist before "cannot see them" means
+   * anything.
    */
   other: {
     email: 'e2e-other@collectionbuddy.test',
@@ -52,15 +43,10 @@ export const SEED = {
     item: 'Fremdes Fundstück',
   },
 
-  // Two collections to read, and one scratch collection *per writing spec*.
-  //
-  // Playwright runs spec files in parallel -- two workers in CI -- against one
-  // database and one user. A test creating an entry while another counts them
-  // fails correctly and at random, so writes are kept off the collections the
-  // read tests describe. They also have to be kept off each other: photos and
-  // entries sharing one scratch collection was the same bug a second time,
-  // and it survived a local run because the interleaving happened not to
-  // occur.
+  // One scratch collection per writing spec, kept separate from the read
+  // collections and from each other: specs run in parallel against one
+  // database, so a test creating an entry while another counts them fails at
+  // random if they share a collection.
   categories: [
     'Münzen',
     'Briefmarken',
@@ -98,7 +84,7 @@ export const SEED = {
     },
     {
       category: 'Münzen',
-      // No place: the map must leave this one out while the list keeps it.
+      // No place: the map should leave this one out while the list keeps it.
       title: 'Notgeld',
       description: 'Papiernotgeld aus der Inflationszeit.',
       place: null,
@@ -116,9 +102,7 @@ export const SEED = {
       tags: ['selten'],
     },
     {
-      // A scratch collection is never empty, so opening it looks the same as
-      // opening any other and the tests that write have a baseline to be
-      // added to.
+      // Keeps the scratch collection non-empty so writing tests have a baseline.
       category: 'Werkstatt',
       title: 'Werkstattstück',
       description: 'Bleibt liegen, damit die Werkstatt nie leer bleibt.',

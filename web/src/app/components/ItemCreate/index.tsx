@@ -8,9 +8,8 @@ import { EMPTY_ITEM_FORM_VALUES, ItemFormValues } from '../ItemForm/types';
 import { useCreateItem } from './useCreateItem';
 import { Props } from './types';
 
-// Split from the main bundle for the same reason the map is (see
-// ItemList/index.tsx's prefetchMap): PlaceAutocomplete's geocoder and its
-// deps are dead weight on every page load that never opens this form.
+// Split from the main bundle: PlaceAutocomplete's geocoder and its deps are
+// dead weight on every page load that never opens this form.
 const ItemForm = dynamic(() => import('../ItemForm'), { ssr: false });
 
 export default function ItemCreate({

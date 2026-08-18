@@ -3,15 +3,12 @@ import { expect, test } from './test';
 import { SEED } from './fixtures';
 import { expectTitles, openCategory, visibleTitles } from './helpers';
 
-// Writes, which is where row-level security has to permit as well as forbid.
-// Everything here goes through the app's own forms against a real database:
-// a policy that stopped allowing an ordinary insert would fail here, and
-// nowhere else in the suite.
+// Writes are where RLS has to permit as well as forbid: a policy that stopped
+// allowing an ordinary insert would fail here, and nowhere else in the suite.
 test.use({ locale: 'en-GB' });
 
-// Each test makes its own entry and takes it away again, so the seeded
-// collection is the same before and after and the tests do not have to run in
-// any particular order.
+// Each test creates and removes its own entry, so the seeded collection is
+// unchanged before and after and tests can run in any order.
 const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
 
 async function createEntry(
@@ -39,9 +36,8 @@ async function deleteEntry(
 }
 
 test.describe('adding and removing entries', () => {
-  // Its own collection, because spec files run in parallel against one
-  // database: creating and deleting entries in a collection another file is
-  // counting would make both of them wrong at random.
+  // Its own collection: spec files run in parallel against one database, so
+  // writing into a collection another file is counting would fail both at random.
   test.beforeEach(async ({ page }) => {
     await openCategory(page, SEED.scratchCategory);
   });
@@ -51,13 +47,11 @@ test.describe('adding and removing entries', () => {
     try {
       await createEntry(page, title);
 
-      // Newest first, so a new entry belongs at the top of the first page.
       const titles = await visibleTitles(page);
       expect(titles[0]).toBe(title);
     } finally {
-      // In a finally, not after the assertions, so an entry from a failed
-      // assertion above still comes out -- left in place, it would feed
-      // straight into the next test's own count of the collection (#338).
+      // In `finally` so a failed assertion above doesn't leave the entry
+      // behind to throw off the next test's count of the collection.
       await deleteEntry(page, title);
     }
   });
@@ -88,9 +82,6 @@ test.describe('adding and removing entries', () => {
     }
   });
 
-  // Confirmation defaults to cancel, and cancelling has to mean it: a
-  // delete dialog that removes the entry anyway is the worst kind of bug in
-  // an app whose whole purpose is keeping things.
   test('leaves the entry alone when the deletion is cancelled', async ({
     page,
   }) => {
@@ -110,8 +101,8 @@ test.describe('adding and removing entries', () => {
   test('edits an entry in place', async ({ page }) => {
     const title = uniqueTitle('Groschen');
     const renamed = `${title} (renamed)`;
-    // Tracks whichever title the entry currently answers to, so cleanup
-    // deletes the right card whether the rename below ran or not.
+    // Tracks the entry's current title, so cleanup deletes the right card
+    // whether the rename below ran or not.
     let currentTitle = title;
     try {
       await createEntry(page, title);
@@ -130,9 +121,8 @@ test.describe('adding and removing entries', () => {
     }
   });
 
-  // The database is the normalization authority -- it trims and collapses
-  // whitespace on write, and the app merges back the row it returns rather
-  // than a client-side guess at what was stored.
+  // The database trims/collapses whitespace on write, and the app merges
+  // back the returned row rather than guessing what was stored.
   test('stores a title as the database normalises it', async ({ page }) => {
     const title = uniqueTitle('Batzen');
     try {

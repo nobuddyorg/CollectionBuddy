@@ -1,23 +1,16 @@
--- Editor role for category_shares (#554).
+-- Adds a second category_shares role, 'editor', giving an invited grantee
+-- parity with the owner on item content (add/edit/delete items, manage
+-- photos) within the shared category. Category-level actions stay
+-- owner-only.
 --
--- 0011_category_shares.sql was deliberately view-only. This migration adds a
--- second role, 'editor', that gets an invited grantee full parity with the
--- owner on item content within the shared category: add, edit, delete
--- items, and manage their photos. Category-level actions (rename, delete
--- the category, manage who it's shared with, export) stay owner-only --
--- out of scope here, unchanged from 0011.
---
--- Ownership stays denormalized and per-row, same as everywhere else in this
--- schema -- an item an editor creates is still owned by that editor
--- (enforce_user_id, 0002_functions.sql, untouched), because an item can
--- belong to several categories (item_categories is many-to-many,
--- 0003_tables.sql) and so has no single "owning category" a trigger could
--- stamp it with. That makes this a *symmetric* access problem, not the
--- one-directional "grantee reads owner's rows" shape 0011/0012/0013 used:
--- the owner needs write access to items an editor created, and an editor
--- needs write access to items the owner (or another editor) created.
--- has_category_write_access(), below, is the one predicate every policy in
--- this file is built from, so that symmetry is expressed once.
+-- Ownership stays per-row: an item an editor creates is still owned by
+-- that editor (enforce_user_id, unchanged), since an item can belong to
+-- several categories and so has no single "owning category" a trigger
+-- could stamp it with. That makes this a *symmetric* access problem, not
+-- the one-directional "grantee reads owner's rows" shape 0011/0012/0013
+-- used -- the owner needs write access to items an editor created, and
+-- vice versa. has_category_write_access(), below, is the one predicate
+-- every policy here is built from.
 begin;
 
 -- A grant is now two-valued: 'viewer' (0011's original, and the default, so
@@ -30,12 +23,9 @@ alter table public.category_shares
 alter table public.category_shares
   add constraint category_shares_role_valid check (role in ('viewer', 'editor'));
 
--- 0011 shipped with no update policy on purpose ("a grant is created and
--- removed, never edited"). The issue this migration closes explicitly asks
--- for toggling an existing share between viewer and editor, so this is now
--- the one field that may change after creation. tg_category_shares_enforce
--- is extended, not replaced, so the insert branch below is unchanged from
--- 0011 -- only an update branch is new.
+-- 0011 shipped with no update policy; role is now the one field that may
+-- change after creation. Extended, not replaced -- the insert branch below
+-- is unchanged from 0011, only the update branch is new.
 create or replace function public.tg_category_shares_enforce()
 returns trigger
 language plpgsql
@@ -47,11 +37,8 @@ declare
   caller_email text;
 begin
   if tg_op = 'UPDATE' then
-    -- Only role may move. Every other column is re-derived or re-validated
-    -- at insert time and has no business changing afterward -- re-sharing
-    -- with a different email or category is a new invite, not a patch to
-    -- this one, the same reasoning 0011 gave for having no update policy at
-    -- all until now.
+    -- Only role may move -- re-sharing with a different email or category
+    -- is a new invite, not a patch to this one.
     if new.category_id <> old.category_id
       or new.invited_email <> old.invited_email
       or new.owner_user_id <> old.owner_user_id
@@ -96,9 +83,8 @@ create trigger trg_category_shares_enforce
 before insert or update on public.category_shares
 for each row execute function public.tg_category_shares_enforce();
 
--- Owner only, and only for changing role -- tg_category_shares_enforce
--- above is the actual enforcement of "only role"; this policy is just the
--- gate on who may attempt an update at all.
+-- Owner only -- tg_category_shares_enforce above is what actually enforces
+-- "only role"; this is just the gate on who may attempt an update.
 drop policy if exists "update own category_shares role" on public.category_shares;
 create policy "update own category_shares role"
 on public.category_shares
@@ -109,16 +95,12 @@ with check (owner_user_id = (select auth.uid()));
 grant update on public.category_shares to authenticated;
 
 -- The one predicate every write policy below is built from: does auth.uid()
--- have write standing on category cat_id, either as its owner or as an
--- active editor grantee. security invoker (the default, stated explicitly)
--- rather than definer -- unlike tg_category_shares_enforce/tg_images_enforce,
--- which have to see rows the caller couldn't otherwise select (an invite's
--- target category before they have any grant on it), this only ever asks
--- "can *you* see yourself as owner or editor here", which is exactly what
--- the existing select policies on categories/category_shares already let
--- the caller see. Running as invoker means a non-owner, non-editor caller's
--- internal subqueries see no rows and this simply returns false, with no
--- need to bypass RLS to get there.
+-- have write standing on cat_id, as owner or active editor grantee.
+-- security invoker, unlike the enforce triggers -- this only ever asks
+-- "can *you* see yourself as owner or editor here", which the existing
+-- select policies already let the caller see, so a non-owner/non-editor's
+-- subqueries just see no rows and this returns false without needing to
+-- bypass RLS.
 create or replace function public.has_category_write_access(cat_id uuid)
 returns boolean
 language sql
@@ -142,16 +124,14 @@ as $$
   )
 $$;
 
--- Postgres grants EXECUTE on a new function to PUBLIC by default
--- (0010_function_grants.sql's note on normalize_text/join_tags) -- revoked
--- immediately here rather than fixed up in a later migration.
+-- Postgres grants EXECUTE to PUBLIC by default (0010) -- revoked
+-- immediately rather than fixed up in a later migration.
 revoke execute on function public.has_category_write_access(uuid) from public;
 grant execute on function public.has_category_write_access(uuid) to authenticated;
 
--- items: redefines update/delete in full (0006_policies.sql's originals no
--- longer apply once these run, same convention 0011 used for select).
--- insert is untouched -- creating an item you own is already unrestricted;
--- the gate that matters is linking it into someone else's category, below.
+-- Redefines update/delete in full (0006's originals no longer apply once
+-- these run). insert is untouched -- the gate that matters is linking an
+-- item into someone else's category, below.
 drop policy if exists "update own items" on public.items;
 create policy "update own items"
 on public.items
@@ -189,10 +169,9 @@ using (
   )
 );
 
--- item_categories: tg_item_categories_enforce's cross-tenant guard
--- ("itm_user <> cat_user") is replaced by has_category_write_access -- still
--- requires the caller to own the item they're linking (itm_user = auth.uid(),
--- unchanged below), just no longer requires the category to be theirs too,
+-- tg_item_categories_enforce's cross-tenant guard is replaced by
+-- has_category_write_access: still requires the caller to own the item
+-- they're linking, just no longer requires the category to be theirs too,
 -- only writable by them.
 create or replace function public.tg_item_categories_enforce()
 returns trigger
@@ -225,9 +204,9 @@ begin
 end
 $$;
 
--- delete: redefined in full. Previously only whoever created a given
--- item_categories row could remove it; now the category's owner or any
--- active editor can unlink any item, not just ones they personally added.
+-- Redefined in full: previously only whoever created a given
+-- item_categories row could remove it; now the owner or any active editor
+-- can unlink any item, not just ones they personally added.
 drop policy if exists "delete own item_categories" on public.item_categories;
 create policy "delete own item_categories"
 on public.item_categories
@@ -237,10 +216,10 @@ using (
   or public.has_category_write_access(category_id)
 );
 
--- images: tg_images_enforce's ownership guard relaxed the same way as
--- item_categories' above -- new.user_id still follows the item's own owner
--- (itm_user), unchanged, since an image's parent is one unambiguous item,
--- not several categories the way an item's parent categories can differ.
+-- Ownership guard relaxed the same way as item_categories' above.
+-- new.user_id still follows the item's own owner, unchanged, since an
+-- image's parent is one unambiguous item, not several categories the way
+-- an item's parent categories can differ.
 create or replace function public.tg_images_enforce()
 returns trigger
 language plpgsql
@@ -299,22 +278,16 @@ using (
   )
 );
 
--- storage.objects: 0012_shared_photos.sql extended select the same way for
--- read-only sharing. These three do the same for write, additive to
--- 0007_storage.sql's owner-only policies (Postgres ORs every applicable
--- policy together), using the same storage_item_id() path parser 0012
--- defined.
+-- Additive to 0007's owner-only policies, same storage_item_id() parser
+-- 0012 used for read.
 --
 -- has_category_write_access(), not a bare editor-grant check: an object's
--- path is `<uploader's own uid>/<itemId>/<file>` (imagePrefix,
--- data/images.ts, uid from verifiedUserId() -- whoever is uploading right
--- now, not the item's owner), so an editor's upload already satisfies
--- 0007's plain "upload own objects" policy on its own. What 0007 cannot
--- cover is the *other* direction: the owner (or a second editor) reaching
--- an object that landed under a first editor's uid prefix, which is
--- exactly the symmetric problem has_category_write_access exists to solve
--- for items/item_categories/images above -- reused here rather than
--- writing a third, editor-only version of the same predicate.
+-- path is prefixed with whoever is *uploading* it, not the item's owner
+-- (imagePrefix, data/images.ts), so an editor's own upload already
+-- satisfies 0007's owner-only policy. What that can't cover is the owner
+-- (or a second editor) reaching an object that landed under a different
+-- editor's uid prefix -- the same symmetric problem has_category_write_access
+-- solves above, reused rather than duplicated.
 drop policy if exists "write shared objects" on storage.objects;
 create policy "write shared objects"
 on storage.objects

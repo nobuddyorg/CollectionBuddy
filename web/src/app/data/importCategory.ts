@@ -1,22 +1,16 @@
 /**
  * Building one category from an archive `exportCategory` produced.
  *
- * The counterpart to `./exportCategory`, and the same shape for the same
- * reason: there is no server here either, so the whole import runs in the
- * tab -- unzip, recreate the category and its items over PostgREST, decode
- * and re-upload each photograph, all client-side. `getUid`/`createCategoryRow`/
- * `createItemRow`/`linkItemToCategoryRow`/`uploadImage`/`readZip`/
- * `compressThumb` are accepted as parameters the same way exportCategory.ts's
- * four raw calls are, so importCategory.test.ts can drive this with fakes.
+ * No server here either: the whole import runs in the tab, unzipping,
+ * recreating the category and its items over PostgREST, and re-uploading
+ * each photograph. The raw calls are accepted as parameters, the same way
+ * exportCategory.ts's are, so importCategory.test.ts can drive this with
+ * fakes.
  *
- * Always creates a *new* category -- never merges into an existing one.
- * Merging raises questions (does a re-import skip items it already has? by
- * what identity, since a fresh account has none of the original ids?) that
- * a first version doesn't have to answer: `manifest.items[].id` is kept in
- * the archive for a future import to use for exactly that, but nothing
- * reads it as an identity yet. Importing the same archive twice makes two
- * categories, not a merge -- surprising only if you expected the merge this
- * doesn't attempt.
+ * Always creates a *new* category, never merges into an existing one:
+ * `manifest.items[].id` is kept in the archive for a future import to use
+ * as merge identity, but nothing reads it that way yet. Importing the same
+ * archive twice makes two categories, not a merge.
  */
 
 import { verifiedUserId } from './auth';
@@ -65,8 +59,7 @@ export class ImportError extends Error {
 }
 
 /** Thrown when the caller's `signal` is aborted -- a user-requested cancel,
- * not a failure. Same distinction as exportCategory.ts's ExportCancelledError,
- * for the same reason: the UI reports a cancel differently from a failure. */
+ * not a failure -- so the UI can report it differently from one. */
 export class ImportCancelledError extends Error {
   constructor() {
     super('Import cancelled');
@@ -78,28 +71,22 @@ function checkCancelled(signal?: AbortSignal): void {
   if (signal?.aborted) throw new ImportCancelledError();
 }
 
-/** How many photographs upload at once. Same number and same reasoning as
- * exportCategory.ts's PHOTO_DOWNLOAD_CONCURRENCY -- a handful of workers
- * holding a handful of Blobs, not the whole archive's worth in memory at
- * once and not one photograph at a time either. */
+/** Bounded, like exportCategory.ts's PHOTO_DOWNLOAD_CONCURRENCY, so only a
+ * handful of Blobs are held in memory at once. */
 export const PHOTO_UPLOAD_CONCURRENCY = 6;
 
 const PHOTO_UPLOAD_ATTEMPTS = 3;
 const PHOTO_UPLOAD_RETRY_BASE_MS = 500;
 
 /**
- * Regenerates the 600px thumbnail from a photograph's already-compressed
- * full-size bytes -- the archive only ever carries the full size (thumbnails
- * are the app's own derivative, left out of the export on purpose -- see
- * exportCategory.ts's fetchPhotoPaths, which never selects path_thumb), so
- * importing has to make a new one
- * the same way `useItemImages.tsx`'s upload path does: from the already-sized
- * image, not a second pass over some larger original that no longer exists.
+ * Regenerates the 600px thumbnail from a photograph's full-size bytes: the
+ * archive only ever carries the full size (thumbnails are the app's own
+ * derivative, left out of the export), so importing must make a new one the
+ * same way `useItemImages.tsx`'s upload path does, from the already-sized
+ * image rather than some larger original that no longer exists.
  */
 // Stryker disable all
-/* v8 ignore start -- the real browser call; every test injects a fake
- * compressThumb instead, the same way exportCategory.test.ts fakes its own
- * four raw calls rather than exercising fetch/Supabase directly. */
+/* v8 ignore start -- the real browser call; every test injects a fake. */
 async function realCompressThumb(
   bytes: Uint8Array<ArrayBuffer>,
 ): Promise<Blob> {
@@ -116,11 +103,9 @@ async function realCompressThumb(
 /* v8 ignore stop */
 // Stryker restore all
 
-/** Retries a single object upload, the same backoff shape as every other
- * retry loop in this app's import/export path. Storage doesn't reliably
- * attach a status the way a `fetch` response does, so (unlike the export's
- * photo *download* retry) every failure here is treated as retryable up to
- * the attempt limit rather than distinguishing permanent from transient. */
+/** Storage doesn't reliably attach a status the way a `fetch` response does,
+ * so (unlike the export's download retry) every failure here is treated as
+ * retryable rather than distinguishing permanent from transient. */
 async function uploadWithRetry(
   path: string,
   blob: Blob,

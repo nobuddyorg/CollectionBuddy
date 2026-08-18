@@ -15,9 +15,6 @@ describe('normalizePreference', () => {
     expect(normalizePreference('dark')).toBe('dark');
   });
 
-  // Nothing stored is the common case -- a first visit, or a visitor who
-  // went back to system, which clears the key rather than writing a third
-  // value. Both have to arrive at the same place.
   it('falls back to system when nothing is stored', () => {
     expect(normalizePreference(null)).toBe('system');
   });
@@ -28,8 +25,6 @@ describe('normalizePreference', () => {
     expect(normalizePreference('Dark')).toBe('system');
   });
 
-  // 'system' is never written, but a value left by an older build of the
-  // app -- or by hand -- must not be mistaken for an explicit choice.
   it('treats a stored "system" as no choice at all', () => {
     expect(normalizePreference('system')).toBe('system');
   });
@@ -41,8 +36,6 @@ describe('resolveTheme', () => {
     expect(resolveTheme('system', false)).toBe('light');
   });
 
-  // The point of offering light and dark alongside system: an explicit
-  // choice has to win over the OS, in both directions.
   it('overrides the OS with an explicit choice', () => {
     expect(resolveTheme('light', true)).toBe('light');
     expect(resolveTheme('dark', false)).toBe('dark');
@@ -54,12 +47,10 @@ describe('resolveTheme', () => {
   });
 });
 
-// The script that runs before the first paint cannot import this module --
-// it is a string inlined into the document head, which is the only thing
-// that runs early enough to stop the flash. So it restates the storage key
-// and the media query by hand, and the two copies have to agree: change one
-// and the page loads light, then corrects itself once React catches up,
-// which is the exact defect the script exists to prevent.
+// The pre-paint script can't import this module -- it's a string inlined
+// into <head> -- so it restates the storage key and media query by hand.
+// The two copies must agree, or the page flashes the wrong theme before
+// React catches up.
 describe('the pre-paint script in layout.tsx', () => {
   const layout = readFileSync(new URL('layout.tsx', import.meta.url), 'utf8');
   const initScript = layout.slice(layout.indexOf('const THEME_INIT_SCRIPT'));
@@ -80,8 +71,7 @@ describe('the pre-paint script in layout.tsx', () => {
 });
 
 describe('THEME_PREFERENCES', () => {
-  // Order is what the control renders, and system leads because it is the
-  // default -- the segment already selected for anyone who has not chosen.
+  // Order is render order; system leads because it's the default.
   it('offers system, light and dark in that order', () => {
     expect(THEME_PREFERENCES).toEqual(['system', 'light', 'dark']);
   });

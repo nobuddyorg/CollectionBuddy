@@ -25,9 +25,8 @@ function renderForm(
   return { onDirtyChange };
 }
 
-// #308: a caller (EditItemModal, the create modal) needs to know when the
-// form has anything worth losing, so it can ask before a backdrop tap or
-// Escape discards it. `onDirtyChange` is the only thing that tells it.
+// Callers need to know when the form has anything worth losing, so they can
+// confirm before a backdrop tap or Escape discards it.
 describe('ItemForm dirty tracking', () => {
   it('reports not dirty on mount, for a blank form', () => {
     const { onDirtyChange } = renderForm();

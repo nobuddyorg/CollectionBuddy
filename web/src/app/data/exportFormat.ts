@@ -4,7 +4,7 @@
  * already fetched, so the shape of an export can be tested without a
  * database, a session or a browser.
  *
- * The archive an export produces looks like this:
+ * The archive looks like this:
  *
  *   CollectionBuddy-coins-2026-08-06/
  *     collection.json      -- every field, enough to re-import from
@@ -13,10 +13,9 @@
  *     photos/001-1855-seated-dime/2.webp
  *     photos/002-silver-eagle/1.webp
  *
- * Two readers, two files. The JSON is the one that keeps its meaning --
- * tags stay a list, coordinates stay numbers, an absent description stays
- * absent rather than becoming an empty cell. The CSV is the one anyone can
- * open, and it pays for that by flattening all of the above into text.
+ * The JSON keeps full fidelity (tags stay a list, coordinates stay numbers,
+ * an absent description stays absent); the CSV is what anyone can open, and
+ * pays for that by flattening all of the above into text.
  */
 
 import type { ExportItemRow } from './items';
@@ -45,12 +44,9 @@ export const PHOTOS_DIR = 'photos';
 export const MANIFEST_NAME = 'collection.json';
 export const CSV_NAME = 'collection.csv';
 
-/**
- * How much of a title survives into a folder name. Long enough to stay
- * recognisable, short enough that the deepest path an export can produce
- * -- root, `photos/`, folder, file -- stays well inside the ~255 byte
- * component limit every extractor has, and inside Windows' path budget.
- */
+/** How much of a title survives into a folder name -- short enough that the
+ * deepest export path stays well inside the ~255 byte component limit every
+ * extractor has, and inside Windows' path budget. */
 const MAX_SLUG_LENGTH = 60;
 
 /** What a title slugs to when it has no characters a file name can keep. */
@@ -58,11 +54,9 @@ const EMPTY_SLUG = 'untitled';
 
 /**
  * A title reduced to something safe as a path component on every platform.
- *
- * Diacritics are decomposed and dropped rather than transliterated, so
- * "Münze" becomes "munze": an approximation, but a stable one, and the
- * exact title is still in the manifest beside it. The item's number in the
- * archive is what actually makes the name unique -- see `exportEntries`.
+ * Diacritics are dropped rather than transliterated ("Münze" -> "munze");
+ * the exact title still lives in the manifest beside it, and the item's
+ * number in the archive is what makes the name unique (see `exportEntries`).
  */
 export function slugify(title: string): string {
   const slug = title
@@ -91,13 +85,12 @@ export function indexPrefix(index: number, total: number): string {
   return String(index + 1).padStart(width, '0');
 }
 
-/** Only what a real extension ever looks like -- letters and digits, short.
+/** Only what a real extension looks like -- letters and digits, short.
  * Rejects anything a storage object name could smuggle through unescaped
- * (backslashes, quotes, spaces, a trailing dot): none of those are
- * reachable today (this app only ever uploads `<uuid>.webp`/`.thumb.webp`,
- * and storage RLS keys every verb on the uid prefix), but the extension
- * itself was copied into the archive path verbatim, with nothing checking
- * it stayed that way. */
+ * (backslashes, quotes, spaces, a trailing dot) before it's copied into the
+ * archive path verbatim; not reachable today since this app only ever
+ * uploads `<uuid>.webp`/`.thumb.webp`, but nothing else checks it stays
+ * that way. */
 const SAFE_EXTENSION = /^\.[A-Za-z0-9]{1,10}$/;
 
 /** `.webp`, `.jpg`, ... taken off a storage object name, `.bin` if it has
@@ -112,8 +105,7 @@ export function extensionOf(path: string): string {
 
 /**
  * Pairs each item with its folder and its photographs, each carrying its
- * own storage path and archive path together rather than as two arrays a
- * caller has to zip back up by index (#421).
+ * own storage path and archive path together.
  *
  * The number prefix is not decoration: two items may legitimately share a
  * title, and an export that quietly merged their photographs into one
@@ -145,12 +137,9 @@ export type ExportManifest = {
 };
 
 /**
- * The full-fidelity half of the archive.
- *
- * Ids are kept even though nothing outside this database can resolve them:
- * they are what would let a future import tell "the same item again" from
- * "a second item that happens to match", and dropping them now would make
- * every existing archive useless for that.
+ * The full-fidelity half of the archive. Ids are kept even though nothing
+ * outside this database can resolve them: they're what would let a future
+ * import tell "the same item again" from "a second item that matches".
  */
 export function buildManifest({
   category,
@@ -189,23 +178,20 @@ export const CSV_COLUMNS = [
 
 /**
  * Characters a spreadsheet treats as the start of a formula rather than as
- * text. A title is user-entered, so `=HYPERLINK(...)` in one is a value
- * this app stored faithfully and must not hand to Excel as something to
- * evaluate -- the cell is prefixed with an apostrophe, which spreadsheets
- * read as "the rest is literal" and strip on display.
+ * text. A user-entered `=HYPERLINK(...)` must not be handed to Excel as
+ * something to evaluate, so the cell is prefixed with an apostrophe, which
+ * spreadsheets read as "the rest is literal" and strip on display.
  */
 const FORMULA_LEAD = /^[=+\-@\t\r]/;
 
 /**
- * RFC 4180 quoting alone: quote when the value contains a delimiter, a
- * quote or a line break, and double any quote inside it. No
- * formula-injection prefix -- for cells this app generates itself (ids,
- * timestamps, numbers, paths), never from a user's own text, so there is no
- * attacker-chosen leading character to guard against. Guarding these too is
- * actively wrong for a coordinate: `FORMULA_LEAD` matches the leading `-`
- * of any negative number, so every southern-hemisphere latitude and
- * western-hemisphere longitude was quietly exported as text instead of a
- * number (#413).
+ * RFC 4180 quoting alone, no formula-injection prefix: these cells are
+ * generated by this app (ids, timestamps, numbers, paths), never from a
+ * user's own text, so there's no attacker-chosen leading character to guard
+ * against. Guarding them too is actively wrong for a coordinate:
+ * `FORMULA_LEAD` matches the leading `-` of any negative number, which
+ * would export every southern/western coordinate as text instead of a
+ * number.
  */
 function plainCell(value: string): string {
   return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
@@ -227,11 +213,9 @@ function numberCell(value: number | null): string {
 }
 
 /**
- * The archive's spreadsheet half.
- *
- * CRLF line endings and a leading byte-order mark, both for the same
- * reason: without them Excel opens a UTF-8 CSV as the local code page and
- * turns every umlaut in a German collection into mojibake.
+ * The archive's spreadsheet half. CRLF line endings and a leading
+ * byte-order mark: without them Excel opens a UTF-8 CSV as the local code
+ * page and turns every umlaut into mojibake.
  */
 export function buildCsv(entries: ExportEntry[]): string {
   const rows = entries.map(({ item, folder, photos }) =>
@@ -253,9 +237,8 @@ export function buildCsv(entries: ExportEntry[]): string {
   return `\ufeff${[csvRow(CSV_COLUMNS.map(plainCell)), ...rows].join('\r\n')}\r\n`;
 }
 
-/** A byte count as the rounded gigabyte figure a size warning can put in
- * front of someone -- "about 1.6 GB", not a raw byte count nobody reads at
- * a glance (#428). */
+/** A byte count as a rounded gigabyte figure -- "about 1.6 GB", not a raw
+ * byte count nobody reads at a glance. */
 export function formatExportBytes(bytes: number): string {
   return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 }
@@ -268,12 +251,10 @@ export function localDateStamp(date: Date): string {
 
 /**
  * Shared by `archiveName` and `archiveRootFolder`: the download is named
- * after this, and it is also the one directory every entry in the archive
- * lives under (#422) -- so an extractor that does not auto-wrap (CLI
- * `unzip`, 7-Zip "extract here") still lands each export in its own
- * directory instead of scattering three top-level entries into whatever
- * directory it was extracted into, where a second export would overwrite
- * the first's `collection.json`/`collection.csv`.
+ * after this, and it's also the one directory every archive entry lives
+ * under, so an extractor that doesn't auto-wrap (CLI `unzip`, 7-Zip
+ * "extract here") still lands each export in a directory of its own instead
+ * of scattering entries where a second export would overwrite the first's.
  */
 function archiveBaseName(categoryName: string, exportedAt: Date): string {
   return `CollectionBuddy-${slugify(categoryName)}-${localDateStamp(exportedAt)}`;

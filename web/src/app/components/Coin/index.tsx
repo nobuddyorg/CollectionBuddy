@@ -20,10 +20,8 @@ export default function Coin({
 }: CoinProps) {
   const rimId = useId();
 
-  // Scales with the viewport rather than pinning a fixed floor, which on a
-  // 390px screen left the medallion touching both edges. The lower bound is
-  // deliberately generous: an earlier 68vw/200px pairing shrank it far too
-  // far on phones, where this is the whole page.
+  // Scales with the viewport rather than a fixed floor, or a 390px screen
+  // has the medallion touching both edges.
   const style = useMemo<React.CSSProperties>(() => {
     const clamped = coinSizeCss(size);
     return { width: clamped, height: clamped };

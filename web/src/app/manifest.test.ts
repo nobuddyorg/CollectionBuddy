@@ -1,10 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-// The manifest is a static file rather than a module, so nothing else in the
-// suite would notice it going wrong: a launcher reads it, silently takes the
-// best of a bad set of icons, and the only symptom is a blurry tile on
-// somebody's phone (#266).
+// The manifest is a static file, not a module, so nothing else in the suite
+// would notice it going wrong: a launcher silently takes the best of a bad
+// set of icons, and the only symptom is a blurry tile on someone's phone.
 const publicDir = new URL('../../public/', import.meta.url);
 
 type ManifestIcon = {
@@ -35,9 +34,8 @@ const edge = (icon: ManifestIcon) => Number(icon.sizes.split('x')[0]);
 
 describe('site.webmanifest', () => {
   it('serves every icon from the deployed scope', () => {
-    // The file is static, so the base path cannot be interpolated into it the
-    // way layout.tsx does -- these paths are literal and have to stay in step
-    // with the scope by hand.
+    // The file is static, so paths are literal and must stay in step with
+    // the scope by hand rather than interpolated like layout.tsx does.
     for (const icon of manifest.icons) {
       expect(icon.src.startsWith(manifest.scope)).toBe(true);
     }
@@ -57,8 +55,8 @@ describe('site.webmanifest', () => {
     }
   });
 
-  // The bug itself: 180px was the largest on offer, so a 512px splash screen
-  // was drawn by stretching it nearly threefold.
+  // 180px used to be the largest on offer, stretched threefold for a 512px
+  // splash screen.
   it('offers an icon large enough for a splash screen to use as-is', () => {
     const usable = manifest.icons.filter(
       (icon) => icon.purpose !== 'maskable' && edge(icon) >= 512,

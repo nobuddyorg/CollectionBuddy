@@ -11,10 +11,8 @@ import type { ItemFormValues } from '../ItemForm';
 import { restoreAt } from './optimistic';
 import type { ItemLite } from './types';
 
-// Edit and delete, the two mutations an already-loaded entry can undergo --
-// separated from the component tree so a save or a delete is not redefined,
-// and its toast/rollback trio rebuilt, on every render the list itself
-// triggers (an image-signature refresh, a page change).
+// Separated from the component tree so save/delete aren't redefined on
+// every render the list triggers for unrelated reasons.
 export function useItemMutations({
   items,
   setItems,
@@ -26,9 +24,8 @@ export function useItemMutations({
   setItems: Dispatch<SetStateAction<ItemLite[]>>;
   reload: (opts?: { silent?: boolean }) => Promise<void>;
   /** Read-only: the item's photograph paths, captured before `deleteItem`
-   * below -- the images rows they name are gone (cascaded away with the
-   * item row) by the time anything could act on them afterward. See
-   * 0013_images.sql's note on the FK-cascade-timing design. */
+   * -- the images rows they name are gone once the item row cascades away
+   * (0013_images.sql). */
   captureItemImagePaths: (
     itemId: string,
   ) => Promise<{ path_full: string; path_thumb: string | null }[]>;
@@ -47,10 +44,8 @@ export function useItemMutations({
       if (isSaving) return false;
       setIsSaving(true);
       try {
-        // The DB is the normalization authority (trims, collapses
-        // whitespace, dedupes/sorts tags) -- send raw values and merge the
-        // row it returns, rather than re-deriving a client-side copy that
-        // can diverge from it.
+        // The DB is the normalization authority -- merge the row it
+        // returns rather than re-deriving a client-side copy.
         const { data, error } = await updateItem(id, values);
         if (error || !data) {
           toast.reportError('save item', error, t('item_list.save_error'));
@@ -68,23 +63,15 @@ export function useItemMutations({
     [isSaving, setItems, t, toast],
   );
 
-  // The card goes the moment the deletion is confirmed, and the work runs
-  // behind it. Deleting used to hold the card on screen through five
-  // sequential round trips -- and clear its image state partway through, so
-  // it sat there as a photoless shell before finally vanishing on a full
-  // page refetch (#238). Nothing about that wait was informative: the
-  // outcome is almost always success, and the one thing the user wants to
-  // see is the card gone.
-  //
-  // Failure puts it back where it was rather than leaving a card the
+  // The card goes the moment deletion is confirmed; the work runs behind
+  // it. Failure puts it back where it was rather than leaving a card the
   // database still has silently missing from the grid.
   const removeItem = useCallback(
     async (id: string) => {
       if (!(await confirm(t('item_list.confirm_delete')))) return;
 
-      // Captured before the optimistic removal, from the rendered list
-      // rather than inside the state updater -- updaters can run more than
-      // once.
+      // From the rendered list, not inside the state updater -- updaters
+      // can run more than once.
       const index = items.findIndex((it) => it.id === id);
       const snapshot = items[index];
       setItems((prev) => prev.filter((it) => it.id !== id));
@@ -94,19 +81,13 @@ export function useItemMutations({
         setItems((prev) => restoreAt(prev, index, snapshot));
       };
 
-      // Read-only, and has to run before deleteItem below: once the item
-      // row is gone, its images rows go with it (on delete cascade,
-      // 0013_images.sql) -- this is the last point their paths can still be
-      // read, the same reasoning deleteCategory (useCategories.tsx) already
-      // applies to the item_categories rows a category delete cascades away.
+      // Must run before deleteItem: once the item row is gone, its images
+      // rows cascade away with it (0013_images.sql) -- this is the last
+      // point their paths can be read.
       const imagePaths = await captureItemImagePaths(id);
 
-      // The row before the objects: deleting the item row first means a
-      // failure here still means "nothing happened" -- the restore is
-      // honest, and no photograph is ever destroyed on a path that reports
-      // itself as failed. Capturing the paths above doesn't change that:
-      // it's a read, not a mutation, so it leaves nothing to undo if this
-      // fails.
+      // The row before the objects: if this fails, nothing happened yet
+      // and the restore above is honest.
       const { error } = await deleteItem(id);
       if (error) {
         toast.reportError('delete item', error, t('item_list.delete_error'));
@@ -114,15 +95,11 @@ export function useItemMutations({
         return;
       }
 
-      // The card is already gone from the grid, and for anyone not looking
-      // at it right now (or focused on it -- see #293) this is the only
-      // evidence the deletion happened at all.
       toast.success(t('item_list.entry_deleted'));
 
       try {
-        // The row is already gone at this point, irreversibly. A failure
-        // here is a storage leak, not data loss -- there is no entry left
-        // to restore, and nothing to gain by pretending otherwise.
+        // Row already gone here. A failure below is a storage leak, not
+        // data loss.
         await removeImageBytes(id, imagePaths);
       } catch (err) {
         toast.reportError(
@@ -131,8 +108,6 @@ export function useItemMutations({
           t('item_list.delete_images_cleanup_error'),
         );
       }
-      // Resyncs the page silently: pulls up whatever item now belongs in
-      // the freed slot and corrects the total the pagination is drawn from.
       void reload({ silent: true });
     },
     [

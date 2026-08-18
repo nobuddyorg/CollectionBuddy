@@ -7,11 +7,10 @@ import '@testing-library/jest-dom/vitest';
 // from one test in a file leak into the next.
 afterEach(cleanup);
 
-// jsdom has no CSSOM view module, so `window.matchMedia` simply isn't there
-// -- any component that asks the OS a question (useTheme asks it about dark
-// mode) throws on mount. The stub answers "no" to everything and registers
-// no listeners, which is the right default: a test that cares about a media
-// query should say so itself rather than inherit an opinion from here.
+// jsdom has no CSSOM view module, so `window.matchMedia` isn't there -- any
+// component asking the OS a question (useTheme, dark mode) throws on mount.
+// Stubbed to answer "no" with no listeners; a test that cares should say so
+// itself.
 if (typeof window !== 'undefined' && !window.matchMedia) {
   window.matchMedia = (query: string) =>
     ({
@@ -26,11 +25,9 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
     }) as MediaQueryList;
 }
 
-// Node 22+ ships its own global `localStorage`/`sessionStorage` (behind
-// --localstorage-file), which Vitest's jsdom environment treats as "already
-// present" and therefore never overrides with jsdom's real implementation --
-// leaving `window.localStorage` silently undefined in every jsdom test.
-// Repoint the globals at the jsdom instance the environment already created.
+// Node 22+ ships its own global `localStorage`, which Vitest's jsdom
+// environment treats as already present and never overrides -- leaving
+// `window.localStorage` silently undefined. Repoint the globals at jsdom's.
 const dom = (globalThis as unknown as { jsdom?: { window: Window } }).jsdom;
 if (dom) {
   Object.defineProperty(globalThis, 'localStorage', {

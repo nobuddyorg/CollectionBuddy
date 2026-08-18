@@ -15,9 +15,8 @@ export function useCreateItem(categoryId: string) {
   const create = useCallback(
     async (values: ItemFormValues): Promise<boolean> => {
       if (isCreating) return false;
-      // The DB is the normalization authority (trims, collapses whitespace,
-      // nullifies blanks, dedupes/sorts tags) -- only guard against an
-      // obviously-blank title here so we don't submit for nothing.
+      // The DB normalizes everything else; only guard an obviously-blank
+      // title here so we don't submit for nothing.
       if (!values.title.trim()) return false;
       const tags = Array.isArray(values.tags) ? values.tags : [];
 

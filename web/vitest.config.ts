@@ -37,55 +37,25 @@ export default defineConfig({
       include: ['src/app/**/*.{ts,tsx}'],
       exclude: ['src/app/**/types.ts', 'src/app/i18n/*.json', '**/*.d.ts'],
       thresholds: {
-        // Global floor: a coverage regression fails CI instead of silently
-        // slipping through. Two things to know before trusting a green
-        // local run:
-        //
-        // 1. `npm test` does NOT enforce these. Only `npm test -- --coverage`
-        //    does, which is what CI runs. Check with coverage before pushing.
-        // 2. CI measures ~0.1pp lower than a local run (it is pinned to Node
-        //    22 while local dev is typically newer, and V8 counts branches
-        //    slightly differently). These values sit a few tenths below the
-        //    last local measurement to absorb that -- keep that headroom
-        //    when raising them.
-        //
-        // Lowered by hand once, deliberately: removing ItemCard's
-        // reveal-on-tap action row deleted well-covered lines, which moves
-        // the ratio for a structural reason rather than a regression in
-        // testing (the suite grew 84 -> 120 tests in the same change).
-        //
-        // Raised to the measurement in #246. They had drifted to roughly 16
-        // points below what the suite actually achieved, which meant half the
-        // tests could have been deleted and CI would still have gone green --
-        // a floor that far under the floorboards is not holding anything up.
-        // The rule from here is that a PR may raise these and must not lower
-        // them.
+        // Global floor. Only `npm test -- --coverage` enforces this (what
+        // CI runs, not plain `npm test`), and CI measures ~0.1pp lower than
+        // local (pinned Node version). A PR may raise these values and must
+        // not lower them.
         statements: 39.4,
         branches: 38.8,
         functions: 40.8,
         lines: 40.0,
 
-        // Was `true`. autoUpdate wrote the local measurement straight back
-        // into this file after every coverage run, including a value CI
-        // could not reach, so a green local run kept producing a red PR --
-        // and any headroom added here was erased by the next local run.
-        // The floor still fails CI on a real regression; it just no longer
-        // moves itself. Raise it by hand when coverage genuinely improves.
+        // Was `true`: autoUpdate wrote the local measurement back into this
+        // file after every run, so a green local run kept producing a red
+        // PR. Raise by hand when coverage genuinely improves.
         autoUpdate: false,
 
-        // Per-file floors for the pure, high-risk logic called out in
-        // https://github.com/nobuddyorg/CollectionBuddy/issues/140 --
-        // string/boundary construction where line coverage alone doesn't
-        // prove the assertions are load-bearing (see the mutation-testing
-        // config in stryker.config.mjs for that part). Each of these
-        // files pairs a `/* v8 ignore start/stop */` block around
-        // React/effect/I-O internals with one or more exported pure
-        // functions that carry the actual risk, so the 100% floor only has
-        // to hold for what's left instrumented -- built from
-        // mutation-targets.mjs rather than listed by hand here, so any
-        // future line added to one of these functions must be tested, and
-        // this list can't quietly drift from what stryker.config.mjs
-        // mutates the way it already had (#370).
+        // Per-file floors for the pure, high-risk logic in
+        // mutation-targets.mjs, where line coverage alone doesn't prove the
+        // assertions are load-bearing (stryker.config.mjs covers that part).
+        // Built from that shared list rather than listed by hand, so it
+        // can't drift from what Stryker mutates.
         ...perFileThresholds,
       },
     },

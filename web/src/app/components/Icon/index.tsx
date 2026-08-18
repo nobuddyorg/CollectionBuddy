@@ -270,9 +270,8 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
           <path d="m21 21-6-6m6 6v-4m0 4h-4" />
           <path d="M3 3l6 6m-6-6v4m0-4h4" />
           <path d="M21 3l-6 6m6-6v4m0-4h-4" />
-          {/* The bottom-left head points inward (+x), unlike the
-              bottom-right one -- a negative run here draws off-canvas and
-              the arrow renders with a leg missing. */}
+          {/* Points inward (+x), unlike the bottom-right arrow: a negative
+              run here draws off-canvas and the leg goes missing. */}
           <path d="M3 21l6-6m-6 6v-4m0 4h4" />
         </svg>
       );
@@ -303,9 +302,8 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
           strokeLinejoin="round"
           {...props}
         >
-          {/* Arrow into a tray: the download glyph, drawn downward so it
-              reads as "out of here and onto your device" rather than as
-              the upload it would be with the arrowhead reversed. */}
+          {/* Drawn downward so it reads as "onto your device", not the
+              upload it would be with the arrowhead reversed. */}
           <path d="M12 3v11" />
           <path d="m7 10 5 5 5-5" />
           <path d="M4 19h16" />
@@ -322,8 +320,7 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
           strokeLinejoin="round"
           {...props}
         >
-          {/* The same tray as Download, arrow reversed: "into here and up
-              onto your collection" rather than out of it. */}
+          {/* Same tray as Download, arrow reversed. */}
           <path d="M12 14V3" />
           <path d="m7 8 5-5 5 5" />
           <path d="M4 19h16" />
@@ -340,9 +337,8 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
           strokeLinejoin="round"
           {...props}
         >
-          {/* Three nodes, two spokes: the shared-category marker in
-              CategorySelect (Dropdown.tsx) -- reads as "this one connects to
-              someone else" without needing a caption at tab-strip size. */}
+          {/* Three nodes, two spokes: reads as "connects to someone else"
+              without a caption at tab-strip size. */}
           <circle cx="18" cy="5" r="3" />
           <circle cx="6" cy="12" r="3" />
           <circle cx="18" cy="19" r="3" />
@@ -368,9 +364,8 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
         </svg>
       );
     default: {
-      // `IconType` is a numeric enum: an unhandled member falls through to
-      // here and renders nothing with no compile error, unless this
-      // assignment forces the exhaustiveness check.
+      // Forces a compile error on an unhandled IconType member, which a
+      // numeric enum would otherwise let fall through silently.
       const exhaustive: never = icon;
       void exhaustive;
       return null;

@@ -42,10 +42,8 @@ describe('CategoryInput', () => {
     expect(props.setExpanded).not.toHaveBeenCalled();
   });
 
-  // Regression (#356): Escape used to collapse the whole panel in one
-  // press, discarding whatever was typed -- inconsistent with the rename
-  // field right above it, where Escape only ever resets the value. A first
-  // Escape here now does the same: clear the field, nothing more.
+  // Escape here matches the rename field above: first press clears the
+  // field, nothing more.
   it('clears what was typed on the first Escape, without collapsing', async () => {
     const props = renderInput({ name: 'Stamps' });
     await userEvent.type(screen.getByRole('textbox'), '{Escape}');

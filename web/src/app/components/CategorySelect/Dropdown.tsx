@@ -15,18 +15,13 @@ type Props = {
   userId: string | null;
 };
 
-// Shared with page.tsx, which owns the entries section this tablist
-// controls -- one fixed id because there is only ever one panel on screen,
-// its contents swapping with the selection rather than the id.
+// Shared with page.tsx, which owns the panel this tablist controls -- one
+// fixed id since there is only ever one panel on screen.
 export const CATEGORY_TABPANEL_ID = 'category-entries-panel';
 
 export const categoryTabId = (id: string) => `category-tab-${id}`;
 
-// Card-catalogue dividers: the active category is marked by an ink rule
-// under its name, the way a tabbed divider stands proud of the cards behind
-// it. No fills, no per-category colour -- colour belongs to the photographs.
-//
-// Scrolls horizontally on narrow screens rather than wrapping to three rows.
+// No per-category colour or fill -- colour is reserved for the photographs.
 export function CategorySelectDropdown({
   selectedCat,
   onSelect,
@@ -37,11 +32,9 @@ export function CategorySelectDropdown({
 }: Props) {
   const { t } = useI18n();
 
-  // Placeholder dividers rather than a "Loading…" line: the strip keeps
-  // its height and its rule, so the page below it doesn't step down when
-  // the real tabs arrive. Three of them, at uneven widths, because
-  // category names are uneven -- three matched bars read as a component
-  // rather than as something unfinished.
+  // Placeholder dividers, not a "Loading…" line: keeps the strip's height so
+  // nothing shifts when the real tabs arrive. Uneven widths since real
+  // category names are uneven too.
   if (isLoading) {
     return (
       <div
@@ -83,12 +76,9 @@ type TablistProps = {
   userId: string | null;
 };
 
-// Roving tabindex: only the selected tab is a Tab stop, and ArrowLeft/
-// ArrowRight/Home/End move both focus and selection between the others --
-// the keyboard model a "tab, 1 of 3" announcement promises. Wraps from the
-// last tab to the first (and back) rather than stopping, since the count of
-// categories is arbitrary and a hard edge would just be a dead end to arrow
-// into.
+// Roving tabindex: only the selected tab is a Tab stop; arrow keys/Home/End
+// move both focus and selection. Wraps at the ends rather than stopping,
+// since the tab count is arbitrary.
 function CategoryTablist({
   selectedCat,
   onSelect,

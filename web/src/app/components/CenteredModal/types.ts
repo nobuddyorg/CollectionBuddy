@@ -4,8 +4,8 @@ export type CenteredModalProps = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   title: string;
-  /** Rendered above the modal's own content and wired to `aria-describedby`
-   *  -- for content that isn't just the dialog's label (a confirm's
+  /** Rendered above the modal's own content and wired to `aria-describedby`,
+   *  for content that isn't just the dialog's label (e.g. a confirm's
    *  question). */
   description?: string;
   closeLabel?: string;

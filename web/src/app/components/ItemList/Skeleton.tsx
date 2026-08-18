@@ -1,14 +1,6 @@
 'use client';
 import { useI18n } from '../../i18n/useI18n';
 
-// The shape of the catalogue, held while the catalogue is still on the
-// wire. Sign-in used to hand over a page that was finished-looking but
-// empty -- the full-screen spinner came down the moment the session
-// resolved, and categories and the first page of entries were still two
-// round trips away. What filled that gap was a centred "Loading…" line,
-// which is a smaller thing than the grid that replaced it, so the page
-// visibly jumped when the entries landed.
-//
 // These placeholders occupy the same boxes the real toolbar and cards
 // will, so arriving content swaps in place instead of pushing the page
 // around.
@@ -17,10 +9,9 @@ import { useI18n } from '../../i18n/useI18n';
 // bars as well turned a quiet placeholder into six blinking cards.
 const bar = 'rounded-sm bg-muted';
 
-// The label's own shape, held while its card is still waiting on a
-// photograph -- shared with `ItemCard` (#556), which shows this in place
-// of the real caption until the hero photograph has actually loaded, so a
-// card never shows its title before it has a picture to go with it.
+// Shared with `ItemCard`, which shows this in place of the real caption
+// until the hero photograph has loaded, so a card never shows its title
+// before it has a picture to go with it.
 export function CaptionSkeleton() {
   return (
     <div className="flex flex-1 flex-col gap-2 p-4">
@@ -45,9 +36,8 @@ function CardSkeleton() {
   );
 }
 
-// Six rather than a full page of nine: two desktop rows is enough to read
-// as "a grid is coming", and nine leaves a column of shimmer far below
-// the fold that nobody sees resolve.
+// Six, not a full page of nine: two desktop rows reads as "a grid is
+// coming"; nine leaves shimmer below the fold that nobody sees resolve.
 const CARD_COUNT = 6;
 
 export function GridSkeleton({ count = CARD_COUNT }: { count?: number }) {
@@ -66,10 +56,9 @@ export function GridSkeleton({ count = CARD_COUNT }: { count?: number }) {
   );
 }
 
-// The whole list, toolbar included -- for the stretch before `ItemList`
-// itself exists, when the category it needs hasn't been resolved yet.
-// Without the toolbar row, search and the entry buttons would drop in
-// afterwards and shove the grid down.
+// The whole list, toolbar included, for the stretch before `ItemList`
+// exists -- without the toolbar row, search and the entry buttons would
+// drop in afterwards and shove the grid down.
 export function ItemListSkeleton() {
   return (
     <div className="space-y-4">

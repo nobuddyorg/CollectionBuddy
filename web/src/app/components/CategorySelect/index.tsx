@@ -34,10 +34,9 @@ type Props = {
   onSelect: (id: string | null) => void;
   categories: UseCategories;
   userId: string | null;
-  /** False until the page's own initial load has resolved -- see the
-   *  `catalogueReady` comment in page.tsx. Held here only long enough to
-   *  keep the header from showing "None selected" for the one render
-   *  before the real selection lands. */
+  /** False until the page's own initial load has resolved (see
+   *  `catalogueReady` in page.tsx) -- keeps the header from showing "None
+   *  selected" for one render before the real selection lands. */
   ready?: boolean;
 };
 
@@ -89,10 +88,8 @@ export default function CategorySelect({
     setExpanded(!selectedCat);
   }
 
-  // The initial load, and the auto-select of a lone category, now happen in
-  // the page: it needs the answer to decide what goes below this strip, and
-  // the collapse that used to ride along with the auto-select is already
-  // handled by the selection transition above.
+  // Initial load and auto-select of a lone category happen in the page, not
+  // here -- it needs the answer to decide what renders below this strip.
 
   // The same order the page picks "the first category" from, so the tab it
   // opens on is the tab that reads as first.
@@ -104,27 +101,25 @@ export default function CategorySelect({
     [cats, selectedCat],
   );
 
-  // listCategories() (data/categories.ts) now returns both owned and
-  // shared-with-me rows under the RLS extension in 0011_category_shares.sql
-  // -- user_id is the only thing in the response that says which is which.
+  // listCategories() returns both owned and shared-with-me rows (RLS
+  // extension in 0011_category_shares.sql); user_id is the only thing
+  // distinguishing which is which.
   const isShared = !!selected && !!userId && selected.user_id !== userId;
 
   // One instance per open panel. For an owned category this lists every
   // grant the owner has made (for SharingSection, below); for a shared one
-  // it resolves to the viewer's own single grant row, which is what
-  // onDelete needs to leave it. Either way, the "select own or invited
-  // category_shares" policy already decided which rows come back -- this
-  // never filters by ownership itself.
+  // it resolves to the viewer's own single grant row, which onDelete needs
+  // to leave it. Either way, the "select own or invited category_shares"
+  // RLS policy already decided which rows come back.
   const shares = useShares(selectedCat);
   const { reload: reloadShares } = shares;
   useEffect(() => {
     if (expanded && selectedCat) void reloadShares();
   }, [expanded, selectedCat, reloadShares]);
 
-  // Keeps the rename field showing the selected category, including when
-  // the selection changes underneath it or a rename normalises server-side.
-  // Done as a render-time transition rather than an effect so the field is
-  // never briefly out of sync with the selection.
+  // Render-time transition rather than an effect, so the rename field is
+  // never briefly out of sync with the selection (including a server-side
+  // rename normalisation).
   const [syncedName, setSyncedName] = useState<string | null>(null);
   if (selected && selected.name !== syncedName) {
     setSyncedName(selected.name);
@@ -154,10 +149,9 @@ export default function CategorySelect({
 
   const onImportFile = useCallback(
     async (file: File) => {
-      // createCategory reloads before handing back the new row (see
-      // useCategories.tsx); import created its category the same way, out
-      // from under this component, so `cats` never picked it up and
-      // selecting it here found nothing to select (#510).
+      // Import creates its category out from under this component, so
+      // `cats` hasn't picked it up yet -- reload() must resolve before
+      // onSelect, or there is nothing yet to select.
       await runImport(file, (categoryId) => {
         void reload().then(() => onSelect(categoryId));
       });
@@ -165,13 +159,10 @@ export default function CategorySelect({
     [runImport, reload, onSelect],
   );
 
-  // Same button, same position, two different operations underneath it:
-  // owning this category means the trash destroys it, being a grantee means
-  // it only ends *this viewer's* access (deleteShare, on their own grant
-  // row -- shares.shares[0], the one row "select own or invited
-  // category_shares" (0011) ever hands back to a non-owner). Either way the
-  // selection falls through to what's left, so leaving a category doesn't
-  // strand the viewer on a chooser any more than deleting one does.
+  // Same button, same position, two different operations: owning this
+  // category means the trash destroys it; being a grantee means it only
+  // ends *this viewer's* access, via deleteShare on shares.shares[0] -- the
+  // one row RLS ever hands back to a non-owner.
   const onLeave = useCallback(async () => {
     if (!selectedCat || !selected) return;
     const myShareId = shares.shares[0]?.id;
@@ -197,10 +188,8 @@ export default function CategorySelect({
     if (!selectedCat) return;
     const name = selected?.name ?? '';
 
-    // Named and counted rather than a bare "Confirm deletion": this is the
-    // easiest way for someone to destroy their whole collection by
-    // accident -- the trash sits right beside the rename field they were
-    // probably reaching for -- and it is permanent, with no undo.
+    // Named and counted rather than a bare "Confirm deletion": the trash
+    // sits right beside the rename field, and deletion is permanent.
     const { count, error: countError } =
       await countItemsForCategory(selectedCat);
     if (countError) console.error(countError);
@@ -216,9 +205,8 @@ export default function CategorySelect({
     if (!(await confirm(message))) return;
     const ok = await deleteCategory(selectedCat);
     if (ok) {
-      // Falls through to what is left rather than to nothing: a collection
-      // with categories in it should always be showing one of them, and
-      // deleting a category is no reason to be sent back to a chooser.
+      // Falls through to what's left rather than to nothing -- deleting a
+      // category is no reason to be sent back to a chooser.
       const remaining = sortedCats.filter((c) => c.id !== selectedCat);
       onSelect(remaining[0]?.id ?? null);
     }
@@ -226,13 +214,8 @@ export default function CategorySelect({
 
   return (
     <section className="space-y-3">
-      {/* One heading, in both states. Opening the panel used to replace the
-          collection's name with a bare label and swap the pencil for a
-          close button drawn at a different height, so every toggle moved
-          the heading down, moved the button up, and shifted everything
-          below by the difference. The panel now opens *underneath* a
-          header that does not move: same line, same slot, same size --
-          only the glyph in it changes. */}
+      {/* One heading in both states, so opening/closing the panel doesn't
+          shift the header or anything below it. */}
       <div className="flex items-end justify-between gap-3 border-b border-border pb-3">
         <CategoryText
           title={t('category_select.title')}
@@ -269,15 +252,8 @@ export default function CategorySelect({
           />
 
           {/* Rename and create are separate rows with their own field and
-              their own button. Sharing one input meant the same box
-              created a category or did nothing depending on hidden state,
-              and there was no way to rename at all.
-
-              They do share one grid, though, so the two fields come out
-              the same width: the trailing controls sit in the same two
-              columns and the add button spans both. Laid out row by row
-              the fields differed by exactly the delete button the rename
-              row carries and this one does not. */}
+              button, but share one grid so the two fields line up at the
+              same width despite the rename row's extra delete button. */}
           <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1.5">
             {selected && (
               <>
@@ -290,18 +266,11 @@ export default function CategorySelect({
                 <input
                   id="rename-category"
                   value={renameValue}
-                  // Shared categories keep this field in the same slot
-                  // rather than hiding it -- inert, not absent, so the
-                  // panel's shape doesn't change depending on who owns
-                  // what's open. Renaming someone else's category would
-                  // fail RLS's "update own categories" policy anyway; this
-                  // just doesn't offer the round trip.
-                  //
-                  // disabled, not readOnly: readOnly still focuses, still
-                  // shows a text cursor and a selection caret -- every visual
-                  // cue of an editable field except the one thing (typing)
-                  // that would actually change it. disabled looks as inert
-                  // as it is.
+                  // Shared categories keep this field in the same slot,
+                  // disabled rather than hidden or readOnly: RLS's "update
+                  // own categories" policy would reject the write anyway,
+                  // and readOnly still shows every visual cue of an
+                  // editable field except the one that matters (typing).
                   disabled={isShared}
                   title={
                     isShared
@@ -313,10 +282,8 @@ export default function CategorySelect({
                     if (e.key === 'Enter') void onRename();
                     if (e.key === 'Escape') {
                       // First Escape discards the edit; only a second one
-                      // (nothing left to discard) closes the panel -- the
-                      // same two-step the new-category field below now
-                      // takes, rather than this field swallowing whatever
-                      // was typed the moment the key is pressed once.
+                      // (nothing left to discard) closes the panel, same
+                      // as the new-category field below.
                       if (renameValue !== selected.name) {
                         setRenameValue(selected.name);
                       } else {
@@ -333,14 +300,13 @@ export default function CategorySelect({
                   }
                   label={t('category_select.rename_confirm')}
                 />
-                {/* Disabled for the whole run, not just while the delete
-                    request is in flight: an export reads storage objects a
-                    confirmed delete would remove out from under it, and the
-                    removals would only fail silently as 404s rather than
-                    stopping either action (#419). A shared category's
-                    grants haven't loaded yet is the same kind of window --
-                    onLeave needs shares.shares[0] to exist before the click
-                    can do anything. */}
+                {/* Disabled for the whole export run, not just while the
+                    delete request is in flight: a confirmed delete would
+                    remove storage objects the export is still reading,
+                    failing silently as 404s rather than stopping either
+                    action. Also disabled while a shared category's grants
+                    haven't loaded, since onLeave needs shares.shares[0] to
+                    exist. */}
                 <DeleteButtonWithLabel
                   onClick={() => void (isShared ? onLeave() : onDelete())}
                   disabled={
@@ -376,9 +342,8 @@ export default function CategorySelect({
           </div>
 
           {/* Only for a category this viewer owns -- a grantee manages
-              their own access through the Delete button above (onLeave),
-              not from here, and never sees who else a category is shared
-              with. */}
+              their own access through Delete (onLeave) and never sees who
+              else a category is shared with. */}
           {selected && !isShared && <SharingSection shares={shares} />}
 
           {/* A category from a file, not a category to select first --
@@ -417,18 +382,11 @@ export default function CategorySelect({
             </p>
           </div>
 
-          {/* Below its own rule, and only once there is a category to take
-              a copy of. The line beside the button is where the export
-              reports from: it runs for as long as the photographs take,
-              which on a large collection is long enough that a button
-              which only dimmed would read as broken.
-
-              Disabled, not absent, for a shared category -- same slot as
-              everything else in this panel, same reason: exportCategory()
-              (data/exportCategory.ts) resolves the *caller's own* uid to
-              build each item's storage prefix, which for a grantee is the
-              wrong prefix entirely, not the owner's, so this has to stay
-              blocked regardless of "view only" scope. */}
+          {/* Below its own rule, only once there is a category to take a
+              copy of. Disabled, not absent, for a shared category:
+              exportCategory() resolves the *caller's own* uid to build
+              each item's storage prefix, which for a grantee is the wrong
+              prefix entirely, not the owner's. */}
           {selected && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3">
               <ExportButton
@@ -452,12 +410,9 @@ export default function CategorySelect({
             </div>
           )}
 
-          {/* Closes the panel off from whatever the page renders next
-              (search bar, data). Collapsed, the header's own border-b
-              already sits at the bottom of this component and needs no
-              help; open, this panel's last row would otherwise butt
-              straight up against that content with only a spacing gap
-              between them. */}
+          {/* Closes the panel off from whatever renders next; only needed
+              while expanded, since the collapsed header already has its
+              own border-b. */}
           <div aria-hidden="true" className="border-t border-border pt-3" />
         </>
       )}

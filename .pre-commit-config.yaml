@@ -21,17 +21,10 @@ repos:
     rev: v1.48.0
     hooks:
       - id: typos
-        # German prose reads as misspelled English almost word for word --
-        # its pronouns and possessives each map onto some near-miss English
-        # word -- so the German-language documents are out of scope rather
-        # than annotated line by line. (Naming the offending words here
-        # would trip this very hook, which is how this comment got shorter.)
-        # The lockfile is a wall of hashes and package names.
-        # The end-to-end fixtures join the list for the same reason as the
-        # translations: the seed collection is written in the app's own
-        # language, because the tests read it back off a German-language
-        # interface. (Naming the offending word here would trip this very
-        # hook, which is how the comment above got shorter too.)
+        # German prose reads as misspelled English near word-for-word, so
+        # German-language documents (incl. the e2e fixtures' German seed
+        # data) are out of scope rather than annotated line by line. The
+        # lockfile is a wall of hashes and package names.
         exclude: |
           (?x)^(
             web/src/app/i18n/(de|en)\.json|

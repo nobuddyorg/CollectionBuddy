@@ -95,8 +95,7 @@ function penPoints(d: string): Array<[number, number]> {
 }
 
 // A corner arrow whose head runs the wrong way leaves the 0..24 viewBox and
-// renders with a leg missing, which is easy to miss in review and was how the
-// bottom-left arrow shipped broken.
+// renders with a leg missing.
 describe('Frame icon geometry', () => {
   const paths = () => {
     const { container } = render(<Icon icon={IconType.Frame} />);

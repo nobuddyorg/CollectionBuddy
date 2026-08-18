@@ -42,11 +42,9 @@ function item(overrides: Partial<ExportItem> = {}): ExportItem {
 }
 
 /**
- * Builds a real archive, the same way exportCategory.ts does, but from a
- * caller-supplied item/photo list rather than a live export -- so
- * importCategory.test.ts exercises the actual format two independent
- * modules (zip.ts, exportFormat.ts) agree on, not a hand-rolled stand-in
- * that could quietly drift from it.
+ * Builds a real archive from a caller-supplied item/photo list, the same
+ * way exportCategory.ts does -- exercises the actual format zip.ts and
+ * exportFormat.ts agree on, not a hand-rolled stand-in.
  */
 async function buildArchive({
   items = [item()],

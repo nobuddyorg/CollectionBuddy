@@ -8,14 +8,9 @@ const CHARCOAL = 'rgb(25, 24, 21)';
 const themeAttr = (page: import('@playwright/test').Page) =>
   page.evaluate(() => document.documentElement.getAttribute('data-theme'));
 
-// The control itself lives in the account menu, behind a session, so what can
-// be held here is the half that runs for everyone: what the page decides
-// before React exists, from the OS and from whatever is in storage.
-//
-// That half is the one worth guarding anyway. It is an inline script that
-// duplicates useTheme's inputs by hand because nothing else runs early enough,
-// and its failure mode is a flash of the wrong theme -- invisible to every
-// unit test, and to anyone not looking at the moment the page loads.
+// Covers only the pre-React half: an inline script sets the theme from OS/storage
+// before hydration, since nothing else runs early enough. Its failure mode is a
+// flash of the wrong theme, invisible to unit tests.
 test.describe('the theme a page arrives in', () => {
   test('follows a dark OS when nothing has been chosen', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
@@ -46,8 +41,7 @@ test.describe('the theme a page arrives in', () => {
     expect(await themeAttr(page)).toBe('light');
   });
 
-  // Storage is not a trusted input: a value left by an older build, or edited
-  // by hand, must land on system rather than on an attribute nothing styles.
+  // Storage is not a trusted input; an invalid value must fall back to the OS.
   test('falls back to the OS for a stored value that is not a theme', async ({
     page,
   }) => {
@@ -57,9 +51,8 @@ test.describe('the theme a page arrives in', () => {
     expect(await themeAttr(page)).toBe('dark');
   });
 
-  // The flash the inline script exists to prevent. `domcontentloaded` is
-  // before hydration -- if the attribute were being set by React, it would not
-  // be there yet, and the visitor would have seen paper first.
+  // `domcontentloaded` fires before hydration, so this fails if the theme
+  // attribute is only ever set by React.
   test('is decided before the page is interactive, not after', async ({
     page,
   }) => {
@@ -76,8 +69,7 @@ test.describe('the theme a page arrives in', () => {
     expect(await cssVar(page, 'color-scheme')).toBe('dark');
   });
 
-  // Both entries have to survive the build: the browser chrome around an
-  // installed app is the one surface the CSS cannot reach.
+  // Browser chrome around an installed app is the one surface CSS can't reach.
   test('declares a theme colour for each scheme', async ({ page }) => {
     await page.goto('login/');
     const metas = page.locator('meta[name="theme-color"]');

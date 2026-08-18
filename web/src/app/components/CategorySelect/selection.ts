@@ -5,9 +5,8 @@ import type { CategorySummary } from '../../data/categories';
 export const SELECTED_CATEGORY_KEY = 'collectionbuddy.selectedCategory';
 
 /**
- * The order the categories are shown in -- and therefore what "the first
- * one" means. German collation with base sensitivity, so ä sorts with a
- * and case doesn't decide anything.
+ * The order categories are shown in. German collation with base
+ * sensitivity, so ä sorts with a and case doesn't decide anything.
  */
 export function sortCategories<T extends { name: string }>(
   cats: readonly T[],
@@ -18,12 +17,8 @@ export function sortCategories<T extends { name: string }>(
 }
 
 /**
- * What to show on arrival. Signing in used to land on "choose a category"
- * unless the collection happened to have exactly one, which made the most
- * ordinary case -- open the app, look at my things -- start with a
- * decision. It now opens on the category last chosen, and on the first one
- * when there is no such choice to honour (or the category it named is
- * gone).
+ * What to show on arrival: the last category chosen, falling back to the
+ * first one if there is no such choice to honour (or it's gone).
  */
 export function pickInitialCategory(
   cats: readonly CategorySummary[],
@@ -34,9 +29,8 @@ export function pickInitialCategory(
   return sortCategories(cats)[0].id;
 }
 
-// Storage is allowed to throw -- Safari's private mode does, and a browser
-// with cookies blocked can too. Losing the preference is a smaller failure
-// than failing to render the catalogue, so both directions swallow it.
+// Storage can throw (Safari private mode, cookies blocked); losing the
+// preference is a smaller failure than failing to render the catalogue.
 export function readStoredCategory(): string | null {
   try {
     return window.localStorage.getItem(SELECTED_CATEGORY_KEY);

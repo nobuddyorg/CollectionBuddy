@@ -1,17 +1,11 @@
 /**
- * A pin's popup: the place, and the entries catalogued there (#404).
+ * A pin's popup. Built as DOM, not markup, since Leaflet binds a node not a
+ * React tree -- every string here is user-entered, so each is set via
+ * `textContent`, never parsed as HTML.
  *
- * Built as DOM rather than markup because Leaflet binds a node, not a React
- * tree -- and every string in here is user-entered, so each one is set with
- * `textContent`. A title is a value this app stored faithfully; it must
- * never be a value this app parses as HTML.
- *
- * Deliberately not themed. A popup floats over map tiles, which are the
- * same paper colour whichever theme the app is in, so it keeps Leaflet's
- * own light styling in both rather than turning charcoal over a light map.
- *
- * Kept in its own module, apart from `./index`, so it can be unit-tested
- * without importing Leaflet's CSS and marker images along with it (#423).
+ * Deliberately not themed: a popup floats over map tiles, which are the
+ * same paper colour in either theme, so it keeps Leaflet's own light
+ * styling rather than turning charcoal over a light map.
  */
 export const popupContent = (
   text: string,
@@ -33,10 +27,8 @@ export const popupContent = (
   }
 
   if (titles?.length) {
-    // Scrolls rather than truncates: the ask was the titles of *all* the
-    // collectibles at a place, and a pin standing for thirty of them should
-    // still be able to name the thirtieth. The cap is on the popup's
-    // height, not on the collection.
+    // Scrolls rather than truncates: the cap is on the popup's height, not
+    // on how many titles it can name.
     const list = document.createElement('ul');
     list.className = 'mt-1.5 max-h-40 overflow-y-auto list-disc pl-4';
     for (const title of titles) {

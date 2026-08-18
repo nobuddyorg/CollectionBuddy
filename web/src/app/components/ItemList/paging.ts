@@ -1,10 +1,6 @@
 /**
- * The arithmetic behind a page of entries.
- *
- * Lifted out of useItems because it is the part that can be wrong: a page
- * number that outlives the entries it was pointing at, or a range that asks
- * the database for rows either side of the ones wanted. Both are off-by-one
- * territory, and both used to sit inline in a hook that no test could reach.
+ * The arithmetic behind a page of entries -- lifted out of useItems since
+ * this is the off-by-one-prone part, so it can be tested directly.
  */
 
 /** Entries per page. Nine fills three desktop rows of three. */
@@ -16,17 +12,10 @@ export function pageCount(total: number): number {
 }
 
 /**
- * The page actually being shown, which is not always the page asked for.
- *
- * Deleting the last entry of the last page leaves a page number pointing past
- * the end. Clamping here rather than writing a corrected number back into
- * state matters: this is derived from state that already exists, so it is
- * right on the render the deletion happens rather than one render later --
- * and that later render is one where the grid asks for an out-of-bounds slice
- * and comes back empty with no page marked active.
- *
- * An empty collection still shows page 1, because "page 0 of 0" is not a
- * thing to put on a screen.
+ * The page actually being shown, not always the page asked for. Deleting
+ * the last entry of the last page leaves a page number pointing past the
+ * end; clamping a derived value fixes it the same render, not one render
+ * later. An empty collection still shows page 1, not "page 0 of 0".
  */
 export function clampPage(page: number, totalPages: number): number {
   if (totalPages <= 0) return 1;

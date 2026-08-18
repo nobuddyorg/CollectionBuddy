@@ -14,11 +14,10 @@ import type { CategoryShareSummary, ShareRole } from '../../data/shares';
 
 export type UseShares = ReturnType<typeof useShares>;
 
-// One instance per open category panel, the same relationship
-// useCategories has to the page: this hook doesn't know or care whether the
-// category belongs to the caller or was shared with them -- the
-// "select own or invited category_shares" RLS policy (0011) already
-// answers that by what rows come back.
+// This hook doesn't know or care whether the category belongs to the
+// caller or was shared with them -- the "select own or invited
+// category_shares" RLS policy (0011) already answers that by what rows
+// come back.
 export function useShares(categoryId: string | null) {
   const { t } = useI18n();
   const toast = useToast();

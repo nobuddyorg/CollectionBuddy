@@ -1,11 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-// The redesign that produced this palette was set off by measured failures
-// -- tag text at 2.1:1 and 4.0:1 against its card -- so the ratios are held
-// here rather than left to the eye. A second theme doubles the surface for
-// that kind of mistake: dark palettes fail quietly, because low contrast on
-// a dark page still looks deliberate.
+// Measured contrast failures motivated this suite; dark palettes fail
+// quietly since low contrast there still looks deliberate.
 const css = readFileSync(new URL('globals.css', import.meta.url), 'utf8');
 
 function tokensIn(selector: string): Record<string, string> {
@@ -35,11 +32,10 @@ function contrast(a: string, b: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-// Tailwind's `/NN` opacity modifier composites the colour onto whatever sits
-// behind it before the browser ever paints -- so a pair drawn with one, like
-// `text-foreground/80` on `bg-mount`, isn't `fg` and isn't `mount`, it's the
-// two blended. This mirrors that compositing so the pair can be measured as
-// what actually reaches the screen.
+// Tailwind's `/NN` opacity modifier composites the colour onto whatever's
+// behind it before paint, so e.g. `text-foreground/80` on `bg-mount` is
+// neither `fg` nor `mount` but the two blended. This mirrors that
+// compositing so the pair is measured as what actually reaches the screen.
 function withAlpha(hexFg: string, alpha: number, hexBg: string): string {
   const fg = [1, 3, 5].map((i) => parseInt(hexFg.slice(i, i + 2), 16));
   const bg = [1, 3, 5].map((i) => parseInt(hexBg.slice(i, i + 2), 16));
@@ -68,9 +64,8 @@ const TEXT_PAIRS: [string, string][] = [
 ];
 
 // --control-border is the only visible edge of every text input, textarea,
-// search field and outline button (CORR-A6) -- a non-text element WCAG
-// 1.4.11 holds to 3:1, not the 4.5:1 that TEXT_PAIRS checks. `card` and
-// `background` are the two surfaces those controls actually sit on.
+// search field and outline button -- a non-text element, so WCAG 1.4.11
+// holds it to 3:1, not the 4.5:1 that TEXT_PAIRS checks.
 const CONTROL_BORDER_PAIRS: [string, string][] = [
   ['control-border', 'card'],
   ['control-border', 'background'],
@@ -78,9 +73,8 @@ const CONTROL_BORDER_PAIRS: [string, string][] = [
 
 describe.each(Object.entries(themes))('%s theme', (name, tokens) => {
   it('defines every colour the other theme defines', () => {
-    // A token present in one theme and missing from the other is the classic
-    // dark-mode hole: the light value stays put and one element on the page
-    // keeps its paper colour.
+    // A token missing from one theme is the classic dark-mode hole: the
+    // light value stays put and one element keeps its paper colour.
     const other = name === 'light' ? themes.dark : themes.light;
     expect(Object.keys(tokens).sort()).toEqual(Object.keys(other).sort());
   });
@@ -93,18 +87,16 @@ describe.each(Object.entries(themes))('%s theme', (name, tokens) => {
 
   // The empty-mount "no images" label draws `text-foreground/80` on
   // `bg-mount` (AddPhotoPlate, ItemList/Actions.tsx) rather than
-  // `muted-foreground`, which measured 3.85:1 on this surface in the light
-  // theme -- below AA, and the resting colour, since touch has no hover to
-  // raise it. This is the pair that combination actually paints.
+  // `muted-foreground`, which measured 3.85:1 here -- below AA.
   it('carries foreground/80 on mount at WCAG AA', () => {
     const composite = withAlpha(tokens.foreground, 0.8, tokens.mount);
     expect(contrast(composite, tokens.mount)).toBeGreaterThanOrEqual(4.5);
   });
 
   // The empty mount's dashed rule (AddPhotoPlate, ItemList/Actions.tsx) is a
-  // non-text boundary, so it's held to 1.4.11's 3:1 rather than the 4.5:1
-  // text pairs above. It used to draw at 20%, which measured 1.76:1 in dark
-  // and 1.47:1 in light -- an edge nobody could actually see (#516).
+  // non-text boundary, held to 1.4.11's 3:1 rather than the 4.5:1 text
+  // pairs above. It used to draw at 20%, measuring as low as 1.47:1 -- an
+  // edge nobody could actually see.
   it('carries foreground/60 on mount at WCAG AA non-text contrast', () => {
     const composite = withAlpha(tokens.foreground, 0.6, tokens.mount);
     expect(contrast(composite, tokens.mount)).toBeGreaterThanOrEqual(3);
@@ -119,11 +111,10 @@ describe.each(Object.entries(themes))('%s theme', (name, tokens) => {
     },
   );
 
-  // The accent is the wordmark, and it is drawn at two sizes. The header's
-  // "Buddy" is 16px/18px at font-display weight 700 -- normal text under
-  // WCAG (large text starts at 18.66px bold or 24px regular), so it needs
-  // the same 4.5:1 as any other text. Only the login page's 4xl/5xl mark is
-  // genuinely large, and gets the 3:1 large-text allowance.
+  // The accent is the wordmark, drawn at two sizes. The header's "Buddy" is
+  // 16px/18px bold -- normal text under WCAG (large text starts at 18.66px
+  // bold), so it needs 4.5:1. Only the login page's 4xl/5xl mark is
+  // genuinely large, getting the 3:1 allowance.
   it.each([['background'], ['card']])(
     'carries the accent on %s at normal-text contrast, for the header wordmark',
     (bg) => {
@@ -144,13 +135,13 @@ describe('the dark theme', () => {
     expect(relativeLuminance(themes.dark.background)).toBeLessThan(
       relativeLuminance(themes.dark.foreground),
     );
-    // And genuinely dark, not merely dimmer than the light theme.
+    // Genuinely dark, not merely dimmer than the light theme.
     expect(relativeLuminance(themes.dark.background)).toBeLessThan(0.05);
   });
 
-  // A card is a mount lifted off the page; an empty mount is a hollow cut
-  // into that card. The order has to hold in both themes, which means it
-  // reverses -- lifted is lighter on a dark page and darker on a light one.
+  // A card is lifted off the page; an empty mount is cut into that card.
+  // The order holds in both themes, so it reverses -- lifted is lighter on
+  // a dark page and darker on a light one.
   it('lifts a card off the page and sinks the empty mount into the card', () => {
     const page = relativeLuminance(themes.dark.background);
     const card = relativeLuminance(themes.dark.card);

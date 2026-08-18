@@ -1,8 +1,6 @@
--- Triggers wiring the functions from 0002 onto the tables from 0003.
---
--- Split from the functions so a body can be changed without restating the
--- wiring, and so the wiring can be read in one screen: what fires, on what,
--- before or after, per row or per statement.
+-- Triggers wiring the functions from 0002 onto the tables from 0003, split
+-- out so the wiring (what fires, on what, before/after, per row/statement)
+-- reads in one screen.
 begin;
 
 -- Ownership, on every write.
@@ -43,20 +41,17 @@ create trigger trg_items_updated_at
 before update on public.items
 for each row execute function public.tg_set_updated_at();
 
--- Orphan collection. FOR EACH STATEMENT with a transition table, so
--- deleting a category is two statements regardless of how many items it
--- held (see delete_item_if_orphan in 0002).
+-- FOR EACH STATEMENT with a transition table: one delete regardless of how
+-- many items the category held (see delete_item_if_orphan, 0002).
 drop trigger if exists trg_delete_orphan_items_after_ic_delete on public.item_categories;
 create trigger trg_delete_orphan_items_after_ic_delete
 after delete on public.item_categories
 referencing old table as old_rows
 for each statement execute function public.delete_item_if_orphan();
 
--- There is deliberately no trigger cleaning up an item's images. SQL can
--- delete rows from storage.objects but cannot reach the object bytes, and
--- since Supabase's `prevent-direct-deletes` guard those deletes raise
--- outright and take the whole transaction with them. Images are removed
--- through the Storage API by the client before the item row goes (see
--- removeItemImages in web/src/app/data/images.ts).
+-- Deliberately no trigger cleaning up an item's images: Supabase's
+-- `prevent-direct-deletes` guard makes a SQL delete of storage.objects
+-- raise and abort the transaction. The client removes Storage objects via
+-- the Storage API before the item row goes (removeItemImages, images.ts).
 
 commit;
