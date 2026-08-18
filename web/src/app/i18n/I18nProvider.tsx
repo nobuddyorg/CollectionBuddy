@@ -79,9 +79,9 @@ function detectLang(): Language {
     if (browserLang in translations) return browserLang as Language;
   } catch {
     // localStorage can throw (private browsing, disabled storage); falls
-    // through to the 'de' default below, same as a stored-language miss.
+    // through to the 'en' default below, same as a stored-language miss.
   }
-  return 'de';
+  return 'en';
 }
 
 // A no-op on the server: Next still executes this once during the static
