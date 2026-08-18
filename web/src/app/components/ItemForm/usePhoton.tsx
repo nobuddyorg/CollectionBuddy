@@ -8,6 +8,13 @@ import {
 } from '../../data/photon';
 import type { PhotonFeature, PlaceChoice } from './types';
 
+// Not built on the shared useDebouncedValue hook (ItemList's search box
+// uses it): that hook debounces a *value*, but refocusing this field must
+// also restart the wait even when the query itself hasn't changed, which
+// only a debounce keyed on this effect's own deps (including `focus`) can
+// give without an extra render's lag.
+const SEARCH_DEBOUNCE_MS = 300;
+
 type RegionNames = Intl.DisplayNames | null;
 
 export function formatPlaceDisplay(
@@ -132,7 +139,7 @@ export function usePhotonSearch(locale?: string) {
           if (abortRef.current === ctl) setLoading(false);
         }
       })();
-    }, 300);
+    }, SEARCH_DEBOUNCE_MS);
     // Cancels the in-flight request too, or closing the form (or the next
     // keystroke) leaves a request on the wire against a rate-limited free
     // service for no reader left to use its result.

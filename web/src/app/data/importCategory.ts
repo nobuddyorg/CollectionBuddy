@@ -34,6 +34,8 @@ import {
 } from './importFormat';
 import { readZipEntries } from './zip';
 import { runPool } from '../lib/pool';
+import { backoffDelayMs } from '../lib/backoff';
+import { WEBP_COMPRESSION_OPTIONS } from '../lib/imageCompression';
 
 export type ImportProgress = {
   phase: 'reading' | 'items' | 'photos';
@@ -95,9 +97,7 @@ async function realCompressThumb(
   const file = new File([bytes], 'photo.webp', { type: 'image/webp' });
   return imageCompression(file, {
     maxWidthOrHeight: 600,
-    initialQuality: 0.8,
-    fileType: 'image/webp',
-    useWebWorker: true,
+    ...WEBP_COMPRESSION_OPTIONS,
   });
 }
 /* v8 ignore stop */
@@ -117,7 +117,10 @@ async function uploadWithRetry(
     checkCancelled(signal);
     if (attempt > 0) {
       await new Promise((resolve) =>
-        setTimeout(resolve, PHOTO_UPLOAD_RETRY_BASE_MS * 2 ** (attempt - 1)),
+        setTimeout(
+          resolve,
+          backoffDelayMs(PHOTO_UPLOAD_RETRY_BASE_MS, attempt - 1),
+        ),
       );
     }
     const { error } = await uploadImage(path, blob);

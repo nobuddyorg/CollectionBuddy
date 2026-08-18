@@ -32,6 +32,7 @@ import {
 } from './exportFormat';
 import { createZipWriter, ZipLimitError } from './zip';
 import { runPool } from '../lib/pool';
+import { backoffDelayMs } from '../lib/backoff';
 
 /** How far an export has got. `total` is 0 until items and photos are counted. */
 export type ExportProgress = {
@@ -70,9 +71,10 @@ export const SIGN_BATCH_SIZE = 100;
 export const LARGE_EXPORT_WARN_BYTES = 1.5 * 1024 ** 3;
 
 /** Signed URLs default to a 1-hour TTL, which a large export on a slow
- * connection can outlive; asked for with room to spare so a URL never
- * expires mid-download. */
-const SIGNED_URL_TTL_SECONDS = 6 * 3600;
+ * connection can outlive; asked for with room to spare (independent of
+ * useItemImages.tsx's own signed-URL refresh margin, a different purpose)
+ * so a URL never expires mid-download. */
+const EXPORT_SIGNED_URL_TTL_SECONDS = 6 * 3600;
 
 export class ExportError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -200,7 +202,7 @@ async function fetchPhotoBytes(
     checkCancelled(signal);
     if (attempt > 0) {
       await new Promise((resolve) =>
-        setTimeout(resolve, PHOTO_RETRY_BASE_MS * 2 ** (attempt - 1)),
+        setTimeout(resolve, backoffDelayMs(PHOTO_RETRY_BASE_MS, attempt - 1)),
       );
     }
     try {
@@ -231,7 +233,10 @@ async function signAll(
   for (let i = 0; i < paths.length; i += SIGN_BATCH_SIZE) {
     checkCancelled(signal);
     const batch = paths.slice(i, i + SIGN_BATCH_SIZE);
-    const { data, error } = await signUrls(batch, SIGNED_URL_TTL_SECONDS);
+    const { data, error } = await signUrls(
+      batch,
+      EXPORT_SIGNED_URL_TTL_SECONDS,
+    );
     if (error) {
       throw new ExportError('Could not sign photograph URLs', { cause: error });
     }
