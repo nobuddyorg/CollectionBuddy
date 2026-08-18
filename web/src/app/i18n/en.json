@@ -79,6 +79,7 @@
     "share_load_error": "Could not load sharing. Please try again.",
     "share_can_edit": "Can edit",
     "share_edit_access": "Edit access",
+    "share_role_editor_badge": "Editor",
     "share_editor_confirm": "Give {email} full edit access to this collection, including adding, changing and deleting entries and photographs?",
     "share_role_update_error": "Could not update this share's access. Please try again.",
     "share_list_title": "Currently shared with",
