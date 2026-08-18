@@ -186,7 +186,7 @@ export default function CategorySelect({
 
   const onDelete = useCallback(async () => {
     if (!selectedCat) return;
-    const name = selected?.name ?? '';
+    const categoryName = selected?.name ?? '';
 
     // Named and counted rather than a bare "Confirm deletion": the trash
     // sits right beside the rename field, and deletion is permanent.
@@ -195,12 +195,18 @@ export default function CategorySelect({
     if (countError) console.error(countError);
     const message =
       countError || count == null
-        ? t('category_select.confirm_delete_generic').replace('{name}', name)
+        ? t('category_select.confirm_delete_generic').replace(
+            '{name}',
+            categoryName,
+          )
         : count > 0
           ? t('category_select.confirm_delete_with_entries')
-              .replace('{name}', name)
+              .replace('{name}', categoryName)
               .replace('{count}', String(count))
-          : t('category_select.confirm_delete_empty').replace('{name}', name);
+          : t('category_select.confirm_delete_empty').replace(
+              '{name}',
+              categoryName,
+            );
 
     if (!(await confirm(message))) return;
     const ok = await deleteCategory(selectedCat);
