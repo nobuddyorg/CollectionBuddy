@@ -12,10 +12,10 @@ import { useItemImages } from './useItemImages';
 import { useItemMutations } from './useItemMutations';
 import { searchStatusFor } from './searchStatus';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
+import { useGuardedModalClose } from '../../lib/useGuardedModalClose';
 import { EditItemModal } from './EditItemModal';
 import { MapModal } from './MapModal';
 import CenteredModal from '../CenteredModal';
-import { useConfirm } from '../Confirm/ConfirmProvider';
 import type { ItemFormValues } from '../ItemForm';
 import type { ImgEntry, ItemLite } from './types';
 
@@ -50,26 +50,17 @@ export default function ItemList({
   canEdit: boolean;
 }) {
   const { t, tCount } = useI18n();
-  const confirm = useConfirm();
 
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [isCreateDirty, setCreateDirty] = useState(false);
 
-  // Same reasoning as EditItemModal's guardedClose: backdrop, Escape and the
-  // dialog's X all resolve here, so none can silently drop a half-written
-  // entry.
-  const guardedCloseCreate = useCallback(() => {
-    if (!isCreateDirty) {
-      setCreateOpen(false);
-      return;
-    }
-    void (async () => {
-      if (await confirm(t('item_create.confirm_discard'))) {
-        setCreateDirty(false);
-        setCreateOpen(false);
-      }
-    })();
-  }, [isCreateDirty, confirm, t]);
+  const closeCreate = useCallback(() => setCreateOpen(false), []);
+  const discardCreate = useCallback(() => setCreateDirty(false), []);
+  const guardedCloseCreate = useGuardedModalClose(
+    isCreateDirty,
+    closeCreate,
+    discardCreate,
+  );
 
   // Declared up here, ahead of the map, because the map is filtered by the
   // same term the list is: they are one filtered set drawn two ways.
