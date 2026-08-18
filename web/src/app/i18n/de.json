@@ -14,6 +14,7 @@
     "title": "CollectionBuddy",
     "account_menu": "Kontomenü",
     "sign_out": "Abmelden",
+    "sign_out_error": "Abmeldung nicht vollständig abgeschlossen, du wurdest aber auf diesem Gerät abgemeldet. Bitte erneut versuchen.",
     "language": "Sprache",
     "theme": "Darstellung",
     "theme_system": "System",

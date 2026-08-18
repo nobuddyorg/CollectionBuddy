@@ -40,8 +40,11 @@ export function useShares(categoryId: string | null) {
       setShares(list);
       return list;
     } catch (e) {
-      console.error(e);
-      toast.error(t('category_select.share_load_error'));
+      toast.reportError(
+        'reload shares',
+        e,
+        t('category_select.share_load_error'),
+      );
       return [];
     } finally {
       setIsLoading(false);
@@ -108,6 +111,12 @@ export function useShares(categoryId: string | null) {
   // leaving a shared category -- deleteShareRow doesn't distinguish, and
   // neither does this: the RLS policy already limited which row the caller
   // was allowed to name.
+  //
+  // No toast on failure here, unlike this hook's other mutations: both
+  // current callers (Sharing.tsx's onRevoke, CategorySelect/index.tsx's
+  // onLeave) already show their own outcome-specific toast from the
+  // returned boolean -- adding one here too would double up. console.error
+  // still logs the real cause for debugging, which `ok: false` alone loses.
   const deleteShare = useCallback(
     async (shareId: string) => {
       if (isRevoking) return false;
@@ -118,7 +127,7 @@ export function useShares(categoryId: string | null) {
         setShares((prev) => prev.filter((s) => s.id !== shareId));
         return true;
       } catch (e) {
-        console.error(e);
+        console.error('delete share', e);
         return false;
       } finally {
         setIsRevoking(false);
