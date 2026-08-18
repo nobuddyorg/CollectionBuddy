@@ -23,9 +23,6 @@ describe('AddButton', () => {
         label="Add"
       />,
     );
-    // Icon-only, like DeleteButtonWithLabel -- the name is said through
-    // aria-label/title rather than visible text, so the spinner replaces
-    // the plus glyph instead of joining a label.
     const button = screen.getByRole('button', { name: 'Add' });
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button.querySelector('.animate-spin')).toBeInTheDocument();
@@ -74,8 +71,6 @@ describe('RenameButton', () => {
   });
 });
 
-// Replaced SetButton, which re-selected the already-selected category and
-// collapsed the panel -- it never set anything.
 describe('CollapseButton', () => {
   it('fires onClick when clicked', async () => {
     const onClick = vi.fn();
@@ -136,9 +131,8 @@ describe('ExportButton', () => {
       />,
     );
     const button = screen.getByRole('button', { name: 'Export' });
-    // Named throughout, not replaced by a spinner: an export can run for
-    // minutes, and a button that loses its label for that long stops
-    // saying what is happening.
+    // Label stays visible while exporting rather than being replaced by a
+    // spinner -- a run that can take minutes shouldn't lose its name.
     expect(button).toHaveTextContent('Export');
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button).toBeDisabled();

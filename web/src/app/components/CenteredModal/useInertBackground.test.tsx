@@ -23,10 +23,6 @@ afterEach(() => {
   appRoot()?.remove();
 });
 
-// Regression (#295): `aria-modal` on the dialog is not enough on its own --
-// a screen reader's virtual cursor walks straight past it into the header,
-// the category tabs and the entry grid behind it. `inert` on everything but
-// the dialog layer is what actually keeps browse mode inside the dialog.
 describe('useInertBackground', () => {
   it('marks the app root inert while active', () => {
     render(<Harness active />);

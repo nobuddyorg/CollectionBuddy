@@ -33,8 +33,6 @@ describe('pickInitialCategory', () => {
     expect(pickInitialCategory([], 'a')).toBeNull();
   });
 
-  // The whole point: signing in used to land on "choose a category" unless
-  // the collection happened to have exactly one.
   it('opens the first category when there is no remembered one', () => {
     const cats = [cat('b', 'Stamps'), cat('a', 'Coins'), cat('c', 'Teddies')];
     expect(pickInitialCategory(cats, null)).toBe('a');
@@ -78,8 +76,6 @@ describe('remembering the selection', () => {
     expect(readStoredCategory()).toBeNull();
   });
 
-  // Safari's private mode throws on both of these. Losing the preference
-  // is a smaller failure than failing to render the catalogue.
   it('survives storage that refuses to answer', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('denied');

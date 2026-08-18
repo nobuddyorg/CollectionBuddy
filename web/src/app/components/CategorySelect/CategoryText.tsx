@@ -1,10 +1,7 @@
 'use client';
 
-// The heading of the category strip: the label, and under it the name of
-// the collection on show. It is rendered in both states of the panel --
-// open and closed -- because it is what the panel is *about*. Showing it
-// in only one of them moved the heading on every toggle, which reads as
-// the page jumping rather than as a panel opening.
+// Rendered in both panel states so the heading doesn't move when the panel
+// toggles open or closed.
 export function CategoryText({
   title,
   name,
@@ -15,9 +12,8 @@ export function CategoryText({
   name: string;
   /** Nothing is selected yet: the line stands in for a name it hasn't got. */
   placeholder?: boolean;
-  /** The catalogue hasn't resolved yet: name/placeholder are both a guess
-   *  this render shouldn't commit to, so a neutral bar stands in for either
-   *  until the real answer -- selected or none -- is known. */
+  /** The catalogue hasn't resolved yet, so a neutral bar stands in until the
+   *  real name (or "none") is known. */
   loading?: boolean;
 }) {
   return (
@@ -32,9 +28,8 @@ export function CategoryText({
         />
       ) : (
         <div
-          // Named for the end-to-end suite: this is the only thing on the
-          // page that says which collection is on show once the strip has
-          // collapsed, and the strip collapses as soon as one is chosen.
+          // data-testid for the e2e suite: the only element still showing
+          // the collection name once the strip has collapsed.
           data-testid="selected-category"
           className={`font-display text-2xl sm:text-3xl truncate ${
             placeholder ? 'text-muted-foreground' : 'text-foreground'

@@ -1,10 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// manifest.test.ts already holds the manifest to its own claims on disk. This
-// asks the other half of the question: whether what is *deployed* still
-// answers, at its real origin and under its real base path. Those are exactly
-// the two things a unit test cannot see, and an icon that 404s in production
-// is invisible until somebody installs the app and gets a grey square (#266).
+// manifest.test.ts checks the manifest's own claims on disk; this checks that
+// what it links actually resolves at the real deployed origin and base path.
 test.describe('the installable app', () => {
   test('links a manifest that the browser can fetch', async ({ page }) => {
     await page.goto('login/');
@@ -44,16 +41,14 @@ test.describe('the installable app', () => {
       expect(response.status(), `${icon.src} (${icon.sizes})`).toBe(200);
       expect(response.headers()['content-type']).toContain('image/png');
 
-      // The PNG header carries the real dimensions, so a manifest entry that
-      // has drifted from its file is caught here rather than by a launcher.
+      // Read real dimensions from the PNG header to catch a manifest entry
+      // that has drifted from its file.
       const bytes = Buffer.from(await response.body());
       const [width, height] = [bytes.readUInt32BE(16), bytes.readUInt32BE(20)];
       expect(`${width}x${height}`, `${icon.src} real size`).toBe(icon.sizes);
     }
   });
 
-  // The size Android wants for a splash screen, and the one whose absence was
-  // the whole of #266 -- it fell back to stretching the 180px apple icon.
   test('offers an icon big enough for a splash screen', async ({ page }) => {
     await page.goto('login/');
     const href = await page
@@ -80,8 +75,8 @@ test.describe('the installable app', () => {
     expect(response.status()).toBe(200);
   });
 
-  // Every path in the manifest is written out by hand, because a static file
-  // cannot interpolate the base path the way the app's own links do.
+  // Manifest paths are written by hand: a static file can't interpolate the
+  // base path the way the app's own links do.
   test('scopes the manifest to where the app is actually served', async ({
     page,
   }) => {

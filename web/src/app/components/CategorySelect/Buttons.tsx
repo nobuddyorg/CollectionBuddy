@@ -17,10 +17,9 @@ export function AddButton({
   label: string;
   className?: string;
 }) {
-  // Icon-only, like DeleteButtonWithLabel beside it -- a spelled-out label
-  // on both the rename and add rows crowded the field down to a sliver on a
-  // phone-width panel; the name is still said, just via aria-label/title
-  // rather than on the button's face.
+  // Icon-only: a spelled-out label on both the rename and add rows crowded
+  // the field down to a sliver on a phone-width panel. The name is still
+  // said, via aria-label/title.
   return (
     <IconButton
       variant="primary"
@@ -50,8 +49,6 @@ export function RenameButton({
   disabled: boolean;
   label: string;
 }) {
-  // Icon-only, like AddButton and DeleteButtonWithLabel: a checkmark reads
-  // as "commit this edit" beside the field it applies to.
   return (
     <IconButton
       variant="outline"
@@ -67,12 +64,8 @@ export function RenameButton({
   );
 }
 
-// Closes the category panel. Replaces a "Set" button that re-selected the
-// already-selected category and collapsed the panel -- it never set
-// anything, so it was named for something it did not do. This pairs with
-// ExpandButton: the pencil opens the panel, this closes it from the same
-// spot, and the two are drawn to the same box so the spot does not move
-// between them.
+// Pairs with ExpandButton: drawn to the same box so the toggle's position
+// doesn't move between open and closed.
 export function CollapseButton({
   onClick,
   label,
@@ -114,8 +107,8 @@ export function DeleteButtonWithLabel({
   return (
     <IconButton
       variant="destructive"
-      // Drawn to the same height as the field and the rename button it
-      // stands beside; at `sm` it was a 32px box in a 44px row.
+      // Drawn to the same height as the field and rename button it stands
+      // beside.
       size="xl"
       onClick={onClick}
       disabled={disabled}
@@ -128,10 +121,8 @@ export function DeleteButtonWithLabel({
   );
 }
 
-// Full width and quiet, sitting under a rule of its own. Export is not a
-// third verb in the rename row: those two edit the category, this one takes
-// a copy of it away, and the one thing it must never be is a neighbour of
-// Delete that a thumb can miss by 6px.
+// Full width, under its own rule, away from Delete: a thumb slip between
+// Export and Delete would be destructive, not just inconvenient.
 export function ExportButton({
   onClick,
   disabled,
@@ -163,9 +154,8 @@ export function ExportButton({
   );
 }
 
-// Sits next to the progress line only while an export is running: the one
-// action available for a run that can take minutes, on a connection that
-// may never come back on its own (#418).
+// Shown only while an export is running -- the one action available for a
+// run that can take minutes.
 export function CancelExportButton({
   onClick,
   label,
@@ -193,8 +183,6 @@ export function CancelExportButton({
   );
 }
 
-// Same shape as ExportButton, its counterpart: a quiet full-width action
-// under its own rule rather than a third verb in the rename row.
 export function ImportButton({
   onClick,
   disabled,
@@ -226,9 +214,6 @@ export function ImportButton({
   );
 }
 
-// Sits next to the progress line only while an import is running, the same
-// as CancelExportButton -- an import of a large archive re-uploads every
-// photograph and can run for minutes too.
 export function CancelImportButton({
   onClick,
   label,

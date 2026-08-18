@@ -1,18 +1,14 @@
--- Every function in `public`. Before the tables, not after, because
--- `items.tags_text` is a generated column whose expression calls
--- `join_tags` -- a generated column cannot reference a function that does
--- not exist yet.
+-- Before the tables, not after: `items.tags_text` is a generated column
+-- whose expression calls `join_tags`, which must already exist.
 --
--- All of them pin `search_path = ''`, so every reference inside a body has
--- to be schema-qualified. Without it a `security definer` function resolves
--- names through the *caller's* search_path, which is how a user who can
--- create objects gets one of these to run their code as the owner.
+-- All of them pin `search_path = ''` so every reference is schema-qualified
+-- -- without it, a `security definer` function resolves names through the
+-- *caller's* search_path, letting anyone who can create objects run code as
+-- the owner.
 begin;
 
--- Trim, collapse internal whitespace runs, and return NULL rather than an
--- empty string. The btrim matters: without it a whitespace-only value
--- normalizes to ' ' instead of NULL, survives `is not null` filters, and
--- gets geocoded as a blank query.
+-- Returns NULL, not '', for a whitespace-only input -- otherwise it would
+-- survive `is not null` filters and get geocoded as a blank query.
 create or replace function public.normalize_text(txt text)
 returns text
 language sql
@@ -23,9 +19,8 @@ as $$
   select nullif(btrim(regexp_replace(coalesce($1, ''), '\s+', ' ', 'g')), '')
 $$;
 
--- Backing expression for items.tags_text. Immutable and qualified down to
--- pg_catalog because a generated column's expression must be, and because
--- with `search_path = ''` nothing else would resolve.
+-- Backing expression for items.tags_text; qualified down to pg_catalog
+-- because `search_path = ''` leaves nothing else resolvable.
 create or replace function public.join_tags(tags text[])
 returns text
 language sql
@@ -36,8 +31,8 @@ as $$
   select coalesce(pg_catalog.array_to_string($1, ' '), '')
 $$;
 
--- Pinged on a schedule by .github/workflows/keep-alive.yml with the anon
--- key, to stop the free-tier project auto-pausing. Does nothing else.
+-- Pinged on a schedule (.github/workflows/keep-alive.yml) to stop the
+-- free-tier project auto-pausing.
 create or replace function public.keepalive()
 returns void
 language sql
@@ -47,10 +42,9 @@ as $$
   select 1
 $$;
 
--- user_id is set by the server, never by the client: on insert it is taken
--- from the JWT, and on update any attempt to change it is reverted rather
--- than rejected. RLS already blocks writing a row you don't own; this is
--- what makes it impossible to hand a row *away* to someone else.
+-- user_id is never trusted from the client: set from the JWT on insert, and
+-- reverted (not rejected) on any update attempt to change it -- what stops
+-- a row from being handed *away* to someone else.
 create or replace function public.enforce_user_id()
 returns trigger
 language plpgsql
@@ -95,9 +89,8 @@ begin
 end
 $$;
 
--- The database is the normalization authority -- the client sends raw
--- values and merges back whatever the row turns out to be, rather than
--- keeping its own copy of these rules.
+-- The database is the normalization authority -- callers merge back
+-- whatever this returns rather than keeping their own copy of the rules.
 create or replace function public.tg_items_normalize()
 returns trigger
 language plpgsql
@@ -124,10 +117,9 @@ begin
 end
 $$;
 
--- item_categories carries its own user_id so its RLS policies don't have to
--- join. That copy is derived here rather than trusted from the client, and
--- the same pass rejects assigning one user's item to another user's
--- category -- the one place where a row references two owned rows at once.
+-- item_categories carries its own user_id so its RLS policies don't need a
+-- join; derived here, not trusted from the client. Also rejects assigning
+-- one user's item to another user's category.
 create or replace function public.tg_item_categories_enforce()
 returns trigger
 language plpgsql
@@ -160,10 +152,8 @@ end
 $$;
 
 -- An item with no categories left is unreachable in the UI, so removing its
--- last mapping deletes it. Statement-level with a transition table, not row
--- level: deleting a category cascades N mappings, and a row trigger would
--- run N EXISTS probes and N single-row deletes for what is one set-based
--- statement.
+-- last mapping deletes it. Statement-level, not row-level, so deleting a
+-- category that cascades N mappings runs one set-based delete instead of N.
 create or replace function public.delete_item_if_orphan()
 returns trigger
 language plpgsql

@@ -1,18 +1,14 @@
 -- Row Level Security, and the grants underneath it.
 --
--- This is the *only* authorization layer in the application. The frontend
--- is a static export with no server runtime and no route handlers, so there
--- is nowhere else a check could live: every request reaches Postgres
--- carrying the user's JWT, and these policies are what stands between it
--- and someone else's rows.
+-- This is the *only* authorization layer in the application: the frontend
+-- is a static export with no server runtime, so every request reaches
+-- Postgres carrying the user's JWT and these policies are what stands
+-- between it and someone else's rows.
 --
--- Every policy is `user_id = auth.uid()` and nothing else. auth.uid() is
--- wrapped in a scalar subquery -- `(select auth.uid())` -- so the planner
--- evaluates it once per query instead of once per row.
---
--- No role is named on these, so they apply to every role that can reach the
--- table. Only `authenticated` is granted anything below, and auth.uid() is
--- null for `anon`, so the predicate is null and denies.
+-- Every policy is `user_id = auth.uid()`, wrapped in a scalar subquery so
+-- the planner evaluates it once per query rather than once per row. No role
+-- is named, so `anon` is denied too -- auth.uid() is null for it, and only
+-- `authenticated` is granted anything below anyway.
 begin;
 
 alter table public.categories enable row level security;
@@ -91,14 +87,14 @@ on public.item_categories
 for delete
 using (user_id = (select auth.uid()));
 
--- Grants. Deliberately narrow: usage, and DML on the three tables. No
--- `create` on the schema, which is also what keeps `search_path = ''` on
--- the security-definer functions in 0002 from being worth attacking.
+-- Deliberately narrow: usage plus DML on the three tables, no `create` on
+-- the schema -- which is also what keeps `search_path = ''` on 0002's
+-- security-definer functions from being worth attacking.
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on all tables in schema public to authenticated;
 
--- keepalive() is called with the anon key by the scheduled workflow, so it
--- is the one thing `anon` may do.
+-- The one thing `anon` may do -- called with the anon key by the scheduled
+-- keep-alive workflow.
 grant execute on function public.keepalive() to anon, authenticated;
 
 commit;

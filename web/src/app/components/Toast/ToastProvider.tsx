@@ -19,18 +19,14 @@ type ToastEntry = { id: number; message: string; kind: ToastKind };
 
 type ToastApi = {
   error: (message: string) => void;
-  /** A visible, self-dismissing confirmation for actions whose only other
-   * signal is structural (a card disappearing, a button re-enabling) --
-   * deleting or renaming a category, deleting a photograph. */
+  /** Visible, self-dismissing confirmation for actions whose only other
+   * signal is structural (a card disappearing, a button re-enabling). */
   success: (message: string) => void;
-  /** Posts an outcome -- "entry added", "changes saved", "entry deleted" --
-   * to the app-level polite live region, for anyone not focused on (or
-   * looking at) whatever just changed. */
+  /** Posts an outcome to the app-level polite live region, for anyone not
+   * looking at whatever just changed. */
   announce: (message: string) => void;
-  /** The console.error + toast.error pair every failed mutation ends with
-   * -- `scope` is a short, fixed label for the console (`'save item'`,
-   * `'delete category'`), `err` is logged in full rather than reduced to
-   * `.message`, and `message` is the translated string shown to the user. */
+  /** console.error + toast.error together: `scope` is a short console
+   * label, `err` is logged in full, `message` is shown to the user. */
   reportError: (scope: string, err: unknown, message: string) => void;
 };
 
@@ -54,14 +50,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [announcement, setAnnouncement] = useState('');
   const nextId = useRef(0);
 
-  // The portal target (document.body) only exists in the browser. Gating on
-  // a post-mount flag instead of a bare `typeof document` check keeps the
-  // client's first render pass -- the one hydration diffs against -- matching
-  // the server's, which never renders the portal at all.
+  // Gated on a post-mount flag, not a bare `typeof document` check, so the
+  // client's first render pass matches the server's (which never renders
+  // the portal at all) for hydration.
   const [mounted, setMounted] = useState(false);
-  // Effects only run client-side, which is exactly the "am I in the
-  // browser yet" signal the portal below needs -- can't be computed
-  // during render without breaking the SSR/hydration match this exists for.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
@@ -107,10 +99,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      {/* The one polite live region for the whole app: create/save/delete
-          outcomes land here so someone not focused on (or looking at) the
-          thing that just changed still gets told it happened -- unlike the
-          toasts below, this never needs to be seen. */}
+      {/* The one polite live region for the whole app -- unlike the toasts
+          below, this never needs to be seen. */}
       <span className="sr-only" aria-live="polite">
         {announcement}
       </span>

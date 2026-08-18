@@ -18,30 +18,22 @@ import { useConfirm } from '../Confirm/ConfirmProvider';
 import type { ItemFormValues } from '../ItemForm';
 import type { ImgEntry, ItemLite } from './types';
 
-// Warms the chunk the map modal's own dynamic() import will ask for --
-// Leaflet is ~40 KB gzipped and, with the geocode cache primed, downloading
-// it is what the map now waits on. Requesting the same specifier is deduped
-// by the bundler, so the later mount resolves straight from the module
-// cache. Hung off intent (hover, focus, the press that precedes the click)
-// rather than page load, so nobody who leaves the map alone pays for it.
+// Warms the map modal's dynamic() chunk on intent (hover/focus/press-down)
+// rather than page load, so leaving the map alone costs nothing.
 const prefetchMap = () => {
-  // A failed prefetch is not worth reporting: dynamic() retries the same
-  // import when the map actually opens, and surfaces the error there.
+  // A failed prefetch isn't reported: dynamic() retries on actual open.
   void import('../Map').catch(() => {});
 };
 
-// Same reasoning, for the create form's own dynamic() import (see
-// ItemCreate/index.tsx) -- PlaceAutocomplete's geocoder is the weight this
-// one is warming ahead of.
+// Same reasoning, for the create form's dynamic() import.
 const prefetchItemForm = () => {
   void import('../ItemForm').catch(() => {});
 };
 import Icon, { IconType } from '../Icon';
 
-// A stable identity for entries with no photographs yet, so a card that
-// hasn't been given one doesn't get a fresh `[]` -- and therefore a forced
-// re-render -- every time this component runs for an unrelated reason
-// (ItemCard is memoized against exactly this; see ItemCard.tsx).
+// Stable identity for entries with no photographs yet, so an unrelated
+// re-render doesn't hand ItemCard a fresh `[]` and force it to re-render too
+// (it's memoized against reference equality here).
 const EMPTY_IMAGES: ImgEntry[] = [];
 
 export default function ItemList({
@@ -49,13 +41,11 @@ export default function ItemList({
   canEdit,
 }: {
   categoryId: string;
-  /** False for a category shared read-only with, not owned or edited by,
-   * the viewer (0014_editor_shares.sql's 'viewer' role). Every write
-   * control but "new entry" (edit, delete, upload) is hidden rather than
-   * merely disabled -- RLS already refuses the writes themselves, so this
-   * is UX, not the boundary (see design-decisions.md's RLS section).
-   * "New entry" stays mounted and disabled instead so the toolbar's width
-   * doesn't jump when the Map button is its only sibling (#549). */
+  /** False for a category shared read-only (viewer role). Every write
+   * control but "New entry" is hidden, not just disabled -- RLS already
+   * refuses the writes, so this is UX, not the security boundary. "New
+   * entry" stays mounted and disabled so the toolbar doesn't shrink to
+   * just the Map button. */
   canEdit: boolean;
 }) {
   const { t, tCount } = useI18n();
@@ -65,9 +55,8 @@ export default function ItemList({
   const [isCreateDirty, setCreateDirty] = useState(false);
 
   // Same reasoning as EditItemModal's guardedClose: backdrop, Escape and the
-  // dialog's X all resolve to this, so none of them can silently drop a
-  // half-written entry (#308). No separate Cancel button exists for create,
-  // so unlike edit there's only the one path to guard here.
+  // dialog's X all resolve here, so none can silently drop a half-written
+  // entry.
   const guardedCloseCreate = useCallback(() => {
     if (!isCreateDirty) {
       setCreateOpen(false);
@@ -98,10 +87,8 @@ export default function ItemList({
 
   const handleCreated = useCallback(() => {
     setCreateOpen(false);
-    // New items sort to page 1 (created_at desc). If we're already there,
-    // reload() to reveal it; otherwise setPage(1) and let useItems' own
-    // page-change effect fetch it -- reload() would just re-fetch the page
-    // we're leaving.
+    // New items sort to page 1. If we're already there, reload() to reveal
+    // it; otherwise setPage(1) and let useItems' own effect fetch it.
     if (page !== 1) {
       setPage(1);
     } else {
@@ -176,13 +163,8 @@ export default function ItemList({
         </div>
 
         <div className="flex gap-2 sm:shrink-0">
-          {/* Disabled, not absent, when read-only: RLS already refuses the
-              write, but dropping the button from the layout shifted the
-              toolbar and left the Map button looking stranded on its own
-              (#549). */}
           <button
             type="button"
-            // Named for the end-to-end suite: its label is translated.
             data-testid="new-entry"
             onClick={() => setCreateOpen(true)}
             onPointerEnter={canEdit ? prefetchItemForm : undefined}
@@ -200,8 +182,6 @@ export default function ItemList({
 
           <button
             type="button"
-            // Named for the end-to-end suite: an icon button whose only label
-            // is translated.
             data-testid="open-map"
             onClick={() => setMapOpen(true)}
             onPointerEnter={prefetchMap}
@@ -216,10 +196,9 @@ export default function ItemList({
         </div>
       </div>
 
-      {/* `searchStatus` -- not raw `qDebounced` -- decides what this says: a
-          1-2 char term (or a non-ASCII one below its own, lower floor) earns
-          no filter from listItems, so announcing a count here would be the
-          unfiltered category's count passed off as a search result (#307). */}
+      {/* searchStatus, not raw qDebounced: a too-short term earns no filter
+          from listItems, so announcing a count here would pass off the
+          unfiltered total as a search result. */}
       <span className="sr-only" aria-live="polite">
         {loading
           ? ''
@@ -231,13 +210,10 @@ export default function ItemList({
       </span>
 
       {items.length === 0 ? (
-        // `total > 0` alongside an empty `items` is not "no entries": it is
-        // the one-render gap between a silent refetch landing for a page
-        // that no longer exists (deleting the last card on the last page)
-        // and the corrected page's own fetch resolving. `currentPage`
-        // (see clampPage) has already moved on by this point, so the
-        // re-fetch is already in flight -- painting the empty state here
-        // would flash "No entries yet" over entries that are still there.
+        // `total > 0` with empty `items` isn't "no entries" -- it's the gap
+        // between a page-no-longer-existing refetch landing and the
+        // corrected page's fetch resolving. Painting the empty state here
+        // would flash it over entries that still exist.
         loading || total > 0 ? (
           <GridSkeleton />
         ) : (
@@ -274,12 +250,9 @@ export default function ItemList({
         <ul
           aria-busy={loading}
           aria-labelledby="entries-heading"
-          // Cards are detached objects on mobile too, not a full-bleed
-          // stack: they keep the page's own side margin, so paper shows on
-          // all four edges of every card. Edge-to-edge cards had no left or
-          // right boundary at all, which left a thin horizontal band as the
-          // single cue separating one entry from the next -- not enough to
-          // bind a caption and its buttons to the photograph above them.
+          // Cards keep the page's side margin even on mobile, not full-bleed
+          // -- edge-to-edge cards left only a thin band separating entries,
+          // not enough to visually bind a caption to its photograph.
           className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-4 transition-opacity ${loading ? 'opacity-60' : ''}`}
         >
           {items.map((it, idx) => (
@@ -295,9 +268,8 @@ export default function ItemList({
               onDeleteItem={() => void removeItem(it.id)}
               onDeleteImage={(img) => void deleteImage(it.id, img)}
               onOpenModal={(index) => setModalState({ itemId: it.id, index })}
-              // The grid is up to 3 columns wide (lg:grid-cols-3), so the
-              // first row -- and the LCP candidate within it -- is always
-              // among these three regardless of viewport.
+              // The grid is up to 3 columns wide, so the LCP candidate is
+              // always among the first three regardless of viewport.
               priority={idx < 3}
               readOnly={!canEdit}
             />

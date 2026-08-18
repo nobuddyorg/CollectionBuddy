@@ -6,33 +6,22 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import { AUTH_STATE_PATH, CONTEXT_PATH, SEED } from './signed-in/fixtures';
 
-// Signs a test user in against the local Supabase stack and leaves the
-// session where the browser will find it, plus a known collection to look at.
+// Sign-in cannot go through the UI (Google OAuth, undrivable in CI), so a
+// session is minted via the auth API and written to localStorage before the
+// app boots; everything after that runs against the real Postgres with real
+// row-level security.
 //
-// Sign-in cannot go through the interface: the only way in is Google OAuth,
-// which no CI runner can drive. So the session is minted through the auth API
-// and written into localStorage before the app boots -- everything after that
-// is the real app talking to a real Postgres with real row-level security,
-// which is the whole point of running against a stack rather than a stub.
-//
-// Local only. There is no path here that could point at a deployed database:
-// the URL and the service key both come from `supabase status`, and the
+// Local only: URL and service key both come from `supabase status`. The
 // public suite is what runs against production.
 const SUPABASE_URL = process.env.E2E_SUPABASE_URL!;
 const ANON_KEY = process.env.E2E_SUPABASE_ANON_KEY!;
 const SERVICE_KEY = process.env.E2E_SUPABASE_SERVICE_KEY!;
 
-// The service key opens exactly one door: creating the user, which is a
-// GoTrue admin call and not a table at all. It cannot be used to seed,
-// because `service_role` is granted nothing on these tables -- 0006 grants
-// `authenticated` and no one else, on the reasoning that row-level security
-// is the only authorization layer this app has.
-//
-// Which turns out to be the better arrangement anyway. The rows below are
-// written by the signed-in user through the same policies the app runs
-// under, so the fixture cannot set up a state the app itself could not have
-// reached, and a policy that stopped permitting an ordinary insert would
-// fail here rather than in production.
+// The service key only creates the user (a GoTrue admin call); `service_role`
+// has no grant on the tables themselves, since row-level security is this
+// app's only authorization layer. Seed rows are written through the signed-in
+// user's own session below, so a policy that stopped permitting an ordinary
+// insert would fail here rather than in production.
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
@@ -46,11 +35,9 @@ async function ensureUser(email: string, password: string): Promise<string> {
   });
   if (!error && data.user) return data.user.id;
 
-  // Already there from a previous run on the same stack -- find it rather
-  // than fail, so the suite is re-runnable without tearing the stack down.
-  // `perPage` defaults to 50; a long-lived local stack that has
-  // accumulated more users than that would otherwise miss this one on the
-  // first (only) page requested and fail with "could not create or find".
+  // Already there from a previous run -- find it rather than fail. `perPage`
+  // must be raised: a long-lived stack can hold more than the default 50
+  // users, and the default page would miss this one.
   const { data: list, error: listError } = await admin.auth.admin.listUsers({
     perPage: 1000,
   });
@@ -63,14 +50,10 @@ async function ensureUser(email: string, password: string): Promise<string> {
 /**
  * Removes every stored object under this user's prefix, across every item.
  *
- * Deleting an item's database row never touches its photographs -- SQL
- * cannot reach object storage, only the Storage API can, so the app deletes
- * objects client-side before the row. A photos.spec.ts test that fails
- * between uploading and deleting an entry leaves its objects behind with no
- * row pointing at them, and reseed()'s own row deletes above cannot find
- * them either. Run once per suite start, this is what stops that leak from
- * accumulating across every run rather than just the rest of one (#338) --
- * anything genuinely still wanted is re-uploaded by the test that wants it.
+ * SQL cannot reach object storage, so a failed test between uploading and
+ * deleting an entry can leave orphaned objects that reseed()'s row deletes
+ * won't catch. Run once per suite start to sweep those up; anything still
+ * wanted is re-uploaded by the test that wants it.
  */
 async function sweepStorage(as: SupabaseClient, userId: string) {
   const { data: itemPrefixes } = await as.storage
@@ -92,8 +75,7 @@ async function sweepStorage(as: SupabaseClient, userId: string) {
  * Puts the collection into a known state.
  *
  * Deleted and rebuilt rather than added to, so a second run sees exactly what
- * the first did -- a suite that asserts "three items" has to be able to say
- * which three.
+ * the first did.
  */
 async function reseed(as: SupabaseClient, userId: string) {
   await sweepStorage(as, userId);
@@ -112,10 +94,8 @@ async function reseed(as: SupabaseClient, userId: string) {
     return found.id;
   };
 
-  // Inserted oldest first so `created_at` runs in the order they are written
-  // here, and the list -- which is newest-first -- shows them reversed. A
-  // batch insert can share a timestamp, which would leave the order of the
-  // first page to chance.
+  // Inserted one at a time, oldest first, so `created_at` reflects insertion
+  // order; a batch insert can share a timestamp and leave order to chance.
   for (const item of SEED.items) {
     const { category, ...fields } = item;
     const { data: inserted, error: itemError } = await as
@@ -165,10 +145,8 @@ async function reseedOther(as: SupabaseClient, userId: string) {
 /**
  * Signs in and returns the localStorage entry the browser build would hold.
  *
- * The key is not spelled out here: supabase-js derives it from the project
- * URL, and this asks the same library the app uses to derive it, by handing
- * it somewhere to write and reading back what it wrote. Guessing the format
- * would be a second place for it to be wrong.
+ * The key is not hardcoded: supabase-js derives it from the project URL, so
+ * this captures whatever it actually writes rather than guessing the format.
  */
 async function mintSession(
   email: string,
@@ -210,9 +188,7 @@ setup('seed the stack and sign in', async ({ baseURL }) => {
   const session = await mintSession(SEED.email, SEED.password);
   await reseed(session.client, userId);
 
-  // The second collector, and a collection for the first one to be unable to
-  // see. Seeded through their own session for the same reason as the first:
-  // service_role has no grant on these tables.
+  // The second collector, and a collection the first one must not see.
   const otherId = await ensureUser(SEED.other.email, SEED.other.password);
   const other = await mintSession(SEED.other.email, SEED.other.password);
   await reseedOther(other.client, otherId);

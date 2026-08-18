@@ -132,12 +132,8 @@ describe('dedupePhotonFeatures', () => {
 });
 
 describe('usePhotonSearch onKeyDown', () => {
-  // Regression: Escape used to only clear local state, with neither
-  // preventDefault() nor stopPropagation(). The keystroke then bubbled past
-  // React's root to the modal's own window-level Escape listener, which
-  // closed the entire create/edit form -- discarding a title, description
-  // and tags along with the suggestion menu the user actually meant to
-  // dismiss.
+  // Regression: Escape used to bubble to the modal's own listener and close
+  // the whole form instead of just dismissing the suggestion menu.
   it('stops Escape from propagating once suggestions are open, instead of only clearing local state', async () => {
     vi.useFakeTimers();
     try {
@@ -219,10 +215,6 @@ describe('isQueryLongEnough', () => {
     expect(isQueryLongEnough('  abc  ')).toBe(true);
   });
 
-  // Regression: this used to hardcode 3 rather than deferring to
-  // data/items.ts's searchMinLength, so a non-ASCII query -- which carries
-  // more meaning per character -- waited for a third character here while
-  // the PostgREST filter it's meant to match already fired at two.
   it('accepts a two-character non-ASCII query, matching the PostgREST filter', () => {
     expect(isQueryLongEnough('京')).toBe(false);
     expect(isQueryLongEnough('京都')).toBe(true);

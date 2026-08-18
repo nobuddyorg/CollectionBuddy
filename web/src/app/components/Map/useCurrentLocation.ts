@@ -11,18 +11,16 @@ export type LocationFailure = 'denied' | 'unavailable';
 export type LocationResult =
   { ok: true; location: Coords } | { ok: false; reason: LocationFailure };
 
-// Stryker disable all: what follows is the settings handed to the browser's
-// geolocation API and the shape it hands back. A test asserting a 12-second
-// timeout can only restate the 12 seconds, which proves the constant is the
-// constant; the judgement in these numbers is not the kind a test can hold.
+// Stryker disable all: a test asserting a 12-second timeout can only
+// restate the 12 seconds, not judge whether it's right.
 const FIX_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
   timeout: 12000,
   maximumAge: 0,
 };
 
-// The deliberate "where am I" tap accepts a recent fix: on a phone that just
-// drew the dot, re-arming the GPS to learn the same thing costs seconds.
+// The "where am I" tap accepts a recent fix -- re-arming the GPS to learn
+// the same thing costs seconds.
 const REQUEST_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
   timeout: 15000,
@@ -35,9 +33,8 @@ const WATCH_OPTIONS: PositionOptions = {
   maximumAge: 0,
 };
 
-// How long to keep refining the first fix. A watch left running holds the
-// GPS on for as long as the map is open, and the pin stops visibly improving
-// well before that.
+// How long to keep refining the first fix -- the pin stops visibly
+// improving well before a watch left open that long would matter.
 const WATCH_MS = 10000;
 
 const coordsOf = (position: GeolocationPosition): Coords => ({
@@ -47,9 +44,8 @@ const coordsOf = (position: GeolocationPosition): Coords => ({
 // Stryker restore all
 
 /**
- * Separates "you said no" from every other way a fix can fail (no hardware,
- * no signal, timeout) -- the two need different advice, and only the first
- * one is something the user can undo.
+ * Separates "you said no" from every other way a fix can fail -- the two
+ * need different advice, and only the first is something the user can undo.
  */
 export function classifyLocationError(error: {
   code?: number;
@@ -60,36 +56,30 @@ export function classifyLocationError(error: {
 }
 
 /**
- * Reads whether geolocation may be used *without* prompting.
- *
- * Installed PWAs are the reason this exists. A prompt raised on its own, the
- * moment a screen mounts, has no visible cause -- so it gets dismissed, and
- * a few dismissals earn a permanent block that no amount of asking can
- * reverse. Only an already-granted permission is spent automatically; the
- * first ask is deferred to the location button, where the user asked for it.
+ * Reads whether geolocation may be used *without* prompting. A prompt
+ * raised the moment a screen mounts has no visible cause and gets
+ * dismissed, and enough dismissals earn a permanent, unreversible block --
+ * so only an already-granted permission is spent automatically.
  */
 export async function isGeolocationGranted(): Promise<boolean> {
   try {
     const status = await navigator.permissions.query({ name: 'geolocation' });
     return status.state === 'granted';
   } catch {
-    // No Permissions API, or one that refuses the geolocation name (older
-    // Safari): fall back to asking, which is what we did before it existed.
+    // No Permissions API, or one refusing the geolocation name (older
+    // Safari): fall back to asking.
     return true;
   }
 }
 
 /**
  * The current position for the map, and a way to ask for it on purpose.
- *
- * `request` is what the location button calls: a user-gesture-driven fix,
- * which is the only reliable moment to raise a permission prompt in a
- * standalone PWA, and the only path that reports why it failed.
+ * `request` is a user-gesture-driven fix, the only reliable moment to raise
+ * a permission prompt in a standalone PWA.
  */
-// Stryker disable all: the hook entire, not just its effects -- mutants in
-// here would report on how thoroughly the navigator API is stubbed, which is
-// not a thing worth a score. The pure classification and permission reads
-// above carry the logic worth asserting on, and they are scored.
+// Stryker disable all: this hook's mutants would only report on how
+// thoroughly the navigator API is stubbed. The pure functions above carry
+// the logic worth scoring.
 export function useCurrentLocation(active: boolean) {
   const [location, setLocation] = useState<Coords | null>(null);
   const [locating, setLocating] = useState(false);

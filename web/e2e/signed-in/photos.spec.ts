@@ -7,32 +7,21 @@ import { createClient } from '@supabase/supabase-js';
 import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
 import { openCategory } from './helpers';
 
-// Photographs are the point of a collection app, and this is the longest path
-// in it: the file is decoded and resized in a canvas, resized again for a
-// thumbnail, uploaded twice, listed back, and signed -- and every step is in
-// the browser, so a `next build` has nothing to say about any of it.
-//
-// It is also the private half of a collection. What the storage policies
-// allow is checked in rls.spec.ts; what is checked here is that an ordinary
-// upload still works, which is the half a policy tightened too far would
-// break.
+// Decode, resize (twice), upload (twice), list, and sign -- all in the
+// browser, so a `next build` can't verify any of it. What the storage
+// policies allow is checked separately in rls.spec.ts; this checks that an
+// ordinary upload still works.
 test.use({ locale: 'en-GB' });
 
-// Every test here decodes a photograph, resizes it twice in a canvas and
-// uploads two objects -- real work, done in the browser, with another worker
-// doing the same thing beside it. Playwright's default 30s covers one upload
-// comfortably and two under load not at all.
-//
-// The assertions below wait for less than this, on purpose: an assertion
-// allowed to run as long as the test can never fail with its own message, so
-// a slow upload was reported as "test timed out" with nothing about what it
-// had been waiting for.
+// Playwright's default 30s test timeout doesn't reliably cover two real
+// browser-side uploads under parallel load.
 test.describe.configure({ timeout: 120_000 });
+// Kept below the test timeout so a slow upload fails with its own assertion
+// message instead of a bare "test timed out".
 const ARRIVES = 45_000;
 
-// A real photograph rather than a fabricated one: the compressor decodes what
-// it is given, and a handful of bytes that merely claim to be a PNG is not
-// something a canvas can draw.
+// A real photograph, not fabricated bytes: the compressor decodes what it's
+// given, and a canvas can't draw something that only claims to be a PNG.
 const PHOTO = resolve(process.cwd(), 'public/logo.png');
 
 const context = () =>
@@ -96,16 +85,12 @@ test.describe('photographs', () => {
 
       await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
 
-      // Compression happens in the browser and the upload is two round trips,
-      // so this waits rather than assuming. What it waits for is the picture
-      // itself, not the placeholder that stood in for it.
+      // Waits for the real picture, not the placeholder that stood in for it.
       await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
       await expect(card.locator('img')).toHaveAttribute('src', /token=/);
     } finally {
-      // In a finally: a leaked entry here is worse than entries.spec.ts's,
-      // since reseed() only ever deletes database rows -- it never touches
-      // object storage, so an orphaned upload persists across every future
-      // run, not just the rest of this one (#338).
+      // In `finally`: reseed() only deletes database rows, never storage
+      // objects, so a leaked entry here orphans an upload permanently.
       await removeEntry(page, title);
     }
   });
@@ -125,9 +110,8 @@ test.describe('photographs', () => {
     }
   });
 
-  // Full size and thumbnail, both under the owner's own prefix -- which is
-  // the segment the storage policies key on, so getting the path wrong locks
-  // a photograph away from the person who took it.
+  // Both files live under the owner's prefix, the segment storage policies
+  // key on; a wrong path locks the photo away from its own owner.
   test('it is stored as a pair, under the owner', async ({
     page,
   }, testInfo) => {
@@ -190,9 +174,8 @@ test.describe('photographs', () => {
     }
   });
 
-  // No trigger cleans these up -- SQL cannot reach object storage, so the app
-  // has to, and an entry deleted without its photographs leaves them paid for
-  // and unreachable forever.
+  // SQL cannot reach object storage, so the app must delete photographs
+  // itself or they become unreachable, paid-for orphans.
   test('deleting the entry takes its photographs with it', async ({
     page,
   }, testInfo) => {

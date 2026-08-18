@@ -3,16 +3,13 @@ import { test } from './test';
 import { itemsIn } from './fixtures';
 import { expectTitles, openCategory } from './helpers';
 
-// Search runs in Postgres, through a hand-built PostgREST `or=()` filter with
-// its own escaping (see buildSearchFilter). Unit tests hold the string it
-// produces; only a real database can say whether that string means what it
-// was meant to mean.
+// Search runs through a hand-built PostgREST `or=()` filter (buildSearchFilter).
+// Unit tests cover the string it produces; only a real database can confirm
+// what that string actually matches.
 test.use({ locale: 'en-GB' });
 
 const allCoins = itemsIn('Münzen').map((item) => item.title);
 
-// Typing only. What follows is waited for by expectTitles, which polls --
-// the box debounces and then the query has to come back.
 async function search(page: import('@playwright/test').Page, term: string) {
   await page.getByTestId('search-input').fill(term);
 }
@@ -27,8 +24,6 @@ test.describe('searching a collection', () => {
     await expectTitles(page, ['Silberdenar']);
   });
 
-  // Four columns are searched together, and a term that only ever matched
-  // titles would not notice the other three going missing.
   test('matches on a description', async ({ page }) => {
     await search(page, 'Lilie');
     await expectTitles(page, ['Goldgulden']);
@@ -49,8 +44,8 @@ test.describe('searching a collection', () => {
     await expectTitles(page, ['Silberdenar']);
   });
 
-  // Below three characters a trigram index cannot seed a scan, so the app
-  // deliberately does not filter -- showing everything rather than nothing.
+  // Below three characters a trigram index can't seed a scan, so the app
+  // deliberately skips filtering rather than showing nothing.
   test('leaves the list alone for a term of two characters', async ({
     page,
   }) => {
@@ -74,9 +69,7 @@ test.describe('searching a collection', () => {
   });
 
   // A percent sign is a LIKE wildcard and a comma is a delimiter in
-  // PostgREST's own `or=()` grammar. Both are escaped before the query is
-  // built; unescaped, the first matches everything and the second is parsed
-  // as extra filter conditions -- which PostgREST rejects outright.
+  // PostgREST's `or=()` grammar; both must be escaped before the query is built.
   test('treats a percent sign as text rather than a wildcard', async ({
     page,
   }) => {

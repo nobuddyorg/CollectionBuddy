@@ -14,9 +14,7 @@ describe('useServiceWorker', () => {
     vi.stubGlobal('navigator', { serviceWorker: { register } });
     renderHook(() => useServiceWorker());
     // NEXT_PUBLIC_BASE_PATH is unset outside a production build (see
-    // next.config.ts), so this is what every dev/test run and CI actually
-    // exercise -- the production value is a literal prefix on both, not a
-    // different code path.
+    // next.config.ts); the production value is just a literal prefix on both.
     expect(register).toHaveBeenCalledWith('/sw.js', { scope: '/' });
   });
 

@@ -10,8 +10,8 @@ import {
   categoryTabId,
 } from './Dropdown';
 
-// user_id 'owner-1' throughout, matching renderDropdown's default userId
-// prop -- none of these read as shared unless a test overrides one.
+// user_id 'owner-1' throughout, matching renderDropdown's default userId --
+// none of these read as shared unless a test overrides one.
 const sortedCats = [
   { id: 'a', name: 'Coins', user_id: 'owner-1' },
   { id: 'b', name: 'Stamps', user_id: 'owner-1' },
@@ -44,9 +44,6 @@ describe('CategorySelectDropdown', () => {
     window.localStorage.setItem('lang', 'en');
   });
 
-  // Roving tabindex: Tab should land on the selected tab and nowhere else,
-  // so a screen reader's "1 of 3" announcement is the only tab stop it has
-  // to walk through, not all three.
   it('gives only the selected tab a tab stop', () => {
     renderDropdown({ selectedCat: 'b' });
     expect(screen.getByRole('tab', { name: 'Coins' })).toHaveAttribute(
@@ -80,8 +77,6 @@ describe('CategorySelectDropdown', () => {
     }
   });
 
-  // ArrowRight/ArrowLeft move both focus and the selection -- the keyboard
-  // model a "tab, 1 of 3, selected" announcement promises.
   it('moves focus and selection with ArrowRight, wrapping past the last tab', async () => {
     const user = userEvent.setup();
     const { onSelect } = renderDropdown({ selectedCat: 'a' });
@@ -118,9 +113,8 @@ describe('CategorySelectDropdown', () => {
     expect(onSelect).toHaveBeenLastCalledWith('a');
   });
 
-  // Arrow navigation is exploratory and should leave the panel open for
-  // more of it; only an explicit click on a tab is a "done choosing" that
-  // collapses the strip.
+  // Arrow navigation is exploratory and shouldn't collapse the panel --
+  // only an explicit click does.
   it('does not collapse the panel while arrowing between tabs', async () => {
     const user = userEvent.setup();
     const { setExpanded } = renderDropdown({ selectedCat: 'a' });
@@ -138,8 +132,6 @@ describe('CategorySelectDropdown', () => {
     expect(setExpanded).toHaveBeenCalledWith(false);
   });
 
-  // After an arrow key, focus should follow onto the newly-selected tab's
-  // own DOM node, not stay behind on the one that lost the roving index.
   it('moves DOM focus onto the newly selected tab', async () => {
     const user = userEvent.setup();
     renderDropdown({ selectedCat: 'a' });
@@ -149,8 +141,8 @@ describe('CategorySelectDropdown', () => {
     expect(screen.getByRole('tab', { name: 'Stamps' })).toHaveFocus();
   });
 
-  // #483: user_id is the only thing distinguishing a shared tab from an
-  // owned one -- there is no separate "kind" field anywhere in this data.
+  // user_id is the only thing distinguishing a shared tab from an owned
+  // one -- there is no separate "kind" field anywhere in this data.
   it('marks a tab whose user_id does not match the viewer, and no other', () => {
     renderDropdown({
       sortedCats: [

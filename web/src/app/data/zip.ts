@@ -1,20 +1,13 @@
 /**
  * A minimal ZIP writer, store-only (no deflate).
  *
- * Written by hand rather than pulled in as a dependency for two reasons.
- * The bytes going into the archive are photographs the app has already
- * compressed to WebP, so deflate has nothing left to take out of them --
- * the whole compression half of a zip library would run over every
- * megabyte to produce roughly the same megabyte. And the format's stored
- * variant is a fixed set of little-endian headers around unmodified bytes,
- * which is pure arithmetic: exactly the kind of thing this project already
- * holds to a 100% floor and mutation-tests, and the kind that is far
- * easier to trust from a test than from a changelog.
+ * Written by hand rather than pulled in as a dependency: the bytes going
+ * into the archive are already WebP-compressed photographs, so deflate
+ * would run over every megabyte to produce roughly the same megabyte.
  *
- * What this deliberately does NOT do is Zip64. That caps an archive at 4
- * GiB and 65535 entries -- see MAX_ZIP_BYTES/MAX_ZIP_ENTRIES below, which
- * the writer enforces rather than silently rolling over into a corrupt
- * file.
+ * Deliberately does NOT support Zip64, which caps an archive at 4 GiB and
+ * 65535 entries -- see MAX_ZIP_BYTES/MAX_ZIP_ENTRIES below, enforced rather
+ * than silently rolling over into a corrupt file.
  */
 
 const LOCAL_HEADER_SIGNATURE = 0x04034b50;
@@ -35,10 +28,9 @@ const FLAG_UTF8 = 0x0800;
 const METHOD_STORE = 0;
 
 /**
- * The point past which the 32-bit fields in the headers below stop being
- * able to describe the archive. Beyond either of these a writer must move
- * to Zip64, so this one refuses instead of emitting something that would
- * unpack to garbage.
+ * The point past which the 32-bit header fields stop being able to
+ * describe the archive; beyond either of these a writer must move to
+ * Zip64, so this one refuses instead.
  */
 export const MAX_ZIP_BYTES = 0xffffffff;
 export const MAX_ZIP_ENTRIES = 0xffff;
@@ -77,11 +69,8 @@ export function crc32(bytes: Uint8Array): number {
 
 /**
  * A timestamp in the packed MS-DOS form the headers use: seconds at
- * two-second resolution, and a year counted from 1980.
- *
- * Anything the format cannot express is clamped to 1980-01-01 rather than
- * allowed to wrap -- a date before the epoch would otherwise come out as
- * some arbitrary year in the future.
+ * two-second resolution, and a year counted from 1980. Anything the format
+ * cannot express is clamped to 1980-01-01 rather than allowed to wrap.
  */
 export function dosDateTime(date: Date): { time: number; date: number } {
   const year = date.getFullYear();
@@ -95,9 +84,7 @@ export function dosDateTime(date: Date): { time: number; date: number } {
   };
 }
 
-// Entry names are UTF-8 on the way in (flag bit 11 above says so), and the
-// length written into the header is the length in *bytes*, not characters
-// -- an umlaut in a category name is two of them.
+// The name-length header field is bytes, not characters -- an umlaut is two.
 const encoder = new TextEncoder();
 
 export function encodePath(path: string): Uint8Array<ArrayBuffer> {
@@ -202,14 +189,10 @@ export class ZipReadError extends Error {
 }
 
 /**
- * The counterpart to `createZipWriter`: reads an archive this writer
- * produced back into its entries, keyed by path.
- *
- * Walks the central directory rather than the local headers that precede
- * each entry's bytes -- the central directory is what a real extractor
- * trusts too, and it is the one place every entry's size and offset are
- * recorded without having to sum the local entries first. Store-only, same
- * as the writer: there is no deflate to invert.
+ * Reads an archive `createZipWriter` produced back into its entries, keyed
+ * by path. Walks the central directory rather than the local headers --
+ * the same place a real extractor trusts, and where every entry's size and
+ * offset are recorded without summing the local entries first.
  */
 export async function readZipEntries(
   blob: Blob,
@@ -221,11 +204,9 @@ export async function readZipEntries(
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const eocd = bytes.length - END_OF_CENTRAL_DIR_BYTES;
   if (dv.getUint32(eocd, true) !== END_OF_CENTRAL_DIR_SIGNATURE) {
-    // A real extractor scans backward for this signature to allow for an
-    // archive comment after it; this reader never writes one (`createZipWriter`
-    // always leaves the comment length at 0), so requiring it at the very
-    // end is exact for anything this app itself produced -- and a clear
-    // refusal for anything else, rather than reading garbage as a directory.
+    // A real extractor scans backward to allow for an archive comment after
+    // this signature; `createZipWriter` never writes one, so requiring it
+    // at the very end is exact for anything this app produced.
     throw new ZipReadError(
       'Not a ZIP archive: no end-of-central-directory record',
     );
@@ -277,14 +258,10 @@ export class ZipLimitError extends Error {
 }
 
 /**
- * The check that keeps this writer inside what its 32-bit headers can
- * describe. Lifted out of the writer so it can be asserted for the entry
- * cap without actually building 65535 entries to get there.
- *
- * `maxBytes`/`maxEntries` default to the real 32-bit limits; a test can
- * lower them to reach a `createZipWriter` boundary cheaply instead of
- * allocating gigabytes or tens of thousands of entries to prove the same
- * guard (#406).
+ * Keeps the writer inside what its 32-bit headers can describe. Lifted out
+ * of the writer so a test can lower `maxBytes`/`maxEntries` to reach a
+ * boundary cheaply instead of allocating gigabytes or tens of thousands of
+ * entries.
  */
 export function assertZipRoom(
   totalBytes: number,
@@ -310,11 +287,10 @@ export type ZipWriter = {
 /**
  * Accumulates entries and hands back the finished archive as one Blob.
  *
- * Each entry is turned into its own Blob the moment it is added, and the
- * caller's `Uint8Array` is not retained. That matters on a phone: a Blob
- * is something the browser may keep on disk, whereas an array of typed
- * arrays is heap it must hold until the very end. A hundred photographs
- * therefore cost one photograph of live heap, not a hundred.
+ * Each entry becomes its own Blob the moment it's added, and the caller's
+ * `Uint8Array` is not retained -- a Blob is something the browser may keep
+ * on disk, so a hundred photographs cost one photograph of live heap, not
+ * a hundred.
  */
 export function createZipWriter({
   maxBytes = MAX_ZIP_BYTES,
@@ -327,9 +303,8 @@ export function createZipWriter({
   return {
     add(path, bytes, modified = new Date()) {
       // Checked before the CRC rather than after: hashing is a pass over
-      // every byte, and there is no reason to spend one on an entry that
-      // is about to be refused. The header's length is known without it --
-      // a fixed part plus the name.
+      // every byte, and there's no reason to spend one on an entry that's
+      // about to be refused.
       const headerLength = LOCAL_HEADER_BYTES + encodePath(path).length;
       assertZipRoom(
         offset + headerLength + bytes.length,
@@ -347,7 +322,6 @@ export function createZipWriter({
         time,
         date,
       };
-      // One Blob per entry, so the bytes stop being live heap here.
       parts.push(new Blob([localFileHeader(entry), bytes]));
       offset += headerLength + bytes.length;
       entries.push(entry);

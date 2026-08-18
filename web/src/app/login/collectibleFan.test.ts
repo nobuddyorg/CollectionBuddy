@@ -14,9 +14,8 @@ describe('fanPositions', () => {
     expect(fanPositions(10)).toHaveLength(10);
   });
 
-  // The whole point of the fan: chips ornament the medallion, they do not
-  // sit on it. Offsets are in coin diameters, so a chip clears the rim
-  // (radius 0.5) at every size the coin takes.
+  // Offsets are in coin diameters, so a chip clears the rim (radius 0.5)
+  // at every size the coin takes.
   it('keeps every chip clear of the coin', () => {
     for (const p of fanPositions(10)) {
       expect(distance(p)).toBeGreaterThanOrEqual(MIN_ORBIT);

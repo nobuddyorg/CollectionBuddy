@@ -6,9 +6,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { TagsInput } from './TagsInput';
 
-// Tags are entered by keyboard and nothing else -- there is no add button --
-// so every rule about what becomes a tag lives in one keydown handler. The
-// end-to-end suite types a title and a description; it never gets near this.
 function renderTags(tags: string[] = []) {
   const setTags = vi.fn();
   render(
@@ -32,8 +29,6 @@ describe('TagsInput', () => {
     expect(setTags).toHaveBeenCalledWith(['silver']);
   });
 
-  // A comma is how anyone who has used a tag field before expects to end one,
-  // and it is also the separator the value is stored under.
   it('adds a tag on a comma', async () => {
     const user = userEvent.setup();
     const { setTags, field } = renderTags();
@@ -74,8 +69,7 @@ describe('TagsInput', () => {
     expect(setTags).not.toHaveBeenCalled();
   });
 
-  // Silently, rather than with a complaint: adding a tag an entry already
-  // carries is a no-op the user does not need to be told about.
+  // No complaint: a duplicate tag is a silent no-op.
   it('refuses a tag the entry already has', async () => {
     const user = userEvent.setup();
     const { setTags, field } = renderTags(['silver']);
@@ -92,9 +86,6 @@ describe('TagsInput', () => {
     expect(field).toHaveValue('');
   });
 
-  // Regression (#353): the field used to stay stuck with the duplicate text
-  // in it, indistinguishable from nothing having happened -- the natural
-  // response was to press Enter again.
   it('clears the field on a duplicate too, not just a successful add', async () => {
     const user = userEvent.setup();
     const { field } = renderTags(['silver']);
@@ -111,8 +102,6 @@ describe('TagsInput', () => {
     expect(screen.getByText('silver').closest('span')).toHaveClass('tag-flash');
   });
 
-  // Backspace on an empty field takes the last tag off, which is the
-  // convention everywhere else this pattern appears.
   it('removes the last tag when Backspace is pressed on an empty field', async () => {
     const user = userEvent.setup();
     const { setTags, field } = renderTags(['gold', 'silver']);
@@ -121,7 +110,7 @@ describe('TagsInput', () => {
     expect(setTags).toHaveBeenCalledWith(['gold']);
   });
 
-  // Only on an *empty* field, or backspacing a typo would delete a tag.
+  // Only on an empty field, or backspacing a typo would delete a tag.
   it('leaves the tags alone when Backspace edits what is being typed', async () => {
     const user = userEvent.setup();
     const { setTags, field } = renderTags(['gold']);

@@ -24,10 +24,9 @@ export function CategoryInput({
       onKeyDown={(e) => {
         if (e.key === 'Enter') createCategory();
         if (e.key === 'Escape') {
-          // Matches the rename field: the first Escape only clears what was
-          // typed. Collapsing the whole panel on one press discarded a
-          // half-typed name the same key would, on the field right above
-          // it, merely have cleared.
+          // Matches the rename field above: first Escape clears the typed
+          // name; only a second Escape (nothing left to clear) collapses
+          // the panel.
           if (name !== '') {
             setName('');
           } else {

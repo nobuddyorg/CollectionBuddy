@@ -1,13 +1,7 @@
-// The Photon client both geocoding surfaces in this app go through:
-// interactive autocomplete while typing (ItemForm/usePhoton.tsx) and the
-// map's background lookup of already-catalogued place names
-// (Map/usePlaces.tsx). They used to hit the endpoint independently, each
-// with its own `lang` handling and -- worse -- two coordinate validators
-// that disagreed on NaN: one rejected it, one didn't, so the same malformed
-// response was silently dropped by one caller and drawn as a pin at
-// nowhere by the other. Both hooks hold only their own UI state now; this
-// is where the transport-level pieces they actually shared are defined
-// once.
+// Shared Photon transport for both geocoding surfaces (ItemForm/usePhoton.tsx
+// and Map/usePlaces.tsx). They used to hit the endpoint independently, with
+// two coordinate validators that disagreed on NaN -- one caller silently
+// dropped a malformed response, the other drew a pin at nowhere.
 
 const PHOTON_ENDPOINT = 'https://photon.komoot.io/api/';
 
@@ -31,12 +25,9 @@ export function photonSearchUrl(
 /**
  * Reads the coordinates off a Photon feature, or null if it carries none
  * usable. GeoJSON orders coordinates lng-first, so the pair is deliberately
- * destructured the "wrong" way round. The type says this is always a
- * numeric pair; the runtime data is a third party's, so it's checked
- * rather than trusted -- `Number.isFinite` in one step, since it coerces
- * nothing: a missing element, a string and a NaN all fail it alike. A NaN
- * slipping through would put a pin nowhere and, worse, suppress whatever
- * fallback would otherwise have found the place properly.
+ * destructured the "wrong" way round. Checked with `Number.isFinite` rather
+ * than trusted, since the runtime data is a third party's and a NaN slipping
+ * through would put a pin nowhere.
  */
 export function coordsFromFeature(
   feature: unknown,
@@ -50,12 +41,9 @@ export function coordsFromFeature(
 }
 
 /**
- * Whether asking again could plausibly give a different answer.
- *
- * A refusal to serve right now (429) and a service that is broken right
- * now (5xx) are worth another go. Anything else is the service having
- * understood the question and answered it, and repeating it verbatim only
- * spends someone else's quota.
+ * Whether asking again could plausibly give a different answer: a refusal
+ * to serve right now (429) or a broken service (5xx). Anything else is an
+ * understood answer, and repeating it only spends quota.
  */
 export function isRetryableStatus(status: number): boolean {
   return status === 429 || status >= 500;

@@ -3,22 +3,14 @@ import { expect, type Page } from '@playwright/test';
 /**
  * Opens the catalogue on a named category.
  *
- * Which category the app opens on is not something a test should assume: with
- * nothing remembered it takes the alphabetically first, and it remembers the
- * last one chosen -- so it depends on the seed data and on whatever ran
- * before. Every test that cares says which one it means.
- *
- * The strip of categories is collapsed once one is selected, so this opens it
- * first. Category names are the user's own words rather than translations,
- * which is why the tab can be named directly.
+ * Which category opens by default depends on seed data and prior selection,
+ * so every test that cares names one explicitly rather than assuming.
  */
 export async function openCategory(page: Page, name: string) {
   await page.goto('', { waitUntil: 'networkidle' });
 
-  // Wait for the categories to have arrived before asking anything about the
-  // strip. `isVisible()` answers immediately rather than waiting, so asking
-  // it too early reports "not collapsed" for a strip that simply is not there
-  // yet -- and the tab that would have been clicked never appears.
+  // `isVisible()` answers immediately rather than waiting, so this must wait
+  // for the strip to have loaded before checking whether it's collapsed.
   await expect(page.getByTestId('selected-category')).not.toBeEmpty();
 
   const tab = page.getByRole('tab', { name, exact: true });
@@ -27,9 +19,8 @@ export async function openCategory(page: Page, name: string) {
   }
   await tab.click();
 
-  // The strip collapses the moment one is chosen, taking the tabs with it --
-  // so what confirms the choice is the heading it collapses to, not the tab
-  // that no longer exists. Then wait for the grid to have refetched.
+  // The strip collapses on selection, taking the tab with it, so the
+  // heading confirms the choice instead. Then wait for the grid to refetch.
   await expect(page.getByTestId('selected-category')).toHaveText(name);
   await expect(page.getByTestId('item-card').first()).toBeVisible();
 }
@@ -45,11 +36,8 @@ export async function visibleTitles(page: Page) {
 /**
  * Waits for the grid to be showing exactly these titles, in this order.
  *
- * Polled rather than read once, because the grid is two waits away from any
- * keystroke: the search box debounces, and then the query has to come back.
- * Sleeping for "long enough" instead is how a suite becomes slow and flaky at
- * the same time -- too short on a loaded CI runner, too long on every other
- * run.
+ * Polled rather than read once: the grid is two async waits away from any
+ * keystroke (debounce, then query), so a fixed sleep would be either flaky or slow.
  */
 export async function expectTitles(page: Page, expected: string[]) {
   await expect.poll(() => visibleTitles(page)).toEqual(expected);

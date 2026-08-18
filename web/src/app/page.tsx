@@ -46,28 +46,26 @@ export default function Page() {
 
   const categories = useCategories();
   const { reload } = categories;
-  // `user` is a fresh object on every onAuthStateChange event (including a
-  // tab regaining focus), so depending on it by identity re-ran this effect
-  // -- and refetched the whole category list -- far more than the session
-  // actually changed. The id is stable across those events.
+  // `user` is a fresh object on every onAuthStateChange event, so depending
+  // on it by identity re-ran this effect far more than the session actually
+  // changed. The id is stable across those events.
   const userId = user?.id;
 
-  // False until the first listing has come back *and* a category has been
-  // selected from it -- both in the same tick, so there is no render in
-  // between where the categories exist but nothing is selected yet. That
-  // render is what used to flash the "choose a category" prompt on the way
-  // to a collection the user never had to choose.
+  // True only once the first listing is back *and* a category is selected,
+  // in the same tick -- otherwise there's a render with categories loaded
+  // but nothing selected, which used to flash the "choose a category"
+  // prompt unnecessarily.
   const [catalogueReady, setCatalogueReady] = useState(false);
 
-  // Waits for the session: these rows are readable only under the signed-in
-  // user's RLS policies, so firing this before the session resolves asks
-  // the database for a list it will refuse to return.
+  // These rows are only readable under the signed-in user's RLS policies,
+  // so firing before the session resolves just asks for a list Postgres
+  // will refuse to return.
   useEffect(() => {
     if (loading || !userId) return;
     void reload().then((catsData) => {
-      // Whatever was last on screen, or the first category, whichever the
-      // listing can honour. Auto-selecting only a lone category meant that
-      // owning a second one turned every sign-in into a decision.
+      // Whatever was last on screen, or the first category. Auto-selecting
+      // only a lone category meant owning a second one turned every
+      // sign-in into a decision.
       setSelectedCategoryId(
         (current) =>
           current ?? pickInitialCategory(catsData, readStoredCategory()),
@@ -78,9 +76,9 @@ export default function Page() {
 
   const signOut = useCallback(async () => {
     try {
-      // Global scope revokes the refresh token server-side. Fall back to a
-      // local clear if that call fails, so the user is never left signed in
-      // on this device by a network error.
+      // Global scope revokes the refresh token server-side; fall back to a
+      // local clear on failure so a network error can't leave the user
+      // signed in on this device.
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Sign-out failed:', error.message);
@@ -101,14 +99,12 @@ export default function Page() {
   const hasCategory = !!selectedCategoryId;
   const headerUser = { ...user, email: user.email ?? '' };
 
-  // Not memoized: cats is short, and this only ever runs on a render this
-  // component was already re-doing for its own reasons (selection change,
-  // categories reloading) -- a dependency array here would cost more to
-  // read than the .find() it would be guarding.
+  // Not memoized: cats is short, and this only runs on renders the
+  // component is already doing for its own reasons.
   const selectedCategory =
     categories.cats.find((c) => c.id === selectedCategoryId) ?? null;
-  // Owner, or an active editor grant (0014_editor_shares.sql) -- a viewer
-  // grant, or no grant at all, both fall through to false the same way.
+  // Owner, or an active editor grant (0014_editor_shares.sql); a viewer
+  // grant or no grant both fall through to false.
   const canEditSelected =
     !!selectedCategory &&
     (selectedCategory.user_id === userId ||
@@ -127,9 +123,8 @@ export default function Page() {
 
       <Header user={headerUser} onSignOut={signOut} />
 
-      {/* No wrapper panels: cards are pinned straight to the teal wall.
-          Nesting them inside bordered trays ate the width on a 390px
-          screen and contradicted the board metaphor. */}
+      {/* No wrapper panels: nesting cards inside bordered trays ate the
+          width on a 390px screen. */}
       <main
         id="main-content"
         // Focusable so a closing dialog can land focus here when the
@@ -146,19 +141,16 @@ export default function Page() {
         />
 
         {!catalogueReady ? (
-          // Sign-in lands here before the categories are back, and the
-          // entries of the category it opens on are the next thing to
-          // appear. Holding their shape means the page fills in rather
-          // than assembling itself in three visible steps.
+          // Holds the shape of the entries about to appear, so the page
+          // fills in rather than assembling itself in visible steps.
           <ItemListSkeleton />
         ) : hasCategory ? (
           <section
             role="tabpanel"
             id={CATEGORY_TABPANEL_ID}
-            // Both ids: the heading always resolves, the tab only while the
-            // category strip is expanded and that tab is actually in the
-            // DOM. An id that doesn't resolve is just skipped, so the panel
-            // is never left without an accessible name either way.
+            // The tab id only resolves while the category strip is
+            // expanded; a dangling id is just skipped, so the heading id
+            // still gives the panel an accessible name either way.
             aria-labelledby={`entries-heading ${categoryTabId(selectedCategoryId)}`}
             className="relative z-50 space-y-4"
           >
@@ -172,9 +164,7 @@ export default function Page() {
             />
           </section>
         ) : (
-          // Reached only by a collection with no categories at all: one
-          // that has any opens on one of them. The prompt names that,
-          // rather than asking for a choice there is nothing to make.
+          // Only reachable for a collection with no categories at all.
           <section className="py-16 grid place-items-center text-center">
             <div className="flex flex-col items-center gap-4 max-w-xs">
               <div className="h-16 w-16 bg-card ring-1 ring-border grid place-items-center text-3xl">

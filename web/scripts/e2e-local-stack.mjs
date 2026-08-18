@@ -3,11 +3,10 @@
 //
 // Usage: npm run e2e:local        (with `supabase start` already up)
 //
-// One script rather than a list of commands in the docs and a copy of that
-// list in the workflow: the keys have to be read out of the running stack and
-// the *build* has to be pointed at it too, because the Supabase URL is baked
-// into the bundle at build time. Getting that second part wrong produces a
-// suite that passes while testing a bundle talking to production.
+// One script, not a list of commands in docs and the workflow: the build
+// has to be pointed at the running stack too, since the Supabase URL is
+// baked in at build time -- getting that wrong tests a bundle talking to
+// production.
 import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,8 +39,7 @@ if (!API_URL || !ANON_KEY || !SERVICE_ROLE_KEY) {
 
 const env = {
   ...process.env,
-  // What the bundle talks to. Baked in at build time, which is why the build
-  // happens here rather than being assumed to have already happened.
+  // Baked in at build time, which is why the build happens here.
   NEXT_PUBLIC_SUPABASE_URL: API_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: ANON_KEY,
   // What the suite's setup step uses to create the user and sign it in.

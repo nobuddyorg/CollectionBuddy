@@ -27,11 +27,10 @@ export function TextRing({
   className,
   radius = DEFAULT_RADIUS,
 }: Props) {
-  // Fit the string to exactly one full turn. Left to flow naturally the
-  // text ran past the end of the path and wrapped over its own start,
-  // clipping the overlap mid-glyph and leaving a stray half-letter on the
-  // rim. `textLength` + `lengthAdjust="spacing"` distributes the slack
-  // between characters instead, so the engraving closes cleanly.
+  // Fit the string to exactly one full turn, or it flows past the end of
+  // the path and wraps over its own start, clipping mid-glyph. `textLength`
+  // + `lengthAdjust="spacing"` distributes the slack between characters
+  // instead, so the engraving closes cleanly.
   const circumference = 2 * Math.PI * radius;
 
   return (

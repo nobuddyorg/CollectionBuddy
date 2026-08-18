@@ -26,9 +26,7 @@ export default function Header({ user, onSignOut }: HeaderProps) {
       <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           {/* eslint-disable-next-line @next/next/no-img-element -- next/image
-              earns nothing on this static export (images.unoptimized); a
-              plain <img> with fetchPriority replaces `priority`'s eager
-              load without the runtime. */}
+              earns nothing on this static export (images.unoptimized). */}
           <img
             src={withBasePath('/logo-header.png')}
             alt=""
@@ -38,16 +36,10 @@ export default function Header({ user, onSignOut }: HeaderProps) {
             fetchPriority="high"
             className="object-contain shrink-0"
           />
-          {/* The login page's wordmark, at header scale: "Collection"
-              underscored in ink, "Buddy" carrying the accent. The two
-              screens now show the same mark rather than the same letters
-              in two different treatments. A 2px rule, not the login
-              page's 3px -- that weight belongs to a 48px heading, and
-              under 16px type it reads as a highlighter stroke.
-
-              `pb-0.5` on the outer span is what keeps the rule visible:
-              `truncate` clips overflow, and the inner span's border sits
-              below the line box. */}
+          {/* The login page's wordmark at header scale. 2px rule, not the
+              login page's 3px -- under 16px type that weight reads as a
+              highlighter stroke. `pb-0.5` on the outer span keeps the rule
+              visible past `truncate`'s clip. */}
           <span className="font-display text-base sm:text-lg text-foreground truncate pb-0.5">
             <span className="border-b-2 border-foreground pb-px">
               {t('brand.collection')}

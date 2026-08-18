@@ -16,14 +16,6 @@ import type { ExportItem } from './exportFormat';
 import * as zipModule from './zip';
 import type { supabase } from '../supabase';
 
-// This is the file the review that opened #415 found completely untested:
-// the pagination boundary, the batching, and the skip-on-failure/retry loop
-// all lived behind a coverage-and-mutation exemption wide enough to hide a
-// regression from every gate. getSession/listItems/listImages/signUrls are
-// now parameters (exportCategory.ts does the same for `now`), so the four
-// real calls this file makes can be replaced with fakes here instead of a
-// database.
-
 type GetSession = () => ReturnType<typeof supabase.auth.getSession>;
 type ListItems = Parameters<typeof exportCategory>[0]['listItems'];
 type ListImages = Parameters<typeof exportCategory>[0]['listImages'];
@@ -43,17 +35,15 @@ function item(overrides: Partial<ExportItem> = {}): ExportItem {
   };
 }
 
-// Stands in for `supabase.auth.getSession()`. Only `data.session.user.id`
-// is ever read, so that is all a fake has to carry.
+// Only `data.session.user.id` is ever read, so that's all the fake carries.
 function fakeGetSession(uid: string | null): GetSession {
   return (async () => ({
     data: { session: uid ? { user: { id: uid } } : null },
   })) as unknown as GetSession;
 }
 
-// Stands in for `listItemsForExport`, paging through a fixed array exactly
-// as PostgREST's own `.range(from, to)` would -- inclusive of `to`, which
-// is the boundary a page-size-off-by-one gets wrong.
+// Pages a fixed array the way PostgREST's own `.range(from, to)` would --
+// inclusive of `to`, the boundary a page-size-off-by-one gets wrong.
 function paginatedListItems(allItems: ExportItem[]): ListItems {
   return vi.fn(async (_categoryId: string, from: number, to: number) => ({
     data: allItems.slice(from, to + 1),
@@ -61,12 +51,9 @@ function paginatedListItems(allItems: ExportItem[]): ListItems {
   })) as unknown as ListItems;
 }
 
-// Stands in for `listExportImagesForItems`, keyed by item id -- the table
-// this replaced Storage listing with already carries the full `uid/itemId/
-// name` path on every row, so the fake builds the same path shape a real
-// row would rather than requiring the caller to construct one. `size_bytes:
-// null` the same as a real row with no size reported -- the tests below
-// that care about size use fakeListImagesWithSizes instead.
+// Keyed by item id, building the same `uid/itemId/name` path shape a real
+// row carries. `size_bytes: null`; tests that care about size use
+// fakeListImagesWithSizes instead.
 function fakeListImages(byItemId: Record<string, string[]>): ListImages {
   return async (itemIds: string[]) => ({
     data: itemIds.flatMap((itemId) =>
@@ -80,8 +67,8 @@ function fakeListImages(byItemId: Record<string, string[]>): ListImages {
   });
 }
 
-// Same shape, but each name carries the byte size #428's total-size check
-// reads out of `size_bytes`.
+// Same shape, but each name carries the byte size the total-size check reads
+// out of `size_bytes`.
 function fakeListImagesWithSizes(
   byItemId: Record<string, { name: string; size: number }[]>,
 ): ListImages {
@@ -97,9 +84,8 @@ function fakeListImagesWithSizes(
   });
 }
 
-// Stands in for `createSignedUrls`: every path signs to a deterministic URL
-// derived from itself, so a test can assert which photograph a fetch was
-// for without threading extra state through.
+// Every path signs to a deterministic URL derived from itself, so a test
+// can assert which photograph a fetch was for without extra state.
 function fakeSignUrls(): SignUrls {
   return (async (paths: string[]) => ({
     data: paths.map((path) => ({ path, signedUrl: `signed://${path}` })),
@@ -115,13 +101,9 @@ function statusResponse(status: number): Response {
   return new Response(null, { status });
 }
 
-/**
- * Reads a store-only ZIP (the only kind `./zip` ever writes) back into its
- * entries, by walking the central directory it did write rather than
- * assuming anything about the offsets it *should* have used -- this is what
- * gives the skip-path test below a real "is this photograph actually in the
- * archive" answer instead of trusting the writer to have done what it says.
- */
+/** Reads a store-only ZIP back into its entries by walking the central
+ * directory it wrote, rather than trusting the writer to have done what it
+ * says. */
 async function readZipEntries(blob: Blob): Promise<Map<string, Uint8Array>> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -148,10 +130,8 @@ async function readZipEntries(blob: Blob): Promise<Map<string, Uint8Array>> {
   return entries;
 }
 
-// The one directory every entry lives under (#422), derived from the
-// result's own filename rather than recomputed from `now`/category name --
-// most of the tests below don't control `now`, so this is the only way to
-// name the root without depending on the date the test happens to run on.
+// Derived from the result's own filename rather than recomputed from
+// `now`/category name, since most tests below don't control `now`.
 function rootFolderOf(result: ExportResult): string {
   return result.filename.replace(/\.zip$/, '');
 }
@@ -193,10 +173,6 @@ describe('exportCategory', () => {
     await expect(failure).rejects.toHaveProperty('cause', readError);
   });
 
-  // A single batched images query replaced the old per-item listing pool
-  // (see fetchPhotoPaths) -- there is no more per-item failure to isolate,
-  // so a failure here aborts the whole export the same way a failed items
-  // page already does above, rather than being skipped and counted.
   it('throws when the photograph listing fails, rather than exporting an incomplete collection', async () => {
     const listingError = { message: 'read failed' };
     const listImages = (async () => ({
@@ -215,9 +191,8 @@ describe('exportCategory', () => {
   });
 
   it('stops paging rather than crashing when a page comes back with no data and no error', async () => {
-    // A defensive case Supabase's types allow (`data: null, error: null`)
-    // even though a real empty page is `[]`: treated the same as an empty
-    // page rather than spread into `items.push(...null)`.
+    // Supabase's types allow `data: null, error: null` even though a real
+    // empty page is `[]`.
     const listItems = (async () => ({
       data: null,
       error: null,
@@ -279,8 +254,6 @@ describe('exportCategory', () => {
       signUrls,
     });
     await expect(failure).rejects.toThrow('Could not sign photograph URLs');
-    // The original PostgREST/storage error rides along as `cause`, not just
-    // a rewritten message -- it's what a caller logging the failure needs.
     await expect(failure).rejects.toHaveProperty('cause', signingError);
   });
 
@@ -308,9 +281,8 @@ describe('exportCategory', () => {
         signUrls: signUrls as unknown as SignUrls,
       });
 
-      // Sliced into exactly two calls -- 100, then the 50 left over -- not
-      // three (an off-by-one at the boundary asking for an empty extra
-      // page) and not one (a slice that silently returned everything).
+      // Two calls -- 100, then the 50 left over -- not three (an off-by-one
+      // asking for an empty extra page) and not one (silently all at once).
       expect(signUrls).toHaveBeenCalledTimes(2);
       expect(signUrls.mock.calls[0][0]).toHaveLength(SIGN_BATCH_SIZE);
       expect(signUrls.mock.calls[1][0]).toHaveLength(50);
@@ -340,10 +312,7 @@ describe('exportCategory', () => {
         listImages: fakeListImages({ a: paths }),
         signUrls: signUrls as unknown as SignUrls,
       });
-      // A count exactly at the boundary looks identical to one past it
-      // until a second call proves there was nothing left to sign -- an
-      // off-by-one the other way (<=) would ask for that second, empty
-      // batch here.
+      // An off-by-one the other way (<=) would ask for a second, empty batch.
       expect(signUrls).toHaveBeenCalledOnce();
     } finally {
       vi.unstubAllGlobals();
@@ -351,10 +320,6 @@ describe('exportCategory', () => {
   });
 
   describe('item pagination', () => {
-    // The four cases a range(from, to)-driven loop can get wrong: nothing
-    // to page through, a short page that ends it immediately, a page
-    // exactly at the size that must NOT be mistaken for the last one, and
-    // one item past that boundary.
     it('reads zero items in one call', async () => {
       const listItems = paginatedListItems([]);
       const result = await exportCategory({
@@ -394,10 +359,8 @@ describe('exportCategory', () => {
         listImages: fakeListImages({}),
         signUrls: fakeSignUrls(),
       });
-      // A page exactly ITEM_PAGE_SIZE long looks identical to a short page
-      // until a second call proves there was nothing left -- stopping on
-      // the first would silently truncate any collection whose size is a
-      // multiple of ITEM_PAGE_SIZE.
+      // Stopping on the first page would silently truncate any collection
+      // whose size is an exact multiple of ITEM_PAGE_SIZE.
       expect(result.itemCount).toBe(ITEM_PAGE_SIZE);
       expect(listItems).toHaveBeenCalledTimes(2);
     });
@@ -425,8 +388,7 @@ describe('exportCategory', () => {
       vi.stubGlobal(
         'fetch',
         vi.fn(async (url: string) => {
-          // A 404 is permanent -- no retry can fix it -- so this resolves
-          // without the backoff delay real timers would otherwise need.
+          // A 404 is permanent, so this resolves without needing fake timers.
           if (url === 'signed://uid/item-1/2.webp') {
             permanentFailureCalls++;
             return statusResponse(404);
@@ -447,8 +409,6 @@ describe('exportCategory', () => {
 
         expect(result.skippedPhotoCount).toBe(1);
         expect(result.photoCount).toBe(1);
-        // A permanent failure is not retried: one call settles it, not the
-        // three a retryable one gets.
         expect(permanentFailureCalls).toBe(1);
 
         const entries = await readZipEntries(result.blob);
@@ -459,8 +419,7 @@ describe('exportCategory', () => {
         );
         expect(entries.has(`${root}/photos/001-item/2.webp`)).toBe(false);
 
-        // The gap is visible, not silent: the manifest still names the
-        // photograph the archive itself is missing.
+        // The manifest still names the photograph the archive is missing.
         const manifest = await manifestOf(result);
         expect(manifest.items[0].photos).toEqual([
           'photos/001-item/1.webp',
@@ -471,11 +430,6 @@ describe('exportCategory', () => {
       }
     });
 
-    // createSignedUrls can come back with a row that names no usable URL
-    // (Supabase drops it silently when signing that one object failed) --
-    // signAll already skips such a row rather than storing an empty
-    // string, and a photo whose path was never signed hits the same
-    // "Unsigned path" guard a genuinely absent one would.
     it('skips a photograph whose signing came back with no usable URL', async () => {
       vi.stubGlobal(
         'fetch',
@@ -572,9 +526,6 @@ describe('exportCategory', () => {
       }
     });
 
-    // A rejected fetch() (offline, DNS failure, a dropped connection) is a
-    // different failure shape from an HTTP error response -- no `status` to
-    // read at all -- and retries the same way a 503 does.
     it('retries a fetch that rejects outright, not just one that resolves with a bad status', async () => {
       vi.useFakeTimers();
       let calls = 0;
@@ -650,11 +601,6 @@ describe('exportCategory', () => {
     }
   });
 
-  // #422: every entry lives under one top-level directory, so an extractor
-  // that does not auto-wrap a ZIP (CLI `unzip`, 7-Zip "extract here") still
-  // lands a whole export in a directory of its own rather than scattering
-  // collection.json/collection.csv/photos/ into whatever directory it was
-  // run in, where a second export would overwrite the first's.
   it('wraps every entry -- manifest, spreadsheet and every photograph -- in one root folder', async () => {
     vi.stubGlobal(
       'fetch',
@@ -698,8 +644,7 @@ describe('exportCategory', () => {
         signUrls: fakeSignUrls(),
       });
 
-      // Exact sequence, not just membership: `done` has to count up from 0
-      // to `total` one photograph at a time, not jump or run backwards.
+      // Exact sequence, not just membership: `done` counts up one at a time.
       expect(onProgress.mock.calls.map(([p]) => p)).toEqual([
         { phase: 'items', done: 0, total: 0 },
         { phase: 'photos', done: 0, total: 2 },
@@ -729,8 +674,6 @@ describe('exportCategory', () => {
         listImages: fakeListImages({ a: ['1.webp'] }),
         signUrls: signUrls as unknown as SignUrls,
       });
-      // 6 hours, not 6 seconds -- a large export on a slow connection can
-      // easily outlive Supabase's own 1-hour default.
       expect(signUrls).toHaveBeenCalledWith(expect.any(Array), 6 * 3600);
     } finally {
       vi.unstubAllGlobals();
@@ -758,9 +701,6 @@ describe('exportCategory', () => {
         'uid/item-1/1.webp',
         expect.anything(),
       );
-      // Names the HTTP status that caused it, not a blank message -- a
-      // developer reading this log is the only diagnostic an export ever
-      // gets, since the failure never reaches the UI beyond a count.
       const [, , err] = consoleError.mock.calls[0] as unknown[];
       expect(String(err)).toContain('HTTP 404');
     } finally {
@@ -841,8 +781,7 @@ describe('exportCategory', () => {
     }
   });
 
-  // 429 (rate limited) and the 5xx boundary are the two edges
-  // isRetryableStatus draws: not the status codes either side of them.
+  // The two edges isRetryableStatus draws, not the codes either side of them.
   it.each([429, 500])(
     'retries HTTP %i rather than treating it as permanent',
     async (status) => {
@@ -897,13 +836,8 @@ describe('exportCategory', () => {
     }
   });
 
-  // #416: the writer's own refuse-don't-corrupt contract (`assertZipRoom`,
-  // tested directly in zip.test.ts) was nullified at its only call site --
-  // caught by the same per-photo catch meant for fetch failures, and
-  // reported as one more skipped photograph. `createZipWriter` is not one
-  // of the four raw calls this file accepts as a parameter (unlike
-  // `fetch`), so it is swapped out at the module level for the one test
-  // that needs to force it to refuse.
+  // `createZipWriter` is not one of the raw calls this file accepts as a
+  // parameter, so it's swapped out at the module level to force it to refuse.
   describe('a ZipLimitError from the writer', () => {
     it('escapes the export instead of being counted as a skipped photograph', async () => {
       const addSpy = vi.fn(() => {
@@ -980,9 +914,8 @@ describe('exportCategory', () => {
       }
     });
 
-    // Two photographs finishing in the pool at almost the same moment can
-    // both trip the limit -- the error reported must be the one that
-    // happened first, not whichever runner happens to reach the catch last.
+    // The error reported must be the one that happened first, not whichever
+    // runner happens to reach the catch last.
     it('reports the first failure when more than one download fails around the same time', async () => {
       let addCalls = 0;
       const addSpy = vi.fn(() => {
@@ -1014,9 +947,6 @@ describe('exportCategory', () => {
     });
   });
 
-  // #418: no request in the export pipeline had a timeout, so a connection
-  // that black-holes mid-response left the whole export stalled forever
-  // with no way to cancel it either.
   describe('timeout and cancellation', () => {
     it('bounds every photograph fetch with a fresh per-attempt timeout signal', async () => {
       const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
@@ -1039,9 +969,8 @@ describe('exportCategory', () => {
       }
     });
 
-    // The signal handed to `fetch` has to actually be linked to the
-    // caller's own signal, not merely a timeout that looks the same --
-    // otherwise a caller's own cancel would never reach the request at all.
+    // The signal handed to `fetch` must actually be linked to the caller's
+    // own signal, not merely a timeout that looks the same.
     it('gives fetch a signal that reflects the caller aborting, not an inert one', async () => {
       const controller = new AbortController();
       let capturedSignal: AbortSignal | undefined;
@@ -1132,9 +1061,6 @@ describe('exportCategory', () => {
         'fetch',
         vi.fn(async () => {
           fetchCalls++;
-          // A cancel arriving while photographs are already downloading --
-          // the ordinary case, since Cancel sits next to the progress line
-          // for exactly this phase.
           controller.abort();
           return okResponse([1]);
         }),
@@ -1161,10 +1087,9 @@ describe('exportCategory', () => {
       }
     });
 
-    // Without a check right after the failure that used up the very last
-    // retry, a cancellation landing on that attempt would fall through to
-    // `throw lastErr` and surface as the underlying network error -- one
-    // more silently skipped photograph -- instead of stopping the export.
+    // Without a check right after the failure that used up the last retry,
+    // a cancellation landing there would fall through to `throw lastErr`
+    // and surface as the network error instead of stopping the export.
     it('reports the cancellation itself, not the network error underneath it, when cancel lands on the last retry attempt', async () => {
       vi.useFakeTimers();
       const controller = new AbortController();
@@ -1186,9 +1111,9 @@ describe('exportCategory', () => {
           signUrls: fakeSignUrls(),
           signal: controller.signal,
         });
-        // Attached before the timers advance and the promise settles: an
-        // assertion built afterwards would attach its handler one tick too
-        // late and have Node flag the rejection as unhandled in between.
+        // Attached before the timers advance: built afterwards, the handler
+        // would attach one tick too late and Node would flag the rejection
+        // as unhandled in between.
         const assertion =
           expect(promise).rejects.toBeInstanceOf(ExportCancelledError);
         await vi.advanceTimersByTimeAsync(10_000);
@@ -1201,10 +1126,6 @@ describe('exportCategory', () => {
     });
   });
 
-  // #420: photographs used to download strictly one at a time. A bounded
-  // pool should hold no more responses in flight than its concurrency, and
-  // must still add every one of them to the archive regardless of the order
-  // they land in.
   it('downloads photographs through a bounded pool, not one at a time or all at once', async () => {
     const photoCount = PHOTO_DOWNLOAD_CONCURRENCY + 4;
     let inFlight = 0;
@@ -1260,11 +1181,6 @@ describe('exportCategory', () => {
   });
 });
 
-// #428: the listing phase already knows every photograph's size from
-// storage's own metadata, so a category whose photographs would risk a
-// killed tab (iOS/WebKit keeps constructed Blobs memory-resident, well
-// under the 4 GiB assertZipRoom would otherwise wait for) gets a chance to
-// warn before a single one is downloaded, not after the archive fails.
 describe('confirmLargeExport', () => {
   it('does not ask when the total stays under the threshold', async () => {
     const confirmLargeExport = vi.fn().mockResolvedValue(true);
@@ -1351,10 +1267,6 @@ describe('confirmLargeExport', () => {
     }
   });
 
-  // Unlike the old Storage-listing shape, there is no separate "thumbnail
-  // object" for this query to filter out of the total: listExportImagesForItems
-  // only ever selects path_full/size_bytes, never path_thumb, so a
-  // thumbnail's size structurally cannot reach this sum in the first place.
   it('sums sizes across every item', async () => {
     const confirmLargeExport = vi.fn().mockResolvedValue(true);
     const half = LARGE_EXPORT_WARN_BYTES / 2 + 1;

@@ -30,8 +30,7 @@ describe('Actions', () => {
     window.localStorage.setItem('lang', 'en');
   });
 
-  // The controls are icon-only, so the names exist solely in the
-  // accessibility tree -- there is no visible text to fall back on.
+  // Icon-only controls: names exist solely in the accessibility tree.
   it('names every action for assistive tech', () => {
     const { input } = renderActions();
     expect(screen.getByRole('button', { name: 'Edit' })).toBeVisible();
@@ -39,9 +38,6 @@ describe('Actions', () => {
     expect(screen.getByLabelText('Add image')).toBe(input);
   });
 
-  // All three things you can do to an entry sit in this one row; the upload
-  // control used to be a full-width band across the middle of the card,
-  // between the photograph and its caption.
   it('carries the upload control alongside edit and delete', () => {
     const { input } = renderActions();
     expect(input).toBeInTheDocument();
@@ -49,8 +45,7 @@ describe('Actions', () => {
   });
 
   // Regression: spelled-out labels overflowed the card in German and were
-  // clipped. Icons are fixed-width, but only work as controls if they are
-  // also hoverable/tappable targets, which the shared icon button provides.
+  // clipped.
   it('gives each control a title so the icon is not the only cue', () => {
     renderActions();
     expect(screen.getByTitle('Add image')).toBeInTheDocument();

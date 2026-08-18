@@ -22,23 +22,14 @@ jobs:
               with:
                   github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-            # Patch-level devDependency bumps only (#290). `--auto` merges the
-            # moment every *required* status check passes -- which is only as
-            # safe as that required list is complete, and until now it held
-            # only build_and_test, not e2e_local_stack (the RLS regression
-            # suite) or prek (where zizmor runs). Both are now required on
-            # main, so `--auto` waits on the full suite rather than a subset
-            # of it.
+            # Patch-level devDependency bumps only. `--auto` merges once every
+            # *required* status check passes, which must include
+            # e2e_local_stack and prek, not just build_and_test.
             #
-            # That still isn't enough on its own: a malicious patch release
-            # doesn't have to break any test to run a payload from a
-            # postinstall script or the shipped module itself, and a merge to
-            # main redeploys the site on the very next push. Scoping this to
-            # `direct:development` shrinks what a blind auto-merge can reach --
-            # a devDependency never ships in the built bundle, so a compromised
-            # one can act on this repository's CI runner but not on every
-            # signed-in user's browser. Anything touching a runtime dependency
-            # still waits for a human to read the diff.
+            # Scoped to `direct:development`: a devDependency never ships in
+            # the built bundle, so a compromised one can act on this repo's
+            # CI runner but not on every signed-in user's browser. Anything
+            # touching a runtime dependency still waits for a human.
             - name: Merge devDependency patch-level updates only
               if: |
                   steps.metadata.outputs.update-type == 'version-update:semver-patch' &&

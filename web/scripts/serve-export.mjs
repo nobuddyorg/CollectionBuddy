@@ -1,11 +1,10 @@
 // Serves the static export the way GitHub Pages does: under the base path,
 // not at the root.
 //
-// That distinction is the whole point. `next build` bakes the base path into
-// every asset URL, every router link and the manifest, so an export served at
-// `/` answers 404 to nearly everything it asks for -- and a suite pointed at
-// it would be testing a site that has never existed. The directory built below
-// exists only to put `out/` one level down, at the name the base path expects.
+// `next build` bakes the base path into every asset URL and the manifest,
+// so an export served at `/` 404s on nearly everything -- a suite pointed
+// at it would test a site that never existed. The directory built below
+// puts `out/` one level down, at the name the base path expects.
 //
 // Usage: node scripts/serve-export.mjs <port> [basePath]
 //

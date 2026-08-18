@@ -27,8 +27,8 @@ export function useMenu() {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        // Dismissing with the keyboard is the one case where focus has
-        // nowhere sensible to land, so send it back to the trigger.
+        // Dismissed by keyboard: focus has nowhere sensible to land, so
+        // send it back to the trigger.
         restoreFocusRef.current = true;
         setOpen(false);
       }
@@ -37,11 +37,9 @@ export function useMenu() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  // Only ever refocus after an Escape. The previous version refocused
-  // whenever `open` was false -- including on mount, and after a click
-  // outside -- and a programmatic focus() matches :focus-visible, so the
-  // trigger picked up a keyboard-style outline it had not earned and kept
-  // it until something else was clicked.
+  // Only ever refocus after an Escape: a programmatic focus() matches
+  // :focus-visible, so refocusing on every close (including a click
+  // outside) gave the trigger a keyboard-style outline it hadn't earned.
   useEffect(() => {
     if (open) return;
     if (!restoreFocusRef.current) return;

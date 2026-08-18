@@ -7,9 +7,8 @@ import { fieldClasses } from '../ui/fieldClasses';
 
 const ESTIMATED_MENU_HEIGHT = 240;
 
-// `onChange` always says what the coordinates are now, never just what the
-// text is: passing null for a hand-typed edit is how stale coordinates are
-// stopped from outliving the name they were looked up for.
+// `onChange` reports null coords for hand-typed edits, so stale coordinates
+// never outlive the name they were looked up for.
 export function PlaceAutocomplete({
   id,
   value,
@@ -43,11 +42,8 @@ export function PlaceAutocomplete({
 
   const showMenu = focus && (loading || results.length > 0 || error);
 
-  // Whether there's more room below the input than above it -- decides
-  // which side the menu opens on. The menu is positioned with `absolute`
-  // inside the anchor below, so (unlike the old fixed/portaled version) it
-  // moves with the input for free on scroll; only the below/above choice
-  // needs recomputing, and only when the menu's presence or size changes.
+  // The menu is positioned absolute inside the anchor, so it moves with the
+  // input on scroll for free; only the below/above choice needs recomputing.
   const [placement, setPlacement] = useState<'below' | 'above'>('below');
   useEffect(() => {
     if (!showMenu) return;
@@ -82,8 +78,6 @@ export function PlaceAutocomplete({
         value={value}
         onChange={(e) => {
           const v = e.target.value;
-          // Typed by hand, so whatever coordinates were attached belong to
-          // a place that is no longer what this field says.
           onChange(v, null);
           setFocus(isQueryLongEnough(v));
         }}

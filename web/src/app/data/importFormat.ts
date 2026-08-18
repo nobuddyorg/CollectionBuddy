@@ -1,13 +1,7 @@
 /**
- * The read side of ./exportFormat: turning an archive's `collection.json`
- * back into rows this app can create, and the archive's own root folder
- * back into something photo paths can be resolved against.
- *
- * Deliberately narrow. An import only ever reads what an export of *this*
- * app wrote -- there is no other producer to be lenient towards -- so
- * validation exists to give someone a clear reason their file was refused
- * (a JSON export from a different tool, an archive from a future version of
- * this one), not to accept a wide range of possible shapes.
+ * The read side of ./exportFormat. Deliberately narrow: an import only
+ * ever reads what an export of *this* app wrote, so validation exists to
+ * give a clear refusal reason, not to accept a wide range of shapes.
  */
 
 import {
@@ -24,13 +18,9 @@ export class ImportFormatError extends Error {
 }
 
 /**
- * Validates and narrows already-parsed JSON into an `ExportManifest`.
- *
- * Only checks what tells a real export apart from anything else: the
- * format tag and the version number. It does not otherwise validate every
- * field's shape -- a manifest that passes both of those was written by
- * `buildManifest` in some version of this app, and `buildManifest`'s own
- * shape is what's trusted for everything past that point.
+ * Validates and narrows already-parsed JSON into an `ExportManifest`. Only
+ * checks the format tag and version number -- a manifest passing both was
+ * written by `buildManifest`, whose own shape is trusted past that point.
  */
 export function parseManifest(data: unknown): ExportManifest {
   if (
@@ -50,11 +40,9 @@ export function parseManifest(data: unknown): ExportManifest {
 }
 
 /**
- * The one directory every entry in the archive lives under (matches
- * `archiveRootFolder` on the export side) -- found by looking for whichever
- * entry ends in `/collection.json` rather than recomputing the name from
- * the category and export date, both of which the importer doesn't know
- * ahead of reading the manifest they're stamped into.
+ * The one directory every entry lives under, found by looking for whichever
+ * entry ends in `/collection.json` -- the importer doesn't know the
+ * category/date the name would otherwise be recomputed from.
  */
 export function findManifestPath(entryNames: Iterable<string>): string | null {
   for (const name of entryNames) {

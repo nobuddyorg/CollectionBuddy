@@ -6,9 +6,6 @@ import { describe, expect, it } from 'vitest';
 
 import { useFocusTrap } from './useFocusTrap';
 
-// A focus trap is entirely invisible: nothing on screen says whether Tab is
-// about to leave the dialog. It is also the difference between a dialog a
-// keyboard user can use and one they cannot, so it is worth pinning.
 function Harness({
   open,
   useInitialFocus = false,
@@ -59,8 +56,6 @@ describe('useFocusTrap', () => {
     expect(button('second')).toHaveFocus();
   });
 
-  // Whatever was focused before the dialog opened is where the page was, and
-  // where it should carry on from.
   it('gives focus back to where it came from on close', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<Harness open={false} />);
@@ -73,9 +68,6 @@ describe('useFocusTrap', () => {
     expect(button('outside before')).toHaveFocus();
   });
 
-  // A confirmed delete removes the card's trash button (the trigger)
-  // optimistically while the confirm dialog is still open, so by the time it
-  // closes `prev` is detached and `.focus()` on it is a no-op (#293).
   it('falls back to the main landmark when the trigger was removed while open', () => {
     const { rerender } = render(<Harness open={false} removeTrigger={false} />);
 
@@ -83,8 +75,6 @@ describe('useFocusTrap', () => {
     rerender(<Harness open removeTrigger={false} />);
     expect(button('first')).toHaveFocus();
 
-    // The trigger is optimistically removed from the DOM while the dialog
-    // is still open -- `prev` (captured on open) is now detached.
     rerender(<Harness open removeTrigger />);
     rerender(<Harness open={false} removeTrigger />);
 
@@ -111,9 +101,7 @@ describe('useFocusTrap', () => {
     expect(button('last')).toHaveFocus();
   });
 
-  // Only the ends wrap. In between, Tab is left alone to do what it does --
-  // in both directions, since each end is guarded by its own condition and
-  // only the matching one should fire.
+  // Only the ends wrap; Tab in the middle is left alone.
   it('leaves Tab alone in the middle of the dialog', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<Harness open={false} />);

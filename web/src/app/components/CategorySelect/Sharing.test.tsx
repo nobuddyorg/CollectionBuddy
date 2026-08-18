@@ -67,10 +67,9 @@ describe('SharingSection', () => {
       screen.getByLabelText('Share with (email)'),
       'grantee@example.com',
     );
-    // userEvent.type doesn't reliably fill a date input across jsdom
-    // versions; fireEvent.change with a `yyyy-mm-dd` value is the input's
-    // own documented API and goes through React's onChange correctly,
-    // unlike setting .value and dispatching a bare native event.
+    // userEvent.type doesn't reliably fill a date input in jsdom;
+    // fireEvent.change with a `yyyy-mm-dd` value goes through React's
+    // onChange correctly.
     fireEvent.change(screen.getByLabelText('Expires (optional)'), {
       target: { value: '2026-08-20' },
     });
@@ -95,10 +94,8 @@ describe('SharingSection', () => {
     ).not.toBeInTheDocument();
   });
 
-  // jsdom has no `showPicker`, so the trigger button falls back to
-  // focusing the underlying (sr-only) date input -- the same thing a
-  // plain click on that field does natively where `showPicker` is
-  // unsupported (older Safari/Firefox).
+  // jsdom has no `showPicker`, so the trigger falls back to focusing the
+  // underlying (sr-only) date input directly.
   it('focuses the date field when its trigger button is clicked', async () => {
     renderSection(sharesState());
     await userEvent.click(screen.getByTitle('Expires (optional)'));
@@ -137,10 +134,9 @@ describe('SharingSection', () => {
         ],
       }),
     );
-    // The dash and the expiry sit in a nested span (see Sharing.tsx), so
-    // the full line is split across elements -- toHaveTextContent reads
-    // an element's aggregate text rather than requiring one node whose
-    // entire content matches exactly, the way getByText's default would.
+    // The expiry sits in a nested span, so toHaveTextContent (which reads
+    // an element's aggregate text) is used instead of getByText, which
+    // needs one node whose entire content matches.
     const row = screen.getByText('grantee@example.com').closest('li')!;
     expect(row).toHaveTextContent(
       `Expires ${new Date(expiresAt).toLocaleDateString()}`,
@@ -265,9 +261,8 @@ describe('SharingSection', () => {
     expect(updateShareRole).toHaveBeenCalledWith('share-1', 'viewer');
   });
 
-  // #556 follow-up: "Can edit" has no room next to the email, expiry chip
-  // and revoke button on a narrow screen, so it's a pen icon there instead
-  // that opens the same checkbox in a modal roomy enough for its label.
+  // "Can edit" has no room on a narrow screen -- the pen icon opens the
+  // same checkbox in a modal instead.
   it('opens the role toggle in a modal from the mobile pen button', async () => {
     const updateShareRole = vi.fn().mockResolvedValue(true);
     renderSection(

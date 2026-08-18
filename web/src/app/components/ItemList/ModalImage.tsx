@@ -23,8 +23,8 @@ export function ModalImage({
   busy = false,
   readOnly = false,
 }: {
-  /** The full set of photographs for the entry this modal was opened from
-   * -- not just the ones a strip cell had room for (#304). */
+  /** The full set of photographs for the entry, not just the ones a strip
+   * cell had room for. */
   imgs: ImgEntry[];
   /** Position within `imgs` to show, or `null` while closed. */
   index: number | null;
@@ -34,19 +34,17 @@ export function ModalImage({
   onDelete: (img: ImgEntry) => void;
   deletingPath: Set<string>;
   busy?: boolean;
-  /** A category shared with, not owned by, the viewer (#483 follow-up): no
-   * delete control in the carousel either. */
+  /** Category shared with, not owned by, the viewer: no delete control in
+   * the carousel either. */
   readOnly?: boolean;
 }) {
   const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement>(null);
 
   const count = imgs.length;
-  // Deleting the photograph currently shown shifts `imgs` under the same
-  // `index` -- the array closes over the gap, so the same position now
-  // names whatever came after it (or the new last one, if it was the
-  // last). Clamping here rather than in the caller is what makes that
-  // fall out for free instead of needing its own bookkeeping.
+  // Deleting the currently shown photograph shifts `imgs` under the same
+  // `index`; clamping here, not in the caller, makes that fall out for
+  // free instead of needing its own bookkeeping.
   const clampedIndex =
     index !== null && count > 0
       ? Math.min(Math.max(index, 0), count - 1)
@@ -62,22 +60,14 @@ export function ModalImage({
     [count, onIndexChange],
   );
 
-  // #484: the Previous/Next buttons sit over the photograph itself, which
-  // is fine with a mouse (there's room beside a cursor-sized target) but on
-  // a narrow phone screen covers real image content. Swipe is the touch
-  // equivalent of those buttons -- a horizontal drag past the threshold
-  // steps the same way a click on them would -- so the buttons can hide on
-  // touch devices ([@media(hover:none)] below) without losing the gesture
-  // that replaces them.
+  // Previous/Next sit over the photograph, fine with a mouse but covering
+  // content on a narrow touch screen. Swipe is the touch equivalent, so the
+  // buttons can hide on touch ([@media(hover:none)] below) without losing
+  // the gesture that replaces them.
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const SWIPE_THRESHOLD_PX = 50;
-  // Set only when a touch just navigated -- so the synthetic click that
+  // Set only when a touch just navigated, so the synthetic click that
   // follows a swipe's touchend doesn't also close the modal it just paged.
-  // Any other tap on the photograph closes it, via the image's own onClick
-  // below rather than a backdrop click: the backdrop and the strip of
-  // controls around the image no longer dismiss on their own, since a
-  // near-miss on Previous/Next/the counter used to close the modal instead
-  // of stepping it.
   const suppressImageClickRef = useRef(false);
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
@@ -97,9 +87,7 @@ export function ModalImage({
       if (!touch) return;
       const dx = touch.clientX - start.x;
       const dy = touch.clientY - start.y;
-      // Horizontal enough to be a swipe rather than a vertical wobble or a
-      // pinch -- the same photograph-inspection gestures #355 already had
-      // to tell apart from a dismiss tap.
+      // Horizontal enough to be a swipe rather than a vertical wobble or pinch.
       if (Math.abs(dx) < SWIPE_THRESHOLD_PX || Math.abs(dx) < Math.abs(dy)) {
         return;
       }
@@ -114,9 +102,8 @@ export function ModalImage({
   useFocusTrap(open, panelRef);
   useInertBackground(open);
 
-  // ArrowLeft/ArrowRight cycle through every photograph, matching the
-  // Escape-to-close pattern already used by this modal (and Pagination's
-  // own Previous/Next) rather than inventing a new convention.
+  // Matches the Escape-to-close convention already used here and by
+  // Pagination's Previous/Next.
   useEffect(() => {
     if (!open || count < 2 || clampedIndex === null) return;
     const onKey = (e: KeyboardEvent) => {
@@ -149,7 +136,7 @@ export function ModalImage({
     >
       {/* Pinned to the corner, not stacked under the image: with the image
           free to take max-h-full, a button below it landed past the bottom
-          of a fixed, unscrollable overlay and could not be reached. */}
+          of the fixed overlay and was unreachable. */}
       <button
         onClick={onClose}
         className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
@@ -159,14 +146,11 @@ export function ModalImage({
         <Icon icon={IconType.Close} className="w-5 h-5" />
       </button>
 
-      {/* Deliberately Trash rather than the strip's small X: this sits in
-          the corner opposite Close (also an X), where a second X would be
-          read as another way to dismiss the modal instead of the photo
-          underneath it. Reachable here because the strip's own delete
-          button only exists on a rendered Plate -- photographs past the
-          strip limit never had one (#304). Absent, not disabled, for a
-          shared category (#483 follow-up) -- RLS already refuses the
-          delete, this just doesn't offer it. */}
+      {/* Trash, not the strip's small X: opposite Close (also an X), so a
+          second X wouldn't read as another dismiss control. Reachable here
+          for photographs past the strip limit, which have no delete button
+          of their own. Absent, not disabled, for a shared category: RLS
+          already refuses the delete, this just doesn't offer it. */}
       {!readOnly && (
         <button
           onClick={() => onDelete(current)}
@@ -185,13 +169,10 @@ export function ModalImage({
 
       {count > 1 && (
         // One bar, on every pointer type, rather than edge buttons that
-        // only showed on hover (#484) plus a separate floating counter.
-        // The edge buttons sat over the photograph itself on a touch
-        // screen -- fine beside a mouse cursor, but the reason they were
-        // hidden there rather than just left in place. Pinning Previous,
-        // the count and Next together at the bottom, inside the padding
-        // reserved below, gives touch the same click-to-page affordance
-        // (#515) without that overlap, and swipe still works alongside it.
+        // only showed on hover and sat over the photograph on touch
+        // screens. Pinning Previous/count/Next together at the bottom gives
+        // touch the same affordance without that overlap; swipe still
+        // works alongside it.
         <div
           aria-live="polite"
           className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 flex items-center gap-3"
@@ -222,17 +203,13 @@ export function ModalImage({
         </div>
       )}
 
-      {/* pb reserves room for the bottom bar above (44px row + its
-          12px/safe-area offset) the same way pt already reserves the top
-          buttons' row -- fixed rather than measured, so a tall portrait
-          photo's rendered edge sits above the bar instead of under it,
-          on every device including one with a safe-area home indicator. */}
+      {/* pb reserves room for the bottom bar (44px row + safe-area offset),
+          same as pt for the top buttons -- fixed rather than measured, so a
+          tall photo's edge sits above the bar rather than under it. */}
       <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
         {/* eslint-disable-next-line @next/next/no-img-element -- next/image
-            earns nothing on this static export (images.unoptimized), and
-            the width={0} height={0} sizes="100vw" it needed here was
-            already the documented workaround for "let CSS size this
-            unconstrained" -- a plain <img> does that natively. */}
+            earns nothing on this static export; a plain <img> already does
+            what `width={0} height={0} sizes="100vw"` was working around. */}
         <img
           key={current.pathFull}
           src={current.urlFull}
@@ -241,10 +218,8 @@ export function ModalImage({
           // Same reasoning as the grid: see the note in ImageGrid.tsx.
           crossOrigin="anonymous"
           className="w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg"
-          // A tap on the photo closes the modal (#511) -- except the tail
-          // end of a swipe that just paged to another photograph, which
-          // onTouchEnd above flags so that gesture doesn't also dismiss the
-          // thing it just changed.
+          // A tap on the photo closes the modal, except the tail end of a
+          // swipe that just paged, which onTouchEnd above flags to prevent.
           onClick={() => {
             if (suppressImageClickRef.current) {
               suppressImageClickRef.current = false;

@@ -7,13 +7,8 @@ const SIZE_CLASSES = {
 
 export type SpinnerSize = keyof typeof SIZE_CLASSES;
 
-// Inherits currentColor rather than a fixed white -- it used to be
-// white-only, which is why the buttons and plates that sit on a pale
-// surface each rolled their own currentColor spinner instead of using this
-// one (three separate implementations, one of them also duplicated as a
-// `.spinner` CSS utility). A caller on a dark surface sets its own text
-// colour to white the way it already sets every other icon's colour, same
-// as a spinner on any other colour.
+// Inherits currentColor rather than a fixed white, so a caller on a dark
+// surface sets its own text colour the same way it sets every other icon's.
 export function Spinner({ size = 'md' }: { size?: SpinnerSize }) {
   return (
     <div

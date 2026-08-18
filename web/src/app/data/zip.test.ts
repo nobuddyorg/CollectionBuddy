@@ -102,9 +102,9 @@ describe('dosDateTime', () => {
     });
   });
 
+  // Tests mid-year rather than 1980-01-01: a clamp firing one year late
+  // would be invisible there, since that's also what it clamps to.
   it('keeps 1980 itself, which is the epoch and not before it', () => {
-    // A clamp that fired one year late would be invisible on 1980-01-01,
-    // since that is also what it clamps to -- so this asks mid-year.
     expect(dosDateTime(new Date(1980, 5, 15, 10, 0, 0))).toEqual({
       time: 10 << 11,
       date: (6 << 5) | 15,
@@ -300,11 +300,9 @@ describe('createZipWriter', () => {
     expect(u16(bytes, 12)).toBe(date);
   });
 
-  // A real `new Date()` here (there being no `modified` to fake it with)
-  // used to be called twice -- once inside the writer, once in the
-  // assertion -- which fails the one run in a thousand where the local
-  // clock ticks past midnight between the two. A pinned clock makes both
-  // calls see the same instant regardless of when the suite happens to run.
+  // Pins the clock so the writer's own `new Date()` and this assertion's
+  // see the same instant, rather than flaking the rare run where the local
+  // clock ticks past midnight between the two.
   it('defaults the modification time to now when none is given', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 5, 15, 23, 59, 59));
@@ -331,19 +329,17 @@ describe('createZipWriter', () => {
   it('refuses an entry that would push the archive past what 32 bits describe', () => {
     const writer = createZipWriter();
     // A length is all the writer reads before it decides, so a stand-in of
-    // the right length saves allocating four gigabytes to prove it.
+    // the right length avoids allocating four gigabytes.
     const huge = {
       length: MAX_ZIP_BYTES,
     } as unknown as Uint8Array<ArrayBuffer>;
     expect(() => writer.add('big.bin', huge, modified)).toThrow(ZipLimitError);
   });
 
-  // #406: a mutant that removes assertZipRoom's byte guard entirely used to
-  // be killed only by the huge-stand-in test above hanging until Stryker's
-  // own timeout -- add() would fall through to crc32(bytes), iterating four
-  // billion times over an array that isn't really there. `maxBytes` reaches
-  // the same guard with a handful of real bytes, so a removed guard fails
-  // this assertion in milliseconds instead of timing out.
+  // A removed byte guard would make add() fall through to crc32(bytes),
+  // iterating over the huge stand-in above until Stryker's own timeout.
+  // `maxBytes` reaches the same guard with real bytes, failing in
+  // milliseconds instead.
   it('refuses an entry through the writer once a lowered byte limit is reached', () => {
     const writer = createZipWriter({ maxBytes: 39 });
     expect(() => writer.add('a.txt', encoder.encode('hello'))).toThrow(
@@ -351,10 +347,6 @@ describe('createZipWriter', () => {
     );
   });
 
-  // Same reasoning for the entry-count guard, and the only test that reaches
-  // the `entries.length + 1` projection in add() rather than exercising
-  // assertZipRoom's own arithmetic directly -- previously Stryker-disabled
-  // as unreachable without genuinely building 65535 entries.
   it('refuses an entry through the writer once a lowered entry-count limit is reached', () => {
     const writer = createZipWriter({ maxEntries: 1 });
     writer.add('a.txt', encoder.encode('x'), modified);
@@ -364,10 +356,7 @@ describe('createZipWriter', () => {
   });
 
   // Every add() fits under the limit on its own; only the central directory
-  // and end-of-central-directory trailer that finish() appends push the
-  // total over it. The only test that reaches the `offset + directorySize +
-  // END_OF_CENTRAL_DIR_BYTES` projection in finish() -- previously
-  // Stryker-disabled for the same reason as the entry-count projection above.
+  // and trailer that finish() appends push the total over it.
   it('refuses at finish() when the directory and trailer push the total past a lowered byte limit', () => {
     const writer = createZipWriter({ maxBytes: 100 });
     writer.add('a.txt', encoder.encode('x'), modified);
@@ -401,9 +390,8 @@ describe('assertZipRoom', () => {
   });
 });
 
-// The counterpart to createZipWriter's own tests: every archive read back
-// here was itself produced by that writer, so a round trip is what proves
-// the two agree on the format rather than each independently claiming to.
+// Every archive read back here was produced by createZipWriter, so a round
+// trip is what proves the two agree on the format.
 describe('readZipEntries', () => {
   it('reads back every entry a writer produced, byte for byte', async () => {
     const writer = createZipWriter();

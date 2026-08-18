@@ -14,31 +14,23 @@ export function useItems(categoryId: string, q: string) {
   const [items, setItems] = useState<ItemLite[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  // Starts loading, because mounting always fetches (the effect below runs
-  // unconditionally). Starting at `false` gave one render where there were
-  // no items and nothing in flight, which is the state the list renders as
-  // "No entries yet" -- so every category opened with a flash of the empty
-  // state before its entries appeared.
+  // Starts true: mounting always fetches, and starting false gave one
+  // render that looked exactly like "No entries yet" before data arrived.
   const [loading, setLoading] = useState(true);
   const reqSeq = useRef(0);
-  // Aborts a superseded request's own fetch, not just its effect on state:
-  // the sequence guard below already discards a late answer, but without
-  // this the response still finishes downloading for a reader that has
-  // already moved on (a debounced keystroke, a category switch).
+  // Aborts a superseded request's own fetch, not just its effect on state
+  // -- otherwise the response still finishes downloading after the sequence
+  // guard below has already discarded it.
   const abortRef = useRef<AbortController | null>(null);
-  // Counts non-silent requests currently in flight, rather than relying on
-  // whichever request happens to be the one the sequence guard lets through.
-  // A non-silent request superseded by a *silent* one used to return at the
-  // guard below without clearing `loading`, and the silent one never clears
-  // it either -- `loading` got stuck true forever (#303). Decrementing this
-  // in `finally`, for every non-silent request that settles regardless of
-  // whether it's the one that ends up "winning", means `loading` always
-  // comes back down once nothing non-silent is left in flight.
+  // Counts non-silent requests in flight rather than trusting whichever one
+  // the sequence guard lets through: a non-silent request superseded by a
+  // silent one used to leave `loading` stuck true forever, since neither
+  // cleared it. Decrementing this for every non-silent settle, win or not,
+  // brings `loading` back down once none are left.
   const pendingNonSilent = useRef(0);
 
-  // Resets to page 1 whenever the category or search query changes, computed
-  // at render time (rather than via a useEffect) so it takes effect the same
-  // render the filters change instead of one render later.
+  // Computed at render time, not via useEffect, so resetting to page 1
+  // takes effect the same render the filters change, not one render later.
   const filterKey = `${categoryId} ${q}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
@@ -48,17 +40,14 @@ export function useItems(categoryId: string, q: string) {
 
   const totalPages = useMemo(() => pageCount(total), [total]);
 
-  // Clamped rather than written back into `page` state via an effect: it's a
-  // pure function of state that already exists, and deriving it avoids a
-  // stale render where `.range()` below would otherwise request an
-  // out-of-bounds slice (e.g. right after deleting the last item on the
-  // last page) and the grid would render empty with no active page.
+  // Derived, not written back into `page` via an effect -- avoids a stale
+  // render where `.range()` below would request an out-of-bounds slice
+  // right after deleting the last item on the last page.
   const currentPage = clampPage(page, totalPages);
 
-  // `silent` refetches without raising `loading`. A delete now removes its
-  // card up front and resyncs behind that, so the refetch has no wait to
-  // announce -- flagging it would only dim a grid the user already sees the
-  // result in.
+  // `silent` refetches without raising `loading` -- a delete already
+  // removed its card up front, so flagging this refetch would only dim a
+  // grid the user has already seen the result in.
   const load = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
       const mySeq = ++reqSeq.current;
@@ -100,10 +89,8 @@ export function useItems(categoryId: string, q: string) {
         );
         setTotal(count || 0);
       } finally {
-        // Runs for every non-silent request that settles -- including one
-        // discarded by the sequence guard above -- so `loading` always ends
-        // up false once nothing non-silent is left in flight, regardless of
-        // which request happens to be the last to resolve.
+        // Runs even for a request the sequence guard above discarded, so
+        // `loading` ends up false regardless of which request resolves last.
         if (!silent) {
           pendingNonSilent.current -= 1;
           if (pendingNonSilent.current === 0) setLoading(false);
@@ -113,24 +100,19 @@ export function useItems(categoryId: string, q: string) {
     [categoryId, currentPage, q, t, toast],
   );
 
-  // Fetches on mount and whenever `load`'s own dependencies change --
-  // exactly what an effect is for: synchronizing component state with the
-  // database. The cleanup aborts whatever's still in flight when the
-  // category/search/page change again (a new `load` about to run would
-  // already abort it, but unmounting entirely never gets that chance).
+  // Cleanup aborts whatever's still in flight on unmount -- a new `load`
+  // triggered by a filter change would already abort it, but unmounting
+  // never gets that chance otherwise.
   useEffect(() => {
     void load();
     return () => abortRef.current?.abort();
   }, [load]);
 
   // `load` is recreated whenever the query/page/category change, but a
-  // caller that kicks off a slow round trip (a delete's confirm + two
-  // requests) and only *then* wants to resync can be holding a `load`/`reload`
-  // reference from several renders ago -- the query may have moved on by the
-  // time that round trip finishes. `reload` below stays one stable identity
-  // and always dispatches through this ref, so whichever `reload` a caller
-  // captured, calling it late still resyncs against whatever is current when
-  // it actually runs, not whatever was current when it was captured (#303).
+  // caller that kicks off a slow round trip may be holding a `reload`
+  // reference from several renders ago. `reload` stays one stable identity
+  // and dispatches through this ref, so a late call resyncs against
+  // whatever is current when it runs, not when it was captured.
   const loadRef = useRef(load);
   useEffect(() => {
     loadRef.current = load;

@@ -21,9 +21,6 @@ export function SearchInput({
       <input
         type="search"
         enterKeyHint="search"
-        // Named for the end-to-end suite. Its only other handle is the
-        // placeholder, which is translated -- so a test would either pin the
-        // language or break when the wording changes.
         data-testid="search-input"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -32,17 +29,13 @@ export function SearchInput({
         className="w-full min-h-11 rounded-sm bg-card text-card-foreground py-2 pl-9 pr-10 ring-1 ring-inset ring-control-border focus:ring-foreground placeholder:text-muted-foreground"
       />
       {/* The only clear button: the browser's own is suppressed in
-          globals.css. This one is labelled, keyboard-reachable and drawn
-          to the app's ink, which the native glyph is none of. */}
+          globals.css. */}
       {value && (
         <button
           type="button"
           onClick={() => onChange('')}
-          // -mr-2 only, not -m-2: it cancels the padding's push against
-          // `right-3` (no transform on that axis to do it automatically).
-          // Vertically, top-1/2 -translate-y-1/2 already recentres the
-          // padded box on its own -- a matching -mt-2 stacked a second,
-          // uncancelled shift on top of that and pushed the icon 8px high.
+          // -mr-2 only: -mt-2 would double the vertical shift that
+          // -translate-y-1/2 already applies, pushing the icon high.
           className="absolute right-3 top-1/2 -translate-y-1/2 p-2 -mr-2 inline-flex items-center justify-center"
           aria-label={t('item_list.search_clear')}
         >

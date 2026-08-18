@@ -3,10 +3,7 @@ import { expect, test } from './test';
 import { SEED, itemsIn } from './fixtures';
 import { expectTitles, openCategory, visibleTitles } from './helpers';
 
-// The first tests to see the app signed in. Everything below goes through the
-// real Postgres and the real row-level security -- what is asserted is not
-// that a component renders, but that the query behind it came back with the
-// right rows for the right user.
+// Runs against the real Postgres and real row-level security, not a mock.
 test.use({ locale: 'en-GB' });
 
 test.describe('the catalogue', () => {
@@ -18,8 +15,6 @@ test.describe('the catalogue', () => {
     await expect(page.getByTestId('search-input')).toBeVisible();
   });
 
-  // Newest first, which is what puts a just-created entry at the top of the
-  // page rather than at the end of it.
   test('shows a category exactly, newest first', async ({ page }) => {
     await openCategory(page, 'Münzen');
     await expectTitles(
@@ -54,8 +49,8 @@ test.describe('the catalogue', () => {
     }
   });
 
-  // An entry with no photograph gets an empty mount rather than no image area
-  // at all, so every card in the stack has the same silhouette.
+  // An unphotographed entry gets an empty mount rather than no image area,
+  // so every card in the stack keeps the same silhouette.
   test('gives an unphotographed entry the same shape as the rest', async ({
     page,
   }) => {

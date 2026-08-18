@@ -21,10 +21,9 @@ function feature(osm_id: number, city: string): PhotonFeature {
   };
 }
 
-// The combobox lives inside a modal (`role="dialog" aria-modal="true"`),
-// which is what makes the bug this component guards against reproducible:
+// Rendered inside a dialog with aria-modal="true": once that's in effect,
 // content outside the dialog's DOM subtree is invisible to assistive tech
-// once `aria-modal` is in effect, no matter what `aria-controls` points at.
+// no matter what aria-controls points at.
 function renderInDialog(value = 'Col') {
   const onChange = vi.fn();
   render(
@@ -62,8 +61,6 @@ describe('PlaceAutocomplete', () => {
 
     const listbox = await screen.findByRole('listbox');
     expect(dialog.contains(listbox)).toBe(true);
-    // Nothing about this component should ever land as a document.body
-    // child sitting outside the dialog -- that's the bug being guarded.
     expect(listbox.parentElement).not.toBe(document.body);
   });
 
@@ -122,13 +119,8 @@ describe('PlaceAutocomplete', () => {
     });
   });
 
-  // Regression: the dropdown row used to compute city/line2 by hand instead
-  // of through formatDisplay, and its inline copy had no countrycode
-  // fallback -- so a feature naming a countrycode but no country rendered
-  // with no country at all, while dedupe (which does go through
-  // formatDisplay) considered it distinct from one that had an explicit
-  // `country`. Picking it still worked; the row just lied about what you'd
-  // get.
+  // The row must render through formatDisplay so a countrycode-only feature
+  // still shows a country, matching what dedupe considers the same entry.
   it('falls back to the country code when a feature has no country name', async () => {
     vi.stubGlobal(
       'fetch',

@@ -1,21 +1,11 @@
--- Account-based category sharing (#483).
+-- One new table, `category_shares`: a row is one owner's grant of access to
+-- one category, to one invited email. No separate "pending"/"accepted"
+-- state -- the grant works the moment `invited_email` matches the caller's
+-- own JWT email, evaluated fresh on every request, so an invite sent before
+-- signup starts working the instant the invitee signs up.
 --
--- One new table, `category_shares`: a row is one owner's grant of read-only
--- access to one category, to one invited email. There is no separate
--- "pending" vs "accepted" state to track -- the grant works the moment its
--- `invited_email` matches the signed-in user's own email, which the JWT
--- already carries. That also means resolution needs no trigger on
--- `auth.users`: an invite sent before the recipient ever signs up starts
--- working the instant they do, because the RLS predicate below is
--- evaluated fresh on every request rather than stamped once at insert time.
---
--- Deliberately narrower than the schema could support: view-only (no new
--- write policies -- a grantee never gets anything beyond `select`), and
--- category-level only (no per-item grants). Photos are out of scope here on
--- purpose -- storage.objects is keyed `<owner_uid>/...`
--- (0007_storage.sql), and authorizing a grantee to read a different
--- owner's objects needs its own migration and its own review, not a rider
--- on this one.
+-- View-only as introduced here (write access for an editor role came
+-- later, 0014_editor_shares.sql); photos came later too (0012).
 begin;
 
 create table if not exists public.category_shares (
@@ -41,11 +31,9 @@ create table if not exists public.category_shares (
   constraint category_shares_category_email_unique unique (category_id, invited_email)
 );
 
--- Ownership + normalization, the same shape as tg_item_categories_enforce
--- (0002_functions.sql): verify the category belongs to the caller, derive
--- owner_user_id from the row rather than trust it from the client, and
--- normalize the email so the unique constraint and every RLS comparison
--- below see the same casing regardless of how it was typed.
+-- Verifies the category belongs to the caller, derives owner_user_id rather
+-- than trusting the client, and normalizes the email so the unique
+-- constraint and every RLS comparison see the same casing.
 create or replace function public.tg_category_shares_enforce()
 returns trigger
 language plpgsql
@@ -102,13 +90,9 @@ on public.category_shares (invited_email);
 
 alter table public.category_shares enable row level security;
 
--- select: the owner managing their own grants, or the grantee finding out
--- what has been shared with them -- both need to see the row, since
--- "leave" is a grantee-initiated delete of a row they first have to see.
 -- No expiry check here: an expired grant should still be visible to the
--- owner (so they see it dangling and can clean it up) and to the grantee
--- (so leaving something that already lapsed still works) -- only the
--- *category/item* access policies below stop honoring it once it expires.
+-- owner (to see it dangling and clean it up) and the grantee (to leave it)
+-- -- only the category/item access policies below stop honoring it.
 drop policy if exists "select own or invited category_shares" on public.category_shares;
 create policy "select own or invited category_shares"
 on public.category_shares
@@ -118,21 +102,18 @@ using (
   or invited_email = lower((select auth.jwt() ->> 'email'))
 );
 
--- insert: owner only. tg_category_shares_enforce above re-derives
--- owner_user_id and re-checks it against the category, so this is a
--- necessary gate, not a sufficient one -- a forged owner_user_id in the
--- client's insert payload is overwritten before it ever reaches here.
+-- Not a sufficient gate on its own: tg_category_shares_enforce re-derives
+-- owner_user_id from the category, so a forged value in the client's
+-- payload is overwritten before it reaches here.
 drop policy if exists "insert own category_shares" on public.category_shares;
 create policy "insert own category_shares"
 on public.category_shares
 for insert
 with check (owner_user_id = (select auth.uid()));
 
--- delete: owner revoking, or grantee leaving. Same two predicates as
--- select, above -- whichever side initiated it, the other side's access
--- ends the moment this row is gone. No update policy: a grant is created
--- and removed, never edited, the same reasoning as item_categories
--- (0006_policies.sql) -- changing an expiry is a new invite, not a patch.
+-- Owner revoking, or grantee leaving -- same two predicates as select, so
+-- whichever side initiated it, the other side's access ends the moment
+-- the row is gone.
 drop policy if exists "delete own or invited category_shares" on public.category_shares;
 create policy "delete own or invited category_shares"
 on public.category_shares
@@ -144,16 +125,10 @@ using (
 
 grant select, insert, delete on public.category_shares to authenticated;
 
--- Extend read access on the three existing tables to an active grant, on
--- top of ownership. Redeclared here rather than edited in 0006/0003 --
--- migrations in this repo are never patched in place once applied (see
--- 0008-0010) -- so these three statements are the *complete*, current
--- definition of each select policy; 0006's original `user_id = auth.uid()`
--- versions no longer apply once these run.
---
--- Write policies (insert/update/delete) are untouched: nothing below grants
--- a grantee anything but select, which is what makes this view-only without
--- needing a separate read-only flag anywhere.
+-- Extends read access on the three existing tables to an active grant, on
+-- top of ownership. Redeclared, not edited in 0006/0003 -- migrations here
+-- are never patched in place once applied (see 0008-0010) -- so these are
+-- the *complete*, current definition of each select policy.
 drop policy if exists "select own categories" on public.categories;
 create policy "select own categories"
 on public.categories

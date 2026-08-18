@@ -7,9 +7,8 @@ import { Spinner } from '../ui/Spinner';
 
 const STRIP_MAX = 4;
 
-// Holds the frame while the bytes are still on the wire, then fades the
-// photograph in over it. A signed URL existing does not mean the image has
-// arrived -- without this the plate is blank white until it does.
+// A signed URL existing doesn't mean the image has arrived; holds the frame
+// and fades the photograph in over it instead of showing blank white.
 function Plate({
   src,
   alt,
@@ -24,19 +23,17 @@ function Plate({
   alt: string;
   ratio: string;
   onOpen: () => void;
-  /** Rendered *inside* the open button, over the photograph -- so a click
-   * on it is a click on the button (the "+N" badge opens the same modal
-   * a tap on the thumbnail underneath it would have, #304), not a second,
-   * separate hit target relying on `pointer-events` to fall through to it. */
+  /** Rendered *inside* the open button, over the photograph, so a click on
+   * it is a click on the button rather than a separate hit target relying
+   * on `pointer-events` to fall through to it. */
   overlay?: React.ReactNode;
   children?: React.ReactNode;
-  /** This plate is (or is likely to be) the LCP element -- fetched eagerly
-   * at high priority instead of lazily, same as next/image's old `priority`
-   * prop. Only ever true for slot 0 of one of the first few cards. */
+  /** Marks this as the likely LCP element: fetched eagerly at high priority
+   * instead of lazily. Only ever true for slot 0 of the first few cards. */
   priority?: boolean;
-  /** Told once this plate's own photograph has settled (loaded or failed).
-   * Only ever wired up for the hero slot -- see `ItemCard`, which holds the
-   * caption back until its card's hero plate reports in (#556). */
+  /** Fires once this plate's photograph has settled (loaded or failed).
+   * Only wired up for the hero slot; see `ItemCard`, which holds the
+   * caption back until it reports in. */
   onReady?: () => void;
 }) {
   const [loaded, setLoaded] = useState(false);
@@ -50,23 +47,15 @@ function Plate({
     <div className={`relative bg-muted ${!loaded ? 'img-skeleton' : ''}`}>
       <button type="button" onClick={onOpen} className="block h-full w-full">
         {/* eslint-disable-next-line @next/next/no-img-element -- next/image
-            earns nothing here: the static export runs with
-            images.unoptimized (no resizing, no format negotiation, no
-            srcSet), so it was a plain <img> plus extra client-side runtime.
-            The dropped width/height were fiction anyway -- the real boxes
-            are aspect-square/aspect-2/3/h-20, not the declared 800x600. */}
+            adds nothing here: the static export runs unoptimized (no
+            resizing, no srcSet), so it's just <img> plus extra runtime. */}
         <img
           src={src}
           alt={alt}
           decoding="async"
-          // Fetched in CORS mode with credentials omitted, which makes the
-          // browser ignore Set-Cookie on the response. Cloudflare fronts
-          // Supabase storage and sets `__cf_bm` scoped to `Domain=supabase.co`
-          // -- a public suffix, so browsers are obliged to reject it and say
-          // so, once per image (#258). The bucket answers
-          // `access-control-allow-origin: *`, so nothing about loading
-          // changes; if that ever stopped being true these would fail to
-          // render rather than merely warn, which is the risk being taken.
+          // credentials omitted so the browser doesn't reject Cloudflare's
+          // `__cf_bm` cookie, scoped to the public suffix supabase.co. The
+          // bucket allows origin `*`, so this doesn't change what loads.
           crossOrigin="anonymous"
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : undefined}
@@ -83,11 +72,8 @@ function Plate({
   );
 }
 
-// A photograph's frame, held from the moment it is handed over. Compressing
-// and uploading a phone photo takes seconds, and until it was done the card
-// showed no sign of it at all beyond a spinner on a button -- so the picture
-// arrived by shoving the caption down, and a second tap on "add" felt like
-// the only way to tell whether the first had registered.
+// Reserves the frame from the moment a photo is handed over, so the upload
+// doesn't shove the caption down once it lands.
 function PendingPlate({
   ratio,
   small,
@@ -110,11 +96,9 @@ function PendingPlate({
   );
 }
 
-// The layout follows how many photographs there actually are, because the
-// common cases are one and two -- and two is usually a matched pair (the
-// front and back of a coin, both faces of a stamp). Giving the second shot
-// a thumbnail slot under a hero misrepresented that pair as a main image
-// plus an afterthought.
+// Layout follows the photo count: two is usually a matched pair (front and
+// back of a coin, both faces of a stamp), so a thumbnail-under-hero layout
+// misrepresented it as a main image plus an afterthought.
 //
 //   1   a single full-width plate
 //   2   two equal halves, read as a pair
@@ -134,9 +118,8 @@ export function ImageGrid({
 }: {
   imgs: ImgEntry[];
   itemTitle: string;
-  /** Opens the full-size carousel starting at this photograph's position
-   * in `imgs` -- an index rather than a URL, so the modal can navigate to
-   * every photograph, including ones with no strip cell of their own. */
+  /** Index into `imgs`, not a URL, so the modal can navigate to
+   * photographs with no strip cell of their own. */
   onOpenModal: (index: number) => void;
   onDelete: (img: ImgEntry) => void;
   deletingPath: Set<string>;
@@ -145,28 +128,24 @@ export function ImageGrid({
   loading?: boolean;
   /** Photographs handed over but not yet on the wall; each gets a frame. */
   pending?: number;
-  /** This card is one of the first few on the page, so its hero plate is
-   * likely the LCP element -- fetched eagerly at high priority rather than
-   * lazily. Never applies to the strip; only slot 0 is ever the hero. */
+  /** Card is among the first few on the page: hero plate is fetched
+   * eagerly at high priority. Never applies to the strip. */
   priority?: boolean;
-  /** A category shared with, not owned by, the viewer (#483 follow-up): no
-   * per-photograph delete control on any plate. */
+  /** Category shared with, not owned by, the viewer: no per-photograph
+   * delete control on any plate. */
   readOnly?: boolean;
-  /** The hero plate (slot 0) has settled -- loaded or failed. Only fires
-   * when slot 0 holds an actual photograph; a still-uploading placeholder
-   * there has nothing to report (#556). */
+  /** Fires once the hero plate (slot 0) has settled (loaded or failed).
+   * Doesn't fire while slot 0 is still an upload placeholder. */
   onHeroReady?: () => void;
 }) {
   const { t } = useI18n();
 
-  // Uploads count towards the layout, so the arrangement a card settles
-  // into is the one it already had while the picture was on its way -- the
-  // placeholder is replaced in place rather than rearranging the card.
+  // Uploads count toward the layout so the arrangement doesn't change once
+  // the picture lands; the placeholder is replaced in place.
   const total = imgs.length + pending;
 
-  // Reserve the frame while we still don't know whether there is a picture.
-  // Rendering nothing and growing an image region later is what pushed the
-  // caption and buttons down as the photographs arrived.
+  // Reserves the frame while it's unknown whether a picture exists;
+  // rendering nothing and growing the region later pushed the caption down.
   if (loading && !total) {
     return (
       <div
@@ -184,9 +163,8 @@ export function ImageGrid({
       .replace('{title}', itemTitle)
       .replace('{idx}', String(i + 1));
 
-  // Deliberately not a red trash icon: that is what removes the whole
-  // entry, from the labelled row under the caption. This sits *on* the
-  // photograph it affects and reads as "take this one off".
+  // Deliberately not a red trash icon: that removes the whole entry. This
+  // sits on the photograph it affects and reads as "take this one off".
   const deleteButton = (img: ImgEntry, small: boolean) => (
     <button
       aria-label={t('item_list.delete_image')}
@@ -195,11 +173,8 @@ export function ImageGrid({
       disabled={deletingPath.has(img.pathFull) || busy}
       className={[
         'absolute top-1.5 right-1.5 flex items-center justify-center rounded-full',
-        // No backdrop blur. It bought nothing behind 55% black sitting on a
-        // photograph, and it cost a backdrop root: the browser has to
-        // snapshot everything painted under the button every time the card
-        // moves, and a snapshot that misses a frame during a fast scroll is
-        // drawn as nothing at all. A slightly heavier scrim reads the same.
+        // No backdrop blur: it buys nothing over 55% black on a photograph,
+        // and costs a backdrop root the browser must re-snapshot every scroll.
         'bg-black/60 text-white hover:bg-black/80',
         'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100',
         'disabled:opacity-60 transition',
@@ -219,9 +194,8 @@ export function ImageGrid({
     </button>
   );
 
-  // One slot of the arrangement: a photograph if there is one for it yet,
-  // and its held frame if it is still being uploaded. Slots past the end of
-  // `imgs` are the pending ones, so a new picture fills the frame that was
+  // A slot: a photograph if present, else its pending frame. Slots past
+  // the end of `imgs` are pending, so a new photo fills the frame that was
   // standing in for it.
   const slot = (
     index: number,
@@ -234,11 +208,9 @@ export function ImageGrid({
       ratio: string;
       small: boolean;
       preferThumb?: boolean;
-      /** Set only on the last strip cell when photographs beyond `imgs`'
-       * strip allowance exist. Covers this cell's own thumbnail with a
-       * "+N" badge rather than hiding it -- the photograph underneath is
-       * still this same index, so opening the modal from here already
-       * lands on the first one the strip had no room for (#304). */
+      /** Set only on the last strip cell when more photos exist than the
+       * strip shows. Covers the cell's own thumbnail with a "+N" badge;
+       * the modal still opens to the (unchanged) photograph underneath. */
       overflowCount?: number;
     },
   ) => {
@@ -260,11 +232,8 @@ export function ImageGrid({
     return (
       <Plate
         key={img.pathFull}
-        // `preferThumb` is its own flag, not just `small`: a two-up half is
-        // full plate chrome (`small: false`, a full-size delete control) at
-        // ~178 CSS px -- closer to the strip's quarter-card cells than to a
-        // hero's full width, so it reads from the thumbnail too (#289)
-        // without shrinking the controls sized for a much bigger plate.
+        // preferThumb is separate from `small`: a pair's half is only
+        // ~178 CSS px, thumbnail-sized, but keeps full-size delete controls.
         src={preferThumb ? img.urlThumb || img.urlFull : img.urlFull}
         alt={alt}
         ratio={ratio}
@@ -273,9 +242,8 @@ export function ImageGrid({
         onReady={index === 0 ? onHeroReady : undefined}
         overlay={
           overflowCount ? (
-            // aria-hidden: the accessible name already carries this via
-            // the image's own alt above -- this is the sighted-user copy
-            // of it, not a second announcement.
+            // aria-hidden: the image's alt already carries this; this is
+            // the sighted-user copy, not a second announcement.
             <div
               aria-hidden="true"
               className="absolute inset-0 flex items-center justify-center bg-black/55"
@@ -292,9 +260,9 @@ export function ImageGrid({
     );
   };
 
-  // The strip takes one track per thumbnail so it never leaves dead cells
-  // at the end of the row, and a fixed height rather than a square ratio so
-  // two thumbnails spread across the card can't balloon into a second hero.
+  // One grid track per thumbnail avoids dead cells at the row's end; fixed
+  // height (not a square ratio) keeps the strip from ballooning into a
+  // second hero.
   const stripStyle = (count: number) => ({
     gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))`,
   });
@@ -304,27 +272,18 @@ export function ImageGrid({
   }
 
   if (total === 2) {
-    // From `sm` up each half is 2:3, so the pair is exactly as tall as the
-    // 4:3 box a single image fills: a half-width cell at 2:3 is
-    // (W/2) x (3/4 W). Cards side by side then line up.
-    //
-    // The ratio is set on the cells rather than as `aspect-4/3` on this
-    // container: a container aspect is not a hard constraint, so the images
-    // inside resolved to their intrinsic height and stretched it, leaving
-    // the pair ~50px taller than a single image instead of equal.
-    //
-    // Below `sm` there is one card per row and nothing to line up against,
-    // so the pair keeps its squarer, less aggressively cropped shape.
+    // Each half is 2:3 from `sm` up, matching the height of a single 4:3
+    // image so cards line up. The ratio is set on the cells rather than as
+    // a container aspect: a container aspect isn't a hard constraint, so
+    // images resolved to their intrinsic height and left the pair ~50px
+    // taller than a single image. Below `sm` there's one card per row, so
+    // the pair keeps its squarer crop.
     return (
       <div className="grid grid-cols-2 gap-px">
         {[0, 1].map((i) =>
           slot(i, {
             ratio: 'aspect-square sm:aspect-2/3',
             small: false,
-            // Each half is ~178 CSS px (a card is ~360px, halved), so the
-            // 1000px full image was ~6x the pixel count the slot can show
-            // at 2x DPR. `small: false` keeps the full-size delete control
-            // a pair's larger plate calls for.
             preferThumb: true,
           }),
         )}
@@ -334,14 +293,8 @@ export function ImageGrid({
 
   const stripCount = Math.min(total - 1, STRIP_MAX);
 
-  // A photograph beyond the strip's last cell used to have nowhere to be
-  // reached from at all -- not rendered, not deletable, still billed
-  // against storage (#304). `total - STRIP_MAX` counts everyone that
-  // situation now applies to, *including* the photograph the last cell
-  // would otherwise have shown on its own: that cell's thumbnail is about
-  // to be covered by the badge instead, so it is exactly as unreachable by
-  // itself as the ones after it, and the modal it opens is where all of
-  // them -- including it -- become reachable.
+  // Includes the last strip cell's own photo in the count, since its
+  // thumbnail is about to be covered by the badge too.
   const overflowCount = total - 1 > STRIP_MAX ? total - STRIP_MAX : 0;
 
   return (

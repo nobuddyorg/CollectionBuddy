@@ -2,14 +2,10 @@ import { expect, test } from '@playwright/test';
 
 import { collectPageProblems, expectNoPageProblems } from '../helpers';
 
-// The sign-in button is named in whatever language the app picked, so the
-// locale is pinned rather than inherited from whoever is running this.
 test.use({ locale: 'en-GB' });
 
-// What the old scripts/smoke-check.mjs did, kept because it is the check that
-// a green `next build` cannot make: prerendering runs in Node with real env
-// vars, which papers over client code that only breaks once it is a bundle in
-// a browser with no Node underneath.
+// A green `next build` can't catch this: prerendering runs in Node with real
+// env vars, which papers over client code that only breaks as a browser bundle.
 test.describe('the deployed bundle', () => {
   test('loads without throwing', async ({ page }) => {
     const problems = collectPageProblems(page);
@@ -18,10 +14,9 @@ test.describe('the deployed bundle', () => {
     expectNoPageProblems(problems);
   });
 
-  // Not a redirect served by anything: the root page renders, finds no
-  // session, and routes itself. If it ever stopped doing that, a signed-out
-  // visitor would sit on an empty catalogue waiting for entries that need a
-  // session to fetch.
+  // No server redirect exists: the root page itself checks for a session and
+  // routes away. If that ever broke, a signed-out visitor would be stuck on an
+  // empty catalogue waiting for entries that need a session to fetch.
   test('sends a signed-out visitor to the login page', async ({ page }) => {
     await page.goto('', { waitUntil: 'networkidle' });
     await expect(page).toHaveURL(/\/login\/?$/);
@@ -36,8 +31,7 @@ test.describe('the deployed bundle', () => {
     expectNoPageProblems(problems);
   });
 
-  // A static export answers any unknown path with its 404 page; what matters
-  // is that it is *the app's* 404 and not a stack trace or a blank document.
+  // Must be the app's own 404 page, not a stack trace or a blank document.
   test('has something to say about a path that does not exist', async ({
     page,
   }) => {

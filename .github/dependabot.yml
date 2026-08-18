@@ -1,13 +1,9 @@
 version: 2
 updates:
-  # Actions were not watched by anything until now, which is why
-  # upload-pages-artifact sat on a major old enough for GitHub to start
-  # forcing its Node 20 runtime onto Node 24 (#237). Grouped into one PR
-  # because these move rarely and reviewing five separate bumps of pinned
-  # third-party actions is worse than reviewing one.
-  #
-  # Actions are pinned by commit hash, so this is also the only thing that
-  # can move them: a tag repointed at new code silently does not.
+  # Grouped into one PR: these move rarely, and reviewing five separate
+  # pinned-action bumps is worse than reviewing one. Actions are pinned by
+  # commit hash, so this is the only thing that can move them -- a tag
+  # repointed at new code silently does not.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

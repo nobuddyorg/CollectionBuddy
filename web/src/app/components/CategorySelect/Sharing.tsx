@@ -17,11 +17,10 @@ type Props = {
   shares: UseShares;
 };
 
-// Local midnight would already be behind `now()` for most of the day a
-// grantor picks "today", tripping the category_shares_expiry_in_future
-// check constraint (0011_category_shares.sql) on a perfectly reasonable
-// choice. End of day gives the whole picked date, the way a person reading
-// "expires August 11" would expect.
+// Local midnight would already be behind `now()` for most of the day
+// picked, tripping the category_shares_expiry_in_future check constraint on
+// a perfectly reasonable choice. End of day gives the whole picked date, as
+// "expires August 11" would suggest.
 function endOfDayIso(dateStr: string): string {
   return new Date(`${dateStr}T23:59:59`).toISOString();
 }
@@ -30,9 +29,8 @@ function todayDateStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Only ever mounted for a category the viewer owns -- a grantee's own grant
-// is managed from the panel's existing Delete button (leave), not from
-// here. See index.tsx's onDelete.
+// Only ever mounted for a category the viewer owns -- a grantee manages
+// their own grant via the panel's Delete button (onLeave in index.tsx).
 export function SharingSection({ shares }: Props) {
   const { t } = useI18n();
   const confirm = useConfirm();
@@ -50,20 +48,16 @@ export function SharingSection({ shares }: Props) {
   const [email, setEmail] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const expiryInputRef = useRef<HTMLInputElement>(null);
-  // Below `sm` a share row has no room left for "Can edit" next to the
-  // email, expiry and revoke controls it already carries -- the checkbox
-  // and its label are swapped for a pen icon there, which opens this share
-  // in a modal roomy enough for the same checkbox and its full label.
+  // Below `sm` a share row has no room for the "Can edit" label alongside
+  // email/expiry/revoke -- swapped for a pen icon that opens the same
+  // checkbox in a modal.
   const [roleModalShareId, setRoleModalShareId] = useState<string | null>(null);
 
-  // Delegates to the native picker instead of reimplementing one: this
-  // button exists to give the *trigger* a consistent look across engines
-  // (see the block comment below), not to replace the OS's own calendar
-  // dialog, its keyboard handling or its mobile affordance. `showPicker`
-  // is unsupported in older Safari/Firefox and doesn't exist in jsdom
-  // (hence the `typeof` guard rather than an `in` check, which jsdom's
-  // stub would still pass) -- focusing the field is what a plain click on
-  // it would have done anyway on those.
+  // Delegates to the native date picker rather than reimplementing one.
+  // `typeof el.showPicker === 'function'` guards against older Safari/
+  // Firefox and jsdom (which stubs the property, so an `in` check would
+  // still pass); falling back to focus() is what a click on the field
+  // would do anyway on those.
   const openDatePicker = useCallback(() => {
     const el = expiryInputRef.current;
     if (!el) return;
@@ -87,8 +81,8 @@ export function SharingSection({ shares }: Props) {
 
   const onToggleRole = useCallback(
     async (shareId: string, invitedEmail: string, canEdit: boolean) => {
-      // Only granting needs a confirmation -- taking edit access back away
-      // is the safe direction and matches the un-warned revoke below.
+      // Only granting needs confirmation -- taking edit access back away is
+      // the safe direction.
       if (canEdit) {
         const message = t('category_select.share_editor_confirm').replace(
           '{email}',
@@ -102,12 +96,11 @@ export function SharingSection({ shares }: Props) {
   );
 
   // Shared by the inline row (sm and up) and the mobile modal below, so the
-  // control itself -- checkbox, label, disabled state -- can't drift
-  // between the two places it's shown. `className` is the label's whole
-  // class list, display utilities included: mixing a hardcoded `flex` in
-  // here with a caller's `hidden ... sm:flex` would put two unconditional
-  // display utilities on the same element with no defined winner between
-  // them.
+  // control itself can't drift between the two places it's shown.
+  // `className` is the label's whole class list, display utilities
+  // included: mixing a hardcoded `flex` in here with a caller's
+  // `hidden ... sm:flex` would put two unconditional display utilities on
+  // the same element with no defined winner between them.
   const roleCheckbox = (s: CategoryShareSummary, className: string) => (
     <label className={className}>
       <input
@@ -154,22 +147,15 @@ export function SharingSection({ shares }: Props) {
           {t('category_select.share_invite_label')}
         </label>
         {/* `<input type="date">` renders its text-and-icon cluster
-            completely differently per engine -- flush-right and
-            stretched to fill in Blink, left-aligned and content-sized in
-            Gecko, clipped at narrow widths -- and none of it is
-            reachable from our CSS (#549, #550, this follow-up, confirmed
-            against screenshots from three real browsers). The actual
-            `<input>` is `sr-only` now, driven by a button that opens its
-            picker via `showPicker()`, so the "Expires {date}" chip is
-            ours to size once and have it hold, in every engine, in
-            German's longer phrasing too (`w-56` was sized against that,
-            the wider of the two locales). The date group and Share
-            button are both `shrink-0`, so email's `sm:flex-1` only ever
-            claims what's left after they've taken their fixed width --
-            capping it as well (tried in an earlier round of this same
-            fix) left it looking cramped for no reason on any container
-            wide enough to hold both fields comfortably, which is every
-            real one. */}
+            completely differently per engine -- flush-right in Blink,
+            left-aligned and clipped in Gecko -- in ways CSS can't reach.
+            The real `<input>` is `sr-only`, driven by a button that opens
+            its picker via `showPicker()`, so the "Expires {date}" chip is
+            ours to size once and have it hold in every engine (`w-56` is
+            sized against German's longer phrasing). The date group and
+            Share button are `shrink-0`, so email's `sm:flex-1` only
+            claims what's left after them, uncapped so it isn't cramped on
+            wider containers. */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
             id="share-email"
@@ -343,10 +329,8 @@ export function SharingSection({ shares }: Props) {
   );
 }
 
-// Split out so the modal only exists while a share is actually being
-// edited on mobile -- `CenteredModal` renders null once `open` is false,
-// but this keeps the "which share" lookup and the title string next to
-// each other rather than inline in the middle of the list's JSX.
+// Split out to keep the "which share" lookup and title string together,
+// rather than inline in the list's JSX.
 function RoleModal({
   share,
   onOpenChange,

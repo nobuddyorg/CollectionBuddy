@@ -18,12 +18,7 @@ import {
 import { uniqueCategoryName } from '../../data/categories';
 import { readZipEntries } from '../../data/zip';
 
-/**
- * What to say while an import runs. Same shape as exportProgressMessage in
- * useExportCategory.tsx, for the same reason: reading the archive and
- * creating rows are short and get a word each, uploading photographs is the
- * long part and the only phase worth counting.
- */
+/** What to say while an import runs. Same shape as exportProgressMessage. */
 export function importProgressMessage(
   progress: ImportProgress | null,
   t: (key: TranslationKey) => string,
@@ -48,11 +43,11 @@ export type UseImportCategory = ReturnType<typeof useImportCategory>;
 export function useImportCategory(existingCategoryNames: string[]) {
   const { t } = useI18n();
   const toast = useToast();
-  // Null means "not importing". A separate boolean would be a second
-  // source of truth for the same fact, and the two could disagree.
+  // Null means "not importing" -- a separate boolean would be a second
+  // source of truth that could disagree.
   const [progress, setProgress] = useState<ImportProgress | null>(null);
-  // One controller per run, so Cancel always aborts whichever import is
-  // actually in flight rather than a stale one from a previous pick.
+  // One controller per run, so Cancel always aborts the import actually in
+  // flight, not a stale one from a previous pick.
   const controllerRef = useRef<AbortController | null>(null);
 
   const runImport = useCallback(
@@ -62,11 +57,9 @@ export function useImportCategory(existingCategoryNames: string[]) {
       controllerRef.current = controller;
       setProgress({ phase: 'reading', done: 0, total: 0 });
       try {
-        // Peeked here, ahead of the real read importCategory.ts does, only
-        // to name the category before creating it: the archive's own
-        // category name, disambiguated against what this account already
-        // has (uniqueCategoryName) the same way a filesystem calls a second
-        // copy "Coins (2)" rather than refusing it or overwriting the first.
+        // Peeked ahead of the real read only to name the category first:
+        // disambiguated against existing names the way a filesystem calls
+        // a second copy "Coins (2)" rather than overwriting the first.
         const entries = await readZipEntries(file);
         const manifestPath = findManifestPath(entries.keys());
         if (!manifestPath) {
@@ -105,7 +98,7 @@ export function useImportCategory(existingCategoryNames: string[]) {
         }
       } catch (e) {
         if (e instanceof ImportCancelledError) {
-          // The user asked for this -- confirmed, not reported as a failure.
+          // Confirmed, not a failure.
           toast.announce(t('category_select.import_cancelled'));
         } else if (e instanceof ImportFormatError) {
           toast.reportError(
@@ -132,9 +125,7 @@ export function useImportCategory(existingCategoryNames: string[]) {
     controllerRef.current?.abort();
   }, []);
 
-  // An import can run for minutes on a large archive; closing the tab
-  // mid-run would silently discard it with no way back, the same reasoning
-  // useExportCategory.tsx's own beforeunload guard already has (#418).
+  // Same beforeunload guard as useExportCategory.tsx, for the same reason.
   useEffect(() => {
     if (!progress) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {

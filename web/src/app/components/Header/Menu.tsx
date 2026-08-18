@@ -16,10 +16,8 @@ function SegmentedControl<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    // Full width with equal segments, rather than sized to its contents:
-    // the labels are language names, which are never translated and so
-    // can't be budgeted for. Sitting beside the caption, the pair fit in
-    // German and were clipped by the menu's edge in English (#242).
+    // Full width with equal segments: labels are language names, never
+    // translated, so their width can't be budgeted for.
     <div className="flex w-full rounded-lg border overflow-hidden">
       {options.map((option) => (
         <button
@@ -62,9 +60,8 @@ export default function Menu({
         {user.email}
       </div>
 
-      {/* Caption above rather than beside, so the control gets the menu's
-          full width and the layout doesn't depend on how long any
-          translation of "Language" happens to be. */}
+      {/* Caption above, not beside, so the layout doesn't depend on how
+          long the translation of "Language" happens to be. */}
       <div className="px-3 py-2 space-y-1.5">
         <span className="block text-sm">{t('header.language')}</span>
         <SegmentedControl
@@ -75,10 +72,7 @@ export default function Menu({
         />
       </div>
 
-      {/* Same shape as the language control directly above it: caption on
-          its own line, segments sharing the menu's full width. Three
-          segments rather than two, and the labels are translated, so
-          neither German nor English can crowd the row. */}
+      {/* Same shape as the language control above. */}
       <div className="px-3 py-2 space-y-1.5">
         <span className="block text-sm">{t('header.theme')}</span>
         <SegmentedControl

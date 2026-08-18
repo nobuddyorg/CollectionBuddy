@@ -13,11 +13,9 @@ function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ');
 }
 
-// A collected object drifting near the medallion. Grayscaled rather than
-// left in full color: a ring of cartoon-bright emoji was the interface
-// supplying its own colour, which is the one thing this achromatic system
-// never does -- the accent wordmark is the single deliberate exception, and
-// these chips competed with it instead of sitting quietly behind it.
+// Grayscaled deliberately: cartoon-bright emoji would supply their own
+// color, which this achromatic system never does outside the accent
+// wordmark.
 function CollectibleComponent({
   delay,
   emoji,
@@ -26,8 +24,6 @@ function CollectibleComponent({
   size = 44,
   className,
 }: CollectibleProps) {
-  // Two layers: the outer element owns positioning and the fling/bob
-  // animation, the inner one owns the chip's look.
   const style: CSSVarStyle = useMemo(
     () => ({
       width: `${size}px`,

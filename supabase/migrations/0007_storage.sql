@@ -1,17 +1,13 @@
--- The image bucket and its object-level RLS.
---
--- One private bucket. Object paths are `<uid>/<itemId>/<file>`, and every
--- policy below says the same thing: you may touch an object only if the
--- first path segment is your own user id. Nothing is ever served publicly;
--- the client reads through signed URLs.
+-- One private bucket. Object paths are `<uid>/<itemId>/<file>`; every
+-- policy below says you may touch an object only if the first path segment
+-- is your own user id. Nothing is served publicly -- the client reads
+-- through signed URLs.
 begin;
 
--- The MIME and size limits are not a duplicate of the client-side checks.
--- `accept="image/*"` on the file picker and the WebP compression before
--- upload are both bypassable by calling the Storage API directly with the
--- anon key -- so without these, any signed-in user could store arbitrary
--- content (including text/html served from the project domain) and consume
--- the storage quota without limit.
+-- Not a duplicate of the client-side checks: the file picker's `accept` and
+-- the client's WebP compression are both bypassable by calling the Storage
+-- API directly, which would otherwise let any signed-in user store
+-- arbitrary content with no quota.
 insert into storage.buckets (
   id,
   name,
@@ -81,23 +77,12 @@ using (
   and split_part(name, '/', 1) = auth.uid()::text
 );
 
--- A second, older set of the same four, written by hand in the Supabase
--- dashboard before any of this was in migrations, and found still live in
--- production when this baseline was taken. They are stated here rather than
--- dropped so the repository describes the project as it actually is, and so
--- a local stack reproduces it.
---
--- Two differences from the set above, neither of which changes who gets in:
---
---   * `left(name, 37)` instead of split_part -- the same test, spelled by
---     length: 36 characters of UUID plus the separator.
---   * No role, so they apply to `anon` too. That grants nothing: auth.uid()
---     is null for an anonymous request, `null || '/'` is null, and a null
---     predicate denies. `anon` also has no grant on storage.objects from
---     this project.
---
--- Policies are OR'd, so these can only ever match a subset of what the
--- four above already allow. They are redundant, not permissive.
+-- A second, older set of the same four policies, written by hand in the
+-- Supabase dashboard and found still live in production -- kept here so the
+-- repo matches reality and a local stack reproduces it, not dropped as
+-- apparent duplicates. Redundant, not permissive: they only ever match a
+-- subset of what the four above already allow (auth.uid() is null for
+-- `anon`, so the `left(name, 37)` check on those still denies).
 drop policy if exists "list own" on storage.objects;
 create policy "list own"
 on storage.objects

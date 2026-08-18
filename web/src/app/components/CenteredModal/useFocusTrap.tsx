@@ -16,12 +16,10 @@ export function useFocusTrap(
       initialFocusRef?.current ?? getFocusable(containerRef.current)[0]
     )?.focus();
     return () => {
-      // `prev` is usually still there to hand focus back to. But a confirmed
-      // delete removes the control that opened the dialog (the card's trash
-      // button) from the DOM before this cleanup runs, which makes
-      // `prev.focus()` a silent no-op -- focus falls to <body>, and the next
-      // Tab restarts from the top of the page. Land on the app's stable
-      // main landmark instead of dropping focus on the floor.
+      // A confirmed delete can remove the control that opened the dialog
+      // (e.g. a card's trash button) from the DOM first, making
+      // `prev.focus()` a silent no-op; fall back to the stable main
+      // landmark instead of dropping focus on the floor.
       if (prev?.isConnected) {
         prev.focus?.();
       } else {

@@ -1,9 +1,7 @@
--- Tables and their constraints. No policies, triggers or indexes here.
---
--- Three tables, and the shape is deliberately not "items belong to a
--- category": an item can sit in several, so the mapping is its own table.
--- Both sides carry `user_id` -- denormalized on purpose, so every RLS
--- policy is a column comparison rather than a join (see 0006).
+-- Three tables. Deliberately not "items belong to a category": an item can
+-- sit in several, so the mapping is its own table. Both sides carry
+-- `user_id`, denormalized so every RLS policy (0006) is a column comparison
+-- rather than a join.
 begin;
 
 create table if not exists public.categories (

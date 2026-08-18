@@ -6,25 +6,17 @@ const SIZE_CLASSES = {
   sm: 'w-8 h-8',
   md: 'w-9 h-9 max-sm:w-11 max-sm:h-11',
   lg: 'w-10 h-10',
-  // The height the form controls elsewhere are drawn to (`min-h-11`), for
-  // an icon button standing in a row of them.
+  // Matches the min-h-11 form controls elsewhere.
   xl: 'w-11 h-11',
 } as const;
 
-// A drawn box rather than a filled one. Three filled ink squares on every
-// card would out-shout the photographs; a hairline frame still reads
-// unmistakably as a control, which bare glyphs on the card did not.
+// Faint but permanent frame, not hover-only: on a phone a hover-only
+// outline never appears at all, and these buttons exist because the
+// actions were invisible on mobile without one.
 //
-// The frame is permanent but faint where there is no hover to reveal it --
-// on a phone an outline that only appears on hover never appears at all,
-// and these buttons exist because the actions were invisible on mobile in
-// the first place. Pointer devices get a clean, frameless resting card and
-// the full frame under the cursor. Keyboard users are covered by the
-// global :focus-visible outline either way.
-//
-// Ring colour is only ever changed inside `[@media(hover:hover)]` so the
-// variants stack in a predictable order; mixing plain `hover:` overrides
-// in here would leave which rule wins up to Tailwind's sort order.
+// Ring colour only ever changes inside `[@media(hover:hover)]` so the
+// variants stack predictably -- mixing in plain `hover:` overrides would
+// leave which rule wins up to Tailwind's sort order.
 const OUTLINE_BASE =
   'bg-card text-muted-foreground ring-1 ring-control-border/60 [@media(hover:hover)]:ring-transparent';
 
@@ -48,11 +40,8 @@ export function iconButtonClasses({
   size?: IconButtonSize;
   className?: string;
 } = {}) {
-  // disabled:pointer-events-none, not just a caller's own disabled:opacity:
-  // every hover:* class above still fires on a merely-dimmed disabled
-  // button, since :hover doesn't care about the disabled attribute --
-  // stopping pointer events from reaching it at all is what actually keeps
-  // a disabled control from looking interactive under the cursor.
+  // disabled:pointer-events-none: :hover doesn't care about the disabled
+  // attribute, so a merely-dimmed button would still trigger hover:* above.
   return `${SIZE_CLASSES[size]} flex items-center justify-center rounded-sm transition disabled:pointer-events-none ${VARIANT_CLASSES[variant]} ${className}`.trim();
 }
 

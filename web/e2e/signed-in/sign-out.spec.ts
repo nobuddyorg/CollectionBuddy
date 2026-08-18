@@ -1,15 +1,10 @@
 import { expect, test } from './test';
 
-// #340: onAuthStateChange's null path -- sign-out and token expiry -- is
-// the only thing that catches a session going stale, and had no e2e
-// journey at all: nothing here ever signed out through the interface.
-//
-// This is the one signed-in spec that calls the real signOut. It revokes
-// the shared user's refresh token server-side, but every other spec's
-// browser context already holds its own copy of the still-valid access
-// token from AUTH_STATE_PATH -- a JWT verified by signature, not looked up
-// against a session table -- so this has nothing to disturb elsewhere in
-// the same run.
+// The one signed-in spec that calls the real signOut. It revokes the shared
+// user's refresh token server-side, but every other spec's browser context
+// holds its own copy of the still-valid access token (a JWT verified by
+// signature, not looked up against a session table), so this has nothing to
+// disturb elsewhere in the same run.
 test.use({ locale: 'en-GB' });
 
 test.describe('signing out', () => {
@@ -24,8 +19,7 @@ test.describe('signing out', () => {
 
     await expect(page).toHaveURL(/\/login\/?$/);
 
-    // Not just a client-side navigation: the session that would have let a
-    // reload skip straight back to the catalogue is actually gone.
+    // Confirms the session itself is gone, not just a client-side navigation.
     await page.reload({ waitUntil: 'networkidle' });
     await expect(page).toHaveURL(/\/login\/?$/);
   });

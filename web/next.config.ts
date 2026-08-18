@@ -6,11 +6,7 @@ const repo = 'CollectionBuddy';
 /**
  * Where a built export expects to be served from -- GitHub Pages puts the
  * site under the repository name, and `next build` bakes that into every
- * asset URL, router link and manifest path.
- *
- * Exported because the end-to-end suite has to serve the export at exactly
- * this path or it is testing a site that has never existed, and a second copy
- * of the string is a second thing to forget.
+ * asset URL. Exported so the e2e suite serves the export at the same path.
  */
 export const EXPORT_BASE_PATH = `/${repo}`;
 

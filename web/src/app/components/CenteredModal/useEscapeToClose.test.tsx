@@ -37,8 +37,6 @@ describe('useEscapeToClose', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  // A closed dialog still has this hook mounted, and a dialog that answered
-  // Escape while shut would be dismissing something it no longer owns.
   it('does nothing while it is disabled', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
@@ -48,8 +46,6 @@ describe('useEscapeToClose', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  // The listener is on the window, so it outlives the component unless it is
-  // taken down again -- and a stale one calls back into a dialog that is gone.
   it('stops listening once it is unmounted', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
@@ -70,10 +66,6 @@ describe('useEscapeToClose', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  // Regression: a nested widget (the place autocomplete's suggestion menu)
-  // handles its own Escape and calls preventDefault() to say so. Before this
-  // listener checked that flag, the same keystroke closed the modal around
-  // it too, discarding whatever the user had typed into the form.
   it('does not close when a nested handler already called preventDefault()', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();

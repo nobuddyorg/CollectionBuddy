@@ -35,18 +35,13 @@ export function MapModal({
     error: placesError,
   } = usePlaces(categoryId, search, open, lang);
 
-  // Starts empty. The map frames the pins it has as they stream in on its
-  // own; this state exists for the re-frame below, once the last place has
-  // been geocoded.
+  // Starts empty; the map frames pins as they stream in on its own. This
+  // state exists for the re-frame below, once the last place is geocoded.
   const [mapCommand, setMapCommand] = useState<MapCommand | null>(null);
 
-  // Issued and then left standing. Every command used to be withdrawn again
-  // on a 0ms timeout, purely so that asking for the same one twice running
-  // still counted as a change -- which made each one a pulse a single tick
-  // wide. A map that had not finished loading Leaflet inside that tick never
-  // saw it, and on the second open, with the library, the pins and the
-  // geolocation fix all already in hand, that is the normal case. The
-  // counter does the same job without the taking-back.
+  // Counter-based rather than withdrawn and reissued: clearing each command
+  // after 0ms so repeats registered as a change made every command a
+  // single-tick pulse a still-loading map could miss.
   const issueMapCommand = useCallback((kind: MapCommandKind) => {
     setMapCommand((prev) => ({ kind, id: (prev?.id ?? 0) + 1 }));
   }, []);
@@ -58,9 +53,8 @@ export function MapModal({
         lng: p.lng,
         popupText: p.name,
         titles: p.titles,
-        // Only worth saying when there is more than one. A lone entry is
-        // already fully described by the single line under the place name,
-        // and "1 entries" is the wording this sidesteps rather than solves.
+        // Only shown when count > 1: a lone entry is already described by
+        // the place name line, and this avoids "1 entries" wording.
         countLabel:
           p.titles.length > 1
             ? t('item_list.map_entries_count').replace(
@@ -72,14 +66,11 @@ export function MapModal({
     [places, t],
   );
 
-  // Pins stream in as each place is geocoded, and the map fits whatever it
-  // has as soon as the first one lands. Re-frame once the last one is in so
-  // the view covers the whole collection, not just the quickest lookups.
-  //
-  // Waits for a pin as well as for the loading to finish. `loadingPlaces` is
-  // still false on the render that opens the map -- the fetch has not been
-  // started yet, let alone flagged -- so without this the first thing the
-  // map is told on every open is to frame an empty collection.
+  // Re-frames once the last pin lands so the view covers the whole
+  // collection, not just the quickest lookups. Also waits for a pin, not
+  // just for loading to finish: `loadingPlaces` is still false on the
+  // render that opens the map, so without this the map would first be told
+  // to frame an empty collection.
   useEffect(() => {
     if (!open || loadingPlaces || places.length === 0) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -92,9 +83,9 @@ export function MapModal({
     request: requestLocation,
   } = useCurrentLocation(open);
 
-  // The button asks for the fix rather than merely re-using one: in an
-  // installed PWA this tap is the gesture the permission prompt hangs off,
-  // and it is the only place a refusal can be explained.
+  // Asks for the fix rather than reusing one: in an installed PWA, this
+  // tap is the gesture the permission prompt hangs off, and the only place
+  // a refusal can be explained.
   const showCurrentLocation = useCallback(async () => {
     const result = await requestLocation();
     if (!result.ok) {
@@ -123,10 +114,9 @@ export function MapModal({
           {t('item_list.map_error')}
         </p>
       ) : !loadingPlaces && places.length === 0 ? (
-        // "Nothing here yet" is the wrong sentence when a search is what
-        // emptied the map -- it reads as "you have entered no places",
-        // which sends the reader looking for a bug in their collection
-        // rather than at the search box they typed in.
+        // A generic empty message would read as "you have no places" when
+        // a search is what emptied the map, sending the reader to the
+        // wrong place.
         <p className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70">
           {t(
             search.length >= searchMinLength(search)
@@ -135,16 +125,13 @@ export function MapModal({
           )}
         </p>
       ) : (
-        // The map mounts right away rather than behind the geocoding
-        // spinner: Leaflet's chunk and the first tiles then load while the
-        // places are still being resolved, instead of after.
+        // Mounts immediately rather than behind the geocoding spinner, so
+        // Leaflet's chunk and first tiles load while places still resolve.
         <div className="relative h-full">
-          {/* The overlay chips below sit above the map, not above anything
-              the app's --z-index-* scale governs: `relative` on this
-              wrapper makes it their own stacking context, so `z-[1000]`
-              only has to clear Leaflet's own control layer (Leaflet's
-              `.leaflet-top`/`.leaflet-control` default to z-index: 1000),
-              not any of the app's named layers. */}
+          {/* `relative` on this wrapper makes the overlay chips their own
+              stacking context, so `z-[1000]` only has to clear Leaflet's
+              own control layer (default z-index 1000), not the app's
+              z-index scale. */}
           <Map
             command={mapCommand}
             markers={mapMarkers}
@@ -159,12 +146,9 @@ export function MapModal({
             }
           />
           {loadingPlaces && (
-            // Fixed light colours and a solid (not translucent) plate,
-            // same reasoning as the button chip below plus one more: this
-            // one used to ride the theme's card colours at 80% opacity,
-            // which on the light theme is a pale chip on pale tiles --
-            // exactly the "barely there" the theme swap was meant to
-            // avoid, just arrived at from the other direction (#512).
+            // Fixed light colours and a solid plate: at 80% theme opacity
+            // this was a pale chip on pale tiles in light mode, exactly
+            // the "barely there" look the theme swap was meant to avoid.
             <div
               role="status"
               aria-label={t('common.loading')}
@@ -174,10 +158,9 @@ export function MapModal({
               {t('common.loading')}
             </div>
           )}
-          {/* Fixed light colours rather than the theme tokens: the map
-              tiles beneath never go dark, so a chip that did would be the
-              one thing on top of the map switching hands with the rest of
-              the app. */}
+          {/* Fixed light colours, not theme tokens: the map tiles beneath
+              never go dark, so a chip that did would be the only thing on
+              the map switching with the rest of the app. */}
           <div className="absolute top-2 right-2 z-[1000] bg-white/80 backdrop-blur rounded-lg flex gap-1 p-1">
             <button
               type="button"

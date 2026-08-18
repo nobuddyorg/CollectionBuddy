@@ -21,18 +21,17 @@ export function formatPlaceDisplay(
       ? regionNames.of(p.countrycode.toUpperCase())
       : undefined);
   const line2 = [p.state, country].filter(Boolean).join(', ');
-  // Normalize each side of the separator independently -- trimming only
-  // the fully-joined string would leave whitespace trailing off `city`
-  // sitting in the middle of the key (right before `|||`), so two
-  // entries differing only in incidental whitespace wouldn't dedupe.
+  // Normalize each side of the separator independently, or whitespace
+  // trailing off `city` sits mid-key and two entries differing only in
+  // incidental whitespace won't dedupe.
   const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
   const key = `${normalize(city)}|||${normalize(line2)}`;
   return { city, line2, key };
 }
 
-// De-duplicates Photon results first by OSM id, then by their rendered
-// display (some places share an OSM id-distinct entry but format
-// identically, e.g. differently-tagged nodes for the same city).
+// Dedupes first by OSM id, then by rendered display: some places have an
+// OSM id-distinct entry that formats identically (e.g. differently-tagged
+// nodes for the same city).
 export function dedupePhotonFeatures(
   features: PhotonFeature[],
   regionNames: RegionNames,
@@ -51,9 +50,8 @@ export function dedupePhotonFeatures(
   return deduped;
 }
 
-// Same threshold the PostgREST search filter uses (`data/items.ts`), for
-// the same trigram-index reasoning -- including the lower floor for a
-// non-ASCII query, which carries more meaning per character.
+// Must match the threshold the PostgREST search filter uses (`data/items.ts`),
+// including the lower floor for non-ASCII queries.
 export function isQueryLongEnough(query: string): boolean {
   const trimmed = query.trim();
   return trimmed.length >= searchMinLength(trimmed);
@@ -61,8 +59,7 @@ export function isQueryLongEnough(query: string): boolean {
 
 /* v8 ignore start -- hook internals (fetch, timers, DOM); the extracted
  * pure helpers above are what's gated and mutation-tested. */
-// Stryker disable all: hook internals aren't covered by tests, only the
-// extracted pure helpers above are -- mutants in here would only be noise.
+// Stryker disable all
 export function usePhotonSearch(locale?: string) {
   const [query, setQuery] = useState('');
   const [focus, setFocus] = useState(false);
@@ -93,9 +90,8 @@ export function usePhotonSearch(locale?: string) {
 
   useEffect(() => {
     if (!focus || !isQueryLongEnough(query)) {
-      // Abort any in-flight geocode too -- otherwise it resolves later and,
-      // if the field is re-focused with a long-enough query before then,
-      // briefly renders results for a query the user already cleared.
+      // Abort any in-flight geocode, or it could resolve after a re-focus
+      // and briefly render results for a query the user already cleared.
       abortRef.current?.abort();
       setResults([]);
       setActiveIdx(-1);
@@ -110,11 +106,9 @@ export function usePhotonSearch(locale?: string) {
         const ctl = new AbortController();
         abortRef.current = ctl;
         // Guards below check `abortRef.current === ctl` rather than relying
-        // solely on AbortError: the abort() call above happens synchronously,
-        // but the aborted request's own rejection is delivered on a later
-        // microtask/turn -- often *after* this request has already reached
-        // `setLoading(true)`. Without the guard, the older request's
-        // `finally` still runs and clears `loading` out from under this one.
+        // solely on AbortError: the aborted request's rejection can land on
+        // a later turn, after this request has already set `loading` true,
+        // and its `finally` would otherwise clear `loading` out from under it.
         try {
           setLoading(true);
           setError(false);
@@ -127,7 +121,7 @@ export function usePhotonSearch(locale?: string) {
           setResults(dedupePhotonFeatures(data.features, regionNames));
           setActiveIdx(-1);
         } catch (err) {
-          // A newer keystroke aborting this request isn't a failure -- the
+          // A newer keystroke aborting this request isn't a failure; the
           // request that superseded it owns the resulting state.
           if (err instanceof DOMException && err.name === 'AbortError') return;
           if (abortRef.current !== ctl) return;
@@ -139,11 +133,9 @@ export function usePhotonSearch(locale?: string) {
         }
       })();
     }, 300);
-    // Cancels the in-flight request too, not just the pending debounce timer
-    // -- otherwise closing the form (or the next keystroke, before the
-    // in-flight request's own abort-and-replace runs) leaves a request on
-    // the wire against a rate-limited free service for no reader left to
-    // use its result.
+    // Cancels the in-flight request too, or closing the form (or the next
+    // keystroke) leaves a request on the wire against a rate-limited free
+    // service for no reader left to use its result.
     return () => {
       clearTimeout(timer);
       abortRef.current?.abort();
@@ -170,10 +162,8 @@ export function usePhotonSearch(locale?: string) {
       setResults([]);
       setActiveIdx(-1);
       setFocus(false);
-      // The coordinates ride along with the label: this is the one moment
-      // the app knows where the place the user picked actually is, and
-      // dropping them here is what forced the map to ask Photon all over
-      // again later.
+      // This is the one moment the app knows where the picked place is;
+      // dropping the coords here would force the map to re-geocode later.
       return { label, coords: coordsFromFeature(hit) };
     },
     [formatDisplay],
@@ -193,9 +183,9 @@ export function usePhotonSearch(locale?: string) {
         const sel = activeIdx >= 0 ? results[activeIdx] : results[0];
         if (sel) return choose(sel);
       } else if (e.key === 'Escape') {
-        // Dismisses the suggestion menu only -- without stopping the
-        // keystroke here, it bubbles past React's root to the modal's own
-        // `window`-level Escape listener and closes the whole form.
+        // Without stopping it here, the keystroke bubbles past React's root
+        // to the modal's own window-level Escape listener and closes the
+        // whole form.
         e.preventDefault();
         e.stopPropagation();
         setResults([]);

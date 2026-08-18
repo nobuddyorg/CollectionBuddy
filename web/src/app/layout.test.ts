@@ -1,10 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-// Same reasoning as useTheme.test.ts's read of the pre-paint script: this
-// runs from a <meta>/<script> tag in the document head, before React (or
-// any bundled module) exists to import from, so it's read and asserted on
-// as raw source text rather than executed.
+// Runs from a <script> tag before React exists to import from, so it's
+// asserted on as raw source text rather than executed.
 const layout = readFileSync(new URL('layout.tsx', import.meta.url), 'utf8');
 
 describe('the framebusting script in layout.tsx', () => {
@@ -47,19 +45,10 @@ describe('the Content-Security-Policy meta tag in layout.tsx', () => {
     );
   });
 
-  // Regression: the first version of this policy had no worker-src, so
-  // worker creation fell back to script-src -- which has no blob: in it --
-  // and every photo upload's client-side compression (browser-image-
-  // compression, which runs in a Web Worker created from a blob: URL)
-  // silently failed under CSP alone, caught only by the signed-in e2e suite
-  // actually uploading a photograph in a real browser.
   it('allows a worker to be created from a blob: URL', () => {
     expect(policy).toContain(`worker-src 'self' blob:`);
   });
 
-  // Also a regression the first version missed: Leaflet's own default icon
-  // handling loads a 1x1 transparent GIF as a data: URI internally, which a
-  // policy with no data: in img-src silently blocks.
   it('allows a data: URI image, which Leaflet loads internally', () => {
     expect(policy).toMatch(/img-src[^;]*\bdata:/);
   });
@@ -68,12 +57,8 @@ describe('the Content-Security-Policy meta tag in layout.tsx', () => {
     expect(layout).toContain("object-src 'none'");
   });
 
-  // frame-ancestors is the directive that would actually stop a clickjacking
-  // frame, and it is meaningless in a <meta> tag -- browsers only honour it
-  // from a real header, which GitHub Pages cannot send. Asserting its
-  // absence here is a guard against someone adding it later believing it
-  // does something: the framebusting script above is what has to carry that
-  // job instead.
+  // Guards against someone adding frame-ancestors later believing it does
+  // something in a <meta> tag; the framebusting script carries that job.
   it('does not declare frame-ancestors, which a meta tag cannot enforce', () => {
     expect(policy).not.toContain('frame-ancestors');
   });
