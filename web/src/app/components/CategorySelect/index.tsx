@@ -21,7 +21,7 @@ import {
 import { CategoryText } from './CategoryText';
 import { CategorySelectDropdown } from './Dropdown';
 import { CategoryInput } from './Input';
-import { sortCategories } from './selection';
+import { nextAfterRemoving, sortCategories } from './selection';
 import { SharingSection } from './Sharing';
 import type { UseCategories } from './useCategories';
 import { useExportCategory } from './useExportCategory';
@@ -177,8 +177,7 @@ export default function CategorySelect({
     const ok = await shares.deleteShare(myShareId);
     if (ok) {
       toast.success(t('category_select.leave_success'));
-      const remaining = sortedCats.filter((c) => c.id !== selectedCat);
-      onSelect(remaining[0]?.id ?? null);
+      onSelect(nextAfterRemoving(sortedCats, selectedCat));
     } else {
       toast.error(t('category_select.leave_error'));
     }
@@ -213,8 +212,7 @@ export default function CategorySelect({
     if (ok) {
       // Falls through to what's left rather than to nothing -- deleting a
       // category is no reason to be sent back to a chooser.
-      const remaining = sortedCats.filter((c) => c.id !== selectedCat);
-      onSelect(remaining[0]?.id ?? null);
+      onSelect(nextAfterRemoving(sortedCats, selectedCat));
     }
   }, [selectedCat, selected, deleteCategory, onSelect, sortedCats, t, confirm]);
 

@@ -1,5 +1,11 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { verifiedUserId } from '../../data/auth';
 import {
   createImageRow,
@@ -118,6 +124,39 @@ export async function signEntries(
 // Stryker disable all: hook internals aren't covered by tests, only
 // groupImageRows/toImgEntries/signEntries above are -- mutants in here
 // would only be noise.
+
+// Refresh signed URLs before Supabase's own 1h server-side expiry so a
+// long-lived tab doesn't turn every thumbnail into a broken-image
+// placeholder. Distinct from exportCategory.ts's SIGNED_URL_TTL_SECONDS,
+// which asks for a longer-lived URL for a different purpose (a slow export
+// download outliving it) rather than mirroring this default.
+function useSignedUrlRefresh(
+  lastSignedAtRef: RefObject<number>,
+  imagesRef: RefObject<Record<string, ImgEntry[]>>,
+  refreshAllImages: (itemIds: string[]) => Promise<void>,
+) {
+  useEffect(() => {
+    const SIGNED_URL_SERVER_TTL_MS = 3600_000;
+    const REFRESH_MARGIN_MS = 5 * 60_000;
+    const maybeRefresh = () => {
+      if (!lastSignedAtRef.current) return;
+      if (
+        Date.now() - lastSignedAtRef.current <
+        SIGNED_URL_SERVER_TTL_MS - REFRESH_MARGIN_MS
+      )
+        return;
+      const itemIds = Object.keys(imagesRef.current);
+      if (itemIds.length) void refreshAllImages(itemIds);
+    };
+    const interval = setInterval(maybeRefresh, 60_000);
+    document.addEventListener('visibilitychange', maybeRefresh);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', maybeRefresh);
+    };
+  }, [lastSignedAtRef, imagesRef, refreshAllImages]);
+}
+
 export function useItemImages() {
   const { t } = useI18n();
   const toast = useToast();
@@ -191,31 +230,7 @@ export function useItemImages() {
     lastSignedAtRef.current = Date.now();
   }, []);
 
-  // Refresh signed URLs before Supabase's own 1h server-side expiry so a
-  // long-lived tab doesn't turn every thumbnail into a broken-image
-  // placeholder. Distinct from exportCategory.ts's SIGNED_URL_TTL_SECONDS,
-  // which asks for a longer-lived URL for a different purpose (a slow
-  // export download outliving it) rather than mirroring this default.
-  useEffect(() => {
-    const SIGNED_URL_SERVER_TTL_MS = 3600_000;
-    const REFRESH_MARGIN_MS = 5 * 60_000;
-    const maybeRefresh = () => {
-      if (!lastSignedAtRef.current) return;
-      if (
-        Date.now() - lastSignedAtRef.current <
-        SIGNED_URL_SERVER_TTL_MS - REFRESH_MARGIN_MS
-      )
-        return;
-      const itemIds = Object.keys(imagesRef.current);
-      if (itemIds.length) void refreshAllImages(itemIds);
-    };
-    const interval = setInterval(maybeRefresh, 60_000);
-    document.addEventListener('visibilitychange', maybeRefresh);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', maybeRefresh);
-    };
-  }, [refreshAllImages]);
+  useSignedUrlRefresh(lastSignedAtRef, imagesRef, refreshAllImages);
 
   const uploadImage = useCallback(
     async (itemId: string, file: File) => {
