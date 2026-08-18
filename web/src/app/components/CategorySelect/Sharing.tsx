@@ -249,8 +249,8 @@ export function SharingSection({ shares }: Props) {
       )}
 
       {list.length > 0 && (
-        <ul className="flex flex-col gap-1.5">
-          <li className="font-label text-[0.6875rem] text-muted-foreground">
+        <ul className="flex flex-col divide-y divide-border/60">
+          <li className="pb-1.5 font-label text-[0.6875rem] text-muted-foreground">
             {t('category_select.share_list_title')}
           </li>
           {list.map((s) => {
@@ -260,16 +260,27 @@ export function SharingSection({ shares }: Props) {
             return (
               <li
                 key={s.id}
-                // Two lines below `sm`: email alone, then expiry and the
-                // controls -- squeezing all four onto one narrow row is
-                // what let a long email crowd the expiry date out of view
-                // entirely. `sm:contents` drops the second line's own box
-                // at `sm` and up, promoting its two children back to being
-                // direct flex items of this `<li>` so the row returns to
-                // one line where there's room for it.
-                className="flex flex-col gap-1.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2"
+                // Two lines below `sm`: email (plus its role badge), then
+                // expiry and the controls -- squeezing all of that onto one
+                // narrow row is what let a long email crowd the expiry
+                // date out of view entirely. `sm:contents` drops the
+                // second line's own box at `sm` and up, promoting its two
+                // children back to being direct flex items of this `<li>`
+                // so the row returns to one line where there's room for it.
+                className="flex flex-col gap-1.5 py-2 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2"
               >
-                <span className="truncate min-w-0">{s.invited_email}</span>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate min-w-0">{s.invited_email}</span>
+                  {/* The role itself carries this now, not the pen button's
+                      colour -- a row is scannable without opening anything,
+                      and "editor" is the one worth calling out; "viewer" is
+                      the default nobody needs flagged. */}
+                  {s.role === 'editor' && (
+                    <span className="tag-chip shrink-0">
+                      {t('category_select.share_role_editor_badge')}
+                    </span>
+                  )}
+                </div>
 
                 <div className="flex items-center justify-between gap-2 sm:contents">
                   <span
@@ -287,36 +298,40 @@ export function SharingSection({ shares }: Props) {
                       : t('category_select.share_no_expiry')}
                   </span>
 
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-1 sm:gap-2">
                     {roleCheckbox(s, 'hidden items-center gap-1.5 sm:flex')}
-                    <IconButton
-                      variant={s.role === 'editor' ? 'primary' : 'outline'}
-                      size="xl"
-                      className="sm:hidden"
+                    {/* Flat rather than framed: the outline/xl treatment
+                        every other IconButton in this section uses read as
+                        a much bigger, heavier control than the plain text
+                        it sits beside. Same touch target (44px below
+                        `sm`), quieter at rest. */}
+                    <button
+                      type="button"
                       onClick={() => setRoleModalShareId(s.id)}
                       aria-label={t('category_select.share_edit_access')}
                       title={t('category_select.share_edit_access')}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:hidden sm:h-9 sm:w-9"
                     >
                       <Icon
                         icon={IconType.Edit}
-                        className="w-5 h-5"
+                        className="w-4 h-4"
                         aria-hidden="true"
                       />
-                    </IconButton>
-                    <IconButton
-                      variant="outlineDestructive"
-                      size="xl"
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => void onRevoke(s.id, s.invited_email)}
                       disabled={isRevoking}
                       aria-label={t('category_select.share_revoke')}
                       title={t('category_select.share_revoke')}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-40 sm:h-9 sm:w-9"
                     >
                       <Icon
                         icon={IconType.Trash}
-                        className="w-5 h-5"
+                        className="w-4 h-4"
                         aria-hidden="true"
                       />
-                    </IconButton>
+                    </button>
                   </div>
                 </div>
               </li>
