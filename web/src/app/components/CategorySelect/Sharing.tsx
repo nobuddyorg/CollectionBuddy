@@ -95,12 +95,8 @@ export function SharingSection({ shares }: Props) {
     [confirm, t, updateShareRole],
   );
 
-  // Shared by the inline row (sm and up) and the mobile modal below, so the
-  // control itself can't drift between the two places it's shown.
-  // `className` is the label's whole class list, display utilities
-  // included: mixing a hardcoded `flex` in here with a caller's
-  // `hidden ... sm:flex` would put two unconditional display utilities on
-  // the same element with no defined winner between them.
+  // `className` sets the label's display too -- a hardcoded `flex` here
+  // would fight a caller's `hidden ... sm:flex`.
   const roleCheckbox = (s: CategoryShareSummary, className: string) => (
     <label className={className}>
       <input
@@ -249,8 +245,8 @@ export function SharingSection({ shares }: Props) {
       )}
 
       {list.length > 0 && (
-        <ul className="flex flex-col gap-1.5">
-          <li className="font-label text-[0.6875rem] text-muted-foreground">
+        <ul className="flex flex-col divide-y divide-border/60">
+          <li className="pb-1.5 font-label text-[0.6875rem] text-muted-foreground">
             {t('category_select.share_list_title')}
           </li>
           {list.map((s) => {
@@ -260,16 +256,26 @@ export function SharingSection({ shares }: Props) {
             return (
               <li
                 key={s.id}
-                className="flex items-center justify-between gap-2 text-sm"
+                // `sm:flex-1` on email below, not `justify-between` here:
+                // with three items, justify-between free-floats the middle
+                // one (expiry) depending on email length. `ml-4` rather
+                // than `pl-4` so the `divide-y` border indents too --
+                // padding doesn't move a box's border.
+                className="ml-4 flex flex-col gap-1.5 py-2 text-sm sm:flex-row sm:items-center sm:gap-2"
               >
-                <span className="truncate min-w-0">
-                  {s.invited_email}
+                <div className="flex min-w-0 items-center gap-1.5 sm:flex-1">
+                  <span className="truncate min-w-0">{s.invited_email}</span>
+                  {s.role === 'editor' && (
+                    <span className="tag-chip shrink-0">
+                      {t('category_select.share_role_editor_badge')}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between gap-2 sm:contents">
                   <span
-                    className={
-                      isExpired ? 'text-destructive' : 'text-muted-foreground'
-                    }
+                    className={`shrink-0 sm:mr-4 ${isExpired ? 'text-destructive' : 'text-muted-foreground'}`}
                   >
-                    {' · '}
                     {s.expires_at
                       ? t(
                           isExpired
@@ -281,39 +287,38 @@ export function SharingSection({ shares }: Props) {
                         )
                       : t('category_select.share_no_expiry')}
                   </span>
-                </span>
-                {roleCheckbox(
-                  s,
-                  'hidden shrink-0 items-center gap-1.5 sm:flex',
-                )}
-                <IconButton
-                  variant={s.role === 'editor' ? 'primary' : 'outline'}
-                  size="md"
-                  className="sm:hidden"
-                  onClick={() => setRoleModalShareId(s.id)}
-                  aria-label={t('category_select.share_edit_access')}
-                  title={t('category_select.share_edit_access')}
-                >
-                  <Icon
-                    icon={IconType.Edit}
-                    className="w-4 h-4"
-                    aria-hidden="true"
-                  />
-                </IconButton>
-                <IconButton
-                  variant="outlineDestructive"
-                  size="md"
-                  onClick={() => void onRevoke(s.id, s.invited_email)}
-                  disabled={isRevoking}
-                  aria-label={t('category_select.share_revoke')}
-                  title={t('category_select.share_revoke')}
-                >
-                  <Icon
-                    icon={IconType.Trash}
-                    className="w-4 h-4"
-                    aria-hidden="true"
-                  />
-                </IconButton>
+
+                  <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                    {roleCheckbox(s, 'hidden items-center gap-1.5 sm:flex')}
+                    <button
+                      type="button"
+                      onClick={() => setRoleModalShareId(s.id)}
+                      aria-label={t('category_select.share_edit_access')}
+                      title={t('category_select.share_edit_access')}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:hidden sm:h-9 sm:w-9"
+                    >
+                      <Icon
+                        icon={IconType.Edit}
+                        className="w-4 h-4"
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void onRevoke(s.id, s.invited_email)}
+                      disabled={isRevoking}
+                      aria-label={t('category_select.share_revoke')}
+                      title={t('category_select.share_revoke')}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-40 sm:h-9 sm:w-9"
+                    >
+                      <Icon
+                        icon={IconType.Trash}
+                        className="w-4 h-4"
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </div>
+                </div>
               </li>
             );
           })}
@@ -329,8 +334,6 @@ export function SharingSection({ shares }: Props) {
   );
 }
 
-// Split out to keep the "which share" lookup and title string together,
-// rather than inline in the list's JSX.
 function RoleModal({
   share,
   onOpenChange,

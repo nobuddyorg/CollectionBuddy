@@ -79,6 +79,7 @@
     "share_load_error": "Freigaben konnten nicht geladen werden. Bitte erneut versuchen.",
     "share_can_edit": "Darf bearbeiten",
     "share_edit_access": "Zugriff bearbeiten",
+    "share_role_editor_badge": "Bearbeiter",
     "share_editor_confirm": "{email} vollen Bearbeitungszugriff auf diese Sammlung geben, einschließlich Hinzufügen, Ändern und Löschen von Einträgen und Fotos?",
     "share_role_update_error": "Zugriff konnte nicht geändert werden. Bitte erneut versuchen.",
     "share_list_title": "Aktuell geteilt mit",
