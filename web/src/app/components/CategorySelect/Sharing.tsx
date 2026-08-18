@@ -260,16 +260,21 @@ export function SharingSection({ shares }: Props) {
             return (
               <li
                 key={s.id}
-                className="flex items-center justify-between gap-2 text-sm"
+                // Two lines below `sm`: email alone, then expiry and the
+                // controls -- squeezing all four onto one narrow row is
+                // what let a long email crowd the expiry date out of view
+                // entirely. `sm:contents` drops the second line's own box
+                // at `sm` and up, promoting its two children back to being
+                // direct flex items of this `<li>` so the row returns to
+                // one line where there's room for it.
+                className="flex flex-col gap-1.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2"
               >
-                <span className="truncate min-w-0">
-                  {s.invited_email}
+                <span className="truncate min-w-0">{s.invited_email}</span>
+
+                <div className="flex items-center justify-between gap-2 sm:contents">
                   <span
-                    className={
-                      isExpired ? 'text-destructive' : 'text-muted-foreground'
-                    }
+                    className={`shrink-0 ${isExpired ? 'text-destructive' : 'text-muted-foreground'}`}
                   >
-                    {' · '}
                     {s.expires_at
                       ? t(
                           isExpired
@@ -281,39 +286,39 @@ export function SharingSection({ shares }: Props) {
                         )
                       : t('category_select.share_no_expiry')}
                   </span>
-                </span>
-                {roleCheckbox(
-                  s,
-                  'hidden shrink-0 items-center gap-1.5 sm:flex',
-                )}
-                <IconButton
-                  variant={s.role === 'editor' ? 'primary' : 'outline'}
-                  size="md"
-                  className="sm:hidden"
-                  onClick={() => setRoleModalShareId(s.id)}
-                  aria-label={t('category_select.share_edit_access')}
-                  title={t('category_select.share_edit_access')}
-                >
-                  <Icon
-                    icon={IconType.Edit}
-                    className="w-4 h-4"
-                    aria-hidden="true"
-                  />
-                </IconButton>
-                <IconButton
-                  variant="outlineDestructive"
-                  size="md"
-                  onClick={() => void onRevoke(s.id, s.invited_email)}
-                  disabled={isRevoking}
-                  aria-label={t('category_select.share_revoke')}
-                  title={t('category_select.share_revoke')}
-                >
-                  <Icon
-                    icon={IconType.Trash}
-                    className="w-4 h-4"
-                    aria-hidden="true"
-                  />
-                </IconButton>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    {roleCheckbox(s, 'hidden items-center gap-1.5 sm:flex')}
+                    <IconButton
+                      variant={s.role === 'editor' ? 'primary' : 'outline'}
+                      size="xl"
+                      className="sm:hidden"
+                      onClick={() => setRoleModalShareId(s.id)}
+                      aria-label={t('category_select.share_edit_access')}
+                      title={t('category_select.share_edit_access')}
+                    >
+                      <Icon
+                        icon={IconType.Edit}
+                        className="w-5 h-5"
+                        aria-hidden="true"
+                      />
+                    </IconButton>
+                    <IconButton
+                      variant="outlineDestructive"
+                      size="xl"
+                      onClick={() => void onRevoke(s.id, s.invited_email)}
+                      disabled={isRevoking}
+                      aria-label={t('category_select.share_revoke')}
+                      title={t('category_select.share_revoke')}
+                    >
+                      <Icon
+                        icon={IconType.Trash}
+                        className="w-5 h-5"
+                        aria-hidden="true"
+                      />
+                    </IconButton>
+                  </div>
+                </div>
               </li>
             );
           })}
