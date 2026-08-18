@@ -11,6 +11,7 @@ export const MUTATE_TARGETS = [
   'src/app/data/exportFormat.ts',
   'src/app/data/exportCategory.ts',
   'src/app/data/photon.ts',
+  'src/app/lib/pool.ts',
   'src/app/components/CategorySelect/useExportCategory.tsx',
   'src/app/components/ItemList/Pagination.tsx',
   'src/app/components/ItemList/useItemImages.tsx',

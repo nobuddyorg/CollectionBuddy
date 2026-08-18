@@ -136,8 +136,8 @@ export default function ItemList({
     ? (items.find((i) => i.id === modalState.itemId)?.title ?? '')
     : '';
 
-  const openEdit = (it: ItemLite) => {
-    setEditingItem(it);
+  const openEdit = (item: ItemLite) => {
+    setEditingItem(item);
     setEditOpen(true);
   };
 
@@ -255,19 +255,19 @@ export default function ItemList({
           // not enough to visually bind a caption to its photograph.
           className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-4 transition-opacity ${loading ? 'opacity-60' : ''}`}
         >
-          {items.map((it, idx) => (
+          {items.map((item, idx) => (
             <ItemCard
-              key={it.id}
-              item={it}
-              imgs={images[it.id] ?? EMPTY_IMAGES}
-              pendingUploads={pendingUploads[it.id] ?? 0}
-              imagesLoading={loadingItems.has(it.id)}
+              key={item.id}
+              item={item}
+              imgs={images[item.id] ?? EMPTY_IMAGES}
+              pendingUploads={pendingUploads[item.id] ?? 0}
+              imagesLoading={loadingItems.has(item.id)}
               deletingPath={deletingPath}
-              onUpload={(f) => void uploadImage(it.id, f)}
-              onEditItem={() => openEdit(it)}
-              onDeleteItem={() => void removeItem(it.id)}
-              onDeleteImage={(img) => void deleteImage(it.id, img)}
-              onOpenModal={(index) => setModalState({ itemId: it.id, index })}
+              onUpload={(f) => void uploadImage(item.id, f)}
+              onEditItem={() => openEdit(item)}
+              onDeleteItem={() => void removeItem(item.id)}
+              onDeleteImage={(img) => void deleteImage(item.id, img)}
+              onOpenModal={(index) => setModalState({ itemId: item.id, index })}
               // The grid is up to 3 columns wide, so the LCP candidate is
               // always among the first three regardless of viewport.
               priority={idx < 3}

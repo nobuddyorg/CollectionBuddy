@@ -33,7 +33,7 @@ import {
   rootFolderOf,
 } from './importFormat';
 import { readZipEntries } from './zip';
-import { runPool } from './exportCategory';
+import { runPool } from '../lib/pool';
 
 export type ImportProgress = {
   phase: 'reading' | 'items' | 'photos';
