@@ -6,6 +6,7 @@ import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { popupContent } from './popup';
+import { useSyncedRef } from '../../lib/useSyncedRef';
 import {
   IconDefaultPrivate,
   Leaflet,
@@ -127,19 +128,11 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     null,
   );
 
-  const markersRef = useRef(markers);
-  const currentLocRef = useRef(currentLocation);
+  const markersRef = useSyncedRef(markers);
+  const currentLocRef = useSyncedRef(currentLocation);
 
   const [ready, setReady] = useState(false);
   const hasInitialFit = useRef(false);
-
-  useEffect(() => {
-    markersRef.current = markers;
-  }, [markers]);
-
-  useEffect(() => {
-    currentLocRef.current = currentLocation;
-  }, [currentLocation]);
 
   useEffect(() => {
     let cancelled = false;
@@ -315,7 +308,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       );
     });
     return () => cancelAnimationFrame(frame);
-  }, [command, ready]);
+  }, [command, ready, markersRef, currentLocRef]);
 
   // Leaflet caches the container size, so a box that changes while mounted
   // (rotation, the mobile URL bar collapsing) renders into stale

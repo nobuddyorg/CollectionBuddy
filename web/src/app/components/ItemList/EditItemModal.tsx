@@ -5,8 +5,8 @@ import dynamic from 'next/dynamic';
 
 import CenteredModal from '../CenteredModal';
 import { EMPTY_ITEM_FORM_VALUES, ItemFormValues } from '../ItemForm/types';
-import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useI18n } from '../../i18n/useI18n';
+import { useGuardedModalClose } from '../../lib/useGuardedModalClose';
 import type { ItemLite } from './types';
 
 // See ItemCreate/index.tsx: same form, same reason to split it out.
@@ -43,24 +43,11 @@ export function EditItemModal({
   onSubmit: (values: ItemFormValues) => void;
 }) {
   const { t } = useI18n();
-  const confirm = useConfirm();
   const [isDirty, setIsDirty] = useState(false);
 
-  // Single path every dismissal goes through (backdrop, Escape, dialog X,
-  // Cancel), so a stray tap can't lose an edit any more easily than
-  // deliberate Cancel would.
-  const guardedClose = useCallback(() => {
-    if (!isDirty) {
-      onOpenChange(false);
-      return;
-    }
-    void (async () => {
-      if (await confirm(t('item_create.confirm_discard'))) {
-        setIsDirty(false);
-        onOpenChange(false);
-      }
-    })();
-  }, [isDirty, confirm, onOpenChange, t]);
+  const close = useCallback(() => onOpenChange(false), [onOpenChange]);
+  const discard = useCallback(() => setIsDirty(false), []);
+  const guardedClose = useGuardedModalClose(isDirty, close, discard);
 
   return (
     <CenteredModal
