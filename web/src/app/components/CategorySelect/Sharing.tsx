@@ -95,12 +95,8 @@ export function SharingSection({ shares }: Props) {
     [confirm, t, updateShareRole],
   );
 
-  // Shared by the inline row (sm and up) and the mobile modal below, so the
-  // control itself can't drift between the two places it's shown.
-  // `className` is the label's whole class list, display utilities
-  // included: mixing a hardcoded `flex` in here with a caller's
-  // `hidden ... sm:flex` would put two unconditional display utilities on
-  // the same element with no defined winner between them.
+  // `className` sets the label's display too -- a hardcoded `flex` here
+  // would fight a caller's `hidden ... sm:flex`.
   const roleCheckbox = (s: CategoryShareSummary, className: string) => (
     <label className={className}>
       <input
@@ -260,30 +256,15 @@ export function SharingSection({ shares }: Props) {
             return (
               <li
                 key={s.id}
-                // Two lines below `sm`: email (plus its role badge), then
-                // expiry and the controls -- squeezing all of that onto one
-                // narrow row is what let a long email crowd the expiry
-                // date out of view entirely. `sm:contents` drops the
-                // second line's own box at `sm` and up, promoting its two
-                // children back to being direct flex items of this `<li>`
-                // so the row returns to one line where there's room for it.
-                //
-                // No `justify-between` here: with three items (email,
-                // expiry, controls) it pins only the first and last to the
-                // edges and free-floats the middle one, so the expiry date
-                // drifted sideways row to row depending on how much of the
-                // row a given email ate. `sm:flex-1` below makes email the
-                // one item that absorbs the leftover space instead, so
-                // expiry and controls stay a fixed unit flush at the end
-                // on every row regardless of email length.
-                className="flex flex-col gap-1.5 py-2 pl-2 text-sm sm:flex-row sm:items-center sm:gap-2"
+                // `sm:flex-1` on email below, not `justify-between` here:
+                // with three items, justify-between free-floats the middle
+                // one (expiry) depending on email length. `ml-4` rather
+                // than `pl-4` so the `divide-y` border indents too --
+                // padding doesn't move a box's border.
+                className="ml-4 flex flex-col gap-1.5 py-2 text-sm sm:flex-row sm:items-center sm:gap-2"
               >
                 <div className="flex min-w-0 items-center gap-1.5 sm:flex-1">
                   <span className="truncate min-w-0">{s.invited_email}</span>
-                  {/* The role itself carries this now, not the pen button's
-                      colour -- a row is scannable without opening anything,
-                      and "editor" is the one worth calling out; "viewer" is
-                      the default nobody needs flagged. */}
                   {s.role === 'editor' && (
                     <span className="tag-chip shrink-0">
                       {t('category_select.share_role_editor_badge')}
@@ -293,7 +274,7 @@ export function SharingSection({ shares }: Props) {
 
                 <div className="flex items-center justify-between gap-2 sm:contents">
                   <span
-                    className={`shrink-0 ${isExpired ? 'text-destructive' : 'text-muted-foreground'}`}
+                    className={`shrink-0 sm:mr-4 ${isExpired ? 'text-destructive' : 'text-muted-foreground'}`}
                   >
                     {s.expires_at
                       ? t(
@@ -309,11 +290,6 @@ export function SharingSection({ shares }: Props) {
 
                   <div className="flex shrink-0 items-center gap-1 sm:gap-2">
                     {roleCheckbox(s, 'hidden items-center gap-1.5 sm:flex')}
-                    {/* Flat rather than framed: the outline/xl treatment
-                        every other IconButton in this section uses read as
-                        a much bigger, heavier control than the plain text
-                        it sits beside. Same touch target (44px below
-                        `sm`), quieter at rest. */}
                     <button
                       type="button"
                       onClick={() => setRoleModalShareId(s.id)}
@@ -358,8 +334,6 @@ export function SharingSection({ shares }: Props) {
   );
 }
 
-// Split out to keep the "which share" lookup and title string together,
-// rather than inline in the list's JSX.
 function RoleModal({
   share,
   onOpenChange,
