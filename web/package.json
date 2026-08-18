@@ -15,7 +15,7 @@
     "e2e:local": "node scripts/e2e-local-stack.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.111.0",
+    "@supabase/supabase-js": "^2.112.2",
     "browser-image-compression": "^2.0.2",
     "leaflet": "^1.9.4",
     "next": "16.3.0",
@@ -36,7 +36,7 @@
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9",
-    "eslint-config-next": "16.2.12",
+    "eslint-config-next": "16.3.0",
     "jsdom": "^30.0.1",
     "playwright": "^1.62.0",
     "prettier": "^3.9.6",
