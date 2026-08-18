@@ -18,6 +18,7 @@ import Header from './components/Header';
 import ItemList from './components/ItemList';
 import { ItemListSkeleton } from './components/ItemList/Skeleton';
 import LoadingOverlay from './components/LoadingOverlay';
+import { useToast } from './components/Toast/ToastProvider';
 import { useI18n } from './i18n/useI18n';
 import { supabase } from './supabase';
 import { useSession } from './useSession';
@@ -26,6 +27,7 @@ export default function Page() {
   const { user, loading } = useSession();
   const router = useRouter();
   const { t } = useI18n();
+  const toast = useToast();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -81,16 +83,20 @@ export default function Page() {
       // signed in on this device.
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error('Sign-out failed:', error.message);
+        toast.reportError('sign out failed', error, t('header.sign_out_error'));
         await supabase.auth.signOut({ scope: 'local' });
       }
     } catch (err) {
-      console.error('Unexpected error during sign-out:', err);
+      toast.reportError(
+        'sign out unexpected error',
+        err,
+        t('header.sign_out_error'),
+      );
       await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
     } finally {
       router.replace('/login');
     }
-  }, [router]);
+  }, [router, t, toast]);
 
   if (loading)
     return <LoadingOverlay label={t('item_list.loading')} theme="auto" />;

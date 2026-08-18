@@ -46,6 +46,9 @@ export function useCategories() {
       if (isCurrent(mySeq)) setCats(list);
       return list;
     } catch (e) {
+      // Logged unconditionally, unlike the toast below: still worth
+      // knowing about even for a request a newer one has already
+      // superseded, which is the only thing `isCurrent` is guarding here.
       console.error(e);
       if (isCurrent(mySeq)) toast.error(t('category_select.load_error'));
       return [];
