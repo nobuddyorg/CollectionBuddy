@@ -1,7 +1,7 @@
--- Three tables. Deliberately not "items belong to a category": an item can
--- sit in several, so the mapping is its own table. Both sides carry
--- `user_id`, denormalized so every RLS policy (0006) is a column comparison
--- rather than a join.
+-- Five tables. Deliberately not "items belong to a category": an item can
+-- sit in several, so the mapping is its own table. Every owned row carries
+-- its own `user_id`, denormalized so every RLS policy (0006) is a column
+-- comparison rather than a join.
 begin;
 
 create table if not exists public.categories (
@@ -51,6 +51,73 @@ create table if not exists public.item_categories (
   user_id uuid not null,
   created_at timestamptz not null default now(),
   primary key (item_id, category_id)
+);
+
+-- One row per owner's grant of access to one category, to one invited
+-- email. No separate "pending"/"accepted" state -- the grant works the
+-- moment `invited_email` matches the caller's own JWT email, evaluated
+-- fresh on every request, so an invite sent before signup starts working
+-- the instant the invitee signs up.
+create table if not exists public.category_shares (
+  id uuid primary key default gen_random_uuid(),
+  category_id uuid not null references public.categories(id) on delete cascade,
+
+  -- Denormalized, same reasoning as item_categories.user_id above: every
+  -- policy in 0006 is a column comparison, never a join back to categories
+  -- to find out who owns it.
+  owner_user_id uuid not null,
+
+  invited_email text not null,
+
+  -- 'viewer' is the default and the original, only role; 'editor' gives an
+  -- invited grantee parity with the owner on item content (add/edit/delete
+  -- items, manage photos) within the shared category. Category-level
+  -- actions (rename, delete the category itself, manage other shares) stay
+  -- owner-only regardless of role.
+  role text not null default 'viewer',
+
+  expires_at timestamptz,
+  created_at timestamptz not null default now(),
+
+  constraint category_shares_invited_email_looks_like_email
+    check (invited_email like '%@%'),
+  constraint category_shares_expiry_in_future
+    check (expires_at is null or expires_at > created_at),
+  constraint category_shares_role_valid check (role in ('viewer', 'editor')),
+
+  -- One grant per (category, email) -- re-sharing with someone already
+  -- invited is a no-op, not a second row with its own, different expiry.
+  constraint category_shares_category_email_unique unique (category_id, invited_email)
+);
+
+-- One row per photograph (full + optional thumbnail). Storage holds the
+-- bytes and is the authority on what exists; this table is a queryable
+-- index of it, written at upload time and cleared at delete.
+--
+-- No position column: there's no reorder feature, and created_at ascending
+-- already keeps a freshly uploaded photograph from displacing the hero
+-- slot (IMAGE_LIST_SORT, images.ts).
+create table if not exists public.images (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references public.items(id) on delete cascade,
+  user_id uuid not null,
+
+  -- Full storage paths (`<uid>/<itemId>/<file>`), not bare object names --
+  -- every reader (signing, Storage remove(), export) wants something it
+  -- can hand straight to the Storage API rather than rebuild with
+  -- imagePrefix() first. It is also what lets a grantee's read (see the
+  -- shared select policy in 0006) resolve straight to the owner's bytes
+  -- without knowing the owner's uid at all.
+  path_full text not null,
+  path_thumb text,
+
+  -- The full photograph's byte size only -- thumbnails were never counted,
+  -- so there is no thumb_size_bytes to keep in step with anything.
+  size_bytes bigint,
+
+  created_at timestamptz not null default now(),
+
+  constraint images_path_full_key unique (path_full)
 );
 
 commit;

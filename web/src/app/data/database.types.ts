@@ -1,4 +1,4 @@
-// Generated from the migrations in supabase/migrations/ (0001-0014).
+// Generated from the migrations in supabase/migrations/ (0001-0007).
 //
 // Regenerate after a schema change, against a local stack:
 //   supabase start
@@ -226,6 +226,8 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      caller_email: { Args: never; Returns: string };
+      has_category_read_access: { Args: { cat_id: string }; Returns: boolean };
       has_category_write_access: { Args: { cat_id: string }; Returns: boolean };
       join_tags: { Args: { tags: string[] }; Returns: string };
       keepalive: { Args: never; Returns: undefined };
