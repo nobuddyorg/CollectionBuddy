@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
+import { restoreAt } from '../../lib/optimistic';
 import { useToast } from '../Toast/ToastProvider';
 import {
   createShare as createShareRow,
@@ -110,30 +111,48 @@ export function useShares(categoryId: string | null) {
   // Backs both a grant the owner revokes and the caller's own grant when
   // leaving a shared category -- deleteShareRow doesn't distinguish, and
   // neither does this: the RLS policy already limited which row the caller
-  // was allowed to name.
-  //
-  // No toast on failure here, unlike this hook's other mutations: both
-  // current callers (Sharing.tsx's onRevoke, CategorySelect/index.tsx's
-  // onLeave) already show their own outcome-specific toast from the
-  // returned boolean -- adding one here too would double up. console.error
-  // still logs the real cause for debugging, which `ok: false` alone loses.
+  // was allowed to name. The row is hidden immediately; the actual delete
+  // is deferred to the toast's undo window (see useToast), so the caller
+  // supplies its own success/error copy rather than getting one outcome
+  // back synchronously.
   const deleteShare = useCallback(
-    async (shareId: string) => {
-      if (isRevoking) return false;
-      setIsRevoking(true);
-      try {
-        const { error } = await deleteShareRow(shareId);
-        if (error) throw error;
-        setShares((prev) => prev.filter((s) => s.id !== shareId));
-        return true;
-      } catch (e) {
-        console.error('delete share', e);
-        return false;
-      } finally {
-        setIsRevoking(false);
-      }
+    (
+      shareId: string,
+      opts: {
+        successMessage: string;
+        errorMessage: string;
+        onRestore?: () => void;
+      },
+    ) => {
+      if (isRevoking) return;
+      const index = shares.findIndex((s) => s.id === shareId);
+      const snapshot = shares[index];
+      if (!snapshot) return;
+      setShares((prev) => prev.filter((s) => s.id !== shareId));
+
+      const restoreAndNotify = () => {
+        setShares((prev) => restoreAt(prev, index, snapshot));
+        opts.onRestore?.();
+      };
+
+      toast.success(opts.successMessage, {
+        action: { label: t('common.undo'), onClick: restoreAndNotify },
+        onExpire: async () => {
+          setIsRevoking(true);
+          try {
+            const { error } = await deleteShareRow(shareId);
+            if (error) throw error;
+          } catch (e) {
+            console.error('delete share', e);
+            toast.error(opts.errorMessage);
+            restoreAndNotify();
+          } finally {
+            setIsRevoking(false);
+          }
+        },
+      });
     },
-    [isRevoking],
+    [isRevoking, shares, t, toast],
   );
 
   return {

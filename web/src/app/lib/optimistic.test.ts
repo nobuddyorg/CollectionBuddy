@@ -1,26 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import { restoreAt } from './optimistic';
-import type { ItemLite } from './types';
 
-function item(id: string): ItemLite {
-  return {
-    id,
-    title: `Item ${id}`,
-    description: null,
-    place: null,
-    place_lat: null,
-    place_lng: null,
-    tags: [],
-  };
+function entry(id: string): { id: string } {
+  return { id };
 }
 
-const a = item('a');
-const b = item('b');
-const c = item('c');
+const a = entry('a');
+const b = entry('b');
+const c = entry('c');
 
 describe('restoreAt', () => {
-  it('puts the card back among the neighbours it had', () => {
+  it('puts the entry back among the neighbours it had', () => {
     expect(restoreAt([a, c], 1, b).map((i) => i.id)).toEqual(['a', 'b', 'c']);
   });
 
@@ -35,12 +26,12 @@ describe('restoreAt', () => {
   });
 
   it('clamps a negative index rather than splicing from the end', () => {
-    // splice(-1) would insert *before the last* element, putting the card
+    // splice(-1) would insert *before the last* element, putting the entry
     // in the wrong place instead of the first.
     expect(restoreAt([a, b], -1, c).map((i) => i.id)).toEqual(['c', 'a', 'b']);
   });
 
-  it('does nothing when the card is already back', () => {
+  it('does nothing when the entry is already back', () => {
     const list = [a, b];
     expect(restoreAt(list, 0, b)).toBe(list);
   });

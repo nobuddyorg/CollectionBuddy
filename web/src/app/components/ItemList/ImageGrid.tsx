@@ -108,7 +108,6 @@ export function ImageGrid({
   itemTitle,
   onOpenModal,
   onDelete,
-  deletingPath,
   busy,
   loading = false,
   pending = 0,
@@ -122,7 +121,6 @@ export function ImageGrid({
    * photographs with no strip cell of their own. */
   onOpenModal: (index: number) => void;
   onDelete: (img: ImgEntry) => void;
-  deletingPath: Set<string>;
   busy: boolean;
   /** Listing/signatures still in flight -- not the same as having none. */
   loading?: boolean;
@@ -170,7 +168,7 @@ export function ImageGrid({
       aria-label={t('item_list.delete_image')}
       title={t('item_list.delete_image')}
       onClick={() => onDelete(img)}
-      disabled={deletingPath.has(img.pathFull) || busy}
+      disabled={busy}
       className={[
         'absolute top-1.5 right-1.5 flex items-center justify-center rounded-full',
         // No backdrop blur: it buys nothing over 55% black on a photograph,
@@ -181,16 +179,12 @@ export function ImageGrid({
         small ? 'w-7 h-7' : 'w-8 h-8',
       ].join(' ')}
     >
-      {deletingPath.has(img.pathFull) ? (
-        <Spinner size="sm" />
-      ) : (
-        <Icon
-          icon={IconType.Close}
-          className={small ? 'w-3.5 h-3.5' : 'w-4 h-4'}
-          // Trailing override: Close's own default is a thinner 2.
-          strokeWidth="2.5"
-        />
-      )}
+      <Icon
+        icon={IconType.Close}
+        className={small ? 'w-3.5 h-3.5' : 'w-4 h-4'}
+        // Trailing override: Close's own default is a thinner 2.
+        strokeWidth="2.5"
+      />
     </button>
   );
 

@@ -24,7 +24,6 @@ function renderGrid(
     itemTitle: 'Blue Mauritius',
     onOpenModal: vi.fn(),
     onDelete: vi.fn(),
-    deletingPath: new Set<string>(),
     busy: false,
     ...overrides,
   };
@@ -249,11 +248,6 @@ describe('ImageGrid', () => {
     renderGrid(imgs, { onDelete });
     await userEvent.click(screen.getByRole('button', { name: 'Delete image' }));
     expect(onDelete).toHaveBeenCalledWith(imgs[0]);
-  });
-
-  it('disables delete while that image is already being deleted', () => {
-    renderGrid([img('a')], { deletingPath: new Set(['a.webp']) });
-    expect(screen.getByRole('button', { name: 'Delete image' })).toBeDisabled();
   });
 
   it('disables delete while the item is busy', () => {

@@ -93,7 +93,6 @@ export default function ItemList({
     captureItemImagePaths,
     removeImageBytes,
     pendingUploads,
-    deletingPath,
   } = useItemImages();
 
   const itemIdsKey = items.map((i) => i.id).join(',');
@@ -250,7 +249,6 @@ export default function ItemList({
               imgs={images[item.id] ?? EMPTY_IMAGES}
               pendingUploads={pendingUploads[item.id] ?? 0}
               imagesLoading={loadingItems.has(item.id)}
-              deletingPath={deletingPath}
               onUpload={(f) => void uploadImage(item.id, f)}
               onEditItem={() => openEdit(item)}
               onDeleteItem={() => void removeItem(item.id)}
@@ -278,7 +276,6 @@ export default function ItemList({
         onDelete={(img) => {
           if (modalState) void deleteImage(modalState.itemId, img);
         }}
-        deletingPath={deletingPath}
         busy={modalState ? (pendingUploads[modalState.itemId] ?? 0) > 0 : false}
         readOnly={!canEdit}
       />

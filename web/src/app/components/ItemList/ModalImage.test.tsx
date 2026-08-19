@@ -23,7 +23,6 @@ function renderModal(
     onIndexChange: vi.fn(),
     onClose: vi.fn(),
     onDelete: vi.fn(),
-    deletingPath: new Set<string>(),
     ...overrides,
   };
   const { rerender } = render(
@@ -152,13 +151,6 @@ describe('ModalImage', () => {
         screen.getByRole('button', { name: 'Delete image' }),
       );
       expect(onDelete).toHaveBeenCalledWith(img('b'));
-    });
-
-    it('disables delete while that photograph is already being deleted', () => {
-      renderModal({ deletingPath: new Set(['a.webp']) });
-      expect(
-        screen.getByRole('button', { name: 'Delete image' }),
-      ).toBeDisabled();
     });
 
     it('disables delete while the entry is busy', () => {

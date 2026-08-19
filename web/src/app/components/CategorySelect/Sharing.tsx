@@ -5,7 +5,6 @@ import { useCallback, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import CenteredModal from '../CenteredModal';
 import { useConfirm } from '../Confirm/ConfirmProvider';
-import { useToast } from '../Toast/ToastProvider';
 import Icon, { IconType } from '../Icon';
 import { IconButton } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
@@ -34,7 +33,6 @@ function todayDateStr(): string {
 export function SharingSection({ shares }: Props) {
   const { t } = useI18n();
   const confirm = useConfirm();
-  const toast = useToast();
   const {
     shares: list,
     isLoading,
@@ -119,14 +117,12 @@ export function SharingSection({ shares }: Props) {
         invitedEmail,
       );
       if (!(await confirm(message))) return;
-      const ok = await deleteShare(shareId);
-      if (ok) {
-        toast.success(t('category_select.share_revoke_success'));
-      } else {
-        toast.error(t('category_select.share_revoke_error'));
-      }
+      deleteShare(shareId, {
+        successMessage: t('category_select.share_revoke_success'),
+        errorMessage: t('category_select.share_revoke_error'),
+      });
     },
-    [confirm, t, deleteShare, toast],
+    [confirm, t, deleteShare],
   );
 
   return (

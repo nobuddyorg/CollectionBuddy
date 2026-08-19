@@ -47,6 +47,15 @@ async function acceptDeleteConfirmation() {
   await userEvent.click(await screen.findByTestId('confirm-accept'));
 }
 
+// The actual deleteItem call is deferred to the toast's undo window --
+// closing the toast (the same as letting it auto-dismiss) is what commits
+// it, so tests exercising the deferred delete need to trigger that
+// themselves rather than waiting on it.
+async function commitDeferredDelete() {
+  await screen.findByRole('status');
+  await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+}
+
 // items lives as the harness's own state, not a variable the test mutates
 // by hand -- removeItem/setItems close over whatever `items` was on the
 // render that created them, so a stand-in that doesn't actually re-render
@@ -108,6 +117,7 @@ describe('useItemMutations removeItem', () => {
       void result.current.removeItem('b');
     });
     await acceptDeleteConfirmation();
+    await commitDeferredDelete();
 
     await screen.findByRole('alert');
     expect(result.current.items.map((i) => i.id)).toEqual(['a', 'b', 'c']);
@@ -154,6 +164,7 @@ describe('useItemMutations removeItem', () => {
       void result.current.removeItem('b');
     });
     await acceptDeleteConfirmation();
+    await commitDeferredDelete();
 
     await screen.findByRole('alert');
     expect(result.current.items.map((i) => i.id)).toEqual(['a', 'c']);

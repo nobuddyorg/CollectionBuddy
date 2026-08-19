@@ -12,6 +12,7 @@ import type { UseCategories } from './useCategories';
 import { useExportCategory } from './useExportCategory';
 import { useImportCategory } from './useImportCategory';
 import { useShares } from './useShares';
+import type { UseShares } from './useShares';
 
 vi.mock('../../data/categories', () => ({
   countItemsForCategory: vi.fn(),
@@ -97,6 +98,7 @@ function categories(overrides: Partial<UseCategories> = {}): UseCategories {
     createCategory: vi.fn(),
     renameCategory: vi.fn(),
     deleteCategory: vi.fn(),
+    optimisticRemove: vi.fn(() => vi.fn()),
     ...overrides,
   };
 }
@@ -464,7 +466,7 @@ describe('CategorySelect', () => {
 
       expect(
         await screen.findByText(
-          'Delete "Coins"? Its 40 entries and all their photographs will be permanently deleted. This cannot be undone.',
+          'Delete "Coins"? Its 40 entries and all their photographs will be permanently deleted.',
         ),
       ).toBeVisible();
     });
@@ -480,9 +482,7 @@ describe('CategorySelect', () => {
       );
       await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-      expect(
-        await screen.findByText('Delete "Coins"? This cannot be undone.'),
-      ).toBeVisible();
+      expect(await screen.findByText('Delete "Coins"?')).toBeVisible();
     });
 
     it('falls back to a generic warning rather than claiming zero entries when the count is unknown', async () => {
@@ -498,7 +498,7 @@ describe('CategorySelect', () => {
 
       expect(
         await screen.findByText(
-          'Delete "Coins"? Its entries and all their photographs will be permanently deleted. This cannot be undone.',
+          'Delete "Coins"? Its entries and all their photographs will be permanently deleted.',
         ),
       ).toBeVisible();
     });
@@ -566,8 +566,8 @@ describe('CategorySelect', () => {
     // Delete stays in the same slot but ends only the viewer's own access
     // (deleteShare) rather than the category itself (deleteCategory).
     it('leaves instead of deleting, with different confirm copy, and falls through to what is left', async () => {
-      const deleteShare = vi.fn().mockResolvedValue(true);
-      const deleteCategory = vi.fn();
+      const deleteShare = vi.fn<UseShares['deleteShare']>();
+      const deleteCategory = vi.fn<UseCategories['deleteCategory']>();
       vi.mocked(useShares).mockReturnValue(
         sharesState({
           shares: [
@@ -598,7 +598,13 @@ describe('CategorySelect', () => {
 
       await userEvent.click(screen.getByTestId('confirm-accept'));
 
-      expect(deleteShare).toHaveBeenCalledWith('share-1');
+      expect(deleteShare).toHaveBeenCalledWith(
+        'share-1',
+        expect.objectContaining({
+          successMessage: 'Left shared collection.',
+          errorMessage: 'Could not leave this collection. Please try again.',
+        }),
+      );
       expect(deleteCategory).not.toHaveBeenCalled();
       expect(onSelect).toHaveBeenCalledWith('b');
     });

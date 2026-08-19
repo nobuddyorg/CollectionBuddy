@@ -9,7 +9,6 @@ import { useFocusTrap } from '../CenteredModal/useFocusTrap';
 import { useInertBackground } from '../CenteredModal/useInertBackground';
 import { useLockBodyScroll } from '../CenteredModal/useLockBodyScroll';
 import Icon, { IconType } from '../Icon';
-import { Spinner } from '../ui/Spinner';
 import type { ImgEntry } from './types';
 
 export function ModalImage({
@@ -19,7 +18,6 @@ export function ModalImage({
   onIndexChange,
   onClose,
   onDelete,
-  deletingPath,
   busy = false,
   readOnly = false,
 }: {
@@ -32,7 +30,6 @@ export function ModalImage({
   onIndexChange: (index: number) => void;
   onClose: () => void;
   onDelete: (img: ImgEntry) => void;
-  deletingPath: Set<string>;
   busy?: boolean;
   /** Category shared with, not owned by, the viewer: no delete control in
    * the carousel either. */
@@ -122,8 +119,6 @@ export function ModalImage({
     .replace('{title}', itemTitle)
     .replace('{idx}', String(clampedIndex + 1));
 
-  const deleting = deletingPath.has(current.pathFull);
-
   return ReactDOM.createPortal(
     <div
       ref={panelRef}
@@ -154,16 +149,12 @@ export function ModalImage({
       {!readOnly && (
         <button
           onClick={() => onDelete(current)}
-          disabled={deleting || busy}
+          disabled={busy}
           className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-60 transition-colors"
           title={t('item_list.delete_image')}
           aria-label={t('item_list.delete_image')}
         >
-          {deleting ? (
-            <Spinner size="sm" />
-          ) : (
-            <Icon icon={IconType.Trash} className="w-5 h-5" />
-          )}
+          <Icon icon={IconType.Trash} className="w-5 h-5" />
         </button>
       )}
 

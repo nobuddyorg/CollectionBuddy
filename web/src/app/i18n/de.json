@@ -31,9 +31,9 @@
     "none_selected": "Keine ausgewählt",
     "add": "Hinzufügen",
     "delete": "Löschen",
-    "confirm_delete_empty": "\"{name}\" löschen? Das kann nicht rückgängig gemacht werden.",
-    "confirm_delete_with_entries": "\"{name}\" löschen? Deine {count} Einträge und alle zugehörigen Fotos werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",
-    "confirm_delete_generic": "\"{name}\" löschen? Deine Einträge und alle zugehörigen Fotos werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",
+    "confirm_delete_empty": "\"{name}\" löschen?",
+    "confirm_delete_with_entries": "\"{name}\" löschen? Deine {count} Einträge und alle zugehörigen Fotos werden endgültig gelöscht.",
+    "confirm_delete_generic": "\"{name}\" löschen? Deine Einträge und alle zugehörigen Fotos werden endgültig gelöscht.",
     "export": "Exportieren",
     "export_hint": "Fotos, JSON und CSV.",
     "export_reading": "Einträge werden gelesen…",
@@ -115,8 +115,8 @@
     "new_entry_disabled_shared": "Du hast keine Berechtigung, Einträge zu dieser geteilten Sammlung hinzuzufügen."
   },
   "item_list": {
-    "confirm_delete": "Diesen Eintrag löschen? Er und alle zugehörigen Fotos werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",
-    "confirm_delete_image": "Dieses Foto löschen? Das kann nicht rückgängig gemacht werden.",
+    "confirm_delete": "Diesen Eintrag löschen? Er und alle zugehörigen Fotos werden endgültig gelöscht.",
+    "confirm_delete_image": "Dieses Foto löschen?",
     "no_user_session": "Keine Benutzersitzung",
     "previous": "Zurück",
     "next": "Weiter",
@@ -183,6 +183,7 @@
     "close": "Schließen",
     "save": "Speichern",
     "confirm": "Bestätigen",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "undo": "Rückgängig machen"
   }
 }

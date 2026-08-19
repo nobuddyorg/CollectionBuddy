@@ -12,7 +12,6 @@ type ItemCardProps = {
   /** Photographs handed over for this entry that have not landed yet. */
   pendingUploads?: number;
   imagesLoading?: boolean;
-  deletingPath: Set<string>;
   onUpload: (file: File) => void;
   onEditItem: () => void;
   onDeleteItem: () => void;
@@ -35,7 +34,6 @@ function ItemCardComponent({
   imgs,
   pendingUploads = 0,
   imagesLoading = false,
-  deletingPath,
   onUpload,
   onEditItem,
   onDeleteItem,
@@ -76,7 +74,6 @@ function ItemCardComponent({
           itemTitle={item.title}
           onOpenModal={onOpenModal}
           onDelete={onDeleteImage}
-          deletingPath={deletingPath}
           busy={busy}
           loading={imagesLoading}
           pending={pendingUploads}
@@ -138,24 +135,10 @@ function ItemCardComponent({
   );
 }
 
-// `deletingPath` is one Set shared by every card (ItemList holds a single
-// in-flight-deletions set, not one per item), so a deletion anywhere in the
-// grid would otherwise re-render every card. Compares only whether *this
-// card's* image paths are in the set, not object identity.
-//
 // Handler props (onUpload, onEditItem, ...) are left out of the comparison:
 // ItemList recreates them as fresh closures each render, but each only
 // closes over `item.id` and stable hook functions, so an old closure
 // behaves like a new one as long as `item` itself hasn't changed.
-function deletingPathIsRelevantlyEqual(
-  prev: Set<string>,
-  next: Set<string>,
-  imgs: ImgEntry[],
-): boolean {
-  if (prev === next) return true;
-  return imgs.every((img) => prev.has(img.pathFull) === next.has(img.pathFull));
-}
-
 export function itemCardPropsAreEqual(
   prev: ItemCardProps,
   next: ItemCardProps,
@@ -166,12 +149,7 @@ export function itemCardPropsAreEqual(
     prev.pendingUploads === next.pendingUploads &&
     prev.imagesLoading === next.imagesLoading &&
     prev.priority === next.priority &&
-    prev.readOnly === next.readOnly &&
-    deletingPathIsRelevantlyEqual(
-      prev.deletingPath,
-      next.deletingPath,
-      next.imgs,
-    )
+    prev.readOnly === next.readOnly
   );
 }
 

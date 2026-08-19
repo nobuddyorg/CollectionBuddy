@@ -297,7 +297,7 @@ describe('SharingSection', () => {
   });
 
   it('revokes only after the confirmation is accepted', async () => {
-    const deleteShare = vi.fn().mockResolvedValue(true);
+    const deleteShare = vi.fn<UseShares['deleteShare']>();
     renderSection(
       sharesState({
         shares: [
@@ -323,6 +323,12 @@ describe('SharingSection', () => {
     ).toBeVisible();
     await userEvent.click(screen.getByTestId('confirm-accept'));
 
-    expect(deleteShare).toHaveBeenCalledWith('share-1');
+    expect(deleteShare).toHaveBeenCalledWith(
+      'share-1',
+      expect.objectContaining({
+        successMessage: 'Sharing revoked.',
+        errorMessage: 'Could not revoke this share. Please try again.',
+      }),
+    );
   });
 });
