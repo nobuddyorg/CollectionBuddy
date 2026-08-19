@@ -54,4 +54,20 @@ for each statement execute function public.delete_item_if_orphan();
 -- raise and abort the transaction. The client removes Storage objects via
 -- the Storage API before the item row goes (removeItemImages, images.ts).
 
+-- Ownership/normalization on a share, and (since role is the one field
+-- that may change after creation) on an update to one too.
+drop trigger if exists trg_category_shares_enforce on public.category_shares;
+create trigger trg_category_shares_enforce
+before insert or update on public.category_shares
+for each row execute function public.tg_category_shares_enforce();
+
+-- Insert only: a photograph row has nothing to change once written --
+-- path_full, path_thumb and size_bytes are all fixed at upload time, same
+-- "a mapping has nothing to change" reasoning as item_categories having no
+-- update policy.
+drop trigger if exists trg_images_enforce on public.images;
+create trigger trg_images_enforce
+before insert on public.images
+for each row execute function public.tg_images_enforce();
+
 commit;
