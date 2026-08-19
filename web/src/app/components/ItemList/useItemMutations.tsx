@@ -7,8 +7,8 @@ import { deleteItem, updateItem } from '../../data/items';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { useConfirm } from '../Confirm/ConfirmProvider';
+import { restoreAt } from '../../lib/optimistic';
 import type { ItemFormValues } from '../ItemForm';
-import { restoreAt } from './optimistic';
 import type { ItemLite } from './types';
 
 // Separated from the component tree so save/delete aren't redefined on
@@ -63,9 +63,10 @@ export function useItemMutations({
     [isSaving, setItems, t, toast],
   );
 
-  // The card goes the moment deletion is confirmed; the work runs behind
-  // it. Failure puts it back where it was rather than leaving a card the
-  // database still has silently missing from the grid.
+  // The card goes the moment deletion is confirmed; the actual delete is
+  // deferred to the toast's undo window (see useToast). Failure or undo
+  // puts it back where it was rather than leaving a card the database
+  // still has silently missing from the grid.
   const removeItem = useCallback(
     async (id: string) => {
       if (!(await confirm(t('item_list.confirm_delete')))) return;
@@ -81,34 +82,41 @@ export function useItemMutations({
         setItems((prev) => restoreAt(prev, index, snapshot));
       };
 
-      // Must run before deleteItem: once the item row is gone, its images
-      // rows cascade away with it (0013_images.sql) -- this is the last
-      // point their paths can be read.
-      const imagePaths = await captureItemImagePaths(id);
+      toast.success(t('item_list.entry_deleted'), {
+        action: { label: t('common.undo'), onClick: restore },
+        onExpire: async () => {
+          // Must run before deleteItem: once the item row is gone, its
+          // images rows cascade away with it (0013_images.sql) -- this is
+          // the last point their paths can be read.
+          const imagePaths = await captureItemImagePaths(id);
 
-      // The row before the objects: if this fails, nothing happened yet
-      // and the restore above is honest.
-      const { error } = await deleteItem(id);
-      if (error) {
-        toast.reportError('delete item', error, t('item_list.delete_error'));
-        restore();
-        return;
-      }
+          // The row before the objects: if this fails, nothing happened
+          // yet and the restore above is honest.
+          const { error } = await deleteItem(id);
+          if (error) {
+            toast.reportError(
+              'delete item',
+              error,
+              t('item_list.delete_error'),
+            );
+            restore();
+            return;
+          }
 
-      toast.success(t('item_list.entry_deleted'));
-
-      try {
-        // Row already gone here. A failure below is a storage leak, not
-        // data loss.
-        await removeImageBytes(id, imagePaths);
-      } catch (err) {
-        toast.reportError(
-          'delete item images',
-          err,
-          t('item_list.delete_images_cleanup_error'),
-        );
-      }
-      void reload({ silent: true });
+          try {
+            // Row already gone here. A failure below is a storage leak,
+            // not data loss.
+            await removeImageBytes(id, imagePaths);
+          } catch (err) {
+            toast.reportError(
+              'delete item images',
+              err,
+              t('item_list.delete_images_cleanup_error'),
+            );
+          }
+          void reload({ silent: true });
+        },
+      });
     },
     [
       items,

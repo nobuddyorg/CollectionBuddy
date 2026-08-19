@@ -28,6 +28,7 @@ import {
   unsignedPaths,
 } from './imageCache';
 import { WEBP_COMPRESSION_OPTIONS } from '../../lib/imageCompression';
+import { restoreAt } from '../../lib/optimistic';
 
 export type ImageEntryData = {
   id: string;
@@ -167,7 +168,6 @@ export function useItemImages() {
   const [pendingUploads, setPendingUploads] = useState<Record<string, number>>(
     {},
   );
-  const [deletingPath, setDeletingPath] = useState<Set<string>>(new Set());
   const [images, setImages] = useState<Record<string, ImgEntry[]>>({});
   // Items whose signatures are still in flight, distinct from "has no
   // images" -- both used to look like an empty array, so a card would grow
@@ -302,53 +302,58 @@ export function useItemImages() {
     [fetchItemImages, t, toast],
   );
 
-  // The row before the bytes: if deleting the images row fails, nothing
-  // happened yet -- same ordering removeItem and deleteCategory use for a
-  // whole item's photographs.
+  // The thumbnail goes the moment deletion is confirmed; the actual delete
+  // is deferred to the toast's undo window (see useToast). Failure or undo
+  // puts it back at its original position.
   const deleteImage = useCallback(
     async (itemId: string, img: ImgEntry) => {
       if (!(await confirm(t('item_list.confirm_delete_image')))) return;
-      try {
-        setDeletingPath((prev) => new Set(prev).add(img.pathFull));
-        const { data, error } = await deleteImageRow(img.id);
-        if (error) {
-          toast.reportError(
-            'delete image',
-            error,
-            t('item_list.delete_image_error'),
-          );
-          return;
-        }
 
+      const index = (images[itemId] ?? []).findIndex((e) => e.id === img.id);
+      setImages((prev) => ({
+        ...prev,
+        [itemId]: (prev[itemId] || []).filter((e) => e.id !== img.id),
+      }));
+
+      const restore = () => {
         setImages((prev) => ({
           ...prev,
-          [itemId]: (prev[itemId] || []).filter((e) => e.id !== img.id),
+          [itemId]: restoreAt(prev[itemId] || [], index, img),
         }));
-        toast.success(t('item_list.delete_image_success'));
+      };
 
-        // Row already gone here. A failure below is a storage leak, not
-        // data loss.
-        const paths = [
-          data.path_full,
-          ...(data.path_thumb ? [data.path_thumb] : []),
-        ];
-        const { error: removeError } = await removeImageObjects(paths);
-        if (removeError) {
-          toast.reportError(
-            'remove image bytes',
-            removeError,
-            t('item_list.delete_image_cleanup_error'),
-          );
-        }
-      } finally {
-        setDeletingPath((prev) => {
-          const next = new Set(prev);
-          next.delete(img.pathFull);
-          return next;
-        });
-      }
+      toast.success(t('item_list.delete_image_success'), {
+        action: { label: t('common.undo'), onClick: restore },
+        onExpire: async () => {
+          const { data, error } = await deleteImageRow(img.id);
+          if (error) {
+            toast.reportError(
+              'delete image',
+              error,
+              t('item_list.delete_image_error'),
+            );
+            restore();
+            return;
+          }
+
+          // Row already gone here. A failure below is a storage leak, not
+          // data loss.
+          const paths = [
+            data.path_full,
+            ...(data.path_thumb ? [data.path_thumb] : []),
+          ];
+          const { error: removeError } = await removeImageObjects(paths);
+          if (removeError) {
+            toast.reportError(
+              'remove image bytes',
+              removeError,
+              t('item_list.delete_image_cleanup_error'),
+            );
+          }
+        },
+      });
     },
-    [confirm, t, toast],
+    [confirm, t, toast, images],
   );
 
   // Read-only: the caller is about to delete a row that cascades this
@@ -393,7 +398,6 @@ export function useItemImages() {
     captureItemImagePaths,
     removeImageBytes,
     pendingUploads,
-    deletingPath,
   };
 }
 // Stryker restore all

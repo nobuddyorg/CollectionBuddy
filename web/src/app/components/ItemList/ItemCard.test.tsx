@@ -33,7 +33,6 @@ function renderCard(
       <ItemCard
         item={{ ...item, ...overrides }}
         imgs={[]}
-        deletingPath={new Set()}
         {...handlers}
         {...props}
       />
@@ -107,7 +106,6 @@ describe('ItemCard', () => {
         <ItemCard
           item={item}
           imgs={[]}
-          deletingPath={new Set()}
           onUpload={vi.fn()}
           onEditItem={vi.fn()}
           onDeleteItem={vi.fn()}
@@ -144,7 +142,6 @@ describe('ItemCard', () => {
           item={item}
           imgs={[]}
           imagesLoading
-          deletingPath={new Set()}
           onUpload={vi.fn()}
           onEditItem={vi.fn()}
           onDeleteItem={vi.fn()}
@@ -211,7 +208,6 @@ describe('ItemCard', () => {
           item={item}
           imgs={[]}
           pendingUploads={1}
-          deletingPath={new Set()}
           onUpload={vi.fn()}
           onEditItem={vi.fn()}
           onDeleteItem={vi.fn()}
@@ -224,10 +220,6 @@ describe('ItemCard', () => {
   });
 });
 
-// `deletingPath` is one Set shared by every card, so deleting a photo on
-// one card gives every other card's props a new Set identity too. Without
-// scoping the comparison to this card's own images, a naive
-// reference-equality memo check would re-render every card on the page.
 describe('itemCardPropsAreEqual', () => {
   const imgs: ImgEntry[] = [
     { id: 'a', pathFull: 'u/1/a.webp', urlFull: 'a.jpg' },
@@ -237,7 +229,6 @@ describe('itemCardPropsAreEqual', () => {
     return {
       item,
       imgs,
-      deletingPath: new Set<string>(),
       onUpload: vi.fn(),
       onEditItem: vi.fn(),
       onDeleteItem: vi.fn(),
@@ -246,18 +237,6 @@ describe('itemCardPropsAreEqual', () => {
       ...overrides,
     };
   }
-
-  it('treats a new, unrelated deletingPath Set as equal', () => {
-    const prev = baseProps({ deletingPath: new Set(['u/2/other.webp']) });
-    const next = baseProps({ deletingPath: new Set(['u/3/another.webp']) });
-    expect(itemCardPropsAreEqual(prev, next)).toBe(true);
-  });
-
-  it("treats a deletingPath change touching this card's own image as unequal", () => {
-    const prev = baseProps({ deletingPath: new Set() });
-    const next = baseProps({ deletingPath: new Set(['u/1/a.webp']) });
-    expect(itemCardPropsAreEqual(prev, next)).toBe(false);
-  });
 
   it('treats a different item reference as unequal', () => {
     const prev = baseProps();

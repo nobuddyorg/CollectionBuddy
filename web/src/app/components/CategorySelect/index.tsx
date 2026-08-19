@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useConfirm } from '../Confirm/ConfirmProvider';
-import { useToast } from '../Toast/ToastProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { countItemsForCategory } from '../../data/categories';
 import type { Category } from '../../types';
@@ -49,7 +48,6 @@ export default function CategorySelect({
 }: Props) {
   const { t } = useI18n();
   const confirm = useConfirm();
-  const toast = useToast();
   const {
     cats,
     isLoading,
@@ -60,6 +58,7 @@ export default function CategorySelect({
     createCategory,
     renameCategory,
     deleteCategory,
+    optimisticRemove,
   } = categories;
   const {
     isExporting,
@@ -174,14 +173,30 @@ export default function CategorySelect({
     );
     if (!(await confirm(message))) return;
 
-    const ok = await shares.deleteShare(myShareId);
-    if (ok) {
-      toast.success(t('category_select.leave_success'));
-      onSelect(nextAfterRemoving(sortedCats, selectedCat));
-    } else {
-      toast.error(t('category_select.leave_error'));
-    }
-  }, [selectedCat, selected, shares, t, confirm, toast, onSelect, sortedCats]);
+    const restoreCategory = optimisticRemove(selectedCat);
+    if (!restoreCategory) return;
+    // Falls through to what's left rather than to nothing -- leaving a
+    // category is no reason to be sent back to a chooser.
+    onSelect(nextAfterRemoving(sortedCats, selectedCat));
+
+    shares.deleteShare(myShareId, {
+      successMessage: t('category_select.leave_success'),
+      errorMessage: t('category_select.leave_error'),
+      onRestore: () => {
+        restoreCategory();
+        onSelect(selectedCat);
+      },
+    });
+  }, [
+    selectedCat,
+    selected,
+    shares,
+    t,
+    confirm,
+    onSelect,
+    sortedCats,
+    optimisticRemove,
+  ]);
 
   const onDelete = useCallback(async () => {
     if (!selectedCat) return;
@@ -208,12 +223,10 @@ export default function CategorySelect({
             );
 
     if (!(await confirm(message))) return;
-    const ok = await deleteCategory(selectedCat);
-    if (ok) {
-      // Falls through to what's left rather than to nothing -- deleting a
-      // category is no reason to be sent back to a chooser.
-      onSelect(nextAfterRemoving(sortedCats, selectedCat));
-    }
+    // Falls through to what's left rather than to nothing -- deleting a
+    // category is no reason to be sent back to a chooser.
+    onSelect(nextAfterRemoving(sortedCats, selectedCat));
+    deleteCategory(selectedCat, { onRestore: () => onSelect(selectedCat) });
   }, [selectedCat, selected, deleteCategory, onSelect, sortedCats, t, confirm]);
 
   return (

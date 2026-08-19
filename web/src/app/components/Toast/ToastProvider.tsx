@@ -15,13 +15,29 @@ import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 
 type ToastKind = 'error' | 'success';
-type ToastEntry = { id: number; message: string; kind: ToastKind };
+type ToastAction = { label: string; onClick: () => void };
+type ToastEntry = {
+  id: number;
+  message: string;
+  kind: ToastKind;
+  action?: ToastAction;
+  onExpire?: () => void | Promise<void>;
+};
+type SuccessOpts = {
+  /** Renders a second button that cancels `onExpire` and runs its own
+   * `onClick` instead -- the toast's undo. */
+  action?: ToastAction;
+  /** Runs once, when the toast is dismissed any way other than its action
+   * button: auto-dismiss or the close button. This is where a deferred
+   * destructive operation actually happens, so it never fires twice. */
+  onExpire?: () => void | Promise<void>;
+};
 
 type ToastApi = {
   error: (message: string) => void;
   /** Visible, self-dismissing confirmation for actions whose only other
    * signal is structural (a card disappearing, a button re-enabling). */
-  success: (message: string) => void;
+  success: (message: string, opts?: SuccessOpts) => void;
   /** Posts an outcome to the app-level polite live region, for anyone not
    * looking at whatever just changed. */
   announce: (message: string) => void;
@@ -57,17 +73,40 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
-  const dismiss = useCallback((id: number) => {
+  // Mirrors `toasts` by id so `expire` can reach a toast's onExpire without
+  // reading it out of a setState updater, which Strict Mode double-invokes.
+  const entriesRef = useRef<Map<number, ToastEntry>>(new Map());
+
+  const remove = useCallback((id: number) => {
+    entriesRef.current.delete(id);
     setToasts((prev) => prev.filter((entry) => entry.id !== id));
   }, []);
 
-  const post = useCallback(
-    (kind: ToastKind, message: string) => {
-      const id = ++nextId.current;
-      setToasts((prev) => [...prev, { id, message, kind }]);
-      setTimeout(() => dismiss(id), AUTO_DISMISS_MS);
+  // Auto-dismiss and the close button both commit whatever the toast
+  // represents; only its action button (the undo) skips onExpire.
+  const expire = useCallback(
+    (id: number) => {
+      void entriesRef.current.get(id)?.onExpire?.();
+      remove(id);
     },
-    [dismiss],
+    [remove],
+  );
+
+  const post = useCallback(
+    (kind: ToastKind, message: string, opts?: SuccessOpts) => {
+      const id = ++nextId.current;
+      const entry: ToastEntry = {
+        id,
+        message,
+        kind,
+        action: opts?.action,
+        onExpire: opts?.onExpire,
+      };
+      entriesRef.current.set(id, entry);
+      setToasts((prev) => [...prev, entry]);
+      setTimeout(() => expire(id), AUTO_DISMISS_MS);
+    },
+    [expire],
   );
 
   const error = useCallback(
@@ -75,7 +114,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [post],
   );
   const success = useCallback(
-    (message: string) => post('success', message),
+    (message: string, opts?: SuccessOpts) => post('success', message, opts),
     [post],
   );
 
@@ -119,9 +158,21 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 }`}
               >
                 <span className="flex-1 text-sm">{entry.message}</span>
+                {entry.action && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      entry.action?.onClick();
+                      remove(entry.id);
+                    }}
+                    className="shrink-0 -my-1 px-1 py-1 text-sm font-medium underline underline-offset-2"
+                  >
+                    {entry.action.label}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => dismiss(entry.id)}
+                  onClick={() => expire(entry.id)}
                   className="shrink-0 -m-1 p-1"
                   aria-label={t('common.close')}
                 >

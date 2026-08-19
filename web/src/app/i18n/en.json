@@ -31,9 +31,9 @@
     "none_selected": "None selected",
     "add": "Add",
     "delete": "Delete",
-    "confirm_delete_empty": "Delete \"{name}\"? This cannot be undone.",
-    "confirm_delete_with_entries": "Delete \"{name}\"? Its {count} entries and all their photographs will be permanently deleted. This cannot be undone.",
-    "confirm_delete_generic": "Delete \"{name}\"? Its entries and all their photographs will be permanently deleted. This cannot be undone.",
+    "confirm_delete_empty": "Delete \"{name}\"?",
+    "confirm_delete_with_entries": "Delete \"{name}\"? Its {count} entries and all their photographs will be permanently deleted.",
+    "confirm_delete_generic": "Delete \"{name}\"? Its entries and all their photographs will be permanently deleted.",
     "export": "Export",
     "export_hint": "Photos, JSON and CSV.",
     "export_reading": "Reading entries…",
@@ -115,8 +115,8 @@
     "new_entry_disabled_shared": "You don't have permission to add entries to this shared collection."
   },
   "item_list": {
-    "confirm_delete": "Delete this entry? It and every one of its photographs will be permanently deleted. This cannot be undone.",
-    "confirm_delete_image": "Delete this photograph? This cannot be undone.",
+    "confirm_delete": "Delete this entry? It and every one of its photographs will be permanently deleted.",
+    "confirm_delete_image": "Delete this photograph?",
     "no_user_session": "No user session",
     "previous": "Previous",
     "next": "Next",
@@ -183,6 +183,7 @@
     "close": "Close",
     "save": "Save",
     "confirm": "Confirm",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "undo": "Undo"
   }
 }

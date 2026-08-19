@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
@@ -176,6 +177,14 @@ describe('useShares', () => {
   });
 
   describe('deleteShare', () => {
+    // The row disappears from the list the moment deleteShare is called;
+    // the actual deleteShareRow call is deferred to the toast's undo
+    // window (see useToast), committed here by closing the toast.
+    async function commitDeferredDelete() {
+      await screen.findByRole('status');
+      await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    }
+
     it('removes exactly the deleted grant from the list', async () => {
       vi.mocked(listSharesForCategory).mockResolvedValue({
         data: [grant, { ...grant, id: 'share-2' }],
@@ -187,17 +196,23 @@ describe('useShares', () => {
         await result.current.reload();
       });
 
-      let ok: boolean | undefined;
-      await act(async () => {
-        ok = await result.current.deleteShare('share-1');
+      act(() => {
+        result.current.deleteShare('share-1', {
+          successMessage: 'Removed.',
+          errorMessage: 'Could not remove.',
+        });
       });
 
-      expect(ok).toBe(true);
-      expect(deleteShareRow).toHaveBeenCalledWith('share-1');
+      expect(result.current.shares).toEqual([{ ...grant, id: 'share-2' }]);
+      await commitDeferredDelete();
+
+      await waitFor(() =>
+        expect(deleteShareRow).toHaveBeenCalledWith('share-1'),
+      );
       expect(result.current.shares).toEqual([{ ...grant, id: 'share-2' }]);
     });
 
-    it('leaves the list untouched when the delete fails', async () => {
+    it('restores the grant when the deferred delete fails', async () => {
       vi.mocked(listSharesForCategory).mockResolvedValue({
         data: [grant],
         error: null,
@@ -205,18 +220,23 @@ describe('useShares', () => {
       vi.mocked(deleteShareRow).mockResolvedValue({
         error: new Error('boom'),
       } as never);
+      vi.spyOn(console, 'error').mockImplementation(() => {});
       const { result } = renderHook(() => useShares('cat-1'), { wrapper });
       await act(async () => {
         await result.current.reload();
       });
 
-      let ok: boolean | undefined;
-      await act(async () => {
-        ok = await result.current.deleteShare('share-1');
+      act(() => {
+        result.current.deleteShare('share-1', {
+          successMessage: 'Removed.',
+          errorMessage: 'Could not remove.',
+        });
       });
 
-      expect(ok).toBe(false);
-      expect(result.current.shares).toEqual([grant]);
+      expect(result.current.shares).toEqual([]);
+      await commitDeferredDelete();
+
+      await waitFor(() => expect(result.current.shares).toEqual([grant]));
     });
   });
 });

@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
+import { restoreAt } from '../../lib/optimistic';
 import { useRequestSequence } from '../../lib/useRequestSequence';
 import { useToast } from '../Toast/ToastProvider';
 import {
@@ -111,123 +112,155 @@ export function useCategories() {
     [t, isRenaming, toast],
   );
 
-  const deleteCategory = useCallback(
-    async (id: string) => {
-      if (!id || isDeleting) return false;
-      setIsDeleting(true);
-      try {
-        // Deleting a category cascades (item_categories -> orphan-item
-        // deletion -> items) through DB triggers, removing only
-        // storage.objects metadata, not the underlying bytes. Work out
-        // which items this deletion would orphan *before* the row is
-        // gone -- the cascade takes item_categories with it, so this is
-        // the last point those links can still be read.
-        const { data: links, error: linksError } =
-          await listItemIdsForCategory(id);
-        if (linksError) {
-          throw new Error('Could not list items for category', {
-            cause: linksError,
-          });
-        }
-
-        const itemIds = Array.from(new Set(links ?? []));
-        let orphanedItemIds = itemIds;
-        if (itemIds.length) {
-          const { data: stillLinked, error: linkedError } =
-            await listItemIdsLinkedElsewhere(itemIds, id);
-          if (linkedError) {
-            // An incomplete answer here (a truncated page, a failed chunk)
-            // must abort the whole deletion, including the category row
-            // itself, rather than being treated as "nothing else links
-            // these items" and silently orphaning the wrong photographs.
-            throw new Error('Could not check items linked elsewhere', {
-              cause: linkedError,
-            });
-          }
-          const keep = new Set(stillLinked ?? []);
-          orphanedItemIds = itemIds.filter((itemId) => !keep.has(itemId));
-        }
-
-        // Read-only, and must run before deleteCategoryRow below: once the
-        // category row is gone, the cascade removes the orphaned items and
-        // their images rows go with them (on delete cascade) -- this is
-        // the last point their paths can still be read. One batched query
-        // rather than one per item.
-        //
-        // Unlike listItemIdsLinkedElsewhere above, a failure here does not
-        // abort the deletion: getting *that* wrong misclassifies which
-        // items are orphaned at all, an active correctness bug. Getting
-        // *this* wrong only means fewer paths to clean up afterward --
-        // logged, not fatal to the category the user asked to delete.
-        const orphanedImagePaths = new Map<
-          string,
-          { path_full: string; path_thumb: string | null }[]
-        >();
-        if (orphanedItemIds.length) {
-          const { data: imageRows, error: imagesError } =
-            await listImagePathsForItems(orphanedItemIds);
-          if (imagesError) {
-            console.error(
-              'Could not read images for orphaned items:',
-              imagesError,
-            );
-          }
-          for (const row of imageRows ?? []) {
-            const list = orphanedImagePaths.get(row.item_id) ?? [];
-            list.push({ path_full: row.path_full, path_thumb: row.path_thumb });
-            orphanedImagePaths.set(row.item_id, list);
-          }
-        }
-
-        // The row before the bytes: deleting the category row first means
-        // a failure here still means "nothing happened" -- no photograph
-        // is ever destroyed on a path that reports itself as failed.
-        // Capturing the paths above doesn't change that: it's a read, not
-        // a mutation.
-        const { error } = await deleteCategoryRow(id);
-        if (error) throw error;
-        await reload();
-
-        if (orphanedItemIds.length) {
-          // The row is already gone, irreversibly. A failure here is a
-          // storage leak, not data loss, so every removal runs to
-          // completion rather than aborting on the first rejection.
-          const results = await Promise.allSettled(
-            orphanedItemIds.map(async (itemId) => {
-              const paths = orphanedImagePaths.get(itemId) ?? [];
-              const flat = paths.flatMap((p) =>
-                p.path_thumb ? [p.path_full, p.path_thumb] : [p.path_full],
-              );
-              if (!flat.length) return;
-              const { error: removeError } = await removeImageObjects(flat);
-              if (removeError) throw removeError;
-            }),
-          );
-          const failures = results.filter(
-            (r): r is PromiseRejectedResult => r.status === 'rejected',
-          );
-          if (failures.length) {
-            failures.forEach((f) =>
-              console.error('Failed to clean up category images:', f.reason),
-            );
-            toast.error(t('category_select.delete_images_cleanup_error'));
-          }
-        }
-
-        toast.success(t('category_select.delete_success'));
-        return true;
-      } catch (e) {
-        toast.reportError(
-          'delete category',
-          e,
-          t('category_select.delete_error'),
-        );
-        return false;
-      } finally {
-        setIsDeleting(false);
-      }
+  // Hides a category from the strip immediately and hands back a restore
+  // closure -- shared by deleteCategory below and by CategorySelect's
+  // onLeave, which needs the same optimistic hide for a share removal
+  // rather than an owner delete.
+  const optimisticRemove = useCallback(
+    (id: string): (() => void) | null => {
+      const index = cats.findIndex((c) => c.id === id);
+      const snapshot = cats[index];
+      if (!snapshot) return null;
+      setCats((prev) => prev.filter((c) => c.id !== id));
+      return () => setCats((prev) => restoreAt(prev, index, snapshot));
     },
-    [reload, t, isDeleting, toast],
+    [cats],
+  );
+
+  const deleteCategory = useCallback(
+    (id: string, opts?: { onRestore?: () => void }) => {
+      if (!id || isDeleting) return;
+      const restore = optimisticRemove(id);
+      if (!restore) return;
+      const restoreAndNotify = () => {
+        restore();
+        opts?.onRestore?.();
+      };
+
+      toast.success(t('category_select.delete_success'), {
+        action: { label: t('common.undo'), onClick: restoreAndNotify },
+        onExpire: async () => {
+          setIsDeleting(true);
+          try {
+            // Deleting a category cascades (item_categories -> orphan-item
+            // deletion -> items) through DB triggers, removing only
+            // storage.objects metadata, not the underlying bytes. Work out
+            // which items this deletion would orphan *before* the row is
+            // gone -- the cascade takes item_categories with it, so this is
+            // the last point those links can still be read.
+            const { data: links, error: linksError } =
+              await listItemIdsForCategory(id);
+            if (linksError) {
+              throw new Error('Could not list items for category', {
+                cause: linksError,
+              });
+            }
+
+            const itemIds = Array.from(new Set(links ?? []));
+            let orphanedItemIds = itemIds;
+            if (itemIds.length) {
+              const { data: stillLinked, error: linkedError } =
+                await listItemIdsLinkedElsewhere(itemIds, id);
+              if (linkedError) {
+                // An incomplete answer here (a truncated page, a failed
+                // chunk) must abort the whole deletion, including the
+                // category row itself, rather than being treated as
+                // "nothing else links these items" and silently orphaning
+                // the wrong photographs.
+                throw new Error('Could not check items linked elsewhere', {
+                  cause: linkedError,
+                });
+              }
+              const keep = new Set(stillLinked ?? []);
+              orphanedItemIds = itemIds.filter((itemId) => !keep.has(itemId));
+            }
+
+            // Read-only, and must run before deleteCategoryRow below: once
+            // the category row is gone, the cascade removes the orphaned
+            // items and their images rows go with them (on delete cascade)
+            // -- this is the last point their paths can still be read. One
+            // batched query rather than one per item.
+            //
+            // Unlike listItemIdsLinkedElsewhere above, a failure here does
+            // not abort the deletion: getting *that* wrong misclassifies
+            // which items are orphaned at all, an active correctness bug.
+            // Getting *this* wrong only means fewer paths to clean up
+            // afterward -- logged, not fatal to the category the user
+            // asked to delete.
+            const orphanedImagePaths = new Map<
+              string,
+              { path_full: string; path_thumb: string | null }[]
+            >();
+            if (orphanedItemIds.length) {
+              const { data: imageRows, error: imagesError } =
+                await listImagePathsForItems(orphanedItemIds);
+              if (imagesError) {
+                console.error(
+                  'Could not read images for orphaned items:',
+                  imagesError,
+                );
+              }
+              for (const row of imageRows ?? []) {
+                const list = orphanedImagePaths.get(row.item_id) ?? [];
+                list.push({
+                  path_full: row.path_full,
+                  path_thumb: row.path_thumb,
+                });
+                orphanedImagePaths.set(row.item_id, list);
+              }
+            }
+
+            // The row before the bytes: deleting the category row first
+            // means a failure here still means "nothing happened" -- no
+            // photograph is ever destroyed on a path that reports itself
+            // as failed. Capturing the paths above doesn't change that:
+            // it's a read, not a mutation.
+            const { error } = await deleteCategoryRow(id);
+            if (error) throw error;
+            await reload();
+
+            if (orphanedItemIds.length) {
+              // The row is already gone, irreversibly. A failure here is a
+              // storage leak, not data loss, so every removal runs to
+              // completion rather than aborting on the first rejection.
+              const results = await Promise.allSettled(
+                orphanedItemIds.map(async (itemId) => {
+                  const paths = orphanedImagePaths.get(itemId) ?? [];
+                  const flat = paths.flatMap((p) =>
+                    p.path_thumb ? [p.path_full, p.path_thumb] : [p.path_full],
+                  );
+                  if (!flat.length) return;
+                  const { error: removeError } = await removeImageObjects(flat);
+                  if (removeError) throw removeError;
+                }),
+              );
+              const failures = results.filter(
+                (r): r is PromiseRejectedResult => r.status === 'rejected',
+              );
+              if (failures.length) {
+                failures.forEach((f) =>
+                  console.error(
+                    'Failed to clean up category images:',
+                    f.reason,
+                  ),
+                );
+                toast.error(t('category_select.delete_images_cleanup_error'));
+              }
+            }
+          } catch (e) {
+            toast.reportError(
+              'delete category',
+              e,
+              t('category_select.delete_error'),
+            );
+            restoreAndNotify();
+          } finally {
+            setIsDeleting(false);
+          }
+        },
+      });
+    },
+    [isDeleting, optimisticRemove, reload, t, toast],
   );
 
   return {
@@ -240,5 +273,6 @@ export function useCategories() {
     createCategory,
     renameCategory,
     deleteCategory,
+    optimisticRemove,
   };
 }

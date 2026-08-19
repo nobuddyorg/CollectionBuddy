@@ -29,6 +29,7 @@ function categoriesState(
     createCategory: vi.fn(),
     renameCategory: vi.fn(),
     deleteCategory: vi.fn(),
+    optimisticRemove: vi.fn(() => vi.fn()),
     ...overrides,
   };
 }

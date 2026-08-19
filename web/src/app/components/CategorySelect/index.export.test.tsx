@@ -39,7 +39,8 @@ function categories(overrides: Partial<UseCategories> = {}): UseCategories {
     reload: () => {},
     createCategory: async () => null,
     renameCategory: async () => {},
-    deleteCategory: async () => true,
+    deleteCategory: () => {},
+    optimisticRemove: () => null,
     ...overrides,
   } as UseCategories;
 }

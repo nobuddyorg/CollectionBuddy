@@ -39,9 +39,7 @@ test.describe('managing categories', () => {
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
     // Category is empty, so this is the unqualified confirmation, not the
     // entry-count warning.
-    await expect(
-      page.getByText(`Delete "${renamed}"? This cannot be undone.`),
-    ).toBeVisible();
+    await expect(page.getByText(`Delete "${renamed}"?`)).toBeVisible();
     await page.getByTestId('confirm-accept').click();
 
     // Deleting selects whatever category is left, which collapses the panel again.
