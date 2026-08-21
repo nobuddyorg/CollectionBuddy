@@ -73,20 +73,23 @@ async function renderRaw(width) {
   });
 }
 
-// Same square-canvas treatment as the icon-*.png targets below, minus the
+// Same square-canvas centering as the icon-*.png targets below, minus the
 // file write -- favicon.ico's 16px layer needs a square PNG buffer, and
 // renderRaw's non-square aspect-preserving crop (built for logo-header.png)
 // doesn't fit an ICONDIRENTRY declared 16x16.
-async function renderSquare(size, fit) {
+async function renderSquare(size, fit, background) {
   const width = artworkWidth(size, fit);
   await page.setViewportSize({ width: size, height: size });
   await page.setContent(
-    `<body style="margin:0;width:${size}px;height:${size}px;background:${PAPER};display:flex;align-items:center;justify-content:center">
+    `<body style="margin:0;width:${size}px;height:${size}px;background:${background};display:flex;align-items:center;justify-content:center">
        <img src="${dataUri}" style="width:${width}px;height:auto;display:block">
      </body>`,
   );
   await page.locator('img').waitFor({ state: 'visible' });
-  return page.screenshot({ clip: { x: 0, y: 0, width: size, height: size } });
+  return page.screenshot({
+    clip: { x: 0, y: 0, width: size, height: size },
+    omitBackground: background === 'transparent',
+  });
 }
 
 for (const { file, size, fit } of targets) {
@@ -109,7 +112,7 @@ for (const { file, size, fit } of targets) {
     process.exit(1);
   }
 
-  const png = await renderSquare(size, fit);
+  const png = await renderSquare(size, fit, PAPER);
   writeFileSync(new URL(file, publicDir), png);
   console.log(
     `${file}: ${size}x${size}, artwork ${Math.round(width)}px wide (${(width / sourceWidth).toFixed(2)}x source)`,
@@ -145,7 +148,11 @@ function buildIco(images) {
   return Buffer.concat([header, ...entries, ...images.map(({ png }) => png)]);
 }
 
-const favicon16 = await renderSquare(16, 'square');
+// Transparent, unlike the app icons above: favicon-32x32.png (read back
+// below, not re-derived) already is, and a browser tab supplies its own
+// background -- there's no iOS-home-screen-style black composite to guard
+// against here.
+const favicon16 = await renderSquare(16, 'square', 'transparent');
 const favicon32 = readFileSync(new URL('favicon-32x32.png', publicDir));
 const ico = buildIco([
   { width: 16, height: 16, png: favicon16 },
