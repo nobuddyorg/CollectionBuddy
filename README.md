@@ -11,6 +11,7 @@ A web-app catalog for your collected items 🗂️
 ![Vitest](https://img.shields.io/badge/tested%20with-Vitest-6E9F18?logo=vitest)
 [![Mutation testing badge](https://img.shields.io/endpoint?style=plastic&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fnobuddyorg%2FCollectionBuddy%2Fmain)](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main)
 [![CI](https://github.com/nobuddyorg/CollectionBuddy/actions/workflows/ci.yml/badge.svg)](https://github.com/nobuddyorg/CollectionBuddy/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/nobuddyorg/CollectionBuddy/graph/badge.svg)](https://codecov.io/gh/nobuddyorg/CollectionBuddy)
 [![CodeQL](https://img.shields.io/badge/security-CodeQL-blue?logo=github)](https://github.com/nobuddyorg/CollectionBuddy/security/code-scanning)
 [![Last commit](https://img.shields.io/github/last-commit/nobuddyorg/CollectionBuddy)](https://github.com/nobuddyorg/CollectionBuddy/commits/main)
 [![License: MIT](https://img.shields.io/github/license/nobuddyorg/CollectionBuddy)](LICENSE)

@@ -67,6 +67,16 @@ jobs:
       - name: Run tests
         run: npm test -- --coverage
 
+      - name: Upload coverage to Codecov
+        # v5.5.1 fetched Codecov's GPG key from a Keybase account Codecov has
+        # since deleted, failing every upload with "no valid OpenPGP data
+        # found". v7 carries the key instead of fetching it.
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: web/coverage
+          fail_ci_if_error: true
+
       # Drives the built export in a real browser, serving it under the base
       # path the way Pages does -- serving at the root would make every
       # asset request a 404 this never caught. Playwright starts and stops
