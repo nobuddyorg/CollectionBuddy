@@ -35,7 +35,22 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov'],
       include: ['src/app/**/*.{ts,tsx}'],
-      exclude: ['src/app/**/types.ts', 'src/app/i18n/*.json', '**/*.d.ts'],
+      exclude: [
+        'src/app/**/types.ts',
+        'src/app/i18n/*.json',
+        '**/*.d.ts',
+        // Routing/auth glue and the Leaflet wrapper -- verified by
+        // Playwright (login.spec.ts, sign-out.spec.ts, map.spec.ts), not
+        // unit tests.
+        'src/app/layout.tsx',
+        'src/app/page.tsx',
+        'src/app/login/page.tsx',
+        'src/app/useSignOut.ts',
+        'src/app/login/useGoogleSignIn.ts',
+        'src/app/login/useAuthRedirect.ts',
+        'src/app/data/auth.ts',
+        'src/app/components/Map/index.tsx',
+      ],
       thresholds: {
         // Global floor. Only `npm test -- --coverage` enforces this (what
         // CI runs, not plain `npm test`), and CI measures ~0.1pp lower than
