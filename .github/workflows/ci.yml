@@ -68,7 +68,10 @@ jobs:
         run: npm test -- --coverage
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        # v5.5.1 fetched Codecov's GPG key from a Keybase account Codecov has
+        # since deleted, failing every upload with "no valid OpenPGP data
+        # found". v7 carries the key instead of fetching it.
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           directory: web/coverage
