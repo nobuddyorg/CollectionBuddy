@@ -20,7 +20,9 @@ A web-app catalog for your collected items 🗂️
 
 Spreadsheets don't have room for a photograph, and social apps don't care about provenance. CollectionBuddy is neither: a quiet, photo-first catalog for the things you collect, whether that's coins, stamps, records, or cameras. Every entry leads with a picture, carries a place and a few tags, and stays searchable once the shelf outgrows memory.
 
-![CollectionBuddy: a grid of catalogued collectible items, each with a photo, title, place, and tags](docs/assets/screenshot.jpg)
+| Sign in                                                                                                                            | Your collection                                                                                                                              | Every item on a map                                                                            |
+| ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| ![Google sign-in screen for CollectionBuddy, showing the app name and tagline inside a circular seal motif](docs/assets/login.png) | ![A Pokémon collection grid in CollectionBuddy, each entry showing a photo, title, description, place, and tags](docs/assets/collection.png) | ![A world map with pins marking the places a collection's items are from](docs/assets/map.png) |
 
 ## Features
 
