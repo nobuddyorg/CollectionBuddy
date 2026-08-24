@@ -35,6 +35,12 @@ updates:
     cooldown:
       default-days: 7
     groups:
+      # stryker-mutator/vitest-runner requires a matching core major version,
+      # so both must land in one PR regardless of update type -- listed
+      # first since dependabot uses the first matching group.
+      stryker:
+        patterns:
+          - "@stryker-mutator/*"
       patch-updates:
         patterns:
           - "*"
