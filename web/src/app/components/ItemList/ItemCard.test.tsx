@@ -218,6 +218,67 @@ describe('ItemCard', () => {
     expect(card.className).not.toMatch(/ring-foreground/);
   });
 
+  // Regression: a naive toggle-on-either-event would drop the highlight the
+  // instant the drag crosses into a child element (each child fires its own
+  // leave+enter pair), flickering the whole time the drag moves over the
+  // card.
+  it('keeps the highlight while the drag crosses a child element', () => {
+    renderCard();
+    const card = screen.getByTestId('item-card');
+    fireEvent.dragEnter(card); // enters the card
+    fireEvent.dragEnter(card); // enters a child within it
+    fireEvent.dragLeave(card); // leaves that child, still over the card
+    expect(card.className).toMatch(/ring-foreground/);
+    fireEvent.dragLeave(card); // leaves the card itself
+    expect(card.className).not.toMatch(/ring-foreground/);
+  });
+
+  it('does not highlight the card while an upload is in flight', () => {
+    renderCard({}, { pendingUploads: 1 });
+    const card = screen.getByTestId('item-card');
+    fireEvent.dragEnter(card);
+    expect(card.className).not.toMatch(/ring-foreground/);
+  });
+
+  it('does not highlight a read-only (shared) card', () => {
+    renderCard({}, { readOnly: true });
+    const card = screen.getByTestId('item-card');
+    fireEvent.dragEnter(card);
+    expect(card.className).not.toMatch(/ring-foreground/);
+  });
+
+  // A browser only allows a drop on an element if something cancels the
+  // dragover event; fireEvent's return value reports whether that happened.
+  it('marks the card a valid drop target while dragging over it', () => {
+    renderCard();
+    const card = screen.getByTestId('item-card');
+    expect(fireEvent.dragOver(card)).toBe(false);
+  });
+
+  it('refuses to become a drop target while an upload is in flight', () => {
+    renderCard({}, { pendingUploads: 1 });
+    const card = screen.getByTestId('item-card');
+    expect(fireEvent.dragOver(card)).toBe(true);
+  });
+
+  it('refuses to become a drop target on a read-only (shared) card', () => {
+    renderCard({}, { readOnly: true });
+    const card = screen.getByTestId('item-card');
+    expect(fireEvent.dragOver(card)).toBe(true);
+  });
+
+  it('leaves drag-leave alone while an upload is in flight', () => {
+    renderCard({}, { pendingUploads: 1 });
+    const card = screen.getByTestId('item-card');
+    expect(fireEvent.dragLeave(card)).toBe(true);
+  });
+
+  it('leaves drag-leave alone on a read-only (shared) card', () => {
+    renderCard({}, { readOnly: true });
+    const card = screen.getByTestId('item-card');
+    expect(fireEvent.dragLeave(card)).toBe(true);
+  });
+
   it('ignores a drop while an upload is in flight', () => {
     const handlers = renderCard({}, { pendingUploads: 1 });
     const file = new File(['x'], 'photo.png', { type: 'image/png' });
