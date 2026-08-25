@@ -100,8 +100,12 @@ function ItemCardComponent({
     <li
       // Lets the e2e suite count/target cards without depending on contents.
       data-testid="item-card"
+      // outline, not ring: `.card-lift` below sets `box-shadow` directly and
+      // wins the cascade over a box-shadow-based ring utility (same
+      // `@layer utilities`, later in source order), so a ring here would
+      // never actually paint.
       className={`fade-up group relative flex h-full flex-col overflow-hidden rounded-sm bg-card text-card-foreground ring-1 ring-border card-lift card-lift-hover transition-shadow ${
-        isDragOver ? 'ring-2 ring-foreground' : ''
+        isDragOver ? 'outline-2 outline-offset-2 outline-foreground' : ''
       }`}
       onDragEnter={onDragEnter}
       onDragOver={onDragOver}
