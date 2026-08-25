@@ -1,5 +1,5 @@
 'use client';
-import { memo, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import type { ItemLite, ImgEntry } from './types';
 import { Actions, AddPhotoPlate } from './Actions';
@@ -45,10 +45,46 @@ function ItemCardComponent({
   const { t } = useI18n();
 
   const busy = pendingUploads > 0;
+  const dropDisabled = readOnly || busy;
 
   // An upload in flight counts as something coming, so the empty-mount
   // state doesn't invite a second upload on top of one already running.
   const awaitingPhoto = !imgs.length && !imagesLoading && !busy;
+
+  // Counts enter/leave pairs rather than toggling on either one, so the
+  // highlight doesn't flicker off while the drag crosses a child element's
+  // own border (each child fires its own leave+enter as the pointer passes).
+  const dragDepth = useRef(0);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const onDragEnter = (e: React.DragEvent) => {
+    if (dropDisabled) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setIsDragOver(true);
+  };
+  const onDragOver = (e: React.DragEvent) => {
+    if (dropDisabled) return;
+    // Required for the element to become a valid drop target at all.
+    e.preventDefault();
+  };
+  const onDragLeave = (e: React.DragEvent) => {
+    if (dropDisabled) return;
+    e.preventDefault();
+    dragDepth.current -= 1;
+    if (dragDepth.current <= 0) {
+      dragDepth.current = 0;
+      setIsDragOver(false);
+    }
+  };
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setIsDragOver(false);
+    if (dropDisabled) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) onUpload(file);
+  };
 
   // Held until the hero photograph settles, so the label never appears
   // before the picture it describes. Deliberately one-way: an edit made
@@ -64,7 +100,13 @@ function ItemCardComponent({
     <li
       // Lets the e2e suite count/target cards without depending on contents.
       data-testid="item-card"
-      className="fade-up group relative flex h-full flex-col overflow-hidden rounded-sm bg-card text-card-foreground ring-1 ring-border card-lift card-lift-hover transition-shadow"
+      className={`fade-up group relative flex h-full flex-col overflow-hidden rounded-sm bg-card text-card-foreground ring-1 ring-border card-lift card-lift-hover transition-shadow ${
+        isDragOver ? 'ring-2 ring-foreground' : ''
+      }`}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
     >
       {awaitingPhoto ? (
         <AddPhotoPlate onUpload={onUpload} busy={busy} readOnly={readOnly} />

@@ -201,6 +201,39 @@ describe('ItemCard', () => {
     expect(inputs).toContain(document.activeElement);
   });
 
+  it('hands a dropped file to onUpload', () => {
+    const handlers = renderCard();
+    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    const card = screen.getByTestId('item-card');
+    fireEvent.drop(card, { dataTransfer: { files: [file] } });
+    expect(handlers.onUpload).toHaveBeenCalledWith(file);
+  });
+
+  it('highlights the card while a file is dragged over it', () => {
+    renderCard();
+    const card = screen.getByTestId('item-card');
+    fireEvent.dragEnter(card);
+    expect(card.className).toMatch(/ring-foreground/);
+    fireEvent.dragLeave(card);
+    expect(card.className).not.toMatch(/ring-foreground/);
+  });
+
+  it('ignores a drop while an upload is in flight', () => {
+    const handlers = renderCard({}, { pendingUploads: 1 });
+    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    const card = screen.getByTestId('item-card');
+    fireEvent.drop(card, { dataTransfer: { files: [file] } });
+    expect(handlers.onUpload).not.toHaveBeenCalled();
+  });
+
+  it('ignores a drop on a read-only (shared) card', () => {
+    const handlers = renderCard({}, { readOnly: true });
+    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    const card = screen.getByTestId('item-card');
+    fireEvent.drop(card, { dataTransfer: { files: [file] } });
+    expect(handlers.onUpload).not.toHaveBeenCalled();
+  });
+
   it('disables the file input while an upload is in flight', () => {
     const { container } = render(
       <I18nProvider>
