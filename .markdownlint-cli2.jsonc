@@ -8,5 +8,15 @@
     // Inline HTML is occasionally the only way to get a layout right.
     "MD033": false
   },
-  "globs": ["**/*.md", "!**/node_modules/**", "!web/out/**", "!web/.next/**"]
+  "globs": [
+    "**/*.md",
+    "!**/node_modules/**",
+    "!web/out/**",
+    "!web/.next/**",
+    // Written verbatim by `next dev`/`next build`, not authored docs --
+    // CLAUDE.md in particular is a one-line `@AGENTS.md` import, not a
+    // heading.
+    "!web/AGENTS.md",
+    "!web/CLAUDE.md"
+  ]
 }
