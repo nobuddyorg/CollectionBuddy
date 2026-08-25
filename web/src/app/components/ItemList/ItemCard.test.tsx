@@ -213,9 +213,9 @@ describe('ItemCard', () => {
     renderCard();
     const card = screen.getByTestId('item-card');
     fireEvent.dragEnter(card);
-    expect(card.className).toMatch(/ring-foreground/);
+    expect(card.className).toMatch(/outline-foreground/);
     fireEvent.dragLeave(card);
-    expect(card.className).not.toMatch(/ring-foreground/);
+    expect(card.className).not.toMatch(/outline-foreground/);
   });
 
   // Regression: a naive toggle-on-either-event would drop the highlight the
@@ -228,23 +228,23 @@ describe('ItemCard', () => {
     fireEvent.dragEnter(card); // enters the card
     fireEvent.dragEnter(card); // enters a child within it
     fireEvent.dragLeave(card); // leaves that child, still over the card
-    expect(card.className).toMatch(/ring-foreground/);
+    expect(card.className).toMatch(/outline-foreground/);
     fireEvent.dragLeave(card); // leaves the card itself
-    expect(card.className).not.toMatch(/ring-foreground/);
+    expect(card.className).not.toMatch(/outline-foreground/);
   });
 
   it('does not highlight the card while an upload is in flight', () => {
     renderCard({}, { pendingUploads: 1 });
     const card = screen.getByTestId('item-card');
     fireEvent.dragEnter(card);
-    expect(card.className).not.toMatch(/ring-foreground/);
+    expect(card.className).not.toMatch(/outline-foreground/);
   });
 
   it('does not highlight a read-only (shared) card', () => {
     renderCard({}, { readOnly: true });
     const card = screen.getByTestId('item-card');
     fireEvent.dragEnter(card);
-    expect(card.className).not.toMatch(/ring-foreground/);
+    expect(card.className).not.toMatch(/outline-foreground/);
   });
 
   // A browser only allows a drop on an element if something cancels the
