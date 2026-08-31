@@ -33,6 +33,7 @@ Spreadsheets don't have room for a photograph, and social apps don't care about 
 - **Import/export** a category as a portable archive.
 - **Bilingual, themeable**: German/English and light/dark/system, both remembered per visitor.
 - Built to work with a keyboard and a screen reader, not just a mouse.
+- **Local demo mode**: run a local Supabase stack in Docker and try the app with no Google account or sign-in screen — see [CONTRIBUTING.md](CONTRIBUTING.md#try-the-local-demo).
 
 See the [user guide](docs/how-to/user-guide.md) for the full rundown.
 

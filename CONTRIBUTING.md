@@ -46,6 +46,28 @@ stack that ships in [`supabase/`](supabase/).
 
     The app is now at `http://localhost:3000`.
 
+## Try the local demo
+
+Want to see the app without a Google account or OAuth credentials? Skip
+step 2's Google setup above and run the demo build instead of `npm run dev`:
+
+```bash
+supabase start
+supabase db reset
+cd web
+npm install
+npm run demo
+```
+
+`npm run demo` points the app at your local stack and turns on demo mode:
+every visitor is signed in automatically, as a fresh anonymous Supabase
+user, so there's no login screen and nothing to sign up for. It's meant
+for one person browsing on their own machine — there's no sharing between
+anonymous users, and signing out (the account menu in the header) starts a
+new, empty one. The data itself lives in the Docker volume `supabase
+start` created, so it survives restarts until you run `supabase db reset`
+or tear the stack down.
+
 ## Commit hooks
 
 [prek](https://github.com/j178/prek) runs the checks in

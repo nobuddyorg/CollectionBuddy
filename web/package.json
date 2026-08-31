@@ -12,7 +12,8 @@
     "test:mutation": "rm -rf reports/mutation && stryker run",
     "icons": "node scripts/make-icons.mjs",
     "e2e": "playwright test",
-    "e2e:local": "node scripts/e2e-local-stack.mjs"
+    "e2e:local": "node scripts/e2e-local-stack.mjs",
+    "demo": "node scripts/demo.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",

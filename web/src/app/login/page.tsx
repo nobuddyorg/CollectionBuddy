@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type CSSProperties } from 'react';
+import { useEffect, useMemo, type CSSProperties } from 'react';
 
 import Coin from '../components/Coin';
 import { coinSizeCss } from '../components/Coin/size';
@@ -11,6 +11,7 @@ import { useToast } from '../components/Toast/ToastProvider';
 import { useI18n } from '../i18n/useI18n';
 import { fanOffsetX, fanOffsetY, fanPositions } from './collectibleFan';
 import { useAuthRedirect } from './useAuthRedirect';
+import { isDemoMode, useDemoSignIn } from './useDemoSignIn';
 import { useGoogleSignIn } from './useGoogleSignIn';
 
 const EMOJIS = ['🪙', '📮', '🎟️', '🐚', '🎖️', '🧩', '📀'] as const;
@@ -28,13 +29,29 @@ export default function LoginPage() {
   const toast = useToast();
   const checking = useAuthRedirect('/');
   const signIn = useGoogleSignIn();
+  const demoMode = isDemoMode();
+  const { error: demoError } = useDemoSignIn(demoMode && !checking);
   const positions = useMemo(() => fanPositions(EMOJIS.length), []);
 
   const handleSignInError = (err: unknown) => {
     toast.reportError('google sign-in', err, t('login_page.sign_in_error'));
   };
 
-  if (checking)
+  useEffect(() => {
+    if (demoError) {
+      toast.reportError(
+        'demo sign-in',
+        demoError,
+        t('login_page.sign_in_error'),
+      );
+    }
+  }, [demoError, t, toast]);
+
+  // While demo mode is signing the visitor in there is no login screen to
+  // show; a failed attempt (e.g. this build pointed at a Supabase project
+  // with anonymous sign-ins turned off) falls back to the Google button
+  // below rather than leaving the overlay up forever.
+  if (checking || (demoMode && !demoError))
     return <LoadingOverlay label={t('item_list.loading')} theme="auto" />;
 
   return (

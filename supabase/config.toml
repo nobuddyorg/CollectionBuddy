@@ -40,7 +40,13 @@ site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://localhost:3000", "http://127.0.0.1:3000"]
 jwt_expiry = 3600
 enable_signup = true
-enable_anonymous_sign_ins = false
+# Powers `npm run demo` (see CONTRIBUTING.md's "Try the local demo"
+# section): that build signs every visitor in as a fresh anonymous user
+# instead of showing the Google button. Anonymous users still get a real
+# auth.uid() and the `authenticated` role, so every RLS policy in
+# 0006_policies.sql and 0007_storage.sql applies to them unchanged -- this
+# only widens who can reach that same role locally, not what it can do.
+enable_anonymous_sign_ins = true
 # Explicit rather than relying on GoTrue's own defaults (#476): a used
 # refresh token is retired and reissuing it is treated as token theft,
 # which is what makes a stolen refresh token a one-time-use risk rather
