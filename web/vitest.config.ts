@@ -57,10 +57,10 @@ export default defineConfig({
         // CI runs, not plain `npm test`), and CI measures ~0.1pp lower than
         // local (pinned Node version). A PR may raise these values and must
         // not lower them.
-        statements: 39.4,
-        branches: 38.8,
-        functions: 40.8,
-        lines: 40.0,
+        statements: 85,
+        branches: 78,
+        functions: 85,
+        lines: 88,
 
         // Was `true`: autoUpdate wrote the local measurement back into this
         // file after every run, so a green local run kept producing a red

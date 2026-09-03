@@ -124,6 +124,10 @@ async function uploadWithRetry(
       );
     }
     const { error } = await uploadImage(path, blob);
+    // Stryker disable next-line ObjectLiteral: every caller only ever
+    // checks this for truthiness, so `{}` (error: undefined) and
+    // `{ error: null }` are indistinguishable at runtime -- an equivalent
+    // mutant, not a gap.
     if (!error) return { error: null };
     lastErr = error;
   }
@@ -236,6 +240,7 @@ export async function importCategory({
   // itself, so this can't actually be null -- guarded only to satisfy the
   // type checker, not because the Map is expected to disagree with its own
   // keys.
+  // Stryker disable next-line all: unreachable defensive guard, see above
   // v8 ignore next
   if (!manifestBytes) throw new ImportFormatError('Archive is corrupt');
 
