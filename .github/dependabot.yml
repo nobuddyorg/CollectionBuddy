@@ -51,3 +51,11 @@ updates:
           - "*"
         update-types:
           - "minor"
+    # stryker-mutator/core@10.0.0 bundles @babel/generator@8.0.0, which
+    # crashes instrumenting this project's TS function-type annotations
+    # (TypeError: Cannot read properties of undefined (reading 'length')
+    # in Printer._parameters). Re-enable the major-version bump once a
+    # fixed stryker-mutator/core or @babel/generator release is out.
+    ignore:
+      - dependency-name: "@stryker-mutator/*"
+        update-types: ["version-update:semver-major"]
