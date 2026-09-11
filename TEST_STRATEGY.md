@@ -2,6 +2,8 @@
 
 What testing this repository needs, at which level, for which risks, and when it runs.
 
+**This document is mandatory.** CLAUDE.md's first hard guardrail requires it to be read at the start of every task in this repository — implementation, refactor, bug fix or test work — and followed. It decides which layer a behavior is tested at, what may be mocked, and which gates a change clears. Disagree with it in the open and get agreement; don't depart from it quietly.
+
 This is a working document, not a survey of testing in general. Everything in it is derived from what is actually in this repository: a static export with no server, a Postgres database that is the only thing enforcing authorization, and an unattended deploy that pushes migrations to production on merge. Where a common practice is not justified here, it says so and why.
 
 Read alongside [docs/reference/architecture.md](docs/reference/architecture.md) (what exists) and [docs/explanation/design-decisions.md](docs/explanation/design-decisions.md) (why). [CONTRIBUTING.md](CONTRIBUTING.md) has the commands; this file has the reasoning behind them.

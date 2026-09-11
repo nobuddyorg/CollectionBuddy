@@ -18,7 +18,9 @@ leads with a photo, carries a place and tags, and is searchable.
   There is nowhere else it could live — see "Hard guardrails" below.
 - **Hosting**: static export deployed to GitHub Pages.
 
-Read [README.md](README.md) for the feature list and
+**Required reading before you write anything**: this file, and
+[TEST_STRATEGY.md](TEST_STRATEGY.md). Both are standing instructions, not
+background material. Read [README.md](README.md) for the feature list and
 [docs/README.md](docs/README.md) for the full documentation set, organised by
 [Diátaxis](https://diataxis.fr).
 
@@ -91,7 +93,29 @@ runs the repo-wide hooks (file hygiene, `typos`, `zizmor`, `shellcheck`,
 These are not suggestions. If one of them would block finishing a task, stop
 and say so instead of working around it.
 
-### 1. Definition of done = the full pre-PR checklist
+### 1. TEST_STRATEGY.md is mandatory, not advisory
+
+[TEST_STRATEGY.md](TEST_STRATEGY.md) defines this repository's testing
+strategy, its risk model, and its quality gates. **Read it at the start of
+every task** — implementation, refactor, bug fix, or test work alike — and
+follow it. It is not a reference to reach for once something looks
+test-shaped; it is the standing instruction for how work here gets verified.
+
+It decides these, and you do not re-decide them per task:
+
+- which layer a given behavior is tested at (see its ownership table),
+- what may be mocked, and what has to be a real Postgres, Storage or browser,
+- which gates a change clears before it counts as done,
+- which testing approaches are deliberately *not* used here, and why.
+
+Disagreeing with it is fine; departing from it silently is not. If a task
+looks like it needs something the strategy rules out, say so and get
+agreement first — same rule as the scope-creep guard below.
+
+Update it in the same change that moves an architectural or testing
+assumption. Don't restate its contents here.
+
+### 2. Definition of done = the full pre-PR checklist
 
 A task is **not** done — do not say "done", open a PR as ready, or report
 success — until every command in the checklist above has been run and is
@@ -100,12 +124,9 @@ green: `build`, `tsc`, `prettier --check`, `lint`, `test -- --coverage`,
 forms/photos/RLS) `e2e:local`. Partial runs ("lint passes, I didn't run the
 rest") are not a stopping point, they're a status update.
 
-- **[TEST_STRATEGY.md](TEST_STRATEGY.md) defines this repository's testing
-  strategy and quality gates.** Read and follow it for all implementation,
-  refactoring, and test-related work — it decides which layer a given
-  behavior belongs to, what may be mocked, and which gates a change has to
-  clear. Update it when architectural or testing assumptions materially
-  change; don't restate it here.
+- Guardrail 1 decides *what* gets tested and at which level; this checklist
+  is *whether you actually ran it*. Both apply — a change that follows the
+  strategy but skips the checklist is not done either.
 - **Never** lower a coverage or mutation-score threshold
   (`web/vitest.config.mts` `test.coverage.thresholds`,
   `web/stryker.config.mjs` `thresholds.break`) to make CI pass. If a
@@ -123,7 +144,7 @@ rest") are not a stopping point, they're a status update.
   with it. A green metric that doesn't correspond to real confidence is worse
   than a documented gap.
 
-### 2. Database changes: local-first, RLS is load-bearing
+### 3. Database changes: local-first, RLS is load-bearing
 
 RLS (`supabase/migrations/0006_policies.sql` for the tables,
 `0007_storage.sql` for the bucket) is the **only** authorization boundary in
@@ -158,7 +179,7 @@ so treat every policy change as security-critical, not routine SQL.
   procedure (see [developer-guide.md#squashing-migrations-again](docs/how-to/developer-guide.md#squashing-migrations-again))
   — never squash as a side effect of an unrelated change.
 
-### 3. Git, branches, CI
+### 4. Git, branches, CI
 
 - Never commit directly to `main` (the pre-commit hook `no-commit-to-branch`
   already blocks this locally — don't bypass it with `--no-verify`).
@@ -173,7 +194,7 @@ so treat every policy change as security-critical, not routine SQL.
   [design-decisions.md#npm-audit-whats-overridden-and-whats-accepted-risk-issue-191](docs/explanation/design-decisions.md#npm-audit-whats-overridden-and-whats-accepted-risk-issue-191)).
   Use targeted `overrides` entries instead.
 
-### 4. Secrets and environment
+### 5. Secrets and environment
 
 - Never write real Google OAuth credentials, Supabase service-role keys, or
   `SUPABASE_DB_URL`/`SUPABASE_ACCESS_TOKEN` values into code, commits, docs,
@@ -186,7 +207,7 @@ so treat every policy change as security-critical, not routine SQL.
   static export; it exists only in CI workflow secrets for specific
   server-side jobs (`pages-deploy.yml`, `cleanup-orphaned-photos.yml`).
 
-### 5. i18n
+### 6. i18n
 
 Every user-facing string goes through `t('...')` and must exist in **both**
 `web/src/app/i18n/de.json` and `en.json` with the same key. There's an
@@ -194,7 +215,7 @@ executable parity test (`web/src/app/i18n/parity.test.ts`) that fails on a
 missing or mismatched key — but don't rely on it to catch this after the
 fact; add both languages in the same change. German is the default locale.
 
-### 6. Scope-creep guard — settled decisions, don't relitigate silently
+### 7. Scope-creep guard — settled decisions, don't relitigate silently
 
 [docs/explanation/design-decisions.md](docs/explanation/design-decisions.md)
 documents choices that look like they could be "improved" but were made
