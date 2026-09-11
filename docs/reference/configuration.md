@@ -24,7 +24,7 @@ From `supabase/config.toml`:
 | API                           | 54321 |
 | Postgres                      | 54322 |
 | Studio (dashboard UI)         | 54323 |
-| Inbucket (local mail capture) | 54324 |
+| Mailpit (local mail capture)  | 54324 |
 
 Project-level storage limit is 50 MiB (`[storage]`), though the `item-images` bucket itself is further restricted to 5 MiB per file and `image/webp`/`image/jpeg`/`image/png` only (see [Architecture reference](architecture.md#storage)).
 
@@ -41,11 +41,25 @@ Project-level storage limit is 50 MiB (`[storage]`), though the `item-images` bu
 
 ## Coverage and mutation thresholds
 
-Defined in [`web/vitest.config.ts`](../../web/vitest.config.ts) (`test.coverage.thresholds`) and [`web/stryker.config.mjs`](../../web/stryker.config.mjs):
+Defined in [`web/vitest.config.mts`](../../web/vitest.config.mts) (`test.coverage.thresholds`) and [`web/stryker.config.mjs`](../../web/stryker.config.mjs):
 
 - Global coverage floor is raised **by hand** (`autoUpdate: false`) as real coverage improves, and never edited down — so a regression fails CI. It auto-ratcheted once and was turned off: it wrote the local measurement straight back into the file after every run, including values CI could not reach, so a green local run kept producing a red PR.
 - Most of the pure, high-risk modules (see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files)) additionally have a 100% per-file coverage floor and a mutation-score break threshold of 90 (the two `Map/` hooks, `usePlaces.tsx` and `useCurrentLocation.ts`, are mutation-tested without a per-file floor).
 - Mutation testing runs on every PR, not only on `main`. Only `main` publishes to the dashboard, so the badge tracks one branch.
+- Stryker's internal test runs use [`web/vitest.mutation.config.mts`](../../web/vitest.mutation.config.mts) instead of `vitest.config.mts` directly (`stryker.config.mjs`'s `vitest.configFile`). It only overrides `test.reporters`: Vitest auto-adds a `github-actions` annotation reporter whenever `GITHUB_ACTIONS` is set, and a mutant being killed means its test run is _expected_ to fail, so left alone that reporter turned every kill into a workflow annotation. `npm test` itself (`vitest.config.mts`, unchanged) still gets real annotations on a real failure.
+
+## CI job summaries
+
+Every check that produces a report writes it to the job's own [Actions summary](https://github.blog/news-insights/product-news/supercharging-github-actions-with-job-summaries/) (`$GITHUB_STEP_SUMMARY`) instead of, or in addition to, its usual output — open the workflow run and look at the job in question:
+
+| Job | What's in the summary | How |
+| ----------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `build_and_test` | Coverage totals against the thresholds above | [`davelosert/vitest-coverage-report-action`](https://github.com/davelosert/vitest-coverage-report-action), reading the `json-summary` coverage reporter |
+| `build_and_test` | Signed-out end-to-end results | [`daun/playwright-report-summary`](https://github.com/daun/playwright-report-summary), reading the `json` Playwright reporter |
+| `e2e_local_stack` | Signed-in end-to-end results | Same action, run again against that job's own report |
+| `mutation_test` | Mutation score, overall and per file | [`web/scripts/mutation-summary.mjs`](../../web/scripts/mutation-summary.mjs), reading Stryker's `json` reporter output via `mutation-testing-metrics` — not the console log, which is mostly the _expected_ per-mutant test "failures" that killing a mutant produces |
+
+Codecov's own pull-request comment is turned off ([`codecov.yml`](../../codecov.yml), `comment: false`) now that the same numbers are in the job summary; its commit status checks are untouched. None of the summary actions post a PR comment either (`create-comment: false` / `comment-on: none`) — job summary only, by design, so nothing new shows up as bot noise on the PR itself.
 
 ## End-to-end tests
 

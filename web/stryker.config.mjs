@@ -2,7 +2,9 @@ import { MUTATE_TARGETS } from './mutation-targets.mjs';
 
 // Publish to the Stryker dashboard only when the API key is available (CI on
 // nobuddyorg/CollectionBuddy). Local runs and key-less CI keep the offline reporters.
-const reporters = ['html', 'clear-text', 'progress'];
+// `json` always runs -- scripts/mutation-summary.mjs reads reports/mutation/mutation.json
+// to build the mutation_test job's Actions summary table.
+const reporters = ['html', 'clear-text', 'progress', 'json'];
 if (process.env.STRYKER_DASHBOARD_API_KEY) reporters.push('dashboard');
 
 /** @type {import('@stryker-mutator/core').PartialStrykerOptions} */
@@ -11,6 +13,11 @@ const config = {
   testRunner: 'vitest',
   coverageAnalysis: 'perTest',
   reporters,
+  // Points Stryker's internal test runs at a vitest config with the noisy
+  // `github-actions` reporter turned off -- see vitest.mutation.config.mts.
+  vitest: {
+    configFile: 'vitest.mutation.config.mts',
+  },
   htmlReporter: {
     fileName: 'reports/mutation/index.html',
   },
@@ -31,7 +38,7 @@ const config = {
     'playwright-report',
   ],
   // See mutation-targets.mjs for what's in this list and why -- shared with
-  // vitest.config.ts's per-file coverage floors so the two can't drift.
+  // vitest.config.mts's per-file coverage floors so the two can't drift.
   mutate: MUTATE_TARGETS,
   thresholds: {
     high: 100,

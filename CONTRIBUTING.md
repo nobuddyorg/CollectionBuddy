@@ -20,7 +20,7 @@ stack that ships in [`supabase/`](supabase/).
     supabase db reset
     ```
 
-    This runs Postgres, Auth (GoTrue), Storage, Studio, and Inbucket. `supabase start`
+    This runs Postgres, Auth (GoTrue), Storage, Studio, and Mailpit. `supabase start`
     prints the local API URL and anon key. They match the defaults in
     `web/.env.example`, so you normally don't need to change anything.
 

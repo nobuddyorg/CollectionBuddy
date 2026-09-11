@@ -28,6 +28,10 @@ npm run e2e:local       # the e2e_local_stack job; needs `supabase start` first
 A fourth job, `prek`, runs the repo-wide hooks — `prek run --all-files` from the repository
 root is the same thing.
 
+Coverage, mutation score, and end-to-end results all show up as a table in their job's own
+Actions summary rather than as a PR comment — see [Configuration
+reference](../reference/configuration.md#ci-job-summaries).
+
 ## Run the end-to-end suite
 
 ```bash
@@ -93,7 +97,7 @@ Adding a file to `mutate` in [`stryker.config.mjs`](../../web/stryker.config.mjs
 
 ## Coverage floors
 
-`vitest.config.ts` carries a global floor plus per-file 100% floors for the pure, high-risk modules. The global floor is not auto-updated: raise it by hand when coverage genuinely improves, and never lower it to make a change fit. It had been left about 16 points below what the suite actually achieved, which meant half the tests could have been deleted with CI still green.
+`vitest.config.mts` carries a global floor plus per-file 100% floors for the pure, high-risk modules. The global floor is not auto-updated: raise it by hand when coverage genuinely improves, and never lower it to make a change fit. It had been left about 16 points below what the suite actually achieved, which meant half the tests could have been deleted with CI still green.
 
 ## Regenerate the app icons
 
