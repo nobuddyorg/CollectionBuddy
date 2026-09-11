@@ -19,7 +19,7 @@ function formatScore(score) {
 
 function statusIcon(score) {
   if (!Number.isFinite(score)) return '➖'; // heavy minus sign -- no mutants to score
-  return score >= BREAK_THRESHOLD ? '✅' : '⚠️';
+  return score >= BREAK_THRESHOLD ? '✅' : '❌';
 }
 
 function toRow(label, metrics) {

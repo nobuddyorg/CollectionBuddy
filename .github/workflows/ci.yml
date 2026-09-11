@@ -87,6 +87,12 @@ jobs:
           vite-config-path: vitest.config.ts
           file-coverage-mode: none
           comment-on: 'none'
+          # Icon glyph only -- doesn't touch the real per-category thresholds
+          # above, which still gate `npm test -- --coverage` untouched. One
+          # shared cutoff (the lowest of the four: branches' 78%) just picks
+          # which icon each row's real percentage gets, to match the
+          # checkmark/cross used in the other two summary tables below.
+          threshold-icons: "{0: '❌', 78: '✅'}"
 
       # Drives the built export in a real browser, serving it under the base
       # path the way Pages does -- serving at the root would make every
@@ -109,6 +115,10 @@ jobs:
           comment-title: 'End-to-end tests -- signed-out (public)'
           job-summary: true
           create-comment: false
+          # Emoji, not the default octicons style -- default renders each
+          # icon as a remote SVG fetched from a third-party host at summary
+          # render time. Emoji also match the coverage/mutation tables.
+          icon-style: emojis
 
       - name: Keep the report from a failed run
         if: failure()
@@ -187,6 +197,7 @@ jobs:
           comment-title: 'End-to-end tests -- signed-in (local stack)'
           job-summary: true
           create-comment: false
+          icon-style: emojis
 
       - name: Keep the report from a failed run
         if: failure()
