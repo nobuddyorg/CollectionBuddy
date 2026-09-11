@@ -10,8 +10,10 @@ permissions:
   contents: read
 
 jobs:
-  # The repo-wide hooks from .pre-commit-config.yaml. Runs alongside
-  # build_and_test rather than gating it, so both finish in parallel.
+  # The repo-wide hooks from .pre-commit-config.yaml. Runs first and gates
+  # every other job -- it's the fastest check, so a failure here (a bad
+  # tsconfig.json, a stray secret, ...) is caught before spending minutes on
+  # a build, two browsers, a Supabase stack and a mutation-testing run.
   # ESLint/Prettier/TypeScript hooks are skipped: build_and_test already
   # runs those same three commands below.
   prek:
@@ -28,6 +30,7 @@ jobs:
           SKIP: no-commit-to-branch,prettier,eslint,tsc
 
   build_and_test:
+    needs: prek
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -138,6 +141,7 @@ jobs:
   # drive it), so setup mints a session through the auth API into
   # localStorage -- this path exists for the local stack only.
   e2e_local_stack:
+    needs: prek
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -218,6 +222,7 @@ jobs:
   # producing a meaningless score. Runs on every PR, not just main: finding
   # out a test asserts nothing is only useful before the merge.
   mutation_test:
+    needs: prek
     runs-on: ubuntu-latest
     defaults:
       run:
