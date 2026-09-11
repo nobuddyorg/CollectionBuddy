@@ -270,6 +270,17 @@ And the rest:
 - **No test gaming** — don't manipulate coverage or mutation score with
   meaningless tests, artificial branches, or exclusions; the metrics should
   reflect real quality.
+- **Comments:**
+  Keep comments to a minimum. Add a comment only when it explains something
+  that is not reasonably obvious from the code itself, such as a non-obvious
+  constraint, workaround, invariant, or important external behavior.
+  Do not add comments merely to document implementation decisions, restate
+  what the code does, narrate obvious logic, or explain routine changes.
+  Prefer clear naming and simple code over explanatory comments.
+  Preserve existing comments unless they are incorrect, obsolete, or
+  misleading. Remove comments that no longer provide meaningful context.
+- **Ui changes:** Always need a e2e test
+- **Functional changes:** Always need a unit test
 
 ## Quick Architecture Reference
 
