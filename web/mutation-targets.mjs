@@ -1,6 +1,6 @@
 // The single list of pure, high-risk modules that get both mutation testing
 // (stryker.config.mjs) and the stricter per-file coverage floor
-// (vitest.config.ts) -- shared so the two lists can't drift apart.
+// (vitest.config.mts) -- shared so the two lists can't drift apart.
 //
 // Every file here pairs pure exported logic with a `Stryker disable all`
 // region around whatever I/O it sits next to, so what's scored is the part

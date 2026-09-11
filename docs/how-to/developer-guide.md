@@ -97,7 +97,7 @@ Adding a file to `mutate` in [`stryker.config.mjs`](../../web/stryker.config.mjs
 
 ## Coverage floors
 
-`vitest.config.ts` carries a global floor plus per-file 100% floors for the pure, high-risk modules. The global floor is not auto-updated: raise it by hand when coverage genuinely improves, and never lower it to make a change fit. It had been left about 16 points below what the suite actually achieved, which meant half the tests could have been deleted with CI still green.
+`vitest.config.mts` carries a global floor plus per-file 100% floors for the pure, high-risk modules. The global floor is not auto-updated: raise it by hand when coverage genuinely improves, and never lower it to make a change fit. It had been left about 16 points below what the suite actually achieved, which meant half the tests could have been deleted with CI still green.
 
 ## Regenerate the app icons
 

@@ -6,6 +6,12 @@
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
+    // Lets vitest.mutation.config.mts import vitest.config.mts by its real
+    // extension -- required so Vite's native config loader (which resolves
+    // by literal specifier, not TS module resolution) sees the same path
+    // TypeScript does. Safe only because noEmit is already true above: there
+    // is no compiled output whose extension this could get confused with.
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
@@ -25,6 +31,7 @@
   "include": [
     "next-env.d.ts",
     "**/*.ts",
+    "**/*.mts",
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"

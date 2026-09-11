@@ -14,9 +14,9 @@ const config = {
   coverageAnalysis: 'perTest',
   reporters,
   // Points Stryker's internal test runs at a vitest config with the noisy
-  // `github-actions` reporter turned off -- see vitest.mutation.config.ts.
+  // `github-actions` reporter turned off -- see vitest.mutation.config.mts.
   vitest: {
-    configFile: 'vitest.mutation.config.ts',
+    configFile: 'vitest.mutation.config.mts',
   },
   htmlReporter: {
     fileName: 'reports/mutation/index.html',
@@ -38,7 +38,7 @@ const config = {
     'playwright-report',
   ],
   // See mutation-targets.mjs for what's in this list and why -- shared with
-  // vitest.config.ts's per-file coverage floors so the two can't drift.
+  // vitest.config.mts's per-file coverage floors so the two can't drift.
   mutate: MUTATE_TARGETS,
   thresholds: {
     high: 100,

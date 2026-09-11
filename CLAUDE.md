@@ -45,7 +45,7 @@ CollectionBuddy/
     ├── src/app/                   # components/, data/, i18n/, lib/, login/
     ├── e2e/                       # Playwright specs (signed-out + signed-in)
     ├── stryker.config.mjs         # Mutation testing, scoped to pure functions
-    └── vitest.config.ts           # Unit tests, coverage thresholds
+    └── vitest.config.mts           # Unit tests, coverage thresholds
 ```
 
 ## Development Commands
@@ -98,7 +98,7 @@ forms/photos/RLS) `e2e:local`. Partial runs ("lint passes, I didn't run the
 rest") are not a stopping point, they're a status update.
 
 - **Never** lower a coverage or mutation-score threshold
-  (`web/vitest.config.ts` `test.coverage.thresholds`,
+  (`web/vitest.config.mts` `test.coverage.thresholds`,
   `web/stryker.config.mjs` `thresholds.break`) to make CI pass. If a
   legitimate change makes a threshold unreachable, that's a design problem —
   redesign the code/tests, or raise it with the user; don't quietly relax the

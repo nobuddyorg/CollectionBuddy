@@ -78,13 +78,13 @@ jobs:
           fail_ci_if_error: true
 
       # Job summary only (codecov.yml disables Codecov's own PR comment) --
-      # reads the json-summary reporter vitest.config.ts adds for this.
+      # reads the json-summary reporter vitest.config.mts adds for this.
       - name: Add coverage report to job summary
         if: always()
         uses: davelosert/vitest-coverage-report-action@c4bbc33a89b7ace0e63d35f1f7d4bcee31155a73 # v2
         with:
           working-directory: web
-          vite-config-path: vitest.config.ts
+          vite-config-path: vitest.config.mts
           file-coverage-mode: none
           comment-on: 'none'
           # No explicit threshold-icons: the action only draws 🔴/🟢 (not the
