@@ -28,6 +28,10 @@ npm run e2e:local       # the e2e_local_stack job; needs `supabase start` first
 A fourth job, `prek`, runs the repo-wide hooks — `prek run --all-files` from the repository
 root is the same thing.
 
+Coverage, mutation score, and end-to-end results all show up as a table in their job's own
+Actions summary rather than as a PR comment — see [Configuration
+reference](../reference/configuration.md#ci-job-summaries).
+
 ## Run the end-to-end suite
 
 ```bash

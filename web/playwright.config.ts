@@ -29,8 +29,14 @@ export default defineConfig({
   workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI
     ? // `html` is kept as an artifact since a browser failure reads better
-      // as a trace than a stack.
-      [['github'], ['list'], ['html', { open: 'never' }]]
+      // as a trace than a stack. `json` feeds the job-summary step in
+      // ci.yml (daun/playwright-report-summary) -- nothing else reads it.
+      [
+        ['github'],
+        ['list'],
+        ['html', { open: 'never' }],
+        ['json', { outputFile: 'playwright-results.json' }],
+      ]
     : [['list']],
   use: {
     baseURL,

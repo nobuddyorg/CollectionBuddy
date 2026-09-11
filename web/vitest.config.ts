@@ -33,7 +33,9 @@ export default defineConfig({
     },
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'lcov'],
+      // `json-summary` feeds the job-summary step in ci.yml
+      // (davelosert/vitest-coverage-report-action) -- nothing else reads it.
+      reporter: ['text', 'lcov', 'json-summary'],
       include: ['src/app/**/*.{ts,tsx}'],
       exclude: [
         'src/app/**/types.ts',

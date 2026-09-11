@@ -1,0 +1,5 @@
+# Coverage now shows up as a table in the build_and_test job's own Actions
+# summary (davelosert/vitest-coverage-report-action, see
+# .github/workflows/ci.yml) instead of as a bot comment on every PR.
+# Commit statuses/checks are untouched -- only the PR comment is disabled.
+comment: false

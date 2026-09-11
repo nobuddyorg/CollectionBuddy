@@ -77,6 +77,16 @@ jobs:
           directory: web/coverage
           fail_ci_if_error: true
 
+      # Job summary only (codecov.yml disables Codecov's own PR comment) --
+      # reads the json-summary reporter vitest.config.ts adds for this.
+      - name: Add coverage report to job summary
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@c4bbc33a89b7ace0e63d35f1f7d4bcee31155a73 # v2
+        with:
+          working-directory: web
+          vite-config-path: vitest.config.ts
+          file-coverage-mode: none
+
       # Drives the built export in a real browser, serving it under the base
       # path the way Pages does -- serving at the root would make every
       # asset request a 404 this never caught. Playwright starts and stops
@@ -86,6 +96,15 @@ jobs:
 
       - name: Run end-to-end tests
         run: npm run e2e
+
+      - name: Add end-to-end results to job summary
+        if: always()
+        uses: daun/playwright-report-summary@31ed947ec7a623d18a66cfd20ef546dc66ef8063 # v4
+        with:
+          report-file: web/playwright-results.json
+          report-tag: 'e2e (signed-out)'
+          job-summary: true
+          create-comment: false
 
       - name: Keep the report from a failed run
         if: failure()
@@ -155,6 +174,15 @@ jobs:
       - name: Run the signed-in end-to-end suite
         run: npm run e2e:local
 
+      - name: Add end-to-end results to job summary
+        if: always()
+        uses: daun/playwright-report-summary@31ed947ec7a623d18a66cfd20ef546dc66ef8063 # v4
+        with:
+          report-file: web/playwright-results.json
+          report-tag: 'e2e (signed-in, local stack)'
+          job-summary: true
+          create-comment: false
+
       - name: Keep the report from a failed run
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -200,6 +228,14 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           STRYKER_DASHBOARD_API_KEY: ${{ github.ref == 'refs/heads/main' && secrets.STRYKER_DASHBOARD_API_KEY || '' }}
+
+      # A table built from reports/mutation/mutation.json (scripts/mutation-summary.mjs),
+      # not console output -- the console log is mostly expected per-mutant
+      # test "failures" (that's what killing a mutant means), which isn't
+      # useful summary material.
+      - name: Add mutation report to job summary
+        if: always()
+        run: npm run mutation:summary
 
       - name: Upload mutation report
         if: always()
