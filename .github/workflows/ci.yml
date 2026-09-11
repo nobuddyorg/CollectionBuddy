@@ -86,6 +86,7 @@ jobs:
           working-directory: web
           vite-config-path: vitest.config.ts
           file-coverage-mode: none
+          comment-on: 'none'
 
       # Drives the built export in a real browser, serving it under the base
       # path the way Pages does -- serving at the root would make every

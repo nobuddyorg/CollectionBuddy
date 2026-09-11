@@ -2,6 +2,22 @@ import { defineConfig } from 'vitest/config';
 
 import { MUTATE_TARGETS, NO_COVERAGE_FLOOR } from './mutation-targets.mjs';
 
+// Global floor. Only `npm test -- --coverage` enforces this (what CI runs,
+// not plain `npm test`), and CI measures ~0.1pp lower than local (pinned
+// Node version). A PR may raise these values and must not lower them.
+//
+// Declared before PER_FILE_FLOOR on purpose: the job-summary step in ci.yml
+// (davelosert/vitest-coverage-report-action) doesn't evaluate this file, it
+// regex-scans the raw text for the first `statements: N` etc. it finds. With
+// PER_FILE_FLOOR's 100s ahead of these, it picked those up as the "target"
+// instead, showing every category as red no matter the real result.
+const GLOBAL_COVERAGE_THRESHOLDS = {
+  statements: 85,
+  branches: 78,
+  functions: 85,
+  lines: 88,
+};
+
 const PER_FILE_FLOOR = {
   statements: 100,
   functions: 100,
@@ -55,14 +71,7 @@ export default defineConfig({
         'src/app/components/Map/index.tsx',
       ],
       thresholds: {
-        // Global floor. Only `npm test -- --coverage` enforces this (what
-        // CI runs, not plain `npm test`), and CI measures ~0.1pp lower than
-        // local (pinned Node version). A PR may raise these values and must
-        // not lower them.
-        statements: 85,
-        branches: 78,
-        functions: 85,
-        lines: 88,
+        ...GLOBAL_COVERAGE_THRESHOLDS,
 
         // Was `true`: autoUpdate wrote the local measurement back into this
         // file after every run, so a green local run kept producing a red
