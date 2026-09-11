@@ -29,6 +29,7 @@ CollectionBuddy/
 ├── README.md                    # Feature overview, screenshots
 ├── CONTRIBUTING.md               # Local setup, pre-PR checklist
 ├── CLAUDE.md                     # This file
+├── TEST_STRATEGY.md              # READ THIS before writing or changing tests
 ├── build.sh                      # Convenience build wrapper
 ├── .pre-commit-config.yaml       # File hygiene, spell check, zizmor, shellcheck,
 │                                  # markdownlint, and web/'s own checks
@@ -97,6 +98,12 @@ green: `build`, `tsc`, `prettier --check`, `lint`, `test -- --coverage`,
 forms/photos/RLS) `e2e:local`. Partial runs ("lint passes, I didn't run the
 rest") are not a stopping point, they're a status update.
 
+- **[TEST_STRATEGY.md](TEST_STRATEGY.md) defines this repository's testing
+  strategy and quality gates.** Read and follow it for all implementation,
+  refactoring, and test-related work — it decides which layer a given
+  behavior belongs to, what may be mocked, and which gates a change has to
+  clear. Update it when architectural or testing assumptions materially
+  change; don't restate it here.
 - **Never** lower a coverage or mutation-score threshold
   (`web/vitest.config.mts` `test.coverage.thresholds`,
   `web/stryker.config.mjs` `thresholds.break`) to make CI pass. If a
