@@ -104,6 +104,9 @@ jobs:
         with:
           report-file: web/playwright-results.json
           report-tag: 'e2e (signed-out)'
+          # report-tag only identifies a PR comment (unused here); this is
+          # what actually shows as the job summary's heading.
+          comment-title: 'End-to-end tests -- signed-out (public)'
           job-summary: true
           create-comment: false
 
@@ -181,6 +184,7 @@ jobs:
         with:
           report-file: web/playwright-results.json
           report-tag: 'e2e (signed-in, local stack)'
+          comment-title: 'End-to-end tests -- signed-in (local stack)'
           job-summary: true
           create-comment: false
 
