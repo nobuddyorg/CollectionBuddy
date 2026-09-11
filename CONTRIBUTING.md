@@ -106,8 +106,8 @@ guide](docs/how-to/developer-guide.md#run-the-checks-ci-runs-locally) for why
 the order matters and what each one catches.
 
 If your change touches the catalogue, search, the map, the entry forms,
-photographs, exporting, or any row-level security policy, also run the
-signed-in suite against a local database:
+photographs, sharing, exporting, or any row-level security policy, also run
+the signed-in suite against a local database:
 
 ```bash
 supabase start   # from the repository root

@@ -55,7 +55,7 @@ This is a mature estate. The work described below is mostly about **closing name
 
 1. **Browser bundle → PostgREST / Storage.** A user's JWT crosses it. Everything on the far side is enforced by RLS and triggers. Anyone can read the bundle, take the anon key, and issue arbitrary requests — so the only meaningful test of this boundary is one that does exactly that.
 2. **Owner → grantee (`category_shares`).** A second identity reaching into someone else's category, at one of two roles. The `editor` role is the most permissive grant the schema can issue.
-3. **`anon` → everything.** Denied twice: RLS predicates resolve to null, *and* table privileges are revoked. Both halves need asserting; they fail differently (`42501` vs. an empty result).
+3. **`anon` → everything.** Denied by RLS on every table, since `auth.uid()` and `auth.jwt()` are both null there, and denied a second time on four of the five by an explicit `revoke` (`category_shares` is not in that list, so there the predicate stands alone). Both halves need asserting; they fail differently — a revoked grant is `42501` before any predicate runs, a policy filter is an empty result.
 4. **CI workflow → production.** `SUPABASE_DB_URL` and `service_role` live here. Not covered by any test; covered by `zizmor`, pinned action hashes, and review.
 5. **App → third-party HTTP** (Photon, OSM tiles). Always faked in tests; never reached.
 

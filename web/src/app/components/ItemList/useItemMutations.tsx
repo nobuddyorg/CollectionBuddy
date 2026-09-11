@@ -25,7 +25,7 @@ export function useItemMutations({
   reload: (opts?: { silent?: boolean }) => Promise<void>;
   /** Read-only: the item's photograph paths, captured before `deleteItem`
    * -- the images rows they name are gone once the item row cascades away
-   * (0013_images.sql). */
+   * (0003_tables.sql). */
   captureItemImagePaths: (
     itemId: string,
   ) => Promise<{ path_full: string; path_thumb: string | null }[]>;
@@ -86,7 +86,7 @@ export function useItemMutations({
         action: { label: t('common.undo'), onClick: restore },
         onExpire: async () => {
           // Must run before deleteItem: once the item row is gone, its
-          // images rows cascade away with it (0013_images.sql) -- this is
+          // images rows cascade away with it (0003_tables.sql) -- this is
           // the last point their paths can be read.
           const imagePaths = await captureItemImagePaths(id);
 

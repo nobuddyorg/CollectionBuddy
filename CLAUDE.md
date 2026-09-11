@@ -41,10 +41,11 @@ CollectionBuddy/
 │                                          # RLS, sharing, search, or deletes
 ├── supabase/
 │   ├── config.toml                # Local stack ports, Google OAuth block
-│   └── migrations/                # 0001..0007 baseline (squashed), 0008+ additive
+│   └── migrations/                # 0001..0007, the whole schema (squashed twice)
 └── web/                           # The Next.js app (see web/CLAUDE.md)
     ├── src/app/                   # components/, data/, i18n/, lib/, login/
     ├── e2e/                       # Playwright specs (signed-out + signed-in)
+    ├── mutation-targets.mjs       # The one list of mutated + 100%-covered files
     ├── stryker.config.mjs         # Mutation testing, scoped to pure functions
     └── vitest.config.mts           # Unit tests, coverage thresholds
 ```
@@ -77,7 +78,8 @@ npm test -- --coverage
 npm run e2e
 npm run test:mutation     # separate CI job, run it too before calling something done
 npm run e2e:local         # needs `supabase start`; required if you touched
-                           # catalogue, search, map, entry forms, photos, or RLS
+                           # catalogue, search, map, entry forms, photos,
+                           # sharing, exporting, or RLS
 ```
 
 `prek run --all-files` (or `pre-commit run --all-files`) from the repo root
@@ -123,11 +125,11 @@ rest") are not a stopping point, they're a status update.
 
 ### 2. Database changes: local-first, RLS is load-bearing
 
-RLS (`supabase/migrations/0006_policies.sql` and its extensions) is the
-**only** authorization boundary in this app — there is no server to fall back
-on. This project's history includes several real RLS-correctness bugs
-(#292, #387, #335, #290, #386), so treat every policy change as
-security-critical, not routine SQL.
+RLS (`supabase/migrations/0006_policies.sql` for the tables,
+`0007_storage.sql` for the bucket) is the **only** authorization boundary in
+this app — there is no server to fall back on. This project's history
+includes several real RLS-correctness bugs (#292, #387, #335, #290, #386),
+so treat every policy change as security-critical, not routine SQL.
 
 - Write and run migrations against the **local** stack only
   (`supabase start`, `supabase db reset`, `supabase migration ...`).
@@ -143,6 +145,12 @@ security-critical, not routine SQL.
 - Never treat a client-side check ("only show the delete button if...") as
   authorization. It's UX. The RLS policy is the real check, and any new
   query needs to be covered by one.
+- A policy, grant, or ownership-trigger change **must** ship a matching case
+  in `web/e2e/signed-in/rls.spec.ts` in the same change. That file is the
+  executable form of the authorization model; a migration with no assertion
+  behind it is an unreviewed change to the only security boundary there is.
+  See [TEST_STRATEGY.md](TEST_STRATEGY.md) for how those cases are written
+  (two real identities, real tokens, straight at PostgREST).
 - Don't touch `storage.objects` DDL — hosted Supabase doesn't grant `postgres`
   ownership of it; policies are fine, `CREATE INDEX`/schema changes are not
   and will fail with `42501` (this is expected, not a bug to work around).
@@ -195,7 +203,9 @@ touching any of the areas below. Do not change these without first flagging
 the tradeoff to the user:
 
 - **No public/anonymous share links** — sharing is account-based only
-  (RLS can't cheaply authorize an anonymous reader; see the doc).
+  (RLS can't cheaply authorize an anonymous reader; see the doc). Note that
+  "account-based" is not "read-only": a grant carries a `role`, and an
+  `editor` writes item content inside the shared category.
 - **Search is trigram `ILIKE`, not full-text search** — don't reintroduce
   `tsvector`/FTS columns; they were added once, found unused, and dropped.
 - **Storage objects are deleted client-side *before* the DB row**, never
@@ -204,10 +214,11 @@ the tradeoff to the user:
   for `storage.objects` (Supabase forbids deleting from it outside the
   Storage API).
 - **Mutation testing (Stryker) is deliberately scoped** to the specific pure
-  functions listed in design-decisions.md, not the whole `src/app` tree.
-  Don't widen `stryker.config.mjs`'s scope without reproducing the
-  reasoning (mutating JSX/Tailwind strings produces thousands of
-  meaningless mutants).
+  functions listed in `web/mutation-targets.mjs` (and explained in
+  design-decisions.md), not the whole `src/app` tree. That one list feeds
+  both Stryker and `vitest.config.mts`'s per-file coverage floors, so it is
+  the only place to change. Don't widen it without reproducing the reasoning
+  (mutating JSX/Tailwind strings produces thousands of meaningless mutants).
 - **The coverage floor is raised by hand** (`autoUpdate: false`) and never
   auto-ratcheted — that was tried and reverted because it made local-green
   runs produce red PRs.
@@ -298,10 +309,16 @@ first — both explain *why*, not just *what*.
 
 - Tables: `categories`, `items`, `item_categories`, `category_shares`,
   `images` — see [architecture.md#tables](docs/reference/architecture.md#tables).
-- Every table's RLS predicate is `user_id = (select auth.uid())`, extended
-  for `category_shares` grants where applicable.
-- `anon` has both RLS denial *and* explicit revoked grants (defense in
-  depth, not redundancy — don't remove either).
+- Every policy starts from `user_id = (select auth.uid())` and is widened
+  by one of two predicates: `has_category_read_access()` (any active
+  `category_shares` grant) or `has_category_write_access()` (category
+  ownership, **or** an active grant at role `editor`). Sharing is *not*
+  read-only — an editor writes items and photographs inside a shared
+  category. Category-level actions (rename, delete, manage shares) stay
+  owner-only at every role.
+- `anon` has both RLS denial *and* explicit revoked grants on four of the
+  five tables (defense in depth, not redundancy — don't remove either).
+  `category_shares` is the exception, denied by RLS alone.
 - Photos: `item-images` Storage bucket, 5 MiB/file limit,
   `image/webp`/`image/jpeg`/`image/png` only; WebP compression happens in
   the browser before upload.
@@ -311,6 +328,18 @@ first — both explain *why*, not just *what*.
 ## Documentation Sync
 
 If a change affects local setup, the pre-PR checklist, architecture,
-configuration, or a design decision, update the relevant file in `docs/`
-(and `CONTRIBUTING.md`/`README.md` if applicable) in the same change — don't
-let docs drift from what the code actually does.
+configuration, a design decision, or a testing assumption, update the
+relevant file in `docs/` (and `CONTRIBUTING.md`/`README.md`/
+`TEST_STRATEGY.md` if applicable) in the same change — don't let docs drift
+from what the code actually does.
+
+Two things have actually rotted here before, so check them by name:
+
+- **Migration filenames.** A squash folds files away, and every reference to
+  one — in `docs/`, here, and in source comments — then points at a file
+  that no longer exists. Repoint them at the baseline file that now holds
+  the thing, in the same change as the squash. `grep -rn '00NN_'` finds them.
+- **Claims about what sharing allows.** "Read-only" was true of the original
+  grant and stopped being true when the `editor` role landed, while five
+  documents went on saying it. A change to `has_category_read_access()` or
+  `has_category_write_access()` changes what the docs owe the reader.

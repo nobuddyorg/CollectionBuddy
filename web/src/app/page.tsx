@@ -47,7 +47,7 @@ export default function Page() {
   // component is already doing for its own reasons.
   const selectedCategory =
     categories.cats.find((c) => c.id === selectedCategoryId) ?? null;
-  // Owner, or an active editor grant (0014_editor_shares.sql); a viewer
+  // Owner, or an active editor grant (0006_policies.sql); a viewer
   // grant or no grant both fall through to false.
   const canEditSelected =
     !!selectedCategory &&

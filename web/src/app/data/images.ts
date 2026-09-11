@@ -44,7 +44,7 @@ export type ExportImageRow = Pick<
   'item_id' | 'path_full' | 'size_bytes'
 >;
 
-// user_id is never sent: tg_images_enforce (0013_images.sql) derives it from
+// user_id is never sent: tg_images_enforce (0002_functions.sql) derives it from
 // the item's own owner and rejects anything else.
 export function createImageRow(row: {
   item_id: string;
@@ -109,7 +109,7 @@ async function selectImagesForItems<T>(
 
 // Ordered oldest-first, `id` breaking a tie between two photographs
 // uploaded in the same instant, matching idx_images_item_created_at
-// (0013_images.sql).
+// (0005_indexes.sql).
 export function listImagesForItems(
   itemIds: string[],
 ): Promise<{ data: ImageListRow[] | null; error: unknown }> {
@@ -121,7 +121,7 @@ export function listImagesForItems(
 
 // Read-only: captures photo paths before a delete that will cascade the
 // images rows away, so the Storage bytes can still be removed afterward.
-// Must run before that delete, not after (see 0013_images.sql).
+// Must run before that delete, not after (see 0003_tables.sql).
 export function listImagePathsForItems(
   itemIds: string[],
 ): Promise<{ data: ImagePathRow[] | null; error: unknown }> {
