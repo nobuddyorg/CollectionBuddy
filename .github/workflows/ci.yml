@@ -87,12 +87,13 @@ jobs:
           vite-config-path: vitest.config.ts
           file-coverage-mode: none
           comment-on: 'none'
-          # Icon glyph only -- doesn't touch the real per-category thresholds
-          # above, which still gate `npm test -- --coverage` untouched. One
-          # shared cutoff (the lowest of the four: branches' 78%) just picks
-          # which icon each row's real percentage gets, to match the
-          # checkmark/cross used in the other two summary tables below.
-          threshold-icons: "{0: '❌', 78: '✅'}"
+          # No explicit threshold-icons: the action only draws 🔴/🟢 (not the
+          # ✅/❌ used below) when left to check each category against its own
+          # real threshold automatically. Supplying custom icons forces one
+          # shared cutoff for all four categories *and* makes the action emit
+          # an unavoidable "thresholds and threshold-icons both defined"
+          # warning on every run -- not worth it for a glyph swap on one of
+          # three tables.
 
       # Drives the built export in a real browser, serving it under the base
       # path the way Pages does -- serving at the root would make every
