@@ -23,7 +23,7 @@ export function listSharesForCategory(categoryId: string) {
 }
 
 // owner_user_id is cast around here since the not-null column has no
-// default; tg_category_shares_enforce (0011_category_shares.sql) fills it
+// default; tg_category_shares_enforce (0002_functions.sql) fills it
 // in from the category's own owner and re-normalizes the email, so the row
 // the insert returns, not the value sent, is what a caller should use.
 export function createShare(
@@ -44,7 +44,7 @@ export function createShare(
     .single<CategoryShareSummary>();
 }
 
-// tg_category_shares_enforce (0014_editor_shares.sql) rejects any other
+// tg_category_shares_enforce (0002_functions.sql) rejects any other
 // column changing in the same update, and the "update own category_shares
 // role" policy limits this to the owner.
 export function updateShareRole(id: string, role: ShareRole) {

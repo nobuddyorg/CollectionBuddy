@@ -18,7 +18,9 @@ leads with a photo, carries a place and tags, and is searchable.
   There is nowhere else it could live — see "Hard guardrails" below.
 - **Hosting**: static export deployed to GitHub Pages.
 
-Read [README.md](README.md) for the feature list and
+**Required reading before you write anything**: this file, and
+[TEST_STRATEGY.md](TEST_STRATEGY.md). Both are standing instructions, not
+background material. Read [README.md](README.md) for the feature list and
 [docs/README.md](docs/README.md) for the full documentation set, organised by
 [Diátaxis](https://diataxis.fr).
 
@@ -29,6 +31,7 @@ CollectionBuddy/
 ├── README.md                    # Feature overview, screenshots
 ├── CONTRIBUTING.md               # Local setup, pre-PR checklist
 ├── CLAUDE.md                     # This file
+├── TEST_STRATEGY.md              # READ THIS before writing or changing tests
 ├── build.sh                      # Convenience build wrapper
 ├── .pre-commit-config.yaml       # File hygiene, spell check, zizmor, shellcheck,
 │                                  # markdownlint, and web/'s own checks
@@ -40,10 +43,11 @@ CollectionBuddy/
 │                                          # RLS, sharing, search, or deletes
 ├── supabase/
 │   ├── config.toml                # Local stack ports, Google OAuth block
-│   └── migrations/                # 0001..0007 baseline (squashed), 0008+ additive
+│   └── migrations/                # 0001..0007, the whole schema (squashed twice)
 └── web/                           # The Next.js app (see web/CLAUDE.md)
     ├── src/app/                   # components/, data/, i18n/, lib/, login/
     ├── e2e/                       # Playwright specs (signed-out + signed-in)
+    ├── mutation-targets.mjs       # The one list of mutated + 100%-covered files
     ├── stryker.config.mjs         # Mutation testing, scoped to pure functions
     └── vitest.config.mts           # Unit tests, coverage thresholds
 ```
@@ -76,7 +80,8 @@ npm test -- --coverage
 npm run e2e
 npm run test:mutation     # separate CI job, run it too before calling something done
 npm run e2e:local         # needs `supabase start`; required if you touched
-                           # catalogue, search, map, entry forms, photos, or RLS
+                           # catalogue, search, map, entry forms, photos,
+                           # sharing, exporting, or RLS
 ```
 
 `prek run --all-files` (or `pre-commit run --all-files`) from the repo root
@@ -88,7 +93,29 @@ runs the repo-wide hooks (file hygiene, `typos`, `zizmor`, `shellcheck`,
 These are not suggestions. If one of them would block finishing a task, stop
 and say so instead of working around it.
 
-### 1. Definition of done = the full pre-PR checklist
+### 1. TEST_STRATEGY.md is mandatory, not advisory
+
+[TEST_STRATEGY.md](TEST_STRATEGY.md) defines this repository's testing
+strategy, its risk model, and its quality gates. **Read it at the start of
+every task** — implementation, refactor, bug fix, or test work alike — and
+follow it. It is not a reference to reach for once something looks
+test-shaped; it is the standing instruction for how work here gets verified.
+
+It decides these, and you do not re-decide them per task:
+
+- which layer a given behavior is tested at (see its ownership table),
+- what may be mocked, and what has to be a real Postgres, Storage or browser,
+- which gates a change clears before it counts as done,
+- which testing approaches are deliberately *not* used here, and why.
+
+Disagreeing with it is fine; departing from it silently is not. If a task
+looks like it needs something the strategy rules out, say so and get
+agreement first — same rule as the scope-creep guard below.
+
+Update it in the same change that moves an architectural or testing
+assumption. Don't restate its contents here.
+
+### 2. Definition of done = the full pre-PR checklist
 
 A task is **not** done — do not say "done", open a PR as ready, or report
 success — until every command in the checklist above has been run and is
@@ -97,6 +124,9 @@ green: `build`, `tsc`, `prettier --check`, `lint`, `test -- --coverage`,
 forms/photos/RLS) `e2e:local`. Partial runs ("lint passes, I didn't run the
 rest") are not a stopping point, they're a status update.
 
+- Guardrail 1 decides *what* gets tested and at which level; this checklist
+  is *whether you actually ran it*. Both apply — a change that follows the
+  strategy but skips the checklist is not done either.
 - **Never** lower a coverage or mutation-score threshold
   (`web/vitest.config.mts` `test.coverage.thresholds`,
   `web/stryker.config.mjs` `thresholds.break`) to make CI pass. If a
@@ -114,13 +144,13 @@ rest") are not a stopping point, they're a status update.
   with it. A green metric that doesn't correspond to real confidence is worse
   than a documented gap.
 
-### 2. Database changes: local-first, RLS is load-bearing
+### 3. Database changes: local-first, RLS is load-bearing
 
-RLS (`supabase/migrations/0006_policies.sql` and its extensions) is the
-**only** authorization boundary in this app — there is no server to fall back
-on. This project's history includes several real RLS-correctness bugs
-(#292, #387, #335, #290, #386), so treat every policy change as
-security-critical, not routine SQL.
+RLS (`supabase/migrations/0006_policies.sql` for the tables,
+`0007_storage.sql` for the bucket) is the **only** authorization boundary in
+this app — there is no server to fall back on. This project's history
+includes several real RLS-correctness bugs (#292, #387, #335, #290, #386),
+so treat every policy change as security-critical, not routine SQL.
 
 - Write and run migrations against the **local** stack only
   (`supabase start`, `supabase db reset`, `supabase migration ...`).
@@ -136,6 +166,12 @@ security-critical, not routine SQL.
 - Never treat a client-side check ("only show the delete button if...") as
   authorization. It's UX. The RLS policy is the real check, and any new
   query needs to be covered by one.
+- A policy, grant, or ownership-trigger change **must** ship a matching case
+  in `web/e2e/signed-in/rls.spec.ts` in the same change. That file is the
+  executable form of the authorization model; a migration with no assertion
+  behind it is an unreviewed change to the only security boundary there is.
+  See [TEST_STRATEGY.md](TEST_STRATEGY.md) for how those cases are written
+  (two real identities, real tokens, straight at PostgREST).
 - Don't touch `storage.objects` DDL — hosted Supabase doesn't grant `postgres`
   ownership of it; policies are fine, `CREATE INDEX`/schema changes are not
   and will fail with `42501` (this is expected, not a bug to work around).
@@ -143,7 +179,7 @@ security-critical, not routine SQL.
   procedure (see [developer-guide.md#squashing-migrations-again](docs/how-to/developer-guide.md#squashing-migrations-again))
   — never squash as a side effect of an unrelated change.
 
-### 3. Git, branches, CI
+### 4. Git, branches, CI
 
 - Never commit directly to `main` (the pre-commit hook `no-commit-to-branch`
   already blocks this locally — don't bypass it with `--no-verify`).
@@ -158,7 +194,7 @@ security-critical, not routine SQL.
   [design-decisions.md#npm-audit-whats-overridden-and-whats-accepted-risk-issue-191](docs/explanation/design-decisions.md#npm-audit-whats-overridden-and-whats-accepted-risk-issue-191)).
   Use targeted `overrides` entries instead.
 
-### 4. Secrets and environment
+### 5. Secrets and environment
 
 - Never write real Google OAuth credentials, Supabase service-role keys, or
   `SUPABASE_DB_URL`/`SUPABASE_ACCESS_TOKEN` values into code, commits, docs,
@@ -171,7 +207,7 @@ security-critical, not routine SQL.
   static export; it exists only in CI workflow secrets for specific
   server-side jobs (`pages-deploy.yml`, `cleanup-orphaned-photos.yml`).
 
-### 5. i18n
+### 6. i18n
 
 Every user-facing string goes through `t('...')` and must exist in **both**
 `web/src/app/i18n/de.json` and `en.json` with the same key. There's an
@@ -179,7 +215,7 @@ executable parity test (`web/src/app/i18n/parity.test.ts`) that fails on a
 missing or mismatched key — but don't rely on it to catch this after the
 fact; add both languages in the same change. German is the default locale.
 
-### 6. Scope-creep guard — settled decisions, don't relitigate silently
+### 7. Scope-creep guard — settled decisions, don't relitigate silently
 
 [docs/explanation/design-decisions.md](docs/explanation/design-decisions.md)
 documents choices that look like they could be "improved" but were made
@@ -188,7 +224,9 @@ touching any of the areas below. Do not change these without first flagging
 the tradeoff to the user:
 
 - **No public/anonymous share links** — sharing is account-based only
-  (RLS can't cheaply authorize an anonymous reader; see the doc).
+  (RLS can't cheaply authorize an anonymous reader; see the doc). Note that
+  "account-based" is not "read-only": a grant carries a `role`, and an
+  `editor` writes item content inside the shared category.
 - **Search is trigram `ILIKE`, not full-text search** — don't reintroduce
   `tsvector`/FTS columns; they were added once, found unused, and dropped.
 - **Storage objects are deleted client-side *before* the DB row**, never
@@ -197,10 +235,11 @@ the tradeoff to the user:
   for `storage.objects` (Supabase forbids deleting from it outside the
   Storage API).
 - **Mutation testing (Stryker) is deliberately scoped** to the specific pure
-  functions listed in design-decisions.md, not the whole `src/app` tree.
-  Don't widen `stryker.config.mjs`'s scope without reproducing the
-  reasoning (mutating JSX/Tailwind strings produces thousands of
-  meaningless mutants).
+  functions listed in `web/mutation-targets.mjs` (and explained in
+  design-decisions.md), not the whole `src/app` tree. That one list feeds
+  both Stryker and `vitest.config.mts`'s per-file coverage floors, so it is
+  the only place to change. Don't widen it without reproducing the reasoning
+  (mutating JSX/Tailwind strings produces thousands of meaningless mutants).
 - **The coverage floor is raised by hand** (`autoUpdate: false`) and never
   auto-ratcheted — that was tried and reverted because it made local-green
   runs produce red PRs.
@@ -291,10 +330,16 @@ first — both explain *why*, not just *what*.
 
 - Tables: `categories`, `items`, `item_categories`, `category_shares`,
   `images` — see [architecture.md#tables](docs/reference/architecture.md#tables).
-- Every table's RLS predicate is `user_id = (select auth.uid())`, extended
-  for `category_shares` grants where applicable.
-- `anon` has both RLS denial *and* explicit revoked grants (defense in
-  depth, not redundancy — don't remove either).
+- Every policy starts from `user_id = (select auth.uid())` and is widened
+  by one of two predicates: `has_category_read_access()` (any active
+  `category_shares` grant) or `has_category_write_access()` (category
+  ownership, **or** an active grant at role `editor`). Sharing is *not*
+  read-only — an editor writes items and photographs inside a shared
+  category. Category-level actions (rename, delete, manage shares) stay
+  owner-only at every role.
+- `anon` has both RLS denial *and* explicit revoked grants on four of the
+  five tables (defense in depth, not redundancy — don't remove either).
+  `category_shares` is the exception, denied by RLS alone.
 - Photos: `item-images` Storage bucket, 5 MiB/file limit,
   `image/webp`/`image/jpeg`/`image/png` only; WebP compression happens in
   the browser before upload.
@@ -304,6 +349,18 @@ first — both explain *why*, not just *what*.
 ## Documentation Sync
 
 If a change affects local setup, the pre-PR checklist, architecture,
-configuration, or a design decision, update the relevant file in `docs/`
-(and `CONTRIBUTING.md`/`README.md` if applicable) in the same change — don't
-let docs drift from what the code actually does.
+configuration, a design decision, or a testing assumption, update the
+relevant file in `docs/` (and `CONTRIBUTING.md`/`README.md`/
+`TEST_STRATEGY.md` if applicable) in the same change — don't let docs drift
+from what the code actually does.
+
+Two things have actually rotted here before, so check them by name:
+
+- **Migration filenames.** A squash folds files away, and every reference to
+  one — in `docs/`, here, and in source comments — then points at a file
+  that no longer exists. Repoint them at the baseline file that now holds
+  the thing, in the same change as the squash. `grep -rn '00NN_'` finds them.
+- **Claims about what sharing allows.** "Read-only" was true of the original
+  grant and stopped being true when the `editor` role landed, while five
+  documents went on saying it. A change to `has_category_read_access()` or
+  `has_category_write_access()` changes what the docs owe the reader.

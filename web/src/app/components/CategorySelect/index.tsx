@@ -100,8 +100,8 @@ export default function CategorySelect({
     [cats, selectedCat],
   );
 
-  // listCategories() returns both owned and shared-with-me rows (RLS
-  // extension in 0011_category_shares.sql); user_id is the only thing
+  // listCategories() returns both owned and shared-with-me rows (the
+  // select policy in 0006_policies.sql); user_id is the only thing
   // distinguishing which is which.
   const isShared = !!selected && !!userId && selected.user_id !== userId;
 

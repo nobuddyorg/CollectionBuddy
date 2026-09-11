@@ -63,7 +63,7 @@ With `E2E_BASE_URL` set it starts no server of its own. That run is what catches
 
 ### The signed-in suite
 
-`e2e/signed-in/` runs against a real database: the catalogue, search, the map, the entry forms, photographs, exporting a category, and — in `rls.spec.ts` — the row-level security boundary itself. That last one is the executable version of the RLS model, and half of it deliberately bypasses the interface: it asks, with a real token, the questions the app would never think to ask. Change a policy in `0006_policies.sql` or `0007_storage.sql` and this is the file that says whether it still holds.
+`e2e/signed-in/` runs against a real database: the catalogue, search, the map, the entry forms, photographs, exporting a category, and — in `rls.spec.ts` — the row-level security boundary itself. That last one is the executable version of the RLS model, and nearly all of it deliberately bypasses the interface: one test looks at the page, and the other twenty-odd ask Postgres directly, with a real token, the questions the app would never think to ask. Change a policy in `0006_policies.sql` or `0007_storage.sql` and this is the file that says whether it still holds — with the one gap named in [TEST_STRATEGY.md](../../TEST_STRATEGY.md): `editor`-role grants aren't covered there yet.
 
 ```bash
 supabase start     # from the repository root
@@ -93,7 +93,7 @@ npm run test:mutation
 
 CI runs this on **every** PR as well as on pushes to `main` (about a minute for ~273 mutants). The score has been 100% throughout; the break threshold is 90. That is 100% of the roughly one-third of mutants left after the `Stryker disable` regions — the `disable` blocks are load-bearing, so a score read without them is not the number you think it is. Only main publishes to the [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main), so the badge keeps tracking one branch — locally, without `STRYKER_DASHBOARD_API_KEY`, it writes an HTML report to `web/reports/mutation/index.html`.
 
-Adding a file to `mutate` in [`stryker.config.mjs`](../../web/stryker.config.mjs) means first drawing a line inside it: every file in that list pairs pure exported logic with a `// Stryker disable all` region around whatever I/O it sits beside. Mutating a `fetch` call scores how elaborately the network was faked, which is not worth a number. Where a mutant is genuinely equivalent — a check the type system needs but the runtime does not — say so with `// Stryker disable next-line all` and a comment explaining why, rather than writing a test that cannot fail.
+The list of mutated files is [`mutation-targets.mjs`](../../web/mutation-targets.mjs), which [`stryker.config.mjs`](../../web/stryker.config.mjs) and `vitest.config.mts`'s per-file coverage floors both read, so the two can't drift apart — a file on that list carries a 100% coverage floor too, unless it is one of the handful named in the same file's `NO_COVERAGE_FLOOR`. Adding one to that list means first drawing a line inside it: every file in that list pairs pure exported logic with a `// Stryker disable all` region around whatever I/O it sits beside. Mutating a `fetch` call scores how elaborately the network was faked, which is not worth a number. Where a mutant is genuinely equivalent — a check the type system needs but the runtime does not — say so with `// Stryker disable next-line all` and a comment explaining why, rather than writing a test that cannot fail.
 
 ## Coverage floors
 
@@ -128,7 +128,7 @@ A migration that touches `storage.objects` can create and drop _policies_ on it,
 
 ### Squashing migrations again
 
-`supabase/migrations/` was squashed once already, down to a seven-file baseline (`0001` to `0007`); six more have been added on top of it since (`0008` to `0013`). See [Design decisions](../explanation/design-decisions.md#why-the-migrations-were-squashed) for why the original sixteen were squashed and how that baseline was verified. Squashing again is a deliberate, occasional act, not routine, and it folds the whole current set, not just the original seven.
+`supabase/migrations/` has been squashed twice, most recently in #580, and currently holds nothing but the resulting seven-file baseline (`0001` to `0007`). See [Design decisions](../explanation/design-decisions.md#why-the-migrations-were-squashed) for what each round folded in and how the result was verified. Squashing is a deliberate, occasional act, not routine, and it folds the whole current set, not just whatever has accumulated since the last time.
 
 If you do it: verify it the same way, by introspecting both databases down to column defaults, constraint expressions, index definitions, function bodies, trigger timing, policy predicates and grants, and diffing them. Afterward, clear `supabase_migrations.schema_migrations` on the hosted project so the new files are recorded as themselves. That table is the only reason the chain can't simply be rewritten in place.
 

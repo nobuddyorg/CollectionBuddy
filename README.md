@@ -27,7 +27,7 @@ Spreadsheets don't have room for a photograph, and social apps don't care about 
 ## Features
 
 - **Photo-first entries**: one photo, a pair, or a whole strip. Phone photos are compressed to WebP in the browser before upload, so there's no manual resizing.
-- **Categories** to keep collections apart, with **sharing** so someone else can browse (read-only) yours.
+- **Categories** to keep collections apart, with **sharing** so someone else can browse yours — read-only by default, or with edit access if you grant it.
 - **Place and map**: give an item a location, then see your whole collection pinned on a map.
 - **Tags and search** across title, description, place, and tags at once.
 - **Import/export** a category as a portable archive.

@@ -80,7 +80,7 @@ export function useShares(categoryId: string | null) {
   );
 
   // Owner-only toggle between viewer and editor on an existing grant -- the
-  // "update own category_shares role" RLS policy (0014_editor_shares.sql)
+  // "update own category_shares role" RLS policy (0006_policies.sql)
   // is what actually limits this to the owner; the grantee's own panel
   // never renders the control that calls this.
   const updateShareRole = useCallback(

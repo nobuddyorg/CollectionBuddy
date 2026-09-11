@@ -358,7 +358,7 @@ export function useItemImages() {
 
   // Read-only: the caller is about to delete a row that cascades this
   // item's images rows away, and needs the paths first to clean up Storage
-  // bytes afterward (0013_images.sql).
+  // bytes afterward (images.item_id cascades, 0003_tables.sql).
   const captureItemImagePaths = useCallback(async (itemId: string) => {
     const { data, error } = await listImagePathsForItems([itemId]);
     if (error) {

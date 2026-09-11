@@ -19,9 +19,10 @@ The picker opens collapsed, on whichever category you had selected last, so you 
 
 ## Share a category
 
-Sharing gives another CollectionBuddy account read-only access to a category: its items, tags, places, and photographs, but no ability to add, edit, or delete anything. There's no public-link option — only an existing account can be granted access.
+Sharing gives another CollectionBuddy account access to one category: its items, tags, places, and photographs. It starts read-only, and you can upgrade it to let them make changes. There's no public-link option — only an existing account can be granted access.
 
 - **Share**: open the category picker, select the category, and enter the other person's email in the share field. Optionally pick an expiry date. Click the share icon. There's no separate accept step — the grant starts working the moment that email signs in, even if it's the first time.
+- **Let someone edit**: a new share can look but not touch. Tick **Can edit** beside their name (on a narrow screen, the pen icon opens the same choice) and confirm, and they can add, change and delete entries and photographs in that category. They still can't rename it, delete it, or share it with anyone else — those stay with you, and so does the ability to take edit access away again by unticking the box. People with edit access are marked **Editor** in the shared-with list.
 - **Set an expiry**: pick a date before sharing; access ends at the end of that day. Leave it blank for no expiry.
 - **Revoke access**: find the person in the shared-with list and click the trash icon beside their email, confirm.
 - **Leave a category shared with you**: a category someone else shared with you shows the same delete control as your own categories — for a shared one it leaves it instead, and doesn't affect the owner's copy.
