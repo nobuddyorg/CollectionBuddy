@@ -451,12 +451,13 @@ This document is expected to change. It is wrong the moment the architecture mov
 
 **Review it** when migrations are next squashed, and whenever `docs/reference/architecture.md` is materially revised — those are the two moments this file is most likely to have quietly gone stale.
 
-**Currently open, from this analysis:**
+**Currently open, from this analysis.** Each is tracked as an issue; close the row here when the issue closes.
 
-| Gap | Section | Priority |
-| --- | --- | --- |
-| `editor`-role grants have no integration-level authorization coverage | §7 | **High** — it is the most permissive grant in the schema |
-| Migrations are only ever exercised against an empty database | §8 | Medium — contained by `needs: migrate`, but discovered in production |
-| Photo-upload retry against a partially-succeeded upload is unasserted | §8 | Low |
-| `cleanup-orphaned-photos.yml`'s query and script are untested and high-privilege | §12 | Low frequency, high consequence — handle by review discipline |
-| Property-based testing not adopted for the four escaping/packing functions | §10 | Optional, dependency cost is real |
+| Gap | Section | Priority | Issue |
+| --- | --- | --- | --- |
+| `editor`-role grants have no integration-level authorization coverage | §7 | **High** — the most permissive grant in the schema | [#611](https://github.com/nobuddyorg/CollectionBuddy/issues/611) |
+| Migrations are only ever exercised against an empty database | §8 | Medium — contained by `needs: migrate`, but discovered in production | [#612](https://github.com/nobuddyorg/CollectionBuddy/issues/612) |
+| `cleanup-orphaned-photos.yml`'s query and script are untested and high-privilege | §12 | Medium — low frequency, high consequence | [#613](https://github.com/nobuddyorg/CollectionBuddy/issues/613) |
+| Photo-upload retry against a partially-succeeded upload is unasserted | §8 | Low | [#614](https://github.com/nobuddyorg/CollectionBuddy/issues/614) |
+| `anon`'s privileges on `category_shares` are assumed, not revoked | §2 | Low — hardening gap, RLS still denies | [#615](https://github.com/nobuddyorg/CollectionBuddy/issues/615) |
+| Property-based testing not adopted for the four escaping/packing functions | §10 | Optional — the dependency cost is real | [#616](https://github.com/nobuddyorg/CollectionBuddy/issues/616) |
