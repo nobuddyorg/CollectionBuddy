@@ -515,6 +515,45 @@ test.describe('a category shared with another collector', () => {
     }
   });
 
+  // An address is typed by a person, so it arrives with whatever case and
+  // stray spaces they typed. Both sides of the comparison have to agree on
+  // what a match is: tg_category_shares_enforce stores `lower(btrim(...))`,
+  // and caller_email() reads `lower(btrim(...))` back off the claim
+  // (0009_caller_email_trim.sql -- it only lowercased before, so an address
+  // pasted with a trailing space was stored trimmed and then never matched).
+  // Fail-closed either way, which is why nothing here is an escalation: the
+  // cost of disagreeing is a grantee silently denied, with nothing to
+  // distinguish it from never having been invited at all.
+  test('an invitation typed with odd case and stray spaces still opens the collection', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const shareId = await share(
+      token,
+      categoryId,
+      `  ${SEED.other.email.toUpperCase()}  `,
+    );
+
+    try {
+      // Stored normalized, not as typed.
+      const { data: stored } = await apiAs(token)
+        .from('category_shares')
+        .select('invited_email')
+        .eq('id', shareId)
+        .single();
+      expect(stored!.invited_email).toBe(SEED.other.email);
+
+      // And the grantee's own, ordinary token matches it.
+      const { data: seen } = await apiAs(otherToken)
+        .from('categories')
+        .select('id')
+        .eq('id', categoryId);
+      expect(seen).toHaveLength(1);
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
   // A *viewer* grant is meant to be view-only. Asserted directly rather than
   // assumed from the absence of a write policy, so a permissive policy added
   // elsewhere in the chain can't pass silently. The role is named in the title

@@ -44,8 +44,22 @@ enable_signup = true
 # section): that build signs every visitor in as a fresh anonymous user
 # instead of showing the Google button. Anonymous users still get a real
 # auth.uid() and the `authenticated` role, so every RLS policy in
-# 0006_policies.sql and 0007_storage.sql applies to them unchanged -- this
-# only widens who can reach that same role locally, not what it can do.
+# 0006_policies.sql and 0007_storage.sql applies to them unchanged.
+#
+# MUST STAY OFF ON THE HOSTED PROJECT, and unlike the refresh-token block
+# below, that has NOT been verified against it -- this file configures the
+# local stack only. It is not merely "wider access to the same role": an
+# anonymous session can call updateUser({ email }) with any address nobody
+# has registered yet and is handed a token carrying it immediately, with no
+# confirmation, with is_anonymous flipped to false, user_metadata
+# .email_verified set to true and auth.users.email_confirmed_at set to now.
+# Sharing authorizes on that address (caller_email(), 0002_functions.sql),
+# so anyone can take a pending invite addressed to someone who has not
+# signed up yet -- executed end to end against the local stack, reading and
+# writing the owner's collection at the editor role. No SQL-side check
+# distinguishes such a caller from a real one; the provider settings are the
+# control. Same for the email/password provider, for the same reason. See
+# #634 and 0009_caller_email_trim.sql.
 enable_anonymous_sign_ins = true
 # Explicit rather than relying on GoTrue's own defaults (#476): a used
 # refresh token is retired and reissuing it is treated as token theft,
