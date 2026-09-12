@@ -8,6 +8,8 @@ import { useEffect } from 'react';
  * replaces it when read this way, not from a variable built from it.
  */
 export function useServiceWorker(): void {
+  // Stryker disable ArrayDeclaration: an empty dependency list and a
+  // constant one are the same to React -- neither changes between renders.
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
@@ -16,8 +18,6 @@ export function useServiceWorker(): void {
       .catch((err: unknown) => {
         console.error('Service worker registration failed:', err);
       });
-    // Stryker disable next-line ArrayDeclaration: an empty dependency list
-    // and a constant one are indistinguishable to React -- neither changes
-    // between renders.
   }, []);
+  // Stryker restore ArrayDeclaration
 }

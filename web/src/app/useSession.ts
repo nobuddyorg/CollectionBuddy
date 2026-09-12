@@ -24,6 +24,8 @@ export function useSession(): SessionState {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Stryker disable ArrayDeclaration: an empty dependency list and a
+  // constant one are the same to React -- neither changes between renders.
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -50,10 +52,8 @@ export function useSession(): SessionState {
       active = false;
       sub.subscription.unsubscribe();
     };
-    // Stryker disable next-line ArrayDeclaration: an empty dependency list
-    // and a constant one are indistinguishable to React -- neither changes
-    // between renders.
   }, []);
+  // Stryker restore ArrayDeclaration
 
   return { user, loading };
 }

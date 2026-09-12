@@ -118,12 +118,12 @@ export function useImportCategory(existingCategoryNames: string[]) {
     [progress, t, toast, existingCategoryNames],
   );
 
-  // Stryker disable next-line ArrayDeclaration: an empty dependency list
-  // and a constant one are indistinguishable to React -- neither changes
-  // between renders.
+  // Stryker disable ArrayDeclaration: an empty dependency list and a
+  // constant one are the same to React -- neither changes between renders.
   const cancelImport = useCallback(() => {
     controllerRef.current?.abort();
   }, []);
+  // Stryker restore ArrayDeclaration
 
   // Same beforeunload guard as useExportCategory.tsx, for the same reason.
   useEffect(() => {
