@@ -53,6 +53,7 @@ export const SEED = {
     'Werkstatt',
     'Fotostudio',
     'Exportarchiv',
+    'Leihgabe',
   ],
   /** For entries.spec.ts. */
   scratchCategory: 'Werkstatt',
@@ -60,6 +61,15 @@ export const SEED = {
   photoCategory: 'Fotostudio',
   /** For export.spec.ts, which also creates, photographs and deletes an entry. */
   exportCategory: 'Exportarchiv',
+  /**
+   * For rls.spec.ts's `editor`-grant cases.
+   *
+   * Those write as the *grantee* -- editing and deleting the owner's entries,
+   * and adding entries of their own. Münzen, which the viewer-grant cases
+   * share, is a read-only fixture for the rest of the suite, so the editor
+   * cases need a collection of their own to take apart.
+   */
+  editorCategory: 'Leihgabe',
 
   // Oldest first. The list sorts newest-first, so the last one here is the
   // first card on the page.
@@ -124,6 +134,17 @@ export const SEED = {
       category: 'Exportarchiv',
       title: 'Archivstück',
       description: 'Bleibt liegen, damit das Archiv nie leer bleibt.',
+      place: null,
+      place_lat: null,
+      place_lng: null,
+      tags: [],
+    },
+    {
+      // The editor-grant cases edit and delete this one, so they reseed it
+      // themselves rather than counting on it surviving.
+      category: 'Leihgabe',
+      title: 'Leihstück',
+      description: 'Bleibt liegen, damit die Leihgabe nie leer bleibt.',
       place: null,
       place_lat: null,
       place_lng: null,

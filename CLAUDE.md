@@ -163,6 +163,24 @@ so treat every policy change as security-critical, not routine SQL.
   grant, new trigger touching auth/ownership — **must** be called out
   explicitly in the commit message and PR description as a security-relevant
   change, with a one-line explanation of what it now allows or denies.
+- **`.github/workflows/cleanup-orphaned-photos.yml` counts as a database
+  change for that rule.** It is the highest-privilege logic in the repository
+  — a `service_role` key and a bulk Storage delete, on a daily cron, with
+  irreversible deletion of live photographs as its failure mode. Three things
+  in it are load-bearing and look like tidy-ups:
+  - **Both `path_full` and `path_thumb`.** A photograph is two objects held
+    in one row; matching only `path_full` classes every thumbnail in the
+    bucket as orphaned.
+  - **No cast of a path to `uuid`,** anywhere. A malformed path fails a cast
+    outright and aborts the whole query rather than simply not matching — the
+    same reasoning that put the exception handler in `storage_item_id()`.
+  - **The 48h grace period** — the only thing separating "orphaned" from
+    "mid-upload", since the objects are written before the `images` row that
+    references them. Don't shorten it.
+
+  Verify a change to that query with a dry run (`workflow_dispatch`, which
+  defaults to it) before letting it delete anything. See
+  [TEST_STRATEGY.md](TEST_STRATEGY.md) §12.
 - Never treat a client-side check ("only show the delete button if...") as
   authorization. It's UX. The RLS policy is the real check, and any new
   query needs to be covered by one.
@@ -229,6 +247,14 @@ the tradeoff to the user:
   `editor` writes item content inside the shared category.
 - **Search is trigram `ILIKE`, not full-text search** — don't reintroduce
   `tsvector`/FTS columns; they were added once, found unused, and dropped.
+- **A storage object's path never changes** — `authenticated` holds no
+  `UPDATE` on `storage.objects` and no `update` policy exists there
+  (`0008_storage_no_update.sql`), so `move()` and `upsert` are refused for
+  owner and grantee alike. Restoring the verb reopens a real escalation: the
+  shared policy could only key on the path's *second* segment, so an `UPDATE`
+  rewriting the *first* carried the owner's photograph into an editor's
+  namespace, past revocation, past the owner, and past the sweep. See
+  [design-decisions.md#why-a-storage-objects-path-can-never-change](docs/explanation/design-decisions.md#why-a-storage-objects-path-can-never-change).
 - **Storage objects are deleted client-side *before* the DB row**, never
   the other way around — reversing the order orphans image files with no
   way to find them again. There is deliberately no DB-side cleanup trigger
@@ -337,14 +363,20 @@ first — both explain *why*, not just *what*.
   read-only — an editor writes items and photographs inside a shared
   category. Category-level actions (rename, delete, manage shares) stay
   owner-only at every role.
-- `anon` has both RLS denial *and* explicit revoked grants on four of the
-  five tables (defense in depth, not redundancy — don't remove either).
-  `category_shares` is the exception, denied by RLS alone.
+- `anon` has both RLS denial *and* explicit revoked grants on **all five**
+  tables (defense in depth, not redundancy — don't remove either).
+  `category_shares` was the exception until `0011_least_privilege_grants.sql`;
+  there the select was actually being refused by a missing `EXECUTE` on
+  `caller_email()`, not by the table grant the docs described.
+  `authenticated` holds exactly the DML each table's policies back, and no
+  `TRUNCATE`/`REFERENCES`/`TRIGGER` — RLS does not filter `TRUNCATE` at all.
 - Photos: `item-images` Storage bucket, 5 MiB/file limit,
   `image/webp`/`image/jpeg`/`image/png` only; WebP compression happens in
   the browser before upload.
-- Weekly `cleanup-orphaned-photos.yml` sweeps Storage objects a crashed
-  client-side delete left behind (48h grace period).
+- Daily `cleanup-orphaned-photos.yml` sweeps Storage objects that no
+  `images` row references (48h grace period), which a crashed client-side
+  delete or a failed row insert leaves behind. `workflow_dispatch` runs it as
+  a dry run by default.
 
 ## Documentation Sync
 

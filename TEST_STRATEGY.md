@@ -35,7 +35,7 @@ It also names, deliberately, where the estate is currently thin. A strategy that
 | Supabase Storage | One private bucket `item-images`, 5 MiB/file, three image MIME types | Bytes cannot be deleted from SQL. Object paths (`<uid>/<itemId>/<file>`) are load-bearing for authorization. |
 | `photon.komoot.io` | Third-party geocoder, called from the browser | Outside our control, allowed by CSP `connect-src`. Never called from a test. |
 | `*.tile.openstreetmap.org` | Third-party map tiles | Same. |
-| GitHub Actions | CI, unattended production deploy, weekly storage sweep, daily keepalive | Holds `service_role`, `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`. The highest-privilege code in the project is bash inside YAML. |
+| GitHub Actions | CI, unattended production deploy, daily storage sweep, daily keepalive | Holds `service_role`, `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`. The highest-privilege code in the project is bash inside YAML. |
 
 There is **no staging environment**. `pages-deploy.yml`'s `migrate` job applies pending migrations directly to production on every push to `main`. CI is the only thing between a migration and the live database.
 
@@ -45,7 +45,7 @@ There is **no staging environment**. `pages-deploy.yml`'s `migrate` job applies 
 | --- | --- | --- | --- | --- |
 | Unit / component | `web/src/**/*.test.{ts,tsx}` | ~79 files, ~850 cases | Seconds. Treat over ~60s as a problem to fix. | Pre-commit hook, every PR, local |
 | Signed-out browser | `web/e2e/public/` | 5 specs, ~30 cases × 2 viewports (Chromium desktop, Pixel 7) | Low minutes | Every PR, and again against the live site post-deploy |
-| Signed-in integration | `web/e2e/signed-in/` | 9 specs, ~59 cases, needs a real Supabase stack | Low minutes + stack start | `e2e_local_stack` job, local via `npm run e2e:local` |
+| Signed-in integration | `web/e2e/signed-in/` | 9 specs, ~69 cases, needs a real Supabase stack | Low minutes + stack start | `e2e_local_stack` job, local via `npm run e2e:local` |
 | Mutation | Stryker over 22 files (`web/mutation-targets.mjs`) | ~273 mutants | ~1 minute (documented) | Every PR and push to `main` |
 | Repo hygiene | `.pre-commit-config.yaml` | `typos`, `zizmor`, `shellcheck`, `markdownlint`, file checks | Seconds | Gates every other CI job |
 | Schema contract | `ci.yml`, `e2e_local_stack` | 1 diff | Seconds | Every PR |
@@ -57,7 +57,7 @@ This is a mature estate. The work described below is mostly about **closing name
 
 1. **Browser bundle → PostgREST / Storage.** A user's JWT crosses it. Everything on the far side is enforced by RLS and triggers. Anyone can read the bundle, take the anon key, and issue arbitrary requests — so the only meaningful test of this boundary is one that does exactly that.
 2. **Owner → grantee (`category_shares`).** A second identity reaching into someone else's category, at one of two roles. The `editor` role is the most permissive grant the schema can issue.
-3. **`anon` → everything.** Denied by RLS on every table, since `auth.uid()` and `auth.jwt()` are both null there, and denied a second time on four of the five by an explicit `revoke` (`category_shares` is not in that list, so there the predicate stands alone). Both halves need asserting; they fail differently — a revoked grant is `42501` before any predicate runs, a policy filter is an empty result.
+3. **`anon` → everything.** Denied by RLS on every table, since `auth.uid()` and `auth.jwt()` are both null there, and denied a second time on all five by an explicit `revoke` (`category_shares` joined that list in `0011_least_privilege_grants.sql`; before it, the select there was refused by `anon` lacking `EXECUTE` on `caller_email()` rather than by the table grant). Both halves need asserting; they fail differently — a revoked grant is `42501` before any predicate runs, a policy filter is an empty result.
 4. **CI workflow → production.** `SUPABASE_DB_URL` and `service_role` live here. Not covered by any test; covered by `zizmor`, pinned action hashes, and review.
 5. **App → third-party HTTP** (Photon, OSM tiles). Always faked in tests; never reached.
 
@@ -84,8 +84,8 @@ Ranked by expected cost, not by likelihood alone. "Cheapest meaningful test" is 
 | # | Risk | What it costs | Cheapest meaningful test | Status |
 | --- | --- | --- | --- | --- |
 | R1 | **Cross-collection read/write** — a policy stops holding | Silent, total confidentiality failure. The UI looks fine. | Integration: real token, real Postgres, bypassing the UI (`e2e/signed-in/rls.spec.ts`) | Covered for owner-vs-stranger and viewer grants |
-| R2 | **`editor` grant reaches too far** — an editor renames/deletes the category, manages shares, promotes itself, or writes outside the shared category | Privilege escalation between two real accounts | Same level as R1, with a second identity holding an `editor` grant | **Gap — see §7** |
-| R3 | **Photograph orphaning / data loss on delete** | Storage bytes with no way to find them, or an entry that loses its photos | Unit for the ordering (delete bytes *then* row); integration for the cascade | Covered by `photos.spec.ts` + unit; the weekly sweep itself is untested |
+| R2 | **`editor` grant reaches too far** — an editor renames/deletes the category, manages shares, promotes itself, or writes outside the shared category | Privilege escalation between two real accounts | Same level as R1, with a second identity holding an `editor` grant | Covered — `rls.spec.ts`, on `Leihgabe` |
+| R3 | **Photograph orphaning / data loss on delete** | Storage bytes with no way to find them, or an entry that loses its photos | Unit for the ordering (delete bytes *then* row); integration for the cascade | Covered by `photos.spec.ts` + unit; the sweep's predicate is verified against a real database, and has a dry run |
 | R4 | **A migration that cannot apply to production** | Deploy blocked, or worse, half-applied ordering | `supabase start` in CI applies every migration from scratch | Covered from-scratch; **not** covered against a populated database — see §8 |
 | R5 | **Client/schema drift** (`database.types.ts` vs. reality) | Runtime `PGRST204`s after deploy | The generated-types diff in `e2e_local_stack` | Covered |
 | R6 | **Search-term injection into PostgREST's `or=()` grammar** | A search term parsed as filter structure | Unit + mutation on `buildSearchFilter`, plus adversarial-input E2E cases | Covered at both levels |
@@ -96,7 +96,7 @@ Ranked by expected cost, not by likelihood alone. "Cheapest meaningful test" is 
 | R11 | **Duplicate/repeated operations** — a retried photo upload, a re-run import | Duplicate objects or categories | Unit with injected fakes | Partly covered — see §8 |
 | R12 | **Third-party outage** (Photon, OSM tiles) | Degraded map/autocomplete | Unit on the error branch. Not worth an integration test. | Covered |
 | R13 | **Availability** — free-tier project auto-pause | The app is simply down | `keep-alive.yml` (a mitigation, not a test) | Mitigated, unmonitored |
-| R14 | **Workflow logic faults** — the orphan sweep deleting the wrong objects | Irreversible deletion of live photographs, using `service_role` | Nothing cheap exists; it is bash + SQL in YAML | **Gap — see §12** |
+| R14 | **Workflow logic faults** — the orphan sweep deleting the wrong objects | Irreversible deletion of live photographs, using `service_role` | Nothing cheap exists; it is bash + SQL in YAML | Mitigated — dry run, plus the review rules in §12 |
 | R15 | **Capacity / throughput** | Slow list or search | Index design + `explain`, not a load test. Single-user-per-collection app. | Not justified as a test |
 
 ---
@@ -198,17 +198,21 @@ Treat this as the shape to hold, not an accident. Two ways it goes wrong: new po
 6. Both **mirrored surfaces** need covering. `images` (a row naming an object) and `storage.objects` (the bytes) are separate authorization surfaces with separate policies and separate join paths — the table joins `item_categories` by `item_id`, storage parses an id back out of a path. A test against one proves nothing about the other.
 7. Grants must be tested **in both directions**: that an active grant opens exactly what it should, and that revocation and expiry close it again with the object still present — otherwise the test only proves the thing stopped existing.
 
-### The named gap: the `editor` role (R2)
+### The `editor` role (R2)
 
-`0003_tables.sql` allows `role in ('viewer', 'editor')`. An `editor` grant reaches further than anything else in the schema: `has_category_write_access()` lets a non-owner update and delete items in someone else's category, insert `images` rows against someone else's item, link items into someone else's category, and read/write/delete objects under someone else's uid prefix.
+`0003_tables.sql` allows `role in ('viewer', 'editor')`. An `editor` grant reaches further than anything else in the schema: `has_category_write_access()` lets a non-owner update and delete items in someone else's category, insert `images` rows against someone else's item, link items into someone else's category, and read and write objects under someone else's uid prefix.
 
-`rls.spec.ts` currently creates grants only through a helper that omits `role` — every share it tests is a `viewer`. Its "the grant does not extend to writing" case asserts a property that is true of viewers and false of editors, so the most permissive path in the schema has **no integration coverage at all**. The existing `editor` tests (`useShares.test.tsx`, `Sharing.test.tsx`, `ItemList/index.test.tsx`) assert that the client sends the right call and enables the right button — UX, by this repository's own rule, not authorization.
+This was the estate's largest hole for as long as `rls.spec.ts` created grants through a helper that omitted `role` — every share it tested took the `'viewer'` default, and its "the grant does not extend to writing" case asserted a property true of viewers and false of editors. The helper now takes a role, that case is named `a viewer grant does not extend to writing`, and the describe block `a category shared at the editor role` covers the grant itself, on `Leihgabe` — a collection of its own, so the viewer cases on `Münzen` stay undisturbed.
 
-This is the first thing to close. What it needs, at the integration level, with the second seeded collector holding an `editor` grant on a category of its own (so the existing viewer-grant cases on `Münzen` stay undisturbed):
+What it asserts, with the second seeded collector holding the grant:
 
-- An editor **can**: update and delete items in the shared category; add an item and link it in; upload, read and delete photographs of shared items; insert an `images` row for a shared item.
-- An editor **cannot**: rename or delete the category; create, update or delete shares on it; promote itself or anyone else; touch the owner's items in a category it was *not* granted; act at all once the grant has expired or been revoked.
-- The owner's view is unchanged: items an editor created inside the shared category are visible to the owner through the category, and the deliberate asymmetry between `has_category_write_access()` (bundles ownership in) and `has_category_read_access()` (does not) still holds.
+- An editor **can**: edit and delete the owner's entries in the shared collection; file an entry of its own into it; upload, sign and delete a photograph of a shared entry, and insert and delete its `images` row.
+- An editor **cannot**: rename or delete the collection; promote itself; issue a grant of its own; reach a collection it was not granted; write once the grant has been revoked or has expired — both asserted with the entry still present, so it is the grant being tested and not a row that stopped existing.
+- An editor **may** delete its own share. That is the grantee leaving, which `"delete own or invited category_shares"` covers deliberately; it ends its own access and touches nobody else's.
+
+One asymmetry is asserted because it is easy to mistake for a bug and must stay a decision: `has_category_write_access()` bundles category ownership in, `has_category_read_access()` does not (`0006_policies.sql:60-65`). The consequence, executed rather than assumed, is that **owning a collection does not reveal an entry an editor merely filed into it** — the owner never held a grant on that entry, and holding the collection is not one. An earlier draft of this section claimed the opposite; the policy has always behaved this way.
+
+The existing `editor` tests (`useShares.test.tsx`, `Sharing.test.tsx`, `ItemList/index.test.tsx`) assert that the client sends the right call and enables the right button — UX, by this repository's own rule, not authorization. They are not a substitute for the above.
 
 ### Standing rule for schema changes
 
@@ -227,7 +231,7 @@ Any PR touching `supabase/migrations/**` in a way that adds or changes a policy,
 ### Setup that must not be weakened
 
 - **Seed as the user, never as `service_role`.** That role holds no grant on these tables; the service key creates the user and nothing else. A fixture that bypasses RLS can construct states the app cannot reach and will hide real policy bugs.
-- **One scratch category per writing spec.** Specs run in parallel against one database. `Münzen` and `Briefmarken` are read-only fixtures; `Werkstatt`, `Fotostudio` and `Exportarchiv` belong to the specs that write. A test that writes into a collection another spec is counting makes both flaky, at random.
+- **One scratch category per writing spec.** Specs run in parallel against one database. `Münzen` and `Briefmarken` are read-only fixtures; `Werkstatt`, `Fotostudio`, `Exportarchiv` and `Leihgabe` belong to the specs that write — the last to `rls.spec.ts`'s editor cases, which edit and delete what they find there. A test that writes into a collection another spec is counting makes both flaky, at random.
 - **Clean up in `finally`.** Probe rows and probe objects must not survive a failed assertion — the next spec may be counting.
 - **The suite fails on a console error.** `e2e/signed-in/test.ts` fails any test where the page threw or logged an error, which is what catches a rejected query behind a passing assertion. Keep it.
 
@@ -250,7 +254,7 @@ Operations that can be repeated, and what is true of each today:
 | `createShare` for an existing `(category, email)` | Refused by `category_shares_category_email_unique` — re-sharing is a no-op, not a second grant with a different expiry | Assert at integration level |
 | Revoke, then revoke again | Second delete affects zero rows | Trivially safe |
 | `delete_item_if_orphan` on a repeated statement | Set-based and guarded by `not exists`; safe to re-run | Covered by cascade tests |
-| The weekly orphan sweep | 48h grace period is the whole idempotency story — it must never race an in-flight upload | See §12 |
+| The daily orphan sweep | 48h grace period is the whole idempotency story — it must never race an in-flight upload | See §12 |
 
 ### What integration tests should *not* do
 
@@ -342,13 +346,23 @@ Injecting failures into the real stack is **optional** and mostly not worth it; 
 
 ### The orphan-sweep workflow (R14)
 
-`cleanup-orphaned-photos.yml` is the highest-privilege logic in the repository: it fetches a `service_role` key and issues a bulk Storage delete based on a SQL left join. It has no test, and its failure mode is irreversible deletion of live photographs.
+`cleanup-orphaned-photos.yml` is the highest-privilege logic in the repository: it fetches a `service_role` key and issues a bulk Storage delete. Its failure mode is irreversible deletion of live photographs.
 
-It is not worth building a harness for a weekly bash script, but it is worth three cheap things:
+It is still not worth building a harness for a bash script in YAML, and the three cheap things are now in place:
 
-1. Any change to that query or script is reviewed as a security change, like a migration.
-2. The query's shape is deliberate and must be preserved: a **left join**, not `not in (select ...)` with a uuid cast — a malformed path fails a cast outright and aborts the whole query rather than simply not matching. Same reasoning as `storage_item_id()` in an RLS predicate.
-3. The 48h grace period is the only thing separating "orphaned" from "mid-upload". Do not shorten it. If the sweep ever needs to run more aggressively, that is a design conversation, not a parameter tweak.
+1. **Reviewed as a database change.** CLAUDE.md's database guardrail names this file, so a change to its query carries the same expectations as a migration.
+2. **A dry run.** `workflow_dispatch` takes a `dry_run` input that lists exactly what the sweep *would* delete and exits — before the `service_role` key is even fetched, so a dry run never puts that credential on the runner. It defaults to **true**, so a human clicking "Run workflow" gets the harmless answer unless they ask for the other one; a scheduled run sends no inputs and sweeps normally. This is the one piece of real verification available against the production database, and a change to the query should go through it first.
+3. **The invariants are written down** — here and in CLAUDE.md — because the risk is a future edit tidying them away.
+
+What the query must keep:
+
+- **Both `path_full` and `path_thumb`.** A photograph is two Storage objects, `<uuid>.webp` and `<uuid>.thumb.webp`, held in one `images` row. Matching only `path_full` classes every thumbnail in the bucket as orphaned and deletes it. This is not hypothetical: it is what a straightforward reading of the fix for #636 produces, and it was caught by executing the predicate rather than reading it.
+- **No cast of a path to `uuid`,** anywhere. A malformed path fails a cast outright and aborts the whole query rather than simply not matching — the same reasoning as `storage_item_id()` in an RLS predicate. Comparing text to text cannot raise.
+- **The 48h grace period.** The only thing separating "orphaned" from "mid-upload", since `useItemImages.tsx` writes both objects before inserting the row that names them. Do not shorten it. If the sweep ever needs to run more aggressively, that is a design conversation, not a parameter tweak.
+
+The predicate asks "does any `images` row reference this object", which is what orphaned actually means. It previously asked "does an item with this id exist", parsed out of the path — a proxy that answered wrongly in both directions: it kept an object whose path merely names a live item, and it could never find one whose row insert failed after the bytes landed.
+
+Verified against a real database, with the cases that distinguish the three readings: an object no row references but whose item still exists (**collected**), an object inside the grace period (**kept**), an object referenced as `path_full` (**kept**), one referenced as `path_thumb` (**kept** — the case that fails under a `path_full`-only predicate), a path whose second segment is not a uuid (**collected, without raising**), and an object in another bucket (**untouched**). The plan is two anti-joins, each on its own unique index.
 
 ---
 
@@ -376,7 +390,7 @@ Identical to the PR set (CI runs on `push` to `main` too), plus the mutation das
 
 ### Scheduled
 
-- Weekly: the orphaned-photograph sweep (an operation, not a test).
+- Daily: the orphaned-photograph sweep (an operation, not a test).
 - Daily: `keepalive()` (a mitigation, not a test).
 - Weekly: Dependabot, grouped, with a 7-day cooldown. Auto-merge is restricted to **patch-level `direct:development` bumps** — a devDependency can reach the CI runner, a runtime dependency reaches every signed-in user's browser. Anything runtime waits for a human. That restriction is a security control; do not widen it.
 
@@ -455,8 +469,6 @@ This document is expected to change. It is wrong the moment the architecture mov
 
 | Gap | Section | Priority |
 | --- | --- | --- |
-| `editor`-role grants have no integration-level authorization coverage | §7 | **High** — it is the most permissive grant in the schema |
 | Migrations are only ever exercised against an empty database | §8 | Medium — contained by `needs: migrate`, but discovered in production |
 | Photo-upload retry against a partially-succeeded upload is unasserted | §8 | Low |
-| `cleanup-orphaned-photos.yml`'s query and script are untested and high-privilege | §12 | Low frequency, high consequence — handle by review discipline |
 | Property-based testing not adopted for the four escaping/packing functions | §10 | Optional, dependency cost is real |
