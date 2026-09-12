@@ -1,5 +1,6 @@
 'use client';
 
+import { labelClasses } from '../ui/labelClasses';
 // Rendered in both panel states so the heading doesn't move when the panel
 // toggles open or closed.
 export function CategoryText({
@@ -18,9 +19,7 @@ export function CategoryText({
 }) {
   return (
     <div className="truncate">
-      <h2 className="font-label text-[0.6875rem] text-muted-foreground mb-1">
-        {title}
-      </h2>
+      <h2 className={labelClasses('mb-1')}>{title}</h2>
       {loading ? (
         <div
           data-testid="selected-category"

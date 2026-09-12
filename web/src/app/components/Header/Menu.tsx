@@ -3,6 +3,7 @@
 import { useI18n } from '../../i18n/useI18n';
 import { THEME_PREFERENCES, useTheme } from '../../useTheme';
 import type { MenuProps } from './types';
+import { labelClasses } from '../ui/labelClasses';
 
 function SegmentedControl<T extends string>({
   value,
@@ -56,9 +57,7 @@ export default function Menu({
       aria-labelledby="user-menu-button"
       className="absolute right-0 mt-2 w-56 rounded-sm border bg-card text-card-foreground backdrop-blur p-1 shadow-lg"
     >
-      <div className="px-3 py-2 font-label text-[0.6875rem] text-muted-foreground truncate">
-        {user.email}
-      </div>
+      <div className={labelClasses('px-3 py-2 truncate')}>{user.email}</div>
 
       {/* Caption above, not beside, so the layout doesn't depend on how
           long the translation of "Language" happens to be. */}

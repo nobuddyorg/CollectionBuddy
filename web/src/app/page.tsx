@@ -12,6 +12,7 @@ import Header from './components/Header';
 import ItemList from './components/ItemList';
 import { ItemListSkeleton } from './components/ItemList/Skeleton';
 import LoadingOverlay from './components/LoadingOverlay';
+import { labelClasses } from './components/ui/labelClasses';
 import { useI18n } from './i18n/useI18n';
 import { useCatalogue } from './useCatalogue';
 import { useSession } from './useSession';
@@ -127,7 +128,11 @@ export default function Page() {
         )}
       </main>
 
-      <footer className="px-4 py-10 pb-[calc(2.5rem+env(safe-area-inset-bottom))] text-center font-label text-[0.6875rem] text-muted-foreground">
+      <footer
+        className={labelClasses(
+          'px-4 py-10 pb-[calc(2.5rem+env(safe-area-inset-bottom))] text-center',
+        )}
+      >
         {t('page.footer')}
       </footer>
     </div>
