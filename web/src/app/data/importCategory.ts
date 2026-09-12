@@ -134,6 +134,18 @@ async function uploadWithRetry(
   return { error: lastErr };
 }
 
+type PhotoTask = { itemId: string; archivePath: string };
+
+/** The raw calls one photograph's round trip makes, threaded through from
+ * importCategory's own parameters so a test drives both with one set of
+ * fakes. */
+type PhotoImportCalls = {
+  uploadImage: typeof uploadImageObject;
+  createImage: typeof createImageRow;
+  compressThumb: (bytes: Uint8Array<ArrayBuffer>) => Promise<Blob>;
+  signal?: AbortSignal;
+};
+
 type ManifestItem = {
   title: string;
   description: string | null;
@@ -174,6 +186,67 @@ async function createImportedItem(
     });
   }
   return data.id;
+}
+
+/**
+ * Recreates one archived photograph: the full size as it came out of the
+ * archive, a freshly derived thumbnail, and the `images` row naming both.
+ * A thumbnail failing on its own is not a failure -- `path_thumb` goes null
+ * and the photograph stands, as in the app's own upload path.
+ *
+ * Returns false for a photograph left out (missing from the archive, or
+ * still failing after `uploadWithRetry`'s attempts), which is reported and
+ * skipped rather than failing the import. Cancellation is the one error
+ * that propagates.
+ */
+async function importPhoto(
+  task: PhotoTask,
+  bytes: Uint8Array<ArrayBuffer> | undefined,
+  uid: string,
+  { uploadImage, createImage, compressThumb, signal }: PhotoImportCalls,
+): Promise<boolean> {
+  if (!bytes) {
+    console.error('Photo missing from archive', task.archivePath);
+    return false;
+  }
+  try {
+    const thumb = await compressThumb(bytes);
+    const base = crypto.randomUUID();
+    const pathBase = `${imagePrefix(uid, task.itemId)}/${base}`;
+    const { error: fullError } = await uploadWithRetry(
+      `${pathBase}.webp`,
+      new Blob([bytes], { type: 'image/webp' }),
+      uploadImage,
+      signal,
+    );
+    if (fullError) {
+      throw new Error('Could not upload photograph', { cause: fullError });
+    }
+    const { error: thumbError } = await uploadWithRetry(
+      `${pathBase}.thumb.webp`,
+      thumb,
+      uploadImage,
+      signal,
+    );
+    if (thumbError) {
+      console.warn('Thumbnail upload failed:', thumbError);
+    }
+
+    const { error: rowError } = await createImage({
+      item_id: task.itemId,
+      path_full: `${pathBase}.webp`,
+      path_thumb: thumbError ? null : `${pathBase}.thumb.webp`,
+      size_bytes: bytes.length,
+    });
+    if (rowError) {
+      throw new Error('Could not record photograph', { cause: rowError });
+    }
+    return true;
+  } catch (err) {
+    if (err instanceof ImportCancelledError) throw err;
+    console.error('Skipping photograph', task.archivePath, err);
+    return false;
+  }
 }
 
 /**
@@ -273,7 +346,7 @@ export async function importCategory({
   // original error is the one worth reporting.
   try {
     onProgress?.({ phase: 'items', done: 0, total: manifestItems.length });
-    const photoTasks: { itemId: string; archivePath: string }[] = [];
+    const photoTasks: PhotoTask[] = [];
     let itemsDone = 0;
     for (const item of manifestItems) {
       checkCancelled(signal);
@@ -302,53 +375,14 @@ export async function importCategory({
 
     await runPool(photoTasks, PHOTO_UPLOAD_CONCURRENCY, async (task) => {
       checkCancelled(signal);
-      const bytes = entries.get(`${root}/${task.archivePath}`);
-      if (!bytes) {
-        console.error('Photo missing from archive', task.archivePath);
-        skippedPhotoCount++;
-        onProgress?.({ phase: 'photos', done: ++done, total });
-        return;
-      }
-      try {
-        const thumb = await compressThumb(bytes);
-        const base = crypto.randomUUID();
-        const pathBase = `${imagePrefix(uid, task.itemId)}/${base}`;
-        const { error: fullError } = await uploadWithRetry(
-          `${pathBase}.webp`,
-          new Blob([bytes], { type: 'image/webp' }),
-          uploadImage,
-          signal,
-        );
-        if (fullError) {
-          throw new Error('Could not upload photograph', {
-            cause: fullError,
-          });
-        }
-        const { error: thumbError } = await uploadWithRetry(
-          `${pathBase}.thumb.webp`,
-          thumb,
-          uploadImage,
-          signal,
-        );
-        if (thumbError) {
-          console.warn('Thumbnail upload failed:', thumbError);
-        }
-
-        const { error: rowError } = await createImage({
-          item_id: task.itemId,
-          path_full: `${pathBase}.webp`,
-          path_thumb: thumbError ? null : `${pathBase}.thumb.webp`,
-          size_bytes: bytes.length,
-        });
-        if (rowError) {
-          throw new Error('Could not record photograph', { cause: rowError });
-        }
-        photoCount++;
-      } catch (err) {
-        if (err instanceof ImportCancelledError) throw err;
-        console.error('Skipping photograph', task.archivePath, err);
-        skippedPhotoCount++;
-      }
+      const imported = await importPhoto(
+        task,
+        entries.get(`${root}/${task.archivePath}`),
+        uid,
+        { uploadImage, createImage, compressThumb, signal },
+      );
+      if (imported) photoCount++;
+      else skippedPhotoCount++;
       onProgress?.({ phase: 'photos', done: ++done, total });
     });
 

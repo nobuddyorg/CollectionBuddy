@@ -250,7 +250,7 @@ Operations that can be repeated, and what is true of each today:
 | Operation | Repeat behaviour | Covered? |
 | --- | --- | --- |
 | Import the same archive twice | Creates a **second category**, deliberately. `manifest.items[].id` is carried for a future merge identity but nothing reads it that way. | Documented; assert it, so it stays a decision rather than a discovery |
-| Photo upload retry (`uploadWithRetry`, 3 attempts) | Retries the **same path**. Every Storage failure is treated as retryable, so a retry after a partially-succeeded upload can hit a conflicting object. | Worth a unit test with a fake that fails after writing |
+| Photo upload retry (`uploadWithRetry`, 3 attempts) | Retries the **same path**. Every Storage failure is treated as retryable, so a retry after a partially-succeeded upload hits an object it cannot overwrite — there is no update policy on `storage.objects` — and the photograph is skipped, leaving the written object to the sweep | Covered — `importCategory.test.ts`, with a fake that writes before failing |
 | `createShare` for an existing `(category, email)` | Refused by `category_shares_category_email_unique` — re-sharing is a no-op, not a second grant with a different expiry | Assert at integration level |
 | Revoke, then revoke again | Second delete affects zero rows | Trivially safe |
 | `delete_item_if_orphan` on a repeated statement | Set-based and guarded by `not exists`; safe to re-run | Covered by cascade tests |
@@ -470,5 +470,4 @@ This document is expected to change. It is wrong the moment the architecture mov
 | Gap | Section | Priority |
 | --- | --- | --- |
 | Migrations are only ever exercised against an empty database | §8 | Medium — contained by `needs: migrate`, but discovered in production |
-| Photo-upload retry against a partially-succeeded upload is unasserted | §8 | Low |
 | Property-based testing not adopted for the four escaping/packing functions | §10 | Optional, dependency cost is real |
