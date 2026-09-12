@@ -55,12 +55,19 @@ describe('the pre-paint script in layout.tsx', () => {
   const layout = readFileSync(new URL('layout.tsx', import.meta.url), 'utf8');
   const initScript = layout.slice(layout.indexOf('const THEME_INIT_SCRIPT'));
 
+  // Both sides spelled out. Interpolating the constant into the expectation
+  // instead compares the script against whatever the constant happens to
+  // say, which is a test that cannot fail when the constant is the thing
+  // that changed -- and the constant changing while the inlined string does
+  // not is the whole failure this pair is here to catch.
   it('reads the same storage key the hook writes', () => {
-    expect(initScript).toContain(`'${THEME_STORAGE_KEY}'`);
+    expect(THEME_STORAGE_KEY).toBe('theme');
+    expect(initScript).toContain(`localStorage.getItem('theme')`);
   });
 
   it('asks the OS the same question the hook asks', () => {
-    expect(initScript).toContain(`'${THEME_MEDIA_QUERY}'`);
+    expect(THEME_MEDIA_QUERY).toBe('(prefers-color-scheme: dark)');
+    expect(initScript).toContain(`matchMedia('(prefers-color-scheme: dark)')`);
   });
 
   it('writes the attribute the dark variant in globals.css selects on', () => {

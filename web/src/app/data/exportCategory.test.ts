@@ -1197,6 +1197,33 @@ describe('confirmLargeExport', () => {
     expect(confirmLargeExport).not.toHaveBeenCalled();
   });
 
+  // The check is a `>`, so a total sitting exactly on the threshold is not
+  // a large export. Nothing else pins which side of the boundary the prompt
+  // starts on, and both neighbours of this case pass either way.
+  it('does not ask for a total sitting exactly on the threshold', async () => {
+    const confirmLargeExport = vi.fn().mockResolvedValue(true);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => okResponse([1])),
+    );
+    try {
+      const result = await exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        getSession: fakeGetSession('uid'),
+        listItems: paginatedListItems([item({ id: 'a' })]),
+        listImages: fakeListImagesWithSizes({
+          a: [{ name: '1.webp', size: LARGE_EXPORT_WARN_BYTES }],
+        }),
+        signUrls: fakeSignUrls(),
+        confirmLargeExport,
+      });
+      expect(confirmLargeExport).not.toHaveBeenCalled();
+      expect(result.photoCount).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('asks, with the total bytes, once the threshold is exceeded, and proceeds when accepted', async () => {
     const bigSize = LARGE_EXPORT_WARN_BYTES + 1;
     const confirmLargeExport = vi.fn().mockResolvedValue(true);

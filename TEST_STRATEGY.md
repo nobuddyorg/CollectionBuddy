@@ -43,10 +43,10 @@ There is **no staging environment**. `pages-deploy.yml`'s `migrate` job applies 
 
 | Suite | Location | Volume | Runtime target | Where it runs |
 | --- | --- | --- | --- | --- |
-| Unit / component | `web/src/**/*.test.{ts,tsx}` | ~79 files, ~850 cases | Seconds. Treat over ~60s as a problem to fix. | Pre-commit hook, every PR, local |
+| Unit / component | `web/src/**/*.test.{ts,tsx}` | 79 files, ~920 cases | Seconds. Treat over ~60s as a problem to fix. | Pre-commit hook, every PR, local |
 | Signed-out browser | `web/e2e/public/` | 5 specs, ~30 cases × 2 viewports (Chromium desktop, Pixel 7) | Low minutes | Every PR, and again against the live site post-deploy |
 | Signed-in integration | `web/e2e/signed-in/` | 9 specs, ~69 cases, needs a real Supabase stack | Low minutes + stack start | `e2e_local_stack` job, local via `npm run e2e:local` |
-| Mutation | Stryker over 22 files (`web/mutation-targets.mjs`) | ~273 mutants | ~1 minute (documented) | Every PR and push to `main` |
+| Mutation | Stryker over 22 files (`web/mutation-targets.mjs`) | ~975 mutants scored, of ~1550 generated — the rest fall inside the `Stryker disable` regions | Low minutes | Every PR and push to `main` |
 | Repo hygiene | `.pre-commit-config.yaml` | `typos`, `zizmor`, `shellcheck`, `markdownlint`, file checks | Seconds | Gates every other CI job |
 | Schema contract | `ci.yml`, `e2e_local_stack` | 1 diff | Seconds | Every PR |
 | Post-deploy smoke | `e2e/public/` against the live URL | Same ~30 cases | Low minutes | Every deploy |
@@ -149,7 +149,7 @@ It is not the usual pyramid. The middle band is unusually load-bearing, because 
 ```text
 Layer                             Roughly today   Runs against
 --------------------------------  --------------  --------------------------------
-Unit + component                       ~850       jsdom, fakes; 22 files mutation-scored
+Unit + component                       ~920       jsdom, fakes; 22 files mutation-scored
 API-level integration                   ~25       real Postgres + Storage, real JWTs,
   (rls.spec.ts + storage assertions)               no browser — ~2/3 of it authorization
 Browser, signed-in journeys             ~37       real stack, real bundle
@@ -313,7 +313,20 @@ Conditions if it is adopted: a **seeded, deterministic** runner (a recorded fail
 - An equivalent mutant (a check the type system needs but the runtime cannot reach) is marked `// Stryker disable next-line all` **with a comment saying why**. Never a test that cannot fail.
 - CI runs it on **every PR**, not just `main`. Learning after the merge that a test asserts nothing is learning it too late.
 
-Score has been 100% against a `break` of 90. §14 explains why the threshold stays at 90.
+Score is **99.18%** against a `break` of 90: 977 mutants scored, 8 surviving. This document reported 100%, which is not what the suite measures on the pinned Stryker (9.6.1) and the current 22-file list; why the two differ is recorded nowhere, so this says what was measured rather than reconstructing the history. Three of the eleven survivors found while writing this down were killed on the spot, because each was a real assertion the suite was missing: the export's large-archive warning sits on a `>` that nothing pinned, and `useTheme`'s storage key and media query were compared against themselves instead of against the literals `layout.tsx`'s pre-hydration script hardcodes.
+
+The eight left are not missing assertions. Each is either a branch no caller can reach or a message string, and each needs the same decision -- kill it, or mark it `// Stryker disable next-line all` with the reason -- which §16 carries as open work rather than settling here:
+
+| Survivor | Reading |
+| --- | --- |
+| `exportCategory.ts:161` — `data ?? []` in `fetchPhotoPaths` | A fabricated row carries no `item_id`, so it lands under a key no item ever asks for and no output changes. Unobservable. |
+| `imageEntries.ts:94` — the `.filter` dropping half-signed rows | `getCachedSignedUrl` and the map-building `.filter` below already discard a null URL, so removing this one changes nothing a caller can see. Unobservable. |
+| `imageEntries.ts:83`, `zip.ts:202` — a `console.error` message and a `ZipReadError` message | Killable only by asserting the prose, which pins wording rather than behaviour. |
+| `zip.ts:221`, `zip.ts:243` — the two `>` bounds in `readZipEntries` | Equality needs an archive whose central header or entry data ends exactly at EOF; the EOCD that follows both makes that impossible in a well-formed file, so the mutant only differs on a hand-crafted corrupt one. |
+| `getFocusable.ts:6` — the `el.hidden` fast path | `getComputedStyle` reports `display: none` for a hidden element in jsdom and in a browser alike (nothing in `globals.css` overrides `[hidden]`), so the check below already covers it. |
+| `exportFormat.ts:94` — the `^` anchor in `SAFE_EXTENSION` | `extensionOf` slices from the last dot, so the candidate always starts with one and the anchor cannot decide anything. |
+
+§14 explains why the threshold stays at 90.
 
 ---
 
@@ -413,7 +426,7 @@ Every number below has a reason. A gate without one is noise.
 | Global coverage floor | statements 85, branches 78, functions 85, lines 88 (`vitest.config.mts`) | A **floor**, set by hand below what the suite actually achieves, with enough margin that CI's measurement (~0.1pp below local, pinned Node) does not flap. It exists to catch a large regression, not to chase a target. |
 | `autoUpdate` | `false`, permanently | It was `true`. It wrote the local measurement back after every run, so a green local run kept producing a red PR. Raise by hand when coverage genuinely improves. |
 | Per-file coverage floor | 100% on every file in `mutation-targets.mjs` except the two in `NO_COVERAGE_FLOOR` | These are small, pure, and high-consequence. 100% is reachable without contortion, and anything less on a file this size means a branch nobody thought about. |
-| Mutation score | `break: 90`, `low: 90`, `high: 100`; actual has been 100% | The break stays at 90 rather than 100 to leave room for a genuinely equivalent mutant to appear without blocking an unrelated PR. Dropping from 100 is still a signal to investigate — it just is not an automatic stop. |
+| Mutation score | `break: 90`, `low: 90`, `high: 100`; actual 99.18% (977 scored, 8 surviving) | The break stays at 90 rather than 100 to leave room for a genuinely equivalent mutant to appear without blocking an unrelated PR — which is the room the eight survivors in §11 are sitting in. Dropping further is still a signal to investigate; it just is not an automatic stop. |
 | Coverage/mutation thresholds, direction | **Never lowered** | A threshold lowered to make CI pass converts a design problem into a permanently weaker gate. If a legitimate change makes one unreachable, redesign or raise it with the user. |
 | Test pass rate | 100%, `retries: 0` except the deployed target | A flake is a defect. The deployed run is the one place where a retry genuinely distinguishes a broken deploy from a dropped connection. |
 | Authorization tests | The `rls.spec.ts` suite must pass; a migration touching policies/grants/ownership triggers must ship a matching assertion in the same PR | The only authorization boundary in the product. See §7. |
@@ -470,4 +483,5 @@ This document is expected to change. It is wrong the moment the architecture mov
 | Gap | Section | Priority |
 | --- | --- | --- |
 | Migrations are only ever exercised against an empty database | §8 | Medium — contained by `needs: migrate`, but discovered in production |
+| Eight surviving mutants, each to be killed or marked equivalent with a reason in the code | §11 | Low — all eight are read as unreachable or message-only, but the reading lives here rather than beside the code |
 | Property-based testing not adopted for the four escaping/packing functions | §10 | Optional, dependency cost is real |
