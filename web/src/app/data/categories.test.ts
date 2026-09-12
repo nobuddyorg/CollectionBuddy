@@ -84,6 +84,7 @@ describe('renameCategory', () => {
     expect(from).toHaveBeenCalledWith('categories');
     expect(calls[0]).toEqual({ method: 'update', args: [{ name: 'Stamps' }] });
     expect(calls[1]).toEqual({ method: 'eq', args: ['id', 'cat-1'] });
+    expect(calls[2]).toEqual({ method: 'select', args: ['id,name,user_id'] });
   });
 });
 

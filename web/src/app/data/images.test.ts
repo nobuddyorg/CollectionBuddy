@@ -38,7 +38,8 @@ describe('createSignedUrls', () => {
   it('signs against the item-images bucket, defaulting to a one hour expiry', () => {
     const { from, createSignedUrls: signFn } = mockStorageFrom();
     void createSignedUrls(['uid/item/1.webp', 'uid/item/2.webp']);
-    expect(from).toHaveBeenCalledWith(ITEM_IMAGES_BUCKET);
+    expect(ITEM_IMAGES_BUCKET).toBe('item-images');
+    expect(from).toHaveBeenCalledWith('item-images');
     expect(signFn).toHaveBeenCalledWith(
       ['uid/item/1.webp', 'uid/item/2.webp'],
       3600,
@@ -140,15 +141,24 @@ function mockImagesQuery(
   },
 ) {
   const calls: { chunk: string[]; from: number; to: number }[] = [];
+  const orders: unknown[][] = [];
+  let columns = '';
   let chunk: string[] = [];
   let range: [number, number] = [0, 0];
   const builder: Record<string, (...args: unknown[]) => unknown> = {};
-  builder.select = () => builder;
-  builder.in = (_col: unknown, ids: unknown) => {
+  builder.select = (select: unknown) => {
+    columns = select as string;
+    return builder;
+  };
+  builder.in = (col: unknown, ids: unknown) => {
+    orders.push(['in', col]);
     chunk = ids as string[];
     return builder;
   };
-  builder.order = () => builder;
+  builder.order = (...args: unknown[]) => {
+    orders.push(args);
+    return builder;
+  };
   builder.range = (from: unknown, to: unknown) => {
     range = [from as number, to as number];
     return builder;
@@ -159,12 +169,12 @@ function mockImagesQuery(
   };
   const from = vi.fn().mockReturnValue(builder);
   vi.spyOn(supabase, 'from').mockImplementation(from);
-  return { from, calls };
+  return { from, calls, orders, columns: () => columns };
 }
 
 describe('listImagesForItems', () => {
   it('selects the listing columns for a single page, single chunk', async () => {
-    const { from, calls } = mockImagesQuery((chunk) => ({
+    const { from, calls, columns } = mockImagesQuery((chunk) => ({
       data: chunk.map((id, i) => ({ item_id: id, n: i })),
       error: null,
     }));
@@ -173,13 +183,38 @@ describe('listImagesForItems', () => {
     expect(error).toBeNull();
     expect(data).toEqual([{ item_id: 'item-1', n: 0 }]);
     expect(calls).toEqual([{ chunk: ['item-1'], from: 0, to: 999 }]);
+    expect(columns()).toBe('id, item_id, path_full, path_thumb');
+  });
+
+  // Oldest first, with the row id breaking a tie between two photographs
+  // uploaded in the same instant: this order is what puts an item's first
+  // photograph in its hero slot, and it matches the index that serves it.
+  it('asks for the rows in the order the grid hangs them', async () => {
+    const { orders } = mockImagesQuery(() => ({ data: [], error: null }));
+    await listImagesForItems(['item-1']);
+    expect(orders).toEqual([
+      ['in', 'item_id'],
+      ['created_at', { ascending: true }],
+      ['id', { ascending: true }],
+    ]);
   });
 
   it('stops as soon as a page comes back empty', async () => {
-    mockImagesQuery(() => ({ data: [], error: null }));
+    const { calls } = mockImagesQuery(() => ({ data: [], error: null }));
     const { data, error } = await listImagesForItems(['item-1']);
     expect(error).toBeNull();
     expect(data).toEqual([]);
+    expect(calls).toHaveLength(1);
+  });
+
+  // No rows is `[]`, but a page that answers with neither rows nor an error
+  // still has to end the walk rather than being read for a length.
+  it('stops on a page that answers with nothing at all', async () => {
+    const { calls } = mockImagesQuery(() => ({ data: null, error: null }));
+    const { data, error } = await listImagesForItems(['item-1']);
+    expect(error).toBeNull();
+    expect(data).toEqual([]);
+    expect(calls).toHaveLength(1);
   });
 
   it('returns the error and gives up as soon as a page fails', async () => {
@@ -194,6 +229,8 @@ describe('listImagesForItems', () => {
     const ids = Array.from({ length: 150 }, (_, i) => `item-${i}`);
     const { calls } = mockImagesQuery(() => ({ data: [], error: null }));
     await listImagesForItems(ids);
+    // Exactly two, not a third empty one: the chunk walk stops at the last
+    // id rather than one past it.
     expect(calls).toHaveLength(2);
     expect(calls[0].chunk).toHaveLength(100);
     expect(calls[1].chunk).toHaveLength(50);
@@ -225,16 +262,24 @@ describe('listImagesForItems', () => {
 
 describe('listImagePathsForItems', () => {
   it('selects path columns without the row id', async () => {
-    const { calls } = mockImagesQuery(() => ({ data: [], error: null }));
+    const { calls, columns } = mockImagesQuery(() => ({
+      data: [],
+      error: null,
+    }));
     await listImagePathsForItems(['item-1']);
     expect(calls).toEqual([{ chunk: ['item-1'], from: 0, to: 999 }]);
+    expect(columns()).toBe('item_id, path_full, path_thumb');
   });
 });
 
 describe('listExportImagesForItems', () => {
   it('selects export columns without path_thumb', async () => {
-    const { calls } = mockImagesQuery(() => ({ data: [], error: null }));
+    const { calls, columns } = mockImagesQuery(() => ({
+      data: [],
+      error: null,
+    }));
     await listExportImagesForItems(['item-1']);
     expect(calls).toEqual([{ chunk: ['item-1'], from: 0, to: 999 }]);
+    expect(columns()).toBe('item_id, path_full, size_bytes');
   });
 });

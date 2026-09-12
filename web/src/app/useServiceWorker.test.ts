@@ -18,6 +18,17 @@ describe('useServiceWorker', () => {
     expect(register).toHaveBeenCalledWith('/sw.js', { scope: '/' });
   });
 
+  it('registers once, however often the page re-renders', () => {
+    const register = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { serviceWorker: { register } });
+    const { rerender } = renderHook(() => useServiceWorker());
+
+    rerender();
+    rerender();
+
+    expect(register).toHaveBeenCalledOnce();
+  });
+
   it('does nothing when the browser has no serviceWorker support', () => {
     vi.stubGlobal('navigator', {});
     expect(() => renderHook(() => useServiceWorker())).not.toThrow();

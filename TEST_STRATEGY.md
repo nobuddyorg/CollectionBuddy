@@ -26,7 +26,7 @@ It also names, deliberately, where the estate is currently thin. A strategy that
 
 | Piece | What it is | Testing consequence |
 | --- | --- | --- |
-| `web/` | Next.js 16, `output: 'export'`, React 19, Tailwind 4 | No server runtime, no route handlers, no server-side authorization to test. The deployable is a folder of static files served under `/CollectionBuddy`. |
+| `web/` | Next.js with `output: 'export'`, React, Tailwind (versions pinned in `web/package.json`) | No server runtime, no route handlers, no server-side authorization to test. The deployable is a folder of static files served under a base path. |
 | GitHub Pages | Static host | Deployment failures are path failures (base path, icon 404, stale CDN asset), not runtime failures. They need a real fetch against the deployed origin to find. |
 | Supabase Postgres | A handful of tables, plus the functions, triggers and indexes around them (`supabase/migrations/`) | Behaviour lives in SQL: normalization triggers, ownership triggers, a statement-level orphan sweep, generated columns. None of it is reachable from a unit test. |
 | Postgres RLS | The policy migrations, for the tables and for the storage bucket | The entire authorization boundary. |

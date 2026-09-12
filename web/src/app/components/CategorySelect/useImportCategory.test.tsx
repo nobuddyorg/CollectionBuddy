@@ -119,7 +119,11 @@ describe('useImportCategory', () => {
       expect.objectContaining({ file: FILE, categoryName: 'Coins (2)' }),
     );
     expect(onImported).toHaveBeenCalledWith('cat-9');
-    expect(await screen.findByRole('status')).toHaveTextContent('Coins (2)');
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Imported as "Coins (2)".',
+    );
+    // Nothing was skipped, so nothing is reported as skipped.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(result.current.isImporting).toBe(false);
   });
 
@@ -147,7 +151,36 @@ describe('useImportCategory', () => {
       await result.current.runImport(FILE);
     });
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('1');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '1 of 3 photographs could not be imported.',
+    );
+  });
+
+  it('says what it is doing while the archive is still being read', async () => {
+    let release: (() => void) | undefined;
+    vi.mocked(importCategory).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve(imported());
+        }),
+    );
+    const { result } = renderHook(() => useImportCategory([]), { wrapper });
+
+    act(() => {
+      void result.current.runImport(FILE);
+    });
+
+    await waitFor(() =>
+      expect(result.current.progress).toEqual({
+        phase: 'reading',
+        done: 0,
+        total: 0,
+      }),
+    );
+    expect(result.current.message).toBe('Reading archive…');
+    await act(async () => {
+      release?.();
+    });
   });
 
   it('rejects a file that is not one of this app archives', async () => {
@@ -159,7 +192,11 @@ describe('useImportCategory', () => {
     });
 
     expect(importCategory).not.toHaveBeenCalled();
-    expect(await screen.findByRole('alert')).toBeVisible();
+    // The format complaint, not the generic one: the file was read, it just
+    // was not one of ours.
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "This file isn't a CollectionBuddy export archive.",
+    );
   });
 
   it('reports an archive whose manifest is not this app format', async () => {
@@ -172,11 +209,16 @@ describe('useImportCategory', () => {
       await result.current.runImport(FILE);
     });
 
-    expect(await screen.findByRole('alert')).toBeVisible();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "This file isn't a CollectionBuddy export archive.",
+    );
     expect(result.current.isImporting).toBe(false);
   });
 
   it('reports any other failure as an import error', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
     vi.mocked(importCategory).mockRejectedValue(new Error('offline'));
     const { result } = renderHook(() => useImportCategory([]), { wrapper });
 
@@ -184,7 +226,14 @@ describe('useImportCategory', () => {
       await result.current.runImport(FILE);
     });
 
-    expect(await screen.findByRole('alert')).toBeVisible();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not import this archive. Please try again.',
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      'import category',
+      expect.any(Error),
+    );
+    consoleError.mockRestore();
   });
 
   it('announces a cancelled import instead of reporting it', async () => {
@@ -196,6 +245,25 @@ describe('useImportCategory', () => {
     });
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(await screen.findByText('Import cancelled.')).toBeInTheDocument();
+  });
+
+  it('can be cancelled when nothing is running, without complaint', () => {
+    const { result } = renderHook(() => useImportCategory([]), { wrapper });
+
+    expect(() => result.current.cancelImport()).not.toThrow();
+  });
+
+  // A changing identity would re-fire every effect that depends on it.
+  it('keeps one cancel function across re-renders', () => {
+    const { result, rerender } = renderHook(() => useImportCategory([]), {
+      wrapper,
+    });
+    const first = result.current.cancelImport;
+
+    rerender();
+
+    expect(result.current.cancelImport).toBe(first);
   });
 
   it('aborts the run in flight when cancelled', async () => {

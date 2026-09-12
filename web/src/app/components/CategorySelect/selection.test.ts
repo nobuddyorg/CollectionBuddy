@@ -22,10 +22,26 @@ describe('sortCategories', () => {
     expect(sorted.map((c) => c.id)).toEqual(['a', 'b', 'c']);
   });
 
+  // Two names that differ only in case compare equal, so the list keeps
+  // the order it arrived in rather than shuffling by capitalisation.
+  it('does not let case decide between two otherwise identical names', () => {
+    const sorted = sortCategories([cat('a', 'Apfel'), cat('b', 'apfel')]);
+    expect(sorted.map((c) => c.id)).toEqual(['a', 'b']);
+  });
+
   it('leaves the given list alone', () => {
     const cats = [cat('b', 'Stamps'), cat('a', 'Coins')];
     sortCategories(cats);
     expect(cats.map((c) => c.id)).toEqual(['b', 'a']);
+  });
+});
+
+// Spelled out rather than compared against the constant: what matters is
+// that the key does not change between releases, since a changed one loses
+// every visitor's remembered selection.
+describe('SELECTED_CATEGORY_KEY', () => {
+  it('is the namespaced key visits are remembered under', () => {
+    expect(SELECTED_CATEGORY_KEY).toBe('collectionbuddy.selectedCategory');
   });
 });
 
