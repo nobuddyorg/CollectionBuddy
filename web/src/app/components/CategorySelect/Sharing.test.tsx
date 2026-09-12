@@ -102,6 +102,40 @@ describe('SharingSection', () => {
     expect(screen.getByLabelText('Expires (optional)')).toHaveFocus();
   });
 
+  // The field itself is `sr-only`; the button beside it is the whole
+  // interface for picking a date, so on an engine that has a picker it has
+  // to open it rather than just focusing something invisible.
+  it('opens the native picker on a browser that has one', async () => {
+    const showPicker = vi.fn();
+    const original = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'showPicker',
+    );
+    Object.defineProperty(HTMLInputElement.prototype, 'showPicker', {
+      value: showPicker,
+      configurable: true,
+      writable: true,
+    });
+    try {
+      renderSection(sharesState());
+      await userEvent.click(screen.getByTitle('Expires (optional)'));
+
+      expect(showPicker).toHaveBeenCalled();
+      expect(screen.getByLabelText('Expires (optional)')).not.toHaveFocus();
+    } finally {
+      if (original) {
+        Object.defineProperty(
+          HTMLInputElement.prototype,
+          'showPicker',
+          original,
+        );
+      } else {
+        delete (HTMLInputElement.prototype as { showPicker?: unknown })
+          .showPicker;
+      }
+    }
+  });
+
   it('shows the picked date and clears it back to "No expiry"', async () => {
     renderSection(sharesState());
     fireEvent.change(screen.getByLabelText('Expires (optional)'), {
@@ -294,6 +328,33 @@ describe('SharingSection', () => {
     await userEvent.click(screen.getByTestId('confirm-accept'));
 
     expect(updateShareRole).toHaveBeenCalledWith('share-1', 'editor');
+  });
+
+  it('closes the role modal again, leaving the row as it was', async () => {
+    const updateShareRole = vi.fn().mockResolvedValue(true);
+    renderSection(
+      sharesState({
+        shares: [
+          {
+            id: 'share-1',
+            invited_email: 'grantee@example.com',
+            expires_at: null,
+            owner_user_id: 'owner-1',
+            role: 'viewer',
+          },
+        ],
+        updateShareRole,
+      }),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit access' }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Close' }),
+    );
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(updateShareRole).not.toHaveBeenCalled();
   });
 
   it('revokes only after the confirmation is accepted', async () => {
