@@ -1,11 +1,3 @@
-/**
- * The pure half of the catalogue's photograph handling: shaping `images`
- * rows into per-item entries and resolving each one's signed URL. Kept
- * apart from `useItemImages.tsx` so what carries the risk is mutation-
- * tested (mutation-targets.mjs) without a `Stryker disable` region around
- * the hook's Supabase calls, timers and compression.
- */
-
 import { createSignedUrls, type ImageListRow } from '../../data/images';
 import {
   cacheSignedUrls,
@@ -20,10 +12,8 @@ export type ImageEntryData = {
   pathThumb?: string;
 };
 
-// Groups a flat multi-item row set into one entry map per item, keyed by
-// row id, preserving query order (oldest first per item, listImagesForItems)
-// -- what keeps the first photograph of an item in the hero slot as more
-// are added.
+// Query order is preserved per item, which is what keeps an item's first
+// photograph in the hero slot as more are added.
 export function groupImageRows(
   rows: ImageListRow[],
 ): Map<string, Map<string, ImageEntryData>> {
@@ -43,7 +33,7 @@ export function groupImageRows(
 
 export function toImgEntries(
   entryData: Map<string, ImageEntryData>,
-  signedUrlMap: Map<string, string>,
+  signedUrlMap: ReadonlyMap<string, string | undefined>,
 ): ImgEntry[] {
   const entries: ImgEntry[] = [];
   for (const data of entryData.values()) {
@@ -91,9 +81,7 @@ export async function signEntries(
   }
 
   const signedUrlMap = new Map(
-    allPaths
-      .map((path) => [path, getCachedSignedUrl(path)] as const)
-      .filter((pair): pair is readonly [string, string] => !!pair[1]),
+    allPaths.map((path) => [path, getCachedSignedUrl(path)] as const),
   );
 
   const result: Record<string, ImgEntry[]> = {};

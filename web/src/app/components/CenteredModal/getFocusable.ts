@@ -3,7 +3,6 @@
 // untestable here. getComputedStyle needs no layout pass, so it works the
 // same under jsdom and a real browser.
 function isVisible(el: HTMLElement): boolean {
-  if (el.hidden) return false;
   const style = window.getComputedStyle(el);
   return style.display !== 'none' && style.visibility !== 'hidden';
 }

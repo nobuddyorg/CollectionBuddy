@@ -197,7 +197,10 @@ describe('signEntries', () => {
       signUrls,
     );
 
-    expect(consoleError).toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      'Failed to create signed URLs',
+      expect.any(Error),
+    );
     // The item whose signature already existed keeps showing it...
     expect(result['item-3a']?.[0]?.urlFull).toBe('https://signed/stale');
     // ...and the one that needed a fresh signature that never arrived is

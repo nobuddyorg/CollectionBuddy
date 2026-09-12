@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   ExportCancelledError,
+  ExportError,
   exportCategory,
   ITEM_PAGE_SIZE,
   LARGE_EXPORT_WARN_BYTES,
@@ -207,21 +208,26 @@ describe('exportCategory', () => {
     expect(result.itemCount).toBe(0);
   });
 
-  it('treats a null photograph listing the same as an empty one', async () => {
+  // Unlike the two null payloads above and below, this one is not read as
+  // "nothing to do". No rows is `[]`; a null answer to the photographs
+  // query would hand back an archive with no photographs in it and nothing
+  // counted as skipped -- indistinguishable from a collection that has
+  // none, for an export whose canonical use is "export, then delete the
+  // originals".
+  it('fails the export rather than shipping an archive a null photograph listing emptied', async () => {
     const listImages = (async () => ({
       data: null,
       error: null,
     })) as unknown as ListImages;
-    const result = await exportCategory({
-      category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
-      listItems: paginatedListItems([item({ id: 'a' })]),
-      listImages,
-      signUrls: fakeSignUrls(),
-    });
-    expect(result.itemCount).toBe(1);
-    expect(result.photoCount).toBe(0);
-    expect(result.skippedPhotoCount).toBe(0);
+    await expect(
+      exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        getSession: fakeGetSession('uid'),
+        listItems: paginatedListItems([item({ id: 'a' })]),
+        listImages,
+        signUrls: fakeSignUrls(),
+      }),
+    ).rejects.toThrow(ExportError);
   });
 
   it('treats a null signed-URL list the same as one with no rows, skipping every photograph it covered', async () => {

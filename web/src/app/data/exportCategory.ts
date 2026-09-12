@@ -152,13 +152,16 @@ async function fetchPhotoPaths(
 }> {
   checkCancelled(signal);
   const { data, error } = await listImages(items.map((item) => item.id));
-  if (error) {
+  // No rows is `[]`, so a null payload means the query did not answer --
+  // exporting an archive with no photographs in it would be the wrong way
+  // to find that out.
+  if (error || !data) {
     throw new ExportError('Could not list photographs', { cause: error });
   }
 
   const photoPathsByItemId = new Map<string, string[]>();
   let totalBytes = 0;
-  for (const row of data ?? []) {
+  for (const row of data) {
     const paths = photoPathsByItemId.get(row.item_id) ?? [];
     paths.push(row.path_full);
     photoPathsByItemId.set(row.item_id, paths);
