@@ -63,7 +63,7 @@ With `E2E_BASE_URL` set it starts no server of its own. That run is what catches
 
 ### The signed-in suite
 
-`e2e/signed-in/` runs against a real database: the catalogue, search, the map, the entry forms, photographs, exporting a category, and — in `rls.spec.ts` — the row-level security boundary itself. That last one is the executable version of the RLS model, and nearly all of it deliberately bypasses the interface: one test looks at the page, and the other twenty-odd ask Postgres directly, with a real token, the questions the app would never think to ask. Change a policy in `0006_policies.sql` or `0007_storage.sql` and this is the file that says whether it still holds — with the one gap named in [TEST_STRATEGY.md](../../TEST_STRATEGY.md): `editor`-role grants aren't covered there yet.
+`e2e/signed-in/` runs against a real database: the catalogue, search, the map, the entry forms, photographs, exporting a category, and — in `rls.spec.ts` — the row-level security boundary itself. That last one is the executable version of the RLS model, and nearly all of it deliberately bypasses the interface: one test looks at the page, and the other twenty-odd ask Postgres directly, with a real token, the questions the app would never think to ask. Change a policy in `0006_policies.sql` or `0007_storage.sql` and this is the file that says whether it still holds, including the `editor` grant — the widest one the schema can issue — in its own describe block.
 
 ```bash
 supabase start     # from the repository root

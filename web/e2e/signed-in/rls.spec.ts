@@ -1063,4 +1063,94 @@ test.describe('a category shared at the editor role', () => {
       if (!left) await unshare(token, shareId);
     }
   });
+
+  // The escalation 0008_storage_no_update.sql closes, asserted through the
+  // real Storage API rather than against the policy text. `move()` was the
+  // sharpest form of it: "update shared objects" authorized on segment 2 of
+  // the path while the owner-only policies authorize on segment 1, so
+  // rewriting segment 1 satisfied both and carried the object into the
+  // editor's own namespace -- out of reach of revocation, of the owner, and
+  // of the weekly sweep, all three.
+  test('an editor cannot move the owner photograph out of the owner prefix', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken, otherUserId } = context();
+    const { categoryId, itemId } = await ownerEntryIn(
+      token,
+      userId,
+      'rls-editor-move-probe',
+    );
+    const path = `${userId}/${itemId}/rls-editor-move-probe.webp`;
+    const stolen = `${otherUserId}/${itemId}/stolen.webp`;
+    const shareId = await editorShare(token, categoryId);
+
+    try {
+      const { error: uploadError } = await apiAs(token)
+        .storage.from('item-images')
+        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+      expect(uploadError).toBeNull();
+
+      const { error: moveError } = await apiAs(otherToken)
+        .storage.from('item-images')
+        .move(path, stolen);
+      expect(moveError).not.toBeNull();
+
+      // Copying is a separate capability (select on the source, insert on the
+      // destination) and is deliberately still allowed -- but it leaves the
+      // owner's own object where it was, which is the invariant that matters.
+      const { data: stillThere } = await apiAs(token)
+        .storage.from('item-images')
+        .list(`${userId}/${itemId}`);
+      expect((stillThere ?? []).map((object) => object.name)).toContain(
+        'rls-editor-move-probe.webp',
+      );
+
+      // And the owner can still sign it, which `list` alone would not prove.
+      const { error: signError } = await apiAs(token)
+        .storage.from('item-images')
+        .createSignedUrl(path, 60);
+      expect(signError).toBeNull();
+    } finally {
+      await apiAs(otherToken).storage.from('item-images').remove([stolen]);
+      await apiAs(token).storage.from('item-images').remove([path, stolen]);
+      await unshare(token, shareId);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // The same invariant from the other side: nobody may move an object even
+  // within their *own* prefix, because UPDATE on storage.objects is gone
+  // entirely rather than merely pinned to segment 1.
+  test('an owner cannot move a photograph either, within their own prefix', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId } = context();
+    const { itemId } = await ownerEntryIn(
+      token,
+      userId,
+      'rls-owner-move-probe',
+    );
+    const path = `${userId}/${itemId}/rls-owner-move-probe.webp`;
+    const moved = `${userId}/${itemId}/rls-owner-moved.webp`;
+
+    try {
+      const { error: uploadError } = await apiAs(token)
+        .storage.from('item-images')
+        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+      expect(uploadError).toBeNull();
+
+      const { error: moveError } = await apiAs(token)
+        .storage.from('item-images')
+        .move(path, moved);
+      expect(moveError).not.toBeNull();
+
+      // Uploading, signing and removing -- everything the app actually does --
+      // are untouched by the lost UPDATE.
+      const { error: signError } = await apiAs(token)
+        .storage.from('item-images')
+        .createSignedUrl(path, 60);
+      expect(signError).toBeNull();
+    } finally {
+      await apiAs(token).storage.from('item-images').remove([path, moved]);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
 });

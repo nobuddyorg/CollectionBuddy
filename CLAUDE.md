@@ -229,6 +229,14 @@ the tradeoff to the user:
   `editor` writes item content inside the shared category.
 - **Search is trigram `ILIKE`, not full-text search** — don't reintroduce
   `tsvector`/FTS columns; they were added once, found unused, and dropped.
+- **A storage object's path never changes** — `authenticated` holds no
+  `UPDATE` on `storage.objects` and no `update` policy exists there
+  (`0008_storage_no_update.sql`), so `move()` and `upsert` are refused for
+  owner and grantee alike. Restoring the verb reopens a real escalation: the
+  shared policy could only key on the path's *second* segment, so an `UPDATE`
+  rewriting the *first* carried the owner's photograph into an editor's
+  namespace, past revocation, past the owner, and past the weekly sweep. See
+  [design-decisions.md#why-a-storage-objects-path-can-never-change](docs/explanation/design-decisions.md#why-a-storage-objects-path-can-never-change).
 - **Storage objects are deleted client-side *before* the DB row**, never
   the other way around — reversing the order orphans image files with no
   way to find them again. There is deliberately no DB-side cleanup trigger
