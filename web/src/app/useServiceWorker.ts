@@ -16,5 +16,8 @@ export function useServiceWorker(): void {
       .catch((err: unknown) => {
         console.error('Service worker registration failed:', err);
       });
+    // Stryker disable next-line ArrayDeclaration: an empty dependency list
+    // and a constant one are indistinguishable to React -- neither changes
+    // between renders.
   }, []);
 }

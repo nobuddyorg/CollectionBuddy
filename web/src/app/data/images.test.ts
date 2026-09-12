@@ -225,6 +225,13 @@ describe('listImagesForItems', () => {
     expect(error).toBe(boom);
   });
 
+  it('asks nothing more of a list that fills its last chunk exactly', async () => {
+    const ids = Array.from({ length: 200 }, (_, i) => `item-${i}`);
+    const { calls } = mockImagesQuery(() => ({ data: [], error: null }));
+    await listImagesForItems(ids);
+    expect(calls).toHaveLength(2);
+  });
+
   it('splits more than 100 ids into chunks of 100', async () => {
     const ids = Array.from({ length: 150 }, (_, i) => `item-${i}`);
     const { calls } = mockImagesQuery(() => ({ data: [], error: null }));

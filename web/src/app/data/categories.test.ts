@@ -194,6 +194,15 @@ describe('listItemIdsLinkedElsewhere', () => {
 
   // `.in()` puts every id in the query string; thousands of UUIDs would hit
   // a URL length limit before the row cap does, hence chunking.
+  it('asks nothing more of a list that fills its last chunk exactly', async () => {
+    const ids = Array.from({ length: 200 }, (_, i) => `id-${i}`);
+    const listPage = vi.fn().mockResolvedValue({ data: [], error: null });
+
+    await listItemIdsLinkedElsewhere(ids, 'cat-1', listPage);
+
+    expect(listPage).toHaveBeenCalledTimes(2);
+  });
+
   it('chunks a candidate list over 100 ids into multiple .in() calls', async () => {
     const ids = Array.from({ length: 250 }, (_, i) => `id-${i}`);
     const page1 = [{ item_id: 'id-0' }];

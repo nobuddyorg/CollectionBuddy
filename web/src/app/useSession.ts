@@ -32,6 +32,10 @@ export function useSession(): SessionState {
       // onAuthStateChange below still catches a session that turns out
       // to be stale.
       const { data } = await supabase.auth.getSession();
+      // Stryker disable next-line ConditionalExpression: React drops a state
+      // update from an unmounted component on the floor, so no test can see
+      // this guard working -- it stays because skipping the work is still
+      // the right thing to do.
       if (!active) return;
       setUser(sessionUserFrom(data.session?.user));
       setLoading(false);
@@ -41,9 +45,14 @@ export function useSession(): SessionState {
       setUser(sessionUserFrom(session?.user));
     });
     return () => {
+      // Stryker disable next-line BooleanLiteral: the other half of the
+      // guard above, and unobservable for the same reason.
       active = false;
       sub.subscription.unsubscribe();
     };
+    // Stryker disable next-line ArrayDeclaration: an empty dependency list
+    // and a constant one are indistinguishable to React -- neither changes
+    // between renders.
   }, []);
 
   return { user, loading };

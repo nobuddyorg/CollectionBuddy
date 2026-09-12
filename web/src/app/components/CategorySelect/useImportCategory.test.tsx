@@ -184,6 +184,9 @@ describe('useImportCategory', () => {
   });
 
   it('rejects a file that is not one of this app archives', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
     vi.mocked(readZipEntries).mockResolvedValue(new Map() as never);
     const { result } = renderHook(() => useImportCategory([]), { wrapper });
 
@@ -191,6 +194,13 @@ describe('useImportCategory', () => {
       await result.current.runImport(FILE);
     });
 
+    expect(consoleError).toHaveBeenCalledWith(
+      'import category',
+      expect.objectContaining({
+        message: 'Not a CollectionBuddy export archive',
+      }),
+    );
+    consoleError.mockRestore();
     expect(importCategory).not.toHaveBeenCalled();
     // The format complaint, not the generic one: the file was read, it just
     // was not one of ours.
@@ -200,6 +210,9 @@ describe('useImportCategory', () => {
   });
 
   it('reports an archive whose manifest is not this app format', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
     vi.mocked(importCategory).mockRejectedValue(
       new ImportFormatError('Not a CollectionBuddy export archive'),
     );
@@ -212,7 +225,12 @@ describe('useImportCategory', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       "This file isn't a CollectionBuddy export archive.",
     );
+    expect(consoleError).toHaveBeenCalledWith(
+      'import category',
+      expect.any(ImportFormatError),
+    );
     expect(result.current.isImporting).toBe(false);
+    consoleError.mockRestore();
   });
 
   it('reports any other failure as an import error', async () => {
