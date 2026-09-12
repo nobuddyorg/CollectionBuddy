@@ -854,8 +854,10 @@ test.describe('a category shared at the editor role', () => {
       'rls-editor-photo-probe',
     );
     const shareId = await editorShare(token, categoryId);
-    // An editor's upload lands under the *editor's* uid prefix (imagePrefix,
-    // data/images.ts), which is what "write shared objects" exists for.
+    // An editor's upload lands under the *editor's own* uid prefix
+    // (imagePrefix, data/images.ts), so "upload own objects" is what admits
+    // it -- and since 0010_storage_pin_upload_prefix.sql that is the only
+    // policy that admits an insert at all.
     const path = `${otherUserId}/${itemId}/rls-editor-probe.webp`;
 
     try {
@@ -1151,6 +1153,44 @@ test.describe('a category shared at the editor role', () => {
     } finally {
       await apiAs(otherToken).storage.from('item-images').remove([stolen]);
       await apiAs(token).storage.from('item-images').remove([path, stolen]);
+      await unshare(token, shareId);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // The insert side of the same root cause. "nothing can be written under
+  // their prefix" above covers a stranger, whom no policy ever admitted; this
+  // covers the holder of an editor grant, whom "write shared objects" did --
+  // it constrained the path's second segment and said nothing about the
+  // first, so an editor could store bytes of their choosing under the owner's
+  // uid, against her quota, served back to her by her own read policy and
+  // attributable to her by path alone.
+  test('an editor cannot plant an object under the owner prefix', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const { categoryId, itemId } = await ownerEntryIn(
+      token,
+      userId,
+      'rls-editor-plant-probe',
+    );
+    const planted = `${userId}/${itemId}/planted-by-the-editor.webp`;
+    const shareId = await editorShare(token, categoryId);
+
+    try {
+      const { error: plantError } = await apiAs(otherToken)
+        .storage.from('item-images')
+        .upload(planted, new Blob(['hostile'], { type: 'image/webp' }));
+      expect(plantError).not.toBeNull();
+
+      // Satisfiable read: the owner can see her own prefix, so an empty
+      // listing is the policy refusing the write rather than hiding it.
+      const { data: mine } = await apiAs(token)
+        .storage.from('item-images')
+        .list(`${userId}/${itemId}`);
+      expect(mine ?? []).toEqual([]);
+    } finally {
+      await apiAs(otherToken).storage.from('item-images').remove([planted]);
+      await apiAs(token).storage.from('item-images').remove([planted]);
       await unshare(token, shareId);
       await apiAs(token).from('items').delete().eq('id', itemId);
     }
