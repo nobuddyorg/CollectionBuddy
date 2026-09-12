@@ -45,7 +45,7 @@ There is **no staging environment**. `pages-deploy.yml`'s `migrate` job applies 
 | --- | --- | --- | --- | --- |
 | Unit / component | `web/src/**/*.test.{ts,tsx}` | ~79 files, ~850 cases | Seconds. Treat over ~60s as a problem to fix. | Pre-commit hook, every PR, local |
 | Signed-out browser | `web/e2e/public/` | 5 specs, ~30 cases × 2 viewports (Chromium desktop, Pixel 7) | Low minutes | Every PR, and again against the live site post-deploy |
-| Signed-in integration | `web/e2e/signed-in/` | 9 specs, ~59 cases, needs a real Supabase stack | Low minutes + stack start | `e2e_local_stack` job, local via `npm run e2e:local` |
+| Signed-in integration | `web/e2e/signed-in/` | 9 specs, ~69 cases, needs a real Supabase stack | Low minutes + stack start | `e2e_local_stack` job, local via `npm run e2e:local` |
 | Mutation | Stryker over 22 files (`web/mutation-targets.mjs`) | ~273 mutants | ~1 minute (documented) | Every PR and push to `main` |
 | Repo hygiene | `.pre-commit-config.yaml` | `typos`, `zizmor`, `shellcheck`, `markdownlint`, file checks | Seconds | Gates every other CI job |
 | Schema contract | `ci.yml`, `e2e_local_stack` | 1 diff | Seconds | Every PR |
@@ -84,7 +84,7 @@ Ranked by expected cost, not by likelihood alone. "Cheapest meaningful test" is 
 | # | Risk | What it costs | Cheapest meaningful test | Status |
 | --- | --- | --- | --- | --- |
 | R1 | **Cross-collection read/write** — a policy stops holding | Silent, total confidentiality failure. The UI looks fine. | Integration: real token, real Postgres, bypassing the UI (`e2e/signed-in/rls.spec.ts`) | Covered for owner-vs-stranger and viewer grants |
-| R2 | **`editor` grant reaches too far** — an editor renames/deletes the category, manages shares, promotes itself, or writes outside the shared category | Privilege escalation between two real accounts | Same level as R1, with a second identity holding an `editor` grant | **Gap — see §7** |
+| R2 | **`editor` grant reaches too far** — an editor renames/deletes the category, manages shares, promotes itself, or writes outside the shared category | Privilege escalation between two real accounts | Same level as R1, with a second identity holding an `editor` grant | Covered — `rls.spec.ts`, on `Leihgabe` |
 | R3 | **Photograph orphaning / data loss on delete** | Storage bytes with no way to find them, or an entry that loses its photos | Unit for the ordering (delete bytes *then* row); integration for the cascade | Covered by `photos.spec.ts` + unit; the weekly sweep itself is untested |
 | R4 | **A migration that cannot apply to production** | Deploy blocked, or worse, half-applied ordering | `supabase start` in CI applies every migration from scratch | Covered from-scratch; **not** covered against a populated database — see §8 |
 | R5 | **Client/schema drift** (`database.types.ts` vs. reality) | Runtime `PGRST204`s after deploy | The generated-types diff in `e2e_local_stack` | Covered |
@@ -198,17 +198,21 @@ Treat this as the shape to hold, not an accident. Two ways it goes wrong: new po
 6. Both **mirrored surfaces** need covering. `images` (a row naming an object) and `storage.objects` (the bytes) are separate authorization surfaces with separate policies and separate join paths — the table joins `item_categories` by `item_id`, storage parses an id back out of a path. A test against one proves nothing about the other.
 7. Grants must be tested **in both directions**: that an active grant opens exactly what it should, and that revocation and expiry close it again with the object still present — otherwise the test only proves the thing stopped existing.
 
-### The named gap: the `editor` role (R2)
+### The `editor` role (R2)
 
-`0003_tables.sql` allows `role in ('viewer', 'editor')`. An `editor` grant reaches further than anything else in the schema: `has_category_write_access()` lets a non-owner update and delete items in someone else's category, insert `images` rows against someone else's item, link items into someone else's category, and read/write/delete objects under someone else's uid prefix.
+`0003_tables.sql` allows `role in ('viewer', 'editor')`. An `editor` grant reaches further than anything else in the schema: `has_category_write_access()` lets a non-owner update and delete items in someone else's category, insert `images` rows against someone else's item, link items into someone else's category, and read and write objects under someone else's uid prefix.
 
-`rls.spec.ts` currently creates grants only through a helper that omits `role` — every share it tests is a `viewer`. Its "the grant does not extend to writing" case asserts a property that is true of viewers and false of editors, so the most permissive path in the schema has **no integration coverage at all**. The existing `editor` tests (`useShares.test.tsx`, `Sharing.test.tsx`, `ItemList/index.test.tsx`) assert that the client sends the right call and enables the right button — UX, by this repository's own rule, not authorization.
+This was the estate's largest hole for as long as `rls.spec.ts` created grants through a helper that omitted `role` — every share it tested took the `'viewer'` default, and its "the grant does not extend to writing" case asserted a property true of viewers and false of editors. The helper now takes a role, that case is named `a viewer grant does not extend to writing`, and the describe block `a category shared at the editor role` covers the grant itself, on `Leihgabe` — a collection of its own, so the viewer cases on `Münzen` stay undisturbed.
 
-This is the first thing to close. What it needs, at the integration level, with the second seeded collector holding an `editor` grant on a category of its own (so the existing viewer-grant cases on `Münzen` stay undisturbed):
+What it asserts, with the second seeded collector holding the grant:
 
-- An editor **can**: update and delete items in the shared category; add an item and link it in; upload, read and delete photographs of shared items; insert an `images` row for a shared item.
-- An editor **cannot**: rename or delete the category; create, update or delete shares on it; promote itself or anyone else; touch the owner's items in a category it was *not* granted; act at all once the grant has expired or been revoked.
-- The owner's view is unchanged: items an editor created inside the shared category are visible to the owner through the category, and the deliberate asymmetry between `has_category_write_access()` (bundles ownership in) and `has_category_read_access()` (does not) still holds.
+- An editor **can**: edit and delete the owner's entries in the shared collection; file an entry of its own into it; upload, sign and delete a photograph of a shared entry, and insert and delete its `images` row.
+- An editor **cannot**: rename or delete the collection; promote itself; issue a grant of its own; reach a collection it was not granted; write once the grant has been revoked or has expired — both asserted with the entry still present, so it is the grant being tested and not a row that stopped existing.
+- An editor **may** delete its own share. That is the grantee leaving, which `"delete own or invited category_shares"` covers deliberately; it ends its own access and touches nobody else's.
+
+One asymmetry is asserted because it is easy to mistake for a bug and must stay a decision: `has_category_write_access()` bundles category ownership in, `has_category_read_access()` does not (`0006_policies.sql:60-65`). The consequence, executed rather than assumed, is that **owning a collection does not reveal an entry an editor merely filed into it** — the owner never held a grant on that entry, and holding the collection is not one. An earlier draft of this section claimed the opposite; the policy has always behaved this way.
+
+The existing `editor` tests (`useShares.test.tsx`, `Sharing.test.tsx`, `ItemList/index.test.tsx`) assert that the client sends the right call and enables the right button — UX, by this repository's own rule, not authorization. They are not a substitute for the above.
 
 ### Standing rule for schema changes
 
@@ -227,7 +231,7 @@ Any PR touching `supabase/migrations/**` in a way that adds or changes a policy,
 ### Setup that must not be weakened
 
 - **Seed as the user, never as `service_role`.** That role holds no grant on these tables; the service key creates the user and nothing else. A fixture that bypasses RLS can construct states the app cannot reach and will hide real policy bugs.
-- **One scratch category per writing spec.** Specs run in parallel against one database. `Münzen` and `Briefmarken` are read-only fixtures; `Werkstatt`, `Fotostudio` and `Exportarchiv` belong to the specs that write. A test that writes into a collection another spec is counting makes both flaky, at random.
+- **One scratch category per writing spec.** Specs run in parallel against one database. `Münzen` and `Briefmarken` are read-only fixtures; `Werkstatt`, `Fotostudio`, `Exportarchiv` and `Leihgabe` belong to the specs that write — the last to `rls.spec.ts`'s editor cases, which edit and delete what they find there. A test that writes into a collection another spec is counting makes both flaky, at random.
 - **Clean up in `finally`.** Probe rows and probe objects must not survive a failed assertion — the next spec may be counting.
 - **The suite fails on a console error.** `e2e/signed-in/test.ts` fails any test where the page threw or logged an error, which is what catches a rejected query behind a passing assertion. Keep it.
 
@@ -455,7 +459,6 @@ This document is expected to change. It is wrong the moment the architecture mov
 
 | Gap | Section | Priority |
 | --- | --- | --- |
-| `editor`-role grants have no integration-level authorization coverage | §7 | **High** — it is the most permissive grant in the schema |
 | Migrations are only ever exercised against an empty database | §8 | Medium — contained by `needs: migrate`, but discovered in production |
 | Photo-upload retry against a partially-succeeded upload is unasserted | §8 | Low |
 | `cleanup-orphaned-photos.yml`'s query and script are untested and high-privilege | §12 | Low frequency, high consequence — handle by review discipline |

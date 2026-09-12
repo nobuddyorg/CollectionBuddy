@@ -29,21 +29,31 @@ function apiAs(token: string) {
   );
 }
 
-/** Grants `invitedEmail` read access to `categoryId`, as the category's owner. */
+/**
+ * Grants `invitedEmail` access to `categoryId`, as the category's owner.
+ *
+ * `role` defaults to `'viewer'` the way the column itself does
+ * (0003_tables.sql), so the cases that omit it keep testing exactly what they
+ * tested before. Passing `'editor'` is the widest grant the schema can issue.
+ */
 async function share(
   token: string,
   categoryId: string,
   invitedEmail: string,
-  window?: { createdAt: string; expiresAt: string },
+  options?: {
+    role?: 'viewer' | 'editor';
+    window?: { createdAt: string; expiresAt: string };
+  },
 ) {
   const { data, error } = await apiAs(token)
     .from('category_shares')
     .insert({
       category_id: categoryId,
       invited_email: invitedEmail,
-      ...(window && {
-        created_at: window.createdAt,
-        expires_at: window.expiresAt,
+      ...(options?.role && { role: options.role }),
+      ...(options?.window && {
+        created_at: options.window.createdAt,
+        expires_at: options.window.expiresAt,
       }),
     })
     .select('id')
@@ -470,8 +480,7 @@ test.describe('a category shared with another collector', () => {
     const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     const expiresAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const shareId = await share(token, categoryId, SEED.other.email, {
-      createdAt,
-      expiresAt,
+      window: { createdAt, expiresAt },
     });
 
     try {
@@ -506,10 +515,12 @@ test.describe('a category shared with another collector', () => {
     }
   });
 
-  // The grant is meant to be view-only. Asserted directly rather than
+  // A *viewer* grant is meant to be view-only. Asserted directly rather than
   // assumed from the absence of a write policy, so a permissive policy added
-  // elsewhere in the chain can't pass silently.
-  test('the grant does not extend to writing', async ({}, testInfo) => {
+  // elsewhere in the chain can't pass silently. The role is named in the title
+  // because this is not the write boundary in general: an `editor` grant is
+  // supposed to reach past it, which the describe block below covers.
+  test('a viewer grant does not extend to writing', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, userId, otherToken } = context();
     const categoryId = await mineCategoryId(token, userId, 'Münzen');
@@ -638,6 +649,418 @@ test.describe('a category shared with another collector', () => {
       expect(after).toEqual([]);
     } finally {
       await apiAs(token).from('images').delete().eq('id', planted!.id);
+    }
+  });
+});
+
+// `has_category_write_access()` is the widest predicate in the schema: an
+// active grant at role 'editor' lets a non-owner edit item *content* inside
+// someone else's category. Everything above tests a viewer, whose grant stops
+// at reading -- so none of it says anything about this path. These cases run
+// on `Leihgabe`, a collection of their own, because they edit and delete the
+// entries they find there.
+test.describe('a category shared at the editor role', () => {
+  /** The shared collection, plus a throwaway entry of the owner's inside it. */
+  async function ownerEntryIn(
+    token: string,
+    userId: string,
+    title: string,
+  ): Promise<{ categoryId: string; itemId: string }> {
+    const categoryId = await mineCategoryId(token, userId, SEED.editorCategory);
+    const { data: item, error: itemError } = await apiAs(token)
+      .from('items')
+      .insert({ user_id: userId, title })
+      .select('id')
+      .single();
+    if (itemError) throw itemError;
+
+    const { error: linkError } = await apiAs(token)
+      .from('item_categories')
+      .insert({ item_id: item!.id, category_id: categoryId });
+    if (linkError) throw linkError;
+
+    return { categoryId, itemId: item!.id };
+  }
+
+  async function editorShare(token: string, categoryId: string) {
+    return share(token, categoryId, SEED.other.email, { role: 'editor' });
+  }
+
+  test('an editor edits and deletes the owner entries it was granted', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const { categoryId, itemId } = await ownerEntryIn(
+      token,
+      userId,
+      'rls-editor-edit-probe',
+    );
+    const shareId = await editorShare(token, categoryId);
+
+    try {
+      const { data: updated } = await apiAs(otherToken)
+        .from('items')
+        .update({ title: 'edited by the editor' })
+        .eq('id', itemId)
+        .select('id');
+      expect(updated).toHaveLength(1);
+
+      // Read back as the owner: a write accepted but hidden from its owner
+      // would be the worst outcome of all.
+      const { data: after } = await apiAs(token)
+        .from('items')
+        .select('title')
+        .eq('id', itemId)
+        .single();
+      expect(after!.title).toBe('edited by the editor');
+
+      const { data: deleted } = await apiAs(otherToken)
+        .from('items')
+        .delete()
+        .eq('id', itemId)
+        .select('id');
+      expect(deleted).toHaveLength(1);
+
+      const { data: gone } = await apiAs(token)
+        .from('items')
+        .select('id')
+        .eq('id', itemId);
+      expect(gone).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // The gate here is tg_item_categories_enforce (0002_functions.sql), not a
+  // policy: the insert policy only checks user_id = auth.uid(), and the
+  // trigger sets that column itself.
+  test('an editor files an entry of its own into the shared collection', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken, otherUserId } = context();
+    const categoryId = await mineCategoryId(token, userId, SEED.editorCategory);
+    const shareId = await editorShare(token, categoryId);
+
+    const { data: mine, error: insertError } = await apiAs(otherToken)
+      .from('items')
+      .insert({ user_id: otherUserId, title: 'rls-editor-own-entry' })
+      .select('id')
+      .single();
+    expect(insertError).toBeNull();
+
+    try {
+      const { error: linkError } = await apiAs(otherToken)
+        .from('item_categories')
+        .insert({ item_id: mine!.id, category_id: categoryId });
+      expect(linkError).toBeNull();
+
+      // The entry stays the editor's own -- the trigger files it under the
+      // item's owner, not under whoever owns the category.
+      const { data: link } = await apiAs(otherToken)
+        .from('item_categories')
+        .select('user_id')
+        .eq('item_id', mine!.id)
+        .single();
+      expect(link!.user_id).toBe(otherUserId);
+    } finally {
+      await unshare(token, shareId);
+      await apiAs(otherToken).from('items').delete().eq('id', mine!.id);
+    }
+  });
+
+  // The deliberate asymmetry in 0006_policies.sql, asserted so it stays a
+  // decision rather than becoming a surprise: has_category_write_access()
+  // bundles category ownership in, has_category_read_access() does not. The
+  // consequence is that owning the category does *not* grant sight of an
+  // entry an editor merely linked into it -- the owner never had a grant on
+  // that entry, and holding the category is not one.
+  test('owning the collection does not reveal an entry the editor filed into it', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken, otherUserId } = context();
+    const categoryId = await mineCategoryId(token, userId, SEED.editorCategory);
+    const shareId = await editorShare(token, categoryId);
+
+    const { data: mine } = await apiAs(otherToken)
+      .from('items')
+      .insert({ user_id: otherUserId, title: 'rls-editor-invisible-entry' })
+      .select('id')
+      .single();
+
+    try {
+      await apiAs(otherToken)
+        .from('item_categories')
+        .insert({ item_id: mine!.id, category_id: categoryId });
+
+      // Satisfiable filter: the row exists and is linked into the owner's own
+      // collection, so only the policy makes this empty.
+      const { data: seen } = await apiAs(token)
+        .from('items')
+        .select('id')
+        .eq('id', mine!.id);
+      expect(seen).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+      await apiAs(otherToken).from('items').delete().eq('id', mine!.id);
+    }
+  });
+
+  // Both mirrored surfaces: the images row (joined through item_categories by
+  // item_id) and the object's bytes (an id parsed back out of the path) are
+  // separate policies with separate join paths.
+  test('an editor photographs a shared entry, on both surfaces', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken, otherUserId } = context();
+    const { categoryId, itemId } = await ownerEntryIn(
+      token,
+      userId,
+      'rls-editor-photo-probe',
+    );
+    const shareId = await editorShare(token, categoryId);
+    // An editor's upload lands under the *editor's* uid prefix (imagePrefix,
+    // data/images.ts), which is what "write shared objects" exists for.
+    const path = `${otherUserId}/${itemId}/rls-editor-probe.webp`;
+
+    try {
+      const { error: uploadError } = await apiAs(otherToken)
+        .storage.from('item-images')
+        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+      expect(uploadError).toBeNull();
+
+      const { data: signed, error: signError } = await apiAs(otherToken)
+        .storage.from('item-images')
+        .createSignedUrl(path, 60);
+      expect(signError).toBeNull();
+      expect(signed).not.toBeNull();
+
+      const { data: row, error: rowError } = await apiAs(otherToken)
+        .from('images')
+        .insert({ item_id: itemId, path_full: path })
+        .select('id,user_id')
+        .single();
+      expect(rowError).toBeNull();
+      // tg_images_enforce files the row under the *item's* owner, whoever
+      // uploaded the bytes.
+      expect(row!.user_id).toBe(userId);
+
+      const { data: removedRow } = await apiAs(otherToken)
+        .from('images')
+        .delete()
+        .eq('id', row!.id)
+        .select('id');
+      expect(removedRow).toHaveLength(1);
+    } finally {
+      await apiAs(otherToken).storage.from('item-images').remove([path]);
+      await unshare(token, shareId);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // The line the role is supposed to stop at: item content, never the
+  // collection itself.
+  test('an editor cannot rename or delete the collection', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, SEED.editorCategory);
+    const shareId = await editorShare(token, categoryId);
+
+    try {
+      const { data: renamed } = await apiAs(otherToken)
+        .from('categories')
+        .update({ name: 'taken over' })
+        .eq('id', categoryId)
+        .select('id');
+      expect(renamed).toEqual([]);
+
+      const { data: deleted } = await apiAs(otherToken)
+        .from('categories')
+        .delete()
+        .eq('id', categoryId)
+        .select('id');
+      expect(deleted).toEqual([]);
+
+      const { data: after } = await apiAs(token)
+        .from('categories')
+        .select('name')
+        .eq('id', categoryId)
+        .single();
+      expect(after!.name).toBe(SEED.editorCategory);
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
+  test('an editor cannot promote itself or issue a grant of its own', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken, otherUserId } = context();
+    const categoryId = await mineCategoryId(token, userId, SEED.editorCategory);
+    // Issued as a viewer, so a successful self-promotion would be visible as
+    // a role change rather than a no-op.
+    const shareId = await share(token, categoryId, SEED.other.email);
+
+    try {
+      const { data: promoted } = await apiAs(otherToken)
+        .from('category_shares')
+        .update({ role: 'editor' })
+        .eq('id', shareId)
+        .select('id');
+      expect(promoted).toEqual([]);
+
+      // Still a viewer, read back as the owner.
+      const { data: after } = await apiAs(token)
+        .from('category_shares')
+        .select('role')
+        .eq('id', shareId)
+        .single();
+      expect(after!.role).toBe('viewer');
+
+      // And it cannot hand the collection on to a third party. Refused by
+      // tg_category_shares_enforce, which re-derives the owner from the
+      // category, so this is an error rather than an empty result.
+      const { error: passedOn } = await apiAs(otherToken)
+        .from('category_shares')
+        .insert({
+          category_id: categoryId,
+          owner_user_id: otherUserId,
+          invited_email: 'nobody-invited@collectionbuddy.test',
+          role: 'editor',
+        });
+      expect(passedOn).not.toBeNull();
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
+  test('an editor reaches no further than the one collection granted', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, SEED.editorCategory);
+    const shareId = await editorShare(token, categoryId);
+
+    try {
+      const { data: elsewhere } = await apiAs(token)
+        .from('items')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('title', itemsIn('Münzen')[0].title)
+        .single();
+
+      const { data: updated } = await apiAs(otherToken)
+        .from('items')
+        .update({ title: 'taken over' })
+        .eq('id', elsewhere!.id)
+        .select('id');
+      expect(updated).toEqual([]);
+
+      const { data: unshared } = await apiAs(otherToken)
+        .from('categories')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('name', 'Briefmarken');
+      expect(unshared).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
+  // Asserted with the entry still present, so this is the revocation being
+  // tested and not a row that stopped existing.
+  test('a revoked editor can no longer write, with the entry still there', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const { categoryId, itemId } = await ownerEntryIn(
+      token,
+      userId,
+      'rls-editor-revoked-probe',
+    );
+
+    try {
+      const shareId = await editorShare(token, categoryId);
+      const { data: while_granted } = await apiAs(otherToken)
+        .from('items')
+        .update({ title: 'edited while granted' })
+        .eq('id', itemId)
+        .select('id');
+      expect(while_granted).toHaveLength(1);
+      await unshare(token, shareId);
+
+      const { data: afterRevoke } = await apiAs(otherToken)
+        .from('items')
+        .update({ title: 'edited after revocation' })
+        .eq('id', itemId)
+        .select('id');
+      expect(afterRevoke).toEqual([]);
+
+      const { data: after } = await apiAs(token)
+        .from('items')
+        .select('title')
+        .eq('id', itemId)
+        .single();
+      expect(after!.title).toBe('edited while granted');
+    } finally {
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
+  test('an expired editor grant writes no more than no grant at all', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const { categoryId, itemId } = await ownerEntryIn(
+      token,
+      userId,
+      'rls-editor-expired-probe',
+    );
+    const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const shareId = await share(token, categoryId, SEED.other.email, {
+      role: 'editor',
+      window: { createdAt, expiresAt },
+    });
+
+    try {
+      const { data: updated } = await apiAs(otherToken)
+        .from('items')
+        .update({ title: 'edited by an expired editor' })
+        .eq('id', itemId)
+        .select('id');
+      expect(updated).toEqual([]);
+
+      const { data: after } = await apiAs(token)
+        .from('items')
+        .select('title')
+        .eq('id', itemId)
+        .single();
+      expect(after!.title).toBe('rls-editor-expired-probe');
+    } finally {
+      await unshare(token, shareId);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // Deliberate, and easy to mistake for the escalation above: "delete own or
+  // invited category_shares" covers the owner revoking *and* the grantee
+  // leaving. Leaving ends its own access; it does not touch anyone else's.
+  test('an editor may leave the share, which ends its own access', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, SEED.editorCategory);
+    const shareId = await editorShare(token, categoryId);
+
+    let left = false;
+    try {
+      const { data: removed } = await apiAs(otherToken)
+        .from('category_shares')
+        .delete()
+        .eq('id', shareId)
+        .select('id');
+      expect(removed).toHaveLength(1);
+      left = true;
+
+      const { data: seen } = await apiAs(otherToken)
+        .from('categories')
+        .select('id')
+        .eq('id', categoryId);
+      expect(seen).toEqual([]);
+    } finally {
+      if (!left) await unshare(token, shareId);
     }
   });
 });
