@@ -165,15 +165,22 @@ so treat every policy change as security-critical, not routine SQL.
   change, with a one-line explanation of what it now allows or denies.
 - **`.github/workflows/cleanup-orphaned-photos.yml` counts as a database
   change for that rule.** It is the highest-privilege logic in the repository
-  — a `service_role` key and a bulk Storage delete driven by a SQL left join,
-  on a weekly cron, with no test and irreversible deletion of live
-  photographs as its failure mode. Two things in it are load-bearing and look
-  like tidy-ups: the **left join** (not `not in (select …)` with a uuid cast,
-  which a malformed path aborts the whole query on — the same reasoning that
-  put the exception handler in `storage_item_id()`), and the **48h grace
-  period** (the only thing separating "orphaned" from "mid-upload", since the
-  object is written before the `images` row that references it). Don't
-  shorten it; see [TEST_STRATEGY.md](TEST_STRATEGY.md) §12.
+  — a `service_role` key and a bulk Storage delete, on a daily cron, with
+  irreversible deletion of live photographs as its failure mode. Three things
+  in it are load-bearing and look like tidy-ups:
+  - **Both `path_full` and `path_thumb`.** A photograph is two objects held
+    in one row; matching only `path_full` classes every thumbnail in the
+    bucket as orphaned.
+  - **No cast of a path to `uuid`,** anywhere. A malformed path fails a cast
+    outright and aborts the whole query rather than simply not matching — the
+    same reasoning that put the exception handler in `storage_item_id()`.
+  - **The 48h grace period** — the only thing separating "orphaned" from
+    "mid-upload", since the objects are written before the `images` row that
+    references them. Don't shorten it.
+
+  Verify a change to that query with a dry run (`workflow_dispatch`, which
+  defaults to it) before letting it delete anything. See
+  [TEST_STRATEGY.md](TEST_STRATEGY.md) §12.
 - Never treat a client-side check ("only show the delete button if...") as
   authorization. It's UX. The RLS policy is the real check, and any new
   query needs to be covered by one.
@@ -246,7 +253,7 @@ the tradeoff to the user:
   owner and grantee alike. Restoring the verb reopens a real escalation: the
   shared policy could only key on the path's *second* segment, so an `UPDATE`
   rewriting the *first* carried the owner's photograph into an editor's
-  namespace, past revocation, past the owner, and past the weekly sweep. See
+  namespace, past revocation, past the owner, and past the sweep. See
   [design-decisions.md#why-a-storage-objects-path-can-never-change](docs/explanation/design-decisions.md#why-a-storage-objects-path-can-never-change).
 - **Storage objects are deleted client-side *before* the DB row**, never
   the other way around — reversing the order orphans image files with no
@@ -366,8 +373,10 @@ first — both explain *why*, not just *what*.
 - Photos: `item-images` Storage bucket, 5 MiB/file limit,
   `image/webp`/`image/jpeg`/`image/png` only; WebP compression happens in
   the browser before upload.
-- Weekly `cleanup-orphaned-photos.yml` sweeps Storage objects a crashed
-  client-side delete left behind (48h grace period).
+- Daily `cleanup-orphaned-photos.yml` sweeps Storage objects that no
+  `images` row references (48h grace period), which a crashed client-side
+  delete or a failed row insert leaves behind. `workflow_dispatch` runs it as
+  a dry run by default.
 
 ## Documentation Sync
 

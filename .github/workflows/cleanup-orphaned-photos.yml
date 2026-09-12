@@ -8,15 +8,21 @@ name: Clean up orphaned photographs
 # sweeping up what the leak leaves behind, on a schedule, so it isn't left
 # to accumulate forever or need a human to notice.
 #
-# 48h grace period: an object with no matching item is only ever orphaned
-# (the item is really gone) or mid-upload (uploadImage in useItemImages.tsx
-# writes the Storage object before the item exists to reference in some
-# import/edge-case ordering) -- 48h is comfortably past any real upload,
-# so nothing in flight can be mistaken for abandoned.
+# 48h grace period: an object no `images` row references is only ever
+# orphaned (whatever should have referenced it is really gone) or mid-upload
+# (useItemImages.tsx writes both Storage objects before inserting the row
+# that names them) -- 48h is comfortably past any real upload, so nothing in
+# flight can be mistaken for abandoned. It is the whole idempotency story
+# here; do not shorten it.
 on:
   schedule:
-    - cron: "30 4 * * 1"
+    - cron: "30 4 * * *"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List what would be deleted, and delete nothing"
+        type: boolean
+        default: true
 
 permissions: {}
 
@@ -28,22 +34,41 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Left join, not `not in (select id from items)` with a uuid cast:
-          # a malformed path (never produced by this app, but not something
-          # SQL should trust either) fails a cast outright, which would abort
-          # the whole query rather than just not matching -- see
-          # storage_item_id() in 0002_functions.sql for the same
-          # reasoning applied to an RLS policy instead of this query.
+          # "No images row references this object" is the actual definition of
+          # orphaned. This used to ask "no item with this id exists", joining
+          # on split_part(o.name, '/', 2) -- a proxy, and one that answered
+          # wrongly in both directions: it kept an object whose path merely
+          # names a live item, and it could only ever find objects whose item
+          # was gone, never one whose row insert failed after the bytes
+          # landed.
+          #
+          # BOTH columns, not just path_full. A photograph is two objects --
+          # `<uuid>.webp` and `<uuid>.thumb.webp` (useItemImages.tsx) -- held
+          # in one row as path_full and path_thumb. Matching path_full alone
+          # would class every thumbnail in the bucket as orphaned and delete
+          # it. Two separate `not exists` rather than one with an `or`, so
+          # each can use its own unique index (0005_indexes.sql).
+          #
+          # Still no cast of the path to uuid anywhere: a malformed path
+          # (never produced by this app, but not something SQL should trust
+          # either) would fail a cast outright and abort the whole query
+          # rather than simply not matching -- see storage_item_id() in
+          # 0002_functions.sql for the same reasoning applied to an RLS
+          # policy. Comparing text to text cannot raise.
           read -r -d '' QUERY <<'SQL' || true
           select
             json_agg(o.name) as paths,
             count(*) as object_count,
             coalesce(sum((o.metadata->>'size')::bigint), 0) as total_bytes
           from storage.objects o
-          left join public.items i on i.id::text = split_part(o.name, '/', 2)
           where o.bucket_id = 'item-images'
-            and i.id is null
-            and o.created_at < now() - interval '48 hours';
+            and o.created_at < now() - interval '48 hours'
+            and not exists (
+              select 1 from public.images im where im.path_full = o.name
+            )
+            and not exists (
+              select 1 from public.images im where im.path_thumb = o.name
+            );
           SQL
 
           payload=$(jq -n --arg q "$QUERY" '{query: $q}')
@@ -63,6 +88,19 @@ jobs:
 
           echo "Found $count orphaned object(s), $bytes bytes." | tee -a "$GITHUB_STEP_SUMMARY"
 
+          # Deliberately before the service_role key is fetched, so a dry run
+          # never puts that credential on the runner at all. `workflow_dispatch`
+          # defaults it to true: a human clicking Run workflow gets the
+          # harmless answer unless they ask for the other one. A scheduled run
+          # sends no inputs, so DRY_RUN is empty and the sweep proceeds.
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            {
+              echo "Dry run -- deleting nothing. Would remove:"
+              echo "$result" | jq -r '.[0].paths[]' | sed 's/^/  /'
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
           # The Storage API is the only way to actually remove object bytes
           # (SQL cannot: see 0004_triggers.sql's note on storage.objects'
           # prevent-direct-deletes guard) -- and removing another user's
@@ -74,6 +112,18 @@ jobs:
             "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             | jq -r '.[] | select(.name == "service_role") | .api_key')
+
+          # A value fetched at run time is not a registered secret, so Actions
+          # does not mask it on its own. Nothing echoes it today; this is about
+          # the next edit, in a public repository, where one `set -x` or a
+          # debugging `echo` would put a credential that bypasses every RLS
+          # policy into a world-readable log.
+          echo "::add-mask::$service_role_key"
+
+          if [ -z "$service_role_key" ] || [ "$service_role_key" = "null" ]; then
+            echo "Could not read the service_role key; refusing to continue." >&2
+            exit 1
+          fi
 
           paths=$(echo "$result" | jq -c '.[0].paths')
           remove_payload=$(jq -n --argjson prefixes "$paths" '{prefixes: $prefixes}')
@@ -89,3 +139,4 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
