@@ -19,7 +19,7 @@
 -- raising on a path whose second segment is not a uuid (0002_functions.sql) --
 -- which is what keeps a malformed value from taking the statement down, but
 -- also means a plain `=` yields NULL, and a CHECK constraint *passes* on NULL.
--- Written with `=`, this constraint admits every unparseable path and rejects
+-- Written with `=`, this constraint admits every unparsable path and rejects
 -- only well-formed ones naming the wrong item: executed, `'../../etc/passwd'`
 -- inserted happily. Since item_id is NOT NULL, `is not distinct from` is false
 -- whenever the left side is NULL, so both shapes are rejected.
