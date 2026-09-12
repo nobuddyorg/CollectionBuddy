@@ -34,11 +34,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3
-        with:
-          # Pinned: an unattended `db push` against production is not the
-          # place to discover a CLI behaviour change.
-          version: 2.110.0
+      # Pinned there: an unattended `db push` against production is not the
+      # place to discover a CLI behaviour change, and CI's local stack has to
+      # apply the same migrations with the same CLI.
+      - uses: ./.github/actions/setup-supabase-cli
 
       # `supabase link` + `--linked` doesn't work here: the push then
       # resolves db.<ref>.supabase.co, which has only an AAAA record, and
@@ -97,14 +96,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '22.x'
-          cache: npm
-          cache-dependency-path: web/package-lock.json
+      - uses: ./.github/actions/setup-web
 
-      - run: npm ci
-      - run: npm run format
       - run: npm run build
       - run: test -d out && test -f out/index.html
       - run: touch out/.nojekyll
@@ -145,13 +138,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '22.x'
-          cache: npm
-          cache-dependency-path: web/package-lock.json
+      - uses: ./.github/actions/setup-web
 
-      - run: npm ci
       - run: npx playwright install --with-deps chromium
       # Through the environment, not the command line: `${{ }}` substitutes
       # before the shell sees it, so a quote-like value would be parsed as

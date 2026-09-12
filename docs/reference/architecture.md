@@ -147,6 +147,14 @@ It is not the only code holding the client, though. Auth and session work reache
 
 ## CI/CD
 
+Five jobs across two workflows all start the same way, so the steps they share live in [`.github/actions/`](../../.github/actions) as composite actions rather than being repeated per job:
+
+| Action | What it pins in one place |
+| --- | --- |
+| [`setup-web`](../../.github/actions/setup-web/action.yml) | The Node version, the npm cache key, and `npm ci` in `web/` — used by `build_and_test`, `e2e_local_stack`, `mutation_test`, and the deploy's `build` and `smoke_test`. |
+| [`setup-supabase-cli`](../../.github/actions/setup-supabase-cli/action.yml) | The Supabase CLI version. CI's local stack and the unattended `db push` in `pages-deploy.yml` have to be the same CLI; this is what makes that structural rather than a comment asking for it. |
+| [`playwright-results`](../../.github/actions/playwright-results/action.yml) | The job summary for a Playwright run plus the report artifact kept on failure. It takes the calling job's `job.status`, because status functions inside a composite action only see the action's own steps. |
+
 | Workflow (job)                                                                       | Trigger                            | Does                                                                                                                                                                                                                                                                                                                                                                           |
 | ------------------------------------------------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [`ci.yml`](../../.github/workflows/ci.yml) (`prek`)                                  | push/PR to `main`                  | The repo-wide hooks from [`.pre-commit-config.yaml`](../../.pre-commit-config.yaml): file hygiene, spell check, shellcheck, markdownlint, and zizmor's security analysis of these workflows.                                                                                                                                                                                   |

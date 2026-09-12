@@ -1,0 +1,46 @@
+name: Publish Playwright results
+description: >-
+  The job summary for one Playwright run, plus the HTML report kept as an
+  artifact when the run failed.
+
+inputs:
+  title:
+    description: Heading the results table gets in the job summary.
+    required: true
+  tag:
+    description: Identifies the run within the summary action.
+    required: true
+  artifact-name:
+    description: Name of the report artifact uploaded when the run failed.
+    required: true
+  job-status:
+    description: >-
+      The calling job's `job.status`. Status functions inside a composite
+      action see only the action's own steps, so whether the run failed has
+      to be passed in rather than asked for with `failure()`.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: daun/playwright-report-summary@31ed947ec7a623d18a66cfd20ef546dc66ef8063 # v4
+      with:
+        report-file: web/playwright-results.json
+        # report-tag only identifies a PR comment (unused here); comment-title
+        # is what actually shows as the job summary's heading.
+        report-tag: ${{ inputs.tag }}
+        comment-title: ${{ inputs.title }}
+        job-summary: true
+        create-comment: false
+        # Emoji, not the default octicons style -- default renders each icon
+        # as a remote SVG fetched from a third-party host at summary render
+        # time. Emoji also match the coverage/mutation tables.
+        icon-style: emojis
+
+    - name: Keep the report from a failed run
+      if: inputs.job-status == 'failure'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: web/playwright-report
+        retention-days: 7

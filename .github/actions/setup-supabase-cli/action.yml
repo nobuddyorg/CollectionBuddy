@@ -1,0 +1,14 @@
+name: Set up the Supabase CLI
+description: >-
+  Installs the Supabase CLI at the one version this repository uses. CI's
+  local stack and the unattended `db push` in pages-deploy.yml must run the
+  same CLI -- an unattended migration against production is not the place to
+  discover a CLI behaviour change -- so the pin lives here rather than being
+  repeated per workflow with a comment asking the two to be kept in step.
+
+runs:
+  using: composite
+  steps:
+    - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3
+      with:
+        version: 2.110.0
