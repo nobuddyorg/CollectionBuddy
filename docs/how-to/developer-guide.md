@@ -128,7 +128,7 @@ A migration that touches `storage.objects` can create and drop _policies_ on it,
 
 ### Squashing migrations again
 
-`supabase/migrations/` has been squashed twice, most recently in #580, and currently holds nothing but the resulting seven-file baseline (`0001` to `0007`). See [Design decisions](../explanation/design-decisions.md#why-the-migrations-were-squashed) for what each round folded in and how the result was verified. Squashing is a deliberate, occasional act, not routine, and it folds the whole current set, not just whatever has accumulated since the last time.
+`supabase/migrations/` has been squashed twice, most recently in #580. It holds the resulting seven-file baseline (`0001` to `0007`) plus the migrations that have landed since (`0008` onward — see the [architecture reference](../reference/architecture.md#database-schema) for what each one changes). See [Design decisions](../explanation/design-decisions.md#why-the-migrations-were-squashed) for what each round folded in and how the result was verified. Squashing is a deliberate, occasional act, not routine, and it folds the whole current set, not just whatever has accumulated since the last time.
 
 If you do it: verify it the same way, by introspecting both databases down to column defaults, constraint expressions, index definitions, function bodies, trigger timing, policy predicates and grants, and diffing them. Afterward, clear `supabase_migrations.schema_migrations` on the hosted project so the new files are recorded as themselves. That table is the only reason the chain can't simply be rewritten in place.
 

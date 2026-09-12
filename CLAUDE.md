@@ -41,9 +41,13 @@ CollectionBuddy/
 │   ├── reference/architecture.md, configuration.md
 │   └── explanation/design-decisions.md   # READ THIS before touching schema,
 │                                          # RLS, sharing, search, or deletes
+├── .github/
+│   ├── actions/                   # Composite actions the workflows share
+│   └── workflows/                 # CI, Pages deploy, the daily orphan sweep
 ├── supabase/
 │   ├── config.toml                # Local stack ports, Google OAuth block
-│   └── migrations/                # 0001..0007, the whole schema (squashed twice)
+│   └── migrations/                # 0001..0007 are the squashed baseline; 0008+
+│                                   # are the changes since (see 0012 for the newest)
 └── web/                           # The Next.js app (see web/CLAUDE.md)
     ├── src/app/                   # components/, data/, i18n/, lib/, login/
     ├── e2e/                       # Playwright specs (signed-out + signed-in)
