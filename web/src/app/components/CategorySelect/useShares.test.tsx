@@ -238,5 +238,85 @@ describe('useShares', () => {
 
       await waitFor(() => expect(result.current.shares).toEqual([grant]));
     });
+
+    it('does nothing for a grant that is not in the list', async () => {
+      const { result } = renderHook(() => useShares('cat-1'), { wrapper });
+
+      act(() => {
+        result.current.deleteShare('share-nope', {
+          successMessage: 'Removed.',
+          errorMessage: 'Could not remove.',
+        });
+      });
+
+      expect(deleteShareRow).not.toHaveBeenCalled();
+    });
+  });
+
+  // Each of these is one request at a time: the second click of a
+  // double-click must not issue a second grant, a second role write, or a
+  // second delete.
+  describe('one request at a time', () => {
+    it('ignores a second invite while the first is still in flight', async () => {
+      let release: (() => void) | undefined;
+      vi.mocked(createShareRow).mockReturnValue(
+        new Promise((resolve) => {
+          release = () => resolve({ data: grant, error: null });
+        }) as never,
+      );
+      const { result } = renderHook(() => useShares('cat-1'), { wrapper });
+
+      act(() => {
+        void result.current.createShare('a@example.com', null);
+      });
+      await waitFor(() => expect(result.current.isSharing).toBe(true));
+      await act(async () => {
+        await expect(
+          result.current.createShare('b@example.com', null),
+        ).resolves.toBe(false);
+      });
+
+      expect(createShareRow).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        release?.();
+      });
+    });
+
+    it('ignores a second role change while the first is still in flight', async () => {
+      let release: (() => void) | undefined;
+      vi.mocked(updateShareRoleRow).mockReturnValue(
+        new Promise((resolve) => {
+          release = () => resolve({ data: grant, error: null });
+        }) as never,
+      );
+      const { result } = renderHook(() => useShares('cat-1'), { wrapper });
+
+      act(() => {
+        void result.current.updateShareRole('share-1', 'editor');
+      });
+      await waitFor(() => expect(result.current.isUpdatingRole).toBe(true));
+      await act(async () => {
+        await expect(
+          result.current.updateShareRole('share-1', 'viewer'),
+        ).resolves.toBe(false);
+      });
+
+      expect(updateShareRoleRow).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        release?.();
+      });
+    });
+
+    it('refuses to invite anyone when there is no category to invite them to', async () => {
+      const { result } = renderHook(() => useShares(null), { wrapper });
+
+      await act(async () => {
+        await expect(
+          result.current.createShare('a@example.com', null),
+        ).resolves.toBe(false);
+      });
+
+      expect(createShareRow).not.toHaveBeenCalled();
+    });
   });
 });

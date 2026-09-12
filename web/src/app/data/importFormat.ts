@@ -23,11 +23,9 @@ export class ImportFormatError extends Error {
  * written by `buildManifest`, whose own shape is trusted past that point.
  */
 export function parseManifest(data: unknown): ExportManifest {
-  if (
-    !data ||
-    typeof data !== 'object' ||
-    (data as { format?: unknown }).format !== EXPORT_FORMAT
-  ) {
+  // No `typeof data === 'object'` check: anything that is not one has no
+  // `format` property either, so the tag check below already refuses it.
+  if (!data || (data as { format?: unknown }).format !== EXPORT_FORMAT) {
     throw new ImportFormatError('Not a CollectionBuddy export archive');
   }
   const version = (data as { version?: unknown }).version;

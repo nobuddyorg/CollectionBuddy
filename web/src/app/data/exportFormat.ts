@@ -91,7 +91,7 @@ export function indexPrefix(index: number, total: number): string {
  * archive path verbatim; not reachable today since this app only ever
  * uploads `<uuid>.webp`/`.thumb.webp`, but nothing else checks it stays
  * that way. */
-const SAFE_EXTENSION = /^\.[A-Za-z0-9]{1,10}$/;
+const SAFE_EXTENSION = /^[A-Za-z0-9]{1,10}$/;
 
 /** `.webp`, `.jpg`, ... taken off a storage object name, `.bin` if it has
  * none or if what follows the last dot isn't a plausible extension. */
@@ -99,8 +99,8 @@ export function extensionOf(path: string): string {
   const name = path.slice(path.lastIndexOf('/') + 1);
   const dot = name.lastIndexOf('.');
   if (dot <= 0) return '.bin';
-  const ext = name.slice(dot);
-  return SAFE_EXTENSION.test(ext) ? ext : '.bin';
+  const ext = name.slice(dot + 1);
+  return SAFE_EXTENSION.test(ext) ? `.${ext}` : '.bin';
 }
 
 /**

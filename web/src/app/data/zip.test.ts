@@ -426,7 +426,39 @@ describe('readZipEntries', () => {
   it('rejects a file too small to hold even the end-of-central-directory record', async () => {
     await expect(
       readZipEntries(new Blob([new Uint8Array(10)])),
-    ).rejects.toThrow(ZipReadError);
+    ).rejects.toThrow(/file is too small/);
+  });
+
+  // The two bounds below are `>`, not `>=`: a structure ending on the
+  // file's last byte is inside the file. Asserted from both sides, since
+  // an off-by-one either rejects a readable archive or reads past the end
+  // of the buffer.
+  it('reads an entry whose data ends on the very last byte', async () => {
+    const writer = createZipWriter();
+    writer.add('a.txt', new Uint8Array([1, 2, 3]));
+    const bytes = await bytesOf(writer.finish());
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const directoryAt = bytes.length - 22 - (46 + 'a.txt'.length);
+    const dataStart = 30 + 'a.txt'.length;
+    dv.setUint32(directoryAt + 24, bytes.length - dataStart, true);
+
+    const entries = await readZipEntries(new Blob([bytes]));
+
+    expect(entries.get('a.txt')).toHaveLength(bytes.length - dataStart);
+  });
+
+  it('reads a directory pointer that leaves exactly one header of room', async () => {
+    const writer = createZipWriter();
+    writer.add('a.txt', new Uint8Array([1, 2, 3]));
+    const bytes = await bytesOf(writer.finish());
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    // Not past the end, so the bound lets it through; what rejects it is
+    // the signature it finds there, which is the more useful complaint.
+    dv.setUint32(bytes.length - 22 + 16, bytes.length - 46, true);
+
+    await expect(readZipEntries(new Blob([bytes]))).rejects.toThrow(
+      /malformed central directory entry/,
+    );
   });
 
   it('rejects a file with no end-of-central-directory signature at all', async () => {

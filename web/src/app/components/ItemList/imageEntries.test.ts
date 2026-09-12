@@ -5,8 +5,12 @@ import {
   clearImageCache,
   getCachedSignedUrl,
 } from './imageCache';
-import { groupImageRows, signEntries, toImgEntries } from './useItemImages';
-import type { ImageEntryData } from './useItemImages';
+import {
+  groupImageRows,
+  signEntries,
+  toImgEntries,
+  type ImageEntryData,
+} from './imageEntries';
 
 describe('groupImageRows', () => {
   it("groups a row by item, keyed by the row's own id", () => {
@@ -193,7 +197,10 @@ describe('signEntries', () => {
       signUrls,
     );
 
-    expect(consoleError).toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      'Failed to create signed URLs',
+      expect.any(Error),
+    );
     // The item whose signature already existed keeps showing it...
     expect(result['item-3a']?.[0]?.urlFull).toBe('https://signed/stale');
     // ...and the one that needed a fresh signature that never arrived is

@@ -5,6 +5,7 @@ import type { ItemLite, ImgEntry } from './types';
 import { Actions, AddPhotoPlate } from './Actions';
 import { ImageGrid } from './ImageGrid';
 import { CaptionSkeleton } from './Skeleton';
+import { labelClasses } from '../ui/labelClasses';
 
 type ItemCardProps = {
   item: ItemLite;
@@ -144,9 +145,7 @@ function ItemCardComponent({
           {(item.place || !!item.tags.length) && (
             <div className="flex flex-col gap-2 border-t border-border pt-2.5 mt-0.5">
               {item.place && (
-                <div className="font-label text-[0.6875rem] text-muted-foreground truncate">
-                  {item.place}
-                </div>
+                <div className={labelClasses('truncate')}>{item.place}</div>
               )}
 
               {!!item.tags.length && (

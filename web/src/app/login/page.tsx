@@ -7,6 +7,7 @@ import { coinSizeCss } from '../components/Coin/size';
 import Collectible from '../components/Collectible';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import LoadingOverlay from '../components/LoadingOverlay';
+import { labelClasses } from '../components/ui/labelClasses';
 import { useToast } from '../components/Toast/ToastProvider';
 import { useI18n } from '../i18n/useI18n';
 import { fanOffsetX, fanOffsetY, fanPositions } from './collectibleFan';
@@ -63,7 +64,7 @@ export default function LoginPage() {
         <span className="text-accent">{t('brand.buddy')}</span>
       </h1>
 
-      <p className="font-label text-[0.6875rem] text-muted-foreground text-center mt-2 mb-8 sm:mb-10">
+      <p className={labelClasses('text-center mt-2 mb-8 sm:mb-10')}>
         {t('page.footer')}
       </p>
 

@@ -37,9 +37,6 @@ export function importProgressMessage(
 
 export type UseImportCategory = ReturnType<typeof useImportCategory>;
 
-/* v8 ignore start -- React state around one async I/O call;
- * importProgressMessage above is the pure part and is what's tested. */
-// Stryker disable all: hook internals aren't covered by tests.
 export function useImportCategory(existingCategoryNames: string[]) {
   const { t } = useI18n();
   const toast = useToast();
@@ -121,9 +118,12 @@ export function useImportCategory(existingCategoryNames: string[]) {
     [progress, t, toast, existingCategoryNames],
   );
 
+  // Stryker disable ArrayDeclaration: an empty dependency list and a
+  // constant one are the same to React -- neither changes between renders.
   const cancelImport = useCallback(() => {
     controllerRef.current?.abort();
   }, []);
+  // Stryker restore ArrayDeclaration
 
   // Same beforeunload guard as useExportCategory.tsx, for the same reason.
   useEffect(() => {
@@ -143,5 +143,3 @@ export function useImportCategory(existingCategoryNames: string[]) {
     cancelImport,
   };
 }
-// Stryker restore all
-/* v8 ignore stop */

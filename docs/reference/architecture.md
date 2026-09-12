@@ -11,11 +11,21 @@ Technical description of how CollectionBuddy is put together. For _why_ it's bui
 
 ## Database schema
 
-Defined across [`supabase/migrations/`](../../supabase/migrations/), applied in filename order. The whole schema is seven files (0001 to 0007), ordered by dependency rather than by history: extensions, functions, tables, triggers, indexes, policies, storage. None of them patches an earlier one, so what a file says is what the database has.
+Defined across [`supabase/migrations/`](../../supabase/migrations/), applied in filename order. The baseline is seven files (0001 to 0007), ordered by dependency rather than by history: extensions, functions, tables, triggers, indexes, policies, storage. None of those seven patches another, so within the baseline, what a file says is what the database has.
 
-Nothing sits on top of that baseline right now. The second squash (#580) folded the then-current 0001 to 0014 back down into these seven, so features that had arrived as migrations of their own — account sharing, the shared-photograph policies, the `images` table, the editor role — are now spread across whichever file owns that kind of object, rather than each having a file to point at. Where a section below would once have named such a file, it names the baseline file the thing actually lives in.
+The second squash (#580) folded the then-current 0001 to 0014 back down into these seven, so features that had arrived as migrations of their own — account sharing, the shared-photograph policies, the `images` table, the editor role — are now spread across whichever file owns that kind of object, rather than each having a file to point at. Where a section below would once have named such a file, it names the baseline file the thing actually lives in.
 
-Keeping that true is a maintenance job, not a property. See [Design decisions](../explanation/design-decisions.md#why-the-migrations-were-squashed) for why, and the [Developer guide](../how-to/developer-guide.md#squashing-migrations-again) for what squashing again would take.
+Five migrations have landed on top of that baseline since, every one of them a correction to the authorization boundary, and each does patch what the baseline says:
+
+| File | What it changes |
+| --- | --- |
+| [`0008_storage_no_update.sql`](../../supabase/migrations/0008_storage_no_update.sql) | Drops `authenticated`'s `UPDATE` on `storage.objects` and the `update shared objects` policy: the policy re-tested only the item-id segment of the path, so an update rewriting the uid segment carried an owner's photograph into an editor's namespace. An object's path can no longer change at all. |
+| [`0009_caller_email_trim.sql`](../../supabase/migrations/0009_caller_email_trim.sql) | `caller_email()` trims as well as lowercases, so both sides of the sharing-email comparison normalize the same way. Fail-closed before, but a legitimate grantee could be denied silently. |
+| [`0010_storage_pin_upload_prefix.sql`](../../supabase/migrations/0010_storage_pin_upload_prefix.sql) | `write shared objects` now constrains the uid segment too, so an editor cannot create an object under the owner's prefix. |
+| [`0011_least_privilege_grants.sql`](../../supabase/migrations/0011_least_privilege_grants.sql) | Revokes `anon`'s remaining privileges on `category_shares` — the one table 0006 omitted — and narrows `authenticated` to the DML its policies actually back. |
+| [`0012_images_path_matches_item.sql`](../../supabase/migrations/0012_images_path_matches_item.sql) | A check constraint tying an `images` row's `path_full` to the item it names (`storage_item_id(path_full) is not distinct from item_id`), so a row can no longer point at another user's object or at something that is not a storage path at all. |
+
+Keeping the baseline readable that way is a maintenance job, not a property. See [Design decisions](../explanation/design-decisions.md#why-the-migrations-were-squashed) for why, and the [Developer guide](../how-to/developer-guide.md#squashing-migrations-again) for what squashing again would take.
 
 ### Tables
 
@@ -140,12 +150,20 @@ An older, hand-written set of four dashboard policies (`list own`, `upload own`,
 - `items.ts` — `listItems()` (paginated, category-scoped, optional search via `buildSearchFilter()`), `createItem()`, `updateItem()`, `deleteItem()`, `linkItemToCategory()`, `listItemPlaces()`.
 - `categories.ts` — `listCategories()`, `createCategory()`, `renameCategory()`, `deleteCategory()`, plus `listItemIdsForCategory()` / `countItemsForCategory()` / `listItemIdsLinkedElsewhere()` used to work out which items a category deletion would orphan, and to warn about how many before it runs.
 - `images.ts` — reads/writes the `images` table (`listImagesForItems()` for the grid/export read path, `listImagePathsForItems()` for the capture-before-cascade delete paths, `createImageRow()`, `deleteImageRow()`) plus the Storage-bytes calls that still go straight to Storage regardless of the table (`createSignedUrls()`, 1 hour expiry; `uploadImageObject()`; `removeImageObjects()`), and `imagePrefix()`, the one place the `<uid>/<itemId>` storage-path scheme is written down.
-- `auth.ts` — `currentUserId()` (reads the local session, no network round trip — the read path) and `verifiedUserId()` (round-trips to the auth server — for a caller about to write bytes under a user-derived path).
+- `auth.ts` — `verifiedUserId()`, which round-trips to the auth server rather than reading the cached session, for a caller about to write bytes under a user-derived path.
 - `photon.ts` — the one [Photon](https://photon.komoot.io/) client both geocoding surfaces (`ItemForm/usePhoton.tsx`'s autocomplete, `Map/usePlaces.tsx`'s background lookup of catalogued place names) go through: `photonSearchUrl()`, `photonLang()`, `coordsFromFeature()` and `isRetryableStatus()`. The two used to hit the endpoint independently, with two coordinate validators that disagreed on `NaN`.
 
 It is not the only code holding the client, though. Auth and session work reaches [`supabase.ts`](../../web/src/app/supabase.ts) directly — `useSession.ts`, `page.tsx`, `login/useAuthRedirect.ts`, `login/useGoogleSignIn.ts` — none of which have anywhere else to live, since there is no session-management equivalent of `data/auth.ts`. Nothing under `components/` does; an ESLint rule (`no-restricted-imports`, scoped to `components/**`) keeps it that way.
 
 ## CI/CD
+
+Five jobs across two workflows all start the same way, so the steps they share live in [`.github/actions/`](../../.github/actions) as composite actions rather than being repeated per job:
+
+| Action | What it pins in one place |
+| --- | --- |
+| [`setup-web`](../../.github/actions/setup-web/action.yml) | The Node version, the npm cache key, and `npm ci` in `web/` — used by `build_and_test`, `e2e_local_stack`, `mutation_test`, and the deploy's `build` and `smoke_test`. |
+| [`setup-supabase-cli`](../../.github/actions/setup-supabase-cli/action.yml) | The Supabase CLI version. CI's local stack and the unattended `db push` in `pages-deploy.yml` have to be the same CLI; this is what makes that structural rather than a comment asking for it. |
+| [`playwright-results`](../../.github/actions/playwright-results/action.yml) | The job summary for a Playwright run plus the report artifact kept on failure. It takes the calling job's `job.status`, because status functions inside a composite action only see the action's own steps. |
 
 | Workflow (job)                                                                       | Trigger                            | Does                                                                                                                                                                                                                                                                                                                                                                           |
 | ------------------------------------------------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

@@ -4,89 +4,13 @@ This file guides Claude Code (and any other AI assistant) when working in this
 repository. It is project-wide: `web/CLAUDE.md` adds Next.js-specific context
 on top of this file and does not replace it.
 
-## Project Overview
-
-**CollectionBuddy** is a photo-first, bilingual (German/English) catalog app
-for personal collections (coins, stamps, records, cameras, ...). Every entry
-leads with a photo, carries a place and tags, and is searchable.
-
-- **Frontend**: Next.js 16 (App Router, **static export**, `output: 'export'`)
-  — no server runtime, no route handlers, no server-side authorization code.
-- **Backend**: Supabase (Postgres + Auth + Storage). Google is the only
-  sign-in provider.
-- **Authorization**: enforced entirely by Postgres **Row Level Security**.
-  There is nowhere else it could live — see "Hard guardrails" below.
-- **Hosting**: static export deployed to GitHub Pages.
-
 **Required reading before you write anything**: this file, and
 [TEST_STRATEGY.md](TEST_STRATEGY.md). Both are standing instructions, not
-background material. Read [README.md](README.md) for the feature list and
-[docs/README.md](docs/README.md) for the full documentation set, organised by
-[Diátaxis](https://diataxis.fr).
-
-## Repository Structure
-
-```text
-CollectionBuddy/
-├── README.md                    # Feature overview, screenshots
-├── CONTRIBUTING.md               # Local setup, pre-PR checklist
-├── CLAUDE.md                     # This file
-├── TEST_STRATEGY.md              # READ THIS before writing or changing tests
-├── build.sh                      # Convenience build wrapper
-├── .pre-commit-config.yaml       # File hygiene, spell check, zizmor, shellcheck,
-│                                  # markdownlint, and web/'s own checks
-├── docs/                         # Diátaxis docs
-│   ├── tutorials/getting-started.md
-│   ├── how-to/user-guide.md, developer-guide.md
-│   ├── reference/architecture.md, configuration.md
-│   └── explanation/design-decisions.md   # READ THIS before touching schema,
-│                                          # RLS, sharing, search, or deletes
-├── supabase/
-│   ├── config.toml                # Local stack ports, Google OAuth block
-│   └── migrations/                # 0001..0007, the whole schema (squashed twice)
-└── web/                           # The Next.js app (see web/CLAUDE.md)
-    ├── src/app/                   # components/, data/, i18n/, lib/, login/
-    ├── e2e/                       # Playwright specs (signed-out + signed-in)
-    ├── mutation-targets.mjs       # The one list of mutated + 100%-covered files
-    ├── stryker.config.mjs         # Mutation testing, scoped to pure functions
-    └── vitest.config.mts           # Unit tests, coverage thresholds
-```
-
-## Development Commands
-
-Full setup: [CONTRIBUTING.md](CONTRIBUTING.md). Summary:
-
-```bash
-# One-time local backend (from repo root)
-supabase start
-supabase db reset
-
-# Web app (from web/)
-cp .env.example .env.local
-npm install
-npm run dev              # http://localhost:3000
-npm run demo             # no Google OAuth needed, anonymous local demo user
-```
-
-Checks, from `web/`, **in this order** (the build must run first — it
-generates `next-env.d.ts`, which `tsc`/ESLint need):
-
-```bash
-npm run build
-npx tsc --noEmit
-npx prettier --check .
-npm run lint
-npm test -- --coverage
-npm run e2e
-npm run test:mutation     # separate CI job, run it too before calling something done
-npm run e2e:local         # needs `supabase start`; required if you touched
-                           # catalogue, search, map, entry forms, photos,
-                           # sharing, exporting, or RLS
-```
-
-`prek run --all-files` (or `pre-commit run --all-files`) from the repo root
-runs the repo-wide hooks (file hygiene, `typos`, `zizmor`, `shellcheck`,
-`markdownlint`) plus the same web checks.
+background material. The hard guardrails come first because they are the part
+that is not negotiable; the project overview, the commands and the
+architecture summary follow. Read [README.md](README.md) for the feature list
+and [docs/README.md](docs/README.md) for the full documentation set, organised
+by [Diátaxis](https://diataxis.fr).
 
 ## Hard guardrails — never skip these
 
@@ -118,11 +42,29 @@ assumption. Don't restate its contents here.
 ### 2. Definition of done = the full pre-PR checklist
 
 A task is **not** done — do not say "done", open a PR as ready, or report
-success — until every command in the checklist above has been run and is
-green: `build`, `tsc`, `prettier --check`, `lint`, `test -- --coverage`,
-`e2e`, `test:mutation`, and (if the change touches catalogue/search/map/
-forms/photos/RLS) `e2e:local`. Partial runs ("lint passes, I didn't run the
-rest") are not a stopping point, they're a status update.
+success — until every one of these has been run from `web/` and is green.
+The order is not decoration: the build must run first, because it generates
+`next-env.d.ts`, which `tsc` and ESLint need.
+
+```bash
+npm run build
+npx tsc --noEmit
+npx prettier --check .
+npm run lint
+npm test -- --coverage
+npm run e2e
+npm run test:mutation     # separate CI job, run it too before calling something done
+npm run e2e:local         # needs `supabase start`; required if you touched
+                           # catalogue, search, map, entry forms, photos,
+                           # sharing, exporting, or RLS
+```
+
+`prek run --all-files` (or `pre-commit run --all-files`) from the repo root
+runs the repo-wide hooks (file hygiene, `typos`, `zizmor`, `shellcheck`,
+`markdownlint`) plus the same web checks.
+
+Partial runs ("lint passes, I didn't run the rest") are not a stopping point,
+they're a status update.
 
 - Guardrail 1 decides *what* gets tested and at which level; this checklist
   is *whether you actually ran it*. Both apply — a change that follows the
@@ -135,9 +77,9 @@ rest") are not a stopping point, they're a status update.
   gate.
 - **Never** add `/* v8 ignore */`, `// Stryker disable`, `.skip`, or an
   ESLint/TS suppression to make a check pass without first understanding
-  *why* it's failing and confirming the suppression is legitimate (see
-  [design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files](docs/explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files)
-  for the one place this pattern is already deliberately used).
+  *why* it's failing and confirming the suppression is legitimate. Where one
+  is already in use, it sits next to I/O that cannot be scored and carries
+  the reason in a comment; anything new needs the same.
 - **No test gaming.** Coverage and mutation score must reflect real
   assertions on real behavior — never write a test just to touch a line, add
   a meaningless branch to dodge a mutant, or exclude a file to avoid dealing
@@ -146,11 +88,12 @@ rest") are not a stopping point, they're a status update.
 
 ### 3. Database changes: local-first, RLS is load-bearing
 
-RLS (`supabase/migrations/0006_policies.sql` for the tables,
-`0007_storage.sql` for the bucket) is the **only** authorization boundary in
-this app — there is no server to fall back on. This project's history
-includes several real RLS-correctness bugs (#292, #387, #335, #290, #386),
-so treat every policy change as security-critical, not routine SQL.
+RLS — the policies on the tables, and the ones on the storage bucket — is
+the **only** authorization boundary in this app; there is no server to fall
+back on. This project's history includes several real RLS-correctness bugs,
+so treat every policy change as security-critical, not routine SQL. Find the
+current files by what they define (`grep -rn 'create policy' supabase/migrations/`)
+rather than by a number: a squash renumbers them.
 
 - Write and run migrations against the **local** stack only
   (`supabase start`, `supabase db reset`, `supabase migration ...`).
@@ -167,35 +110,28 @@ so treat every policy change as security-critical, not routine SQL.
   change for that rule.** It is the highest-privilege logic in the repository
   — a `service_role` key and a bulk Storage delete, on a daily cron, with
   irreversible deletion of live photographs as its failure mode. Three things
-  in it are load-bearing and look like tidy-ups:
-  - **Both `path_full` and `path_thumb`.** A photograph is two objects held
-    in one row; matching only `path_full` classes every thumbnail in the
-    bucket as orphaned.
-  - **No cast of a path to `uuid`,** anywhere. A malformed path fails a cast
-    outright and aborts the whole query rather than simply not matching — the
-    same reasoning that put the exception handler in `storage_item_id()`.
-  - **The 48h grace period** — the only thing separating "orphaned" from
-    "mid-upload", since the objects are written before the `images` row that
-    references them. Don't shorten it.
-
-  Verify a change to that query with a dry run (`workflow_dispatch`, which
-  defaults to it) before letting it delete anything. See
-  [TEST_STRATEGY.md](TEST_STRATEGY.md) §12.
+  in its query are load-bearing and look like tidy-ups: it matches **both
+  `path_full` and `path_thumb`**, it casts **no path to `uuid`** anywhere,
+  and it holds a **48h grace period**. Don't drop, narrow or shorten any of
+  them, and verify a change to that query with a dry run
+  (`workflow_dispatch`, which defaults to it) before letting it delete
+  anything. What each one prevents, and how the predicate was verified
+  against a real database, is in [TEST_STRATEGY.md](TEST_STRATEGY.md) §12.
 - Never treat a client-side check ("only show the delete button if...") as
   authorization. It's UX. The RLS policy is the real check, and any new
   query needs to be covered by one.
 - A policy, grant, or ownership-trigger change **must** ship a matching case
-  in `web/e2e/signed-in/rls.spec.ts` in the same change. That file is the
-  executable form of the authorization model; a migration with no assertion
-  behind it is an unreviewed change to the only security boundary there is.
-  See [TEST_STRATEGY.md](TEST_STRATEGY.md) for how those cases are written
-  (two real identities, real tokens, straight at PostgREST).
+  in `web/e2e/signed-in/rls.spec.ts` in the same change — that file is the
+  executable form of the authorization model.
+  [TEST_STRATEGY.md](TEST_STRATEGY.md) §7 has why the rule is absolute and
+  how those cases are written (two real identities, real tokens, straight at
+  PostgREST).
 - Don't touch `storage.objects` DDL — hosted Supabase doesn't grant `postgres`
   ownership of it; policies are fine, `CREATE INDEX`/schema changes are not
   and will fail with `42501` (this is expected, not a bug to work around).
 - Squashing migrations again is a deliberate, rare act with a verification
-  procedure (see [developer-guide.md#squashing-migrations-again](docs/how-to/developer-guide.md#squashing-migrations-again))
-  — never squash as a side effect of an unrelated change.
+  procedure (see [developer-guide.md](docs/how-to/developer-guide.md)) —
+  never squash as a side effect of an unrelated change.
 
 ### 4. Git, branches, CI
 
@@ -208,9 +144,10 @@ so treat every policy change as security-critical, not routine SQL.
   without the user explicitly asking for that change.
 - Never run `npm audit fix --force` or a from-scratch
   `rm -rf node_modules package-lock.json && npm install` in `web/` — both
-  have concretely made the dependency tree *worse* on this project (see
-  [design-decisions.md#npm-audit-whats-overridden-and-whats-accepted-risk-issue-191](docs/explanation/design-decisions.md#npm-audit-whats-overridden-and-whats-accepted-risk-issue-191)).
-  Use targeted `overrides` entries instead.
+  have concretely made the dependency tree *worse* on this project (see the
+  advisory section of
+  [design-decisions.md](docs/explanation/design-decisions.md)). Use targeted
+  `overrides` entries instead.
 
 ### 5. Secrets and environment
 
@@ -248,24 +185,25 @@ the tradeoff to the user:
 - **Search is trigram `ILIKE`, not full-text search** — don't reintroduce
   `tsvector`/FTS columns; they were added once, found unused, and dropped.
 - **A storage object's path never changes** — `authenticated` holds no
-  `UPDATE` on `storage.objects` and no `update` policy exists there
-  (`0008_storage_no_update.sql`), so `move()` and `upsert` are refused for
-  owner and grantee alike. Restoring the verb reopens a real escalation: the
-  shared policy could only key on the path's *second* segment, so an `UPDATE`
-  rewriting the *first* carried the owner's photograph into an editor's
-  namespace, past revocation, past the owner, and past the sweep. See
-  [design-decisions.md#why-a-storage-objects-path-can-never-change](docs/explanation/design-decisions.md#why-a-storage-objects-path-can-never-change).
+  `UPDATE` on `storage.objects` and no `update` policy exists there, so
+  `move()` and `upsert` are refused for owner and grantee alike. Restoring
+  the verb reopens a real escalation: the shared policy could only key on
+  the path's *second* segment, so an `UPDATE` rewriting the *first* carried
+  the owner's photograph into an editor's namespace, past revocation, past
+  the owner, and past the sweep. See
+  [design-decisions.md](docs/explanation/design-decisions.md).
 - **Storage objects are deleted client-side *before* the DB row**, never
   the other way around — reversing the order orphans image files with no
   way to find them again. There is deliberately no DB-side cleanup trigger
   for `storage.objects` (Supabase forbids deleting from it outside the
   Storage API).
-- **Mutation testing (Stryker) is deliberately scoped** to the specific pure
-  functions listed in `web/mutation-targets.mjs` (and explained in
-  design-decisions.md), not the whole `src/app` tree. That one list feeds
-  both Stryker and `vitest.config.mts`'s per-file coverage floors, so it is
-  the only place to change. Don't widen it without reproducing the reasoning
-  (mutating JSX/Tailwind strings produces thousands of meaningless mutants).
+- **Mutation testing (Stryker) is scoped by a list**, `web/mutation-targets.mjs`,
+  not applied to the whole `src/app` tree. That one list feeds both Stryker
+  and `vitest.config.mts`'s per-file coverage floors, so it is the only
+  place to change, and everything on it carries a 100% coverage floor.
+  Widening it is welcome where the logic is genuinely reachable from tests;
+  what stays off it is rendering — mutating JSX and class strings produces
+  near-equivalent mutants by the thousand and a score nobody can act on.
 - **The coverage floor is raised by hand** (`autoUpdate: false`) and never
   auto-ratcheted — that was tried and reverted because it made local-green
   runs produce red PRs.
@@ -277,6 +215,75 @@ the tradeoff to the user:
 
 If a task seems to require reversing one of these, say so explicitly and
 explain why, rather than quietly doing it.
+
+## Project Overview
+
+**CollectionBuddy** is a photo-first, bilingual (German/English) catalog app
+for personal collections (coins, stamps, records, cameras, ...). Every entry
+leads with a photo, carries a place and tags, and is searchable.
+
+- **Frontend**: Next.js (App Router, **static export**, `output: 'export'`)
+  — no server runtime, no route handlers, no server-side authorization code.
+  The pinned version is `web/package.json`'s, and `web/AGENTS.md` says to
+  read the version's own docs before writing against its APIs.
+- **Backend**: Supabase (Postgres + Auth + Storage). Google is the only
+  sign-in provider.
+- **Authorization**: enforced entirely by Postgres **Row Level Security**.
+  There is nowhere else it could live — see "Hard guardrails" above.
+- **Hosting**: static export deployed to GitHub Pages.
+
+## Repository Structure
+
+```text
+CollectionBuddy/
+├── README.md                      # Feature overview, screenshots
+├── CONTRIBUTING.md               # Local setup, pre-PR checklist
+├── CLAUDE.md                     # This file
+├── TEST_STRATEGY.md              # READ THIS before writing or changing tests
+├── build.sh                      # Convenience build wrapper
+├── .pre-commit-config.yaml       # File hygiene, spell check, zizmor, shellcheck,
+│                                  # markdownlint, and web/'s own checks
+├── docs/                         # Diátaxis docs
+│   ├── tutorials/getting-started.md
+│   ├── how-to/user-guide.md, developer-guide.md
+│   ├── reference/architecture.md, configuration.md
+│   └── explanation/design-decisions.md   # READ THIS before touching schema,
+│                                          # RLS, sharing, search, or deletes
+├── .github/
+│   ├── actions/                   # Composite actions the workflows share
+│   └── workflows/                 # CI, Pages deploy, the daily orphan sweep
+├── supabase/
+│   ├── config.toml                # Local stack ports, Google OAuth block
+│   └── migrations/                # Applied in filename order; a squashed
+│                                   # baseline plus whatever has landed since
+└── web/                           # The Next.js app (see web/CLAUDE.md)
+    ├── src/app/                   # components/, data/, i18n/, lib/, login/
+    ├── e2e/                       # Playwright specs (signed-out + signed-in)
+    ├── scripts/                   # Dev/CI tooling: export server, local-stack
+    │                               # runner, icon generation, mutation summary
+    ├── mutation-targets.mjs       # The one list of mutated + 100%-covered files
+    ├── stryker.config.mjs         # Mutation testing, scoped to pure functions
+    └── vitest.config.mts          # Unit tests, coverage thresholds
+```
+
+## Development Commands
+
+Full setup: [CONTRIBUTING.md](CONTRIBUTING.md). Summary:
+
+```bash
+# One-time local backend (from repo root)
+supabase start
+supabase db reset
+
+# Web app (from web/)
+cp .env.example .env.local
+npm install
+npm run dev              # http://localhost:3000
+npm run demo             # no Google OAuth needed, anonymous local demo user
+```
+
+The checks that decide whether a change is finished live in guardrail 2
+above, not here.
 
 ## Engineering Principles
 
@@ -355,7 +362,7 @@ For anything beyond this summary, read
 first — both explain *why*, not just *what*.
 
 - Tables: `categories`, `items`, `item_categories`, `category_shares`,
-  `images` — see [architecture.md#tables](docs/reference/architecture.md#tables).
+  `images` — see [architecture.md](docs/reference/architecture.md).
 - Every policy starts from `user_id = (select auth.uid())` and is widened
   by one of two predicates: `has_category_read_access()` (any active
   `category_shares` grant) or `has_category_write_access()` (category
@@ -363,16 +370,17 @@ first — both explain *why*, not just *what*.
   read-only — an editor writes items and photographs inside a shared
   category. Category-level actions (rename, delete, manage shares) stay
   owner-only at every role.
-- `anon` has both RLS denial *and* explicit revoked grants on **all five**
-  tables (defense in depth, not redundancy — don't remove either).
-  `category_shares` was the exception until `0011_least_privilege_grants.sql`;
-  there the select was actually being refused by a missing `EXECUTE` on
-  `caller_email()`, not by the table grant the docs described.
+- `anon` has both RLS denial *and* explicit revoked grants on **every**
+  table (defense in depth, not redundancy — don't remove either). One table
+  was missing from that list for a while, and the denial everyone believed
+  in was actually coming from a missing `EXECUTE` on a helper function,
+  which is the kind of thing only the executable assertions catch.
   `authenticated` holds exactly the DML each table's policies back, and no
   `TRUNCATE`/`REFERENCES`/`TRIGGER` — RLS does not filter `TRUNCATE` at all.
-- Photos: `item-images` Storage bucket, 5 MiB/file limit,
-  `image/webp`/`image/jpeg`/`image/png` only; WebP compression happens in
-  the browser before upload.
+- Photos: one private Storage bucket, with a per-file size cap and an
+  image-only MIME allowlist configured on the bucket itself (`supabase/config.toml`
+  and the storage migration); WebP compression happens in the browser
+  before upload.
 - Daily `cleanup-orphaned-photos.yml` sweeps Storage objects that no
   `images` row references (48h grace period), which a crashed client-side
   delete or a failed row insert leaves behind. `workflow_dispatch` runs it as

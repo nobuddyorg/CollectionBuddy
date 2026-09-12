@@ -1,32 +1,29 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useI18n } from '../../i18n/useI18n';
-import { countItemsForCategory } from '../../data/categories';
 import type { Category } from '../../types';
 import {
   AddButton,
-  CancelExportButton,
-  CancelImportButton,
   CollapseButton,
   DeleteButtonWithLabel,
   ExpandButton,
-  ExportButton,
-  ImportButton,
   RenameButton,
 } from './Buttons';
 import { CategoryText } from './CategoryText';
 import { CategorySelectDropdown } from './Dropdown';
 import { CategoryInput } from './Input';
-import { nextAfterRemoving, sortCategories } from './selection';
+import { sortCategories } from './selection';
 import { SharingSection } from './Sharing';
+import { ExportRow, ImportRow } from './TransferRows';
 import type { UseCategories } from './useCategories';
+import { useCategoryRemoval } from './useCategoryRemoval';
 import { useExportCategory } from './useExportCategory';
 import { useImportCategory } from './useImportCategory';
 import { useShares } from './useShares';
 import { fieldClasses } from '../ui/fieldClasses';
+import { labelClasses } from '../ui/labelClasses';
 
 type Props = {
   selectedCat: string | null;
@@ -47,7 +44,6 @@ export default function CategorySelect({
   ready = true,
 }: Props) {
   const { t } = useI18n();
-  const confirm = useConfirm();
   const {
     cats,
     isLoading,
@@ -57,8 +53,6 @@ export default function CategorySelect({
     reload,
     createCategory,
     renameCategory,
-    deleteCategory,
-    optimisticRemove,
   } = categories;
   const {
     isExporting,
@@ -73,7 +67,6 @@ export default function CategorySelect({
     runImport,
     cancelImport,
   } = useImportCategory(existingCategoryNames);
-  const importInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [renameValue, setRenameValue] = useState('');
   const [expanded, setExpanded] = useState(!selectedCat);
@@ -160,74 +153,15 @@ export default function CategorySelect({
 
   // Same button, same position, two different operations: owning this
   // category means the trash destroys it; being a grantee means it only
-  // ends *this viewer's* access, via deleteShare on shares.shares[0] -- the
-  // one row RLS ever hands back to a non-owner.
-  const onLeave = useCallback(async () => {
-    if (!selectedCat || !selected) return;
-    const myShareId = shares.shares[0]?.id;
-    if (!myShareId) return;
-
-    const message = t('category_select.confirm_leave').replace(
-      '{name}',
-      selected.name,
-    );
-    if (!(await confirm(message))) return;
-
-    const restoreCategory = optimisticRemove(selectedCat);
-    if (!restoreCategory) return;
-    // Falls through to what's left rather than to nothing -- leaving a
-    // category is no reason to be sent back to a chooser.
-    onSelect(nextAfterRemoving(sortedCats, selectedCat));
-
-    shares.deleteShare(myShareId, {
-      successMessage: t('category_select.leave_success'),
-      errorMessage: t('category_select.leave_error'),
-      onRestore: () => {
-        restoreCategory();
-        onSelect(selectedCat);
-      },
-    });
-  }, [
+  // ends *this viewer's* access.
+  const { onDelete, onLeave } = useCategoryRemoval({
     selectedCat,
     selected,
-    shares,
-    t,
-    confirm,
-    onSelect,
     sortedCats,
-    optimisticRemove,
-  ]);
-
-  const onDelete = useCallback(async () => {
-    if (!selectedCat) return;
-    const categoryName = selected?.name ?? '';
-
-    // Named and counted rather than a bare "Confirm deletion": the trash
-    // sits right beside the rename field, and deletion is permanent.
-    const { count, error: countError } =
-      await countItemsForCategory(selectedCat);
-    if (countError) console.error(countError);
-    const message =
-      countError || count == null
-        ? t('category_select.confirm_delete_generic').replace(
-            '{name}',
-            categoryName,
-          )
-        : count > 0
-          ? t('category_select.confirm_delete_with_entries')
-              .replace('{name}', categoryName)
-              .replace('{count}', String(count))
-          : t('category_select.confirm_delete_empty').replace(
-              '{name}',
-              categoryName,
-            );
-
-    if (!(await confirm(message))) return;
-    // Falls through to what's left rather than to nothing -- deleting a
-    // category is no reason to be sent back to a chooser.
-    onSelect(nextAfterRemoving(sortedCats, selectedCat));
-    deleteCategory(selectedCat, { onRestore: () => onSelect(selectedCat) });
-  }, [selectedCat, selected, deleteCategory, onSelect, sortedCats, t, confirm]);
+    categories,
+    shares,
+    onSelect,
+  });
 
   return (
     <section className="space-y-3">
@@ -276,7 +210,7 @@ export default function CategorySelect({
               <>
                 <label
                   htmlFor="rename-category"
-                  className="col-span-3 font-label text-[0.6875rem] text-muted-foreground"
+                  className={labelClasses('col-span-3')}
                 >
                   {t('category_select.rename')}
                 </label>
@@ -338,9 +272,7 @@ export default function CategorySelect({
 
             <label
               htmlFor="new-category-name"
-              className={`col-span-3 font-label text-[0.6875rem] text-muted-foreground ${
-                selected ? 'mt-1.5' : ''
-              }`}
+              className={labelClasses(`col-span-3 ${selected ? 'mt-1.5' : ''}`)}
             >
               {t('category_select.new_category')}
             </label>
@@ -363,68 +295,23 @@ export default function CategorySelect({
               else a category is shared with. */}
           {selected && !isShared && <SharingSection shares={shares} />}
 
-          {/* A category from a file, not a category to select first --
-              independent of `selected`, unlike Export below, which needs
-              something already there to take a copy of. */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3">
-            <input
-              ref={importInputRef}
-              type="file"
-              accept=".zip"
-              data-testid="import-file-input"
-              className="sr-only"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = '';
-                if (file) void onImportFile(file);
-              }}
-            />
-            <ImportButton
-              onClick={() => importInputRef.current?.click()}
-              disabled={isImporting}
-              isImporting={isImporting}
-              label={t('category_select.import')}
-            />
-            {isImporting && (
-              <CancelImportButton
-                onClick={cancelImport}
-                label={t('category_select.import_cancel')}
-              />
-            )}
-            <p
-              aria-live="polite"
-              className="min-w-0 flex-1 font-label text-[0.6875rem] text-muted-foreground"
-            >
-              {importMessage ?? t('category_select.import_hint')}
-            </p>
-          </div>
+          <ImportRow
+            isImporting={isImporting}
+            message={importMessage}
+            onFile={(file) => void onImportFile(file)}
+            onCancel={cancelImport}
+          />
 
           {/* Below its own rule, only once there is a category to take a
-              copy of. Disabled, not absent, for a shared category:
-              exportCategory() resolves the *caller's own* uid to build
-              each item's storage prefix, which for a grantee is the wrong
-              prefix entirely, not the owner's. */}
+              copy of. */}
           {selected && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3">
-              <ExportButton
-                onClick={() => void runExport(selected)}
-                disabled={isExporting || isShared}
-                isExporting={isExporting}
-                label={t('category_select.export')}
-              />
-              {isExporting && (
-                <CancelExportButton
-                  onClick={cancelExport}
-                  label={t('category_select.export_cancel')}
-                />
-              )}
-              <p
-                aria-live="polite"
-                className="min-w-0 flex-1 font-label text-[0.6875rem] text-muted-foreground"
-              >
-                {exportMessage ?? t('category_select.export_hint')}
-              </p>
-            </div>
+            <ExportRow
+              isExporting={isExporting}
+              isShared={isShared}
+              message={exportMessage}
+              onExport={() => void runExport(selected)}
+              onCancel={cancelExport}
+            />
           )}
 
           {/* Closes the panel off from whatever renders next; only needed

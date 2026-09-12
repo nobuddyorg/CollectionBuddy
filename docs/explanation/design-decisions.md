@@ -62,7 +62,7 @@ Line coverage answers "did this code run during a test," not "would a real bug i
 
 - `buildSearchFilter` (`data/items.ts`) — escaping/quoting for PostgREST's `or=()` filter grammar. Get the escaping wrong and search either breaks or, worse, lets a search term leak into the filter as structural syntax.
 - `getPaginationItems` (`Pagination.tsx`) — the ellipsis/window boundary logic has several off-by-one-prone conditions.
-- `pairImageEntries` / `toImgEntries` (`useItemImages.tsx`) — matching `.webp`/`.thumb.webp` pairs by filename.
+- `groupImageRows` / `toImgEntries` / `signEntries` (`ItemList/imageEntries.ts`) — grouping `images` rows per item in query order, and resolving each entry's signed URL, falling back to a cached one rather than dropping a photograph when signing fails.
 - `formatPlaceDisplay` / `dedupePhotonFeatures` / `isQueryLongEnough` (`ItemForm/usePhoton.tsx`) — geocoding result formatting, de-duplication, and the length floor a query has to clear before it earns a request.
 - `resolveTranslationKey` (`I18nProvider.tsx`) — dotted-key lookup against the translation tree.
 - `restoreAt` (`lib/optimistic.ts`) — putting a card back at its old index after a failed delete. Clamping an index against a list that may have changed underneath, with an off-by-one on either side that would drop the card in the wrong place and a negative index that `splice` would silently read as "from the end".

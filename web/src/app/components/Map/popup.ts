@@ -15,12 +15,16 @@ export const popupContent = (
   const el = document.createElement('div');
 
   const heading = document.createElement('p');
+  // Stryker disable next-line StringLiteral: a class list, not logic --
+  // pinning it in a test would assert the styling, not the behaviour.
   heading.className = 'font-display text-sm font-bold';
   heading.textContent = text;
   el.appendChild(heading);
 
   if (countLabel) {
     const count = document.createElement('p');
+    // Stryker disable next-line StringLiteral: a class list, not logic --
+    // pinning it in a test would assert the styling, not the behaviour.
     count.className = 'font-label text-[0.6875rem] text-neutral-500';
     count.textContent = countLabel;
     el.appendChild(count);
@@ -30,6 +34,8 @@ export const popupContent = (
     // Scrolls rather than truncates: the cap is on the popup's height, not
     // on how many titles it can name.
     const list = document.createElement('ul');
+    // Stryker disable next-line StringLiteral: a class list, not logic --
+    // pinning it in a test would assert the styling, not the behaviour.
     list.className = 'mt-1.5 max-h-40 overflow-y-auto list-disc pl-4';
     for (const title of titles) {
       const item = document.createElement('li');

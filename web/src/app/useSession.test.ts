@@ -181,6 +181,45 @@ describe('useSession', () => {
     consoleError.mockRestore();
   });
 
+  // user_metadata is whatever the auth provider sent; a provider that sends
+  // none at all must not take the session down with it.
+  it('survives a user carrying no metadata at all', async () => {
+    vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
+      data: {
+        session: sessionWith({
+          id: 'user-5',
+          email: 'a@example.com',
+        } as never),
+      },
+      error: null,
+    } satisfies GetSessionResult);
+    mockAuthStateChange();
+
+    const { result } = renderHook(() => useSession());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.user).toEqual({
+      id: 'user-5',
+      email: 'a@example.com',
+      name: null,
+    });
+  });
+
+  it('reads the session once, however often it re-renders', async () => {
+    const getSession = vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
+      data: { session: null },
+      error: null,
+    } satisfies GetSessionResult);
+    mockAuthStateChange();
+
+    const { rerender, result } = renderHook(() => useSession());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    rerender();
+    rerender();
+
+    expect(getSession).toHaveBeenCalledOnce();
+  });
+
   it('unsubscribes from auth state changes on unmount', () => {
     vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
       data: { session: null },

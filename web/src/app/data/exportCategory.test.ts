@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   ExportCancelledError,
+  ExportError,
   exportCategory,
   ITEM_PAGE_SIZE,
   LARGE_EXPORT_WARN_BYTES,
@@ -207,21 +208,26 @@ describe('exportCategory', () => {
     expect(result.itemCount).toBe(0);
   });
 
-  it('treats a null photograph listing the same as an empty one', async () => {
+  // Unlike the two null payloads above and below, this one is not read as
+  // "nothing to do". No rows is `[]`; a null answer to the photographs
+  // query would hand back an archive with no photographs in it and nothing
+  // counted as skipped -- indistinguishable from a collection that has
+  // none, for an export whose canonical use is "export, then delete the
+  // originals".
+  it('fails the export rather than shipping an archive a null photograph listing emptied', async () => {
     const listImages = (async () => ({
       data: null,
       error: null,
     })) as unknown as ListImages;
-    const result = await exportCategory({
-      category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
-      listItems: paginatedListItems([item({ id: 'a' })]),
-      listImages,
-      signUrls: fakeSignUrls(),
-    });
-    expect(result.itemCount).toBe(1);
-    expect(result.photoCount).toBe(0);
-    expect(result.skippedPhotoCount).toBe(0);
+    await expect(
+      exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        getSession: fakeGetSession('uid'),
+        listItems: paginatedListItems([item({ id: 'a' })]),
+        listImages,
+        signUrls: fakeSignUrls(),
+      }),
+    ).rejects.toThrow(ExportError);
   });
 
   it('treats a null signed-URL list the same as one with no rows, skipping every photograph it covered', async () => {
@@ -1195,6 +1201,33 @@ describe('confirmLargeExport', () => {
       confirmLargeExport,
     });
     expect(confirmLargeExport).not.toHaveBeenCalled();
+  });
+
+  // The check is a `>`, so a total sitting exactly on the threshold is not
+  // a large export. Nothing else pins which side of the boundary the prompt
+  // starts on, and both neighbours of this case pass either way.
+  it('does not ask for a total sitting exactly on the threshold', async () => {
+    const confirmLargeExport = vi.fn().mockResolvedValue(true);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => okResponse([1])),
+    );
+    try {
+      const result = await exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        getSession: fakeGetSession('uid'),
+        listItems: paginatedListItems([item({ id: 'a' })]),
+        listImages: fakeListImagesWithSizes({
+          a: [{ name: '1.webp', size: LARGE_EXPORT_WARN_BYTES }],
+        }),
+        signUrls: fakeSignUrls(),
+        confirmLargeExport,
+      });
+      expect(confirmLargeExport).not.toHaveBeenCalled();
+      expect(result.photoCount).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('asks, with the total bytes, once the threshold is exceeded, and proceeds when accepted', async () => {

@@ -80,6 +80,35 @@ describe('useCatalogue', () => {
     expect(result.current.selectedCategoryId).toBe('b');
   });
 
+  // The load is gated on the session, so it has to run again when the
+  // session resolves -- not only on the first render.
+  it('loads once the session stops resolving, not only on first render', async () => {
+    const reload = vi.fn().mockResolvedValue(cats);
+    vi.mocked(useCategories).mockReturnValue(categoriesState({ reload }));
+    const { rerender, result } = renderHook(
+      ({ loading }: { loading: boolean }) => useCatalogue(loading, 'user-1'),
+      { initialProps: { loading: true } },
+    );
+    expect(reload).not.toHaveBeenCalled();
+
+    rerender({ loading: false });
+
+    await waitFor(() => expect(result.current.catalogueReady).toBe(true));
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  // Naming it in another callback's dependency array has to be free.
+  it('keeps one selectCategory across re-renders', () => {
+    const { result, rerender } = renderHook(() =>
+      useCatalogue(false, 'user-1'),
+    );
+    const first = result.current.selectCategory;
+
+    rerender();
+
+    expect(result.current.selectCategory).toBe(first);
+  });
+
   it('selecting a category persists it for the next visit', () => {
     const { result } = renderHook(() => useCatalogue(false, 'user-1'));
 

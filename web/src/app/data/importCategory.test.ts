@@ -505,6 +505,49 @@ describe('importCategory', () => {
     }
   });
 
+  // The repeat-operation case named in TEST_STRATEGY.md's idempotency
+  // table: uploadWithRetry retries the *same path* and treats every storage
+  // failure as retryable, so an attempt that wrote its object before failing
+  // leaves the next attempt facing an object it cannot overwrite -- there is
+  // no update policy on storage.objects. The photograph is skipped rather
+  // than failing the import, no images row is written, and the object left
+  // behind is exactly what the daily sweep collects.
+  it('skips a photograph whose retry meets the object the failed attempt already wrote', async () => {
+    const written = new Set<string>();
+    const uploadImage = vi.fn(async (path: string) => {
+      if (written.has(path)) return { error: new Error('Duplicate') };
+      written.add(path);
+      return { error: new Error('connection lost after the object landed') };
+    }) as unknown as UploadImage;
+    const createImage = fakeCreateImage();
+    const archive = await buildArchive();
+    vi.useFakeTimers();
+    try {
+      const promise = importCategory({
+        file: archive,
+        categoryName: 'Coins',
+        ...baseFakes(),
+        uploadImage,
+        createImage,
+      });
+      await vi.advanceTimersByTimeAsync(10_000);
+      const result = await promise;
+
+      expect(result.itemCount).toBe(1);
+      expect(result.photoCount).toBe(0);
+      expect(result.skippedPhotoCount).toBe(1);
+      // Three attempts at the full size, and no thumbnail attempt at all:
+      // the full size failing is what ends this photograph.
+      expect(uploadImage).toHaveBeenCalledTimes(3);
+      expect([...written]).toEqual([
+        expect.stringMatching(/^uid\/new-item-1\/[0-9a-f-]+\.webp$/),
+      ]);
+      expect(createImage).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('still counts the photograph a success when only its thumbnail fails to upload', async () => {
     const uploadImage = vi.fn(async (path: string) =>
       path.endsWith('.thumb.webp')
