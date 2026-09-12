@@ -32,8 +32,7 @@ function categories(overrides: Partial<UseCategories> = {}): UseCategories {
     createCategory: vi.fn(),
     renameCategory: vi.fn(),
     deleteCategory: vi.fn(),
-    // Hands back a restore function, the way the real one does for a
-    // category it actually removed.
+    // Hands back a restore function, as the real one does.
     optimisticRemove: vi.fn(() => vi.fn()),
     ...overrides,
   };
@@ -133,9 +132,7 @@ describe('useCategoryRemoval', () => {
       expect(onSelect).not.toHaveBeenCalled();
     });
 
-    // The delete is optimistic: useCategories puts the row back if the
-    // request fails, and the selection has to come back with it, or the
-    // restored category sits there unselected.
+    // The row comes back on failure, and the selection has to come with it.
     it('re-selects the category when the delete is undone or fails', async () => {
       const deleteCategory = vi.fn<UseCategories['deleteCategory']>();
       const { result, onSelect } = setUp({
@@ -176,8 +173,6 @@ describe('useCategoryRemoval', () => {
       expect(onSelect).toHaveBeenCalledWith('b');
     });
 
-    // Same optimistic shape as the delete above: the row comes back, and
-    // the selection has to follow it.
     it('puts the category back and re-selects it when leaving fails', async () => {
       const restoreCategory = vi.fn();
       const deleteShare = vi.fn<UseShares['deleteShare']>();
@@ -223,9 +218,8 @@ describe('useCategoryRemoval', () => {
       expect(screen.queryByTestId('confirm-accept')).not.toBeInTheDocument();
     });
 
-    // optimisticRemove answers with null when the row is already gone
-    // -- another tab, or a second click -- and then there is nothing to
-    // undo and no share to end.
+    // Already gone -- another tab, or a second click -- leaves nothing to
+    // undo, and so nothing to end either.
     it('does not end the grant when the category was already removed', async () => {
       const deleteShare = vi.fn<UseShares['deleteShare']>();
       const { result } = setUp({

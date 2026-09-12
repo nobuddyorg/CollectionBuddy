@@ -12,8 +12,6 @@ import {
 } from './Buttons';
 import { labelClasses } from '../ui/labelClasses';
 
-// Both rows below are the same strip: an action, a cancel button while the
-// action is running, and one live region carrying its progress.
 function TransferRow({
   children,
   message,
@@ -31,8 +29,6 @@ function TransferRow({
   );
 }
 
-/** A category from a file, not a category to select first -- so, unlike
- *  ExportRow, this one renders whether or not something is selected. */
 export function ImportRow({
   isImporting,
   message,

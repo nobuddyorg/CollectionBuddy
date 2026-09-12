@@ -10,8 +10,6 @@ import type { CategoryShareSummary } from '../../data/shares';
 import type { UseShares } from './useShares';
 import { labelClasses } from '../ui/labelClasses';
 
-// Every grant the owner has made on this category, each with the role
-// toggle and the revoke button that end it.
 export function ShareList({ shares }: { shares: UseShares }) {
   const { t } = useI18n();
   const confirm = useConfirm();

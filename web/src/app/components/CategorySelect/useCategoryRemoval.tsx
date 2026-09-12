@@ -11,11 +11,9 @@ import type { UseCategories } from './useCategories';
 import type { UseShares } from './useShares';
 
 /**
- * The two ways a category can leave the panel, behind one trash button:
- * owning it means the button destroys it, being a grantee means it only
- * ends this viewer's own access. Which one runs is the caller's decision
- * (`isShared` in index.tsx); both end with the selection falling through to
- * whatever is left rather than back to no selection at all.
+ * Owning a category means the trash destroys it; being a grantee means it
+ * only ends this viewer's own access. Both leave the selection on whatever
+ * is left rather than on nothing.
  */
 export function useCategoryRemoval({
   selectedCat,

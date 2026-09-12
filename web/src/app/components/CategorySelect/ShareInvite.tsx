@@ -22,8 +22,8 @@ function todayDateStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// The invite row. A grant is always issued at the `viewer` role -- promoting
-// one to `editor` happens from the list beside it, on a row that exists.
+// A grant is always issued at the `viewer` role; promoting one to `editor`
+// happens from the list beside this, on a row that already exists.
 export function ShareInvite({ shares }: { shares: UseShares }) {
   const { t } = useI18n();
   const { isSharing, createShare } = shares;
