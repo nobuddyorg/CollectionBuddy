@@ -26,7 +26,7 @@ It also names, deliberately, where the estate is currently thin. A strategy that
 
 | Piece | What it is | Testing consequence |
 | --- | --- | --- |
-| `web/` | Next.js with `output: 'export'`, React, Tailwind (versions pinned in `web/package.json`) | No server runtime, no route handlers, no server-side authorization to test. The deployable is a folder of static files served under a base path. |
+| `web/` | The static export CLAUDE.md's overview describes | Nothing server-side to test: no route handlers, and no authorization code in the deployable, which is a folder of static files served under a base path. |
 | GitHub Pages | Static host | Deployment failures are path failures (base path, icon 404, stale CDN asset), not runtime failures. They need a real fetch against the deployed origin to find. |
 | Supabase Postgres | A handful of tables, plus the functions, triggers and indexes around them (`supabase/migrations/`) | Behaviour lives in SQL: normalization triggers, ownership triggers, a statement-level orphan sweep, generated columns. None of it is reachable from a unit test. |
 | Postgres RLS | The policy migrations, for the tables and for the storage bucket | The entire authorization boundary. |
@@ -137,6 +137,7 @@ Ranked by expected cost, not by likelihood alone. "Cheapest meaningful test" is 
 | Base path, icons, manifest, service worker, CSP, framebusting | Signed-out browser suite, plus source-text assertions for the inline scripts | Not unit alone — the inline scripts run before React exists |
 | One complete user journey (add an entry, photograph it, find it, export it) | E2E | Not one E2E case per field |
 | Migration applicability | CI `supabase start` | Not review-by-eye |
+| Repo tooling in `web/scripts/` — export server, local-stack runner, icon generation, mutation summary | The job or npm script that runs it; a broken one fails the step that depends on it | Not unit tests. None of it ships in the bundle, and it sits outside the coverage `include` deliberately — a script with logic worth asserting belongs in `src/` instead |
 
 ---
 
@@ -218,7 +219,9 @@ The existing `editor` tests (`useShares.test.tsx`, `Sharing.test.tsx`, `ItemList
 
 ### Standing rule for schema changes
 
-Any PR touching `supabase/migrations/**` in a way that adds or changes a policy, grant, or ownership-affecting trigger must add or extend a case in `rls.spec.ts` in the same PR, and say in the commit message and PR description what it now allows or denies. A migration with no matching assertion is an unreviewed change to the only security boundary in the product.
+The rule is CLAUDE.md's database guardrail: a PR that adds or changes a policy, grant or ownership-affecting trigger ships a matching case in `rls.spec.ts` in the same PR.
+
+It is stated as an absolute because the failure is invisible. A wrong policy changes nothing about how the interface looks, there is no second layer to catch it, and review of SQL by eye has already missed this class of bug here more than once. A migration with no matching assertion is an unreviewed change to the only security boundary in the product.
 
 ### Out of scope, deliberately
 
@@ -361,13 +364,13 @@ It is still not worth building a harness for a bash script in YAML, and the thre
 
 1. **Reviewed as a database change.** CLAUDE.md's database guardrail names this file, so a change to its query carries the same expectations as a migration.
 2. **A dry run.** `workflow_dispatch` takes a `dry_run` input that lists exactly what the sweep *would* delete and exits — before the `service_role` key is even fetched, so a dry run never puts that credential on the runner. It defaults to **true**, so a human clicking "Run workflow" gets the harmless answer unless they ask for the other one; a scheduled run sends no inputs and sweeps normally. This is the one piece of real verification available against the production database, and a change to the query should go through it first.
-3. **The invariants are written down** — here and in CLAUDE.md — because the risk is a future edit tidying them away.
+3. **The invariants are named as rules** in CLAUDE.md's database guardrail, because the risk is a future edit tidying them away.
 
-What the query must keep:
+What each one prevents — the part a reviewer needs, and the part the rule itself does not carry:
 
 - **Both `path_full` and `path_thumb`.** A photograph is two Storage objects, `<uuid>.webp` and `<uuid>.thumb.webp`, held in one `images` row. Matching only `path_full` classes every thumbnail in the bucket as orphaned and deletes it. This is not hypothetical: it is what a straightforward reading of an earlier fix produced, and it was caught by executing the predicate rather than reading it.
-- **No cast of a path to `uuid`,** anywhere. A malformed path fails a cast outright and aborts the whole query rather than simply not matching — the same reasoning as `storage_item_id()` in an RLS predicate. Comparing text to text cannot raise.
-- **The 48h grace period.** The only thing separating "orphaned" from "mid-upload", since `useItemImages.tsx` writes both objects before inserting the row that names them. Do not shorten it. If the sweep ever needs to run more aggressively, that is a design conversation, not a parameter tweak.
+- **No cast of a path to `uuid`.** A malformed path fails a cast outright and aborts the whole query rather than simply not matching — the same reasoning as `storage_item_id()` in an RLS predicate. Comparing text to text cannot raise.
+- **The 48h grace period.** The only thing separating "orphaned" from "mid-upload", since the upload path writes both objects before inserting the row that names them. If the sweep ever needs to run more aggressively, that is a design conversation, not a parameter tweak.
 
 The predicate asks "does any `images` row reference this object", which is what orphaned actually means. It previously asked "does an item with this id exist", parsed out of the path — a proxy that answered wrongly in both directions: it kept an object whose path merely names a live item, and it could never find one whose row insert failed after the bytes landed.
 
@@ -453,7 +456,7 @@ Specific to this repository. Each of these has either happened here or is a step
 11. **Test gaming.** A test written to touch a line, a branch added to dodge a mutant, a file excluded to avoid dealing with it. A green metric that does not correspond to real confidence is worse than a documented gap.
 12. **Widening Stryker's scope to the component tree.** Mutating JSX and Tailwind strings produces thousands of meaningless mutants and a score nobody can act on.
 13. **Testing a SQL-side storage cleanup trigger.** It cannot work — Supabase's `prevent-direct-deletes` guard is statement-level and raises even when the delete matches nothing. Writing a test for one means writing a test for a design that has already been tried and reverted.
-14. **Running any test, migration or `db push` against the hosted project.** Local stack only.
+14. **Running any test, migration or `db push` against the hosted project.** Local stack only — CLAUDE.md's database guardrail is the rule, and there is no staging behind it to absorb a mistake.
 15. **Asserting `expect(error ?? {}).toBeTruthy()` or similar.** An object is always truthy; assert the error code (`42501`) and the status. This exact trap is already called out in `rls.spec.ts`.
 16. **Adding an E2E case for a field-level detail.** Journeys, not fields.
 
