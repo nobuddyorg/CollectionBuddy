@@ -10,8 +10,10 @@ on top of this file and does not replace it.
 for personal collections (coins, stamps, records, cameras, ...). Every entry
 leads with a photo, carries a place and tags, and is searchable.
 
-- **Frontend**: Next.js 16 (App Router, **static export**, `output: 'export'`)
+- **Frontend**: Next.js (App Router, **static export**, `output: 'export'`)
   — no server runtime, no route handlers, no server-side authorization code.
+  The pinned version is `web/package.json`'s, and `web/AGENTS.md` says to
+  read the version's own docs before writing against its APIs.
 - **Backend**: Supabase (Postgres + Auth + Storage). Google is the only
   sign-in provider.
 - **Authorization**: enforced entirely by Postgres **Row Level Security**.
@@ -46,8 +48,8 @@ CollectionBuddy/
 │   └── workflows/                 # CI, Pages deploy, the daily orphan sweep
 ├── supabase/
 │   ├── config.toml                # Local stack ports, Google OAuth block
-│   └── migrations/                # 0001..0007 are the squashed baseline; 0008+
-│                                   # are the changes since (see 0012 for the newest)
+│   └── migrations/                # Applied in filename order; a squashed
+│                                   # baseline plus whatever has landed since
 └── web/                           # The Next.js app (see web/CLAUDE.md)
     ├── src/app/                   # components/, data/, i18n/, lib/, login/
     ├── e2e/                       # Playwright specs (signed-out + signed-in)
@@ -139,9 +141,9 @@ rest") are not a stopping point, they're a status update.
   gate.
 - **Never** add `/* v8 ignore */`, `// Stryker disable`, `.skip`, or an
   ESLint/TS suppression to make a check pass without first understanding
-  *why* it's failing and confirming the suppression is legitimate (see
-  [design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files](docs/explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files)
-  for the one place this pattern is already deliberately used).
+  *why* it's failing and confirming the suppression is legitimate. Where one
+  is already in use, it sits next to I/O that cannot be scored and carries
+  the reason in a comment; anything new needs the same.
 - **No test gaming.** Coverage and mutation score must reflect real
   assertions on real behavior — never write a test just to touch a line, add
   a meaningless branch to dodge a mutant, or exclude a file to avoid dealing
@@ -150,11 +152,12 @@ rest") are not a stopping point, they're a status update.
 
 ### 3. Database changes: local-first, RLS is load-bearing
 
-RLS (`supabase/migrations/0006_policies.sql` for the tables,
-`0007_storage.sql` for the bucket) is the **only** authorization boundary in
-this app — there is no server to fall back on. This project's history
-includes several real RLS-correctness bugs (#292, #387, #335, #290, #386),
-so treat every policy change as security-critical, not routine SQL.
+RLS — the policies on the tables, and the ones on the storage bucket — is
+the **only** authorization boundary in this app; there is no server to fall
+back on. This project's history includes several real RLS-correctness bugs,
+so treat every policy change as security-critical, not routine SQL. Find the
+current files by what they define (`grep -rn 'create policy' supabase/migrations/`)
+rather than by a number: a squash renumbers them.
 
 - Write and run migrations against the **local** stack only
   (`supabase start`, `supabase db reset`, `supabase migration ...`).
@@ -198,8 +201,8 @@ so treat every policy change as security-critical, not routine SQL.
   ownership of it; policies are fine, `CREATE INDEX`/schema changes are not
   and will fail with `42501` (this is expected, not a bug to work around).
 - Squashing migrations again is a deliberate, rare act with a verification
-  procedure (see [developer-guide.md#squashing-migrations-again](docs/how-to/developer-guide.md#squashing-migrations-again))
-  — never squash as a side effect of an unrelated change.
+  procedure (see [developer-guide.md](docs/how-to/developer-guide.md)) —
+  never squash as a side effect of an unrelated change.
 
 ### 4. Git, branches, CI
 
@@ -212,9 +215,10 @@ so treat every policy change as security-critical, not routine SQL.
   without the user explicitly asking for that change.
 - Never run `npm audit fix --force` or a from-scratch
   `rm -rf node_modules package-lock.json && npm install` in `web/` — both
-  have concretely made the dependency tree *worse* on this project (see
-  [design-decisions.md#npm-audit-whats-overridden-and-whats-accepted-risk-issue-191](docs/explanation/design-decisions.md#npm-audit-whats-overridden-and-whats-accepted-risk-issue-191)).
-  Use targeted `overrides` entries instead.
+  have concretely made the dependency tree *worse* on this project (see the
+  advisory section of
+  [design-decisions.md](docs/explanation/design-decisions.md)). Use targeted
+  `overrides` entries instead.
 
 ### 5. Secrets and environment
 
@@ -252,24 +256,24 @@ the tradeoff to the user:
 - **Search is trigram `ILIKE`, not full-text search** — don't reintroduce
   `tsvector`/FTS columns; they were added once, found unused, and dropped.
 - **A storage object's path never changes** — `authenticated` holds no
-  `UPDATE` on `storage.objects` and no `update` policy exists there
-  (`0008_storage_no_update.sql`), so `move()` and `upsert` are refused for
-  owner and grantee alike. Restoring the verb reopens a real escalation: the
+  `UPDATE` on `storage.objects` and no `update` policy exists there, so
+  `move()` and `upsert` are refused for owner and grantee alike. Restoring the verb reopens a real escalation: the
   shared policy could only key on the path's *second* segment, so an `UPDATE`
   rewriting the *first* carried the owner's photograph into an editor's
   namespace, past revocation, past the owner, and past the sweep. See
-  [design-decisions.md#why-a-storage-objects-path-can-never-change](docs/explanation/design-decisions.md#why-a-storage-objects-path-can-never-change).
+  [design-decisions.md](docs/explanation/design-decisions.md).
 - **Storage objects are deleted client-side *before* the DB row**, never
   the other way around — reversing the order orphans image files with no
   way to find them again. There is deliberately no DB-side cleanup trigger
   for `storage.objects` (Supabase forbids deleting from it outside the
   Storage API).
-- **Mutation testing (Stryker) is deliberately scoped** to the specific pure
-  functions listed in `web/mutation-targets.mjs` (and explained in
-  design-decisions.md), not the whole `src/app` tree. That one list feeds
-  both Stryker and `vitest.config.mts`'s per-file coverage floors, so it is
-  the only place to change. Don't widen it without reproducing the reasoning
-  (mutating JSX/Tailwind strings produces thousands of meaningless mutants).
+- **Mutation testing (Stryker) is scoped by a list**, `web/mutation-targets.mjs`,
+  not applied to the whole `src/app` tree. That one list feeds both Stryker
+  and `vitest.config.mts`'s per-file coverage floors, so it is the only
+  place to change, and everything on it carries a 100% coverage floor.
+  Widening it is welcome where the logic is genuinely reachable from tests;
+  what stays off it is rendering — mutating JSX and class strings produces
+  near-equivalent mutants by the thousand and a score nobody can act on.
 - **The coverage floor is raised by hand** (`autoUpdate: false`) and never
   auto-ratcheted — that was tried and reverted because it made local-green
   runs produce red PRs.
@@ -359,7 +363,7 @@ For anything beyond this summary, read
 first — both explain *why*, not just *what*.
 
 - Tables: `categories`, `items`, `item_categories`, `category_shares`,
-  `images` — see [architecture.md#tables](docs/reference/architecture.md#tables).
+  `images` — see [architecture.md](docs/reference/architecture.md).
 - Every policy starts from `user_id = (select auth.uid())` and is widened
   by one of two predicates: `has_category_read_access()` (any active
   `category_shares` grant) or `has_category_write_access()` (category
@@ -367,16 +371,17 @@ first — both explain *why*, not just *what*.
   read-only — an editor writes items and photographs inside a shared
   category. Category-level actions (rename, delete, manage shares) stay
   owner-only at every role.
-- `anon` has both RLS denial *and* explicit revoked grants on **all five**
-  tables (defense in depth, not redundancy — don't remove either).
-  `category_shares` was the exception until `0011_least_privilege_grants.sql`;
-  there the select was actually being refused by a missing `EXECUTE` on
-  `caller_email()`, not by the table grant the docs described.
+- `anon` has both RLS denial *and* explicit revoked grants on **every**
+  table (defense in depth, not redundancy — don't remove either). One table
+  was missing from that list for a while, and the denial everyone believed
+  in was actually coming from a missing `EXECUTE` on a helper function,
+  which is the kind of thing only the executable assertions catch.
   `authenticated` holds exactly the DML each table's policies back, and no
   `TRUNCATE`/`REFERENCES`/`TRIGGER` — RLS does not filter `TRUNCATE` at all.
-- Photos: `item-images` Storage bucket, 5 MiB/file limit,
-  `image/webp`/`image/jpeg`/`image/png` only; WebP compression happens in
-  the browser before upload.
+- Photos: one private Storage bucket, with a per-file size cap and an
+  image-only MIME allowlist configured on the bucket itself (`supabase/config.toml`
+  and the storage migration); WebP compression happens in the browser
+  before upload.
 - Daily `cleanup-orphaned-photos.yml` sweeps Storage objects that no
   `images` row references (48h grace period), which a crashed client-side
   delete or a failed row insert leaves behind. `workflow_dispatch` runs it as
