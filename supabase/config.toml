@@ -3,7 +3,14 @@ project_id = "CollectionBuddy"
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "graphql_public"]
+# `public` only. pg_graphql was exposed here and served nothing: the client
+# never issues a GraphQL query -- every read goes through PostgREST, and
+# `grep -rn "graphql\|\.rpc(" web/src/` finds hits only in the generated
+# database.types.ts. RLS applies to pg_graphql too, so this was never a
+# bypass; it was a second query engine with its own resolver and its own
+# introspection, reachable by anyone holding the anon key, for no caller.
+# #641.
+schemas = ["public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 

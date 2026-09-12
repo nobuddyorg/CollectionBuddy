@@ -294,16 +294,56 @@ test.describe('one collection cannot reach another', () => {
       .eq('title', SEED.other.item)
       .single();
 
+    // Deliberately a *conforming* path (the item id is its second segment),
+    // so images_path_full_matches_item cannot be what refuses this and the
+    // trigger is left as the only thing that can.
     const { data, error } = await apiAs(token)
       .from('images')
       .insert({
         item_id: theirItem!.id,
-        path_full: 'planted/planted.webp',
+        path_full: `planted/${theirItem!.id}/planted.webp`,
       })
       .select('id');
     expect(data).toBeNull();
     expect(error).not.toBeNull();
   });
+
+  // Not an authorization boundary -- claiming a path conveys no access, since
+  // the storage policies parse an object's own name and never consult this
+  // table. It keeps the mirror self-consistent by construction
+  // (images_path_full_matches_item, 0012): a row may only name a path whose
+  // item-id segment is the item it belongs to, so it cannot point at a path
+  // its own owner is unable to read.
+  for (const [shape, path] of [
+    [
+      'naming another item',
+      '{uid}/99999999-9999-9999-9999-999999999999/x.webp',
+    ],
+    ['that does not parse at all', 'planted.webp'],
+    ['reaching outside the bucket', '../../etc/passwd'],
+  ] as const) {
+    test(`a photograph record cannot claim a path ${shape}`, async ({}, testInfo) => {
+      testInfo.skip(!process.env.E2E_SUPABASE_URL);
+      const { token, userId } = context();
+
+      const { data: mine } = await apiAs(token)
+        .from('items')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('title', itemsIn('Münzen')[0].title)
+        .single();
+
+      const { data, error } = await apiAs(token)
+        .from('images')
+        .insert({
+          item_id: mine!.id,
+          path_full: path.replace('{uid}', userId),
+        })
+        .select('id');
+      expect(data).toBeNull();
+      expect(error).not.toBeNull();
+    });
+  }
 
   // Signed out is a step earlier than the rest: `anon` holds no grant on
   // these tables at all, so the request is refused (42501) before any policy
@@ -311,7 +351,14 @@ test.describe('one collection cannot reach another', () => {
   // and the policy was doing the work. Asserted on the error code, not just
   // truthiness: `expect(error ?? {}).toBeTruthy()` would pass either way,
   // since an object is always truthy.
-  for (const table of ['items', 'categories']) {
+  //
+  // `category_shares` is in this list since 0011_least_privilege_grants.sql.
+  // Before it, anon still held full DML there and the select was refused by a
+  // different mechanism entirely -- anon lacks EXECUTE on caller_email(), so
+  // the policy raised before its predicate resolved. Same visible outcome,
+  // one layer of defence rather than two, and this loop is what tells them
+  // apart.
+  for (const table of ['items', 'categories', 'category_shares']) {
     test(`a visitor with no session is refused ${table} outright`, async ({}, testInfo) => {
       testInfo.skip(!process.env.E2E_SUPABASE_URL);
       const anon = createClient(
@@ -363,6 +410,69 @@ test.describe('one collection cannot reach another', () => {
       .from('item_categories')
       .insert({ item_id: mine!.id, category_id: theirs!.id });
     expect(error).not.toBeNull();
+  });
+
+  // A mapping has nothing to change and a photograph row is written once and
+  // removed, so item_categories and images deliberately carry no update
+  // policy (0006_policies.sql). That made an update a silent no-op: denied,
+  // but by the *absence* of a policy while the grant sat there alive.
+  // 0011_least_privilege_grants.sql revoked the grant too, so both are now
+  // refused outright -- the same 42501-versus-empty-result distinction the
+  // anon cases above turn on, asserted here on a caller's *own* rows so
+  // nothing else could be doing the refusing.
+  test('a photograph record cannot be updated, not even your own', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId } = context();
+
+    const { data: item } = await apiAs(token)
+      .from('items')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('title', itemsIn('Münzen')[0].title)
+      .single();
+    const { data: planted } = await apiAs(token)
+      .from('images')
+      .insert({
+        item_id: item!.id,
+        path_full: `${userId}/${item!.id}/rls-images-update-probe.webp`,
+      })
+      .select('id')
+      .single();
+
+    try {
+      const { data, error } = await apiAs(token)
+        .from('images')
+        .update({ path_thumb: 'rewritten' })
+        .eq('id', planted!.id)
+        .select('id');
+      expect(data).toBeNull();
+      expect(error).not.toBeNull();
+      expect(error!.code).toBe('42501');
+    } finally {
+      await apiAs(token).from('images').delete().eq('id', planted!.id);
+    }
+  });
+
+  test('a mapping cannot be updated, not even your own', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId } = context();
+
+    const { data: mine } = await apiAs(token)
+      .from('item_categories')
+      .select('item_id,category_id')
+      .eq('user_id', userId)
+      .limit(1)
+      .single();
+    expect(mine).not.toBeNull();
+
+    const { data, error } = await apiAs(token)
+      .from('item_categories')
+      .update({ category_id: mine!.category_id })
+      .eq('item_id', mine!.item_id)
+      .select('item_id');
+    expect(data).toBeNull();
+    expect(error).not.toBeNull();
+    expect(error!.code).toBe('42501');
   });
 
   // Stronger than list() returning []: that could just mean nothing was

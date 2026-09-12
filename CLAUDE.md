@@ -163,6 +163,17 @@ so treat every policy change as security-critical, not routine SQL.
   grant, new trigger touching auth/ownership — **must** be called out
   explicitly in the commit message and PR description as a security-relevant
   change, with a one-line explanation of what it now allows or denies.
+- **`.github/workflows/cleanup-orphaned-photos.yml` counts as a database
+  change for that rule.** It is the highest-privilege logic in the repository
+  — a `service_role` key and a bulk Storage delete driven by a SQL left join,
+  on a weekly cron, with no test and irreversible deletion of live
+  photographs as its failure mode. Two things in it are load-bearing and look
+  like tidy-ups: the **left join** (not `not in (select …)` with a uuid cast,
+  which a malformed path aborts the whole query on — the same reasoning that
+  put the exception handler in `storage_item_id()`), and the **48h grace
+  period** (the only thing separating "orphaned" from "mid-upload", since the
+  object is written before the `images` row that references it). Don't
+  shorten it; see [TEST_STRATEGY.md](TEST_STRATEGY.md) §12.
 - Never treat a client-side check ("only show the delete button if...") as
   authorization. It's UX. The RLS policy is the real check, and any new
   query needs to be covered by one.
@@ -345,9 +356,13 @@ first — both explain *why*, not just *what*.
   read-only — an editor writes items and photographs inside a shared
   category. Category-level actions (rename, delete, manage shares) stay
   owner-only at every role.
-- `anon` has both RLS denial *and* explicit revoked grants on four of the
-  five tables (defense in depth, not redundancy — don't remove either).
-  `category_shares` is the exception, denied by RLS alone.
+- `anon` has both RLS denial *and* explicit revoked grants on **all five**
+  tables (defense in depth, not redundancy — don't remove either).
+  `category_shares` was the exception until `0011_least_privilege_grants.sql`;
+  there the select was actually being refused by a missing `EXECUTE` on
+  `caller_email()`, not by the table grant the docs described.
+  `authenticated` holds exactly the DML each table's policies back, and no
+  `TRUNCATE`/`REFERENCES`/`TRIGGER` — RLS does not filter `TRUNCATE` at all.
 - Photos: `item-images` Storage bucket, 5 MiB/file limit,
   `image/webp`/`image/jpeg`/`image/png` only; WebP compression happens in
   the browser before upload.
