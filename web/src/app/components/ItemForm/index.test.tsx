@@ -25,6 +25,69 @@ function renderForm(
   return { onDirtyChange };
 }
 
+describe('ItemForm submission', () => {
+  function renderWithSubmit(initial: ItemFormValues = EMPTY_ITEM_FORM_VALUES) {
+    const onSubmit = vi.fn();
+    render(
+      <I18nProvider>
+        <ItemForm
+          initial={initial}
+          submitLabel="Save"
+          onSubmit={onSubmit}
+          onDirtyChange={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+    return { onSubmit };
+  }
+
+  it('refuses to submit an entry with no title, and says which field is wrong', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderWithSubmit();
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText('Title is required.')).toBeVisible();
+    const title = screen.getByLabelText(/title/i);
+    expect(title).toHaveFocus();
+    expect(title).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  // Coordinates come from the place autocomplete, and an entry edited
+  // without touching its place must keep the ones it already had.
+  it('carries the coordinates of an untouched place through a save', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderWithSubmit({
+      ...EMPTY_ITEM_FORM_VALUES,
+      title: 'Seated Dime',
+      place: 'Bonn',
+      place_lat: 50.7,
+      place_lng: 7.1,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ place_lat: 50.7, place_lng: 7.1 }),
+    );
+  });
+
+  it('submits no coordinates for an entry that never had any', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderWithSubmit({
+      ...EMPTY_ITEM_FORM_VALUES,
+      title: 'Seated Dime',
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ place_lat: null, place_lng: null }),
+    );
+  });
+});
+
 // Callers need to know when the form has anything worth losing, so they can
 // confirm before a backdrop tap or Escape discards it.
 describe('ItemForm dirty tracking', () => {

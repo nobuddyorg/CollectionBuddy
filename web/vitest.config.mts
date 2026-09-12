@@ -12,10 +12,10 @@ import { MUTATE_TARGETS, NO_COVERAGE_FLOOR } from './mutation-targets.mjs';
 // PER_FILE_FLOOR's 100s ahead of these, it picked those up as the "target"
 // instead, showing every category as red no matter the real result.
 const GLOBAL_COVERAGE_THRESHOLDS = {
-  statements: 85,
-  branches: 78,
-  functions: 85,
-  lines: 88,
+  statements: 97,
+  branches: 91,
+  functions: 97,
+  lines: 98,
 };
 
 const PER_FILE_FLOOR = {

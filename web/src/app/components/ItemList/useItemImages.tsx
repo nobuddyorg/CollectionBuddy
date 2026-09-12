@@ -28,10 +28,6 @@ import {
 import { WEBP_COMPRESSION_OPTIONS } from '../../lib/imageCompression';
 import { restoreAt } from '../../lib/optimistic';
 
-/* v8 ignore start -- hook internals: Supabase I/O, timers and compression,
- * none of it covered by a unit test. The logic worth gating is in
- * ./imageEntries, which carries the 100% floor and the mutation score. */
-
 // Refresh signed URLs before Supabase's own 1h server-side expiry so a
 // long-lived tab doesn't turn every thumbnail into a broken-image
 // placeholder. Distinct from exportCategory.ts's SIGNED_URL_TTL_SECONDS,
@@ -306,4 +302,3 @@ export function useItemImages() {
     pendingUploads,
   };
 }
-/* v8 ignore stop */
