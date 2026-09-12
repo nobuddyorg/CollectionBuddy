@@ -5,8 +5,12 @@ import {
   clearImageCache,
   getCachedSignedUrl,
 } from './imageCache';
-import { groupImageRows, signEntries, toImgEntries } from './useItemImages';
-import type { ImageEntryData } from './useItemImages';
+import {
+  groupImageRows,
+  signEntries,
+  toImgEntries,
+  type ImageEntryData,
+} from './imageEntries';
 
 describe('groupImageRows', () => {
   it("groups a row by item, keyed by the row's own id", () => {

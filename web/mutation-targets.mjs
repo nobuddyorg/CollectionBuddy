@@ -16,7 +16,7 @@ export const MUTATE_TARGETS = [
   'src/app/lib/backoff.ts',
   'src/app/components/CategorySelect/useExportCategory.tsx',
   'src/app/components/ItemList/Pagination.tsx',
-  'src/app/components/ItemList/useItemImages.tsx',
+  'src/app/components/ItemList/imageEntries.ts',
   'src/app/lib/optimistic.ts',
   'src/app/components/ItemList/paging.ts',
   'src/app/components/ItemList/imageCache.ts',
