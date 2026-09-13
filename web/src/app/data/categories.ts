@@ -32,7 +32,7 @@ export function listCategories() {
   return supabase
     .from('categories')
     .select('id,name,user_id,category_shares(role)')
-    .returns<CategorySummary[]>();
+    .overrideTypes<CategorySummary[], { merge: false }>();
 }
 
 export function createCategory(name: string) {

@@ -6,3 +6,5 @@ reports
 test-results
 playwright-report
 .stryker-tmp
+lighthouse-reports
+.lighthouseci

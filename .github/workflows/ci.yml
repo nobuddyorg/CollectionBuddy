@@ -344,3 +344,57 @@ jobs:
         with:
           sarif_file: opengrep-results.sarif
           category: opengrep
+
+  # Lighthouse CI against the real production export -- signed-out (the
+  # plain static build) and signed-in (demo mode against the local stack,
+  # scripts/lighthouse.mjs), each served exactly as GitHub Pages serves the
+  # real site (scripts/serve-export.mjs), never `next dev`. Gated on `web`
+  # changing (see the `changes` job): this measures the web bundle/page
+  # performance, the same surface `build_and_test`/`mutation_test` gate on,
+  # not database behaviour.
+  #
+  # Accessibility is deliberately not asserted here even though Lighthouse
+  # computes it (also axe-core-based): #650 already added a dedicated,
+  # more actionable axe-core/Playwright integration
+  # (e2e/{public,signed-in}/accessibility.spec.ts), and `onlyCategories`
+  # below leaves accessibility out of the run entirely rather than
+  # double-gating the same finding through two tools.
+  lighthouse:
+    needs: [prek, changes]
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-web
+
+      - uses: ./.github/actions/setup-supabase-cli
+
+      - name: Start Supabase
+        run: supabase start
+        working-directory: .
+
+      # Both builds point at this stack rather than needing repo secrets,
+      # same as e2e_local_stack above.
+      - run: npx playwright install --with-deps chromium
+
+      - name: Run Lighthouse CI
+        run: npm run lighthouse
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lighthouse-reports
+          path: web/lighthouse-reports
+          retention-days: 30
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
+        working-directory: .

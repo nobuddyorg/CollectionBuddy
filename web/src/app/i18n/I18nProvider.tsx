@@ -44,6 +44,11 @@ export function resolveTranslationKey(
   for (const k of keys) {
     if (
       typeof value === 'object' &&
+      // `TranslationValue` never includes `null`, so the type checker
+      // considers this unreachable -- kept anyway because `typeof null ===
+      // 'object'` is true, and nothing stops a translation JSON file from
+      // adding a literal `null` value the type just hasn't seen yet.
+      // eslint-disable-next-line sonarjs/different-types-comparison
       value !== null &&
       Object.hasOwn(value, k)
     ) {

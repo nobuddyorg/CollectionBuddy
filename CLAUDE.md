@@ -65,6 +65,8 @@ supabase test db          # pgTAP, from the repo root; needs `supabase start`;
 opengrep scan --config auto \
   web/src web/scripts web/e2e supabase   # separate CI job (see CONTRIBUTING.md
                            # for install); run it too if you touched those paths
+npm run lighthouse        # separate CI job, needs `supabase start`; run it too
+                           # before calling something done
 ```
 
 `prek run --all-files` (or `pre-commit run --all-files`) from the repo root

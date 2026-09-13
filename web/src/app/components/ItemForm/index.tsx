@@ -68,7 +68,7 @@ export default function ItemForm({
   const titleError = titleTouched && !title.trim();
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent<HTMLFormElement>) => {
+    (e: React.SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!title.trim()) {
         setTitleTouched(true);

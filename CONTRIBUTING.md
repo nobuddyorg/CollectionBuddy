@@ -136,6 +136,25 @@ supabase start   # from the repository root
 cd web && npm run e2e:local
 ```
 
+### Performance budgets (Lighthouse CI)
+
+CI also runs [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci)
+against the real production export — signed out (the plain static build) and
+signed in (demo mode against a local Supabase stack) — never against `next
+dev`. It's CI-only, not part of the `web/` checklist above or a `prek` hook:
+building twice, serving each build, and running headless Chrome against it is
+the same cost class as the e2e suite, which is already CI-only. To reproduce
+a run locally:
+
+```bash
+supabase start   # from the repository root
+cd web && npm run lighthouse
+```
+
+See [TEST_STRATEGY.md](TEST_STRATEGY.md) for the measured baseline the
+thresholds are set against and how the accessibility-category overlap with
+`@axe-core/playwright` (above) is handled.
+
 If your change touches a row-level security policy, a grant, an
 ownership-affecting trigger, or the schema more generally, also run the
 pgTAP database suite (`supabase/tests/database/`) against the local stack.

@@ -32,6 +32,14 @@ const config: KnipConfig = {
     // never an npm dependency of this project.
     'supabase',
   ],
+  ignoreDependencies: [
+    // scripts/lighthouse.mjs invokes it as `npx lhci autorun` -- Knip's
+    // binary-usage detection resolves a bin invocation back to its
+    // package by name (this is how `serve`, invoked the same way from
+    // scripts/serve-export.mjs, needs no entry here), but `@lhci/cli`'s
+    // own bin is named `lhci`, not `@lhci/cli`, so that match fails.
+    '@lhci/cli',
+  ],
 };
 
 export default config;

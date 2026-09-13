@@ -35,7 +35,7 @@ function mockQueryBuilder() {
     'in',
     'range',
     'single',
-    'returns',
+    'overrideTypes',
   ] as const;
   const builder: Record<string, (...args: unknown[]) => unknown> = {};
   for (const method of methods) {

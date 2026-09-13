@@ -97,7 +97,7 @@ async function selectImagesForItems<T>(
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
         .range(from, from + ROW_PAGE_SIZE - 1)
-        .returns<T[]>();
+        .overrideTypes<T[], { merge: false }>();
       if (error) return { data: null, error };
       if (!data?.length) break;
       rows.push(...data);

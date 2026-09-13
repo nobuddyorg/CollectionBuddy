@@ -13,6 +13,9 @@ import { usePlaces } from '../Map/usePlaces';
 import { useCurrentLocation } from '../Map/useCurrentLocation';
 import type { MapCommand, MapCommandKind } from '../Map/types';
 
+// Names the component it dynamically imports, not the JS Map builtin;
+// nothing in this scope ever constructs one.
+// eslint-disable-next-line sonarjs/no-globals-shadowing
 const Map = dynamic(() => import('../Map'), { ssr: false });
 
 export function MapModal({
@@ -109,11 +112,13 @@ export function MapModal({
       closeLabel={t('common.close')}
       size="full"
     >
-      {placesError ? (
+      {placesError && (
         <p className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70">
           {t('item_list.map_error')}
         </p>
-      ) : !loadingPlaces && places.length === 0 ? (
+      )}
+
+      {!placesError && !loadingPlaces && places.length === 0 && (
         // A generic empty message would read as "you have no places" when
         // a search is what emptied the map, sending the reader to the
         // wrong place.
@@ -124,7 +129,9 @@ export function MapModal({
               : 'item_list.map_empty',
           )}
         </p>
-      ) : (
+      )}
+
+      {!placesError && (loadingPlaces || places.length > 0) && (
         // Mounts immediately rather than behind the geocoding spinner, so
         // Leaflet's chunk and first tiles load while places still resolve.
         <div className="relative h-full">

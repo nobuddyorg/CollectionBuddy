@@ -85,11 +85,13 @@ export default function Page() {
           ready={catalogueReady}
         />
 
-        {!catalogueReady ? (
+        {!catalogueReady && (
           // Holds the shape of the entries about to appear, so the page
           // fills in rather than assembling itself in visible steps.
           <ItemListSkeleton />
-        ) : hasCategory ? (
+        )}
+
+        {catalogueReady && hasCategory && (
           <section
             role="tabpanel"
             id={CATEGORY_TABPANEL_ID}
@@ -108,7 +110,9 @@ export default function Page() {
               canEdit={canEditSelected}
             />
           </section>
-        ) : (
+        )}
+
+        {catalogueReady && !hasCategory && (
           // Only reachable for a collection with no categories at all.
           <section className="py-16 grid place-items-center text-center">
             <div className="flex flex-col items-center gap-4 max-w-xs">

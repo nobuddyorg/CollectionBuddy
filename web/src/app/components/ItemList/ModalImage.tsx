@@ -102,7 +102,7 @@ export function ModalImage({
   // Matches the Escape-to-close convention already used here and by
   // Pagination's Previous/Next.
   useEffect(() => {
-    if (!open || count < 2 || clampedIndex === null) return;
+    if (!open || count < 2) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
       if (e.key === 'ArrowLeft') goTo(clampedIndex - 1);

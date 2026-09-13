@@ -79,20 +79,22 @@ export function useCategoryRemoval({
     const { count, error: countError } =
       await countItemsForCategory(selectedCat);
     if (countError) console.error(countError);
-    const message =
-      countError || count == null
-        ? t('category_select.confirm_delete_generic').replace(
-            '{name}',
-            categoryName,
-          )
-        : count > 0
-          ? t('category_select.confirm_delete_with_entries')
-              .replace('{name}', categoryName)
-              .replace('{count}', String(count))
-          : t('category_select.confirm_delete_empty').replace(
-              '{name}',
-              categoryName,
-            );
+    let message;
+    if (countError || count == null) {
+      message = t('category_select.confirm_delete_generic').replace(
+        '{name}',
+        categoryName,
+      );
+    } else if (count > 0) {
+      message = t('category_select.confirm_delete_with_entries')
+        .replace('{name}', categoryName)
+        .replace('{count}', String(count));
+    } else {
+      message = t('category_select.confirm_delete_empty').replace(
+        '{name}',
+        categoryName,
+      );
+    }
 
     if (!(await confirm(message))) return;
     onSelect(nextAfterRemoving(sortedCats, selectedCat));
