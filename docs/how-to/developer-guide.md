@@ -117,11 +117,10 @@ The list of mutated files is [`mutation-targets.mjs`](../../web/mutation-targets
 
 ## Run the OWASP ZAP baseline scan
 
-[`zap-baseline.yml`](../../.github/workflows/zap-baseline.yml) runs a passive DAST scan
-against the built static export — see [TEST_STRATEGY.md](../../TEST_STRATEGY.md)'s "Dynamic
-scanning (OWASP ZAP baseline)" for what it covers and what it deliberately doesn't (it is
-not a substitute for `rls.spec.ts`). To run the same scan locally, build and serve the
-export from `web/` first:
+`ci.yml`'s `zap_baseline` job runs a passive DAST scan against the built static export — see
+[TEST_STRATEGY.md](../../TEST_STRATEGY.md)'s "Dynamic scanning (OWASP ZAP baseline)" for what
+it covers and what it deliberately doesn't (it is not a substitute for `rls.spec.ts`). To run
+the same scan locally, build and serve the export from `web/` first:
 
 ```bash
 cd web
