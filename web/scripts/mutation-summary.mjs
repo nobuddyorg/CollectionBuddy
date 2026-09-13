@@ -71,7 +71,7 @@ async function main() {
   try {
     summary = await buildSummary();
   } catch (error) {
-    console.error(`Could not read ${REPORT_PATH}:`, error);
+    console.error('Could not read %s:', REPORT_PATH, error);
     summary = [
       '## \u{1f9ec} Mutation testing',
       '',

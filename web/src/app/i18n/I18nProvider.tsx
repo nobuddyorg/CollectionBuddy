@@ -42,7 +42,11 @@ export function resolveTranslationKey(
   const keys = key.split('.');
   let value: TranslationValue = dict;
   for (const k of keys) {
-    if (typeof value === 'object' && value !== null && k in value) {
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      Object.hasOwn(value, k)
+    ) {
       value = value[k];
     } else {
       return undefined;
