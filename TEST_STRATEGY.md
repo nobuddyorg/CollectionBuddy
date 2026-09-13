@@ -48,7 +48,7 @@ There is **no staging environment**. `pages-deploy.yml`'s `migrate` job applies 
 | Signed-in integration | `web/e2e/signed-in/` | One spec per journey, plus the authorization suite; needs a real Supabase stack | Low minutes + stack start | `e2e_local_stack` job, local via `npm run e2e:local` |
 | Database (pgTAP) | `supabase/tests/database/` | RLS/authorization matrix, schema/constraint checks, function and trigger behaviour; needs a real Supabase stack | Seconds | `e2e_local_stack` job (via `supabase test db`, right after the stack starts), local via `supabase test db` |
 | Mutation | Stryker over the modules listed in `web/mutation-targets.mjs` | Every mutant the list produces, minus the `Stryker disable` regions | Low minutes | PRs touching `web/` (see §13), and push to `main` |
-| Repo hygiene | `.pre-commit-config.yaml` | `typos`, `zizmor`, `shellcheck`, `markdownlint`, `sqlfluff-lint`, file checks | Seconds | Gates every other CI job |
+| Repo hygiene | `.pre-commit-config.yaml` | `typos`, `zizmor`, `shellcheck`, `markdownlint`, `sqlfluff-lint`, `depcruise`, file checks | Seconds | Gates every other CI job |
 | Schema contract | `ci.yml`, `e2e_local_stack` | 1 diff | Seconds | PRs touching `web/` or `supabase/` (see §13), and push to `main` |
 | Post-deploy smoke | `e2e/public/` against the live URL | The same signed-out suite | Low minutes | Every deploy |
 
@@ -188,6 +188,19 @@ Treat this as the shape to hold, not an accident. Two ways it goes wrong: new po
 - **Partial failure** — a thumbnail upload may fail while the full-size one succeeded; `path_thumb` goes null and the entry survives. That is a deliberate accepted failure, and the test for it belongs at unit level with an injected failing upload.
 - **Duplicate invocation / idempotency** — see §8.
 - **Local emulation vs. deployed** — the local stack *is* the real Postgres, GoTrue and Storage, in containers, at the CLI version `.github/actions/setup-supabase-cli` pins (the same one `db push` uses in production). It is not an emulator. Treat integration results from it as trustworthy; treat Pages-specific behaviour (base path, CDN) as only provable against the deployed site.
+
+### Architectural boundaries (dependency-cruiser)
+
+`web/.dependency-cruiser.mjs` (`npm run depcruise`, wired to `web/tsconfig.json` via its `tsConfig` option so the `@/*` path alias resolves) statically checks the module *graph* — every rule is verified against the actual dependency structure of `web/src/app/`, `web/e2e/` and `web/scripts/`, not imposed from a generic template:
+
+- **`supabase-behind-data-layer`** is the one this exists for. `eslint.config.mjs`'s `no-restricted-imports` already forbids `components/**` importing `**/supabase` directly, but that rule can only see a single file's own import statements — it cannot see a component reaching Supabase *indirectly* through some other module (a `lib/` helper, say) that itself imports `supabase.ts`. dependency-cruiser walks the whole graph, so this rule is scoped to the whole app rather than duplicating the components-only check: only `data/`, `login/`, and the top-level auth/session bootstrap files (`useSession.ts`, `useSignOut.ts`, `SupabaseWarmup.tsx`) may import `supabase.ts` directly, which means a new indirect path gets caught at the point a module *creates* it, regardless of who ends up importing that module.
+- **`no-circular`** — a cycle between modules is a design smell here as anywhere; the graph currently has none.
+- **`no-orphans`** — a module with no incoming or outgoing local edges is dead code (CLAUDE.md rules that out explicitly), scoped away from test/spec files and `.d.ts` files, which are legitimately "orphans" in graph terms since they're run or referenced by the compiler, not imported.
+- **`not-to-unresolvable`** — an import dependency-cruiser cannot resolve is a sanity check that the tool (and its `tsConfig`/alias wiring) is actually working, as much as an architecture rule.
+- **`data-layer-no-components`**, **`i18n-no-app-deps`** — the reverse-layering checks: the data-access layer and the translation layer are both leaves that must not depend back on the UI or on each other's siblings.
+- **`e2e-is-black-box`**, **`scripts-are-standalone`**, **`app-bundle-no-node-tooling`** — `e2e/` drives the app through a real browser and `scripts/` are Node tools that run outside the Next.js build (see the table in §5); neither imports `src/app/`, and — the direction that actually matters for risk — `src/app/` (what ships in the static export) must never import from either. `scripts/` and `e2e/` are the only places in `web/` that ever reference a `service_role`/admin credential (for local-stack seeding); this rule is what would catch one of those Node-only paths being pulled into the client bundle, which this app's "no server, no privileged code path in the browser" model treats as a real risk even without any current instance of it.
+
+Measured at ~1.5s against the whole graph (262 modules, ~900 dependencies) — comfortably inside `prek`'s budget, so it runs as a `prek` local hook (`.pre-commit-config.yaml`'s `depcruise` entry) rather than a separate CI job, the same reasoning `sqlfluff-lint` uses in §7. Discovery-mode findings (orphans from type-only imports not being followed by default, resolved via `tsPreCompilationDeps: true`) were reviewed before any rule was turned into an `error`; there were no pre-existing violations to accept as documented exceptions.
 
 ---
 
