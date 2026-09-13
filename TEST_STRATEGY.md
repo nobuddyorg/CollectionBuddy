@@ -43,13 +43,13 @@ There is **no staging environment**. `pages-deploy.yml`'s `migrate` job applies 
 
 | Suite | Location | Volume | Runtime target | Where it runs |
 | --- | --- | --- | --- | --- |
-| Unit / component | `web/src/**/*.test.{ts,tsx}` | The bulk of the estate, one file per module | Seconds. Treat over ~60s as a problem to fix. | Pre-commit hook, every PR, local |
-| Signed-out browser | `web/e2e/public/` | A handful of specs, run against two viewports (desktop Chromium and a phone) | Low minutes | Every PR, and again against the live site post-deploy |
+| Unit / component | `web/src/**/*.test.{ts,tsx}` | The bulk of the estate, one file per module | Seconds. Treat over ~60s as a problem to fix. | Pre-commit hook, PRs touching `web/` (see §13), local |
+| Signed-out browser | `web/e2e/public/` | A handful of specs, run against two viewports (desktop Chromium and a phone) | Low minutes | PRs touching `web/` (see §13), and again against the live site post-deploy |
 | Signed-in integration | `web/e2e/signed-in/` | One spec per journey, plus the authorization suite; needs a real Supabase stack | Low minutes + stack start | `e2e_local_stack` job, local via `npm run e2e:local` |
 | Database (pgTAP) | `supabase/tests/database/` | RLS/authorization matrix, schema/constraint checks, function and trigger behaviour; needs a real Supabase stack | Seconds | `e2e_local_stack` job (via `supabase test db`, right after the stack starts), local via `supabase test db` |
-| Mutation | Stryker over the modules listed in `web/mutation-targets.mjs` | Every mutant the list produces, minus the `Stryker disable` regions | Low minutes | Every PR and push to `main` |
-| Repo hygiene | `.pre-commit-config.yaml` | `typos`, `zizmor`, `shellcheck`, `markdownlint`, file checks | Seconds | Gates every other CI job |
-| Schema contract | `ci.yml`, `e2e_local_stack` | 1 diff | Seconds | Every PR |
+| Mutation | Stryker over the modules listed in `web/mutation-targets.mjs` | Every mutant the list produces, minus the `Stryker disable` regions | Low minutes | PRs touching `web/` (see §13), and push to `main` |
+| Repo hygiene | `.pre-commit-config.yaml` | `typos`, `zizmor`, `shellcheck`, `markdownlint`, `sqlfluff-lint`, file checks | Seconds | Gates every other CI job |
+| Schema contract | `ci.yml`, `e2e_local_stack` | 1 diff | Seconds | PRs touching `web/` or `supabase/` (see §13), and push to `main` |
 | Post-deploy smoke | `e2e/public/` against the live URL | The same signed-out suite | Low minutes | Every deploy |
 
 This is a mature estate. The work described below is mostly about **closing named gaps and holding the line**, not about building a test suite from nothing.
@@ -269,6 +269,34 @@ The rule is CLAUDE.md's database guardrail: a PR that adds or changes a policy, 
 
 It is stated as an absolute because the failure is invisible. A wrong policy changes nothing about how the interface looks, there is no second layer to catch it, and review of SQL by eye has already missed this class of bug here more than once. A migration with no matching assertion is an unreviewed change to the only security boundary in the product.
 
+### SQLFluff, and why it is a different concern from pgTAP/`rls.spec.ts`
+
+`sqlfluff-lint` (config: [`.sqlfluff`](.sqlfluff)) runs against
+`supabase/migrations/` and `supabase/tests/database/` as a `prek` hook,
+gating every PR and push to `main` alongside `typos`/`zizmor`/`shellcheck`.
+It answers a completely different question from the rest of this section: not
+"does this policy allow the right thing", but "is this SQL well-formed and
+free of static footguns" — ambiguous joins, inconsistent `GROUP BY`/`ORDER BY`
+references, needless subqueries, keyword misuse. It cannot see a single
+policy's *logic*, so it discharges none of the standing rule below and adds
+no authorization coverage on its own; think of it as the SQL-side counterpart
+to ESLint, not a competitor to pgTAP.
+
+Its `core` rule bundle is scoped down from `all`: `aliasing.table`,
+`references.consistent`, `references.keywords`, `references.special_chars`,
+and the pure-formatting `layout.*` rules (`layout.spacing`, `layout.indent`,
+`layout.long_lines`, `layout.functions`, `layout.cte_newline`) are excluded
+in `.sqlfluff`, each because fixing it would mean rewriting already-applied
+migrations or already-reviewed pgTAP files for style, or — for
+`references.special_chars` and `references.keywords` — because the "finding"
+is a deliberate, documented choice (RLS policy names are quoted
+space-containing identifiers; `category_shares.role` is a real column name),
+not a defect. Everything left in `core` was verified clean against every
+migration and pgTAP file before adopting the config, and stays available to
+catch the same class of mistake in new SQL going forward. It runs in ~2
+seconds against the current migration set, comfortably inside `prek`'s
+budget; there was no reason to push it to CI-only.
+
 ### Out of scope, deliberately
 
 - Penetration testing of Supabase itself.
@@ -371,7 +399,7 @@ Conditions if it is adopted: a **seeded, deterministic** runner (a recorded fail
 - Mutating the whole `src/app` tree means mutating JSX and Tailwind class strings — thousands of near-equivalent mutants, a score that means nothing, and a run nobody waits for.
 - Adding a file to the list means first drawing that line inside it. If a file cannot be split that way, the file is the problem.
 - An equivalent mutant (a check the type system needs but the runtime cannot reach) is marked `// Stryker disable next-line all` **with a comment saying why**. Never a test that cannot fail.
-- CI runs it on **every PR**, not just `main`. Learning after the merge that a test asserts nothing is learning it too late.
+- CI runs it on **every PR that touches web code** (gated by the `changes` job, §13), not just `main`, and unconditionally on `main` itself. Learning after the merge that a test asserts nothing is learning it too late.
 
 The score is enforced by `stryker.config.mjs`'s `break`, and the list it runs over is `web/mutation-targets.mjs`; both are the source of truth, so neither number is restated here. What matters is what happens to a survivor, and there are exactly two honest endings:
 
@@ -437,19 +465,23 @@ Verified against a real database, with the cases that distinguish the three read
 
 ### Pull request — the gate that matters
 
-`prek` runs first and gates everything (file hygiene, `typos`, `zizmor`, `shellcheck`, `markdownlint`). It is the fastest check, so a bad JSON file or a stray key fails before spending minutes on browsers and a database. Then, in parallel:
+`prek` runs first and gates everything (file hygiene, `typos`, `zizmor`, `shellcheck`, `markdownlint`, `sqlfluff-lint`). It is the fastest check, so a bad JSON file or a stray key fails before spending minutes on browsers and a database. `prek` is unconditional — file hygiene and secret scanning have to see every changed file regardless of directory, and `sqlfluff-lint` here is a fixed ~2s over the whole (small) migrations/pgTAP set, not worth gating.
 
-| Job | What it proves |
-| --- | --- |
-| `build_and_test` | The export builds; types, format and lint hold; unit suite passes with coverage floors; the built export works in a real browser under the real base path, desktop and phone |
-| `e2e_local_stack` | Every migration applies to a fresh Postgres; the pgTAP suite (`supabase/tests/database/`) passes against it; `database.types.ts` matches the schema; the signed-in journeys and **the whole authorization model** hold against a real stack |
-| `mutation_test` | The unit assertions on high-risk pure logic are actually load-bearing |
+A `changes` job runs alongside `prek` (`dorny/paths-filter` against the PR's changed files) and decides which of the three heavier jobs below actually run:
 
-All three are required. The order within `build_and_test` is not decoration: `next build` generates `next-env.d.ts`, which `tsc` and ESLint need on a clean checkout.
+| Job | Gated on | What it proves |
+| --- | --- | --- |
+| `build_and_test` | `web/**` or `.github/workflows/ci.yml` changed | The export builds; types, format and lint hold; unit suite passes with coverage floors; the built export works in a real browser under the real base path, desktop and phone |
+| `e2e_local_stack` | the above, **or** `supabase/migrations/**`, `supabase/tests/database/**`, or `.sqlfluff` changed | Every migration applies to a fresh Postgres; the pgTAP suite (`supabase/tests/database/`) passes against it; `database.types.ts` matches the schema; the signed-in journeys and **the whole authorization model** hold against a real stack |
+| `mutation_test` | same as `build_and_test` | The unit assertions on high-risk pure logic are actually load-bearing |
+
+`e2e_local_stack` is gated on the union of both path sets rather than split into two jobs, because it is the one place the schema/pgTAP side and the signed-in Playwright journeys share a single running stack — either side changing can break it, and splitting it would mean starting that stack twice. The order within `build_and_test` is not decoration: `next build` generates `next-env.d.ts`, which `tsc` and ESLint need on a clean checkout.
+
+A job skipped by its `if:` reports as a passing, not failing, check, so this does not weaken branch protection — a docs-only or SQL-only PR simply doesn't need `build_and_test`/`mutation_test` to have run. It does mean a PR that only touched `supabase/` never runs the unit suite or mutation testing, which is deliberately safe: nothing in `web/mutation-targets.mjs` or the unit suite can be affected by SQL that isn't reachable from JS.
 
 ### Main
 
-Identical to the PR set (CI runs on `push` to `main` too), plus the mutation dashboard publish so the badge tracks one branch.
+The one asymmetry from the PR set: the `changes` job forces `web` and `sql` both `true` unconditionally on a push to `main`, regardless of what actually changed in that push. `main` is the branch `pages-deploy.yml`'s `migrate` job deploys straight from, so the pre-deploy run stays the full, unconditional gate this repo has always had — a squash-merge landing unrelated changes together must never get a job skipped right before it deploys. PRs get the path-filtered speedup; the actual release gate does not. Plus the mutation dashboard publish so the badge tracks one branch.
 
 ### Deploy to production (also `main`)
 

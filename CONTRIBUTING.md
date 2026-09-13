@@ -72,8 +72,10 @@ or tear the stack down.
 
 [prek](https://github.com/j178/prek) runs the checks in
 [`.pre-commit-config.yaml`](.pre-commit-config.yaml) against each commit:
-file hygiene, spell checking, and (for `web/`) the same lint/format/type
-checks CI runs. Install it once, then install the hook:
+file hygiene, spell checking, SQL linting (`sqlfluff`, over
+`supabase/migrations/` and `supabase/tests/database/`, config in
+[`.sqlfluff`](.sqlfluff)), and (for `web/`) the same lint/format/type checks
+CI runs. Install it once, then install the hook:
 
 ```bash
 prek install

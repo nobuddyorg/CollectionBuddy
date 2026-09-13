@@ -52,6 +52,16 @@ repos:
     hooks:
       - id: markdownlint-cli2
 
+  # SQLFluff: SQL static analysis for supabase/migrations/ and
+  # supabase/tests/database/ (config: .sqlfluff). Only sqlfluff-lint, not
+  # sqlfluff-fix -- migrations are applied history and pgTAP files are
+  # already-reviewed SQL; a finding gets a config change or a PR-description
+  # exception, never an autofix.
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 4.3.0
+    hooks:
+      - id: sqlfluff-lint
+
   # The web app's own checks, run from web/ where its config lives. These
   # are the same commands CI runs, so a passing commit is a passing build.
   - repo: local

@@ -1,0 +1,51 @@
+# SQLFluff config for supabase/migrations/**/*.sql and supabase/tests/database/**/*.sql
+# (the only SQL in the repo -- see CLAUDE.md/TEST_STRATEGY.md for why RLS-bearing
+# migrations are treated as security-critical, already-reviewed SQL).
+#
+# Scope: the `core` rule bundle, not `all`. The rules excluded below sit
+# outside `core` (aliasing.table, references.consistent/keywords/special_chars)
+# or inside it (the three layout.* entries) but all five would force a
+# wholesale reformat of already-applied/already-reviewed SQL rather than
+# catch a real defect:
+#   - aliasing.table / layout.functions / layout.cte_newline / layout.spacing /
+#     layout.indent / layout.long_lines: pure formatting preferences that
+#     would rewrite every one of the 12 migration files and 6 pgTAP suites.
+#   - references.special_chars: RLS policy names are deliberately quoted,
+#     space-containing identifiers (`"select own categories"`); renaming
+#     them is a real DDL change to security-critical migrations, not a
+#     style fix, and out of scope for adopting a linter.
+#   - references.keywords: `category_shares.role` is a real, documented
+#     column name (see docs/reference/architecture.md); Postgres treats
+#     `role` as non-reserved, and renaming it would be a schema change.
+#   - references.consistent: would want every single-table column reference
+#     qualified across already-applied migrations.
+#
+# What's left (ambiguous.*, most of structure.*, capitalisation.*, the
+# remaining aliasing/convention/references rules) is genuinely clean today
+# -- verified by running `sqlfluff lint` against every migration and pgTAP
+# file before adopting this config -- and stays useful for catching real
+# issues (ambiguous joins, inconsistent GROUP BY/ORDER BY references,
+# needless subqueries) in new SQL going forward.
+[sqlfluff]
+dialect = postgres
+templater = raw
+rules = core
+exclude_rules = aliasing.table,references.consistent,references.keywords,references.special_chars,layout.spacing,layout.indent,layout.long_lines,layout.functions,layout.cte_newline
+
+# The whole schema is written lowercase (keywords, identifiers, functions,
+# types); lock that in explicitly rather than relying on "consistent", which
+# would only enforce whatever the first occurrence happened to be.
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.identifiers]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.types]
+extended_capitalisation_policy = lower
