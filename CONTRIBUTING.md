@@ -98,6 +98,8 @@ npm run build
 npx tsc --noEmit
 npx prettier --check .
 npm run lint
+npm run depcruise
+npm run knip
 npm test -- --coverage
 npm run e2e
 npm run test:mutation
@@ -106,6 +108,24 @@ npm run test:mutation
 These are the same checks CI runs. See the [developer
 guide](docs/how-to/developer-guide.md#run-the-checks-ci-runs-locally) for why
 the order matters and what each one catches.
+
+### General-purpose static analysis (Opengrep)
+
+CI also runs [Opengrep](https://opengrep.dev/) (an LGPL fork of the Semgrep
+engine) over `web/src`, `web/scripts`, `web/e2e` and `supabase`, uploading
+SARIF to GitHub's code-scanning Security tab. It's a standalone binary, not
+an npm dependency, so it isn't part of the `web/` checklist above; to
+reproduce a run locally:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash -s -- -v v1.30.0
+"$HOME/.opengrep/cli/latest/opengrep" scan --config auto \
+  web/src web/scripts web/e2e supabase
+```
+
+`--config auto` fetches Semgrep's public community rule pack anonymously (no
+account or API key); see [TEST_STRATEGY.md](TEST_STRATEGY.md) for what it
+covers and why it's CI-only rather than a `prek` hook.
 
 If your change touches the catalogue, search, the map, the entry forms,
 photographs, sharing, exporting, or any row-level security policy, also run

@@ -48,9 +48,8 @@ const KEY_LIKE = /^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)+$/;
 // Walks paren depth from a call's `(` to its matching `)`, collecting every
 // key-shaped literal in between -- so `t(cond ? 'a' : 'b')` is caught, not
 // just the plain single-literal case.
-function extractCallLiterals(content: string, name: string): string[][] {
+function extractCallLiterals(content: string, callOpen: RegExp): string[][] {
   const calls: string[][] = [];
-  const callOpen = new RegExp(`\\b${name}\\(`, 'g');
   for (const start of content.matchAll(callOpen)) {
     const literals: string[] = [];
     let depth = 1;
@@ -83,13 +82,13 @@ function collectUsedKeys(files: string[]): Map<string, string[]> {
   };
   for (const file of files) {
     const content = readFileSync(file, 'utf8');
-    for (const literals of extractCallLiterals(content, 't')) {
+    for (const literals of extractCallLiterals(content, /\bt\(/g)) {
       for (const key of literals) record(key, file);
     }
     // tCount also resolves to `${key}_one` for a count of one (see
     // I18nProvider's tCount), but that literal never appears in source, so
     // it's credited as used alongside the base key.
-    for (const literals of extractCallLiterals(content, 'tCount')) {
+    for (const literals of extractCallLiterals(content, /\btCount\(/g)) {
       for (const key of literals) {
         record(key, file);
         record(`${key}_one`, file);

@@ -1,7 +1,7 @@
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
 
-export type ItemRow = Database['public']['Tables']['items']['Row'];
+type ItemRow = Database['public']['Tables']['items']['Row'];
 export type ItemInsert = Database['public']['Tables']['items']['Insert'];
 export type ItemUpdate = Database['public']['Tables']['items']['Update'];
 
@@ -9,7 +9,7 @@ export type ItemUpdate = Database['public']['Tables']['items']['Update'];
 // from it below, so a dropped field can't silently vanish from responses
 // while TypeScript still believes it's there -- `.returns<T>()` is an
 // assertion, not a check.
-export const ITEM_FIELD_KEYS = [
+const ITEM_FIELD_KEYS = [
   'id',
   'title',
   'description',
@@ -33,7 +33,7 @@ export type ItemSearchRow = ItemFields & {
  * there; `id` so a geocoded place can be written back onto its row instead
  * of repeating the lookup on every map open.
  */
-export const ITEM_PLACE_FIELD_KEYS = [
+const ITEM_PLACE_FIELD_KEYS = [
   'id',
   'title',
   'place',
