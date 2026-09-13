@@ -395,13 +395,16 @@ jobs:
               | [.runs[].results[] | . + {level: ($levelById[.ruleId] // "warning")}] as $results
               | ($results | length) as $total
               | ($results | map(select(.level == "error")) | length) as $errors
-              | ($results
-                  | group_by(.ruleId)
-                  | map({rule: (.[0].ruleId // "unknown"), level: .[0].level, count: length})
-                  | sort_by(-.count)) as $groups
               | "**Total findings:** \($total) (\($errors) at error severity -- blocking; full detail in the Security tab, category `opengrep`)\n"
-              + (if ($groups | length) > 0
-                 then "\n| Rule | Severity | Count |\n|---|---|---|\n" + ($groups | map("| `\(.rule)` | \(.level) | \(.count) |") | join("\n"))
+              + (if $total > 0
+                 then "\n| Severity | Rule | Location |\n|---|---|---|\n" + (
+                   $results
+                   | sort_by(.level != "error", .level != "warning")
+                   | map(
+                       "| \(.level) | `\(.ruleId)` | \(.locations[0].physicalLocation.artifactLocation.uri // "?"):\(.locations[0].physicalLocation.region.startLine // "?") |"
+                     )
+                   | join("\n")
+                 )
                  else "" end)
             ' opengrep-results.sarif
           } >> "$GITHUB_STEP_SUMMARY"
