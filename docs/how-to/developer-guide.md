@@ -117,15 +117,20 @@ The list of mutated files is [`mutation-targets.mjs`](../../web/mutation-targets
 
 ## Run the OWASP ZAP baseline scan
 
-`ci.yml`'s `zap_baseline` job runs a passive DAST scan against the built static export — see
-[TEST_STRATEGY.md](../../TEST_STRATEGY.md)'s "Dynamic scanning (OWASP ZAP baseline)" for what
-it covers and what it deliberately doesn't (it is not a substitute for `rls.spec.ts`). To run
-the same scan locally, build and serve the export from `web/` first:
+`ci.yml`'s `zap_baseline` job runs a passive DAST scan against the built static export, twice
+— signed out, then signed in via demo mode — see [TEST_STRATEGY.md](../../TEST_STRATEGY.md)'s
+"Dynamic scanning (OWASP ZAP baseline)" for what it covers and what it deliberately doesn't
+(it is not a substitute for `rls.spec.ts`). Both passes need the local stack up first
+(`supabase start` from the repo root); from `web/`:
 
 ```bash
 cd web
+status=$(supabase status -o json)
+export NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL <<< "$status")
+export NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .ANON_KEY <<< "$status")
+
 npm run build
-ln -s . out/CollectionBuddy   # see the workflow's own comment for why this is needed
+ln -s . out/CollectionBuddy   # see the job's own comment for why this is needed
 npx serve out -l 4173
 ```
 
@@ -137,7 +142,7 @@ Linux):
 docker run --rm -v "$(pwd):/zap/wrk/:rw" --network host \
   ghcr.io/zaproxy/zaproxy:stable \
   zap-baseline.py -t http://127.0.0.1:4173/ -c /zap/wrk/.zap/rules.tsv -I \
-  -r /zap/wrk/zap-report.html
+  -r /zap/wrk/zap-report-signed-out.html
 ```
 
 The self-referencing symlink is required, not cosmetic: `zap-baseline.py` always resets its
@@ -145,10 +150,32 @@ spider to the target's host root regardless of any path in the URL you give it, 
 export only renders under `/CollectionBuddy/` (`next.config.ts` bakes that in). The symlink
 makes the one build answer identically at both.
 
-`zap-report.html` lands at the repository root (delete it afterward — it isn't a build
-artifact anything else expects to find there). Remove `out/CollectionBuddy` before running
-`npm run e2e`/`npm run e2e:local` afterward; the real e2e suite serves the export
-differently (`web/scripts/serve-export.mjs`) and doesn't expect that symlink to exist.
+For the signed-in pass, stop the first `serve` (`Ctrl-C`), remove the symlink
+(`rm out/CollectionBuddy`), then rebuild with demo mode on and repeat against a different port
+so nothing from the first pass lingers:
+
+```bash
+NEXT_PUBLIC_DEMO_MODE=true npm run build
+ln -s . out/CollectionBuddy
+npx serve out -l 4174
+```
+
+```bash
+docker run --rm -v "$(pwd):/zap/wrk/:rw" --network host \
+  ghcr.io/zaproxy/zaproxy:stable \
+  zap-baseline.py -t http://127.0.0.1:4174/ -c /zap/wrk/.zap/rules.tsv -I \
+  -r /zap/wrk/zap-report-signed-in.html
+```
+
+Worth knowing before reading too much into the signed-in pass's report: a fresh demo-mode
+account has zero categories (same caveat `scripts/lighthouse.mjs` already carries), so it
+scans a different code path and a larger bundle, not real seeded catalogue content.
+
+Both `zap-report-*.html` files land at the repository root (delete them afterward — they
+aren't build artifacts anything else expects to find there). Remove `out/CollectionBuddy`
+before running `npm run e2e`/`npm run e2e:local` afterward; the real e2e suite serves the
+export differently (`web/scripts/serve-export.mjs`) and doesn't expect that symlink to exist.
+`supabase stop` when done.
 
 ## Coverage floors
 
