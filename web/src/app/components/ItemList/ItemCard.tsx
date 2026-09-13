@@ -98,6 +98,10 @@ function ItemCardComponent({
   // h-full so cards in a desktop row share a height; the caption grows and
   // pushes the action row to the bottom, keeping rows lined up.
   return (
+    // Drag-and-drop-to-upload is a pointer-only progressive enhancement --
+    // AddPhotoPlate below already renders a real keyboard/screen-reader
+    // accessible <label>/<input type="file"> for adding a photograph.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <li
       // Lets the e2e suite count/target cards without depending on contents.
       data-testid="item-card"

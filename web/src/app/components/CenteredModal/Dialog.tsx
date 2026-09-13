@@ -44,6 +44,10 @@ export function Dialog({
           : 'p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]'
       } ${open ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
     >
+      {/* The onClick below isn't an interactive action -- it only stops a
+          click inside the panel from bubbling to the backdrop's
+          close-on-click-outside handler. */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div
         ref={panelRef}
         role={role}

@@ -1,6 +1,7 @@
 import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
 import nextTypescript from 'eslint-config-next/typescript';
 import tseslint from 'typescript-eslint';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 const eslintConfig = [
   // Generated output and working directories from an interrupted run
@@ -48,6 +49,26 @@ const eslintConfig = [
     files: ['src/**/*.test.{ts,tsx}'],
     rules: {
       '@typescript-eslint/require-await': 'off',
+    },
+  },
+  // eslint-config-next's core-web-vitals bundles eslint-plugin-jsx-a11y
+  // transitively but only enables 6 of its rules (verified with
+  // `eslint --print-config`). core-web-vitals already registers the
+  // plugin under the "jsx-a11y" namespace, so only apply the fuller rule
+  // set here -- redeclaring `plugins` errors with "Cannot redefine plugin".
+  // Scoped to JSX-bearing app source, not tests (which don't ship to users).
+  {
+    files: ['src/app/**/*.tsx'],
+    ignores: ['src/app/**/*.test.tsx'],
+    rules: {
+      ...jsxA11y.flatConfigs.strict.rules,
+      // Crashes ("_minimatch.default is not a function") under this repo's
+      // minimatch@10 override (see design-decisions.md's advisory section)
+      // -- the rule's `mayContainChildComponent` helper calls minimatch as
+      // a default export, which v10's CJS build no longer has. No other
+      // jsx-a11y rule uses that helper. @axe-core/playwright's runtime
+      // check covers missing form labels instead.
+      'jsx-a11y/label-has-associated-control': 'off',
     },
   },
   // Components talk to Supabase through data/, never the client directly.
