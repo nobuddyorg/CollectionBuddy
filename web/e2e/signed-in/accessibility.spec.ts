@@ -9,6 +9,16 @@ import { openCategory } from './helpers';
 // focus order, or the real accessible-name/ARIA-state computation.
 test.use({ locale: 'en-GB' });
 
+// Cards mount with `.fade-up` (globals.css), a 500ms opacity/transform
+// animation. axe's color-contrast check samples whatever is on screen the
+// instant it runs, so scanning mid-fade reads a blended, lower-contrast
+// colour than the settled one globals.contrast.test.ts actually verifies --
+// a false positive in the check's timing, not a real design defect. Same
+// wait login.spec.ts already uses for the same animation.
+async function waitForCardsSettled(page: import('@playwright/test').Page) {
+  await expect(page.getByTestId('item-card').first()).toHaveCSS('opacity', '1');
+}
+
 test.describe('accessibility -- signed in', () => {
   // Covers the catalogue grid *and* an entry's detail (title, description,
   // place, tags are all rendered inline on the card -- this app has no
@@ -17,6 +27,7 @@ test.describe('accessibility -- signed in', () => {
     page,
   }, testInfo) => {
     await openCategory(page, 'Münzen');
+    await waitForCardsSettled(page);
     await expectNoSeriousA11yViolations(page, testInfo);
   });
 
@@ -35,6 +46,7 @@ test.describe('accessibility -- signed in', () => {
     await openCategory(page, 'Münzen');
     await page.getByTestId('search-input').fill('Silberdenar');
     await expect(page.getByTestId('item-card')).toHaveCount(1);
+    await waitForCardsSettled(page);
     await expectNoSeriousA11yViolations(page, testInfo);
   });
 
@@ -57,8 +69,11 @@ test.describe('accessibility -- signed in', () => {
     await page.getByTestId('new-entry').click();
     await expect(page.getByTestId('item-title')).toBeVisible();
     await expectNoSeriousA11yViolations(page, testInfo);
-    // Cancelled, not submitted -- this spec only looks, it doesn't write.
-    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    // Closed, not submitted -- this spec only looks, it doesn't write. The
+    // creation form (ItemCreate) has no Cancel button, only the modal's own
+    // close control (EditItemModal is the one that passes ItemForm an
+    // onCancel, for the edit flow).
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
   });
 
   // The sharing panel lives inside the same expanded strip categories.spec.ts
@@ -67,6 +82,7 @@ test.describe('accessibility -- signed in', () => {
     page,
   }, testInfo) => {
     await openCategory(page, 'Münzen');
+    await waitForCardsSettled(page);
     await page.getByTestId('expand-categories').click();
     await expect(page.getByLabel('New collection')).toBeVisible();
     await expectNoSeriousA11yViolations(page, testInfo);

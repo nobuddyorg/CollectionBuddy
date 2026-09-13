@@ -51,6 +51,7 @@ export function ImportRow({
         accept=".zip"
         data-testid="import-file-input"
         className="sr-only"
+        aria-label={t('category_select.import')}
         onChange={(e) => {
           const file = e.target.files?.[0];
           e.target.value = '';
