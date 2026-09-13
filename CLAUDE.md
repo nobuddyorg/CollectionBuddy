@@ -51,6 +51,7 @@ npm run build
 npx tsc --noEmit
 npx prettier --check .
 npm run lint
+npm run depcruise      # architectural boundaries -- see TEST_STRATEGY.md §6
 npm test -- --coverage
 npm run e2e
 npm run test:mutation     # separate CI job, run it too before calling something done

@@ -90,3 +90,14 @@ repos:
         pass_filenames: false
         files: ^web/(src/.*\.(ts|tsx)|tsconfig\.json)$
         stages: [pre-commit]
+
+      # ~1.5s against the whole web/src+e2e+scripts graph (measured on this
+      # repo) -- comfortably inside prek's budget, same reasoning as
+      # sqlfluff-lint above.
+      - id: depcruise
+        name: dependency-cruiser (web)
+        entry: bash -c 'cd web && npm run depcruise'
+        language: system
+        pass_filenames: false
+        files: ^web/(src/app/.*\.(ts|tsx)|e2e/.*\.ts|scripts/.*\.mjs|tsconfig\.json|\.dependency-cruiser\.mjs)$
+        stages: [pre-commit]
