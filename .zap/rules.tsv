@@ -1,4 +1,8 @@
 # Rule overrides for the OWASP ZAP baseline scan (ci.yml's zap_baseline job).
+# Applies to both of that job's passes, signed-out and signed-in (demo
+# mode) -- one file, since the reasoning behind each entry below (a header
+# this static export structurally can't send, a content-based check that
+# should never fire) doesn't change with the caller's auth state.
 #
 # Format: <rule id><TAB><threshold><TAB># <comment>
 # Threshold is one of FAIL, WARN, INFO, IGNORE. Anything not listed here

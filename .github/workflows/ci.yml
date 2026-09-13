@@ -499,9 +499,9 @@ jobs:
         run: supabase stop
         working-directory: .
 
-  # OWASP ZAP baseline (passive-only) DAST scan against an isolated,
-  # ephemeral copy of the built export -- security headers, cookie flags,
-  # and passive injection/error-disclosure probes against real rendered
+  # OWASP ZAP baseline (passive-only) DAST scan against isolated, ephemeral
+  # copies of the built export -- security headers, cookie flags, and
+  # passive injection/error-disclosure probes against real rendered
   # responses, a different angle from Opengrep (source text) and axe-core
   # (a static DOM). Complements, never substitutes for, the authorization
   # testing in e2e_local_stack -- see TEST_STRATEGY.md's "Dynamic scanning
@@ -509,6 +509,19 @@ jobs:
   # Gated on web changing (see the `changes` job), same as
   # build_and_test/mutation_test/lighthouse: this measures the built web
   # bundle's runtime surface, not database behaviour.
+  #
+  # Two passes, signed-out then signed-in (demo mode) -- matching Lighthouse
+  # and axe-core, which already scan both. A login-page-only scan has almost
+  # nothing rendered to find an injection/disclosure finding in; the app's
+  # actual content (item titles, descriptions, tags, place names) only
+  # exists once signed in, which is exactly where #104 (stored HTML
+  # injection into a map popup) lived. Both builds point at a local
+  # Supabase stack rather than needing repo secrets, mirroring
+  # scripts/lighthouse.mjs exactly. Caveat carried over from Lighthouse's
+  # own notes: a fresh demo-mode account has zero categories, so the
+  # signed-in pass broadens which code paths/bundle get scanned rather than
+  # scanning real seeded content -- seeding a fixture item is a reasonable
+  # future step, not done here.
   zap_baseline:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true'
@@ -522,12 +535,23 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-web
+      - uses: ./.github/actions/setup-supabase-cli
 
-      - name: Build the static export
+      - name: Start Supabase
+        run: supabase start
+        working-directory: .
+
+      # Same local stack backs both builds below -- read once into
+      # GITHUB_ENV rather than re-querying `supabase status` per build.
+      - name: Point the build at the local stack
+        run: |
+          status=$(supabase status -o json)
+          echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL <<< "$status")" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .ANON_KEY <<< "$status")" >> "$GITHUB_ENV"
+        working-directory: .
+
+      - name: Build the signed-out export
         run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       # zap-baseline.py always resets its spider to the *host root* of
       # whatever target URL it's given -- any path component is stripped
@@ -540,10 +564,11 @@ jobs:
       # referencing symlink makes the one built export answer identically at
       # both `/` (what ZAP actually crawls) and `/CollectionBuddy/*` (what
       # the HTML's own URLs point at) -- no second build, nothing rewritten.
-      - name: Serve the export at the site root
+      - name: Serve the signed-out export at the site root
         run: |
           ln -s . out/CollectionBuddy
           npx serve out -l 4173 &
+          echo $! > /tmp/zap-serve.pid
           timeout 30 bash -c 'until curl -sf http://127.0.0.1:4173/ >/dev/null; do sleep 1; done'
 
       # Baseline = passive only (spider + passive scan rules), never an
@@ -553,7 +578,7 @@ jobs:
       # for human triage, the same graduated-severity split this repo
       # already uses for Opengrep, axe-core (e2e/axe.ts), and Lighthouse
       # (scripts/lighthouse.mjs) above.
-      - name: ZAP baseline scan (signed-out surface only)
+      - name: ZAP baseline scan -- signed out
         uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
           target: 'http://127.0.0.1:4173/'
@@ -561,22 +586,74 @@ jobs:
           cmd_options: '-I'
           fail_action: true
           allow_issue_writing: false
-          artifact_name: 'zap-baseline-report'
+          artifact_name: 'zap-baseline-report-signed-out'
 
       # The action writes report_md.md into the workspace root (the `-w`
       # flag baked into its own zap-baseline.py invocation) in addition to
-      # uploading it as part of the zap-baseline-report artifact -- same
-      # tee-and-cat pattern this file already uses for depcruise/knip/pgTAP,
-      # just with the report file written for us instead of by us. Note
-      # this step deliberately has no working-directory override -- the
-      # report lands at the repo root (the container mount point), not
-      # under web/, unlike the job's other steps.
-      - name: Add ZAP scan results to job summary
+      # uploading it as part of the artifact above -- same tee-and-cat
+      # pattern this file already uses for depcruise/knip/pgTAP, just with
+      # the report file written for us instead of by us. Captured now,
+      # before the signed-in pass's build overwrites it.
+      - name: Add the signed-out ZAP results to the job summary
         if: always()
         working-directory: .
         run: |
           {
-            echo '## 🕷️ OWASP ZAP baseline scan'
+            echo '## 🕷️ OWASP ZAP baseline scan -- signed out'
             echo
             cat report_md.md 2>/dev/null || echo '_The scan did not complete far enough to produce a report -- see the step above._'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Tear down before rebuilding in the same out/ directory: next build
+      # doesn't expect the self-referencing symlink still there, and a
+      # lingering `serve` process would otherwise hold the port.
+      - name: Stop the signed-out server
+        if: always()
+        run: |
+          kill "$(cat /tmp/zap-serve.pid)" 2>/dev/null || true
+          rm -f out/CollectionBuddy
+
+      # NEXT_PUBLIC_DEMO_MODE signs every visitor in as a fresh anonymous
+      # user instead of showing the Google button -- the same mechanism
+      # scripts/demo.mjs and scripts/lighthouse.mjs already use, since there
+      # is no username/password to script in CI otherwise.
+      - name: Build the signed-in (demo mode) export
+        run: npm run build
+        env:
+          NEXT_PUBLIC_DEMO_MODE: 'true'
+
+      - name: Serve the signed-in export at the site root
+        run: |
+          ln -s . out/CollectionBuddy
+          npx serve out -l 4174 &
+          echo $! > /tmp/zap-serve.pid
+          timeout 30 bash -c 'until curl -sf http://127.0.0.1:4174/ >/dev/null; do sleep 1; done'
+
+      - name: ZAP baseline scan -- signed in (demo mode)
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        with:
+          target: 'http://127.0.0.1:4174/'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-I'
+          fail_action: true
+          allow_issue_writing: false
+          artifact_name: 'zap-baseline-report-signed-in'
+
+      - name: Add the signed-in ZAP results to the job summary
+        if: always()
+        working-directory: .
+        run: |
+          {
+            echo '## 🕷️ OWASP ZAP baseline scan -- signed in (demo mode)'
+            echo
+            cat report_md.md 2>/dev/null || echo '_The scan did not complete far enough to produce a report -- see the step above._'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop the signed-in server
+        if: always()
+        run: kill "$(cat /tmp/zap-serve.pid)" 2>/dev/null || true
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
+        working-directory: .
