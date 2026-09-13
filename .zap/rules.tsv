@@ -1,4 +1,4 @@
-# Rule overrides for the OWASP ZAP baseline scan (.github/workflows/zap-baseline.yml).
+# Rule overrides for the OWASP ZAP baseline scan (ci.yml's zap_baseline job).
 #
 # Format: <rule id><TAB><threshold><TAB># <comment>
 # Threshold is one of FAIL, WARN, INFO, IGNORE. Anything not listed here
