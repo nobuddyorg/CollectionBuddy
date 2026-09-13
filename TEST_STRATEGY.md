@@ -1,384 +1,556 @@
-# Test strategy
+# Test strategy playbook
 
-What testing this repository needs, at which level, for which risks, and when it runs.
+A portable testing strategy for apps built on the **"thin client, fat
+database"** shape: a static or serverless frontend with no backend of its
+own, sitting on top of a Postgres database (Supabase, or self-hosted
+PostgREST + Postgres, or anything with the same properties) whose
+Row-Level-Security policies are the **only** authorization boundary in the
+system.
 
-**This document is mandatory.** CLAUDE.md's first hard guardrail requires it to be read at the start of every task in this repository — implementation, refactor, bug fix or test work — and followed. It decides which layer a behavior is tested at, what may be mocked, and which gates a change clears. Disagree with it in the open and get agreement; don't depart from it quietly.
+This is not a general "how to test software" essay — plenty of those exist.
+It is the distilled, project-agnostic form of a strategy that was built and
+hardened against a real production app of exactly this shape, including the
+mistakes that shape produces if you don't plan for them. Copy this file into
+a new project of the same archetype, then localize it: fill the risk-model
+template with your actual tables and roles, pick your actual tool stack,
+measure your actual thresholds from your actual code. Nothing in this file
+should end up referencing a real table name, file path, or measured number —
+those belong in the project's own docs, CI config, and threshold files, not
+here. When you localize it, that project-specific instantiation is the thing
+that makes this document enforceable day to day; keep this file itself clean
+so it stays copy-pasteable the next time.
 
-This is a working document, not a survey of testing in general. Everything in it is derived from what is actually in this repository: a static export with no server, a Postgres database that is the only thing enforcing authorization, and an unattended deploy that pushes migrations to production on merge. Where a common practice is not justified here, it says so and why.
+Two meta-rules the rest of this document assumes:
 
-Read alongside [docs/reference/architecture.md](docs/reference/architecture.md) (what exists) and [docs/explanation/design-decisions.md](docs/explanation/design-decisions.md) (why). [CONTRIBUTING.md](CONTRIBUTING.md) has the commands; this file has the reasoning behind them.
+- **Disagreeing with a strategy in the open beats departing from it
+  quietly.** If a task seems to need something the strategy rules out, say
+  so and get agreement before doing it anyway.
+- **This is a working document, not a monument.** Update it the moment the
+  architecture it describes moves. A strategy document that nobody updates
+  is worse than none, because it produces false confidence at the exact
+  layer nobody double-checks.
+
+---
+
+## 0. When this applies, and when it doesn't
+
+This playbook assumes:
+
+- The frontend ships as static files or a thin serverless layer with **no
+  server-side authorization code of its own** — no session-aware backend
+  sitting between the client and the database.
+- Postgres Row-Level-Security (RLS) is where authorization actually lives,
+  reached through an auto-generated REST/GraphQL layer (PostgREST or
+  equivalent) rather than hand-written endpoints.
+- The client holds a token that is only as trustworthy as the policies
+  written against it — anyone can extract the anon key from the bundle and
+  issue arbitrary requests, so the policies are the entire defense.
+- There is probably no staging environment, and migrations likely apply
+  straight to production on merge to the default branch.
+
+If any of those stop being true — a server-side execution surface appears
+(an Edge Function, a route handler, anything that isn't a static file or a
+pure DB policy), or a second authorization layer gets added — this
+playbook's central claim (**the database is the only thing that can catch an
+authorization bug**) stops holding, and the whole document needs rethinking,
+not just patching.
 
 ---
 
 ## 1. Purpose
 
-To keep the confidence-per-test high and the feedback loop short, by putting each check at the cheapest level that would actually catch the failure it is aimed at.
+To keep confidence-per-test high and the feedback loop short, by putting
+each check at the cheapest level that would actually catch the failure it's
+aimed at.
 
-The document exists because this repository has one property that changes the usual calculus: **there is no server**. Authorization is not layered — if a Row Level Security policy is wrong, nothing else catches it, and the interface looks identical while showing somebody else's collection. That single fact determines most of what follows.
+The reason this needs its own document, instead of a generic testing
+checklist, is the property named in §0: **there is no server**. Authorization
+is not layered — if a database policy is wrong, nothing else in the stack
+catches it, and the interface looks completely normal while showing somebody
+else's data. That single fact should determine most of a project's testing
+priorities, and in practice it's the thing generic advice skips, because most
+testing literature assumes a server exists to fall back on.
 
-It also names, deliberately, where the estate is currently thin. A strategy that only describes what is already green is not a strategy.
+A strategy that only describes what's already green isn't a strategy. Name
+the gaps explicitly, and track them (§16).
 
 ---
 
 ## 2. System testing context
 
-### What is actually deployed
+### The shape to map, for any project of this archetype
+
+Before writing tests, write down (in the project's own docs, not here) a
+table like this one, filled in with the project's real pieces:
 
 | Piece | What it is | Testing consequence |
 | --- | --- | --- |
-| `web/` | The static export CLAUDE.md's overview describes | Nothing server-side to test: no route handlers, and no authorization code in the deployable, which is a folder of static files served under a base path. |
-| GitHub Pages | Static host | Deployment failures are path failures (base path, icon 404, stale CDN asset), not runtime failures. They need a real fetch against the deployed origin to find. |
-| Supabase Postgres | A handful of tables, plus the functions, triggers and indexes around them (`supabase/migrations/`) | Behaviour lives in SQL: normalization triggers, ownership triggers, a statement-level orphan sweep, generated columns. None of it is reachable from a unit test. |
-| Postgres RLS | The policy migrations, for the tables and for the storage bucket | The entire authorization boundary. |
-| PostgREST | Auto-generated REST API over the schema | There is no hand-written API to contract-test. The schema *is* the contract, and `database.types.ts` is the client's copy of it. |
-| GoTrue | Google OAuth only (plus anonymous sign-in, local demo builds only) | Sign-in cannot be driven in CI. Sessions are minted through the auth API instead. |
-| Supabase Storage | One private bucket `item-images`, 5 MiB/file, three image MIME types | Bytes cannot be deleted from SQL. Object paths (`<uid>/<itemId>/<file>`) are load-bearing for authorization. |
-| `photon.komoot.io` | Third-party geocoder, called from the browser | Outside our control, allowed by CSP `connect-src`. Never called from a test. |
-| `*.tile.openstreetmap.org` | Third-party map tiles | Same. |
-| GitHub Actions | CI, unattended production deploy, daily storage sweep, daily keepalive | Holds `service_role`, `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`. The highest-privilege code in the project is bash inside YAML. |
+| The static/serverless frontend | No route handlers, no server-side authorization code in the deployable | Nothing server-side to unit-test for auth; the deployable is files or edge functions with no privileged logic |
+| The static host / CDN | Deployment failures are usually path failures (base path, asset 404s, stale cache), not runtime failures | Needs a real fetch against the deployed origin to catch |
+| The Postgres database | Tables, functions, triggers, indexes | Behavior living in SQL (normalization, ownership rewriting, cleanup jobs, generated columns) is unreachable from a unit test — it needs a real database |
+| RLS policies | On every table, and on any object-storage bucket | The entire authorization boundary — see §7 |
+| The auto-generated API layer (PostgREST/similar) | No hand-written API to contract-test | The schema *is* the contract; a generated client-types file is the client's copy of it, and drift between them is a real production failure mode |
+| The auth provider | Whatever sign-in flow is used | Interactive sign-in usually can't be driven in CI; sessions get minted through an admin/session API instead |
+| Object storage | A bucket with size/MIME limits, holding files a database row merely references | Bytes can't be deleted from SQL; object *paths* are often load-bearing for authorization if the bucket has its own policies |
+| Third-party services called from the browser | Whatever's outside your control | Always faked in tests; never reached from one |
+| CI/CD | Holds the highest-privilege credentials in the project (a service-role key, a direct DB connection string) if anything auto-deploys | The highest-privilege *code* in the project is often bash inside a CI workflow, not application code — treat it that way |
 
-There is **no staging environment**. `pages-deploy.yml`'s `migrate` job applies pending migrations directly to production on every push to `main`. CI is the only thing between a migration and the live database.
+If there's **no staging environment** and CI applies pending migrations
+straight to production on merge, say so explicitly in this table's row for
+CI/CD — that fact should be driving how heavy the pre-merge gate is (§13).
 
-### What the test estate is today
+### What the test estate should cover, roughly
 
-| Suite | Location | Volume | Runtime target | Where it runs |
-| --- | --- | --- | --- | --- |
-| Unit / component | `web/src/**/*.test.{ts,tsx}` | The bulk of the estate, one file per module | Seconds. Treat over ~60s as a problem to fix. | Pre-commit hook, PRs touching `web/` (see §13), local |
-| Signed-out browser | `web/e2e/public/` | A handful of specs, run against two viewports (desktop Chromium and a phone) | Low minutes | PRs touching `web/` (see §13), and again against the live site post-deploy |
-| Signed-in integration | `web/e2e/signed-in/` | One spec per journey, plus the authorization suite; needs a real Supabase stack | Low minutes + stack start | `e2e_local_stack` job, local via `npm run e2e:local` |
-| Database (pgTAP) | `supabase/tests/database/` | RLS/authorization matrix, schema/constraint checks, function and trigger behaviour; needs a real Supabase stack | Seconds | `e2e_local_stack` job (via `supabase test db`, right after the stack starts), local via `supabase test db` |
-| Mutation | Stryker over the modules listed in `web/mutation-targets.mjs` | Every mutant the list produces, minus the `Stryker disable` regions | Low minutes | PRs touching `web/` (see §13), and push to `main` |
-| Repo hygiene | `.pre-commit-config.yaml` | `typos`, `zizmor`, `shellcheck`, `markdownlint`, `sqlfluff-lint`, `depcruise`, `knip`, file checks | Seconds | Gates every other CI job |
-| Schema contract | `ci.yml`, `e2e_local_stack` | 1 diff | Seconds | PRs touching `web/` or `supabase/` (see §13), and push to `main` |
-| General-purpose SAST | `ci.yml`'s `opengrep` job, over `web/src`, `web/scripts`, `web/e2e`, `supabase` | Semgrep's public community rule pack (`--config auto`) | Low minutes (binary install + registry fetch + scan) | PRs touching `web/` or `supabase/` (see §13), and push to `main`; SARIF uploaded to code scanning |
-| Post-deploy smoke | `e2e/public/` against the live URL | The same signed-out suite | Low minutes | Every deploy |
+A mature estate for this archetype looks like this — not as a percentage
+target, but as a checklist of *kinds* of coverage that should each exist
+somewhere:
 
-This is a mature estate. The work described below is mostly about **closing named gaps and holding the line**, not about building a test suite from nothing.
+| Suite | Typical location | What it's for |
+| --- | --- | --- |
+| Unit / component | Alongside source, one file per module | The bulk of the estate once logic is properly extracted from I/O |
+| Signed-out browser | A dedicated suite, run at more than one viewport | Everything that must hold for an anonymous visitor — safe to run against production post-deploy |
+| Signed-in integration | A dedicated suite, against a real local stack | Critical journeys, end to end, against real infrastructure |
+| Database tests (pgTAP or equivalent) | Run directly against Postgres | The RLS/authorization matrix, schema constraints, function/trigger behavior — fast, and the closest thing to the actual policy logic |
+| Mutation testing | Scoped to a deliberate subset | Proves unit assertions are load-bearing, not just line-covering |
+| Repo hygiene / static analysis | Pre-commit or equivalent | Fast, cheap, gates everything else |
+| Schema contract check | CI | Client-side generated types match the live schema |
+| General-purpose SAST | CI | Language-level bug/security patterns nothing else is looking for |
+| Post-deploy smoke | CI, against the live URL | The one check that sees what users actually see |
 
-### Trust boundaries
+### Trust boundaries to enumerate
 
-1. **Browser bundle → PostgREST / Storage.** A user's JWT crosses it. Everything on the far side is enforced by RLS and triggers. Anyone can read the bundle, take the anon key, and issue arbitrary requests — so the only meaningful test of this boundary is one that does exactly that.
-2. **Owner → grantee (`category_shares`).** A second identity reaching into someone else's category, at one of two roles. The `editor` role is the most permissive grant the schema can issue.
-3. **`anon` → everything.** Denied by RLS on every table, since `auth.uid()` and `auth.jwt()` are both null there, and denied a second time by an explicit `revoke`. One table was missing from that second list for a while, and what was actually refusing it was a missing `EXECUTE` on a helper function — a denial nobody had asserted, holding for a reason nobody had written down. Both halves need asserting; they fail differently — a revoked grant is `42501` before any predicate runs, a policy filter is an empty result.
-4. **CI workflow → production.** `SUPABASE_DB_URL` and `service_role` live here. Not covered by any test; covered by `zizmor`, pinned action hashes, and review.
-5. **App → third-party HTTP** (Photon, OSM tiles). Always faked in tests; never reached.
+Every project of this shape has some version of these; write the concrete
+version into the project's own docs:
+
+1. **Browser bundle → database API.** A user's token crosses it. Everything
+   on the far side is enforced by RLS and triggers. Since the bundle and its
+   anon key are both public, the only meaningful test of this boundary is
+   one that does exactly what an attacker could: issue a request directly,
+   with a real (or absent) token, bypassing the UI.
+2. **One identity → another identity's data**, through whatever sharing or
+   delegation mechanism exists. If there's more than one role a grant can
+   carry (read-only vs. can-write, say), the most permissive role is the one
+   that needs the most scrutiny — see §7.
+3. **Anonymous/unauthenticated → everything.** Usually denied twice: once by
+   RLS (the policy predicate never matches with no identity), and once by an
+   explicit revoke of the underlying table grant. Both halves need testing
+   independently — they fail differently (a revoked grant errors before any
+   policy runs; a policy filter just returns nothing), and a project can have
+   one covered while believing both are.
+4. **CI/CD → production.** Whatever holds the highest-privilege credential.
+   Rarely covered by any *test*; covered instead by workflow-scanning tools,
+   pinned action versions, and review.
+5. **App → third-party HTTP.** Always faked in tests; never reached.
 
 ---
 
 ## 3. Testing principles
 
-1. **Authorization is not testable from the client.** A component test asserting that a button is hidden proves a UX property, nothing more. Authorization tests hold a real token and talk to a real Postgres.
-2. **Never mock the thing that carries the risk.** Mocking supabase-js tests our call shape, which is fine and cheap — it is not a test of RLS, triggers, constraints, or PostgREST behaviour.
-3. **Coverage is a signal; mutation score is a stronger one.** Line coverage says the line ran. For pure, high-consequence logic, that is close to worthless on its own, which is why a short list of files carries both a 100% coverage floor and mutation testing.
-4. **Prefer the lowest level that gives the same confidence.** Pagination math is a unit test. The *fact that the grid paginates* is one E2E case, not fourteen.
-5. **Deterministic or deleted.** Playwright runs with `retries: 0` locally and in CI (the deployed target is the one exception, where a retry distinguishes a broken deploy from a dropped connection). A flake is a defect in the test or the code, not weather.
-6. **Test the failure paths.** Export and import both skip-and-continue on a failed photograph, retry with backoff, and can be cancelled. Those are the paths that carry data loss, and they are the ones worth injecting failures into.
-7. **If it is hard to test, fix the design.** Every file in `mutation-targets.mjs` earned its place by having its pure logic pulled out from the I/O it sits beside. That is the pattern: extract, then test the extract — not fake the world.
-8. **Fixtures may not out-privilege the app.** The signed-in suite seeds through the user's own session; `service_role` opens exactly one door (creating the user). A fixture that can set up a state the app could not reach is a fixture that hides bugs.
-9. **One new behaviour, one new assertion at one level.** Duplicated coverage at three levels costs three times as much to maintain and catches the bug once.
+1. **Authorization is not testable from the client.** A component test
+   asserting that a button is hidden proves a UX property, nothing more.
+   Authorization tests hold a real token and talk to a real database.
+2. **Never mock the thing that carries the risk.** Mocking the database
+   client tests your own call shape, which is fine and cheap — it is not a
+   test of RLS, triggers, constraints, or the API layer's behavior.
+3. **Coverage is a signal; mutation score is a stronger one.** Line coverage
+   says the line ran. For pure, high-consequence logic, that's close to
+   worthless on its own — which is why a deliberately short list of files
+   should carry both a coverage floor and mutation testing, not the whole
+   tree.
+4. **Prefer the lowest level that gives the same confidence.** Pagination
+   math is a unit test. The *fact that the UI paginates* is one E2E case,
+   not one per field.
+5. **Deterministic or deleted.** No retries to paper over flakiness, except
+   at the one boundary where a retry distinguishes a real fault from a
+   dropped connection (typically: a post-deploy smoke test against a live,
+   possibly cold-starting target). A flake is a defect in the test or the
+   code, not weather.
+6. **Test the failure paths, not just the happy path.** Anything that
+   retries, skips-and-continues, or can be cancelled mid-operation is
+   carrying a data-loss or data-duplication risk — those are the paths worth
+   injecting failures into deliberately.
+7. **If it's hard to test, fix the design.** Every file that earns a place
+   on a mutation-testing list does so by having its pure logic pulled out
+   from the I/O sitting beside it. Extract, then test the extract — don't
+   fake the world to make the untestable testable.
+8. **Fixtures may not out-privilege the app.** If tests seed data through an
+   elevated/service-role credential, that credential should open exactly one
+   door (creating test identities) and nothing else. A fixture that can
+   construct a state the app itself could never reach is a fixture that
+   hides bugs.
+9. **One new behavior, one new assertion, at one level.** Duplicated
+   coverage at three levels costs three times as much to maintain and
+   catches the bug exactly once.
 
 ---
 
-## 4. Risk model
+## 4. Risk model — a template, not a checklist
 
-Ranked by expected cost, not by likelihood alone. "Cheapest meaningful test" is the level below which the risk is genuinely not covered.
+Rank risks by expected cost, not likelihood alone. "Cheapest meaningful
+test" means the level below which the risk is genuinely uncovered — a
+higher-level test that happens to also exercise the risk doesn't count if a
+regression there wouldn't reliably fail it.
 
-| # | Risk | What it costs | Cheapest meaningful test | Status |
-| --- | --- | --- | --- | --- |
-| R1 | **Cross-collection read/write** — a policy stops holding | Silent, total confidentiality failure. The UI looks fine. | Integration: real token, real Postgres, bypassing the UI (`e2e/signed-in/rls.spec.ts`) | Covered for owner-vs-stranger and viewer grants — and, faster and complementary, at the SQL surface by `supabase/tests/database/010_ownership_rls_test.sql` and `020_category_shares_rls_test.sql` |
-| R2 | **`editor` grant reaches too far** — an editor renames/deletes the category, manages shares, promotes itself, or writes outside the shared category | Privilege escalation between two real accounts | Same level as R1, with a second identity holding an `editor` grant | Covered — `rls.spec.ts`, on `Leihgabe`, and `supabase/tests/database/030_editor_role_rls_test.sql` |
-| R3 | **Photograph orphaning / data loss on delete** | Storage bytes with no way to find them, or an entry that loses its photos | Unit for the ordering (delete bytes *then* row); integration for the cascade | Covered by `photos.spec.ts` + unit; the sweep's predicate is verified against a real database, and has a dry run |
-| R4 | **A migration that cannot apply to production** | Deploy blocked, or worse, half-applied ordering | `supabase start` in CI applies every migration from scratch | Covered from-scratch; **not** covered against a populated database — see §8 |
-| R5 | **Client/schema drift** (`database.types.ts` vs. reality) | Runtime `PGRST204`s after deploy | The generated-types diff in `e2e_local_stack` | Covered |
-| R6 | **Search-term injection into PostgREST's `or=()` grammar** | A search term parsed as filter structure | Unit + mutation on `buildSearchFilter`, plus adversarial-input E2E cases | Covered at both levels |
-| R7 | **CSV formula injection in an export** | A spreadsheet executing a collector's text | Unit + mutation on `csvCell` | Covered |
-| R8 | **Corrupt archive on export** (ZIP 32-bit overflow, pre-1980 dates) | An archive that will not open | Unit + mutation on `zip.ts` | Covered |
-| R9 | **Static-export deployment faults** — base path, icon 404, manifest scope | A site that 404s everything after a green CI run | Serve the built export under the real base path in a browser; repeat against the deployed origin | Covered (`e2e/public/`, `smoke_test`) |
-| R10 | **In-tab request races** — a stale search response overwriting a newer one; an expired signed URL | Wrong data shown, broken images | Unit on `useRequestSequence`, `imageCache`, `paging` | Covered |
-| R11 | **Duplicate/repeated operations** — a retried photo upload, a re-run import | Duplicate objects or categories | Unit with injected fakes | Partly covered — see §8 |
-| R12 | **Third-party outage** (Photon, OSM tiles) | Degraded map/autocomplete | Unit on the error branch. Not worth an integration test. | Covered |
-| R13 | **Availability** — free-tier project auto-pause | The app is simply down | `keep-alive.yml` (a mitigation, not a test) | Mitigated, unmonitored |
-| R14 | **Workflow logic faults** — the orphan sweep deleting the wrong objects | Irreversible deletion of live photographs, using `service_role` | Nothing cheap exists; it is bash + SQL in YAML | Mitigated — dry run, plus the review rules in §12 |
-| R15 | **Capacity / throughput** | Slow list or search | Index design + `explain`, not a load test. Single-user-per-collection app. | Not justified as a test |
-| R16 | **Accessibility regressions** — a missing label, insufficient contrast, a broken keyboard/focus path | The app fails the "works with a keyboard and a screen reader" claim README makes | Static: `eslint-plugin-jsx-a11y` in `npm run lint`. Runtime: `@axe-core/playwright` against representative pages/states — see §9 | Covered for automatable findings; manual keyboard/screen-reader review is explicitly not automated — see §9 |
+Below is the *shape* of a risk model for this archetype, generalized from
+what tends to actually go wrong in a "database is the only boundary"
+project. Copy the columns, replace the rows with the project's real tables,
+roles, and operations, and rank by real cost.
+
+| Risk category | What it typically costs | Cheapest meaningful test |
+| --- | --- | --- |
+| **Cross-tenant read/write** — a policy stops holding | Silent, total confidentiality failure; the UI looks fine | Integration test with a real token against a real database, bypassing the UI entirely |
+| **A permissive grant/role reaches further than intended** — e.g. an "editor"-style role can also rename, delete, or manage the parent resource, or promote itself | Privilege escalation between two real accounts | Same level as above, with a second real identity holding that specific role |
+| **Orphaned files / data loss on delete** — an object-storage file outlives the row that named it, or vice versa | Storage bytes with no way to find them again, or a record that silently loses its attachments | Unit test for delete ordering (bytes before row, or whatever the safe order is); integration test for the cascade |
+| **A migration that can't apply to a populated database** — works against an empty CI database, fails against real data | Deploy blocked, or a half-applied schema change | CI applying every migration from scratch catches syntax; it does **not** catch a `NOT NULL` with no default, a unique index existing rows violate, etc. — see §8 |
+| **Client/schema drift** — generated client types fall behind the live schema | Runtime errors after deploy, in exactly the requests that touch the drifted column | A generated-types diff, run in CI |
+| **Injection into a generated query grammar** — a search term or filter string gets parsed as filter *structure* instead of a literal value | A user's input rewrites the query the app meant to run | Unit + mutation tests on the function that builds the filter string, plus adversarial-input E2E cases |
+| **Export-format injection/corruption** — e.g. a CSV export executing a user's own text as a spreadsheet formula, or an archive format's own limits (32-bit overflow, epoch limits) producing a corrupt file | A file that damages the opener, or won't open at all | Unit + mutation tests on the specific encoding function |
+| **Static-hosting/deployment faults** — base path, manifest scope, stale CDN asset, icon 404s | A site that quietly breaks after a green CI run | Serve the actual built artifact under its real path in a browser; repeat against the deployed origin |
+| **In-client race conditions** — a stale response overwriting a newer one, an expired signed URL reused | Wrong data shown, broken assets | Unit tests on the sequencing/caching logic, not an E2E timing test |
+| **Duplicate/repeated operations** — a retried upload, a re-run import, a double-submitted form | Duplicate records or duplicate side effects | Unit tests with injected fakes that simulate the retry |
+| **Third-party outage** — a mapping/geocoding/analytics service the browser calls directly | Degraded feature, not an outage of your own app | Unit test on the error branch; not worth an integration test against the real third party |
+| **Availability** — a free/low tier backend that auto-pauses or cold-starts | The app is simply down or slow to first response | A keep-alive/ping mitigation, tracked as a mitigation, not something a test suite can cover |
+| **Destructive scheduled-job logic faults** — a cleanup/sweep job with elevated credentials matches the wrong objects | Irreversible deletion of live user data | No cheap automated test exists for bash-in-YAML; mitigate with a dry-run mode and treat the query itself as security-critical — see §12 |
+| **Capacity/throughput** | Slow queries under real usage | Index design + query-plan inspection, not a load-testing harness, unless there's an actual SLA |
+| **Accessibility regressions** | The app fails to be usable with a keyboard or screen reader | Static linting for the automatable subset, runtime axe-style checks for what only a rendered DOM reveals — see §9 |
+
+A project should end up with 10-20 rows like this, each with a named
+"covered / partly covered / not covered" status, reviewed and updated as
+real incidents happen (§16).
 
 ---
 
 ## 5. Test layers
 
-### Classification
+### Classification — generic verdicts for this archetype
 
-| Layer | Verdict | Why, for this repository |
+| Layer | Verdict, in this archetype | Why |
 | --- | --- | --- |
-| Unit (pure functions) | **Required** | Where most of the logic that can be wrong in an interesting way lives, once extracted from I/O. Fast, deterministic, and the only level where mutation testing means anything. |
-| Component / hook (Testing Library + jsdom) | **Required** | Rendering-level faults (a hydration mismatch, a missing `aria-*`, a disabled control) are invisible to pure-logic tests. A deliberate, documented adoption; keep extending it as files are touched. |
-| Integration against real Postgres/Storage | **Required** | The only level at which RLS, triggers, constraints, generated columns and PostgREST behaviour exist at all. Non-negotiable here. |
-| Service integration (managed services, local stack) | **Required** | GoTrue session minting, Storage signed URLs, MIME/size limits. All are real behaviour the app depends on and none of it is in our code. |
-| API testing | **Required, but not a separate suite** | PostgREST is generated from the schema; there is no hand-written endpoint. API testing here *is* the integration suite, issuing PostgREST calls directly. |
-| Contract testing | **Required in one narrow form; Pact-style is not justified** | The one real contract is schema ↔ `database.types.ts`, and CI already regenerates and diffs it. There are no independently deployed services to run consumer/provider verification between. |
-| Authorization / security testing | **Required — highest priority** | See §7. |
-| Dynamic scanning (DAST) | **Required, narrow scope** | Generic, signed-out passive scanning (OWASP ZAP baseline) of the built export — headers, cookie flags, passive injection/config probes. Complements §7; does not replace it. See §6's "Dynamic scanning (OWASP ZAP baseline)". |
+| Unit (pure functions) | **Required** | Where most interestingly-wrong logic lives once extracted from I/O; the only level mutation testing means anything at. |
+| Component / hook | **Required** | Rendering faults (hydration mismatches, missing a11y attrs, a control that never disables) are invisible to pure-logic tests. |
+| Integration against a real database/storage | **Required, non-negotiable** | The only level RLS, triggers, constraints and the API layer's real behavior exist at all. |
+| Service integration (auth, storage, local stack) | **Required** | Session minting, signed URLs, MIME/size limits — real behavior in none of your own code. |
+| API testing | **Required, usually not a separate suite** | If the API is auto-generated, this *is* the integration suite issuing direct calls. |
+| Contract testing | **Required, narrow form** | The real contract is schema ↔ generated types; Pact-style provider/consumer testing rarely justified without independent deploys on both sides. |
+| Authorization/security testing | **Required — highest priority** | §7. |
+| Dynamic scanning (DAST) | **Recommended, narrow scope** | A passive baseline scan of the *running* built artifact — headers, cookie flags, passive injection/error-disclosure probes. Distinct from every static tool in §6, which reads source or a dependency graph, not live HTTP responses. Complements §7; never a substitute for it — see below. |
 | Property-based | **Recommended, narrowly** | See §10. |
-| Mutation | **Required, scoped** | See §11. |
-| E2E (browser, full stack) | **Required, deliberately small** | See §9. |
-| API fuzzing | **Not justified as tooling; required as targeted adversarial inputs** | There is no bespoke API to fuzz. Fuzzing PostgREST tests Supabase's product. What *is* ours is what we put into a filter string, a CSV cell, or a ZIP header — covered by unit tests with hostile inputs and by mutation testing. |
-| Concurrency testing | **Required at unit level only** | The concurrency that exists is in-tab (superseded requests, bounded upload/download pools), not multi-writer. Two users writing the same row is not a scenario this data model produces. |
-| Load testing | **Not justified** | Collections are personal-scale, the app is one user per collection, and there is no throughput SLA. Capacity work belongs in index design and `explain`, not in a load harness. |
-| Resilience / failure injection | **Required at unit level; optional above it** | Export/import retry, backoff, skip-on-failure and cancellation are driven through injected fakes today. Injecting failures into the real stack adds cost without adding much signal. |
-| Infrastructure / deployment testing | **Required** | Two concrete forms already exist: every migration applied from scratch in CI, and the built export served under its real base path. Both are deployment tests wearing other names. |
-| Smoke testing | **Required** | `smoke_test` runs the signed-out suite against the deployed origin. Prerendering in Node with real env vars masks failures that only exist as a bundle in a browser. |
-| Production synthetic testing | **Optional** | The post-deploy smoke run is the synthetic, and it is enough. A scheduled signed-out probe would mainly catch a free-tier pause, which `keep-alive.yml` already prevents. Do not point anything signed-in at production. |
+| Mutation | **Required, deliberately scoped** | See §11. |
+| E2E (full stack, browser) | **Required, deliberately small** | See §9. |
+| API fuzzing | **Usually not justified as tooling** | Fuzzing an auto-generated API layer mostly tests the vendor's product. What's actually yours — a filter string, an export cell, a file header — is better covered by unit tests with hostile inputs plus mutation testing. |
+| Concurrency testing | **Unit level only, unless the data model has real multi-writer scenarios** | In-client races (superseded requests, bounded pools) are common; genuine multi-writer conflicts on the same row are rare in single-owner-per-resource data models. |
+| Load testing | **Usually not justified** | Only add it once there's an actual throughput SLA. Otherwise it's a number nobody set a target for. |
+| Resilience/failure injection | **Required at unit level; optional above it** | Drive retry/backoff/skip/cancel logic through injected fakes. Injecting failures into the real stack adds cost without proportionate signal once the unit-level branches are covered. |
+| Infrastructure/deployment testing | **Required** | Two forms are usually enough: every migration applied from scratch in CI, and the actual built artifact served under its real path. |
+| Smoke testing | **Required** | Run the signed-out suite (or equivalent) against the deployed origin. Prerendering in a Node test runner with real env vars can mask failures that only exist once the code is a bundle running in an actual browser. |
+| Production synthetic testing | **Optional** | If post-deploy smoke already exists, a separate scheduled synthetic mostly duplicates it unless there's a reason (e.g. catching a cold-start pause) a keep-alive mitigation doesn't already cover. Never point a signed-in synthetic at production. |
 
-### Who owns which behaviour
+### Who owns which behavior — build this table for the real project
 
-| Behaviour | Owning layer | Not this |
+The template:
+
+| Behavior class | Owning layer | Not this |
 | --- | --- | --- |
-| Search-filter escaping, pagination windows, ZIP headers, CSV quoting, theme resolution, translation lookup | Unit + mutation | Do not re-assert this through the browser |
-| Rendering, disabled states, focus trapping, keyboard paths, `aria-*` | Component (Testing Library) | Not E2E, unless the journey depends on it |
-| Normalization, ownership rewriting, orphan sweep, constraints, cascades, generated columns | Integration (real Postgres) | Not unit — none of it exists in JS |
-| Row/object visibility, grant scope, grant expiry, revocation, `anon` denial | Integration, as a second identity | **Never** from client code or a component test |
-| `database.types.ts` ↔ schema | Contract diff in CI | Not a hand-written assertion |
-| Base path, icons, manifest, service worker, CSP, framebusting | Signed-out browser suite, plus source-text assertions for the inline scripts | Not unit alone — the inline scripts run before React exists |
-| One complete user journey (add an entry, photograph it, find it, export it) | E2E | Not one E2E case per field |
-| Migration applicability | CI `supabase start` | Not review-by-eye |
-| Repo tooling in `web/scripts/` — export server, local-stack runner, icon generation, mutation summary | The job or npm script that runs it; a broken one fails the step that depends on it | Not unit tests. None of it ships in the bundle, and it sits outside the coverage `include` deliberately — a script with logic worth asserting belongs in `src/` instead |
+| Pure data transforms (filter-building, pagination math, encoding/escaping, formatting, lookup) | Unit + mutation | Not the browser |
+| Rendering, disabled states, focus, keyboard paths, accessibility attributes | Component tests | Not E2E, unless the journey genuinely depends on it |
+| Normalization, ownership rewriting, cleanup jobs, constraints, cascades, generated columns | Integration against a real database | Not unit — none of it exists in application code |
+| Row/object visibility, grant scope, expiry, revocation, anonymous denial | Integration, as a second real identity | **Never** from client code or a component test |
+| Generated client types ↔ schema | An automated contract diff | Not a hand-written assertion |
+| Base path, icons, manifest, service worker, CSP, anything that runs before the app framework initializes | Signed-out browser suite | Not unit alone — pre-hydration code often isn't reachable from a component test |
+| One complete user journey | E2E | Not one E2E case per field — that's what component tests are for |
+| Migration applicability | CI applying from scratch | Not review-by-eye alone |
+| Repo tooling / scripts that run outside the shipped bundle | The job or script that depends on them | Not unit tests, and not inside the shipped bundle's coverage scope |
 
 ---
 
 ## 6. Architecture-specific strategy
 
-### The shape of the pyramid here
+### The shape of the pyramid, in this archetype
 
-It is not the usual pyramid. The middle band is unusually load-bearing, because authorization and a large share of the business rules live in SQL and do not exist anywhere a unit test can reach them.
+It's not the usual pyramid. The middle band — integration against a real
+database — is unusually load-bearing, because authorization and a
+meaningful share of the business rules live in SQL and don't exist anywhere
+a unit test can reach them.
 
 ```text
-Layer                             Weight          Runs against
---------------------------------  --------------  --------------------------------
-Unit + component                  most of it      jsdom, fakes; the listed modules
-                                                  also mutation-scored
-Database (pgTAP)                  fast, targeted  real Postgres, direct SQL, no
-  (supabase/tests/database/)                      PostgREST, no browser
-API-level integration             a wide band     real Postgres + Storage, real JWTs,
-  (rls.spec.ts + storage)                         no browser — mostly authorization
-Browser, signed-in journeys       one per journey real stack, real bundle
-Browser, signed-out               small           built export, two viewports; also
-                                                  post-deploy
+Layer                              Weight           Runs against
+---------------------------------  ---------------  --------------------------------
+Unit + component                   most of it       fakes/in-memory; a deliberately
+                                                      scoped subset also mutation-scored
+Database tests (pgTAP or similar)  fast, targeted    real Postgres, direct SQL, no
+                                                      API layer, no browser
+API-level integration              a wide band       real database + storage, real
+                                                      tokens, no browser — mostly
+                                                      authorization
+Browser, signed-in journeys        one per journey   real stack, real bundle
+Browser, signed-out                small             built artifact, more than one
+                                                      viewport; also post-deploy
 ```
 
-Treat this as the shape to hold, not an accident. Two ways it goes wrong: new policies landing without the API-level band growing (authorization drifting out of test), or the browser bands growing to assert things a unit or component test could have settled (slow, flaky, and expensive to maintain). Watch the first ratio in particular — it is the one that fails silently.
+Treat this as the shape to *hold*, not an accident. Two ways it drifts: new
+policies landing without the API-level band growing (authorization drifting
+out of test coverage — this fails silently, watch it in particular), or the
+browser bands growing to assert things a unit or component test could have
+settled far more cheaply.
 
 ### What must be real, and what may be faked
 
 | Thing | In unit/component tests | In the integration suite |
 | --- | --- | --- |
-| Supabase client (`supabase.ts`) | Faked. Injected as a parameter wherever a module was designed for it (`exportCategory.ts`, `importCategory.ts`), otherwise module-mocked. | **Real.** A `createClient` per identity, carrying that identity's token and nothing else. |
-| Postgres, RLS, triggers | Absent — do not simulate them | **Real.** This is the point of the suite. |
-| Storage | Faked | **Real**, including MIME and size enforcement |
-| Auth / sessions | Faked | **Real** GoTrue, session minted through the admin API and written to `localStorage` |
-| `browser-image-compression` | Faked (it needs a Worker) | Real, in the browser half |
-| Photon, OSM tiles | **Always faked** | Always faked. Never reach a third party from a test. |
-| `crypto.randomUUID`, `Date.now` | Injected or stubbed | Real |
-| `service_role` | Never | **Only** to create the test users. Never to seed rows. |
+| Database client | Faked — injected as a parameter where the module was designed for it, otherwise module-mocked | **Real.** One client per identity, carrying only that identity's token. |
+| Postgres, RLS, triggers | Absent — do not simulate | **Real.** This is the entire point of the suite. |
+| Object storage | Faked | **Real**, including MIME/size enforcement |
+| Auth/sessions | Faked | **Real**, session minted through an admin API and injected into the test browser context |
+| Anything requiring a browser-only API (Worker, Canvas, etc.) | Faked | Real, in the browser half |
+| Third-party services | **Always faked** | Always faked. Never reach a third party from a test. |
+| Non-deterministic primitives (random ids, clocks) | Injected or stubbed | Real |
+| Elevated/service-role credential | Never used in a test's assertions | **Only** to create test identities, never to seed the data under test — see §3 principle 8 |
 
 ### Managed-service boundaries worth explicit attention
 
-- **Function/runtime boundary** — none. There are no Edge Functions, no serverless handlers. If one is ever added it becomes the first server-side authorization surface in the project and needs its own section here before it ships.
-- **Database-level security policies** — §7.
-- **Managed storage** — object paths carry authorization meaning (`<uid>/<itemId>/<file>`). A path that does not parse must make one policy *not match*, not abort the statement; `storage_item_id()` exists for exactly that, and it is worth a direct test.
-- **Eventual consistency** — PostgREST serves from a cached schema. A newly added column is invisible until `notify pgrst, 'reload schema'`. The `migrate` job sends it unconditionally; a migration applied by hand needs it too. This is the one "eventual consistency" failure mode in the system and it is a deploy-time concern, not a test-time one.
-- **Throttling / row caps** — `max_rows = 1000` silently truncates an unranged PostgREST response. `images.ts` and `exportCategory.ts` page around it. Page-boundary behaviour is unit-tested with fakes; keep it that way, and keep the page sizes honest (`ROW_PAGE_SIZE`, `ITEM_PAGE_SIZE`).
-- **Partial failure** — a thumbnail upload may fail while the full-size one succeeded; `path_thumb` goes null and the entry survives. That is a deliberate accepted failure, and the test for it belongs at unit level with an injected failing upload.
-- **Duplicate invocation / idempotency** — see §8.
-- **Local emulation vs. deployed** — the local stack *is* the real Postgres, GoTrue and Storage, in containers, at the CLI version `.github/actions/setup-supabase-cli` pins (the same one `db push` uses in production). It is not an emulator. Treat integration results from it as trustworthy; treat Pages-specific behaviour (base path, CDN) as only provable against the deployed site.
+- **Function/edge runtime boundary.** If there is none — no Edge Functions,
+  no serverless handlers — say so explicitly, because the day one is added
+  it becomes the first server-side authorization surface in the project and
+  needs its own section before it ships.
+- **Database-level security policies.** See §7.
+- **Object storage paths that carry authorization meaning.** If a bucket's
+  policies parse identity or ownership out of the object path itself, a path
+  that fails to parse must make the policy **not match**, never abort the
+  whole statement — a parsing helper that fails closed (returns "no match")
+  rather than raising is worth a direct unit test of its own.
+- **Schema-cache staleness.** An auto-generated API layer often caches the
+  schema; a newly added column can be invisible until the cache is told to
+  reload. If a deploy pipeline does this automatically, a migration applied
+  by hand needs the same step — this is usually the one "eventual
+  consistency" failure mode in this architecture, and it's a deploy-time
+  concern, not a test-time one.
+- **Row/response caps.** An API layer with a default row limit will silently
+  truncate an unranged response. Anything that reads a potentially large set
+  needs to page around it deliberately; page-boundary behavior is a unit
+  test with fakes.
+- **Partial failure across correlated writes.** If one logical action
+  produces more than one write (e.g. a full-size and a thumbnail upload),
+  decide and document what happens when one succeeds and the other doesn't
+  — and test that specific, chosen behavior with an injected failing write,
+  rather than leaving it as an accident of whichever write happened to run
+  first.
+- **Local emulation vs. deployed.** If the local stack runs the *same*
+  database/auth/storage engine in containers (not a mocked emulator), treat
+  its integration results as trustworthy. Reserve "only provable against the
+  deployed target" for genuinely host-specific behavior (CDN caching, base
+  path, cold starts).
 
-### Architectural boundaries (dependency-cruiser)
+### Static analysis layering
 
-`web/.dependency-cruiser.mjs` (`npm run depcruise`, wired to `web/tsconfig.json` via its `tsConfig` option so the `@/*` path alias resolves) statically checks the module *graph* — every rule is verified against the actual dependency structure of `web/src/app/`, `web/e2e/` and `web/scripts/`, not imposed from a generic template:
+A project of this shape typically wants four *different* static-analysis
+tools, because they answer four different questions — don't let one stand in
+for another:
 
-- **`supabase-behind-data-layer`** is the one this exists for. `eslint.config.mjs`'s `no-restricted-imports` already forbids `components/**` importing `**/supabase` directly, but that rule can only see a single file's own import statements — it cannot see a component reaching Supabase *indirectly* through some other module (a `lib/` helper, say) that itself imports `supabase.ts`. dependency-cruiser walks the whole graph, so this rule is scoped to the whole app rather than duplicating the components-only check: only `data/`, `login/`, and the top-level auth/session bootstrap files (`useSession.ts`, `useSignOut.ts`, `SupabaseWarmup.tsx`) may import `supabase.ts` directly, which means a new indirect path gets caught at the point a module *creates* it, regardless of who ends up importing that module.
-- **`no-circular`** — a cycle between modules is a design smell here as anywhere; the graph currently has none.
-- **`no-orphans`** — a module with no incoming or outgoing local edges is dead code (CLAUDE.md rules that out explicitly), scoped away from test/spec files and `.d.ts` files, which are legitimately "orphans" in graph terms since they're run or referenced by the compiler, not imported.
-- **`not-to-unresolvable`** — an import dependency-cruiser cannot resolve is a sanity check that the tool (and its `tsConfig`/alias wiring) is actually working, as much as an architecture rule.
-- **`data-layer-no-components`**, **`i18n-no-app-deps`** — the reverse-layering checks: the data-access layer and the translation layer are both leaves that must not depend back on the UI or on each other's siblings.
-- **`e2e-is-black-box`**, **`scripts-are-standalone`**, **`app-bundle-no-node-tooling`** — `e2e/` drives the app through a real browser and `scripts/` are Node tools that run outside the Next.js build (see the table in §5); neither imports `src/app/`, and — the direction that actually matters for risk — `src/app/` (what ships in the static export) must never import from either. `scripts/` and `e2e/` are the only places in `web/` that ever reference a `service_role`/admin credential (for local-stack seeding); this rule is what would catch one of those Node-only paths being pulled into the client bundle, which this app's "no server, no privileged code path in the browser" model treats as a real risk even without any current instance of it.
+1. **Module-boundary / dependency-graph tool** (e.g. dependency-cruiser) —
+   answers "does an import cross a boundary it shouldn't", by walking the
+   whole module graph rather than one file's own imports. The one rule worth
+   having from day one in this archetype: **only the data-access layer may
+   import the database client directly.** A linter that only looks at a
+   single file's imports can't see a component reaching the database
+   *indirectly* through some other module; a graph tool can. Also worth
+   having: no import cycles, no orphaned modules (dead code), and a rule
+   that the shipped bundle never imports Node-only tooling (scripts, test
+   harnesses) that might carry privileged credentials.
+2. **Dead-code / unused-dependency tool** (e.g. knip) — answers "does
+   anything have zero reachable consumers". Generated files (a schema-types
+   file, say) need an explicit ignore rather than being "fixed" by hand.
+   Anything referenced only as a string inside another tool's config (a
+   script name inside a test runner's config, for instance) needs an
+   explicit entry point, since static analysis can't follow a string.
+3. **General-purpose SAST** (e.g. Semgrep/Opengrep with a community rule
+   pack) — answers "does this match a known language-level bug or
+   vulnerability shape" that neither of the above is written to catch.
+   Worth verifying, once, for any such tool: what it actually sends over the
+   network (some "auto" configs claim to phone home with project metadata —
+   read the tool's own source rather than trust a docstring), and whether
+   findings are graduated by severity rather than all-or-nothing (block on
+   the equivalent of "error", surface "warning"/"info" for human triage
+   without blocking). Prefer a path-level ignore for "never scan this
+   generated file" and an inline per-line suppression (with a comment) for
+   "this one rule is a false positive on this one line" — don't use the
+   broad tool to solve the narrow problem or vice versa. Every suppression
+   needs the false-positive reasoning written down at the suppression, not
+   just asserted.
+4. **A code-smell/maintainability linter** (e.g. a cognitive-complexity or
+   duplication rule set) — catches things a type checker and a graph tool
+   are both structurally blind to. Tune its defaults against the project's
+   *own* real code before accepting them wholesale — a duplication rule that
+   fires on repeated CSS class names rather than duplicated logic is noise,
+   not signal, and a complexity threshold copied from the tool's default
+   without checking it against real functions is a guess, not a
+   measurement.
 
-Measured at ~1.5s against the whole graph (262 modules, ~900 dependencies) — comfortably inside `prek`'s budget, so it runs as a `prek` local hook (`.pre-commit-config.yaml`'s `depcruise` entry) for a local `prek run --all-files`. In CI it follows the same path as `prettier`/`eslint`/`tsc`: the repo-root `prek` job never installs `web/node_modules`, so `ci.yml` skips all four hooks there and instead runs them as explicit `build_and_test` steps, after `npm ci` and `npm run build` — no separate job of its own. Discovery-mode findings (orphans from type-only imports not being followed by default, resolved via `tsPreCompilationDeps: true`) were reviewed before any rule was turned into an `error`; there were no pre-existing violations to accept as documented exceptions.
+For all four: measure how long each actually takes against the real
+codebase before deciding where it runs. A check that finishes in a couple of
+seconds belongs in a fast pre-commit/pre-push gate everyone runs constantly;
+one that needs a live network fetch or a cold binary install belongs in CI
+only.
 
-### Dead code and unused dependencies (Knip)
+### Dynamic scanning (DAST)
 
-`web/knip.config.ts` (`npm run knip`) answers a different question than dependency-cruiser above: not "does an import cross a boundary it shouldn't", but "does anything in `web/` — a file, an export, a dependency — have zero reachable consumers". Knip's built-in Next.js, Vitest and Stryker plugins already resolve this repo's App Router entry points (`page.tsx`/`layout.tsx`/`route.ts`-style files, `next.config.ts`), the `*.test.{ts,tsx}` suite, and the mutation-test config with no extra configuration. `knip.config.ts`'s `entry` array adds exactly the three places left that Knip's static analysis genuinely can't follow — each is a string embedded inside *another* tool's config, not a static import:
+Everything in §6 so far is static: it reads source, a dependency graph, or a
+findings file. A **baseline (passive-only) scan** — spider plus passive
+rules, never an active/attack scan — points a scanner at the *running* app
+instead, against an isolated, ephemeral local build, never a deployed
+target. It's the only layer that would notice a response header regressing
+or a stack trace leaking into rendered HTML — things no static tool sees
+because none of them look at real HTTP responses.
 
-- `scripts/serve-export.mjs`, named only inside `playwright.config.ts`'s `webServer.command` shell string.
-- `e2e/signed-in.setup.ts`, matched only by `playwright.config.ts`'s `testMatch` regex against a conditionally-spread Playwright project.
-- `vitest.mutation.config.mts`, named only inside `stryker.config.mjs`'s `configFile` string.
-
-Two more entries in the config are ignores, not entries: `src/app/data/database.types.ts` (generated by `supabase gen types`, kept honest by `ci.yml`'s schema-diff check per CLAUDE.md guardrail #3 — not a file Knip should suggest pruning exports from) and the `supabase` binary invoked from `scripts/demo.mjs`/`scripts/e2e-local-stack.mjs` (the CLI installed by `.github/actions/setup-supabase-cli` or locally, never an npm dependency).
-
-**What it does not cover, and does not claim to:** unused i18n translation keys in `web/src/app/i18n/de.json`/`en.json`. That is `web/src/app/i18n/parity.test.ts`'s concern — it asserts every `t()` key exists in both languages, which is a different property from "is this key ever read", and Knip has no visibility into template-string lookups against a JSON dictionary either way.
-
-The initial run found three categories of finding, all resolved in the same change as adopting the tool: the three config-referenced files above (added to `entry`); a handful of exported types and one class/function/two constants that were genuinely never imported outside their own file (`axeOn` in `e2e/axe.ts`, `ImportError` in `data/importCategory.ts`, `ITEM_FIELD_KEYS`/`ITEM_PLACE_FIELD_KEYS` in `data/items.ts`, and the row/summary type aliases in `data/categories.ts`, `data/items.ts`, `data/shares.ts`, `data/exportFormat.ts`, `components/Header/types.ts`, plus two fully-dead `UseExportCategory`/`UseImportCategory` type aliases) — the unnecessary `export` keyword was removed (or, for the two fully dead aliases, the declaration deleted), which is a behavior-preserving visibility change, not a logic change; and the generated-file exports, handled by the `ignore` entry above rather than by editing generated code. No genuinely dead *dependency* was found — `serve` looked unused until `scripts/serve-export.mjs` became a Knip entry point, at which point Knip's own binary-usage detection resolved it without an ignore.
-
-Measured at ~1.6s against the whole project — same budget as `depcruise`/`sqlfluff-lint` above, so it runs as a `prek` local hook (`.pre-commit-config.yaml`'s `knip` entry) and, in CI, as a `build_and_test` step alongside `depcruise` for the same node-less-`prek`-job reason described above. No telemetry was found to disable — verified by inspecting the installed package for analytics/telemetry code; Knip ships none.
-
-### General-purpose SAST (Opengrep)
-
-Where dependency-cruiser and Knip above both know this codebase's own shape (its module graph, its entry points), [Opengrep](https://opengrep.dev/) — an LGPL-licensed fork of the Semgrep engine, `.github/workflows/ci.yml`'s `opengrep` job — is the opposite: a generic, community-maintained rule pack looking for language-level bug and security patterns (unsafe regex, obvious injection shapes, dangerous stdlib calls) that neither ESLint's TypeScript-aware rules nor dependency-cruiser's graph rules are written to catch, and that CodeQL's dataflow analysis (enabled separately through the repository's default code-scanning setup — there is deliberately no CodeQL workflow file to duplicate here) approaches differently again. Three layers, three different techniques, not three copies of the same finding.
-
-- **Ruleset**: `--config auto`, which resolves to Semgrep's public `p/default` community pack (`https://semgrep.dev/c/p/default` — confirmed by reading Opengrep's own source, `src/osemgrep/networking/Semgrep_Registry.ml`, rather than assumed). This is an anonymous, unauthenticated GET — no account, API key, or registry login, satisfying "no new secrets or cloud accounts" outright. One upstream Semgrep docstring claims `auto` also sends the project's URL to tailor rule selection; Opengrep's actual fetch code does no such thing (the docstring is inherited, not reimplemented) — `auto` here is exactly the static community pack and nothing project-specific leaves the runner.
-- **Scope**: `web/src`, `web/scripts`, `web/e2e`, `supabase` — the actual application and its SQL, not the whole repository. Opengrep only scans git-tracked files by default, so `node_modules/`, `.next/`, `out/`, `coverage/`, `reports/`, `.stryker-tmp/`, `test-results/` and `playwright-report/` need no explicit exclusion — they're already in `web/.gitignore`. `.semgrepignore` (repo root, gitignore syntax — Opengrep's default ignore-file name; the pinned v1.30.0 CLI has no `--semgrepignore-filename` to rename it, unlike the unreleased `main` branch its source was first read against) is the one thing that does need an explicit entry: `web/src/app/data/database.types.ts`, generated by `supabase gen types` and excluded from static analysis the same way `eslint.config.mjs` and `.dependency-cruiser.mjs` already exclude it (CLAUDE.md guardrail #3).
-- **Suppression, two tools for two different scopes**: `.semgrepignore` is file/path-level only (gitignore syntax) — it's the right tool for "never scan this generated file" but the wrong one for "this one rule is a false positive on this one line," since it would blind the scanner to every *other* rule in that file too. For that narrower case, Opengrep honors the standard `// nosemgrep: <rule-id>` comment (verified locally — it must be a trailing comment on the flagged line, or a standalone comment on the line immediately before it; anywhere earlier in a longer comment block does not suppress it, confirmed by testing both placements against a minimal local rule before relying on it). Both are reviewable in the diff at the point of the suppression; between the two, prefer `.semgrepignore` when the whole file should never be scanned and `nosemgrep` when only one rule, on one line, should stop firing.
-- **Telemetry**: none to disable. Opengrep's OCaml source was read directly (`src/osemgrep/`) rather than assumed clean-by-reputation: the only "metrics" references left are a stale docstring and an unused ATD schema field carried over from the Semgrep fork point — no code path actually sends anything.
-- **Failure mode**: graduated, not all-or-nothing. Every finding, any severity, always lands in the code-scanning Security tab (`github/codeql-action/upload-sarif`, category `opengrep` so it can't collide with CodeQL's own entries there) — that upload happens unconditionally and isn't what decides the job's outcome. A separate step re-reads the same SARIF, resolves each result's severity from its rule definition (`tool.driver.rules[].defaultConfiguration.level` — a result's own `level` is unset; Opengrep encodes severity per-rule, not per-result) and fails the job only if an **ERROR**-severity (`p/default`'s own bar for "this looks like a real bug or vulnerability shape", not a stylistic nit) finding exists. WARNING/INFO stay report-only, visible in the job summary and the Security tab for human triage, the same three-tier split `@axe-core/playwright` (serious/critical vs. moderate/minor, §9) and Lighthouse (blocking `performance` vs. everything else, §12) already use elsewhere in this pipeline — consistent policy, not a one-off. This replaced an earlier upload-only design (no `--error` flag at all) once every other static-analysis tool in this pipeline had a real pass/fail gate and Opengrep was the one exception.
-- **Placement**: CI-only, not `prek`. Unlike `depcruise`/`knip`/`sqlfluff-lint` above, Opengrep is not a self-contained fast local check: it is a standalone binary with no npm/pip presence in this project, its own scan needs a live fetch from `semgrep.dev`'s registry on every invocation, and neither its install nor that fetch belongs in a `prek` hook other contributors expect to run offline in under a couple of seconds per commit. It runs as its own `ci.yml` job (`opengrep`), gated the same way `e2e_local_stack` is — on `web` or `sql` changing, since the scanned tree spans both.
-- **Measured**: ~2s to install the binary, ~17s to scan (257 git-tracked files, 214 of the 1074-rule community pack applicable by language), ~13s more to validate and upload the SARIF and wait for GitHub to finish processing it — around 30s total job wall-clock, comfortably inside the CI-only budget above.
-- **Initial findings, all triaged**: 3, all false positives:
-  - `javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring` on `web/scripts/mutation-summary.mjs`'s `` console.error(`Could not read ${REPORT_PATH}:`, error) ``. `REPORT_PATH` is a local constant, not attacker input, so there was nothing to fix security-wise — but the rule's own suggestion (a literal format string, the value passed separately: `console.error('Could not read %s:', REPORT_PATH, error)`) is genuinely the more idiomatic form for exactly the pattern the rule flags, so that's what shipped. Resolved by the rewrite; does not recur.
-  - `javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop` on `web/src/app/i18n/I18nProvider.tsx`'s `resolveTranslationKey`, which walks a dot-separated key through a nested object with `value = value[k]` in a loop. Not exploitable as flagged — the loop only *reads* through the existence check before assigning, so there's no path from an attacker-controlled key to a mutated `Object.prototype`. The existence check itself, `k in value`, matched *inherited* properties too (`'toString' in {}` is `true`), which is the shape this class of rule is generally right to be suspicious of, so it was swapped for `Object.hasOwn(value, k)` regardless — a real tightening, worth keeping on its own merits. **This did not make the finding stop firing**: verified directly (a minimal local rule mimicking the same `$OBJ = $OBJ[$KEY]`-in-a-loop shape still matches `value = value[k]` after the `Object.hasOwn` swap, and the real CI run continues to report exactly this one finding on this one line, every run, at WARNING). The pattern the rule matches on — assigning through a computed key inside a loop — is inherent to walking a dot-separated path at all; there's no rewrite of that algorithm that stops resembling it without simply restructuring code to dodge a pattern-matcher, which is not a fix. Suppressed with an inline `// nosemgrep: <rule-id>` at the assignment, reasoned the same way this section now is.
-  - `javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp` on `web/src/app/i18n/parity.test.ts`'s `extractCallLiterals`, which built `` new RegExp(`\\b${name}\\(`, 'g') `` from a `name` parameter. That parameter only ever took two hardcoded values (`'t'`, `'tCount'`) at its two call sites — never file content, never anything external — so there was no ReDoS path, but the fix the rule's own message suggests (hardcode the regex) was still a straightforward, equivalent rewrite: the function now takes the `RegExp` itself, built as a literal at each call site. Resolved by the rewrite; does not recur.
-  - The lesson, generalized: "this rewrite is more correct" and "this rewrite stops the specific rule from matching" are different claims — verify the second one against a real run (or a local rule mimicking the same AST shape) rather than assuming a genuine improvement also silences the pattern-matcher that flagged it.
-- **Not a finding, a scan-coverage caveat, worth naming rather than chasing**: the run reported 8 files "partially analyzed due to parsing or internal Opengrep errors" (out of 257) — the OCaml/tree-sitter-based parser occasionally cannot fully parse newer TypeScript syntax. `tsc`/ESLint still see those files in full; treat a partial-parse count as expected background noise from this tool, not a gap to suppress or investigate file-by-file unless it grows sharply between runs.
-
-### Maintainability and code-smell linting (SonarJS)
-
-`eslint-plugin-sonarjs`'s `recommended` config, layered into `web/eslint.config.mjs` scoped to `src/**/*.{ts,tsx}` (not `*.test.{ts,tsx}` — a test's job is to be exhaustive, not non-repetitive), adds a fourth kind of static analysis alongside dependency-cruiser (module graph), Knip (reachability) and Opengrep (generic security patterns) above: cognitive complexity, duplicated/identical logic, and dead or self-contradicting control flow that a type checker and a graph-shaped tool are both structurally blind to. It runs through the existing `npm run lint` (`--max-warnings 0`), not a separate command — three of its defaults were tuned against this codebase's actual code rather than left at the plugin's generic assumption, each explained at its rule entry in `eslint.config.mjs`:
-
-- `sonarjs/no-duplicate-string` is off — it fires on repeated Tailwind `className` strings, not duplicated business logic, the same near-equivalent-noise problem `mutation-targets.mjs` already excludes JSX/Tailwind strings from for the identical reason (§11).
-- `sonarjs/void-use` is off — it flags this codebase's own established `void somePromise` convention (the fix `@typescript-eslint/no-floating-promises`, already on via `recommendedTypeChecked`, asks for) and TypeScript's `const x: never = y; void x` exhaustiveness idiom.
-- `sonarjs/prefer-read-only-props` is off — enabling it would mean wrapping nearly every component's props type in `Readonly<...>` project-wide, a house-style adoption this codebase hasn't made anywhere yet, not a small fix. Worth doing incrementally, the same way component test coverage was rolled out (`docs/explanation/design-decisions.md`), not as a drive-by of adopting a new lint plugin.
-- `sonarjs/cognitive-complexity`'s threshold is `20`, not the plugin's default `15` — set by running the rule against this codebase's real functions rather than assumed. One genuine outlier remains above it (`Map/usePlaces.tsx`'s `partitionByStoredCoords`, at 21) and is suppressed at its own definition rather than lowering the threshold further: it's two flat bookkeeping loops already covered by `mutation-targets.mjs`'s 100% floor, not a shape splitting it would actually simplify. It starts at `warn`, since cognitive complexity is inherently a judgment call about a specific number, not a bug-risk finding — but `--max-warnings 0` still means every `warn`-level finding has to be genuinely clean or explicitly suppressed with a reason, the same bar as an `error`.
-
-A handful of individually-suppressed findings, at the specific line rather than a blanket rule turn-off, follow this repository's established `// eslint-disable-next-line rule -- reason` convention (already used for jsx-a11y's deliberate pointer-only conveniences, §9): `sonarjs/no-globals-shadowing` on the two places a component is named `Map` (matching its folder/import, never actually colliding with the JS builtin); `sonarjs/no-nested-functions` on the handful of callbacks whose depth comes from Leaflet's own re-render shape or a cancellable-concurrent-geocoding-queue's closure, where extracting the innermost callback would only trade the nesting for threading several closed-over variables through as parameters; and `sonarjs/different-types-comparison` on `I18nProvider.tsx`'s `value !== null` check, which the type checker considers unreachable (`TranslationValue` has no `null` member) but which stays as a real runtime guard against `typeof null === 'object'` should a translation file ever gain a literal `null`. Every other finding from the initial run was fixed directly — flattened nested ternaries (mostly three-way JSX state dispatch, rewritten as sequential `condition && (...)` blocks), a redundant type-narrowing null check `!open` already covered, and the `.returns<T>()` postgrest-js calls across `data/` switched to their documented non-deprecated replacement, `.overrideTypes<T, { merge: false }>()`.
-
-No telemetry to disable — the plugin runs entirely inside the existing `eslint` process, the same as `eslint-plugin-jsx-a11y` and `typescript-eslint` already do. Measured at ~24s for `npm run lint` with the plugin active, against a ~30s baseline without it (both are dominated by ESLint's own project-wide type-aware pass, not by SonarJS's own rule execution) — no placement change: it stays inside `build_and_test`'s existing lint step (CI) and the existing `eslint`/`prettier` local hooks (`prek`), never a second command or a second job.
-
-### Dynamic scanning (OWASP ZAP baseline)
-
-Everything above this point is static: it reads source, a dependency graph, or a SARIF file. Nothing in this repository's CI, before #661, ever pointed a scanner at the *running* app — there was no DAST at all, generic or otherwise.
-
-`ci.yml`'s `zap_baseline` job runs an [OWASP ZAP](https://www.zaproxy.org/) **baseline (passive-only) scan** — spider plus passive rules, never an active scan — against an isolated, ephemeral copy of the built static export, served on the runner itself. It lives alongside Opengrep and Lighthouse as its own `ci.yml` job, gated the same way (`needs.changes.outputs.web == 'true'`), rather than as a separate workflow — the closest precedent here is Opengrep, which uses the identical shape (a generic scanner, a graduated severity split, one `ci.yml` job).
-
-- **What it covers**: the same class of finding Opengrep and axe-core cover from other angles — generic security-header/cookie-flag misconfiguration and passive injection/error-disclosure probes — but observed against real rendered HTTP responses rather than source text or a static DOM. It is the only layer in this repository that would notice, say, a response header regressing or a stack trace leaking into shipped HTML.
-- **What it explicitly does not cover, and must never be read as covering**: this app's authorization model. Cross-tenant access, `editor`-grant boundaries, `anon` denial — all of that is owned entirely by `web/e2e/signed-in/rls.spec.ts` per §7, which holds real tokens for real identities and talks to a real Postgres. ZAP never signs in, never holds a token, and never probes RLS. A green ZAP run says nothing about RLS; only a green `rls.spec.ts` run does.
-- **Never scans anything but a local, ephemeral build.** Both passes target `http://127.0.0.1` on the runner itself (`:4173` signed out, `:4174` signed in) — never `pages-deploy.yml`'s deployed URL. CLAUDE.md's guardrail against pointing signed-in or write-capable tooling at production applies here too, and this job has no path to production at all, signed in or out — "signed in" here means a local demo account on a local, ephemeral database, not a real identity or a real deployment.
-- **Scans both a signed-out and a signed-in pass**, matching Lighthouse and axe-core, which already scan both for the same reason: a login-page-only scan has almost nothing rendered to find a content-based finding in, and this app's actual content (item titles, descriptions, tags, place names) only exists once signed in — exactly where #104 (stored HTML injection into a Leaflet map popup) lived. There is no username/password auth to script (Google OAuth only in production), so the signed-in pass piggybacks on local demo-mode anonymous sign-in against a local Supabase stack, the same mechanism `scripts/demo.mjs` and `scripts/lighthouse.mjs` already use — both builds point at that local stack rather than needing repo secrets. Carried over honestly from Lighthouse's own notes: a fresh demo-mode account has zero categories, so this pass broadens which code paths and bundle size get scanned rather than scanning real seeded content; seeding a fixture item for a more content-heavy pass is reasonable future work, not done here.
-- **The base-path/self-scan quirk, because it looks like a bug otherwise**: ZAP's baseline scanner always resets its spider to the target's host root, discarding any path component — a documented (if surprising) property of `zap-baseline.py` itself, not a workaround this repo invented. Since the export only renders correctly under `EXPORT_BASE_PATH` (`next.config.ts` bakes it into every asset/navigation URL, the same reason `web/scripts/serve-export.mjs` exists), the workflow serves the one built export through a self-referencing symlink so it answers identically at `/` (what ZAP actually crawls) and at `/CollectionBuddy/*` (what the HTML's own URLs point at).
-- **Severity threshold, and why it starts conservative**: `.zap/rules.tsv` promotes exactly one rule to `FAIL` on this first rollout (Application Error Disclosure — content-based, and should never legitimately fire against a clean static export) and explicitly `IGNORE`s three rules that are structurally unfixable on GitHub Pages rather than leaving them as permanent noise: missing `X-Frame-Options`/`Content-Security-Policy` **response headers** (this app's CSP is a `<meta>` tag for exactly the reason those headers don't exist — see `web/src/app/layout.tsx` and design-decisions.md — and clickjacking is mitigated by a framebusting script instead, already tracked as #334) and missing HSTS (added by GitHub Pages at the edge, not by this app; already tracked as the closed #391). Everything else defaults to `WARN`: reported in the job summary and the uploaded `zap-baseline-report` artifact for human triage, but — via `zap-baseline.py`'s `-I` flag — not blocking. This is the same graduated severity split already used for Opengrep (§6 above), axe-core (§9), and Lighthouse (§12): a real pass/fail gate for the findings this repo currently has confidence are always actionable, everything else visible rather than silently ignored. Tightening it further needs real scan history to work from, not a guess made while writing the workflow.
-- **Local run**: see [developer-guide.md](docs/how-to/developer-guide.md).
-- **Placement**: a `ci.yml` job (`zap_baseline`), gated on `web` changing via the `changes` job — same gating as `build_and_test`/`mutation_test`/`lighthouse`, since this measures the built web bundle's runtime surface, not database *behaviour* (the local stack it starts, like Lighthouse's, exists only to mint a demo session, not to exercise schema/RLS — that stays `e2e_local_stack`'s job, gated separately on `sql` changing too). Not a `prek` hook — it needs two full builds and two served exports, the same cost class as the e2e suite.
+- **What it covers**: the same class of finding a SAST tool and static
+  accessibility linting cover from other angles — generic
+  header/cookie-flag misconfiguration, passive injection/error-disclosure
+  probes — observed against real rendered responses instead of source text.
+- **What it explicitly does not cover.** A DAST baseline scan never signs
+  in with a real identity and never holds a token, so it says nothing about
+  the authorization model — that's §7's job, exclusively. Never read a green
+  DAST run as authorization coverage.
+- **Never scans anything but a local, ephemeral build** — never a deployed
+  or production target, signed in or out.
+- **Scan more than the entry page** if the app's real content only exists
+  once signed in (a login screen alone has almost nothing rendered for a
+  content-based finding to hide in) — matching whatever other tooling
+  already scans both states (e.g. an accessibility or performance gate).
+- **A structurally unfixable static-hosting header stays explicitly
+  ignored, not silently unaddressed** — if the hosting platform can't set a
+  given security header at all, document why and move on, rather than
+  leaving it as permanent unexplained noise.
+- **Graduated severity**, same pattern as every other tool in this section:
+  a small, deliberate set of findings that block, everything else surfaced
+  for triage. Tighten the blocking set only once real scan history justifies it.
 
 ---
 
 ## 7. Security and authorization testing
 
-**This is the highest-value testing in the repository.** The project's own history includes several RLS-correctness bugs, and there is no second layer to catch the next one.
+**This is the highest-value testing in this architecture.** There is no
+second layer to catch an authorization bug — it fails silently and looks
+exactly like success.
 
 ### Rules
 
-1. Every authorization test holds a **real access token for a real identity** and issues requests **directly**, not through the interface. `e2e/signed-in/rls.spec.ts` is the executable form of the security model; the bulk of it deliberately bypasses the UI.
-2. Every test needs **at least two identities**. A single-user suite makes only requests the policies are supposed to allow, so it cannot notice a broken policy.
-3. Assert on the **mechanism, not just the outcome**. An empty result and a `42501` mean different things: the first says a policy filtered the row, the second says the grant never existed. Both are asserted for `anon` today; keep that distinction.
-4. Assert that a **satisfiable** filter returns nothing. `select where user_id = <theirs>` returning `[]` is a much sharper signal than an unfiltered read that happens not to contain their row.
-5. Write-side tests must **read back as the owner**. A policy that accepts a write while hiding it on read is the worst outcome, and only the owner's own read can rule it out.
-6. Both **mirrored surfaces** need covering. `images` (a row naming an object) and `storage.objects` (the bytes) are separate authorization surfaces with separate policies and separate join paths — the table joins `item_categories` by `item_id`, storage parses an id back out of a path. A test against one proves nothing about the other.
-7. Grants must be tested **in both directions**: that an active grant opens exactly what it should, and that revocation and expiry close it again with the object still present — otherwise the test only proves the thing stopped existing.
+1. Every authorization test holds a **real access token for a real
+   identity** and issues requests **directly against the API layer**, not
+   through the UI. This suite is the executable form of the authorization
+   model; most of it should deliberately bypass the interface.
+2. Every test needs **at least two identities**. A single-identity suite
+   only ever makes requests the policies are supposed to allow, so it can
+   never notice a broken policy — it has nothing to be denied.
+3. Assert on the **mechanism, not just the outcome**. An empty result and an
+   authorization error mean different things: one says a policy filtered
+   the row, the other says the grant never existed in the first place. Both
+   are worth distinguishing for the anonymous/no-identity case especially.
+4. Assert that a **satisfiable** filter returns nothing. Querying for
+   exactly the other identity's known row and getting `[]` back is a much
+   sharper signal than an unfiltered read that merely happens not to
+   contain it.
+5. Write-side tests must **read back as the owner**. A policy that accepts a
+   write while hiding it from the writer's own later read is the worst
+   possible outcome, and only the owner's own subsequent read can rule it
+   out.
+6. **Every mirrored authorization surface needs its own test.** If a
+   resource has a database row *and* a corresponding object-storage file (or
+   any other pair of things governed by separate policies with separate
+   join logic), a test against one proves nothing about the other. Name each
+   surface and cover each one.
+7. Grants must be tested **in both directions**: that an active grant opens
+   exactly what it should, *and* that revocation/expiry closes it again with
+   the underlying resource still present — otherwise the "access denied"
+   assertion only proves the resource stopped existing, not that the grant
+   stopped working.
 
-### The `editor` role (R2)
+### The most-permissive role is the one that needs the most scrutiny
 
-The schema allows a grant at `viewer` or `editor`. An `editor` grant reaches further than anything else in the schema: `has_category_write_access()` lets a non-owner update and delete items in someone else's category, insert `images` rows against someone else's item, link items into someone else's category, and read and write objects under someone else's uid prefix.
+If the sharing/delegation model has more than one role (read-only vs.
+can-edit, say), the most permissive non-owner role is where privilege
+escalation actually lives. Write out, for the real project, and test both
+halves of each line:
 
-This was the estate's largest hole for as long as `rls.spec.ts` created grants through a helper that omitted `role` — every share it tested took the `'viewer'` default, and its "the grant does not extend to writing" case asserted a property true of viewers and false of editors. The helper now takes a role, that case is named `a viewer grant does not extend to writing`, and the describe block `a category shared at the editor role` covers the grant itself, on `Leihgabe` — a collection of its own, so the viewer cases on `Münzen` stay undisturbed.
+- What the role **can** do: the specific actions it should be able to take
+  inside the scope it was granted.
+- What the role **cannot** do: anything scoped to the *parent* resource
+  (rename it, delete it, manage who else has access, promote its own grant)
+  even though it can act on the resource's contents. Also: reaching a
+  resource it was never granted at all, and continuing to act after its
+  grant is revoked or expires — both asserted with the underlying resource
+  still present, so the test is proving the grant stopped working, not that
+  the resource disappeared.
 
-What it asserts, with the second seeded collector holding the grant:
+One asymmetry worth checking explicitly and writing down once confirmed: if
+"can write" is defined as "owns the parent, **or** holds a write-level
+grant", and "can read" is defined only via an active grant (ownership of the
+*parent* doesn't imply a grant on something a delegate created *inside* it),
+then **owning the parent does not automatically reveal everything a
+delegate has done inside it**. That's a legitimate, deliberate design — but
+it's exactly the kind of thing that's easy to assume is a bug, easy to get
+backwards in code review, and worth a named, executed test rather than a
+comment.
 
-- An editor **can**: edit and delete the owner's entries in the shared collection; file an entry of its own into it; upload, sign and delete a photograph of a shared entry, and insert and delete its `images` row.
-- An editor **cannot**: rename or delete the collection; promote itself; issue a grant of its own; reach a collection it was not granted; write once the grant has been revoked or has expired — both asserted with the entry still present, so it is the grant being tested and not a row that stopped existing.
-- An editor **may** delete its own share. That is the grantee leaving, which `"delete own or invited category_shares"` covers deliberately; it ends its own access and touches nobody else's.
+Tests that only assert "the client sends the right call" or "the button is
+disabled for a lower role" are UX tests. They are not a substitute for the
+above, by the rule in §3 principle 1.
 
-One asymmetry is asserted because it is easy to mistake for a bug and must stay a decision: `has_category_write_access()` bundles category ownership in, `has_category_read_access()` does not. The consequence, executed rather than assumed, is that **owning a collection does not reveal an entry an editor merely filed into it** — the owner never held a grant on that entry, and holding the collection is not one. An earlier draft of this section claimed the opposite; the policy has always behaved this way.
+### Two levels of authorization test, and how they divide labor
 
-The existing `editor` tests (`useShares.test.tsx`, `Sharing.test.tsx`, `ItemList/index.test.tsx`) assert that the client sends the right call and enables the right button — UX, by this repository's own rule, not authorization. They are not a substitute for the above.
+If the platform supports impersonating a role directly against the database
+(e.g. pgTAP-style tests that `set local role` and inject the claims a real
+token would carry), that gives a second, faster layer alongside true
+end-to-end integration tests. They complement rather than replace each
+other:
 
-### pgTAP, and how it divides labor with `rls.spec.ts`
+- **Direct-database tests** prove the **policy and trigger logic itself** —
+  fast enough to run on every schema change, and closest to the actual
+  predicate being evaluated. If this mechanism exists, verify the
+  impersonation itself works (a sanity test that shows the identical query
+  fail with no claim, pass with one, and depend on the claim's actual
+  content) — otherwise a test file that accidentally runs with full
+  privileges would silently pass everything.
+- **Full end-to-end integration tests** prove the **same properties hold
+  through the real pipeline** — a real API request, a real minted token,
+  the real client library. This is also usually the only place
+  storage-level authorization and real storage-API behavior (MIME/size
+  limits, signed URLs, whether a path can be renamed) get exercised, since
+  a direct-database layer typically can't reach into a managed storage
+  service's own tables directly.
+- Fixtures at the direct-database layer should still be seeded the way §3
+  principle 8 requires — impersonating the real identity's own role, never
+  a superuser bypass — even though this layer never touches the API layer
+  at all.
 
-`supabase/tests/database/` runs pgTAP directly against Postgres, inside a
-transaction that always rolls back, by impersonating the `authenticated`
-and `anon` roles: `set local role`, plus a `request.jwt.claims` GUC carrying
-the claims a real JWT would. This is not through PostgREST and not through
-a browser — it is the SQL surface the policies are actually written
-against, and it runs in seconds.
+A schema change that adds or modifies a policy, grant, or
+ownership-affecting trigger should ship a matching case in the end-to-end
+suite in the same change; a direct-database case alongside it is encouraged
+where it adds a fast, targeted assertion, but doesn't discharge that
+requirement on its own. State this as an absolute, not a guideline — the
+failure is invisible, there is no second layer to catch it, and SQL review
+by eye has a documented history (in whichever project you're running this
+in) of missing exactly this class of bug.
 
-That speed is also its limit, and the reason it complements
-`web/e2e/signed-in/rls.spec.ts` rather than replacing any of it:
+### SQL linting is a different concern from authorization testing
 
-- pgTAP proves the **policy and trigger logic** — the RLS/authorization
-  matrix in §7's rules, schema constraints, and function/trigger behaviour
-  (`delete_item_if_orphan`'s statement-level cleanup, `storage_item_id`'s
-  fail-closed parsing, `caller_email`'s normalization) — fast enough to run
-  on every change that touches the schema.
-- `rls.spec.ts` proves the **same properties hold through the real
-  pipeline**: a real PostgREST request, a real JWT minted by GoTrue, the
-  real Supabase client. It is also the only place `storage.objects` and
-  real Storage-API behaviour (MIME/size enforcement, signed URLs, `move()`)
-  get exercised — pgTAP tests deliberately stop at the five `public` schema
-  tables and do not reach into `storage.objects` directly, because that
-  table's own extension-owned triggers are not something to guess the shape
-  of from a test that cannot be run against a live database first (see
-  anti-pattern §15.13 for a related reason not to poke at it from SQL).
-- The impersonation mechanism itself is verified, not assumed:
-  `005_impersonation_sanity_test.sql` shows the identical query fail as
-  `anon`, pass as `authenticated` with a claim, and depend on the claim's
-  actual content — so a pgTAP file that accidentally ran as `postgres`
-  would be caught rather than silently passing.
-- Fixtures are seeded the same way `rls.spec.ts`'s are, in spirit: through
-  the ordinary insert path under the relevant identity's own impersonated
-  role, never a `service_role`/superuser bypass — see §8's "seed as the
-  user" rule, which this suite follows even though it never touches
-  PostgREST.
+A SQL linter/formatter run against migrations answers "is this SQL
+well-formed and free of static footguns" — ambiguous joins, inconsistent
+`GROUP BY` references, needless subqueries. It cannot see a single policy's
+*logic*, discharges none of the authorization-testing requirement above, and
+adds no authorization coverage on its own. Think of it as the SQL-side
+counterpart to a general code linter, not a competitor to database tests.
 
-A policy, grant, or ownership-affecting trigger change still needs a
-matching `rls.spec.ts` case per the standing rule below; a pgTAP case
-alongside it is encouraged where it adds a fast, direct assertion, but does
-not discharge that rule on its own.
+### Out of scope, deliberately, in most projects of this shape
 
-### Standing rule for schema changes
-
-The rule is CLAUDE.md's database guardrail: a PR that adds or changes a policy, grant or ownership-affecting trigger ships a matching case in `rls.spec.ts` in the same PR.
-
-It is stated as an absolute because the failure is invisible. A wrong policy changes nothing about how the interface looks, there is no second layer to catch it, and review of SQL by eye has already missed this class of bug here more than once. A migration with no matching assertion is an unreviewed change to the only security boundary in the product.
-
-### SQLFluff, and why it is a different concern from pgTAP/`rls.spec.ts`
-
-`sqlfluff-lint` (config: [`.sqlfluff`](.sqlfluff)) runs against
-`supabase/migrations/` and `supabase/tests/database/` as a `prek` hook,
-gating every PR and push to `main` alongside `typos`/`zizmor`/`shellcheck`.
-It answers a completely different question from the rest of this section: not
-"does this policy allow the right thing", but "is this SQL well-formed and
-free of static footguns" — ambiguous joins, inconsistent `GROUP BY`/`ORDER BY`
-references, needless subqueries, keyword misuse. It cannot see a single
-policy's *logic*, so it discharges none of the standing rule below and adds
-no authorization coverage on its own; think of it as the SQL-side counterpart
-to ESLint, not a competitor to pgTAP.
-
-Its `core` rule bundle is scoped down from `all`: `aliasing.table`,
-`references.consistent`, `references.keywords`, `references.special_chars`,
-and the pure-formatting `layout.*` rules (`layout.spacing`, `layout.indent`,
-`layout.long_lines`, `layout.functions`, `layout.cte_newline`) are excluded
-in `.sqlfluff`, each because fixing it would mean rewriting already-applied
-migrations or already-reviewed pgTAP files for style, or — for
-`references.special_chars` and `references.keywords` — because the "finding"
-is a deliberate, documented choice (RLS policy names are quoted
-space-containing identifiers; `category_shares.role` is a real column name),
-not a defect. Everything left in `core` was verified clean against every
-migration and pgTAP file before adopting the config, and stays available to
-catch the same class of mistake in new SQL going forward. It runs in ~2
-seconds against the current migration set, comfortably inside `prek`'s
-budget; there was no reason to push it to CI-only.
-
-### Out of scope, deliberately
-
-- Penetration testing of Supabase itself.
-- Anything that would need an anonymous share link — ruled out by design (see design-decisions.md); if it is ever built it is a new, higher-risk boundary needing its own model.
-- Secret scanning beyond the `detect-private-key` hook and GitHub's own tooling.
+- Penetration testing of the managed platform itself (Supabase, or
+  whichever backend-as-a-service is in use) — that's the vendor's surface,
+  not yours.
+- Anything that would require an anonymous/public share link, if the
+  project has deliberately ruled that out by design — RLS can't cheaply
+  authorize an anonymous reader, so if this is ever added it's a new,
+  higher-risk boundary needing its own model, not a checkbox on an existing
+  one.
+- Secret scanning beyond a dedicated pre-commit hook and the platform's own
+  tooling.
 
 ---
 
@@ -386,106 +558,199 @@ budget; there was no reason to push it to CI-only.
 
 ### Setup that must not be weakened
 
-- **Seed as the user, never as `service_role`.** That role holds no grant on these tables; the service key creates the user and nothing else. A fixture that bypasses RLS can construct states the app cannot reach and will hide real policy bugs.
-- **One scratch category per writing spec.** Specs run in parallel against one database. `Münzen` and `Briefmarken` are read-only fixtures; `Werkstatt`, `Fotostudio`, `Exportarchiv` and `Leihgabe` belong to the specs that write — the last to `rls.spec.ts`'s editor cases, which edit and delete what they find there. A test that writes into a collection another spec is counting makes both flaky, at random.
-- **Clean up in `finally`.** Probe rows and probe objects must not survive a failed assertion — the next spec may be counting.
-- **The suite fails on a console error.** `e2e/signed-in/test.ts` fails any test where the page threw or logged an error, which is what catches a rejected query behind a passing assertion. Keep it.
+- **Seed as the user, never through an elevated/service-role bypass.** A
+  fixture that bypasses RLS to set up state can construct scenarios the app
+  itself could never reach, and will hide real policy bugs by doing so. The
+  elevated credential should exist only to create test identities.
+- **Isolate fixtures across parallel specs.** If specs run in parallel
+  against one shared database, decide explicitly which fixtures are
+  read-only shared state and which are scratch resources owned by exactly
+  one writing spec. A spec that writes into a resource another spec is
+  counting makes both flaky, unpredictably.
+- **Clean up in `finally`.** Probe records and probe files must not survive
+  a failed assertion — later specs may be counting them.
+- **Fail the suite on an unexpected console/runtime error.** This is what
+  catches a rejected background query hiding behind a passing assertion.
 
-### Migrations against a populated database (R4)
+### Migrations against a populated database
 
-CI applies every migration to an **empty** database (`supabase start`). Production applies only the *pending* ones to a database **full of rows**. Those are different operations, and the second is unattended.
+CI typically applies every migration to an **empty** database from scratch.
+Production applies only the *pending* migrations to a database **full of
+real rows**. Those are different operations, and in a no-staging setup the
+second one is unattended.
 
-A migration that adds a `not null` column without a default, a unique index existing rows violate, or a `check` constraint existing data fails, passes CI and fails in production. The blast radius is contained — `build` declares `needs: migrate`, so a failed push leaves the previous bundle serving the unchanged schema — but it fails in the worst place to discover it.
+A migration that adds a `NOT NULL` column with no default, a unique index
+existing rows would violate, or a constraint existing data fails, passes the
+from-scratch CI check and fails against production. If the deploy pipeline
+orders "migrate" strictly before "build/deploy the new bundle", a failed
+migration at least leaves the previous bundle serving the unchanged schema —
+but it still fails in the worst place to discover it.
 
-**Policy:** for any migration that alters an existing table or adds a constraint or index to one, verify it locally against a database that already holds rows (`supabase db reset`, seed, *then* apply the new file) before opening the PR, and say in the PR description that you did. This is a review-enforced practice, not an automated gate, because automating it means committing a production-shaped seed and maintaining it.
+**Policy:** any migration that alters an existing table, or adds a
+constraint/index to one, gets verified locally against a database that
+already holds representative rows (reset, seed, *then* apply the new
+migration) before it's proposed for merge — and that verification gets
+stated explicitly, not assumed. Treat this as a review-enforced practice
+rather than an automated gate unless the cost of maintaining a
+production-shaped seed for CI is worth paying.
 
-### Idempotency and repeated operations (R11)
+### Idempotency and repeated operations
 
-Operations that can be repeated, and what is true of each today:
+Any operation that can plausibly be retried, resubmitted, or re-run needs an
+explicit, *decided* answer to "what happens the second time", not an
+accidental one discovered later:
 
-| Operation | Repeat behaviour | Covered? |
-| --- | --- | --- |
-| Import the same archive twice | Creates a **second category**, deliberately. `manifest.items[].id` is carried for a future merge identity but nothing reads it that way. | Documented; assert it, so it stays a decision rather than a discovery |
-| Photo upload retry (`uploadWithRetry`, 3 attempts) | Retries the **same path**. Every Storage failure is treated as retryable, so a retry after a partially-succeeded upload hits an object it cannot overwrite — there is no update policy on `storage.objects` — and the photograph is skipped, leaving the written object to the sweep | Covered — `importCategory.test.ts`, with a fake that writes before failing |
-| `createShare` for an existing `(category, email)` | Refused by `category_shares_category_email_unique` — re-sharing is a no-op, not a second grant with a different expiry | Assert at integration level |
-| Revoke, then revoke again | Second delete affects zero rows | Trivially safe |
-| `delete_item_if_orphan` on a repeated statement | Set-based and guarded by `not exists`; safe to re-run | Covered by cascade tests |
-| The daily orphan sweep | 48h grace period is the whole idempotency story — it must never race an in-flight upload | See §12 |
+| Operation shape | What to decide and test |
+| --- | --- |
+| An import/create run twice with the same input | Does it create a duplicate, or is there an identity to detect the repeat? Whichever is chosen, assert it — so it stays a decision, not a discovery. |
+| A file upload retried after a partial failure | Does the retry target the same path? If the storage layer has no "overwrite" verb, a retry after a partial success can get stuck refusing to overwrite — decide the fallback (skip and flag, or a fresh path) and test it with a fake that fails partway through. |
+| Creating a grant/share that already exists | Should be a no-op or a clear conflict, never a silent duplicate with different terms. |
+| Revoking something already revoked | Should be safely idempotent — a second delete affecting zero rows. |
+| A cleanup/orphan-detection job re-run | Should be safe to run repeatedly without re-deleting or double-processing already-handled records — a set-based, existence-checked approach usually gets this for free. |
 
 ### What integration tests should *not* do
 
-Re-test pure logic that already has unit and mutation coverage. If pagination arithmetic is wrong, `paging.test.ts` says so in milliseconds; making the same point through a browser and a database costs a hundred times more and fails less clearly.
+Re-test pure logic that already has unit and mutation coverage. If
+pagination arithmetic is wrong, a unit test says so in milliseconds; making
+the same point through a browser and a real database costs orders of
+magnitude more and fails far less clearly.
 
 ---
 
 ## 9. E2E strategy
 
-Two suites with different jobs, and the split matters:
+Split into (at least) two suites with genuinely different jobs:
 
-**`e2e/public/`** — everything in it must hold for a **signed-out visitor**. That is what makes it safe to run against production after every deploy. It covers what only a real browser and a real deploy can show: the base path, the manifest and every icon it advertises, the service worker, theme and language resolution before hydration, the login page's layout on desktop and on a phone. Nothing signed-in may ever be added here.
+**Signed-out.** Everything in it must hold for an anonymous visitor — that's
+what makes it safe to run against production after every deploy. It's the
+right place for things only a real browser and a real deployed artifact can
+show: base path correctness, manifest/icons, anything that runs before the
+app framework hydrates, layout at more than one viewport. Nothing signed-in
+ever belongs here.
 
-**`e2e/signed-in/`** — the critical journeys, against a real stack. Keep it to journeys and to things that genuinely cross the whole system:
+**Signed-in.** The critical journeys, against a real stack. Keep this suite
+to whole journeys, not field-level detail:
 
-- Open the catalogue signed in; a category shows exactly its entries, newest first.
-- Create, rename and delete a category.
-- Add an entry, edit it in place, delete it; normalization visible as the database performed it.
-- Search narrows the grid on title, description, place and tag, and survives hostile characters (`%`, comma, quote, parenthesis).
-- Photograph an entry: stored as a full/thumb pair under the owner's prefix, still there on the next visit, removable, and gone when the entry goes.
-- The map draws a pin per placed entry and follows the search.
-- Export a category and get an archive containing the manifest, the CSV and the photograph.
-- Sign out, and the catalogue does not come back on reload.
+- Load the main view signed in and see the right data, correctly ordered.
+- Create, edit, and delete the core resource end to end.
+- Search/filter narrows results correctly, including hostile input
+  (wildcards, quotes, characters the query grammar treats specially).
+- A file attached to a resource persists, survives a reload, and is removed
+  when the resource is removed.
+- Any cross-cutting view (a map, a dashboard) reflects the same data the
+  list view does.
+- Export/import round-trips, if the app has one.
+- Signing out actually ends the session — no stale data on reload.
 
-That is roughly where the suite already sits. A UI change still ships with an E2E test — that is standing repository policy (CLAUDE.md) and this document does not relax it. What it does say is **where the rest of the assertions go**: the journey gets its browser case; the field-level details around it (disabled states, validation wording, focus order, every branch of a form) belong in component tests, where they run in milliseconds and fail legibly. Adding a *second* browser case for the same journey should feel expensive.
+That's roughly where a mature suite of this kind sits. A UI change still
+generally needs an E2E case somewhere — but the discipline this section adds
+is about **where the rest of the assertions go**: the journey gets its one
+browser case; every field-level detail around it (disabled states,
+validation wording, focus order, every branch of a form) belongs in
+component tests, where it runs in milliseconds and fails legibly. Adding a
+*second* browser case for the same journey should feel expensive, because it
+is.
 
-Two conventions worth keeping: mobile is a **target project** (Pixel 7), not a variation, because most layout faults in this project have been phone-only; and `expectTitles()` polls rather than reading the grid once, because search debounces and then waits on a round trip — an immediate assertion asserts on the previous answer.
+Two habits worth adopting directly: treat mobile as its own **target**, not
+a variant, if layout faults in the project tend to be viewport-specific; and
+**poll for expected state rather than reading once**, whenever the UI
+debounces or waits on a round trip — an immediate read asserts on the
+previous state, not the new one.
 
-### Accessibility (jsx-a11y + axe-core), and how the two layers divide labor
+### Accessibility, and how two automated layers divide labor
 
-The README claims the app is "built to work with a keyboard and a screen reader, not just a mouse." Two complementary, automated gates hold part of that claim; neither is proof of the whole of it (see the caveat below).
+Two complementary automated gates can cover part of an accessibility claim;
+neither proves the whole of it:
 
-- **Static (`eslint-plugin-jsx-a11y`, in `npm run lint`)** — catches what's wrong in the JSX itself, before anything renders: a missing `alt`, an invalid ARIA attribute, a `<label>` with nothing to point at. `eslint-config-next`'s `core-web-vitals` already pulls this plugin in transitively but only turns on 6 of its rules; `web/eslint.config.mjs` depends on the same plugin version directly for its `strict` rule set, scoped to `src/app/**/*.tsx` (not test files). `jsx-a11y/label-has-associated-control` is turned off — it crashes under this repo's `minimatch@10` override (see `docs/explanation/design-decisions.md`'s advisory section for why that override exists); axe's `label` rule covers the same ground at runtime instead. A handful of `onClick` handlers on non-interactive elements (`Backdrop`, the modal panel's click-outside guard, `ItemCard`'s drag-and-drop, `ModalImage`'s tap-to-close) are deliberate pointer-only conveniences layered on top of a fully keyboard-operable alternative (Escape, a real button, or a real `<label>`/`<input type="file">`) — each carries an inline `eslint-disable` line explaining the alternative, rather than a blanket exclusion.
-- **Runtime (`@axe-core/playwright`, in `e2e/axe.ts`, run from both `e2e/public/accessibility.spec.ts` and `e2e/signed-in/accessibility.spec.ts`)** — catches what only a rendered DOM reveals: computed color contrast, real focus order, the actual accessible-name/ARIA-state computation after the app's own JS has run. Scoped to WCAG 2.2 AA (`wcag2a`, `wcag2aa`, `wcag22aa`), and to representative states rather than every route: the sign-in screen (signed-out); the catalogue grid (which doubles as this app's entry "detail" view — there is no separate detail page), the map, search results, the no-results state, the entry form, and the sharing panel (signed-in). `image-alt`, `aria-valid-attr-value` and `aria-allowed-attr` are disabled in `axeOn()` since jsx-a11y already asserts those statically; duplicating them at the E2E level would just mean two failures for one bug.
-- **CI severity gate**: only `serious`/`critical` axe findings fail a test; `moderate`/`minor` findings are attached to the test report (`axe-violations.json`) for human triage rather than blocking, per #650 — many of them are ambiguous outside a real design review (contrast on a decorative element, a landmark preference).
-- **Not covered by either layer, and not claimed**: full WCAG compliance, screen-reader-specific behaviour (announcement timing, verbosity), and keyboard-only manual walkthroughs of dialogs and the map's custom controls. Passing both gates is evidence toward the README's claim, not proof of it — treat a clean run as "no known regression," not "verified accessible."
+- **Static** (a JSX/template accessibility linter) — catches what's visibly
+  wrong before anything renders: a missing alt text, invalid ARIA usage, a
+  label with nothing to point at.
+- **Runtime** (an axe-core-style checker driven through the real browser
+  suite) — catches what only a rendered DOM reveals: computed color
+  contrast, real focus order, the actual accessible-name computation after
+  the app's own JS has run. Scope it to representative states, not every
+  route — a form, a list view, an empty state, a modal — rather than trying
+  to hit every page.
+
+Whatever severity levels the runtime tool reports, decide explicitly which
+ones block CI and which are surfaced for human triage — treating every
+finding as equally blocking usually means the gate gets disabled the first
+time it catches something ambiguous (a contrast call on a decorative
+element, say).
+
+**Neither layer is proof of the whole claim.** Full compliance,
+screen-reader-specific behavior (announcement timing, verbosity), and
+keyboard-only manual walkthroughs of custom widgets are not covered by
+either. A clean run is "no known regression," not "verified accessible" —
+say that explicitly wherever the app's own claims reference accessibility.
 
 ---
 
 ## 10. Property-based testing strategy
 
-**Recommended, narrowly. Not currently present, and not urgent.**
+**Recommended, narrowly. Adopt only where it earns its dependency.**
 
-Most of this codebase's pure functions have small, enumerable input spaces that example-based tests already cover exhaustively, and mutation testing already proves those examples are load-bearing. Property-based testing earns its place only where an input space is genuinely adversarial and a property is easy to state:
+Most pure functions in a typical app of this shape have small, enumerable
+input spaces that example-based tests already cover exhaustively, and
+mutation testing already proves those examples are load-bearing.
+Property-based testing earns its place specifically where an input space is
+genuinely adversarial and a property is easy to state — a filter-builder
+that must never let user input escape its intended grammar, an
+encoding/decoding pair that must round-trip for *any* input, a date-packing
+function that must never produce a value below its valid range.
 
-| Candidate | Property |
-| --- | --- |
-| `buildSearchFilter` (`data/items.ts`) | For any string, the result parses as exactly four PostgREST conditions — no input can add a fifth or escape the quoting |
-| `csvCell` (`data/exportFormat.ts`) | For any string, parsing the cell back per RFC 4180 yields either the input or the input prefixed with one `'`, and the parsed value never begins with `=`, `+`, `-` or `@` |
-| `dosDateTime` (`data/zip.ts`) | For any date, the packed value decodes to a valid DOS date and never wraps below the 1980 epoch |
-| `clampPage` / `pageRange` (`ItemList/paging.ts`) | For any page and total, the resulting range is non-empty, within bounds, and inclusive-correct |
-
-Conditions if it is adopted: a **seeded, deterministic** runner (a recorded failing seed must reproduce); one dependency only (`fast-check`); properties live beside the existing example tests, they do not replace them; and it must stay inside the unit suite's time budget. Given this project's "every line has to earn its place" and "minimal dependencies" rules, adding the dependency needs a concrete reason — a near-miss in one of the functions above is a good one. Speculative adoption is not.
+If adopted: use a **seeded, deterministic** runner (a recorded failing seed
+must reproduce the failure); keep it to one dependency; write properties
+*beside* the existing example tests rather than replacing them; and keep it
+inside the unit suite's normal time budget. Given the "every dependency
+needs a concrete reason" principle most such projects hold themselves to,
+adding the library needs a real near-miss as its justification, not
+speculative adoption.
 
 ---
 
 ## 11. Mutation testing strategy
 
-**Required, and the scope is a settled decision** — see design-decisions.md. Do not widen it without reproducing the reasoning.
+**Required, deliberately scoped — not applied to the whole codebase.**
 
-- Scope is exactly `web/mutation-targets.mjs`, shared with `vitest.config.mts`'s per-file 100% coverage floors so the two lists cannot drift.
-- Every file in that list pairs pure exported logic with a `// Stryker disable all` + `/* v8 ignore */` region around the I/O beside it. Those regions are load-bearing: a score read without them is not the number you think it is.
-- Mutating the whole `src/app` tree means mutating JSX and Tailwind class strings — thousands of near-equivalent mutants, a score that means nothing, and a run nobody waits for.
-- Adding a file to the list means first drawing that line inside it. If a file cannot be split that way, the file is the problem.
-- An equivalent mutant (a check the type system needs but the runtime cannot reach) is marked `// Stryker disable next-line all` **with a comment saying why**. Never a test that cannot fail.
-- CI runs it on **every PR that touches web code** (gated by the `changes` job, §13), not just `main`, and unconditionally on `main` itself. Learning after the merge that a test asserts nothing is learning it too late.
+- Scope it to a short, explicit, maintained list of files — sharing that
+  same list with any per-file coverage floor, so the two can't drift apart.
+- Every file on that list should pair pure, exported logic with the I/O
+  sitting beside it clearly marked as excluded from mutation (with the
+  reason, if the tool supports inline exclusion regions) — those exclusions
+  are load-bearing; a score read without understanding them isn't the
+  number it looks like.
+- **Never mutate the rendering layer.** Mutating JSX/template strings and
+  class names produces thousands of near-equivalent mutants and a score
+  nobody can act on. If a file can't be split into "pure logic" and
+  "rendering", the file is the actual problem to fix, not the mutation
+  scope.
+- Run it on every change that touches the scoped files, not just on the
+  default branch — learning after merge that a test asserts nothing is
+  learning it too late.
 
-The score is enforced by `stryker.config.mjs`'s `break`, and the list it runs over is `web/mutation-targets.mjs`; both are the source of truth, so neither number is restated here. What matters is what happens to a survivor, and there are exactly two honest endings:
+What happens to a surviving mutant has exactly two honest endings:
 
-- **It is a missing assertion.** Kill it with a test that asserts real behaviour — usually a boundary nothing pinned, or an error path nothing exercised. Most survivors are this, including every one found the last time this document was checked against a real run.
-- **It is equivalent.** No input can distinguish the mutant from the original: a guard the type system needs but the runtime cannot reach, a fallback whose value nothing downstream can observe. Then either delete the code (an unreachable branch is dead code) or mark it `// Stryker disable next-line all` **with the reason in the comment**. Never a test that cannot fail.
+- **It's a missing assertion.** Kill it with a test that asserts real
+  behavior — usually a boundary nothing pinned, or an error path nothing
+  exercised.
+- **It's equivalent.** No input can distinguish the mutant from the
+  original — a guard the type system needs but the runtime can never reach,
+  a fallback whose value nothing downstream observes. Either delete the
+  code (an unreachable branch is dead code) or mark the exclusion **with the
+  reason written at the exclusion**. Never write a test that can't fail just
+  to make a mutant die.
 
-Telling those apart is the work, and it is worth doing per mutant rather than in bulk: the third possibility — that the mutant is alive because the code is more complicated than it needs to be — is the one that pays for the whole exercise.
+There's a third possibility worth actively looking for, not just the two
+above: the mutant survives because the code is more complicated than it
+needs to be. That's usually the one that pays for the whole exercise —
+finding it is the actual point of running mutation testing at all, not the
+score itself.
 
-A score below the `break` fails the job. A score above it but below 100% is not an automatic stop, and is also not a place to leave unexamined: the survivors are a list of questions nobody has answered yet.
+A score below a set threshold should fail the build. A score above the
+threshold but below 100% is not an automatic stop, and isn't a place to
+leave unexamined either — every survivor is a question nobody has answered
+yet.
 
 ---
 
@@ -493,174 +758,285 @@ A score below the `break` fails the job. A score above it but below 100% is not 
 
 ### Performance
 
-**No numeric gate is justified for the database/backend side.** There is no throughput SLA, collections are personal-scale, and a synthetic load number against a free-tier Supabase project would measure the tier, not the code.
+**No numeric gate is usually justified for the database/backend side**
+unless there's an actual throughput SLA. A synthetic load number against a
+personal-scale or low-traffic app mostly measures the hosting tier, not the
+code.
 
-What replaces it there is design-time discipline, per this repo's "measure, don't assume":
+What replaces a load-test number, per the "measure, don't assume" principle:
 
-- A new query that filters or sorts must name the index that serves it, or add one. Search is four `ILIKE` branches OR'd together and **each one needs its trigram index** — a single unindexed branch collapses the whole query onto a sequential scan.
-- A new bulk operation must be set-based. `delete_item_if_orphan()` was `FOR EACH ROW` and was a real O(n) fault at category-deletion scale; it is `FOR EACH STATEMENT` with a transition table now, and must stay that way.
-- Anything reading a potentially large set must page. `max_rows = 1000` truncates silently.
+- A new query that filters or sorts names the index that serves it, or adds
+  one. If a search feature is built from multiple OR'd conditions, **every
+  branch needs its own index** — one unindexed branch collapses the whole
+  query onto a sequential scan regardless of how well-indexed the others
+  are.
+- A new bulk operation is set-based, not row-by-row. A row-level trigger
+  that fires once per affected row is a real O(n) fault at scale; prefer a
+  statement-level trigger with a transition table where the platform
+  supports it.
+- Anything reading a potentially large set pages around the API layer's row
+  cap rather than assuming an unbounded response.
 
-`explain (analyze, buffers)` against the local stack is the tool. A PR that changes a hot query and says nothing about its plan is an incomplete PR.
+Inspect the real query plan for any new hot query — a PR that changes one
+and says nothing about its plan is incomplete.
 
-**The frontend bundle/page-load side does have a numeric gate now: Lighthouse CI** (`web/lighthouserc.signed-out.json`, `web/lighthouserc.signed-in.json`, `web/scripts/lighthouse.mjs`, `.github/workflows/ci.yml`'s `lighthouse` job), replacing the "watched by eye" line this section used to have for bundle size and render cost.
+**The frontend bundle/page-load side does benefit from a numeric gate**
+(a Lighthouse-style budget or equivalent), because unlike backend
+throughput, bundle size and render cost degrade gradually and invisibly
+without one. If adopted:
 
-- **Runs against the real production export**, never `next dev`: `scripts/lighthouse.mjs` builds the static export twice — once plain (signed out) and once with `NEXT_PUBLIC_DEMO_MODE=true` against a local Supabase stack (signed in, reusing the same anonymous-sign-in mechanism `scripts/demo.mjs` and `e2e:local` already use rather than a second way to get an authenticated session) — and serves each with `scripts/serve-export.mjs`, the same script the e2e suite serves the export with, under the same base path GitHub Pages uses.
-- **Two representative pages, not every route**: `/login/` signed out, and `/` (the catalogue grid) signed in. This app is a client-side SPA behind a static export — item detail, the map, and the sharing panel are states reached by interaction on the same `/` route, not separate URLs Lighthouse's plain navigation mode can drive; scripting a click-through user flow to reach them is future work if it turns out to matter, not something this change claims coverage for.
-- **Blocking category: `performance` only** (plus `best-practices`/`seo`, both currently perfect and cheap to keep that way). `settings.onlyCategories` leaves `accessibility` out of the Lighthouse run entirely, rather than asserting on it — Lighthouse's accessibility category is itself axe-core under the hood, and §9 already has a dedicated, more actionable axe-core/Playwright integration (`@axe-core/playwright`) for exactly that finding; asserting the same thing twice through two tools would mean one accessibility regression fails two unrelated-looking CI jobs.
-- **Median-of-three, not single-shot**: `numberOfRuns: 3` in both configs, so a single slow run (GC pause, a noisy neighbour on the runner) can't fail the build on its own — Lighthouse CI's own representative-run selection is what `assert` checks against.
-- **Thresholds set from a measured baseline, with real margin, not the plugin's generic numbers.** Signed-out: measured locally (`chrome-launcher` against Playwright's own Chromium, mobile emulation, simulated throttling — Lighthouse CI's default collection profile) across several repeated 3-run `lhci autorun` invocations of `/login/`, performance scored 0.82–0.93 and LCP landed around 3.0–3.2s each time; `categories:performance` is `0.8` and `largest-contentful-paint` is `5000`ms, a deliberate margin below even the lowest clean measurement rather than the median. Signed-in: this sandbox has no working Docker daemon, so the first real numbers came from this change's own CI run rather than local measurement — `/` scored performance 0.72–0.73 (all three runs) against an initial `0.75` guess, and CLS landed at a **consistent** 0.347 (identical to three decimal places across all three runs, i.e. deterministic, not noise) against an initial `0.1` guess. Both were widened in response, to `0.65` and `0.4`, with margin above/below the measured value rather than set to it exactly.
-- **The CLS finding is real and understood, not paved over.** A brand-new demo-mode account has zero categories, so the very first render after sign-in goes `ItemListSkeleton` (`GridSkeleton`'s six full card placeholders, two desktop rows) → the "no categories yet" empty state (`page.tsx`, a few lines of centered text) once `useCatalogue` resolves — a large, one-time height collapse that reproduces every time because a fresh demo sign-in is exactly what `scripts/lighthouse.mjs` drives. It is not representative of an established user's session (real accounts have categories already), and fixing the skeleton/empty-state size mismatch is real, separate UX work this PR doesn't attempt blind, without a browser to verify a fix in. The widened threshold reflects the actual, deterministic cost of testing a cold-start empty account, not a rubber-stamped gate — revisit this specific measurement first if that skeleton is ever reworked, since a real fix should tighten it back down, not leave it loose forever.
-- **No external service.** `upload.target: "filesystem"` (per config) writes reports to `web/lighthouse-reports/`, uploaded as a CI artifact (`actions/upload-artifact`) — nothing is sent to Lighthouse CI's hosted server or Google's temporary-public-storage target.
-- **Placement: CI-only**, not `prek` — building the export twice, serving it, and driving headless Chrome against it is the same cost class as the e2e suite, already CI-only for the same reason. Gated on `web` changing (the `changes` job), matching `build_and_test`/`mutation_test`'s gate rather than `e2e_local_stack`'s: this measures the web bundle and page-load cost, not database behaviour, even though the signed-in half needs the local stack to build against.
+- Run it against the **real production build**, never a dev server — a dev
+  build's performance characteristics don't resemble what ships.
+- Pick a small number of representative pages/states, not every route,
+  especially if the app is a single-page client behind a static export
+  where most "pages" are really client-side states.
+- Gate on the performance category specifically, and leave accessibility to
+  the dedicated accessibility tooling in §9 rather than asserting the same
+  finding through two different tools — one regression shouldn't fail two
+  unrelated-looking jobs.
+- Take a median of several runs, not a single shot — a single slow run from
+  a noisy CI neighbor shouldn't fail the build.
+- **Set thresholds from a measured baseline, with real margin below/above
+  it** — never from a tool's generic defaults, and never set exactly to the
+  measured value (that has zero margin for measurement noise). If a
+  measurement reveals something genuinely worth understanding (e.g. a
+  first-run, empty-state layout shift that a real user's established session
+  would never see), write down *why* the threshold is where it is rather
+  than silently widening it to make the build pass — the threshold should be
+  loose because the underlying case is real and understood, not because it
+  was easier than investigating.
 
 ### Resilience
 
-Failure injection belongs at unit level, driven through the injected fakes these modules were designed for:
+Failure injection belongs mostly at unit level, driven through the fakes
+those modules should already be designed to accept:
 
-- Export: a failed signed-URL batch, a failed photo fetch, retry with backoff, skip-and-continue, and the resulting `skippedPhotoCount`.
-- Import: a photo missing from the archive, an upload that fails all three attempts, a thumbnail that fails while the full size succeeds, and cancellation via `AbortSignal`.
-- `runPool`: first rejection stops further pickup, in-flight work settles, the error is rethrown once.
-- Storage: a failed thumbnail upload leaves `path_thumb` null and the entry intact.
-- Delete: bytes first, row second — always. Reversing the order orphans files with no way to find them.
+- Anything that batches network calls (an export, a bulk fetch): a failed
+  sub-call, retry-with-backoff behavior, skip-and-continue behavior, and
+  whatever "N items skipped" result that produces.
+- Anything that imports/writes in bulk: a missing input, an upload that
+  fails all its retries, a partial multi-write failure (§6), and
+  cancellation mid-operation.
+- Any bounded concurrency pool: the first rejection stops further pickup,
+  in-flight work still settles, the error surfaces exactly once.
+- Delete ordering: whichever order is safe for the resource type, verified
+  and never silently reversed.
 
-Injecting failures into the real stack is **optional** and mostly not worth it; the interesting branches are all reachable with a fake.
+Injecting failures into the real stack is optional and usually not worth
+it once the branches above are reachable with a fake — the interesting
+logic rarely depends on the real network actually failing in a specific
+way.
 
-### The orphan-sweep workflow (R14)
+### Destructive scheduled jobs (the highest-risk logic in the whole system)
 
-`cleanup-orphaned-photos.yml` is the highest-privilege logic in the repository: it fetches a `service_role` key and issues a bulk Storage delete. Its failure mode is irreversible deletion of live photographs.
+If the project has any scheduled job holding elevated credentials and doing
+irreversible bulk deletes — a storage-cleanup sweep is the canonical
+example — treat its query as the single most security-critical piece of SQL
+in the project, more so than most RLS policies, because its failure mode is
+silent, irreversible, and touches live user data. It's rarely worth building
+a test harness for bash-in-YAML, but three cheap mitigations are almost
+always worth having:
 
-It is still not worth building a harness for a bash script in YAML, and the three cheap things are now in place:
+1. **Review it like a schema change**, every time its query changes, with
+   the same scrutiny a new RLS policy gets.
+2. **A dry-run mode that lists what it *would* delete and exits**, ideally
+   before any elevated credential is even fetched — so a dry run never puts
+   that credential on the runner at all. Default manual invocations to dry
+   run; let only the real schedule run for real.
+3. **A grace period between "looks orphaned" and "eligible for deletion"**,
+   long enough that a slow or partially-failed write can never fall inside
+   the window. This is usually the single most important invariant in the
+   whole query, and the easiest one for a future edit to accidentally shrink
+   while "simplifying."
 
-1. **Reviewed as a database change.** CLAUDE.md's database guardrail names this file, so a change to its query carries the same expectations as a migration.
-2. **A dry run.** `workflow_dispatch` takes a `dry_run` input that lists exactly what the sweep *would* delete and exits — before the `service_role` key is even fetched, so a dry run never puts that credential on the runner. It defaults to **true**, so a human clicking "Run workflow" gets the harmless answer unless they ask for the other one; a scheduled run sends no inputs and sweeps normally. This is the one piece of real verification available against the production database, and a change to the query should go through it first.
-3. **The invariants are named as rules** in CLAUDE.md's database guardrail, because the risk is a future edit tidying them away.
+Three specific lessons worth carrying into any project of this shape,
+generalized from real incidents of exactly this kind:
 
-What each one prevents — the part a reviewer needs, and the part the rule itself does not carry:
-
-- **Both `path_full` and `path_thumb`.** A photograph is two Storage objects, `<uuid>.webp` and `<uuid>.thumb.webp`, held in one `images` row. Matching only `path_full` classes every thumbnail in the bucket as orphaned and deletes it. This is not hypothetical: it is what a straightforward reading of an earlier fix produced, and it was caught by executing the predicate rather than reading it.
-- **No cast of a path to `uuid`.** A malformed path fails a cast outright and aborts the whole query rather than simply not matching — the same reasoning as `storage_item_id()` in an RLS predicate. Comparing text to text cannot raise.
-- **The 48h grace period.** The only thing separating "orphaned" from "mid-upload", since the upload path writes both objects before inserting the row that names them. If the sweep ever needs to run more aggressively, that is a design conversation, not a parameter tweak.
-
-The predicate asks "does any `images` row reference this object", which is what orphaned actually means. It previously asked "does an item with this id exist", parsed out of the path — a proxy that answered wrongly in both directions: it kept an object whose path merely names a live item, and it could never find one whose row insert failed after the bytes landed.
-
-Verified against a real database, with the cases that distinguish the three readings: an object no row references but whose item still exists (**collected**), an object inside the grace period (**kept**), an object referenced as `path_full` (**kept**), one referenced as `path_thumb` (**kept** — the case that fails under a `path_full`-only predicate), a path whose second segment is not a uuid (**collected, without raising**), and an object in another bucket (**untouched**). The plan is two anti-joins, each on its own unique index.
+- **A cleanup predicate must match every derived artifact, not just the
+  primary one.** If one logical record produces more than one storage
+  object (a full-size image and a thumbnail, say), matching only the
+  primary path classifies every *secondary* object as orphaned and deletes
+  it. This is not a hypothetical edge case — it's what a plausible-looking
+  first draft of such a query naturally produces, and it's caught only by
+  actually executing the predicate against real data, not by reading it.
+- **Never cast an untrusted or malformed identifier into a typed column
+  inside the query.** A cast that fails aborts the *entire* query rather
+  than simply not matching that one row — comparing as text, or otherwise
+  failing closed to "no match" rather than raising, is the safe default for
+  anything parsed out of a path or a user-controlled string.
+- **The predicate should ask "does anything still reference this object",
+  not a proxy for that question** (like "does a record with this parsed-out
+  id still exist"). A proxy answers wrong in both directions: it can keep
+  an object that merely shares an id with something unrelated, and it can
+  never find an object whose owning record failed to get created after the
+  bytes were already written.
 
 ---
 
 ## 13. CI/CD execution strategy
 
-### Pull request — the gate that matters
+### The general shape
 
-`prek` runs first and gates everything (file hygiene, `typos`, `zizmor`, `shellcheck`, `markdownlint`, `sqlfluff-lint`). It is the fastest check, so a bad JSON file or a stray key fails before spending minutes on browsers and a database. `prek` is unconditional — file hygiene and secret scanning have to see every changed file regardless of directory, and `sqlfluff-lint` here is a fixed ~2s over the whole (small) migrations/pgTAP set, not worth gating.
+1. **Fast hygiene first.** File hygiene, secret scanning, formatting, and
+   any check on the order of a couple of seconds should run first and gate
+   everything else — a bad config file should fail before minutes are spent
+   spinning up browsers and databases.
+2. **Path-filter the heavier jobs on pull requests.** A database/integration
+   job only needs to run when database-adjacent files changed; a
+   frontend-build job only when frontend files changed. A job skipped by its
+   own condition should report as passing, not failing, so this never
+   weakens what branch protection actually requires.
+3. **Run the full, unconditional set on whatever branch actually deploys**,
+   regardless of what that specific push touched. If the default branch
+   deploys straight to production, a squash-merge that happens to bundle
+   unrelated changes together must never get a job skipped right before it
+   ships. Path-filtering is a PR-time speedup, not a release-time one.
+4. **Order the deploy pipeline so a failure fails safe.** Typically: migrate
+   the database, then build, then deploy, then smoke-test — in that order,
+   with each step depending on the previous one succeeding — so a rejected
+   migration leaves the previous bundle serving the previous (unchanged)
+   schema, rather than a half-migrated database serving a bundle that
+   expects the new one.
+5. **Retry only the deploy-target smoke test, and only there.** That's the
+   one place a retry distinguishes a genuinely broken deploy from a dropped
+   connection to a cold-starting target. Everywhere else, `retries: 0` — a
+   flake anywhere else is a defect, not weather (§3 principle 5).
+6. **No staging means the PR gate has to be heavier, not lighter.** If
+   merging to the default branch *is* the release, with no environment in
+   between to catch what CI missed, that's the argument for running the full
+   authorization/integration suite on every relevant PR rather than treating
+   it as optional or nightly-only.
 
-A `changes` job runs alongside `prek` (`dorny/paths-filter` against the PR's changed files) and decides which of the three heavier jobs below actually run:
+### Scheduled jobs
 
-| Job | Gated on | What it proves |
-| --- | --- | --- |
-| `build_and_test` | `web/**` or `.github/workflows/ci.yml` changed | The export builds; types, format and lint hold; unit suite passes with coverage floors; the built export works in a real browser under the real base path, desktop and phone |
-| `e2e_local_stack` | the above, **or** `supabase/migrations/**`, `supabase/tests/database/**`, or `.sqlfluff` changed | Every migration applies to a fresh Postgres; the pgTAP suite (`supabase/tests/database/`) passes against it; `database.types.ts` matches the schema; the signed-in journeys and **the whole authorization model** hold against a real stack |
-| `mutation_test` | same as `build_and_test` | The unit assertions on high-risk pure logic are actually load-bearing |
-| `opengrep` | same as `e2e_local_stack` (its scanned tree spans `web/` and `supabase/`) | Semgrep's community rule pack finds no ERROR-severity finding in the scanned tree (WARNING/INFO are report-only); every finding lands in code scanning regardless of job status |
-| `lighthouse` | same as `build_and_test` | Signed-out and signed-in pages of the real production export hold their measured performance budget (§12); accessibility is deliberately not asserted here (§9 covers it) |
-| `zap_baseline` | same as `build_and_test` | A ZAP baseline (passive-only) scan of the signed-out surface finds no `FAIL`-level finding per `.zap/rules.tsv`; WARN-level findings are report-only. Complements, never substitutes for, `e2e_local_stack`'s authorization coverage — see "Dynamic scanning (OWASP ZAP baseline)" in §6 |
-
-`e2e_local_stack` is gated on the union of both path sets rather than split into two jobs, because it is the one place the schema/pgTAP side and the signed-in Playwright journeys share a single running stack — either side changing can break it, and splitting it would mean starting that stack twice. The order within `build_and_test` is not decoration: `next build` generates `next-env.d.ts`, which `tsc` and ESLint need on a clean checkout.
-
-A job skipped by its `if:` reports as a passing, not failing, check, so this does not weaken branch protection — a docs-only or SQL-only PR simply doesn't need `build_and_test`/`mutation_test` to have run. It does mean a PR that only touched `supabase/` never runs the unit suite or mutation testing, which is deliberately safe: nothing in `web/mutation-targets.mjs` or the unit suite can be affected by SQL that isn't reachable from JS.
-
-### Main
-
-The one asymmetry from the PR set: the `changes` job forces `web` and `sql` both `true` unconditionally on a push to `main`, regardless of what actually changed in that push. `main` is the branch `pages-deploy.yml`'s `migrate` job deploys straight from, so the pre-deploy run stays the full, unconditional gate this repo has always had — a squash-merge landing unrelated changes together must never get a job skipped right before it deploys. PRs get the path-filtered speedup; the actual release gate does not. Plus the mutation dashboard publish so the badge tracks one branch.
-
-### Deploy to production (also `main`)
-
-`migrate` → `build` → `deploy` → `smoke_test`. The database is migrated **before** the bundle that depends on it, and nothing downstream runs if the migration fails, so a rejected migration leaves the old bundle serving the old schema. `smoke_test` then runs the signed-out suite against the **live URL**, with retries enabled there and only there: prerendering runs in Node with real env vars and can mask code that breaks once it is only a bundle in a browser.
-
-### Scheduled
-
-- Daily: the orphaned-photograph sweep (an operation, not a test).
-- Daily: `keepalive()` (a mitigation, not a test).
-- Weekly: Dependabot, grouped, with a 7-day cooldown. Auto-merge is restricted to **patch-level `direct:development` bumps** — a devDependency can reach the CI runner, a runtime dependency reaches every signed-in user's browser. Anything runtime waits for a human. That restriction is a security control; do not widen it.
-
-### Pre-release
-
-There is no release train and no staging. Merging to `main` *is* the release. That is a deliberate consequence of the deployment model, and it is why the PR gate is as heavy as it is.
-
-### Production
-
-`smoke_test` post-deploy, and nothing else. Nothing signed-in ever points at production; no test writes to it.
+Typical candidates: a destructive cleanup sweep (§12, dry-run by default),
+an availability keep-alive/ping (a mitigation, not a test), and dependency
+updates. For dependency auto-merge specifically: restrict it to
+patch-level, dev-only dependency bumps if anything auto-merges at all — a
+dev dependency reaches the CI runner; a runtime dependency reaches every
+user's browser. That asymmetry is a security control, not a convenience
+setting, and shouldn't be widened casually.
 
 ---
 
 ## 14. Quality gates
 
-Every number below has a reason. A gate without one is noise.
+Every gate needs a stated reason. A gate without one is noise, and tends to
+get silently loosened the first time it's inconvenient.
 
-| Gate | Value | Why this value |
-| --- | --- | --- |
-| Global coverage floor | The values in `vitest.config.mts` | A **floor**, set by hand a little below what the suite actually achieves, with enough margin that CI's measurement (marginally below local, on a pinned Node) does not flap. It exists to catch a regression, not to chase a target — but it is raised when the suite genuinely improves, and never lowered. |
-| `autoUpdate` | `false`, permanently | It was `true`. It wrote the local measurement back after every run, so a green local run kept producing a red PR. Raise by hand when coverage genuinely improves. |
-| Per-file coverage floor | 100% on every file in `mutation-targets.mjs` except those listed in `NO_COVERAGE_FLOOR` | A module earns its place on that list by being reachable from tests without faking the world; once it is there, 100% is reachable without contortion, and anything less means a branch nobody thought about. |
-| Mutation score | The thresholds in `stryker.config.mjs` | The break sits below 100 so a genuinely equivalent mutant cannot block an unrelated PR. Anything under 100 is still a list of unanswered questions — see §11 for the two endings a survivor is allowed to have. |
-| Coverage/mutation thresholds, direction | **Never lowered** | A threshold lowered to make CI pass converts a design problem into a permanently weaker gate. If a legitimate change makes one unreachable, redesign or raise it with the user. |
-| Test pass rate | 100%, `retries: 0` except the deployed target | A flake is a defect. The deployed run is the one place where a retry genuinely distinguishes a broken deploy from a dropped connection. |
-| Authorization tests | The `rls.spec.ts` suite must pass; a migration touching policies/grants/ownership triggers must ship a matching assertion in the same PR | The only authorization boundary in the product. See §7. |
-| Schema contract | The `database.types.ts` regenerate-and-diff must be clean | Drift here surfaces as runtime `PGRST204`s after deploy, i.e. in production. |
-| i18n parity | Every `t()` key present in both `de.json` and `en.json` | Executable (`i18n/parity.test.ts`) — but add both languages in the same change rather than relying on it to catch the omission afterwards. |
-| Deployment | `smoke_test` green against the live origin | The only check that sees what users see. |
-| Performance (database) | No numeric gate; an index/plan justification for any new filtering or sorting query | See §12. A number nobody can act on is worse than a rule reviewers can apply. |
-| Performance (frontend) | Lighthouse CI, thresholds in `web/lighthouserc.signed-out.json`/`.signed-in.json` | See §12. Set from a measured baseline with margin, median of 3 runs, `performance` category only — accessibility is left to axe-core/jsx-a11y (§9) rather than double-gated. |
-| General-purpose SAST | Zero ERROR-severity Opengrep findings; WARNING/INFO report-only | See §6. Matches every other tool's split here between what blocks and what's surfaced for human triage. |
-| New UI | Needs an E2E test | Standing repository policy, unchanged. §9 adds only *where*: the right suite (`public/` must hold signed-out), one journey case, and the field-level detail in component tests alongside it. |
-| New functional behaviour | Needs a unit test | Already repository policy. If the behaviour is authorization, a unit test does **not** discharge it. |
-| Suppressions (`v8 ignore`, `Stryker disable`, `.skip`, ESLint/TS) | Only with a comment explaining why, and never to make a failing check pass before understanding it | The existing `Stryker disable` regions are a deliberate, documented pattern; a new one needs the same justification. |
+| Gate | Generic guidance |
+| --- | --- |
+| Coverage floor | A **floor**, set from what the suite actually achieves with a little margin so CI's measurement (often marginally different from local) doesn't flap — not a target to chase. Raise it by hand when the suite genuinely improves; a small number of files may reasonably carry a 100% floor once they're actually reachable from tests without faking the world. |
+| Auto-ratcheting coverage | **Don't.** A tool that rewrites the local floor after every run means a green local run can still produce a red PR the moment someone else's coverage differs slightly. Raise floors by hand. |
+| Mutation score | A break threshold below 100%, so a genuinely equivalent mutant can't block an unrelated change — but every survivor above the break is still an open question (§11), not a pass. |
+| Direction of any threshold | **Never lowered** to make a build pass. A threshold lowered that way converts a design problem into a permanently weaker gate. If a legitimate change makes a threshold genuinely unreachable, that's a signal to redesign, or to raise the question explicitly — not to quietly relax the gate. |
+| Test pass rate | 100%, `retries: 0` except the one deploy-target boundary named in §13. |
+| Authorization tests | Must pass, and a change touching policies/grants/ownership-affecting triggers must ship a matching case in the same change. See §7. |
+| Schema contract | The generated-types-vs-schema diff must be clean — drift here surfaces as production runtime errors, not CI failures, if it's allowed through. |
+| Deployment | The post-deploy smoke suite green against the **live** origin — the only check that sees what users actually see. |
+| Performance | Per §12: no numeric backend gate without a real SLA; a frontend budget set from a measured baseline with real margin, not a tool's generic defaults. |
+| Static analysis (SAST, etc.) | Graduated by severity — block on what the tool itself calls a real finding, surface the rest for human triage, per §6. |
+| Suppressions of any kind (coverage ignores, mutation exclusions, skipped tests, lint/type suppressions) | Only with a comment explaining *why*, added only after understanding the failure, never as a first response to a red check. |
+| New UI | Needs an E2E case for the journey, plus component-level coverage for the field-level detail — not one E2E case per field. |
+| New functional behavior | Needs a unit test. If the behavior is authorization, a unit test does **not** discharge that — see §7. |
 
 ---
 
 ## 15. Test anti-patterns
 
-Specific to this repository. Each of these has either happened here or is a step away from something that did.
+Watch for these specifically in this architecture — each one either fails
+silently or looks like flake when it's actually a defect.
 
-1. **Treating a client-side check as an authorization test.** "The delete button is hidden for a viewer" is a UX assertion. RLS is the check. A green component test here provides zero security confidence.
-2. **Mocking supabase-js and calling the result an integration test.** It tests our call shape. Policies, triggers, constraints and PostgREST behaviour are all on the far side of the mock.
-3. **Seeding fixtures with `service_role`.** It bypasses RLS and can construct states the app cannot reach. The service key creates users; that is all.
-4. **Testing one mirrored surface and assuming the other.** `images` and `storage.objects` have separate policies and separate join paths.
-5. **Sharing a seeded category between parallel writing specs.** One spec creating an entry while another counts them fails both, at random, and looks like flake.
-6. **Leaving probe rows or objects behind on a failed assertion.** Clean up in `finally`.
-7. **Putting a signed-in test in `e2e/public/`.** That suite runs against **production** after every deploy. Everything in it must hold for a signed-out visitor.
-8. **Retries or `waitForTimeout` to paper over a flake.** Search debounces and then round-trips; poll for the expected state (`expectTitles`) instead of sleeping, and fix the race rather than retrying it.
-9. **Re-testing pure logic through the browser.** Pagination windows, escaping and clamping are unit-tested and mutation-scored. A second copy at E2E level costs orders of magnitude more and fails less clearly.
-10. **Lowering a threshold, or reaching for `v8 ignore` / `Stryker disable` / `.skip`, to get to green.** Understand the failure first; the suppression is almost never the answer, and when it is, it needs a comment.
-11. **Test gaming.** A test written to touch a line, a branch added to dodge a mutant, a file excluded to avoid dealing with it. A green metric that does not correspond to real confidence is worse than a documented gap.
-12. **Widening Stryker's scope to the component tree.** Mutating JSX and Tailwind strings produces thousands of meaningless mutants and a score nobody can act on.
-13. **Testing a SQL-side storage cleanup trigger.** It cannot work — Supabase's `prevent-direct-deletes` guard is statement-level and raises even when the delete matches nothing. Writing a test for one means writing a test for a design that has already been tried and reverted.
-14. **Running any test, migration or `db push` against the hosted project.** Local stack only — CLAUDE.md's database guardrail is the rule, and there is no staging behind it to absorb a mistake.
-15. **Asserting `expect(error ?? {}).toBeTruthy()` or similar.** An object is always truthy; assert the error code (`42501`) and the status. This exact trap is already called out in `rls.spec.ts`.
-16. **Adding an E2E case for a field-level detail.** Journeys, not fields.
+1. **Treating a client-side check as an authorization test.** "The button is
+   hidden for this role" is a UX assertion. The policy is the real check. A
+   green component test here provides zero security confidence.
+2. **Mocking the database client and calling the result an integration
+   test.** It tests your own call shape. Policies, triggers, constraints,
+   and the real API layer are all on the far side of the mock.
+3. **Seeding fixtures with an elevated/service-role credential.** It
+   bypasses RLS and can construct states the app itself can never reach.
+   That credential should create test identities and nothing else.
+4. **Testing one mirrored authorization surface and assuming the other.**
+   A record's database row and its storage object(s) have separate
+   policies and separate join logic; a test against one proves nothing
+   about the other.
+5. **Sharing one seeded resource between parallel writing specs.** One spec
+   writing while another is counting fails both, at random, and looks
+   exactly like flake.
+6. **Leaving probe records or probe files behind on a failed assertion.**
+   Clean up in `finally` — later specs may be counting.
+7. **Putting a signed-in test in the signed-out suite.** If that suite runs
+   against production post-deploy, everything in it must hold for an
+   anonymous visitor.
+8. **Retries or arbitrary sleeps to paper over a flake.** Poll for the
+   expected state instead of waiting a fixed time, and fix the underlying
+   race rather than retrying past it.
+9. **Re-testing pure logic through the browser.** A second, slower copy of
+   an already unit-tested and mutation-scored assertion costs orders of
+   magnitude more and fails far less clearly.
+10. **Lowering a threshold, or reaching for a suppression, to get to
+    green.** Understand the failure first. A suppression is almost never
+    the right answer, and when it genuinely is, it needs a comment
+    explaining why.
+11. **Test gaming.** A test written to touch a line, a branch added
+    specifically to dodge a mutant, a file excluded just to avoid dealing
+    with it. A green metric that doesn't correspond to real confidence is
+    worse than a documented gap.
+12. **Widening a mutation-testing scope to the rendering layer.** Mutating
+    template/JSX strings produces thousands of meaningless mutants and a
+    score nobody can act on.
+13. **Writing a test for a platform behavior the platform itself has
+    already ruled out.** If a managed backend deliberately doesn't support
+    some capability (a specific trigger location, a specific storage
+    operation) for its own architectural reasons, a test asserting the
+    unsupported behavior "works" is testing a design that was already tried
+    and reverted upstream — check the platform's own constraints before
+    writing the test, not after it fails mysteriously.
+14. **Running any test, migration, or destructive operation against the
+    real hosted project.** Local stack only, always — there is no staging
+    behind production to absorb a mistake.
+15. **Asserting a weak truthiness check on an error object instead of its
+    actual code/status.** An object is almost always truthy; assert the
+    specific error code and status the failure mode actually produces.
+16. **Adding an E2E case for a field-level detail.** Journeys belong at
+    E2E level; fields belong in component tests.
 
 ---
 
-## 16. Evolution and maintenance of the strategy
+## 16. Adapting and maintaining this playbook
 
-This document is expected to change. It is wrong the moment the architecture moves and nobody updates it.
+### When copying this into a new project
 
-**Update it when:**
+1. Fill in §2's system-context table and trust-boundary list with the
+   project's real pieces.
+2. Build §4's risk table with the project's real tables, roles, and
+   operations — rank by real cost, not by copying the example rows verbatim.
+3. Fill in §5's "who owns which behavior" table once the codebase exists
+   enough to have real modules to assign.
+4. Pick the actual tool stack for §6's four static-analysis layers and §11's
+   mutation scope, and measure real thresholds for §12 and §14 — don't carry
+   over numbers from a different project's measurements.
+5. Write the concrete instantiation of all of the above into the project's
+   own docs (an architecture doc, a design-decisions doc, CI config, and
+   whatever pre-merge checklist the project enforces) — not into a copy of
+   this file. Keep this file itself free of project-specific facts so it
+   stays reusable the next time.
 
-- A server-side execution surface appears (an Edge Function, a route handler, anything that is not a static file). That would be the first place authorization could live outside Postgres, and it changes §2, §6 and §7.
-- A new trust boundary appears — another role, another grant shape, a second data source, or (explicitly) anonymous share links.
-- A test layer's verdict in §5 changes, in either direction. Record the reasoning, not just the new verdict.
-- A quality gate moves. Every number in §14 carries its justification; a change to the number is a change to the justification.
-- A gap named here is closed. Delete the gap; do not leave the document describing a hole that no longer exists.
-- An incident happens. A production fault that the estate did not catch is the single best input this document gets — add the risk to §4 and name the level that should have caught it.
+### When to update it
 
-**Review it** when migrations are next squashed, and whenever `docs/reference/architecture.md` is materially revised — those are the two moments this file is most likely to have quietly gone stale.
-
-**Currently open, from this analysis:**
-
-| Gap | Section | Priority |
-| --- | --- | --- |
-| Migrations are only ever exercised against an empty database | §8 | Medium — contained by `needs: migrate`, but discovered in production |
-| Surviving mutants, wherever the current run reports them, are questions nobody has answered | §11 | Low while the score holds above the break — but the answer belongs next to the code, not here |
-| Property-based testing not adopted for the escaping and packing functions | §10 | Optional, dependency cost is real |
-| The rendering layer is deliberately outside the mutation list, so its assertions are gated by coverage alone | §11 | Accepted — revisit only if a rendering fault ever survives the component suite |
+- A server-side execution surface appears where there was none — this
+  invalidates the central assumption in §0 and needs rethinking, not
+  patching.
+- A new trust boundary appears — another role, another grant shape, a new
+  external data source, or a capability (like anonymous access) that was
+  previously ruled out.
+- A layer's verdict in §5 changes, in either direction — record the
+  reasoning, not just the new verdict.
+- A quality gate moves. Every entry in §14 should carry its justification;
+  a changed number is a changed justification, not just a changed number.
+- A named gap gets closed. Delete the gap; don't leave a strategy document
+  describing a hole that no longer exists.
+- **An incident happens.** A real fault that the estate didn't catch is the
+  single best input this kind of document ever gets — add it to the risk
+  model and name the level that should have caught it, in the project's own
+  instantiation of §4.

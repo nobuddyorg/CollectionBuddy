@@ -73,11 +73,14 @@ select ok(
 )
 from unnest(array['categories', 'items', 'item_categories', 'category_shares', 'images']) as t;
 
--- The historical gap TEST_STRATEGY.md names by name: "one table was
--- missing from that [revoke] list for a while, and what was actually
--- refusing it was a missing EXECUTE on a helper function... a denial
--- nobody had asserted". Assert both halves directly so neither can drift
--- back to being an accident.
+-- A real historical gap in this project: one table was missing from that
+-- revoke list for a while, and what was actually refusing anon in its
+-- place was a missing EXECUTE on a helper function -- a denial nobody had
+-- asserted, holding for a reason nobody had written down (see
+-- TEST_STRATEGY.md trust boundary 3: both the policy denial and the
+-- revoked-grant denial need asserting independently, since a project can
+-- have one covered while believing both are). Assert both halves directly
+-- so neither can drift back to being an accident.
 select ok(
   not has_function_privilege('anon', 'public.has_category_write_access(uuid)', 'EXECUTE'),
   'anon has no EXECUTE on has_category_write_access'
@@ -136,7 +139,8 @@ select ok(
 
 -- category_shares_category_email_unique: re-sharing the same (category,
 -- email) pair is refused outright, not a second grant with its own expiry
--- (TEST_STRATEGY.md R11).
+-- (TEST_STRATEGY.md §8's idempotency table, "creating a grant/share that
+-- already exists").
 insert into public.category_shares (category_id, invited_email)
 values (:'category_id'::uuid, 'schema-test-grantee@collectionbuddy.test');
 

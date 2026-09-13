@@ -31,8 +31,9 @@ root is the same thing.
 
 A fifth job, `changes`, decides whether `build_and_test`, `mutation_test`, and
 `e2e_local_stack` run at all: on a PR, each is skipped unless the paths it
-actually covers changed (see [TEST_STRATEGY.md](../../TEST_STRATEGY.md) §13
-for exactly which). Don't be surprised to see one of them missing on a
+actually covers changed — see `.github/workflows/ci.yml`'s `changes` job for
+exactly which, and [TEST_STRATEGY.md](../../TEST_STRATEGY.md) §13 for the
+general rationale. Don't be surprised to see one of them missing on a
 docs-only or SQL-only PR — the local commands above still all run and are
 still worth running before opening one, since nothing about the local
 pre-PR checklist is conditional.

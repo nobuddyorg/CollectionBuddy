@@ -19,25 +19,39 @@ and say so instead of working around it.
 
 ### 1. TEST_STRATEGY.md is mandatory, not advisory
 
-[TEST_STRATEGY.md](TEST_STRATEGY.md) defines this repository's testing
-strategy, its risk model, and its quality gates. **Read it at the start of
-every task** — implementation, refactor, bug fix, or test work alike — and
-follow it. It is not a reference to reach for once something looks
-test-shaped; it is the standing instruction for how work here gets verified.
+[TEST_STRATEGY.md](TEST_STRATEGY.md) is a **generic, portable testing
+playbook** — deliberately project-agnostic, written so it can be copied into
+any project built on "a static/serverless frontend with no server of its
+own, sitting on a Postgres database whose RLS policies are the only
+authorization boundary" (which is exactly this app's shape). It carries no
+CollectionBuddy-specific facts on purpose. **Read it at the start of every
+task** — implementation, refactor, bug fix, or test work alike — and follow
+its methodology. It is not a reference to reach for once something looks
+test-shaped; it is the standing instruction for *how* work here gets
+verified.
 
-It decides these, and you do not re-decide them per task:
+It decides the general approach, and you do not re-decide these per task:
 
-- which layer a given behavior is tested at (see its ownership table),
-- what may be mocked, and what has to be a real Postgres, Storage or browser,
-- which gates a change clears before it counts as done,
-- which testing approaches are deliberately *not* used here, and why.
+- which layer a given kind of behavior is tested at, and why (§5),
+- what may be mocked, and what has to be a real Postgres, Storage or browser
+  (§6),
+- the rules authorization tests must follow (§7),
+- which testing approaches are deliberately *not* used for this class of app,
+  and why (throughout).
 
-Disagreeing with it is fine; departing from it silently is not. If a task
-looks like it needs something the strategy rules out, say so and get
+This repository's **concrete instantiation** of that methodology — the
+actual risk table, the actual RLS/sharing model, the actual measured
+thresholds, the actual CI wiring — lives where it always has: the pre-PR
+checklist below (guardrail 2), [docs/reference/architecture.md](docs/reference/architecture.md),
+and [docs/explanation/design-decisions.md](docs/explanation/design-decisions.md).
+When a task changes an architectural or testing assumption, update *those*
+files, not TEST_STRATEGY.md — TEST_STRATEGY.md only changes when the general
+methodology itself should change (see its own §16), and a CollectionBuddy
+fact landing in it is a bug, not a documentation update.
+
+Disagreeing with the playbook is fine; departing from it silently is not. If
+a task looks like it needs something the strategy rules out, say so and get
 agreement first — same rule as the scope-creep guard below.
-
-Update it in the same change that moves an architectural or testing
-assumption. Don't restate its contents here.
 
 ### 2. Definition of done = the full pre-PR checklist
 
@@ -403,9 +417,11 @@ first — both explain *why*, not just *what*.
 
 If a change affects local setup, the pre-PR checklist, architecture,
 configuration, a design decision, or a testing assumption, update the
-relevant file in `docs/` (and `CONTRIBUTING.md`/`README.md`/
-`TEST_STRATEGY.md` if applicable) in the same change — don't let docs drift
-from what the code actually does.
+relevant file in `docs/` (and `CONTRIBUTING.md`/`README.md` if applicable) in
+the same change — don't let docs drift from what the code actually does.
+`TEST_STRATEGY.md` is the one exception: per guardrail 1, it stays generic
+and project-agnostic on purpose, so a CollectionBuddy-specific fact belongs
+in `docs/` instead, never added there.
 
 Two things have actually rotted here before, so check them by name:
 
