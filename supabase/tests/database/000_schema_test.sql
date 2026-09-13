@@ -107,7 +107,7 @@ select ok(
 -- a different item, or one that does not parse as <uid>/<itemId>/<file>
 -- at all -- both collapse to the same "is not distinct from" comparison
 -- against NULL, since storage_item_id() answers NULL rather than raising
--- on an unparseable path.
+-- on an unparsable path.
 select gen_random_uuid() as owner_id \gset
 select pg_temp.auth_as(:'owner_id'::uuid, 'schema-test-owner@collectionbuddy.test');
 
