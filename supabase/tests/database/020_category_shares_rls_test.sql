@@ -154,7 +154,7 @@ insert into public.category_shares (category_id, invited_email)
 values (:'category_id'::uuid, '  SHARE-GRANTEE@COLLECTIONBUDDY.TEST  ')
 returning invited_email as stored_email \gset
 
-select is(:'stored_email', 'share-grantee@collectionbuddy.test',
+select is(:'stored_email'::text, 'share-grantee@collectionbuddy.test',
   'the address is stored normalized, not as typed');
 
 select pg_temp.auth_as(:'grantee_id'::uuid, 'share-grantee@collectionbuddy.test');

@@ -44,7 +44,7 @@ select is(public.join_tags(null), '',
 -- row.
 select gen_random_uuid() as probe_item_id \gset
 select is(
-  public.storage_item_id(:'probe_item_id'::text || '/some/path.webp'),
+  public.storage_item_id('some-uid/' || :'probe_item_id'::text || '/path.webp'),
   :'probe_item_id'::uuid,
   'storage_item_id parses the second path segment as the item id'
 );
