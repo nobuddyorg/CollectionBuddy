@@ -8,11 +8,20 @@ A web-app catalog for your collected items 🗂️
 ![GitHub Pages](https://img.shields.io/badge/hosting-GitHub%20Pages-blue?logo=github)
 ![ESLint](https://img.shields.io/badge/ESLint-9-4B32C3?logo=eslint)
 ![Prettier](https://img.shields.io/badge/Prettier-3-F7B93E?logo=prettier)
+![SonarJS](https://img.shields.io/badge/code%20smells-SonarJS-4E9BCD?logo=sonarqube&logoColor=white)
+![dependency-cruiser](https://img.shields.io/badge/architecture-dependency--cruiser-orange)
+![Knip](https://img.shields.io/badge/dead%20code-Knip-000000)
+![SQLFluff](https://img.shields.io/badge/SQL%20lint-SQLFluff-0074D9)
+![Accessibility](https://img.shields.io/badge/a11y-jsx--a11y%20%2B%20axe--core-663399)
 ![Vitest](https://img.shields.io/badge/tested%20with-Vitest-6E9F18?logo=vitest)
+![Playwright](https://img.shields.io/badge/e2e-Playwright-2EAD33?logo=playwright&logoColor=white)
+![pgTAP](https://img.shields.io/badge/DB%20tests-pgTAP-336791?logo=postgresql&logoColor=white)
 [![Mutation testing badge](https://img.shields.io/endpoint?style=plastic&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fnobuddyorg%2FCollectionBuddy%2Fmain)](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main)
 [![CI](https://github.com/nobuddyorg/CollectionBuddy/actions/workflows/ci.yml/badge.svg)](https://github.com/nobuddyorg/CollectionBuddy/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/nobuddyorg/CollectionBuddy/graph/badge.svg)](https://codecov.io/gh/nobuddyorg/CollectionBuddy)
 [![CodeQL](https://img.shields.io/badge/security-CodeQL-blue?logo=github)](https://github.com/nobuddyorg/CollectionBuddy/security/code-scanning)
+[![Opengrep](https://img.shields.io/badge/SAST-Opengrep-blue?logo=github)](https://github.com/nobuddyorg/CollectionBuddy/security/code-scanning)
+![Lighthouse CI](https://img.shields.io/badge/performance-Lighthouse%20CI-F44B21?logo=lighthouse&logoColor=white)
 [![Last commit](https://img.shields.io/github/last-commit/nobuddyorg/CollectionBuddy)](https://github.com/nobuddyorg/CollectionBuddy/commits/main)
 [![License: MIT](https://img.shields.io/github/license/nobuddyorg/CollectionBuddy)](LICENSE)
 
@@ -61,6 +70,8 @@ Full docs live in [`docs/`](docs/README.md), organised by [Diátaxis](https://di
   &nbsp;&nbsp;&nbsp;
   <img src="https://api.iconify.design/logos:supabase-icon.svg?height=82" height="82" alt="Supabase" />
   &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:postgresql.svg?height=82" height="82" alt="PostgreSQL" />
+  &nbsp;&nbsp;&nbsp;
   <img src="https://api.iconify.design/logos:leaflet.svg?height=66" height="66" alt="Leaflet" />
   &nbsp;&nbsp;&nbsp;
   <img src="https://api.iconify.design/logos:docker-icon.svg?height=72" height="72" alt="Docker" />
@@ -73,7 +84,11 @@ Full docs live in [`docs/`](docs/README.md), organised by [Diátaxis](https://di
   &nbsp;&nbsp;&nbsp;
   <img src="https://api.iconify.design/logos:vitest.svg?height=82" height="82" alt="Vitest" />
   &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:playwright.svg?height=82" height="82" alt="Playwright" />
+  &nbsp;&nbsp;&nbsp;
   <img src="https://api.iconify.design/simple-icons:stryker.svg?height=82&color=%23E74C3C" height="82" alt="Stryker" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://api.iconify.design/logos:lighthouse.svg?height=82" height="82" alt="Lighthouse" />
   &nbsp;&nbsp;&nbsp;
   <img src="https://api.iconify.design/logos:eslint.svg?height=82" height="82" alt="ESLint" />
   &nbsp;&nbsp;&nbsp;

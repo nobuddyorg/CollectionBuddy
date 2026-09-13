@@ -107,10 +107,32 @@ jobs:
         run: npm run lint
 
       - name: Check architectural boundaries
-        run: npm run depcruise
+        run: npm run depcruise 2>&1 | tee depcruise-output.txt
+
+      - name: Add architecture check to job summary
+        if: always()
+        run: |
+          {
+            echo '## 🏗️ Architectural boundaries (dependency-cruiser)'
+            echo
+            echo '```'
+            cat depcruise-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check for dead code and unused dependencies
-        run: npm run knip
+        run: npm run knip 2>&1 | tee knip-output.txt
+
+      - name: Add dead-code check to job summary
+        if: always()
+        run: |
+          {
+            echo '## 🧹 Dead code and unused dependencies (Knip)'
+            echo
+            echo '```'
+            cat knip-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run tests
         run: npm test -- --coverage
@@ -207,7 +229,19 @@ jobs:
       # division of labor between the two.
       - name: Run pgTAP database tests
         working-directory: .
-        run: supabase test db
+        run: supabase test db 2>&1 | tee pgtap-output.txt
+
+      - name: Add pgTAP results to job summary
+        if: always()
+        working-directory: .
+        run: |
+          {
+            echo '## 🐘 pgTAP database tests'
+            echo
+            echo '```'
+            cat pgtap-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # Regenerates database.types.ts's body against the stack just started
       # and fails on any difference. Piped through the project's own
@@ -345,6 +379,27 @@ jobs:
           sarif_file: opengrep-results.sarif
           category: opengrep
 
+      # jq ships on the runner image; no new dependency for a one-off count.
+      - name: Add scan results to job summary
+        if: always()
+        run: |
+          {
+            echo '## 🔍 General-purpose SAST (Opengrep)'
+            echo
+            jq -r '
+              [.runs[].results[]] as $results
+              | ($results | length) as $total
+              | ($results
+                  | group_by(.ruleId)
+                  | map({rule: (.[0].ruleId // "unknown"), count: length})
+                  | sort_by(-.count)) as $groups
+              | "**Total findings:** \($total) (full detail in the Security tab, category `opengrep`)\n"
+              + (if ($groups | length) > 0
+                 then "\n| Rule | Count |\n|---|---|\n" + ($groups | map("| `\(.rule)` | \(.count) |") | join("\n"))
+                 else "" end)
+            ' opengrep-results.sarif
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # Lighthouse CI against the real production export -- signed-out (the
   # plain static build) and signed-in (demo mode against the local stack,
   # scripts/lighthouse.mjs), each served exactly as GitHub Pages serves the
@@ -385,6 +440,10 @@ jobs:
 
       - name: Run Lighthouse CI
         run: npm run lighthouse
+
+      - name: Add Lighthouse scores to job summary
+        if: always()
+        run: npm run lighthouse:summary
 
       - name: Upload Lighthouse reports
         if: always()
