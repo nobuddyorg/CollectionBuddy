@@ -120,8 +120,8 @@ The list of mutated files is [`mutation-targets.mjs`](../../web/mutation-targets
 
 `ci.yml`'s `zap_baseline` job runs a passive DAST scan against the built static export, twice
 — signed out, then signed in via demo mode — see [TEST_STRATEGY.md](../../TEST_STRATEGY.md)'s
-"Dynamic scanning (OWASP ZAP baseline)" for what it covers and what it deliberately doesn't
-(it is not a substitute for `rls.spec.ts`). Both passes need the local stack up first
+§6 "Dynamic scanning (DAST)" for what this kind of scan covers and what it deliberately
+doesn't (it is not a substitute for `rls.spec.ts`). Both passes need the local stack up first
 (`supabase start` from the repo root); from `web/`:
 
 ```bash

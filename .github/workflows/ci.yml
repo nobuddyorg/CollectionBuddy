@@ -505,8 +505,8 @@ jobs:
   # passive injection/error-disclosure probes against real rendered
   # responses, a different angle from Opengrep (source text) and axe-core
   # (a static DOM). Complements, never substitutes for, the authorization
-  # testing in e2e_local_stack -- see TEST_STRATEGY.md's "Dynamic scanning
-  # (OWASP ZAP baseline)" section; a green run here says nothing about RLS.
+  # testing in e2e_local_stack -- see TEST_STRATEGY.md's §6 "Dynamic
+  # scanning (DAST)" section; a green run here says nothing about RLS.
   # Gated on web changing (see the `changes` job), same as
   # build_and_test/mutation_test/lighthouse: this measures the built web
   # bundle's runtime surface, not database behaviour.

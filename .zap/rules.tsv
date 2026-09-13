@@ -9,9 +9,9 @@
 # defaults to WARN and is reported in the scan artifact/job summary but does
 # not fail the job -- the workflow passes zap-baseline.py's `-I` flag, so
 # only a rule explicitly set to FAIL below can fail this check. See
-# TEST_STRATEGY.md ("Dynamic scanning (OWASP ZAP baseline)") for what this
-# scan covers and doesn't, and docs/how-to/developer-guide.md for how to run
-# it locally.
+# TEST_STRATEGY.md's §6 "Dynamic scanning (DAST)" for what this kind of scan
+# covers and doesn't, and docs/how-to/developer-guide.md for how to run it
+# locally.
 #
 # Deliberately short and conservative on a first rollout, per the rule this
 # file exists to serve: a false positive here is CI noise nobody asked for,
