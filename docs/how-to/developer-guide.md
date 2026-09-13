@@ -111,9 +111,44 @@ cd web
 npm run test:mutation
 ```
 
-CI runs this on **every** PR as well as on pushes to `main` (about a minute for ~273 mutants). The score has been 100% throughout; the break threshold is 90. That is 100% of the roughly one-third of mutants left after the `Stryker disable` regions — the `disable` blocks are load-bearing, so a score read without them is not the number you think it is. Only main publishes to the [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main), so the badge keeps tracking one branch — locally, without `STRYKER_DASHBOARD_API_KEY`, it writes an HTML report to `web/reports/mutation/index.html`.
+CI runs this on **every** PR as well as on pushes to `main` — check the `mutation_test` job's own duration on a recent run rather than trusting a number written here, since the mutant count and runtime both drift as files are added to the scoped list. The score has been 100% throughout; the break threshold is 90. That is 100% of the roughly one-third of mutants left after the `Stryker disable` regions — the `disable` blocks are load-bearing, so a score read without them is not the number you think it is. Only main publishes to the [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main), so the badge keeps tracking one branch — locally, without `STRYKER_DASHBOARD_API_KEY`, it writes an HTML report to `web/reports/mutation/index.html`.
 
 The list of mutated files is [`mutation-targets.mjs`](../../web/mutation-targets.mjs), which [`stryker.config.mjs`](../../web/stryker.config.mjs) and `vitest.config.mts`'s per-file coverage floors both read, so the two can't drift apart — a file on that list carries a 100% coverage floor too, unless it is one of the handful named in the same file's `NO_COVERAGE_FLOOR`. Adding one to that list means first drawing a line inside it: every file in that list pairs pure exported logic with a `// Stryker disable all` region around whatever I/O it sits beside. Mutating a `fetch` call scores how elaborately the network was faked, which is not worth a number. Where a mutant is genuinely equivalent — a check the type system needs but the runtime does not — say so with `// Stryker disable next-line all` and a comment explaining why, rather than writing a test that cannot fail.
+
+## Run the OWASP ZAP baseline scan
+
+`ci.yml`'s `zap_baseline` job runs a passive DAST scan against the built static export — see
+[TEST_STRATEGY.md](../../TEST_STRATEGY.md)'s "Dynamic scanning (OWASP ZAP baseline)" for what
+it covers and what it deliberately doesn't (it is not a substitute for `rls.spec.ts`). To run
+the same scan locally, build and serve the export from `web/` first:
+
+```bash
+cd web
+npm run build
+ln -s . out/CollectionBuddy   # see the workflow's own comment for why this is needed
+npx serve out -l 4173
+```
+
+Then, from the repository root, in a second terminal (Docker Desktop users: swap
+`--network host` for `-t http://host.docker.internal:4173/` below; that flag only works on
+Linux):
+
+```bash
+docker run --rm -v "$(pwd):/zap/wrk/:rw" --network host \
+  ghcr.io/zaproxy/zaproxy:stable \
+  zap-baseline.py -t http://127.0.0.1:4173/ -c /zap/wrk/.zap/rules.tsv -I \
+  -r /zap/wrk/zap-report.html
+```
+
+The self-referencing symlink is required, not cosmetic: `zap-baseline.py` always resets its
+spider to the target's host root regardless of any path in the URL you give it, but the
+export only renders under `/CollectionBuddy/` (`next.config.ts` bakes that in). The symlink
+makes the one build answer identically at both.
+
+`zap-report.html` lands at the repository root (delete it afterward — it isn't a build
+artifact anything else expects to find there). Remove `out/CollectionBuddy` before running
+`npm run e2e`/`npm run e2e:local` afterward; the real e2e suite serves the export
+differently (`web/scripts/serve-export.mjs`) and doesn't expect that symlink to exist.
 
 ## Coverage floors
 

@@ -68,6 +68,7 @@ jobs:
           filters: |
             web:
               - 'web/**'
+              - '.zap/rules.tsv'
               - '.github/workflows/ci.yml'
             sql:
               - 'supabase/migrations/**'
@@ -497,3 +498,85 @@ jobs:
         if: always()
         run: supabase stop
         working-directory: .
+
+  # OWASP ZAP baseline (passive-only) DAST scan against an isolated,
+  # ephemeral copy of the built export -- security headers, cookie flags,
+  # and passive injection/error-disclosure probes against real rendered
+  # responses, a different angle from Opengrep (source text) and axe-core
+  # (a static DOM). Complements, never substitutes for, the authorization
+  # testing in e2e_local_stack -- see TEST_STRATEGY.md's "Dynamic scanning
+  # (OWASP ZAP baseline)" section; a green run here says nothing about RLS.
+  # Gated on web changing (see the `changes` job), same as
+  # build_and_test/mutation_test/lighthouse: this measures the built web
+  # bundle's runtime surface, not database behaviour.
+  zap_baseline:
+    needs: [prek, changes]
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-web
+
+      - name: Build the static export
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      # zap-baseline.py always resets its spider to the *host root* of
+      # whatever target URL it's given -- any path component is stripped
+      # before spidering ("backwards compatibility", docker/zap-baseline.py
+      # in zaproxy/zaproxy), so pointing it at .../CollectionBuddy/ directly
+      # would silently scan an empty host root instead. The real export only
+      # renders correctly under EXPORT_BASE_PATH, though -- next.config.ts
+      # bakes it into every asset/navigation URL, the same reason
+      # web/scripts/serve-export.mjs exists for Playwright. A self-
+      # referencing symlink makes the one built export answer identically at
+      # both `/` (what ZAP actually crawls) and `/CollectionBuddy/*` (what
+      # the HTML's own URLs point at) -- no second build, nothing rewritten.
+      - name: Serve the export at the site root
+        run: |
+          ln -s . out/CollectionBuddy
+          npx serve out -l 4173 &
+          timeout 30 bash -c 'until curl -sf http://127.0.0.1:4173/ >/dev/null; do sleep 1; done'
+
+      # Baseline = passive only (spider + passive scan rules), never an
+      # active scan -- deliberately out of scope per #661. `-I` means only a
+      # rule this repo has explicitly promoted to FAIL in .zap/rules.tsv can
+      # fail this job; everything else still lands in the report/artifact
+      # for human triage, the same graduated-severity split this repo
+      # already uses for Opengrep, axe-core (e2e/axe.ts), and Lighthouse
+      # (scripts/lighthouse.mjs) above.
+      - name: ZAP baseline scan (signed-out surface only)
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        with:
+          target: 'http://127.0.0.1:4173/'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-I'
+          fail_action: true
+          allow_issue_writing: false
+          artifact_name: 'zap-baseline-report'
+
+      # The action writes report_md.md into the workspace root (the `-w`
+      # flag baked into its own zap-baseline.py invocation) in addition to
+      # uploading it as part of the zap-baseline-report artifact -- same
+      # tee-and-cat pattern this file already uses for depcruise/knip/pgTAP,
+      # just with the report file written for us instead of by us. Note
+      # this step deliberately has no working-directory override -- the
+      # report lands at the repo root (the container mount point), not
+      # under web/, unlike the job's other steps.
+      - name: Add ZAP scan results to job summary
+        if: always()
+        working-directory: .
+        run: |
+          {
+            echo '## 🕷️ OWASP ZAP baseline scan'
+            echo
+            cat report_md.md 2>/dev/null || echo '_The scan did not complete far enough to produce a report -- see the step above._'
+          } >> "$GITHUB_STEP_SUMMARY"
