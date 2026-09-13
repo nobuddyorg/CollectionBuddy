@@ -22,6 +22,7 @@ A web-app catalog for your collected items 🗂️
 [![CodeQL](https://img.shields.io/badge/security-CodeQL-blue?logo=github)](https://github.com/nobuddyorg/CollectionBuddy/security/code-scanning)
 [![Opengrep](https://img.shields.io/badge/SAST-Opengrep-blue?logo=github)](https://github.com/nobuddyorg/CollectionBuddy/security/code-scanning)
 ![Lighthouse CI](https://img.shields.io/badge/performance-Lighthouse%20CI-F44B21?logo=lighthouse&logoColor=white)
+[![OWASP ZAP baseline scan](https://github.com/nobuddyorg/CollectionBuddy/actions/workflows/zap-baseline.yml/badge.svg)](https://github.com/nobuddyorg/CollectionBuddy/actions/workflows/zap-baseline.yml)
 [![Last commit](https://img.shields.io/github/last-commit/nobuddyorg/CollectionBuddy)](https://github.com/nobuddyorg/CollectionBuddy/commits/main)
 [![License: MIT](https://img.shields.io/github/license/nobuddyorg/CollectionBuddy)](LICENSE)
 

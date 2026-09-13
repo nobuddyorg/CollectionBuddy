@@ -92,3 +92,17 @@ jobs:
           fail_action: true
           allow_issue_writing: false
           artifact_name: 'zap-baseline-report'
+
+      # The action writes report_md.md into the workspace root (the `-w`
+      # flag baked into its own zap-baseline.py invocation) in addition to
+      # uploading it as part of the zap-baseline-report artifact -- same
+      # tee-and-cat pattern ci.yml already uses for depcruise/knip/pgTAP,
+      # just with the report file written for us instead of by us.
+      - name: Add ZAP scan results to job summary
+        if: always()
+        run: |
+          {
+            echo '## 🕷️ OWASP ZAP baseline scan'
+            echo
+            cat report_md.md 2>/dev/null || echo '_The scan did not complete far enough to produce a report -- see the step above._'
+          } >> "$GITHUB_STEP_SUMMARY"
