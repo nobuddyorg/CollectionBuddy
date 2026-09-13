@@ -14,7 +14,7 @@ jobs:
   # every other job -- it's the fastest check, so a failure here (a bad
   # tsconfig.json, a stray secret, ...) is caught before spending minutes on
   # a build, two browsers, a Supabase stack and a mutation-testing run.
-  # ESLint/Prettier/TypeScript/depcruise hooks are skipped: build_and_test
+  # ESLint/Prettier/TypeScript/depcruise/knip hooks are skipped: build_and_test
   # already runs those same commands below. Unconditional (unlike the jobs
   # below): file hygiene and secret scanning need to see every changed file
   # regardless of which directory it's in, and sqlfluff-lint here is only
@@ -30,7 +30,7 @@ jobs:
         with:
           extra-args: "--all-files"
         env:
-          SKIP: no-commit-to-branch,prettier,eslint,tsc,depcruise
+          SKIP: no-commit-to-branch,prettier,eslint,tsc,depcruise,knip
 
   # Decides which of the two expensive job groups below actually need to
   # run. `web` gates the app-code checks (build/tsc/lint/unit tests/mutation
@@ -108,6 +108,9 @@ jobs:
 
       - name: Check architectural boundaries
         run: npm run depcruise
+
+      - name: Check for dead code and unused dependencies
+        run: npm run knip
 
       - name: Run tests
         run: npm test -- --coverage
@@ -285,3 +288,58 @@ jobs:
           name: mutation-report
           path: web/reports/mutation
           retention-days: 30
+
+  # General-purpose SAST (Opengrep, an LGPL fork of the Semgrep engine),
+  # complementing rather than duplicating ESLint/dependency-cruiser (which
+  # know this app's own conventions) and CodeQL (dataflow analysis, enabled
+  # separately via the repo's default code-scanning setup, not a workflow
+  # file here): Opengrep's community rule pack catches generic
+  # language-level bug/security patterns neither of those is written to
+  # find. A standalone binary with no npm/pip dependency, so its own job
+  # rather than a build_and_test step -- nothing here needs web/node_modules.
+  # Gated on web or sql changing (see the `changes` job): the scanned tree
+  # is exactly web/{src,scripts,e2e} and supabase/, so a docs-only PR has
+  # nothing for it to find.
+  #
+  # `--config auto` resolves to Opengrep's default community pack
+  # (semgrep.dev's public `p/default` registry endpoint) -- no account, API
+  # key, or registry login involved; it's an anonymous, unauthenticated
+  # fetch, the same as CodeQL's own bundled query packs need no credential.
+  # No `--error`, so a finding surfaces in the Security tab without failing
+  # the job -- the same division CodeQL's default setup uses between
+  # findings and job status. No telemetry to disable: Opengrep's source was
+  # checked (see TEST_STRATEGY.md) and ships none.
+  opengrep:
+    needs: [prek, changes]
+    if: needs.changes.outputs.web == 'true' || needs.changes.outputs.sql == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Opengrep
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash -s -- -v v1.30.0
+          echo "$HOME/.opengrep/cli/latest" >> "$GITHUB_PATH"
+
+      # .opengrepignore is this repo's one suppression file (gitignore
+      # syntax) -- see its own comments for what's excluded and why.
+      # Build artifacts need no entry there: Opengrep only scans git-tracked
+      # files, and all of them are already in web/.gitignore.
+      - name: Run Opengrep
+        run: |
+          opengrep scan \
+            --config auto \
+            --semgrepignore-filename=.opengrepignore \
+            --sarif-output=opengrep-results.sarif \
+            web/src web/scripts web/e2e supabase
+
+      - name: Upload SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          sarif_file: opengrep-results.sarif
+          category: opengrep

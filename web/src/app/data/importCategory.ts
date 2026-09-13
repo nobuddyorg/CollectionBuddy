@@ -53,7 +53,7 @@ export type ImportResult = {
   skippedPhotoCount: number;
 };
 
-export class ImportError extends Error {
+class ImportError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
     this.name = 'ImportError';

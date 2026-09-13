@@ -1,8 +1,7 @@
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
 
-export type CategoryShareRow =
-  Database['public']['Tables']['category_shares']['Row'];
+type CategoryShareRow = Database['public']['Tables']['category_shares']['Row'];
 export type ShareRole = 'viewer' | 'editor';
 export type CategoryShareSummary = Pick<
   CategoryShareRow,

@@ -1,4 +1,4 @@
-export type HeaderUser = { email: string };
+type HeaderUser = { email: string };
 
 export type HeaderProps = {
   user: HeaderUser;

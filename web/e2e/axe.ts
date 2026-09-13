@@ -12,7 +12,7 @@ const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag22aa'];
  * the rendered DOM reveals: computed contrast, focus order, the real
  * accessible-name computation, dynamic ARIA state.
  */
-export function axeOn(page: Page) {
+function axeOn(page: Page) {
   return new AxeBuilder({ page })
     .withTags(WCAG_TAGS)
     .disableRules(['image-alt', 'aria-valid-attr-value', 'aria-allowed-attr']);

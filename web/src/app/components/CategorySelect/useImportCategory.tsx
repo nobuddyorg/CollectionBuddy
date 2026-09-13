@@ -35,8 +35,6 @@ export function importProgressMessage(
   return t('category_select.import_items');
 }
 
-export type UseImportCategory = ReturnType<typeof useImportCategory>;
-
 export function useImportCategory(existingCategoryNames: string[]) {
   const { t } = useI18n();
   const toast = useToast();

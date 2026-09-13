@@ -24,7 +24,7 @@ import type { ExportItemRow } from './items';
 export type ExportItem = ExportItemRow;
 
 /** One photograph: where it lives in storage, and where it belongs in the archive. */
-export type ExportPhoto = {
+type ExportPhoto = {
   storagePath: string;
   archivePath: string;
 };

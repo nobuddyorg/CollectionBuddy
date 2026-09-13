@@ -35,8 +35,6 @@ export function exportProgressMessage(
   return t('category_select.export_packing');
 }
 
-export type UseExportCategory = ReturnType<typeof useExportCategory>;
-
 /* v8 ignore start -- React state around one async I/O call;
  * exportProgressMessage above is the pure part and is what's tested. */
 // Stryker disable all: hook internals aren't covered by tests.

@@ -2,7 +2,7 @@ import { supabase } from '../supabase';
 import type { Database } from './database.types';
 import type { ShareRole } from './shares';
 
-export type CategoryRow = Database['public']['Tables']['categories']['Row'];
+type CategoryRow = Database['public']['Tables']['categories']['Row'];
 // user_id distinguishes "mine" from "shared with me". category_shares is
 // scoped by RLS to the caller's own role; treat a missing array the same as
 // an empty one, see page.tsx's canEditSelected.

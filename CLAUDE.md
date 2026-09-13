@@ -52,6 +52,7 @@ npx tsc --noEmit
 npx prettier --check .
 npm run lint
 npm run depcruise      # architectural boundaries -- see TEST_STRATEGY.md §6
+npm run knip           # dead code / unused dependencies -- see TEST_STRATEGY.md §6
 npm test -- --coverage
 npm run e2e
 npm run test:mutation     # separate CI job, run it too before calling something done
@@ -61,6 +62,9 @@ npm run e2e:local         # needs `supabase start`; required if you touched
 supabase test db          # pgTAP, from the repo root; needs `supabase start`;
                            # required alongside e2e:local for changes touching
                            # RLS policies, grants, ownership triggers, or schema
+opengrep scan --config auto --semgrepignore-filename=.opengrepignore \
+  web/src web/scripts web/e2e supabase   # separate CI job (see CONTRIBUTING.md
+                           # for install); run it too if you touched those paths
 ```
 
 `prek run --all-files` (or `pre-commit run --all-files`) from the repo root

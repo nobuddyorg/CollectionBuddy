@@ -101,3 +101,16 @@ repos:
         pass_filenames: false
         files: ^web/(src/app/.*\.(ts|tsx)|e2e/.*\.ts|scripts/.*\.mjs|tsconfig\.json|\.dependency-cruiser\.mjs)$
         stages: [pre-commit]
+
+      # ~1.6s against the whole project (measured on this repo) -- same
+      # budget as depcruise/sqlfluff-lint above. Scoped to the files that
+      # can actually change what it finds: source/test files (an added or
+      # removed one changes the unused-file/export graph), package.json
+      # (dependency changes), and its own entry-point/ignore config.
+      - id: knip
+        name: Knip -- dead code and unused dependencies (web)
+        entry: bash -c 'cd web && npm run knip'
+        language: system
+        pass_filenames: false
+        files: ^web/(src/.*\.(ts|tsx)|e2e/.*\.ts|scripts/.*\.mjs|package\.json|knip\.config\.ts|next\.config\.ts|playwright\.config\.ts|stryker\.config\.mjs|vitest(\.mutation)?\.config\.mts)$
+        stages: [pre-commit]
