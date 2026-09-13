@@ -114,6 +114,22 @@ supabase start   # from the repository root
 cd web && npm run e2e:local
 ```
 
+If your change touches a row-level security policy, a grant, an
+ownership-affecting trigger, or the schema more generally, also run the
+pgTAP database suite (`supabase/tests/database/`) against the local stack.
+It complements `e2e:local`'s `rls.spec.ts` rather than duplicating it: pgTAP
+runs fast, function/schema-level assertions directly against Postgres,
+inside a transaction that rolls back, by impersonating the `authenticated`
+and `anon` roles the way PostgREST itself does; the Playwright suite is
+what proves the same policies hold through a real request carrying a real
+JWT. See [TEST_STRATEGY.md](TEST_STRATEGY.md) for the full division of
+labor.
+
+```bash
+supabase start   # from the repository root, if not already running
+supabase test db
+```
+
 For anything past this checklist (changing the database schema, deploying,
 setting up a new Supabase environment), see the [developer
 guide](docs/how-to/developer-guide.md).

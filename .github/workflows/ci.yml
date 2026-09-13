@@ -134,9 +134,22 @@ jobs:
 
       - name: Start Supabase
         # From the repo root, where supabase/ lives. Applies every
-        # migration, so one that can't apply fails here, not production.
+        # migration, so one that can't apply fails here, not production --
+        # which is also what makes this the migration-applies-cleanly test
+        # the pgTAP suite below depends on: it never runs against anything
+        # but a database that just came up from a fresh `supabase start`.
         run: supabase start
         working-directory: .
+
+      # pg_prove against the local stack (supabase/tests/database/), right
+      # after the stack comes up and before the slower Playwright install +
+      # run below -- a schema/RLS regression fails here in seconds rather
+      # than after paying for browsers too. Complements, not duplicates,
+      # the signed-in suite's rls.spec.ts: see TEST_STRATEGY.md for the
+      # division of labor between the two.
+      - name: Run pgTAP database tests
+        working-directory: .
+        run: supabase test db
 
       # Regenerates database.types.ts's body against the stack just started
       # and fails on any difference. Piped through the project's own

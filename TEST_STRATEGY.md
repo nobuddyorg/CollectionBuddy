@@ -46,6 +46,7 @@ There is **no staging environment**. `pages-deploy.yml`'s `migrate` job applies 
 | Unit / component | `web/src/**/*.test.{ts,tsx}` | The bulk of the estate, one file per module | Seconds. Treat over ~60s as a problem to fix. | Pre-commit hook, every PR, local |
 | Signed-out browser | `web/e2e/public/` | A handful of specs, run against two viewports (desktop Chromium and a phone) | Low minutes | Every PR, and again against the live site post-deploy |
 | Signed-in integration | `web/e2e/signed-in/` | One spec per journey, plus the authorization suite; needs a real Supabase stack | Low minutes + stack start | `e2e_local_stack` job, local via `npm run e2e:local` |
+| Database (pgTAP) | `supabase/tests/database/` | RLS/authorization matrix, schema/constraint checks, function and trigger behaviour; needs a real Supabase stack | Seconds | `e2e_local_stack` job (via `supabase test db`, right after the stack starts), local via `supabase test db` |
 | Mutation | Stryker over the modules listed in `web/mutation-targets.mjs` | Every mutant the list produces, minus the `Stryker disable` regions | Low minutes | Every PR and push to `main` |
 | Repo hygiene | `.pre-commit-config.yaml` | `typos`, `zizmor`, `shellcheck`, `markdownlint`, file checks | Seconds | Gates every other CI job |
 | Schema contract | `ci.yml`, `e2e_local_stack` | 1 diff | Seconds | Every PR |
@@ -83,8 +84,8 @@ Ranked by expected cost, not by likelihood alone. "Cheapest meaningful test" is 
 
 | # | Risk | What it costs | Cheapest meaningful test | Status |
 | --- | --- | --- | --- | --- |
-| R1 | **Cross-collection read/write** — a policy stops holding | Silent, total confidentiality failure. The UI looks fine. | Integration: real token, real Postgres, bypassing the UI (`e2e/signed-in/rls.spec.ts`) | Covered for owner-vs-stranger and viewer grants |
-| R2 | **`editor` grant reaches too far** — an editor renames/deletes the category, manages shares, promotes itself, or writes outside the shared category | Privilege escalation between two real accounts | Same level as R1, with a second identity holding an `editor` grant | Covered — `rls.spec.ts`, on `Leihgabe` |
+| R1 | **Cross-collection read/write** — a policy stops holding | Silent, total confidentiality failure. The UI looks fine. | Integration: real token, real Postgres, bypassing the UI (`e2e/signed-in/rls.spec.ts`) | Covered for owner-vs-stranger and viewer grants — and, faster and complementary, at the SQL surface by `supabase/tests/database/010_ownership_rls_test.sql` and `020_category_shares_rls_test.sql` |
+| R2 | **`editor` grant reaches too far** — an editor renames/deletes the category, manages shares, promotes itself, or writes outside the shared category | Privilege escalation between two real accounts | Same level as R1, with a second identity holding an `editor` grant | Covered — `rls.spec.ts`, on `Leihgabe`, and `supabase/tests/database/030_editor_role_rls_test.sql` |
 | R3 | **Photograph orphaning / data loss on delete** | Storage bytes with no way to find them, or an entry that loses its photos | Unit for the ordering (delete bytes *then* row); integration for the cascade | Covered by `photos.spec.ts` + unit; the sweep's predicate is verified against a real database, and has a dry run |
 | R4 | **A migration that cannot apply to production** | Deploy blocked, or worse, half-applied ordering | `supabase start` in CI applies every migration from scratch | Covered from-scratch; **not** covered against a populated database — see §8 |
 | R5 | **Client/schema drift** (`database.types.ts` vs. reality) | Runtime `PGRST204`s after deploy | The generated-types diff in `e2e_local_stack` | Covered |
@@ -152,6 +153,8 @@ Layer                             Weight          Runs against
 --------------------------------  --------------  --------------------------------
 Unit + component                  most of it      jsdom, fakes; the listed modules
                                                   also mutation-scored
+Database (pgTAP)                  fast, targeted  real Postgres, direct SQL, no
+  (supabase/tests/database/)                      PostgREST, no browser
 API-level integration             a wide band     real Postgres + Storage, real JWTs,
   (rls.spec.ts + storage)                         no browser — mostly authorization
 Browser, signed-in journeys       one per journey real stack, real bundle
@@ -216,6 +219,48 @@ What it asserts, with the second seeded collector holding the grant:
 One asymmetry is asserted because it is easy to mistake for a bug and must stay a decision: `has_category_write_access()` bundles category ownership in, `has_category_read_access()` does not. The consequence, executed rather than assumed, is that **owning a collection does not reveal an entry an editor merely filed into it** — the owner never held a grant on that entry, and holding the collection is not one. An earlier draft of this section claimed the opposite; the policy has always behaved this way.
 
 The existing `editor` tests (`useShares.test.tsx`, `Sharing.test.tsx`, `ItemList/index.test.tsx`) assert that the client sends the right call and enables the right button — UX, by this repository's own rule, not authorization. They are not a substitute for the above.
+
+### pgTAP, and how it divides labor with `rls.spec.ts`
+
+`supabase/tests/database/` runs pgTAP directly against Postgres, inside a
+transaction that always rolls back, by impersonating the `authenticated`
+and `anon` roles: `set local role`, plus a `request.jwt.claims` GUC carrying
+the claims a real JWT would. This is not through PostgREST and not through
+a browser — it is the SQL surface the policies are actually written
+against, and it runs in seconds.
+
+That speed is also its limit, and the reason it complements
+`web/e2e/signed-in/rls.spec.ts` rather than replacing any of it:
+
+- pgTAP proves the **policy and trigger logic** — the RLS/authorization
+  matrix in §7's rules, schema constraints, and function/trigger behaviour
+  (`delete_item_if_orphan`'s statement-level cleanup, `storage_item_id`'s
+  fail-closed parsing, `caller_email`'s normalization) — fast enough to run
+  on every change that touches the schema.
+- `rls.spec.ts` proves the **same properties hold through the real
+  pipeline**: a real PostgREST request, a real JWT minted by GoTrue, the
+  real Supabase client. It is also the only place `storage.objects` and
+  real Storage-API behaviour (MIME/size enforcement, signed URLs, `move()`)
+  get exercised — pgTAP tests deliberately stop at the five `public` schema
+  tables and do not reach into `storage.objects` directly, because that
+  table's own extension-owned triggers are not something to guess the shape
+  of from a test that cannot be run against a live database first (see
+  anti-pattern §15.13 for a related reason not to poke at it from SQL).
+- The impersonation mechanism itself is verified, not assumed:
+  `005_impersonation_sanity_test.sql` shows the identical query fail as
+  `anon`, pass as `authenticated` with a claim, and depend on the claim's
+  actual content — so a pgTAP file that accidentally ran as `postgres`
+  would be caught rather than silently passing.
+- Fixtures are seeded the same way `rls.spec.ts`'s are, in spirit: through
+  the ordinary insert path under the relevant identity's own impersonated
+  role, never a `service_role`/superuser bypass — see §8's "seed as the
+  user" rule, which this suite follows even though it never touches
+  PostgREST.
+
+A policy, grant, or ownership-affecting trigger change still needs a
+matching `rls.spec.ts` case per the standing rule below; a pgTAP case
+alongside it is encouraged where it adds a fast, direct assertion, but does
+not discharge that rule on its own.
 
 ### Standing rule for schema changes
 
@@ -387,7 +432,7 @@ Verified against a real database, with the cases that distinguish the three read
 | Job | What it proves |
 | --- | --- |
 | `build_and_test` | The export builds; types, format and lint hold; unit suite passes with coverage floors; the built export works in a real browser under the real base path, desktop and phone |
-| `e2e_local_stack` | Every migration applies to a fresh Postgres; `database.types.ts` matches the schema; the signed-in journeys and **the whole authorization model** hold against a real stack |
+| `e2e_local_stack` | Every migration applies to a fresh Postgres; the pgTAP suite (`supabase/tests/database/`) passes against it; `database.types.ts` matches the schema; the signed-in journeys and **the whole authorization model** hold against a real stack |
 | `mutation_test` | The unit assertions on high-risk pure logic are actually load-bearing |
 
 All three are required. The order within `build_and_test` is not decoration: `next build` generates `next-env.d.ts`, which `tsc` and ESLint need on a clean checkout.
