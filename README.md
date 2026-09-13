@@ -2,8 +2,8 @@
 
 A web-app catalog for your collected items 🗂️
 
-![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen?logo=node.js)
-![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
+![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen?logo=nodedotjs&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs)
 ![Supabase](https://img.shields.io/badge/backend-Supabase-3ECF8E?logo=supabase&logoColor=white)
 ![GitHub Pages](https://img.shields.io/badge/hosting-GitHub%20Pages-blue?logo=github)
 ![ESLint](https://img.shields.io/badge/ESLint-9-4B32C3?logo=eslint)
@@ -14,7 +14,7 @@ A web-app catalog for your collected items 🗂️
 ![SQLFluff](https://img.shields.io/badge/SQL%20lint-SQLFluff-0074D9)
 ![Accessibility](https://img.shields.io/badge/a11y-jsx--a11y%20%2B%20axe--core-663399)
 ![Vitest](https://img.shields.io/badge/tested%20with-Vitest-6E9F18?logo=vitest)
-![Playwright](https://img.shields.io/badge/e2e-Playwright-2EAD33?logo=playwright&logoColor=white)
+![Playwright](https://img.shields.io/badge/e2e-Playwright-2EAD33)
 ![pgTAP](https://img.shields.io/badge/DB%20tests-pgTAP-336791?logo=postgresql&logoColor=white)
 [![Mutation testing badge](https://img.shields.io/endpoint?style=plastic&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fnobuddyorg%2FCollectionBuddy%2Fmain)](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main)
 [![CI](https://github.com/nobuddyorg/CollectionBuddy/actions/workflows/ci.yml/badge.svg)](https://github.com/nobuddyorg/CollectionBuddy/actions/workflows/ci.yml)
