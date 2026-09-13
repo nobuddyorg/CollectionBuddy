@@ -20,38 +20,22 @@ and say so instead of working around it.
 ### 1. TEST_STRATEGY.md is mandatory, not advisory
 
 [TEST_STRATEGY.md](TEST_STRATEGY.md) is a **generic, portable testing
-playbook** — deliberately project-agnostic, written so it can be copied into
-any project built on "a static/serverless frontend with no server of its
-own, sitting on a Postgres database whose RLS policies are the only
-authorization boundary" (which is exactly this app's shape). It carries no
-CollectionBuddy-specific facts on purpose. **Read it at the start of every
-task** — implementation, refactor, bug fix, or test work alike — and follow
-its methodology. It is not a reference to reach for once something looks
-test-shaped; it is the standing instruction for *how* work here gets
-verified.
+playbook** — deliberately project-agnostic (no CollectionBuddy-specific
+facts), so it stays copy-pasteable into any project of this app's shape:
+static/serverless frontend, Postgres RLS as the only authorization boundary.
+**Read it at the start of every task** and follow its methodology: which
+layer tests a given behavior (§5), what may be mocked vs. must be real
+(§6), the rules authorization tests must follow (§7), and which approaches
+are deliberately not used, and why (throughout).
 
-It decides the general approach, and you do not re-decide these per task:
+This repo's **concrete instantiation** — the actual risk table, RLS/sharing
+model, measured thresholds, CI wiring — lives in the pre-PR checklist below
+(guardrail 2), [architecture.md](docs/reference/architecture.md), and
+[design-decisions.md](docs/explanation/design-decisions.md). A task that
+changes an architectural or testing assumption updates *those* files, not
+TEST_STRATEGY.md — a CollectionBuddy fact landing there is a bug.
 
-- which layer a given kind of behavior is tested at, and why (§5),
-- what may be mocked, and what has to be a real Postgres, Storage or browser
-  (§6),
-- the rules authorization tests must follow (§7),
-- which testing approaches are deliberately *not* used for this class of app,
-  and why (throughout).
-
-This repository's **concrete instantiation** of that methodology — the
-actual risk table, the actual RLS/sharing model, the actual measured
-thresholds, the actual CI wiring — lives where it always has: the pre-PR
-checklist below (guardrail 2), [docs/reference/architecture.md](docs/reference/architecture.md),
-and [docs/explanation/design-decisions.md](docs/explanation/design-decisions.md).
-When a task changes an architectural or testing assumption, update *those*
-files, not TEST_STRATEGY.md — TEST_STRATEGY.md only changes when the general
-methodology itself should change (see its own §16), and a CollectionBuddy
-fact landing in it is a bug, not a documentation update.
-
-Disagreeing with the playbook is fine; departing from it silently is not. If
-a task looks like it needs something the strategy rules out, say so and get
-agreement first — same rule as the scope-creep guard below.
+Disagreeing with the playbook is fine; departing from it silently is not.
 
 ### 2. Definition of done = the full pre-PR checklist
 
@@ -131,16 +115,14 @@ rather than by a number: a squash renumbers them.
   explicitly in the commit message and PR description as a security-relevant
   change, with a one-line explanation of what it now allows or denies.
 - **`.github/workflows/cleanup-orphaned-photos.yml` counts as a database
-  change for that rule.** It is the highest-privilege logic in the repository
-  — a `service_role` key and a bulk Storage delete, on a daily cron, with
-  irreversible deletion of live photographs as its failure mode. Three things
-  in its query are load-bearing and look like tidy-ups: it matches **both
-  `path_full` and `path_thumb`**, it casts **no path to `uuid`** anywhere,
-  and it holds a **48h grace period**. Don't drop, narrow or shorten any of
-  them, and verify a change to that query with a dry run
-  (`workflow_dispatch`, which defaults to it) before letting it delete
-  anything. What each one prevents, and how the predicate was verified
-  against a real database, is in [TEST_STRATEGY.md](TEST_STRATEGY.md) §12.
+  change for that rule.** It's the highest-privilege logic in the repo — a
+  `service_role` key and a bulk Storage delete, on a daily cron, with
+  irreversible deletion of live photographs as its failure mode. Three
+  invariants in its query look like tidy-ups but aren't — never drop, narrow
+  or shorten them: it matches **both `path_full` and `path_thumb`**, it casts
+  **no path to `uuid`**, and it holds a **48h grace period**. Verify any
+  change with a dry run (`workflow_dispatch`, which defaults to it) before
+  letting it delete anything. Why each one matters: [TEST_STRATEGY.md](TEST_STRATEGY.md) §12.
 - Never treat a client-side check ("only show the delete button if...") as
   authorization. It's UX. The RLS policy is the real check, and any new
   query needs to be covered by one.
@@ -209,13 +191,11 @@ the tradeoff to the user:
 - **Search is trigram `ILIKE`, not full-text search** — don't reintroduce
   `tsvector`/FTS columns; they were added once, found unused, and dropped.
 - **A storage object's path never changes** — `authenticated` holds no
-  `UPDATE` on `storage.objects` and no `update` policy exists there, so
-  `move()` and `upsert` are refused for owner and grantee alike. Restoring
-  the verb reopens a real escalation: the shared policy could only key on
-  the path's *second* segment, so an `UPDATE` rewriting the *first* carried
-  the owner's photograph into an editor's namespace, past revocation, past
-  the owner, and past the sweep. See
-  [design-decisions.md](docs/explanation/design-decisions.md).
+  `UPDATE` on `storage.objects`, so `move()` and `upsert` are refused for
+  owner and grantee alike. Restoring the verb reopens a real, previously
+  exploited escalation (an editor moving the owner's photo into their own
+  namespace, past revocation and past the sweep) — full story in
+  [design-decisions.md](docs/explanation/design-decisions.md#why-a-storage-objects-path-can-never-change).
 - **Storage objects are deleted client-side *before* the DB row**, never
   the other way around — reversing the order orphans image files with no
   way to find them again. There is deliberately no DB-side cleanup trigger
@@ -398,10 +378,9 @@ first — both explain *why*, not just *what*.
   category. Category-level actions (rename, delete, manage shares) stay
   owner-only at every role.
 - `anon` has both RLS denial *and* explicit revoked grants on **every**
-  table (defense in depth, not redundancy — don't remove either). One table
-  was missing from that list for a while, and the denial everyone believed
-  in was actually coming from a missing `EXECUTE` on a helper function,
-  which is the kind of thing only the executable assertions catch.
+  table (defense in depth, not redundancy — don't remove either; a real gap
+  here once hid behind a missing function `EXECUTE` grant instead, caught
+  only by the executable assertions — `supabase/tests/database/000_schema_test.sql`).
   `authenticated` holds exactly the DML each table's policies back, and no
   `TRUNCATE`/`REFERENCES`/`TRIGGER` — RLS does not filter `TRUNCATE` at all.
 - Photos: one private Storage bucket, with a per-file size cap and an
