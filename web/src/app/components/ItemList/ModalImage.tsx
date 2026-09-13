@@ -198,9 +198,13 @@ export function ModalImage({
           same as pt for the top buttons -- fixed rather than measured, so a
           tall photo's edge sits above the bar rather than under it. */}
       <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
-        {/* eslint-disable-next-line @next/next/no-img-element -- next/image
-            earns nothing on this static export; a plain <img> already does
-            what `width={0} height={0} sizes="100vw"` was working around. */}
+        {/* next/image earns nothing on this static export; a plain <img>
+            already does what `width={0} height={0} sizes="100vw"` was
+            working around. Tap-to-close is a pointer-only convenience: the
+            close button above and Escape (useEscapeToClose) already cover
+            the keyboard path, and this element only wants tap/click, not
+            focus. */}
+        {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
         <img
           key={current.pathFull}
           src={current.urlFull}
