@@ -64,7 +64,7 @@ supabase test db          # pgTAP, from the repo root; needs `supabase start`;
 
 `prek run --all-files` (or `pre-commit run --all-files`) from the repo root
 runs the repo-wide hooks (file hygiene, `typos`, `zizmor`, `shellcheck`,
-`markdownlint`) plus the same web checks.
+`markdownlint`, `sqlfluff-lint`) plus the same web checks.
 
 Partial runs ("lint passes, I didn't run the rest") are not a stopping point,
 they're a status update.
@@ -245,7 +245,10 @@ CollectionBuddy/
 ├── TEST_STRATEGY.md              # READ THIS before writing or changing tests
 ├── build.sh                      # Convenience build wrapper
 ├── .pre-commit-config.yaml       # File hygiene, spell check, zizmor, shellcheck,
-│                                  # markdownlint, and web/'s own checks
+│                                  # markdownlint, sqlfluff-lint, and web/'s own
+│                                  # checks
+├── .sqlfluff                      # SQLFluff config for supabase/migrations/
+│                                  # and supabase/tests/database/
 ├── docs/                         # Diátaxis docs
 │   ├── tutorials/getting-started.md
 │   ├── how-to/user-guide.md, developer-guide.md

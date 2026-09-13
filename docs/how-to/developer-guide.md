@@ -29,6 +29,14 @@ npm run e2e:local       # the rest of the e2e_local_stack job; same prerequisite
 A fourth job, `prek`, runs the repo-wide hooks — `prek run --all-files` from the repository
 root is the same thing.
 
+A fifth job, `changes`, decides whether `build_and_test`, `mutation_test`, and
+`e2e_local_stack` run at all: on a PR, each is skipped unless the paths it
+actually covers changed (see [TEST_STRATEGY.md](../../TEST_STRATEGY.md) §13
+for exactly which). Don't be surprised to see one of them missing on a
+docs-only or SQL-only PR — the local commands above still all run and are
+still worth running before opening one, since nothing about the local
+pre-PR checklist is conditional.
+
 Coverage, mutation score, and end-to-end results all show up as a table in their job's own
 Actions summary rather than as a PR comment — see [Configuration
 reference](../reference/configuration.md#ci-job-summaries).

@@ -15,7 +15,10 @@ jobs:
   # tsconfig.json, a stray secret, ...) is caught before spending minutes on
   # a build, two browsers, a Supabase stack and a mutation-testing run.
   # ESLint/Prettier/TypeScript hooks are skipped: build_and_test already
-  # runs those same three commands below.
+  # runs those same three commands below. Unconditional (unlike the jobs
+  # below): file hygiene and secret scanning need to see every changed file
+  # regardless of which directory it's in, and sqlfluff-lint here is only
+  # ~2s against the fixed migrations/pgTAP set, not worth path-gating.
   prek:
     runs-on: ubuntu-latest
     steps:
@@ -29,8 +32,52 @@ jobs:
         env:
           SKIP: no-commit-to-branch,prettier,eslint,tsc
 
+  # Decides which of the two expensive job groups below actually need to
+  # run. `web` gates the app-code checks (build/tsc/lint/unit tests/mutation
+  # testing/signed-out e2e); `sql` OR `web` gates e2e_local_stack, since that
+  # job validates both the schema/pgTAP side and the signed-in Playwright
+  # journeys together against one running stack, and either changing can
+  # break it. `.github/workflows/ci.yml` is in both filters, so a change to
+  # this file's own logic always exercises what it just changed. Forced to
+  # "true" unconditionally on a push to main: that's the event that
+  # triggers pages-deploy.yml's migrate -> build -> deploy, and PRs get the
+  # path-filtered speedup while the actual pre-deploy gate stays the full,
+  # unconditional run this repo has always had -- a squash-merge combining
+  # unrelated changes must never get a job skipped right before it deploys.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      web: ${{ steps.force.outputs.value == 'true' || steps.filter.outputs.web == 'true' }}
+      sql: ${{ steps.force.outputs.value == 'true' || steps.filter.outputs.sql == 'true' }}
+    steps:
+      - name: Force a full run on pushes to main
+        id: force
+        run: echo "value=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          filters: |
+            web:
+              - 'web/**'
+              - '.github/workflows/ci.yml'
+            sql:
+              - 'supabase/migrations/**'
+              - 'supabase/tests/database/**'
+              - '.sqlfluff'
+              - '.github/workflows/ci.yml'
+
   build_and_test:
-    needs: prek
+    needs: [prek, changes]
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -117,8 +164,13 @@ jobs:
   # Sign-in can't go through the interface (Google OAuth, no runner can
   # drive it), so setup mints a session through the auth API into
   # localStorage -- this path exists for the local stack only.
+  #
+  # Gated on web OR sql changing (see the `changes` job): this is the one
+  # job where the two concerns share a running stack, so either side
+  # changing needs the whole thing to run.
   e2e_local_stack:
-    needs: prek
+    needs: [prek, changes]
+    if: needs.changes.outputs.web == 'true' || needs.changes.outputs.sql == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -188,10 +240,13 @@ jobs:
 
   # Scoped to the pure, high-risk modules (stryker.config.mjs) -- mutating
   # the whole app tree would mean mutating JSX and Tailwind class strings,
-  # producing a meaningless score. Runs on every PR, not just main: finding
-  # out a test asserts nothing is only useful before the merge.
+  # producing a meaningless score. Runs on every PR that touches web code,
+  # not just main: finding out a test asserts nothing is only useful before
+  # the merge. Gated on web changing (see the `changes` job) -- nothing in
+  # mutation-targets.mjs can be affected by a SQL-only or docs-only change.
   mutation_test:
-    needs: prek
+    needs: [prek, changes]
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
