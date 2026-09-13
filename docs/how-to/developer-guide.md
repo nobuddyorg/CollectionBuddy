@@ -115,6 +115,42 @@ CI runs this on **every** PR as well as on pushes to `main` (about a minute for 
 
 The list of mutated files is [`mutation-targets.mjs`](../../web/mutation-targets.mjs), which [`stryker.config.mjs`](../../web/stryker.config.mjs) and `vitest.config.mts`'s per-file coverage floors both read, so the two can't drift apart — a file on that list carries a 100% coverage floor too, unless it is one of the handful named in the same file's `NO_COVERAGE_FLOOR`. Adding one to that list means first drawing a line inside it: every file in that list pairs pure exported logic with a `// Stryker disable all` region around whatever I/O it sits beside. Mutating a `fetch` call scores how elaborately the network was faked, which is not worth a number. Where a mutant is genuinely equivalent — a check the type system needs but the runtime does not — say so with `// Stryker disable next-line all` and a comment explaining why, rather than writing a test that cannot fail.
 
+## Run the OWASP ZAP baseline scan
+
+[`zap-baseline.yml`](../../.github/workflows/zap-baseline.yml) runs a passive DAST scan
+against the built static export — see [TEST_STRATEGY.md](../../TEST_STRATEGY.md)'s "Dynamic
+scanning (OWASP ZAP baseline)" for what it covers and what it deliberately doesn't (it is
+not a substitute for `rls.spec.ts`). To run the same scan locally, build and serve the
+export from `web/` first:
+
+```bash
+cd web
+npm run build
+ln -s . out/CollectionBuddy   # see the workflow's own comment for why this is needed
+npx serve out -l 4173
+```
+
+Then, from the repository root, in a second terminal (Docker Desktop users: swap
+`--network host` for `-t http://host.docker.internal:4173/` below; that flag only works on
+Linux):
+
+```bash
+docker run --rm -v "$(pwd):/zap/wrk/:rw" --network host \
+  ghcr.io/zaproxy/zaproxy:stable \
+  zap-baseline.py -t http://127.0.0.1:4173/ -c /zap/wrk/.zap/rules.tsv -I \
+  -r /zap/wrk/zap-report.html
+```
+
+The self-referencing symlink is required, not cosmetic: `zap-baseline.py` always resets its
+spider to the target's host root regardless of any path in the URL you give it, but the
+export only renders under `/CollectionBuddy/` (`next.config.ts` bakes that in). The symlink
+makes the one build answer identically at both.
+
+`zap-report.html` lands at the repository root (delete it afterward — it isn't a build
+artifact anything else expects to find there). Remove `out/CollectionBuddy` before running
+`npm run e2e`/`npm run e2e:local` afterward; the real e2e suite serves the export
+differently (`web/scripts/serve-export.mjs`) and doesn't expect that symlink to exist.
+
 ## Coverage floors
 
 `vitest.config.mts` carries a global floor plus per-file 100% floors for the pure, high-risk modules. The global floor is not auto-updated: raise it by hand when coverage genuinely improves, and never lower it to make a change fit. It had been left about 16 points below what the suite actually achieved, which meant half the tests could have been deleted with CI still green.
