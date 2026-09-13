@@ -380,6 +380,10 @@ jobs:
           category: opengrep
 
       # jq ships on the runner image; no new dependency for a one-off count.
+      # A result's own `level` is unset in Opengrep's SARIF -- severity lives
+      # on the rule definition (`tool.driver.rules[].defaultConfiguration.level`,
+      # ERROR/WARNING/INFO mapped to error/warning/note), so both this and
+      # the enforcement step below join results back to their rule first.
       - name: Add scan results to job summary
         if: always()
         run: |
@@ -387,18 +391,51 @@ jobs:
             echo '## 🔍 General-purpose SAST (Opengrep)'
             echo
             jq -r '
-              [.runs[].results[]] as $results
+              (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
+              | [.runs[].results[] | . + {level: ($levelById[.ruleId] // "warning")}] as $results
               | ($results | length) as $total
+              | ($results | map(select(.level == "error")) | length) as $errors
               | ($results
                   | group_by(.ruleId)
-                  | map({rule: (.[0].ruleId // "unknown"), count: length})
+                  | map({rule: (.[0].ruleId // "unknown"), level: .[0].level, count: length})
                   | sort_by(-.count)) as $groups
-              | "**Total findings:** \($total) (full detail in the Security tab, category `opengrep`)\n"
+              | "**Total findings:** \($total) (\($errors) at error severity -- blocking; full detail in the Security tab, category `opengrep`)\n"
               + (if ($groups | length) > 0
-                 then "\n| Rule | Count |\n|---|---|\n" + ($groups | map("| `\(.rule)` | \(.count) |") | join("\n"))
+                 then "\n| Rule | Severity | Count |\n|---|---|---|\n" + ($groups | map("| `\(.rule)` | \(.level) | \(.count) |") | join("\n"))
                  else "" end)
             ' opengrep-results.sarif
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Everything else in this repo already has a real pass/fail gate
+      # (ESLint's --max-warnings 0, depcruise/Knip/SQLFluff's zero-violation
+      # default, Stryker's break threshold, axe-core's serious/critical
+      # split, Lighthouse's per-category budgets) -- this was the one
+      # exception, upload-only regardless of findings. WARNING/INFO stay
+      # report-only (community-pack noise and stylistic suggestions are
+      # mostly there; see TEST_STRATEGY.md for the three ERROR-adjacent
+      # false positives already triaged), but an ERROR-severity finding
+      # (the pack's own bar for "this is a real bug/vulnerability shape")
+      # now fails the job instead of only landing quietly in the Security
+      # tab. Runs after the upload above so the tab stays populated either
+      # way.
+      - name: Fail on error-severity findings
+        run: |
+          count=$(jq '
+            (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
+            | [.runs[].results[] | . + {level: ($levelById[.ruleId] // "warning")}]
+            | map(select(.level == "error")) | length
+          ' opengrep-results.sarif)
+          if [ "$count" -gt 0 ]; then
+            jq -r '
+              (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
+              | [.runs[].results[] | . + {level: ($levelById[.ruleId] // "warning")}]
+              | map(select(.level == "error"))[]
+              | "::error file=\(.locations[0].physicalLocation.artifactLocation.uri // "?"),line=\(.locations[0].physicalLocation.region.startLine // 1)::\(.ruleId): \(.message.text)"
+            ' opengrep-results.sarif
+            echo "$count error-severity Opengrep finding(s) -- see the annotations above, the job summary, or the Security tab (category opengrep)."
+            exit 1
+          fi
+          echo "No error-severity findings."
 
   # Lighthouse CI against the real production export -- signed-out (the
   # plain static build) and signed-in (demo mode against the local stack,

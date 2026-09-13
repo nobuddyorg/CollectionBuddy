@@ -127,6 +127,11 @@ curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh |
 account or API key); see [TEST_STRATEGY.md](TEST_STRATEGY.md) for what it
 covers and why it's CI-only rather than a `prek` hook.
 
+Any **ERROR**-severity finding fails the CI job (WARNING/INFO are
+report-only, surfaced for human triage rather than blocking) — the local
+command above prints the same findings the CI step reads, so an ERROR-level
+one there means CI will fail on it too.
+
 If your change touches the catalogue, search, the map, the entry forms,
 photographs, sharing, exporting, or any row-level security policy, also run
 the signed-in suite against a local database:
