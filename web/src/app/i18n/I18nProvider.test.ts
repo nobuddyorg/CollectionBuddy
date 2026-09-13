@@ -35,6 +35,14 @@ describe('resolveTranslationKey', () => {
     expect(resolveTranslationKey(dict, 'common.close.extra')).toBeUndefined();
   });
 
+  it('returns undefined for a numeric trailing segment instead of indexing into a leaf string', () => {
+    // A boxed string has its characters as own, enumerable properties
+    // (`Object.hasOwn('Close', '0')` is true), so a looser type check here
+    // would resolve 'common.close.0' to 'C' instead of reporting the extra
+    // segment as a miss, the same way 'common.close.extra' already does.
+    expect(resolveTranslationKey(dict, 'common.close.0')).toBeUndefined();
+  });
+
   it('returns undefined instead of throwing when a segment resolves to null', () => {
     // Translation JSON always bottoms out in strings, so this forces past
     // the type to exercise the runtime guard for malformed data.

@@ -163,7 +163,7 @@ function mockImagesQuery(
     range = [from as number, to as number];
     return builder;
   };
-  builder.returns = () => {
+  builder.overrideTypes = () => {
     calls.push({ chunk, from: range[0], to: range[1] });
     return Promise.resolve(resolve(chunk, range[0], range[1]));
   };

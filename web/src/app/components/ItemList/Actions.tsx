@@ -55,13 +55,14 @@ export function AddPhotoPlate({
 }) {
   const { t } = useI18n();
   const Frame = readOnly ? 'div' : 'label';
+  let interactionClasses = '';
+  if (!readOnly) {
+    interactionClasses = 'cursor-pointer hover:bg-mount-hover';
+    if (busy) interactionClasses += ' pointer-events-none opacity-60';
+  }
   return (
     <Frame
-      className={`group/plate relative flex aspect-4/3 w-full items-center justify-center bg-mount transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-foreground ${
-        readOnly
-          ? ''
-          : `cursor-pointer hover:bg-mount-hover ${busy ? 'pointer-events-none opacity-60' : ''}`
-      }`}
+      className={`group/plate relative flex aspect-4/3 w-full items-center justify-center bg-mount transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-foreground ${interactionClasses}`}
       title={readOnly ? undefined : t('item_list.add_image')}
     >
       {!readOnly && <UploadInput onUpload={onUpload} busy={busy} />}

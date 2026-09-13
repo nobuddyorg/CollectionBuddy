@@ -44,9 +44,22 @@ export function resolveTranslationKey(
   for (const k of keys) {
     if (
       typeof value === 'object' &&
+      // `TranslationValue` never includes `null`, so the type checker
+      // considers this unreachable -- kept anyway because `typeof null ===
+      // 'object'` is true, and nothing stops a translation JSON file from
+      // adding a literal `null` value the type just hasn't seen yet.
+      // eslint-disable-next-line sonarjs/different-types-comparison
       value !== null &&
       Object.hasOwn(value, k)
     ) {
+      // The rule flags any `obj = obj[dynamicKey]` inside a loop regardless
+      // of the guard in front of it -- the `Object.hasOwn` check above (see
+      // TEST_STRATEGY.md's Opengrep section) already closes the actual
+      // prototype-pollution path this rule exists to catch; the shape it's
+      // matching on is inherent to walking a dot-separated key path, so
+      // there's no rewrite left that changes the underlying algorithm
+      // without just restructuring code to dodge a pattern-matcher.
+      // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop
       value = value[k];
     } else {
       return undefined;

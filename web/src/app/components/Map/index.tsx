@@ -119,6 +119,9 @@ const runCommand = (
   }
 };
 
+// Names the component, matching its folder (components/Map); nothing in
+// this scope ever constructs a JS Map.
+// eslint-disable-next-line sonarjs/no-globals-shadowing
 const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const LRef = useRef<Leaflet | null>(null);
@@ -209,7 +212,13 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
             // A function, not a built element: every geocode landing
             // rebuilds every marker, so building the popup content eagerly
             // would redo it for every pin on every rebuild instead of only
-            // the one a reader actually opens.
+            // the one a reader actually opens. The nesting this reads at
+            // (effect -> render -> world-copy loop -> per-marker forEach)
+            // is Leaflet's own re-render shape, not something splitting
+            // this callback out would actually simplify -- it would just
+            // trade the nesting for threading `layer`/`copy` through as
+            // parameters.
+            // eslint-disable-next-line sonarjs/no-nested-functions
             .bindPopup(() => popupContent(m.popupText, m.titles, m.countLabel));
         });
       }

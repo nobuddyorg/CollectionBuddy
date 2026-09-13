@@ -56,8 +56,14 @@ Every check that produces a report writes it to the job's own [Actions summary](
 | ----------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `build_and_test` | Coverage totals against the thresholds above | [`davelosert/vitest-coverage-report-action`](https://github.com/davelosert/vitest-coverage-report-action), reading the `json-summary` coverage reporter |
 | `build_and_test` | Signed-out end-to-end results | [`daun/playwright-report-summary`](https://github.com/daun/playwright-report-summary), reading the `json` Playwright reporter |
-| `e2e_local_stack` | Signed-in end-to-end results | Same action, run again against that job's own report |
+| `build_and_test` | Architectural boundary check (pass/fail + any violations) | The step's own text output, `tee`'d to a file and cat'd into the summary — dependency-cruiser's default `err` reporter is already the same text a human reads on a failure |
+| `build_and_test` | Dead-code/unused-dependency findings | Same `tee`-and-cat approach, against Knip's default reporter output |
+| `e2e_local_stack` | Signed-in end-to-end results | Same Playwright action, run again against that job's own report |
+| `e2e_local_stack` | pgTAP results | Same `tee`-and-cat approach, against `supabase test db`'s own `pg_prove` output |
 | `mutation_test` | Mutation score, overall and per file | [`web/scripts/mutation-summary.mjs`](../../web/scripts/mutation-summary.mjs), reading Stryker's `json` reporter output via `mutation-testing-metrics` — not the console log, which is mostly the _expected_ per-mutant test "failures" that killing a mutant produces |
+| `opengrep` | Finding count, total and by rule | `jq` (already on the runner image) against the same SARIF file uploaded to code scanning — no new dependency for a one-line count |
+| `lighthouse` | Performance/best-practices/SEO scores, LCP, CLS, against each page's thresholds | [`web/scripts/lighthouse-summary.mjs`](../../web/scripts/lighthouse-summary.mjs), reading each target's `manifest.json` and its representative run's own report |
+| `build_and_test`, `e2e_local_stack` | Non-blocking (moderate/minor) accessibility findings, when any exist | [`web/e2e/axe.ts`](../../web/e2e/axe.ts)'s `reportNonBlockingFindings`, called from inside the Playwright test itself (in CI only — it checks for `$GITHUB_STEP_SUMMARY` before writing) since these findings never fail a test and would otherwise only exist as a downloadable attachment nobody opens |
 
 Codecov's own pull-request comment is turned off ([`codecov.yml`](../../codecov.yml), `comment: false`) now that the same numbers are in the job summary; its commit status checks are untouched. None of the summary actions post a PR comment either (`create-comment: false` / `comment-on: none`) — job summary only, by design, so nothing new shows up as bot noise on the PR itself.
 

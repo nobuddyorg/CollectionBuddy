@@ -19,6 +19,17 @@ import type { CategorySummary } from '../../data/categories';
 
 export type UseCategories = ReturnType<typeof useCategories>;
 
+// Pulled out of the orphan-cleanup loop below purely to keep that loop's
+// nesting shallow -- no closure over anything but its own argument.
+function storagePathsOf(image: {
+  path_full: string;
+  path_thumb: string | null;
+}): string[] {
+  return image.path_thumb
+    ? [image.path_full, image.path_thumb]
+    : [image.path_full];
+}
+
 // Owned by the page rather than by CategorySelect: the page decides what
 // to render below the strip based on whether the categories have arrived
 // yet.
@@ -226,9 +237,7 @@ export function useCategories() {
               const results = await Promise.allSettled(
                 orphanedItemIds.map(async (itemId) => {
                   const paths = orphanedImagePaths.get(itemId) ?? [];
-                  const flat = paths.flatMap((p) =>
-                    p.path_thumb ? [p.path_full, p.path_thumb] : [p.path_full],
-                  );
+                  const flat = paths.flatMap(storagePathsOf);
                   if (!flat.length) return;
                   const { error: removeError } = await removeImageObjects(flat);
                   if (removeError) throw removeError;

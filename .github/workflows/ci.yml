@@ -107,10 +107,32 @@ jobs:
         run: npm run lint
 
       - name: Check architectural boundaries
-        run: npm run depcruise
+        run: npm run depcruise 2>&1 | tee depcruise-output.txt
+
+      - name: Add architecture check to job summary
+        if: always()
+        run: |
+          {
+            echo '## 🏗️ Architectural boundaries (dependency-cruiser)'
+            echo
+            echo '```'
+            cat depcruise-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check for dead code and unused dependencies
-        run: npm run knip
+        run: npm run knip 2>&1 | tee knip-output.txt
+
+      - name: Add dead-code check to job summary
+        if: always()
+        run: |
+          {
+            echo '## 🧹 Dead code and unused dependencies (Knip)'
+            echo
+            echo '```'
+            cat knip-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run tests
         run: npm test -- --coverage
@@ -207,7 +229,19 @@ jobs:
       # division of labor between the two.
       - name: Run pgTAP database tests
         working-directory: .
-        run: supabase test db
+        run: supabase test db 2>&1 | tee pgtap-output.txt
+
+      - name: Add pgTAP results to job summary
+        if: always()
+        working-directory: .
+        run: |
+          {
+            echo '## 🐘 pgTAP database tests'
+            echo
+            echo '```'
+            cat pgtap-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # Regenerates database.types.ts's body against the stack just started
       # and fails on any difference. Piped through the project's own
@@ -344,3 +378,122 @@ jobs:
         with:
           sarif_file: opengrep-results.sarif
           category: opengrep
+
+      # jq ships on the runner image; no new dependency for a one-off count.
+      # A result's own `level` is unset in Opengrep's SARIF -- severity lives
+      # on the rule definition (`tool.driver.rules[].defaultConfiguration.level`,
+      # ERROR/WARNING/INFO mapped to error/warning/note), so both this and
+      # the enforcement step below join results back to their rule first.
+      - name: Add scan results to job summary
+        if: always()
+        run: |
+          {
+            echo '## 🔍 General-purpose SAST (Opengrep)'
+            echo
+            jq -r '
+              (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
+              | [.runs[].results[] | . + {level: ($levelById[.ruleId] // "warning")}] as $results
+              | ($results | length) as $total
+              | ($results | map(select(.level == "error")) | length) as $errors
+              | "**Total findings:** \($total) (\($errors) at error severity -- blocking; full detail in the Security tab, category `opengrep`)\n"
+              + (if $total > 0
+                 then "\n| Severity | Rule | Location |\n|---|---|---|\n" + (
+                   $results
+                   | sort_by(.level != "error", .level != "warning")
+                   | map(
+                       "| \(.level) | `\(.ruleId)` | \(.locations[0].physicalLocation.artifactLocation.uri // "?"):\(.locations[0].physicalLocation.region.startLine // "?") |"
+                     )
+                   | join("\n")
+                 )
+                 else "" end)
+            ' opengrep-results.sarif
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Everything else in this repo already has a real pass/fail gate
+      # (ESLint's --max-warnings 0, depcruise/Knip/SQLFluff's zero-violation
+      # default, Stryker's break threshold, axe-core's serious/critical
+      # split, Lighthouse's per-category budgets) -- this was the one
+      # exception, upload-only regardless of findings. WARNING/INFO stay
+      # report-only (community-pack noise and stylistic suggestions are
+      # mostly there; see TEST_STRATEGY.md for the three ERROR-adjacent
+      # false positives already triaged), but an ERROR-severity finding
+      # (the pack's own bar for "this is a real bug/vulnerability shape")
+      # now fails the job instead of only landing quietly in the Security
+      # tab. Runs after the upload above so the tab stays populated either
+      # way.
+      - name: Fail on error-severity findings
+        run: |
+          count=$(jq '
+            (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
+            | [.runs[].results[] | . + {level: ($levelById[.ruleId] // "warning")}]
+            | map(select(.level == "error")) | length
+          ' opengrep-results.sarif)
+          if [ "$count" -gt 0 ]; then
+            jq -r '
+              (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
+              | [.runs[].results[] | . + {level: ($levelById[.ruleId] // "warning")}]
+              | map(select(.level == "error"))[]
+              | "::error file=\(.locations[0].physicalLocation.artifactLocation.uri // "?"),line=\(.locations[0].physicalLocation.region.startLine // 1)::\(.ruleId): \(.message.text)"
+            ' opengrep-results.sarif
+            echo "$count error-severity Opengrep finding(s) -- see the annotations above, the job summary, or the Security tab (category opengrep)."
+            exit 1
+          fi
+          echo "No error-severity findings."
+
+  # Lighthouse CI against the real production export -- signed-out (the
+  # plain static build) and signed-in (demo mode against the local stack,
+  # scripts/lighthouse.mjs), each served exactly as GitHub Pages serves the
+  # real site (scripts/serve-export.mjs), never `next dev`. Gated on `web`
+  # changing (see the `changes` job): this measures the web bundle/page
+  # performance, the same surface `build_and_test`/`mutation_test` gate on,
+  # not database behaviour.
+  #
+  # Accessibility is deliberately not asserted here even though Lighthouse
+  # computes it (also axe-core-based): #650 already added a dedicated,
+  # more actionable axe-core/Playwright integration
+  # (e2e/{public,signed-in}/accessibility.spec.ts), and `onlyCategories`
+  # below leaves accessibility out of the run entirely rather than
+  # double-gating the same finding through two tools.
+  lighthouse:
+    needs: [prek, changes]
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-web
+
+      - uses: ./.github/actions/setup-supabase-cli
+
+      - name: Start Supabase
+        run: supabase start
+        working-directory: .
+
+      # Both builds point at this stack rather than needing repo secrets,
+      # same as e2e_local_stack above.
+      - run: npx playwright install --with-deps chromium
+
+      - name: Run Lighthouse CI
+        run: npm run lighthouse
+
+      - name: Add Lighthouse scores to job summary
+        if: always()
+        run: npm run lighthouse:summary
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lighthouse-reports
+          path: web/lighthouse-reports
+          retention-days: 30
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
+        working-directory: .

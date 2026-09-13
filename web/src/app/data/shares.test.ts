@@ -23,7 +23,7 @@ function mockQueryBuilder() {
     'delete',
     'eq',
     'single',
-    'returns',
+    'overrideTypes',
   ] as const;
   const builder: Record<string, (...args: unknown[]) => unknown> = {};
   for (const method of methods) {

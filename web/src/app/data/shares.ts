@@ -18,7 +18,7 @@ export function listSharesForCategory(categoryId: string) {
     .from('category_shares')
     .select(SHARE_COLUMNS)
     .eq('category_id', categoryId)
-    .returns<CategoryShareSummary[]>();
+    .overrideTypes<CategoryShareSummary[], { merge: false }>();
 }
 
 // owner_user_id is cast around here since the not-null column has no

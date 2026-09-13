@@ -7,8 +7,8 @@ export type ItemUpdate = Database['public']['Tables']['items']['Update'];
 
 // Single source for both the field list and the `.select()` string built
 // from it below, so a dropped field can't silently vanish from responses
-// while TypeScript still believes it's there -- `.returns<T>()` is an
-// assertion, not a check.
+// while TypeScript still believes it's there -- `.overrideTypes<T, { merge:
+// false }>()` is an assertion, not a check.
 const ITEM_FIELD_KEYS = [
   'id',
   'title',
@@ -132,7 +132,7 @@ export function listItems({
   return query
     .order('created_at', { ascending: false })
     .range(from, to)
-    .returns<ItemSearchRow[]>();
+    .overrideTypes<ItemSearchRow[], { merge: false }>();
 }
 
 export function createItem(payload: Pick<ItemInsert, ItemEditableFieldKey>) {
@@ -208,7 +208,7 @@ export function rawListItemPlaces(
   return query
     .order('created_at', { ascending: false })
     .range(from, to)
-    .returns<ItemPlaceRow[]>();
+    .overrideTypes<ItemPlaceRow[], { merge: false }>();
 }
 
 // Unfiltered by the search box on purpose: an export is of a category, not
@@ -232,7 +232,7 @@ export function listItemsForExport(
     .order('created_at', { ascending: true })
     .order('id', { ascending: true })
     .range(from, to)
-    .returns<ExportItemRow[]>();
+    .overrideTypes<ExportItemRow[], { merge: false }>();
 }
 // Stryker restore all
 /* v8 ignore stop */

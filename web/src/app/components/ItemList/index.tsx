@@ -140,6 +140,26 @@ export default function ItemList({
     [editingItem, saveEdit, setEditOpen, setEditingItem],
   );
 
+  // `total > 0` with empty `items` isn't "no entries" -- it's the gap
+  // between a page-no-longer-existing refetch landing and the corrected
+  // page's fetch resolving. Painting the empty state here would flash it
+  // over entries that still exist.
+  const isEmpty = items.length === 0;
+  const showSkeleton = isEmpty && (loading || total > 0);
+  const showEmptyState = isEmpty && !showSkeleton;
+
+  let searchAnnouncement = '';
+  if (!loading) {
+    if (searchStatus.kind === 'active') {
+      searchAnnouncement = tCount(
+        'item_list.results_count',
+        searchStatus.total,
+      );
+    } else if (searchStatus.kind === 'tooShort') {
+      searchAnnouncement = t('item_list.search_too_short');
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Mobile-first toolbar: search takes the full first row where it is
@@ -187,53 +207,43 @@ export default function ItemList({
           from listItems, so announcing a count here would pass off the
           unfiltered total as a search result. */}
       <span className="sr-only" aria-live="polite">
-        {loading
-          ? ''
-          : searchStatus.kind === 'active'
-            ? tCount('item_list.results_count', searchStatus.total)
-            : searchStatus.kind === 'tooShort'
-              ? t('item_list.search_too_short')
-              : ''}
+        {searchAnnouncement}
       </span>
 
-      {items.length === 0 ? (
-        // `total > 0` with empty `items` isn't "no entries" -- it's the gap
-        // between a page-no-longer-existing refetch landing and the
-        // corrected page's fetch resolving. Painting the empty state here
-        // would flash it over entries that still exist.
-        loading || total > 0 ? (
-          <GridSkeleton />
-        ) : (
-          <section className="py-16 grid place-items-center text-center">
-            <div className="flex flex-col items-center gap-4 max-w-xs">
-              <div className="h-16 w-16 bg-card ring-1 ring-border grid place-items-center text-3xl">
-                {qDebounced ? '🔍' : '🧺'}
-              </div>
-              <div className="space-y-1.5">
-                <h3 className="font-display text-lg text-foreground">
-                  {searchStatus.kind === 'active'
-                    ? t('item_list.no_results_title').replace('{q}', qDebounced)
-                    : t('item_list.no_items_title')}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {searchStatus.kind === 'active'
-                    ? t('item_list.no_results_hint')
-                    : t('item_list.no_items_hint')}
-                </p>
-              </div>
-              {qDebounced && (
-                <button
-                  type="button"
-                  onClick={() => setQ('')}
-                  className="min-h-11 px-3 font-label text-xs text-foreground underline underline-offset-4"
-                >
-                  {t('item_list.search_clear')}
-                </button>
-              )}
+      {showSkeleton && <GridSkeleton />}
+
+      {showEmptyState && (
+        <section className="py-16 grid place-items-center text-center">
+          <div className="flex flex-col items-center gap-4 max-w-xs">
+            <div className="h-16 w-16 bg-card ring-1 ring-border grid place-items-center text-3xl">
+              {qDebounced ? '🔍' : '🧺'}
             </div>
-          </section>
-        )
-      ) : (
+            <div className="space-y-1.5">
+              <h3 className="font-display text-lg text-foreground">
+                {searchStatus.kind === 'active'
+                  ? t('item_list.no_results_title').replace('{q}', qDebounced)
+                  : t('item_list.no_items_title')}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {searchStatus.kind === 'active'
+                  ? t('item_list.no_results_hint')
+                  : t('item_list.no_items_hint')}
+              </p>
+            </div>
+            {qDebounced && (
+              <button
+                type="button"
+                onClick={() => setQ('')}
+                className="min-h-11 px-3 font-label text-xs text-foreground underline underline-offset-4"
+              >
+                {t('item_list.search_clear')}
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+
+      {!isEmpty && (
         <ul
           aria-busy={loading}
           aria-labelledby="entries-heading"

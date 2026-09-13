@@ -91,6 +91,13 @@ export function ShareList({ shares }: { shares: UseShares }) {
             const isExpired =
               !!s.expires_at &&
               new Date(s.expires_at).getTime() <= new Date().getTime();
+            let expiryLabel = t('category_select.share_no_expiry');
+            if (s.expires_at) {
+              const date = new Date(s.expires_at).toLocaleDateString();
+              expiryLabel = isExpired
+                ? t('category_select.share_expired_on').replace('{date}', date)
+                : t('category_select.share_expires_on').replace('{date}', date);
+            }
             return (
               <li
                 key={s.id}
@@ -114,16 +121,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
                   <span
                     className={`shrink-0 sm:mr-4 ${isExpired ? 'text-destructive' : 'text-muted-foreground'}`}
                   >
-                    {s.expires_at
-                      ? t(
-                          isExpired
-                            ? 'category_select.share_expired_on'
-                            : 'category_select.share_expires_on',
-                        ).replace(
-                          '{date}',
-                          new Date(s.expires_at).toLocaleDateString(),
-                        )
-                      : t('category_select.share_no_expiry')}
+                    {expiryLabel}
                   </span>
 
                   <div className="flex shrink-0 items-center gap-1 sm:gap-2">
