@@ -14,8 +14,8 @@ jobs:
   # every other job -- it's the fastest check, so a failure here (a bad
   # tsconfig.json, a stray secret, ...) is caught before spending minutes on
   # a build, two browsers, a Supabase stack and a mutation-testing run.
-  # ESLint/Prettier/TypeScript hooks are skipped: build_and_test already
-  # runs those same three commands below. Unconditional (unlike the jobs
+  # ESLint/Prettier/TypeScript/depcruise hooks are skipped: build_and_test
+  # already runs those same commands below. Unconditional (unlike the jobs
   # below): file hygiene and secret scanning need to see every changed file
   # regardless of which directory it's in, and sqlfluff-lint here is only
   # ~2s against the fixed migrations/pgTAP set, not worth path-gating.
@@ -30,7 +30,7 @@ jobs:
         with:
           extra-args: "--all-files"
         env:
-          SKIP: no-commit-to-branch,prettier,eslint,tsc
+          SKIP: no-commit-to-branch,prettier,eslint,tsc,depcruise
 
   # Decides which of the two expensive job groups below actually need to
   # run. `web` gates the app-code checks (build/tsc/lint/unit tests/mutation
@@ -105,6 +105,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Check architectural boundaries
+        run: npm run depcruise
 
       - name: Run tests
         run: npm test -- --coverage
