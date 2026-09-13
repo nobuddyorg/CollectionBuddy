@@ -1,6 +1,8 @@
-# Opengrep's own suppression mechanism -- the single reviewable place for
-# accepted findings/exclusions, per TEST_STRATEGY.md. Every entry needs a
-# reason; do not add a blanket exclusion to silence a real finding.
+# Opengrep's own suppression mechanism (its default ignore-file name --
+# v1.30.0's CLI has no --semgrepignore-filename to rename it) -- the single
+# reviewable place for accepted findings/exclusions, per TEST_STRATEGY.md.
+# Every entry needs a reason; do not add a blanket exclusion to silence a
+# real finding.
 #
 # Build artifacts (out/, .next/, coverage/, reports/, .stryker-tmp/,
 # test-results/, playwright-report/, node_modules/) are not listed here --

@@ -120,7 +120,6 @@ reproduce a run locally:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash -s -- -v v1.30.0
 "$HOME/.opengrep/cli/latest/opengrep" scan --config auto \
-  --semgrepignore-filename=.opengrepignore \
   web/src web/scripts web/e2e supabase
 ```
 

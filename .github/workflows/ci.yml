@@ -326,15 +326,16 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash -s -- -v v1.30.0
           echo "$HOME/.opengrep/cli/latest" >> "$GITHUB_PATH"
 
-      # .opengrepignore is this repo's one suppression file (gitignore
-      # syntax) -- see its own comments for what's excluded and why.
-      # Build artifacts need no entry there: Opengrep only scans git-tracked
-      # files, and all of them are already in web/.gitignore.
+      # .semgrepignore (Opengrep's default ignore-file name -- v1.30.0 has no
+      # --semgrepignore-filename to rename it) is this repo's one
+      # suppression file (gitignore syntax) -- see its own comments for
+      # what's excluded and why. Build artifacts need no entry there:
+      # Opengrep only scans git-tracked files, and all of them are already
+      # in web/.gitignore.
       - name: Run Opengrep
         run: |
           opengrep scan \
             --config auto \
-            --semgrepignore-filename=.opengrepignore \
             --sarif-output=opengrep-results.sarif \
             web/src web/scripts web/e2e supabase
 

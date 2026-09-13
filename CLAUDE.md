@@ -62,7 +62,7 @@ npm run e2e:local         # needs `supabase start`; required if you touched
 supabase test db          # pgTAP, from the repo root; needs `supabase start`;
                            # required alongside e2e:local for changes touching
                            # RLS policies, grants, ownership triggers, or schema
-opengrep scan --config auto --semgrepignore-filename=.opengrepignore \
+opengrep scan --config auto \
   web/src web/scripts web/e2e supabase   # separate CI job (see CONTRIBUTING.md
                            # for install); run it too if you touched those paths
 ```
