@@ -22,7 +22,8 @@ step. Two more jobs run alongside it rather than after it, so run them separatel
 
 ```bash
 npm run test:mutation   # the mutation_test job
-npm run e2e:local       # the e2e_local_stack job; needs `supabase start` first
+supabase test db        # part of the e2e_local_stack job; needs `supabase start` first
+npm run e2e:local       # the rest of the e2e_local_stack job; same prerequisite
 ```
 
 A fourth job, `prek`, runs the repo-wide hooks — `prek run --all-files` from the repository
@@ -81,6 +82,17 @@ Two things worth knowing before adding tests here:
 - **Spec files run in parallel against one database.** Tests that write use their own category (`SEED.scratchCategory`); the collections the reading tests describe are never touched. A test that creates an entry in a collection another file is counting would make both wrong, at random.
 
 Prefer `expectTitles(page, [...])` over reading the grid once: the search box debounces and then waits on a round trip, so anything that asserts immediately after typing is asserting on the previous answer.
+
+### The pgTAP database suite
+
+`supabase/tests/database/` runs [pgTAP](https://pgtap.org/) directly against Postgres — no PostgREST, no browser — by impersonating the `authenticated` and `anon` roles the way a real request does: `set local role`, plus a `request.jwt.claims` GUC carrying the claims a JWT would. It runs in the same job as the signed-in suite, right after `supabase start`, because a schema or policy regression is cheaper to catch there than after paying for Playwright's browser install too.
+
+```bash
+supabase start   # from the repository root, if not already running
+supabase test db
+```
+
+It complements `rls.spec.ts` rather than duplicating it: pgTAP proves the policy, trigger and constraint logic fast and directly; `rls.spec.ts` proves the same properties hold through the real PostgREST-and-JWT pipeline, and is still the only place `storage.objects` and the real Storage API get exercised. See [TEST_STRATEGY.md](../../TEST_STRATEGY.md#7-security-and-authorization-testing) for the full division of labor. A policy, grant, or ownership-affecting trigger change still needs its `rls.spec.ts` case regardless of whether a pgTAP case exists alongside it — that rule (CLAUDE.md guardrail 3) is not discharged by pgTAP coverage.
 
 ## Run mutation testing
 

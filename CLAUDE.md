@@ -57,6 +57,9 @@ npm run test:mutation     # separate CI job, run it too before calling something
 npm run e2e:local         # needs `supabase start`; required if you touched
                            # catalogue, search, map, entry forms, photos,
                            # sharing, exporting, or RLS
+supabase test db          # pgTAP, from the repo root; needs `supabase start`;
+                           # required alongside e2e:local for changes touching
+                           # RLS policies, grants, ownership triggers, or schema
 ```
 
 `prek run --all-files` (or `pre-commit run --all-files`) from the repo root
