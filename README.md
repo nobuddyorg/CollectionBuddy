@@ -3,8 +3,13 @@
 A web-app catalog for your collected items 🗂️
 
 ![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen?logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/language-TypeScript-3178C6?logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/UI-React-20232a?logo=react&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs)
+![Tailwind CSS](https://img.shields.io/badge/styling-Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white)
 ![Supabase](https://img.shields.io/badge/backend-Supabase-3ECF8E?logo=supabase&logoColor=white)
+![Leaflet](https://img.shields.io/badge/maps-Leaflet-199900?logo=leaflet&logoColor=white)
+![Docker](https://img.shields.io/badge/containers-Docker-2496ED?logo=docker&logoColor=white)
 ![GitHub Pages](https://img.shields.io/badge/hosting-GitHub%20Pages-blue?logo=github)
 ![ESLint](https://img.shields.io/badge/ESLint-9-4B32C3?logo=eslint)
 ![Prettier](https://img.shields.io/badge/Prettier-3-F7B93E?logo=prettier)
@@ -55,46 +60,6 @@ Full docs live in [`docs/`](docs/README.md), organised by [Diátaxis](https://di
 - **How-to**: [User guide](docs/how-to/user-guide.md) · [Developer guide](docs/how-to/developer-guide.md) (checks, migrations, new environments, deploy)
 - **Reference**: [Architecture](docs/reference/architecture.md) · [Configuration](docs/reference/configuration.md)
 - **Explanation**: [Design decisions](docs/explanation/design-decisions.md)
-
-## Technology Map
-
-<p align="center">
-  <img src="https://api.iconify.design/logos:nodejs-icon.svg?height=88" height="88" alt="Node.js" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:typescript-icon.svg?height=88" height="88" alt="TypeScript" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:react.svg?height=82" height="82" alt="React" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:nextjs-icon.svg?height=82" height="82" alt="Next.js" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:tailwindcss-icon.svg?height=82" height="82" alt="Tailwind CSS" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:supabase-icon.svg?height=82" height="82" alt="Supabase" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:postgresql.svg?height=82" height="82" alt="PostgreSQL" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:leaflet.svg?height=66" height="66" alt="Leaflet" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:docker-icon.svg?height=72" height="72" alt="Docker" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:github-icon.svg?height=82" height="82" alt="GitHub Pages" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:github-actions.svg?height=82" height="82" alt="GitHub Actions" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/vscode-icons:file-type-codeql.svg?height=78" height="78" alt="CodeQL" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:vitest.svg?height=82" height="82" alt="Vitest" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:playwright.svg?height=82" height="82" alt="Playwright" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/simple-icons:stryker.svg?height=82&color=%23E74C3C" height="82" alt="Stryker" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:lighthouse.svg?height=82" height="82" alt="Lighthouse" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:eslint.svg?height=82" height="82" alt="ESLint" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="https://api.iconify.design/logos:prettier.svg?height=72" height="72" alt="Prettier" />
-</p>
 
 ## Contributing
 
