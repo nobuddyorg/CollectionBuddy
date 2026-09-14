@@ -182,6 +182,16 @@ export differently (`web/scripts/serve-export.mjs`) and doesn't expect that syml
 
 `vitest.config.mts` carries a global floor plus per-file 100% floors for the pure, high-risk modules. The global floor is not auto-updated: raise it by hand when coverage genuinely improves, and never lower it to make a change fit. It had been left about 16 points below what the suite actually achieved, which meant half the tests could have been deleted with CI still green.
 
+## Read the e2e JS/CSS coverage report
+
+`npm run e2e` and `npm run e2e:local` both collect JS/CSS coverage automatically, via Playwright's own `page.coverage` (Chromium's CDP coverage collector — every project in `playwright.config.ts` runs on a Chromium engine, so this needs no Istanbul/babel instrumentation step). `e2e/coverage.ts` wires it into every test through an auto fixture; `e2e/global-teardown.ts` merges what each worker collected into one report after all projects finish, via [`monocart-coverage-reports`](https://github.com/cenfun/monocart-coverage-reports).
+
+```bash
+open web/coverage-e2e/index.html   # after any e2e run
+```
+
+It's an observability report, not a gate — nothing in the pre-PR checklist reads it, and there's no threshold to fail. `i18n.spec.ts` is the one file that opts out (it drives its own `browser.newContext()` rather than the `page` fixture the auto fixture attaches to). Coverage is measured against the built bundle, not the original source, since the export doesn't ship source maps (`next.config.ts` doesn't set `productionBrowserSourceMaps`) — turning those on would be a separate, deliberate call, since they'd also ship in the production static export.
+
 ## Regenerate the app icons
 
 The home-screen and splash-screen icons in `web/public/` are rendered from a single piece of artwork, `web/public/logo.png`:

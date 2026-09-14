@@ -1,3 +1,6 @@
+// Not '../coverage': every test here opens its own `browser.newContext()`
+// rather than using the `page` fixture, so the autoCoverage fixture there
+// would have nothing to attach to.
 import { expect, test } from '@playwright/test';
 
 // Language is decided client-side (storage, then browser); a wrong `<html lang>`

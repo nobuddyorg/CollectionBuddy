@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/coverage-e2e
 /reports
 .stryker-tmp
 /test-results

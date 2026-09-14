@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../coverage';
 
 import { collectPageProblems, expectNoPageProblems } from '../helpers';
 

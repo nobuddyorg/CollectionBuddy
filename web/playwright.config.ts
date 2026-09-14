@@ -21,6 +21,9 @@ const localStack = Boolean(process.env.E2E_SUPABASE_URL);
 
 export default defineConfig({
   testDir: './e2e',
+  // Merges every worker's JS/CSS coverage (e2e/coverage.ts's autoCoverage
+  // fixture) into one report once every project has finished.
+  globalTeardown: './e2e/global-teardown.ts',
   // Retries would hide the flake worth knowing about. The remote target is
   // the exception: there, a retry distinguishes a broken deploy from a
   // dropped connection.
