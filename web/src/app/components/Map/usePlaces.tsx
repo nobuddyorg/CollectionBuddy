@@ -262,13 +262,11 @@ export function usePlaces(
             // just leaves it unlocated for one more lookup. The builder only
             // sends once `.then()` is called, so a handler is needed rather
             // than a plain `void`.
-            const idsAtPlace = ids.get(place) ?? [];
-            if (idsAtPlace.length > 0)
-              void updateItemsPlace(idsAtPlace, {
-                place_lat: entry.lat,
-                place_lng: entry.lng,
-                // eslint-disable-next-line sonarjs/no-nested-functions
-              }).then(() => {});
+            void updateItemsPlace(ids.get(place) ?? [], {
+              place_lat: entry.lat,
+              place_lng: entry.lng,
+              // eslint-disable-next-line sonarjs/no-nested-functions
+            }).then(() => {});
           }
         };
 
