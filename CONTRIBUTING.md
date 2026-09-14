@@ -179,6 +179,20 @@ supabase start   # from the repository root, if not already running
 supabase test db
 ```
 
+If your migration alters an existing table, or adds a constraint or index to
+one, also test it against a populated database, not just the empty one
+`supabase start`/`supabase db reset` gives you — CI only proves a migration
+applies from scratch, while production applies it to a database full of
+rows on every merge to `main`, with no staging environment in between:
+
+```bash
+supabase db reset          # from the repository root
+# seed the affected tables, e.g. the e2e/signed-in.setup.ts seed
+# then apply the new migration file on top of that populated database
+```
+
+Say in the PR description that you did this.
+
 For anything past this checklist (changing the database schema, deploying,
 setting up a new Supabase environment), see the [developer
 guide](docs/how-to/developer-guide.md).

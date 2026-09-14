@@ -110,6 +110,17 @@ rather than by a number: a squash renumbers them.
   `SUPABASE_DB_URL`/`SUPABASE_ACCESS_TOKEN` secrets this session should not
   have reason to use, and pushing schema changes to `main` is what
   `pages-deploy.yml`'s `migrate` job does, deliberately, in CI.
+- CI only proves a migration applies **from scratch** (`supabase start` runs
+  `0001`…`N` against an empty database); production applies it with `db
+  push` against a database **full of rows**, on every merge to `main`, with
+  no staging in between. For any migration that alters an existing table, or
+  adds a constraint or index to one, also test it against populated data
+  before opening the PR: `supabase db reset`, seed rows into the affected
+  tables (the `e2e/signed-in.setup.ts` seed covers most shapes), then apply
+  the new migration file on top of that — not through a fresh reset — and
+  say in the PR description that you did. This is a review-enforced practice,
+  not an automated gate: a committed production-shaped seed would just be a
+  second schema to keep in step with the first.
 - Any change to `supabase/migrations/**` — new policy, changed policy, new
   grant, new trigger touching auth/ownership — **must** be called out
   explicitly in the commit message and PR description as a security-relevant
