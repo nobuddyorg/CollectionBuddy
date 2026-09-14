@@ -9,7 +9,6 @@ A web-app catalog for your collected items 🗂️
 ![Tailwind CSS](https://img.shields.io/badge/styling-Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white)
 ![Supabase](https://img.shields.io/badge/backend-Supabase-3ECF8E?logo=supabase&logoColor=white)
 ![Leaflet](https://img.shields.io/badge/maps-Leaflet-199900?logo=leaflet&logoColor=white)
-![Docker](https://img.shields.io/badge/containers-Docker-2496ED?logo=docker&logoColor=white)
 ![GitHub Pages](https://img.shields.io/badge/hosting-GitHub%20Pages-blue?logo=github)
 ![ESLint](https://img.shields.io/badge/lint-ESLint-4B32C3?logo=eslint&logoColor=white)
 ![Prettier](https://img.shields.io/badge/format-Prettier-F7B93E?logo=prettier&logoColor=white)
