@@ -5,7 +5,7 @@ A web-app catalog for your collected items 🗂️
 ![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen?logo=nodedotjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/language-TypeScript-3178C6?logo=typescript&logoColor=white)
 ![React](https://img.shields.io/badge/UI-React-20232a?logo=react&logoColor=white)
-![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs)
+![Next.js](https://img.shields.io/badge/framework-Next.js-black?logo=nextdotjs&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/styling-Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white)
 ![Supabase](https://img.shields.io/badge/backend-Supabase-3ECF8E?logo=supabase&logoColor=white)
 ![Leaflet](https://img.shields.io/badge/maps-Leaflet-199900?logo=leaflet&logoColor=white)
