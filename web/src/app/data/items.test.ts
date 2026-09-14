@@ -8,6 +8,7 @@ import {
   listItemPlaces,
   listItems,
   listItemsForExport,
+  rawCountItems,
   rawListItemPlaces,
   rawListItems,
   searchFilterFor,
@@ -121,6 +122,12 @@ describe('the queries behind the list and the map', () => {
     paramsOf(rawListItems({ categoryId: 'cat-1', search, from: 0, to: 8 }));
   const mapQuery = (search: string) =>
     paramsOf(rawListItemPlaces('cat-1', search, 0, ITEM_PLACE_PAGE_SIZE - 1));
+  const countBuilder = (search: string) =>
+    rawCountItems({ categoryId: 'cat-1', search }) as unknown as {
+      url: URL;
+      method: string;
+      headers: Headers;
+    };
 
   it('narrows the map by the same search as the list, character for character', () => {
     expect(mapQuery('coin').get('or')).toBe(listQuery('coin').get('items.or'));
@@ -145,6 +152,39 @@ describe('the queries behind the list and the map', () => {
     expect(listQuery('coin').get('select')).toBe(
       'items!inner(id,title,description,place,place_lat,place_lng,tags)',
     );
+  });
+
+  // The exact total is a separate, cheaper request from the page itself
+  // (#PERF-H3): counting through the items join costs a join on every row
+  // even with nothing to filter on, where a bare item_categories count
+  // measures ~15x cheaper.
+  it('counts item_categories alone, with no join to items, when there is no search filter', () => {
+    const builder = countBuilder('');
+    expect(builder.url.searchParams.get('select')).toBe('item_id');
+    expect(builder.method).toBe('HEAD');
+    expect(builder.headers.get('Prefer')).toContain('count=exact');
+  });
+
+  it('narrows the count query by category the same way the page query is', () => {
+    expect(countBuilder('').url.searchParams.get('category_id')).toBe(
+      'eq.cat-1',
+    );
+  });
+
+  it('brings the items join back into the count only once a search filter applies', () => {
+    const builder = countBuilder('coin');
+    expect(builder.url.searchParams.get('select')).toBe(
+      'items!inner(id,title,description,place,place_lat,place_lng,tags)',
+    );
+    expect(builder.method).toBe('HEAD');
+    expect(builder.headers.get('Prefer')).toContain('count=exact');
+    expect(builder.url.searchParams.get('items.or')).toBe(
+      listQuery('coin').get('items.or'),
+    );
+  });
+
+  it('leaves the count query unfiltered for a search term below the minimum length', () => {
+    expect(countBuilder('ab').url.searchParams.get('select')).toBe('item_id');
   });
 
   it('leaves both unfiltered for a term below the minimum length', () => {
@@ -199,16 +239,17 @@ describe('listItems', () => {
     };
   }
 
-  it('unwraps each row to the item it embeds, passing the count through', async () => {
+  it('unwraps each row to the item it embeds, combining it with the count from the separate count request', async () => {
     const rawList = vi.fn().mockResolvedValue({
       data: [{ items: item('a') }, { items: item('b') }],
       error: null,
-      count: 2,
     });
+    const rawCount = vi.fn().mockResolvedValue({ count: 2, error: null });
 
     const { data, error, count } = await listItems(
       { categoryId: 'cat-1', search: '', from: 0, to: 8 },
       rawList,
+      rawCount,
     );
 
     expect(error).toBeNull();
@@ -220,16 +261,43 @@ describe('listItems', () => {
       from: 0,
       to: 8,
     });
+    expect(rawCount).toHaveBeenCalledWith({
+      categoryId: 'cat-1',
+      search: '',
+      from: 0,
+      to: 8,
+    });
   });
 
-  it('returns no data and a null count on error, without touching the rows', async () => {
+  it('returns no data and a null count when the page request errors, without touching the rows', async () => {
     const rawList = vi
       .fn()
-      .mockResolvedValue({ data: null, error: new Error('boom'), count: 5 });
+      .mockResolvedValue({ data: null, error: new Error('boom') });
+    const rawCount = vi.fn().mockResolvedValue({ count: 5, error: null });
 
     const { data, error, count } = await listItems(
       { categoryId: 'cat-1', search: '', from: 0, to: 8 },
       rawList,
+      rawCount,
+    );
+
+    expect(data).toBeNull();
+    expect(error).toBeInstanceOf(Error);
+    expect(count).toBeNull();
+  });
+
+  it('returns no data and a null count when the count request errors, even though the page succeeded', async () => {
+    const rawList = vi
+      .fn()
+      .mockResolvedValue({ data: [{ items: item('a') }], error: null });
+    const rawCount = vi
+      .fn()
+      .mockResolvedValue({ count: null, error: new Error('boom') });
+
+    const { data, error, count } = await listItems(
+      { categoryId: 'cat-1', search: '', from: 0, to: 8 },
+      rawList,
+      rawCount,
     );
 
     expect(data).toBeNull();
@@ -238,13 +306,13 @@ describe('listItems', () => {
   });
 
   it('flattens to an empty page rather than crashing when a successful response carries no rows', async () => {
-    const rawList = vi
-      .fn()
-      .mockResolvedValue({ data: null, error: null, count: 0 });
+    const rawList = vi.fn().mockResolvedValue({ data: null, error: null });
+    const rawCount = vi.fn().mockResolvedValue({ count: 0, error: null });
 
     const { data, error, count } = await listItems(
       { categoryId: 'cat-1', search: '', from: 0, to: 8 },
       rawList,
+      rawCount,
     );
 
     expect(error).toBeNull();
