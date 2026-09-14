@@ -261,7 +261,12 @@ export function usePlaces(
             // this one (#PERF-H6). Best effort, not awaited: a failed write
             // just leaves it unlocated for one more lookup. The builder only
             // sends once `.then()` is called, so a handler is needed rather
-            // than a plain `void`.
+            // than a plain `void`. `ids` is seeded from the same rows that
+            // produced `unlocated` (and therefore this queue), so every
+            // place reaching this worker already has at least one id keyed
+            // here -- `?? []` guards only the type checker, not a case the
+            // Map is expected to actually hit.
+            // v8 ignore next
             void updateItemsPlace(ids.get(place) ?? [], {
               place_lat: entry.lat,
               place_lng: entry.lng,
