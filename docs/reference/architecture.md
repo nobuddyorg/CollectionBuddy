@@ -111,7 +111,7 @@ There is no image-cleanup trigger reaching into `storage.objects`. A `cleanup_it
 - `(user_id, created_at desc)` on `items`, for list ordering.
 - Trigram GIN indexes (`pg_trgm`) on `items.title`, `items.description`, `items.place`, `items.tags_text` — see [Design decisions](../explanation/design-decisions.md#why-search-uses-trigram-ilike-instead-of-full-text-search) for why these exist instead of Postgres full-text search.
 - A plain GIN index on `items.tags` for containment filtering, which is an array operation and can't use the trigram index.
-- `item_id`, `category_id` and `user_id` on `item_categories`.
+- `item_id`, `category_id` and `user_id` on `item_categories`, plus `(category_id, created_at desc, item_id)` — the catalogue page and its RLS-widened grantee path are driven from `item_categories` rather than `items` specifically so this index can serve both the ordering and the category scoping without a full per-category scan (#618, #619).
 - `(item_id, created_at asc, id)` and `user_id` on `images` — the former is both the read path (an item's photographs, oldest-first, matching the ordering `storage.list()` used to guarantee) and what a capture-before-cascade delete filters by; the latter matches `item_categories`' own precedent of indexing `user_id` even though `item_id` already narrows most queries.
 
 Nothing here indexes `storage.objects`, and nothing can: hosted Supabase owns it as `supabase_storage_admin` and doesn't make `postgres` a member, so `create index` on it raises `42501` for every role available to us. Policies on it are fine; DDL is not.
