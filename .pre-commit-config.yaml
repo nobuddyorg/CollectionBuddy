@@ -18,7 +18,7 @@ repos:
 
   # Spell checking
   - repo: https://github.com/crate-ci/typos
-    rev: v1.50.0
+    rev: v1.50.1
     hooks:
       - id: typos
         # German prose reads as misspelled English near word-for-word, so
@@ -35,7 +35,7 @@ repos:
 
   # zizmor: security analysis of the GitHub Actions workflows
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.29.0
+    rev: v1.30.0
     hooks:
       - id: zizmor
 
