@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import {
   listItemPlaces,
-  updateItem,
+  updateItemsPlace,
   type ItemPlaceRow,
 } from '../../data/items';
 import {
@@ -253,18 +253,22 @@ export function usePlaces(
               // eslint-disable-next-line sonarjs/no-nested-functions
               setPlaces((prev) => [...prev, withTitles(entry, titles)]);
 
-            // Written back to every row from this place, so the next open
-            // reads it instead of asking the gazetteer again. Best effort,
-            // not awaited: a failed write just leaves it unlocated for one
-            // more lookup. The builder only sends once `.then()` is called,
-            // so a handler is needed rather than a plain `void`.
-            for (const id of ids.get(place) ?? []) {
-              void updateItem(id, {
+            // Written back to every row from this place, chunked into a
+            // handful of requests instead of one PATCH per item -- a place
+            // shared by thousands of rows used to fire that many concurrent,
+            // un-awaited requests at once, the only fan-out in the app that
+            // could exhaust PostgREST's connections for every user, not just
+            // this one (#PERF-H6). Best effort, not awaited: a failed write
+            // just leaves it unlocated for one more lookup. The builder only
+            // sends once `.then()` is called, so a handler is needed rather
+            // than a plain `void`.
+            const idsAtPlace = ids.get(place) ?? [];
+            if (idsAtPlace.length > 0)
+              void updateItemsPlace(idsAtPlace, {
                 place_lat: entry.lat,
                 place_lng: entry.lng,
                 // eslint-disable-next-line sonarjs/no-nested-functions
               }).then(() => {});
-            }
           }
         };
 

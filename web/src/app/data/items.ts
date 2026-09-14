@@ -203,6 +203,16 @@ export function updateItem(
     .single<ItemFields>();
 }
 
+// One `.in()` filter's worth of items, not one row -- what `updateItemsPlace`
+// below chunks over so a place shared by thousands of items becomes a
+// handful of requests instead of one per row (#PERF-H6).
+export function rawUpdateItemsPlace(
+  ids: string[],
+  payload: Pick<ItemUpdate, 'place_lat' | 'place_lng'>,
+) {
+  return supabase.from('items').update(payload).in('id', ids);
+}
+
 // `.select().single()` turns an RLS-refused delete (zero rows affected,
 // which a bare `.delete()` reports as `{ error: null }`) into an error a
 // caller can see.
@@ -281,6 +291,31 @@ export function listItemsForExport(
 /* v8 ignore stop */
 
 export type ExportItemRow = ItemFields & { created_at: string };
+
+// Ids per `.in()` filter; more risks hitting a URL length limit before
+// PostgREST's own row cap does (same constant, and same reasoning, as
+// data/categories.ts and data/images.ts).
+const ID_FILTER_CHUNK_SIZE = 100;
+
+/**
+ * Writes a geocoded place back onto every item at that place, one request
+ * per `ID_FILTER_CHUNK_SIZE` items rather than one per item (#PERF-H6) --
+ * `Map/usePlaces.tsx` calls this once per resolved place, not once per row.
+ * `updatePage` is a parameter so the chunking can be driven with a fake
+ * instead of a real database.
+ */
+export async function updateItemsPlace(
+  ids: string[],
+  payload: Pick<ItemUpdate, 'place_lat' | 'place_lng'>,
+  updatePage: typeof rawUpdateItemsPlace = rawUpdateItemsPlace,
+): Promise<{ error: unknown }> {
+  for (let i = 0; i < ids.length; i += ID_FILTER_CHUNK_SIZE) {
+    const chunk = ids.slice(i, i + ID_FILTER_CHUNK_SIZE);
+    const { error } = await updatePage(chunk, payload);
+    if (error) return { error };
+  }
+  return { error: null };
+}
 
 // PostgREST caps an unranged request at max_rows (supabase/config.toml,
 // 1000) and truncates silently, so that's the page size a map request uses.

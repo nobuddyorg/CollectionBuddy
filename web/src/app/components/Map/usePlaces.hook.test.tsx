@@ -2,12 +2,12 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { listItemPlaces, updateItem } from '../../data/items';
+import { listItemPlaces, updateItemsPlace } from '../../data/items';
 import { usePlaces } from './usePlaces';
 
 vi.mock('../../data/items', () => ({
   listItemPlaces: vi.fn(),
-  updateItem: vi.fn(),
+  updateItemsPlace: vi.fn(),
 }));
 
 const GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
@@ -46,7 +46,7 @@ describe('usePlaces', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
-    vi.mocked(updateItem).mockResolvedValue({ error: null } as never);
+    vi.mocked(updateItemsPlace).mockResolvedValue({ error: null });
     listed([]);
   });
 
@@ -80,7 +80,7 @@ describe('usePlaces', () => {
     expect(result.current.error).toBe(false);
   });
 
-  it('geocodes a place with no coordinates and writes the answer back to its entries', async () => {
+  it('geocodes a place with no coordinates and writes the answer back to its entries in one batched call', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => photonHit(7.1, 50.7)),
@@ -96,13 +96,11 @@ describe('usePlaces', () => {
       lng: 7.1,
       titles: ['Item a', 'Item b'],
     });
-    // Both rows at that place, so the next open reads the coordinates
+    // Both rows at that place, written back with one call rather than one
+    // PATCH per item (#PERF-H6), so the next open reads the coordinates
     // instead of asking again.
-    expect(updateItem).toHaveBeenCalledWith('a', {
-      place_lat: 50.7,
-      place_lng: 7.1,
-    });
-    expect(updateItem).toHaveBeenCalledWith('b', {
+    expect(updateItemsPlace).toHaveBeenCalledTimes(1);
+    expect(updateItemsPlace).toHaveBeenCalledWith(['a', 'b'], {
       place_lat: 50.7,
       place_lng: 7.1,
     });
