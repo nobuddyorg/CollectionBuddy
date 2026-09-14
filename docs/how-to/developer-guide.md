@@ -205,6 +205,17 @@ Every schema change goes through a new migration file, never an edit to an exist
 4. See [Architecture reference](../reference/architecture.md#database-schema) for what's already there, so your migration doesn't duplicate an existing table, trigger, or index.
 5. Merging to `main` applies it to production — see below. Nothing needs applying by hand.
 
+`supabase db reset` only proves the migration applies against an **empty**
+database — that's all CI checks too. Production applies it with `db push`
+against a database full of rows, unattended, with no staging in between: a
+`not null` column with no default, a unique index existing rows violate, or a
+check constraint existing data fails would pass every automated check and
+only fail there. If your migration alters an existing table, or adds a
+constraint or index to one, reset and seed the local database (the
+`e2e/signed-in.setup.ts` seed covers most shapes), apply the new migration
+file on top of that populated database rather than through a fresh reset,
+and say in the PR description that you did.
+
 If you ever apply a migration outside the pipeline (SQL editor, `db push` by hand), send `notify pgrst, 'reload schema'` afterwards. PostgREST serves from a cached schema, so until it reloads, every write naming a newly added column fails with `PGRST204: Could not find the 'x' column of 'items' in the schema cache` — the table is fine, the API just hasn't noticed. Most Supabase projects have a `pgrst_ddl_watch` event trigger that does this automatically; this one doesn't, and can't, since creating an event trigger needs superuser and `postgres` isn't. The `migrate` job sends it on every run, so migrations that go through `main` are covered.
 
 A migration that touches `storage.objects` can create and drop _policies_ on it, but not indexes or anything else needing ownership: hosted Supabase owns that table as `supabase_storage_admin` and never grants it to `postgres`, so `create index` on it raises `42501` for every role available to us. An earlier migration carried such an index for a year, which meant that file — one transaction — had never applied anywhere, locally or in production, while the repo and its docs described it as live.
