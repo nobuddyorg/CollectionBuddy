@@ -23,9 +23,9 @@ export type ItemEditableFieldKey = Exclude<
   (typeof ITEM_FIELD_KEYS)[number],
   'id'
 >;
-export type ItemSearchRow = ItemFields & {
-  item_categories: { category_id: string }[];
-};
+/** What a page read returns per matching `item_categories` row, before
+ * `listItems` flattens it to the item itself. */
+type ItemCategoryPageRow = { items: ItemFields };
 
 /**
  * A place as stored on an item, for the map to draw without geocoding.
@@ -50,7 +50,13 @@ export type ItemPlaceRow = Pick<
 // Coordinates come back with every item read so an item edited without
 // touching its place keeps the pin it already had.
 const ITEM_FIELDS_SELECT = ITEM_FIELD_KEYS.join(',');
-const ITEMS_SEARCH_SELECT = `${ITEM_FIELDS_SELECT},item_categories!inner(category_id)`;
+// Embeds items as the many-to-one side of item_categories rather than the
+// other way around, so item_categories -- not items -- is the driving,
+// top-level table. That is what lets .order() below sort and .range() page
+// on item_categories' own created_at, walking idx_item_categories_cat_created
+// (0013_item_categories_cat_created_idx.sql) instead of scanning every item
+// in the category before sorting (#618, #619).
+const ITEM_CATEGORY_PAGE_SELECT = `items!inner(${ITEM_FIELDS_SELECT})`;
 const ITEM_PLACE_FIELDS_SELECT = ITEM_PLACE_FIELD_KEYS.join(',');
 // Stryker restore all
 /* v8 ignore stop */
@@ -101,7 +107,7 @@ export function searchFilterFor(search: string): string | null {
  * searchFilterFor above are what's gated and mutation-tested. */
 // Stryker disable all: what these builders are held to is the shape of the
 // query, not their lines.
-export function listItems({
+export function rawListItems({
   categoryId,
   search,
   from,
@@ -116,25 +122,62 @@ export function listItems({
    * downloading for nothing. */
   signal?: AbortSignal;
 }) {
+  // Driven from item_categories (see ITEM_CATEGORY_PAGE_SELECT above), with
+  // category_id a plain column filter on that same top-level table rather
+  // than an embedded-table one.
+  //
   // `count: 'exact'` runs a full COUNT on every call, including every
   // debounced keystroke -- kept fast by the trigram GIN indexes
-  // (migrations/0005). Revisit with `count: 'estimated'` if search gets
-  // slow on a large collection.
+  // (migrations/0005) for the search filter, but still an O(category size)
+  // scan on its own (#PERF-H3, tracked separately).
   let query = supabase
-    .from('items')
-    .select(ITEMS_SEARCH_SELECT, { count: 'exact' })
-    .eq('item_categories.category_id', categoryId);
+    .from('item_categories')
+    .select(ITEM_CATEGORY_PAGE_SELECT, { count: 'exact' })
+    .eq('category_id', categoryId);
 
   const filter = searchFilterFor(search);
-  if (filter) query = query.or(filter);
+  if (filter) query = query.or(filter, { referencedTable: 'items' });
   if (signal) query = query.abortSignal(signal);
 
   return query
     .order('created_at', { ascending: false })
     .range(from, to)
-    .overrideTypes<ItemSearchRow[], { merge: false }>();
+    .overrideTypes<ItemCategoryPageRow[], { merge: false }>();
+}
+/* v8 ignore stop */
+// Stryker restore all
+
+/**
+ * The catalogue page: every item currently linked into `categoryId`,
+ * newest first. A thin flatten over `rawListItems` -- kept outside the
+ * ignored block above (unlike that builder) because unwrapping `items` is
+ * real logic worth a real test, the same reasoning `listItemPlaces` below
+ * applies to its own paging over `rawListItemPlaces`. `rawList` is a
+ * parameter for exactly that test, not for production callers.
+ */
+export async function listItems(
+  params: {
+    categoryId: string;
+    search: string;
+    from: number;
+    to: number;
+    signal?: AbortSignal;
+  },
+  rawList: typeof rawListItems = rawListItems,
+): Promise<{
+  data: ItemFields[] | null;
+  error: unknown;
+  count: number | null;
+}> {
+  const { data, error, count } = await rawList(params);
+  if (error) return { data: null, error, count: null };
+  return { data: (data ?? []).map((row) => row.items), error: null, count };
 }
 
+/* v8 ignore start -- thin Supabase query builders; buildSearchFilter and
+ * searchFilterFor above are what's gated and mutation-tested. */
+// Stryker disable all: what these builders are held to is the shape of the
+// query, not their lines.
 export function createItem(payload: Pick<ItemInsert, ItemEditableFieldKey>) {
   return (
     supabase

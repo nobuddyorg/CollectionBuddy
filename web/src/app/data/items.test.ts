@@ -9,6 +9,7 @@ import {
   listItems,
   listItemsForExport,
   rawListItemPlaces,
+  rawListItems,
   searchFilterFor,
   searchMinLength,
 } from './items';
@@ -116,12 +117,12 @@ describe('the queries behind the list and the map', () => {
     (builder as { url: URL }).url.searchParams;
 
   const listQuery = (search: string) =>
-    paramsOf(listItems({ categoryId: 'cat-1', search, from: 0, to: 8 }));
+    paramsOf(rawListItems({ categoryId: 'cat-1', search, from: 0, to: 8 }));
   const mapQuery = (search: string) =>
     paramsOf(rawListItemPlaces('cat-1', search, 0, ITEM_PLACE_PAGE_SIZE - 1));
 
   it('narrows the map by the same search as the list, character for character', () => {
-    expect(mapQuery('coin').get('or')).toBe(listQuery('coin').get('or'));
+    expect(mapQuery('coin').get('or')).toBe(listQuery('coin').get('items.or'));
     expect(mapQuery('coin').get('or')).toContain('coin');
   });
 
@@ -131,9 +132,23 @@ describe('the queries behind the list and the map', () => {
     );
   });
 
+  // The list is driven from item_categories itself (#618, #619) rather than
+  // from items with an embedded item_categories filter, so category_id is a
+  // plain column filter here instead of the embedded-table one the map still
+  // uses above.
+  it('narrows the list by category as a plain column filter, not an embedded one', () => {
+    expect(listQuery('coin').get('category_id')).toBe('eq.cat-1');
+  });
+
+  it('drives the list from item_categories, embedding items as the inner join that carries the search filter', () => {
+    expect(listQuery('coin').get('select')).toBe(
+      'items!inner(id,title,description,place,place_lat,place_lng,tags)',
+    );
+  });
+
   it('leaves both unfiltered for a term below the minimum length', () => {
     expect(mapQuery('ab').has('or')).toBe(false);
-    expect(listQuery('ab').has('or')).toBe(false);
+    expect(listQuery('ab').has('items.or')).toBe(false);
   });
 
   it('asks only for entries that have a place to draw', () => {
@@ -148,6 +163,10 @@ describe('the queries behind the list and the map', () => {
   const exportQuery = () => paramsOf(listItemsForExport('cat-1', 0, 499));
 
   it('orders the map newest-first, the same as the list', () => {
+    // Same param, same value -- though the list now sorts on
+    // item_categories.created_at and the map still sorts on items.created_at
+    // (#618/#619's accepted semantic note: the two coincide because a
+    // mapping row is only ever written alongside its item, never later).
     expect(mapQuery('coin').get('order')).toBe(listQuery('coin').get('order'));
     expect(listQuery('coin').get('order')).toBe('created_at.desc');
   });
@@ -163,6 +182,73 @@ describe('the queries behind the list and the map', () => {
   it('pages the export the same way range() was asked to', () => {
     expect(exportQuery().get('offset')).toBe('0');
     expect(exportQuery().get('limit')).toBe('500');
+  });
+});
+
+describe('listItems', () => {
+  function item(id: string) {
+    return {
+      id,
+      title: id,
+      description: null,
+      place: null,
+      place_lat: null,
+      place_lng: null,
+      tags: [],
+    };
+  }
+
+  it('unwraps each row to the item it embeds, passing the count through', async () => {
+    const rawList = vi.fn().mockResolvedValue({
+      data: [{ items: item('a') }, { items: item('b') }],
+      error: null,
+      count: 2,
+    });
+
+    const { data, error, count } = await listItems(
+      { categoryId: 'cat-1', search: '', from: 0, to: 8 },
+      rawList,
+    );
+
+    expect(error).toBeNull();
+    expect(count).toBe(2);
+    expect(data).toEqual([item('a'), item('b')]);
+    expect(rawList).toHaveBeenCalledWith({
+      categoryId: 'cat-1',
+      search: '',
+      from: 0,
+      to: 8,
+    });
+  });
+
+  it('returns no data and a null count on error, without touching the rows', async () => {
+    const rawList = vi
+      .fn()
+      .mockResolvedValue({ data: null, error: new Error('boom'), count: 5 });
+
+    const { data, error, count } = await listItems(
+      { categoryId: 'cat-1', search: '', from: 0, to: 8 },
+      rawList,
+    );
+
+    expect(data).toBeNull();
+    expect(error).toBeInstanceOf(Error);
+    expect(count).toBeNull();
+  });
+
+  it('flattens to an empty page rather than crashing when a successful response carries no rows', async () => {
+    const rawList = vi
+      .fn()
+      .mockResolvedValue({ data: null, error: null, count: 0 });
+
+    const { data, error, count } = await listItems(
+      { categoryId: 'cat-1', search: '', from: 0, to: 8 },
+      rawList,
+    );
+
+    expect(error).toBeNull();
+    expect(count).toBe(0);
+    expect(data).toEqual([]);
   });
 });
 
