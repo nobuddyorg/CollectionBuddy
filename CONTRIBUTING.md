@@ -156,9 +156,12 @@ supabase start   # from the repository root
 cd web && npm run lighthouse
 ```
 
-See [TEST_STRATEGY.md](TEST_STRATEGY.md) for the measured baseline the
-thresholds are set against and how the accessibility-category overlap with
-`@axe-core/playwright` (above) is handled.
+The actual thresholds (and the measured baseline they were set against) live
+in `web/lighthouserc.signed-out.json`/`.signed-in.json`; see
+[TEST_STRATEGY.md](TEST_STRATEGY.md) §12 for the general approach (measure a
+real baseline, set the gate with margin, never the tool's generic defaults)
+and how the accessibility-category overlap with `@axe-core/playwright`
+(above) is handled.
 
 If your change touches a row-level security policy, a grant, an
 ownership-affecting trigger, or the schema more generally, also run the

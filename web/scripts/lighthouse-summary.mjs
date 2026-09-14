@@ -8,7 +8,12 @@
 import { readFile, appendFile } from 'node:fs/promises';
 
 // Must match the `assert` blocks in lighthouserc.signed-out.json /
-// .signed-in.json -- see TEST_STRATEGY.md §12 for why the two differ.
+// .signed-in.json. The two targets differ because a brand-new signed-in
+// demo account has zero categories, so its first render goes through a
+// large, deterministic skeleton-to-empty-state layout shift that a
+// signed-out page never hits -- see TEST_STRATEGY.md §12 for the general
+// principle (set thresholds from a measured baseline with real margin, and
+// write down why a threshold is loose rather than silently widening it).
 const TARGETS = [
   {
     label: 'Signed out (`/login/`)',

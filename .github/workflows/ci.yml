@@ -416,8 +416,9 @@ jobs:
       # split, Lighthouse's per-category budgets) -- this was the one
       # exception, upload-only regardless of findings. WARNING/INFO stay
       # report-only (community-pack noise and stylistic suggestions are
-      # mostly there; see TEST_STRATEGY.md for the three ERROR-adjacent
-      # false positives already triaged), but an ERROR-severity finding
+      # mostly there; a handful of ERROR-adjacent false positives have
+      # already been triaged at their `nosemgrep` suppression sites), but
+      # an ERROR-severity finding
       # (the pack's own bar for "this is a real bug/vulnerability shape")
       # now fails the job instead of only landing quietly in the Security
       # tab. Runs after the upload above so the tab stays populated either
@@ -504,8 +505,8 @@ jobs:
   # passive injection/error-disclosure probes against real rendered
   # responses, a different angle from Opengrep (source text) and axe-core
   # (a static DOM). Complements, never substitutes for, the authorization
-  # testing in e2e_local_stack -- see TEST_STRATEGY.md's "Dynamic scanning
-  # (OWASP ZAP baseline)" section; a green run here says nothing about RLS.
+  # testing in e2e_local_stack -- see TEST_STRATEGY.md's §6 "Dynamic
+  # scanning (DAST)" section; a green run here says nothing about RLS.
   # Gated on web changing (see the `changes` job), same as
   # build_and_test/mutation_test/lighthouse: this measures the built web
   # bundle's runtime surface, not database behaviour.

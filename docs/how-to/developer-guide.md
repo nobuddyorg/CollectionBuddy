@@ -31,8 +31,9 @@ root is the same thing.
 
 A fifth job, `changes`, decides whether `build_and_test`, `mutation_test`, and
 `e2e_local_stack` run at all: on a PR, each is skipped unless the paths it
-actually covers changed (see [TEST_STRATEGY.md](../../TEST_STRATEGY.md) §13
-for exactly which). Don't be surprised to see one of them missing on a
+actually covers changed — see `.github/workflows/ci.yml`'s `changes` job for
+exactly which, and [TEST_STRATEGY.md](../../TEST_STRATEGY.md) §13 for the
+general rationale. Don't be surprised to see one of them missing on a
 docs-only or SQL-only PR — the local commands above still all run and are
 still worth running before opening one, since nothing about the local
 pre-PR checklist is conditional.
@@ -119,8 +120,8 @@ The list of mutated files is [`mutation-targets.mjs`](../../web/mutation-targets
 
 `ci.yml`'s `zap_baseline` job runs a passive DAST scan against the built static export, twice
 — signed out, then signed in via demo mode — see [TEST_STRATEGY.md](../../TEST_STRATEGY.md)'s
-"Dynamic scanning (OWASP ZAP baseline)" for what it covers and what it deliberately doesn't
-(it is not a substitute for `rls.spec.ts`). Both passes need the local stack up first
+§6 "Dynamic scanning (DAST)" for what this kind of scan covers and what it deliberately
+doesn't (it is not a substitute for `rls.spec.ts`). Both passes need the local stack up first
 (`supabase start` from the repo root); from `web/`:
 
 ```bash

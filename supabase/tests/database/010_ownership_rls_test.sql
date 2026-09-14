@@ -1,8 +1,8 @@
 -- "Your own vs. a stranger's" -- the core matrix for categories, items,
 -- item_categories and images with no sharing involved. TEST_STRATEGY.md
--- R1: a wrong policy here is a silent, total confidentiality failure, and
--- the interface would look identical while showing somebody else's
--- collection.
+-- §4's "cross-tenant read/write" risk: a wrong policy here is a silent,
+-- total confidentiality failure, and the interface would look identical
+-- while showing somebody else's collection.
 --
 -- Complements web/e2e/signed-in/rls.spec.ts's "one collection cannot reach
 -- another" describe block rather than duplicating it: that suite proves
