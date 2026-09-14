@@ -92,6 +92,48 @@ Two things worth knowing before adding tests here:
 
 Prefer `expectTitles(page, [...])` over reading the grid once: the search box debounces and then waits on a round trip, so anything that asserts immediately after typing is asserting on the previous answer.
 
+### Known E2E journey-coverage gaps
+
+A walk of README's feature list and this suite (2026-09), checking each
+feature against `e2e/signed-in/` and — per TEST_STRATEGY.md §9 — whether an
+apparent gap is actually delegated to a component/unit test instead. Most
+of README's list is covered one way or the other: photo strips and the
+multi-photo carousel are unit-tested in `ModalImage.test.tsx`, and the
+sharing UI's mechanics (invite form, role selector) are unit-tested in
+`Sharing.test.tsx`/`useShares.test.tsx`. Two gaps found no delegation for:
+
+- **Importing a category has no browser-level test.** `export.spec.ts`
+  exists specifically because "only a real browser can prove that clicking
+  Export produces a download, and that a real, independent extractor can
+  open it" (its own comment) — pagination/batching/skip-on-failure are
+  unit-tested with fake I/O in `importCategory.test.ts` and
+  `useImportCategory.test.tsx`, but nothing proves the symmetric case: that
+  selecting a real archive in a real browser and clicking Import actually
+  produces real items with real photographs in the catalogue. Since export
+  already builds an archive to a temp path, the same spec (or a sibling)
+  could round-trip it straight back through Import.
+- **Sharing through the interface has no browser-level test with two real
+  identities.** `rls.spec.ts` proves the authorization boundary — grants,
+  roles, revocation — almost entirely at the API level (one `page.get*` call
+  in the whole file); component tests prove the sharing panel's own
+  mechanics with a mocked client. Nothing drives two real signed-in browser
+  sessions through the actual UI (owner types an email into `ShareInvite`,
+  picks a role, the other identity's category list picks it up) the way
+  `rls.spec.ts` already uses two real identities at the API layer. This is
+  the one journey in README's feature list that has real, RLS-backed
+  cross-user behavior but no full-stack UI journey test — everything else
+  cross-user lives in `rls.spec.ts` by design, but that file explicitly
+  isn't meant to substitute for a UI journey (TEST_STRATEGY.md §7).
+
+Local demo mode (`npm run demo`) also has no E2E coverage, but it's dev
+tooling rather than a production code path, so it's a lower-priority gap
+than the two above.
+
+Neither gap is large: both features already have thorough
+unit/component-level tests, so the risk this leaves open is specifically
+"the UI doesn't actually wire up to the real backend the way the unit tests
+assume" — the failure mode a mocked-client test structurally cannot catch.
+
 ### The pgTAP database suite
 
 `supabase/tests/database/` runs [pgTAP](https://pgtap.org/) directly against Postgres — no PostgREST, no browser — by impersonating the `authenticated` and `anon` roles the way a real request does: `set local role`, plus a `request.jwt.claims` GUC carrying the claims a JWT would. It runs in the same job as the signed-in suite, right after `supabase start`, because a schema or policy regression is cheaper to catch there than after paying for Playwright's browser install too.
