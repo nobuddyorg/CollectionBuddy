@@ -207,13 +207,13 @@ export type Database = {
       join_tags: { Args: { tags: string[] }; Returns: string };
       keepalive: { Args: never; Returns: undefined };
       list_category_places: {
-        Args: { cat_id: string; like_pattern?: string | null };
+        Args: { cat_id: string; like_pattern?: string };
         Returns: {
-          place: string;
-          place_lat: number | null;
-          place_lng: number | null;
-          titles: string[];
           ids: string[];
+          place: string;
+          place_lat: number;
+          place_lng: number;
+          titles: string[];
         }[];
       };
       normalize_text: { Args: { txt: string }; Returns: string };
@@ -225,13 +225,13 @@ export type Database = {
           page_to: number;
         };
         Returns: {
+          description: string;
           id: string;
-          title: string;
-          description: string | null;
-          place: string | null;
-          place_lat: number | null;
-          place_lng: number | null;
+          place: string;
+          place_lat: number;
+          place_lng: number;
           tags: string[];
+          title: string;
           total_count: number;
         }[];
       };
