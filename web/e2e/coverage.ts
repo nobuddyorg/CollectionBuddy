@@ -11,7 +11,7 @@ import MCR from 'monocart-coverage-reports';
 const mcr = MCR({
   name: 'CollectionBuddy e2e coverage',
   outputDir: 'coverage-e2e',
-  reports: ['v8', 'console-summary'],
+  reports: ['v8', 'console-summary', 'markdown-summary'],
   // The static export's own bundle, not e.g. the service worker registered
   // alongside it.
   entryFilter: '**/_next/**',
@@ -20,6 +20,26 @@ const mcr = MCR({
   // alongside app code (Supabase, Leaflet, React) would swamp the report.
   sourceFilter: '**/src/app/**',
 });
+
+/**
+ * A floor, not a target -- see TEST_STRATEGY.md and CLAUDE.md's coverage
+ * guardrail. Measured from a full local run of the signed-out suite alone
+ * (chromium + mobile, e2e/public), the smaller of the two suites that feed
+ * this report, with a margin below what it actually achieved:
+ * statements 15.22%, branches 6.33%, functions 12.57%, lines 42.44%. The
+ * signed-in suite (npm run e2e:local) touches far more of the app and
+ * clears this easily; it shares the same floor rather than a tighter one
+ * of its own because this sandbox has no Supabase/Docker to measure it
+ * against for real, and a guessed number is worse than none (see
+ * "Measure, don't assume" in CLAUDE.md). Raise by hand once a real run
+ * reports a higher achieved number -- never lower it to make a change fit.
+ */
+const COVERAGE_THRESHOLDS = {
+  statements: 12,
+  branches: 5,
+  functions: 10,
+  lines: 35,
+};
 
 export const test = base.extend<{ autoCoverage: void }>({
   autoCoverage: [
@@ -50,9 +70,28 @@ export { expect } from '@playwright/test';
 
 /**
  * Merges every worker's coverage (each `add()` above persists to
- * `outputDir`'s cache, not just this process's memory) into one report.
- * Called once from globalTeardown, after every project has finished.
+ * `outputDir`'s cache, not just this process's memory) into one report, then
+ * gates on COVERAGE_THRESHOLDS. Called once from globalTeardown, after every
+ * project has finished -- throwing here fails the whole Playwright run, the
+ * same as a failed test would.
  */
 export async function generateCoverageReport() {
-  await mcr.generate();
+  const results = await mcr.generate();
+  if (!results) return;
+
+  const failures = Object.entries(COVERAGE_THRESHOLDS)
+    .map(([metric, floor]) => {
+      const pct =
+        results.summary[metric as keyof typeof COVERAGE_THRESHOLDS]?.pct;
+      return typeof pct === 'number' && pct < floor
+        ? `${metric}: ${pct.toFixed(2)}% is below the ${floor}% floor`
+        : null;
+    })
+    .filter((failure) => failure !== null);
+
+  if (failures.length > 0) {
+    throw new Error(
+      `e2e coverage dropped below its floor:\n${failures.join('\n')}`,
+    );
+  }
 }

@@ -186,6 +186,7 @@ jobs:
           title: 'End-to-end tests -- signed-out (public)'
           tag: 'e2e (signed-out)'
           artifact-name: playwright-report
+          coverage-artifact-name: e2e-coverage
           job-status: ${{ job.status }}
 
   # The signed-in half of the app, against a real database. Its own job
@@ -275,6 +276,7 @@ jobs:
           title: 'End-to-end tests -- signed-in (local stack)'
           tag: 'e2e (signed-in, local stack)'
           artifact-name: playwright-report-signed-in
+          coverage-artifact-name: e2e-coverage-signed-in
           job-status: ${{ job.status }}
 
       - name: Stop Supabase
