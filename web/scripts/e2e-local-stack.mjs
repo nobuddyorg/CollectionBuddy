@@ -46,6 +46,10 @@ const env = {
   E2E_SUPABASE_URL: API_URL,
   E2E_SUPABASE_ANON_KEY: ANON_KEY,
   E2E_SUPABASE_SERVICE_KEY: SERVICE_ROLE_KEY,
+  // This build only ever feeds this script's own e2e run, never a deploy,
+  // so source maps are free here -- they make the coverage report
+  // (e2e/coverage.ts) point at real source instead of the bundle.
+  E2E_COVERAGE_SOURCEMAPS: 'true',
 };
 
 const run = (command, args) =>

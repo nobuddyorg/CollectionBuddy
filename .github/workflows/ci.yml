@@ -95,6 +95,9 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # This build feeds the e2e run below, not a deploy -- source maps
+          # make its coverage report (e2e/coverage.ts) point at real source.
+          E2E_COVERAGE_SOURCEMAPS: 'true'
 
       # After the build, not before: `next build` generates next-env.d.ts
       # (gitignored), which tsc/eslint need on a clean checkout.
@@ -171,7 +174,7 @@ jobs:
       # asset request a 404 this never caught. Playwright starts and stops
       # the server itself (playwright.config.ts).
       - name: Install browsers for the end-to-end suite
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
 
       - name: Run end-to-end tests
         run: npm run e2e
@@ -183,6 +186,7 @@ jobs:
           title: 'End-to-end tests -- signed-out (public)'
           tag: 'e2e (signed-out)'
           artifact-name: playwright-report
+          coverage-artifact-name: e2e-coverage
           job-status: ${{ job.status }}
 
   # The signed-in half of the app, against a real database. Its own job
@@ -272,6 +276,7 @@ jobs:
           title: 'End-to-end tests -- signed-in (local stack)'
           tag: 'e2e (signed-in, local stack)'
           artifact-name: playwright-report-signed-in
+          coverage-artifact-name: e2e-coverage-signed-in
           job-status: ${{ job.status }}
 
       - name: Stop Supabase

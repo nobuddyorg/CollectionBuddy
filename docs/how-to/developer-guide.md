@@ -224,6 +224,22 @@ export differently (`web/scripts/serve-export.mjs`) and doesn't expect that syml
 
 `vitest.config.mts` carries a global floor plus per-file 100% floors for the pure, high-risk modules. The global floor is not auto-updated: raise it by hand when coverage genuinely improves, and never lower it to make a change fit. It had been left about 16 points below what the suite actually achieved, which meant half the tests could have been deleted with CI still green.
 
+## Read the e2e JS/CSS coverage report
+
+`npm run e2e` and `npm run e2e:local` both collect JS/CSS coverage automatically, via Playwright's own `page.coverage` (Chromium's CDP coverage collector, so this needs no Istanbul/babel instrumentation step). `e2e/coverage.ts` wires it into every test through an auto fixture; `e2e/global-teardown.ts` merges what each worker collected into one report after all projects finish, via [`monocart-coverage-reports`](https://github.com/cenfun/monocart-coverage-reports).
+
+```bash
+open web/coverage-e2e/index.html   # after any e2e run
+```
+
+`e2e/coverage.ts`'s `COVERAGE_THRESHOLDS` gates on it: `generateCoverageReport()` throws out of `global-teardown.ts` if statements/branches/functions/lines drop below their floor, which fails the whole `npm run e2e`/`e2e:local` run the same as a failed test would. Like `vitest.config.mts`'s floor, it's not auto-ratcheted — raise it by hand when a real run reports a higher achieved number, never lower it to make a change fit. It's currently set from a full local run of the signed-out suite alone (chromium + mobile, `e2e/public` — the smaller of the two suites that feed this report), with a margin below what it actually achieved; the signed-in suite (`npm run e2e:local`) touches far more of the app and clears it easily, but shares the same floor rather than a tighter one of its own, since it hasn't been measured for real yet — see the comment above `COVERAGE_THRESHOLDS` for the exact numbers and reasoning.
+
+Two things opt out of coverage collection entirely: `i18n.spec.ts` (it drives its own `browser.newContext()` rather than the `page` fixture the auto fixture attaches to), and the `firefox` project (Playwright's Coverage API is Chromium-only over CDP; Firefox still runs every other assertion in `e2e/public`, just without contributing to this report or the gate).
+
+CI posts the `console-summary`/`markdown-summary` table to the job summary and uploads the full `web/coverage-e2e/` report as a build artifact (`e2e-coverage`/`e2e-coverage-signed-in`) on every run, pass or fail — both via `.github/actions/playwright-results`, alongside the existing Playwright HTML report. `pages-deploy.yml`'s `smoke_test` job (post-deploy check against production) doesn't use that action and isn't part of this — it stays a narrower pass/fail signal, not a coverage source.
+
+By default coverage is measured against the built bundle, not the original source, since the export doesn't ship source maps (`next.config.ts` only sets `productionBrowserSourceMaps` when `E2E_COVERAGE_SOURCEMAPS=true`). CI (`ci.yml`'s `build_and_test` job) and `npm run e2e:local` (`scripts/e2e-local-stack.mjs`) both set it, so their reports map back to real `src/app/**` files and lines (`sourceFilter` in `e2e/coverage.ts` keeps vendor library source out of it); a plain local `npm run build && npm run e2e` doesn't, and reads against the minified bundle instead. `pages-deploy.yml`'s actual deploy build never sets it — turning source maps on there would ship them in the production static export, which is a separate, deliberate call this doesn't make.
+
 ## Regenerate the app icons
 
 The home-screen and splash-screen icons in `web/public/` are rendered from a single piece of artwork, `web/public/logo.png`:
