@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import {
-  listItemPlaces,
+  listCategoryPlaces,
   updateItemsPlace,
-  type ItemPlaceRow,
+  type PlaceGroupRow,
 } from '../../data/items';
 import {
   coordsFromFeature,
@@ -39,61 +39,42 @@ function writeGeocodeCache(cache: Record<string, PlaceCoords>) {
 // Stryker restore all
 
 /**
- * Splits the rows to draw into places that already know where they are and
- * names that still need a lookup, deduplicated by name. A name is only
- * unlocated if *no* row carrying it has coordinates.
+ * Splits the places to draw into ones that already know where they are and
+ * names that still need a lookup. `list_category_places`
+ * (0014_list_category_places.sql) has already folded every item down to one
+ * row per distinct place, so there is no deduplication left to do here --
+ * only deciding, per place, whether the coordinates it carries are usable.
  */
-// Two flat bookkeeping loops with early `continue`s, not deep nesting; the
-// complexity is the geocoding domain logic itself (already covered by
-// mutation-targets.mjs's 100% floor), not a shape that would get clearer
-// by splitting.
-// eslint-disable-next-line sonarjs/cognitive-complexity
-export function partitionByStoredCoords(rows: ItemPlaceRow[]): {
+export function partitionByStoredCoords(rows: PlaceGroupRow[]): {
   located: PlaceCoords[];
   unlocated: string[];
   titles: Map<string, string[]>;
   ids: Map<string, string[]>;
 } {
-  const byName = new Map<string, PlaceCoords>();
+  const located: PlaceCoords[] = [];
+  const unlocated: string[] = [];
   const titles = new Map<string, string[]>();
   const ids = new Map<string, string[]>();
   for (const row of rows) {
-    const { id, place, title, place_lat: lat, place_lng: lng } = row;
-    if (!place) continue;
+    const { place, place_lat: lat, place_lng: lng } = row;
+    titles.set(place, row.titles);
+    ids.set(place, row.ids);
 
-    // Every entry at this place, including rows with no coordinates of
-    // their own -- a neighbouring row may say where "there" is.
-    const at = titles.get(place);
-    if (at) at.push(title);
-    else titles.set(place, [title]);
-
-    // Once the place is geocoded, the answer is written back to every row
-    // named here.
-    const idsAt = ids.get(place);
-    if (idsAt) idsAt.push(id);
-    else ids.set(place, [id]);
-
-    if (byName.has(place)) continue;
     // Not a type guard on its own -- narrows the pair to `number` for the
     // compiler. Number.isFinite below rejects null too, so this line is
     // unobservable at runtime.
     // Stryker disable next-line all
-    if (lat == null || lng == null) continue;
-    // A stored NaN would draw a pin nowhere and suppress the geocode that
-    // would have found the place properly.
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-    byName.set(place, { name: place, lat, lng });
-  }
-
-  const located: PlaceCoords[] = [];
-  const unlocated: string[] = [];
-  const seen = new Set<string>();
-  for (const { place } of rows) {
-    if (!place || seen.has(place)) continue;
-    seen.add(place);
-    const hit = byName.get(place);
-    if (hit) located.push(hit);
-    else unlocated.push(place);
+    if (lat == null || lng == null) {
+      unlocated.push(place);
+      continue;
+    }
+    // A stored NaN/Infinity would draw a pin nowhere and suppress the
+    // geocode that would have found the place properly.
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      located.push({ name: place, lat, lng });
+    } else {
+      unlocated.push(place);
+    }
   }
   return { located, unlocated, titles, ids };
 }
@@ -190,7 +171,7 @@ export function usePlaces(
       setError(false);
       setPlaces([]);
       try {
-        const { data: items, error } = await listItemPlaces(
+        const { data: places, error } = await listCategoryPlaces(
           categoryId,
           search,
           controller.signal,
@@ -199,7 +180,7 @@ export function usePlaces(
         if (error) throw new Error('Could not list places', { cause: error });
 
         const { located, unlocated, titles, ids } = partitionByStoredCoords(
-          items ?? [],
+          places ?? [],
         );
         const cache = readGeocodeCache();
         let cacheDirty = false;

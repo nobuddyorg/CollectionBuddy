@@ -7,7 +7,7 @@ import {
   withTitles,
 } from './usePlaces';
 import type { PlaceCoords } from './types';
-import type { ItemPlaceRow } from '../../data/items';
+import type { PlaceGroupRow } from '../../data/items';
 
 const cologne: PlaceCoords = { name: 'Cologne', lat: 50.94, lng: 6.96 };
 const berlin: PlaceCoords = { name: 'Berlin', lat: 52.52, lng: 13.4 };
@@ -16,22 +16,25 @@ function photon(coordinates: unknown) {
   return { features: [{ geometry: { coordinates } }] };
 }
 
-function row(
-  place: string | null,
+// `list_category_places` (0014_list_category_places.sql) already folds
+// every item at a place into one row, newest first -- this builds that
+// row directly rather than the per-item rows the SQL now groups.
+function group(
+  place: string,
   place_lat: number | null = null,
   place_lng: number | null = null,
-  title = 'An entry',
-  id = 'row-id',
-): ItemPlaceRow {
-  return { id, title, place, place_lat, place_lng };
+  titles: string[] = ['An entry'],
+  ids: string[] = ['row-id'],
+): PlaceGroupRow {
+  return { place, place_lat, place_lng, titles, ids };
 }
 
 describe('partitionByStoredCoords', () => {
-  it('draws stored coordinates without a lookup, and lists the rest', () => {
+  it('draws a place with a stored coordinate pair, and lists the rest as unlocated', () => {
     const { located, unlocated } = partitionByStoredCoords([
-      row('Cologne', 50.94, 6.96),
-      row('Paris'),
-      row('Berlin', 52.52, 13.4),
+      group('Cologne', 50.94, 6.96),
+      group('Paris'),
+      group('Berlin', 52.52, 13.4),
     ]);
     expect(located).toEqual([cologne, berlin]);
     expect(unlocated).toEqual(['Paris']);
@@ -39,85 +42,40 @@ describe('partitionByStoredCoords', () => {
 
   it('preserves input order within each side of the split', () => {
     const { located, unlocated } = partitionByStoredCoords([
-      row('Berlin', 52.52, 13.4),
-      row('Paris'),
-      row('Cologne', 50.94, 6.96),
-      row('Rome'),
+      group('Berlin', 52.52, 13.4),
+      group('Paris'),
+      group('Cologne', 50.94, 6.96),
+      group('Rome'),
     ]);
     expect(located).toEqual([berlin, cologne]);
     expect(unlocated).toEqual(['Paris', 'Rome']);
   });
 
-  it('deduplicates a place repeated across items', () => {
-    const { located, unlocated } = partitionByStoredCoords([
-      row('Cologne', 50.94, 6.96),
-      row('Cologne', 50.94, 6.96),
-      row('Paris'),
-      row('Paris'),
-    ]);
-    expect(located).toEqual([cologne]);
-    expect(unlocated).toEqual(['Paris']);
-  });
-
-  it('spares a place a lookup when any one item located it', () => {
-    // An item entered before 0015 alongside one entered after: the older
-    // row has no coordinates, but the place is still known.
-    const { located, unlocated } = partitionByStoredCoords([
-      row('Cologne'),
-      row('Cologne', 50.94, 6.96),
-    ]);
-    expect(located).toEqual([cologne]);
-    expect(unlocated).toEqual([]);
-  });
-
   it('falls back to a lookup when only one coordinate was stored', () => {
     expect(
-      partitionByStoredCoords([row('Cologne', 50.94, null)]),
+      partitionByStoredCoords([group('Cologne', 50.94, null)]),
     ).toMatchObject({ located: [], unlocated: ['Cologne'] });
-    expect(partitionByStoredCoords([row('Cologne', null, 6.96)])).toMatchObject(
-      { located: [], unlocated: ['Cologne'] },
-    );
+    expect(
+      partitionByStoredCoords([group('Cologne', null, 6.96)]),
+    ).toMatchObject({ located: [], unlocated: ['Cologne'] });
   });
 
   it('falls back to a lookup rather than pinning a non-finite coordinate', () => {
-    expect(partitionByStoredCoords([row('Broken', NaN, 6.96)])).toMatchObject({
-      located: [],
-      unlocated: ['Broken'],
-    });
+    expect(partitionByStoredCoords([group('Broken', NaN, 6.96)])).toMatchObject(
+      { located: [], unlocated: ['Broken'] },
+    );
     expect(
-      partitionByStoredCoords([row('Broken', 50.94, Infinity)]),
+      partitionByStoredCoords([group('Broken', 50.94, Infinity)]),
     ).toMatchObject({ located: [], unlocated: ['Broken'] });
   });
 
   it('treats zero coordinates as a real location, not a missing one', () => {
-    expect(partitionByStoredCoords([row('Null Island', 0, 0)])).toMatchObject({
-      located: [{ name: 'Null Island', lat: 0, lng: 0 }],
-      unlocated: [],
-    });
-  });
-
-  // Two items can name the same place and disagree about where it is -- one
-  // entered by picking a suggestion, another edited by hand. The first
-  // located row wins, so the pin does not jump about depending on the order
-  // the rows happen to come back in.
-  it('keeps the first coordinates given for a repeated place', () => {
-    const { located } = partitionByStoredCoords([
-      row('Cologne', 50.94, 6.96),
-      row('Cologne', 1, 2),
-    ]);
-    expect(located).toEqual([cologne]);
-  });
-
-  it('ignores rows with no place at all', () => {
-    const { located, unlocated, titles } = partitionByStoredCoords([
-      row(null, 50.94, 6.96),
-      row(''),
-    ]);
-    expect(located).toEqual([]);
-    expect(unlocated).toEqual([]);
-    // A row with no place has nowhere to be listed, so its title is not
-    // collected either -- an unnamed key would draw a pin onto nothing.
-    expect(titles.size).toBe(0);
+    expect(partitionByStoredCoords([group('Null Island', 0, 0)])).toMatchObject(
+      {
+        located: [{ name: 'Null Island', lat: 0, lng: 0 }],
+        unlocated: [],
+      },
+    );
   });
 
   it('has nothing to do for an empty row list', () => {
@@ -129,78 +87,30 @@ describe('partitionByStoredCoords', () => {
 });
 
 describe('partitionByStoredCoords, on the entries at each place', () => {
-  it('collects every title catalogued at a place', () => {
-    const { titles } = partitionByStoredCoords([
-      row('Cologne', 50.94, 6.96, 'Seated Dime'),
-      row('Cologne', 50.94, 6.96, 'Silver Eagle'),
-      row('Berlin', 52.52, 13.4, 'Buffalo Nickel'),
+  it('carries through the titles and ids the row already grouped', () => {
+    const { titles, ids } = partitionByStoredCoords([
+      group(
+        'Cologne',
+        50.94,
+        6.96,
+        ['Seated Dime', 'Silver Eagle'],
+        ['item-1', 'item-2'],
+      ),
+      group('Berlin', 52.52, 13.4, ['Buffalo Nickel'], ['item-3']),
     ]);
     expect(titles.get('Cologne')).toEqual(['Seated Dime', 'Silver Eagle']);
     expect(titles.get('Berlin')).toEqual(['Buffalo Nickel']);
-  });
-
-  it('keeps the order the rows came back in', () => {
-    // The query orders newest first so the popup and the list agree; that
-    // order is carried through rather than re-sorted here.
-    const { titles } = partitionByStoredCoords([
-      row('Cologne', 50.94, 6.96, 'Newest'),
-      row('Cologne', 50.94, 6.96, 'Older'),
-      row('Cologne', 50.94, 6.96, 'Oldest'),
-    ]);
-    expect(titles.get('Cologne')).toEqual(['Newest', 'Older', 'Oldest']);
-  });
-
-  it('lists an entry whose own row carried no coordinates', () => {
-    // Entered before 0015, so it has no coordinates of its own -- but it is
-    // catalogued at a place a neighbouring row does locate, and a popup
-    // that skipped it would under-report the collection.
-    const { located, titles } = partitionByStoredCoords([
-      row('Cologne', null, null, 'Older entry'),
-      row('Cologne', 50.94, 6.96, 'Newer entry'),
-    ]);
-    expect(located).toEqual([cologne]);
-    expect(titles.get('Cologne')).toEqual(['Older entry', 'Newer entry']);
-  });
-
-  it('collects titles for a place still awaiting a lookup', () => {
-    const { unlocated, titles } = partitionByStoredCoords([
-      row('Paris', null, null, 'Napoleon Franc'),
-    ]);
-    expect(unlocated).toEqual(['Paris']);
-    // The geocode has not happened yet, but the titles are already known --
-    // they come from the rows, not from the gazetteer.
-    expect(titles.get('Paris')).toEqual(['Napoleon Franc']);
-  });
-
-  // The write-back a resolved geocode does (#512) needs to know which rows
-  // to correct -- every row catalogued at a place, the same rows the
-  // titles above are collected from.
-  it('collects the id of every row catalogued at a place', () => {
-    const { ids } = partitionByStoredCoords([
-      row('Paris', null, null, 'Napoleon Franc', 'item-1'),
-      row('Paris', null, null, 'Louis Franc', 'item-2'),
-      row('Berlin', 52.52, 13.4, 'Buffalo Nickel', 'item-3'),
-    ]);
-    expect(ids.get('Paris')).toEqual(['item-1', 'item-2']);
+    expect(ids.get('Cologne')).toEqual(['item-1', 'item-2']);
     expect(ids.get('Berlin')).toEqual(['item-3']);
   });
 
-  it('collects a row’s id even when that row itself carries no coordinates', () => {
-    const { ids } = partitionByStoredCoords([
-      row('Cologne', null, null, 'Older entry', 'item-old'),
-      row('Cologne', 50.94, 6.96, 'Newer entry', 'item-new'),
+  it('carries through titles and ids for a place still awaiting a lookup', () => {
+    const { unlocated, titles, ids } = partitionByStoredCoords([
+      group('Paris', null, null, ['Napoleon Franc'], ['item-1']),
     ]);
-    expect(ids.get('Cologne')).toEqual(['item-old', 'item-new']);
-  });
-
-  it('keeps two entries that share a title', () => {
-    // Duplicates are not collapsed: two coins of the same name are two
-    // coins, and a popup showing one would be miscounting the collection.
-    const { titles } = partitionByStoredCoords([
-      row('Cologne', 50.94, 6.96, 'Seated Dime'),
-      row('Cologne', 50.94, 6.96, 'Seated Dime'),
-    ]);
-    expect(titles.get('Cologne')).toEqual(['Seated Dime', 'Seated Dime']);
+    expect(unlocated).toEqual(['Paris']);
+    expect(titles.get('Paris')).toEqual(['Napoleon Franc']);
+    expect(ids.get('Paris')).toEqual(['item-1']);
   });
 });
 

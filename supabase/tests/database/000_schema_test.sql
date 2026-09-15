@@ -93,6 +93,18 @@ select ok(
   not has_function_privilege('anon', 'public.caller_email()', 'EXECUTE'),
   'anon has no EXECUTE on caller_email'
 );
+select ok(
+  not has_function_privilege(
+    'anon', 'public.list_category_places(uuid, text)', 'EXECUTE'
+  ),
+  'anon has no EXECUTE on list_category_places'
+);
+select ok(
+  not has_function_privilege(
+    'anon', 'public.search_category_items(uuid, text, int, int)', 'EXECUTE'
+  ),
+  'anon has no EXECUTE on search_category_items -- SECURITY DEFINER makes this the highest-stakes grant to get right'
+);
 
 -- delete_item_if_orphan (CLAUDE.md: "deliberately FOR EACH STATEMENT, not
 -- FOR EACH ROW -- the row-level version was a real O(n) performance bug

@@ -206,7 +206,35 @@ export type Database = {
       has_category_write_access: { Args: { cat_id: string }; Returns: boolean };
       join_tags: { Args: { tags: string[] }; Returns: string };
       keepalive: { Args: never; Returns: undefined };
+      list_category_places: {
+        Args: { cat_id: string; like_pattern?: string | null };
+        Returns: {
+          place: string;
+          place_lat: number | null;
+          place_lng: number | null;
+          titles: string[];
+          ids: string[];
+        }[];
+      };
       normalize_text: { Args: { txt: string }; Returns: string };
+      search_category_items: {
+        Args: {
+          cat_id: string;
+          like_pattern: string;
+          page_from: number;
+          page_to: number;
+        };
+        Returns: {
+          id: string;
+          title: string;
+          description: string | null;
+          place: string | null;
+          place_lat: number | null;
+          place_lng: number | null;
+          tags: string[];
+          total_count: number;
+        }[];
+      };
       storage_item_id: { Args: { path: string }; Returns: string };
     };
     Enums: {

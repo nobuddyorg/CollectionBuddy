@@ -1,8 +1,21 @@
 -- Search is substring ILIKE across four text columns OR'd together
--- (ITEMS_SEARCH_SELECT, items.ts), so all four need a trigram index: one
--- unindexed branch collapses the whole query onto a sequential scan.
--- tags_text exists solely to give the tags array a fourth ILIKE-able
+-- (buildSearchFilter/likePatternFor, items.ts), so all four need a trigram
+-- index: one unindexed branch collapses the whole query onto a sequential
+-- scan. tags_text exists solely to give the tags array a fourth ILIKE-able
 -- branch.
+--
+-- These indexes are *not*, on their own, reachable by an ordinary
+-- `authenticated` query: `texticlike` (ILIKE's underlying function) is not
+-- leakproof, and Postgres will not evaluate a non-leakproof qual before a
+-- relation's RLS security qual, so under RLS these can never become an
+-- index condition for a role RLS applies to (#621/PERF-H4). They earn their
+-- keep only through `search_category_items` (0015_search_category_items.sql),
+-- a `SECURITY DEFINER` function that re-implements the read-access check
+-- itself and then queries with RLS bypassed, so the planner can reach them.
+-- Every other read of `items` -- including the map's own place search
+-- (`list_category_places`, 0014_list_category_places.sql), which stays
+-- `SECURITY INVOKER` -- still runs under ordinary RLS and still cannot use
+-- them.
 begin;
 
 -- Case-insensitive uniqueness of category names, per user.
