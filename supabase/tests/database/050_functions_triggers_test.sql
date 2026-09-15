@@ -128,5 +128,83 @@ select is(
   'an item still linked elsewhere survives the same batch delete'
 );
 
+-- list_category_places (0014_list_category_places.sql): the map's places
+-- for a category, one row per distinct place instead of one per item
+-- (#PERF-H5). Its own aggregate has to reproduce, in SQL, the "any row can
+-- locate the place, ties go to the newest one" rule
+-- partitionByStoredCoords (Map/usePlaces.tsx) used to apply on the client.
+select gen_random_uuid() as places_owner \gset
+select pg_temp.auth_as(:'places_owner'::uuid, 'places-test@collectionbuddy.test');
+insert into public.categories (name) values ('Places test')
+returning id as places_category \gset
+
+insert into public.items (title, place, place_lat, place_lng, created_at) values
+  ('Oldest at Cologne', 'Cologne', 1, 2, now() - interval '3 hours'),
+  ('Middle at Cologne, no coords', 'Cologne', null, null, now() - interval '2 hours'),
+  ('Newest at Cologne', 'Cologne', 50.94, 6.96, now() - interval '1 hour'),
+  ('Only entry, unlocated', 'Nowhere Yet', null, null, now());
+
+-- Fetched back by title, one \gset per row, rather than off the INSERT's
+-- own RETURNING: \gset accepts exactly one row, and the insert above wrote
+-- four.
+select id as oldest_id from public.items where title = 'Oldest at Cologne' \gset
+select id as middle_id from public.items where title = 'Middle at Cologne, no coords' \gset
+select id as newest_id from public.items where title = 'Newest at Cologne' \gset
+select id as unlocated_id from public.items where title = 'Only entry, unlocated' \gset
+
+insert into public.item_categories (item_id, category_id) values
+  (:'oldest_id'::uuid, :'places_category'::uuid),
+  (:'middle_id'::uuid, :'places_category'::uuid),
+  (:'newest_id'::uuid, :'places_category'::uuid),
+  (:'unlocated_id'::uuid, :'places_category'::uuid);
+
+select is(
+  (select place_lat from public.list_category_places(:'places_category'::uuid, null)
+    where place = 'Cologne'),
+  50.94::double precision,
+  'the newest row with a coordinate pair wins over an older, conflicting one'
+);
+select is(
+  (select place_lng from public.list_category_places(:'places_category'::uuid, null)
+    where place = 'Cologne'),
+  6.96::double precision,
+  'lat and lng are taken from the same winning row, not mixed across rows'
+);
+select is(
+  (select titles from public.list_category_places(:'places_category'::uuid, null)
+    where place = 'Cologne'),
+  array['Newest at Cologne', 'Middle at Cologne, no coords', 'Oldest at Cologne'],
+  'every title at the place is collected, newest first, including a row with no coordinates of its own'
+);
+select is(
+  (select ids from public.list_category_places(:'places_category'::uuid, null)
+    where place = 'Cologne'),
+  array[:'newest_id'::uuid, :'middle_id'::uuid, :'oldest_id'::uuid],
+  'ids are collected in the same newest-first order, for the geocode write-back'
+);
+select is(
+  (select place_lat from public.list_category_places(:'places_category'::uuid, null)
+    where place = 'Nowhere Yet'),
+  null,
+  'a place with no located row at all comes back with null coordinates rather than being dropped'
+);
+
+select is(
+  (select array_agg(place order by place)
+    from public.list_category_places(:'places_category'::uuid, '%Newest%')),
+  array['Cologne'],
+  'a like_pattern narrows to the places matching it, the same as the searched list'
+);
+
+-- SECURITY INVOKER: a bystander gets nothing back, not an error, the same
+-- as an ordinary RLS-scoped read would deny them.
+select gen_random_uuid() as places_bystander \gset
+select pg_temp.auth_as(:'places_bystander'::uuid, 'places-bystander@collectionbuddy.test');
+select is(
+  (select count(*) from public.list_category_places(:'places_category'::uuid, null)),
+  0::bigint,
+  'a bystander with no relationship to the category gets no places back'
+);
+
 select * from finish();
 rollback;

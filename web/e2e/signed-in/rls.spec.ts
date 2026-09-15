@@ -1343,3 +1343,218 @@ test.describe('a category shared at the editor role', () => {
     }
   });
 });
+
+// `search_category_items` (0015_search_category_items.sql) is `SECURITY
+// DEFINER`: it queries with RLS bypassed so ILIKE can reach the trigram
+// indexes (#621/PERF-H4), which makes it an authorization boundary in its
+// own right rather than RLS re-expressed for convenience. It is called
+// directly via `.rpc()`, the same way a plain `.from('items').select()`
+// probe is used above, rather than through the app -- anyone holding a
+// valid session could call it with any `cat_id`, guessed or otherwise, so
+// its own re-implementation of the read-access check is what has to hold,
+// not just the app never sending someone else's category id.
+test.describe('search_category_items (the search RPC)', () => {
+  async function searchIn(
+    token: string,
+    categoryId: string,
+    term: string,
+  ): Promise<{ titles: string[]; error: unknown }> {
+    const { data, error } = await apiAs(token).rpc('search_category_items', {
+      cat_id: categoryId,
+      like_pattern: `%${term}%`,
+      page_from: 0,
+      page_to: 9,
+    });
+    return {
+      titles: (data ?? []).map((row: { title: string }) => row.title),
+      error,
+    };
+  }
+
+  test('an owner searches their own category and finds a matching title', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+
+    const { titles, error } = await searchIn(token, categoryId, 'Silberdenar');
+
+    expect(error).toBeNull();
+    expect(titles).toContain('Silberdenar');
+  });
+
+  test('a term matching nothing in the category returns an empty page, not an error', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+
+    const { titles, error } = await searchIn(token, categoryId, 'zzzznothing');
+
+    expect(error).toBeNull();
+    expect(titles).toEqual([]);
+  });
+
+  // Called the way anyone holding a session token could: with a category id
+  // that is real, but not theirs, and a term known to match a real row in
+  // it -- a satisfiable filter, so only the function's own read-access check
+  // makes this come back empty.
+  test('searching a category the caller has no relationship to returns nothing, not an error', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, otherToken, otherUserId } = context();
+    const categoryId = await mineCategoryId(
+      otherToken,
+      otherUserId,
+      SEED.other.category,
+    );
+
+    const { titles, error } = await searchIn(
+      token,
+      categoryId,
+      SEED.other.item,
+    );
+
+    expect(error).toBeNull();
+    expect(titles).toEqual([]);
+  });
+
+  test('an active grant opens search the same as it opens a plain read', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const shareId = await share(token, categoryId, SEED.other.email);
+
+    try {
+      const { titles, error } = await searchIn(
+        otherToken,
+        categoryId,
+        'Silberdenar',
+      );
+      expect(error).toBeNull();
+      expect(titles).toContain('Silberdenar');
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
+  test('an expired grant is refused for search, exactly like no grant at all', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const shareId = await share(token, categoryId, SEED.other.email, {
+      window: { createdAt, expiresAt },
+    });
+
+    try {
+      const { titles, error } = await searchIn(
+        otherToken,
+        categoryId,
+        'Silberdenar',
+      );
+      expect(error).toBeNull();
+      expect(titles).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
+  // Both directions, per TEST_STRATEGY.md #7: an active grant opens search,
+  // and revoking it closes search again -- with the entry still there, so
+  // this proves the grant stopped working rather than the row vanishing.
+  test('revoking the grant closes search again, with the entry still there', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const shareId = await share(token, categoryId, SEED.other.email);
+
+    const opened = await searchIn(otherToken, categoryId, 'Silberdenar');
+    expect(opened.titles).toContain('Silberdenar');
+
+    await unshare(token, shareId);
+
+    const { titles, error } = await searchIn(
+      otherToken,
+      categoryId,
+      'Silberdenar',
+    );
+    expect(error).toBeNull();
+    expect(titles).toEqual([]);
+
+    // Satisfiable as the owner: the entry itself was never touched.
+    const stillThere = await searchIn(token, categoryId, 'Silberdenar');
+    expect(stillThere.titles).toContain('Silberdenar');
+  });
+
+  // The same asymmetry as "owning the collection does not reveal an entry
+  // the editor filed into it" (the editor-role describe block above),
+  // asserted against the search RPC specifically: `search_category_items`
+  // must reproduce that rule, not widen past it as a side effect of
+  // bypassing RLS for the trigram indexes.
+  test('owning the collection does not surface, through search, an entry the editor filed into it', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken, otherUserId } = context();
+    const categoryId = await mineCategoryId(token, userId, SEED.editorCategory);
+    const shareId = await share(token, categoryId, SEED.other.email, {
+      role: 'editor',
+    });
+
+    const { data: mine } = await apiAs(otherToken)
+      .from('items')
+      .insert({ user_id: otherUserId, title: 'rls-search-invisible-entry' })
+      .select('id')
+      .single();
+
+    try {
+      await apiAs(otherToken)
+        .from('item_categories')
+        .insert({ item_id: mine!.id, category_id: categoryId });
+
+      const { titles, error } = await searchIn(
+        token,
+        categoryId,
+        'rls-search-invisible-entry',
+      );
+      expect(error).toBeNull();
+      expect(titles).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+      await apiAs(otherToken).from('items').delete().eq('id', mine!.id);
+    }
+  });
+
+  // The editor's own entry stays visible to the editor through search --
+  // `i.user_id = auth.uid()` covers it even though the editor holds no
+  // read grant of their own on the owner's category (only the write grant
+  // that let them file it there in the first place).
+  test('an editor finds, through search, an entry it filed into the shared collection itself', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken, otherUserId } = context();
+    const categoryId = await mineCategoryId(token, userId, SEED.editorCategory);
+    const shareId = await share(token, categoryId, SEED.other.email, {
+      role: 'editor',
+    });
+
+    const { data: mine } = await apiAs(otherToken)
+      .from('items')
+      .insert({ user_id: otherUserId, title: 'rls-search-editor-own-entry' })
+      .select('id')
+      .single();
+
+    try {
+      await apiAs(otherToken)
+        .from('item_categories')
+        .insert({ item_id: mine!.id, category_id: categoryId });
+
+      const { titles, error } = await searchIn(
+        otherToken,
+        categoryId,
+        'rls-search-editor-own-entry',
+      );
+      expect(error).toBeNull();
+      expect(titles).toContain('rls-search-editor-own-entry');
+    } finally {
+      await unshare(token, shareId);
+      await apiAs(otherToken).from('items').delete().eq('id', mine!.id);
+    }
+  });
+});

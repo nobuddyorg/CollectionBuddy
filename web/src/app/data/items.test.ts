@@ -1,16 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  ITEM_PLACE_PAGE_SIZE,
   SEARCH_MIN_LENGTH,
   SEARCH_MIN_LENGTH_NON_ASCII,
   buildSearchFilter,
-  listItemPlaces,
+  likePatternFor,
+  listCategoryPlaces,
   listItems,
   listItemsForExport,
   rawCountItems,
-  rawListItemPlaces,
+  rawListCategoryPlaces,
   rawListItems,
+  rawSearchCategoryItems,
   searchFilterFor,
   searchMinLength,
   updateItemsPlace,
@@ -98,6 +99,33 @@ describe('searchFilterFor', () => {
   });
 });
 
+describe('likePatternFor', () => {
+  it('produces the bare %...% pattern for a term long enough to use it', () => {
+    expect(likePatternFor('coin')).toBe('%coin%');
+  });
+
+  it('declines a term one short of the minimum', () => {
+    expect(likePatternFor('a'.repeat(SEARCH_MIN_LENGTH - 1))).toBeNull();
+  });
+
+  it('declines an empty term', () => {
+    expect(likePatternFor('')).toBeNull();
+  });
+
+  it('filters a two-character non-ASCII term', () => {
+    expect(likePatternFor('日本')).toBe('%日本%');
+  });
+
+  it('escapes % and _ the same way buildSearchFilter does, before quoting', () => {
+    expect(likePatternFor('50%')).toBe('%50\\%%');
+    expect(likePatternFor('a_b')).toBe('%a\\_b%');
+  });
+
+  it('escapes a literal backslash for the LIKE layer', () => {
+    expect(likePatternFor('a\\b')).toBe('%a\\\\b%');
+  });
+});
+
 describe('searchMinLength', () => {
   it('is the ASCII minimum for a plain Latin term', () => {
     expect(searchMinLength('ab')).toBe(SEARCH_MIN_LENGTH);
@@ -121,7 +149,7 @@ describe('the queries behind the list and the map', () => {
   const listQuery = (search: string) =>
     paramsOf(rawListItems({ categoryId: 'cat-1', search, from: 0, to: 8 }));
   const mapQuery = (search: string) =>
-    paramsOf(rawListItemPlaces('cat-1', search, 0, ITEM_PLACE_PAGE_SIZE - 1));
+    paramsOf(rawListCategoryPlaces('cat-1', search));
   const countBuilder = (search: string) =>
     rawCountItems({ categoryId: 'cat-1', search }) as unknown as {
       url: URL;
@@ -129,15 +157,52 @@ describe('the queries behind the list and the map', () => {
       headers: Headers;
     };
 
-  it('narrows the map by the same search as the list, character for character', () => {
-    expect(mapQuery('coin').get('or')).toBe(listQuery('coin').get('items.or'));
-    expect(mapQuery('coin').get('or')).toContain('coin');
+  it('calls the grouped-places RPC as a GET, with the category and a raw LIKE pattern', () => {
+    const params = mapQuery('coin');
+    expect(params.get('cat_id')).toBe('cat-1');
+    expect(params.get('like_pattern')).toBe('%coin%');
+    expect(
+      (rawListCategoryPlaces('cat-1', 'coin') as unknown as { method: string })
+        .method,
+    ).toBe('GET');
   });
 
-  it('narrows the map by category as well', () => {
-    expect(mapQuery('coin').get('item_categories.category_id')).toBe(
-      'eq.cat-1',
+  it('omits like_pattern rather than sending it as the literal text "null"', () => {
+    expect(mapQuery('').has('like_pattern')).toBe(false);
+    expect(mapQuery('ab').has('like_pattern')).toBe(false);
+  });
+
+  it('narrows the map by the same escaping and minimum length as the list', () => {
+    expect(mapQuery('coin').get('like_pattern')).toBe(likePatternFor('coin'));
+    expect(mapQuery('50%').get('like_pattern')).toBe(likePatternFor('50%'));
+  });
+
+  const searchParamsOf = (search: string) =>
+    paramsOf(
+      rawSearchCategoryItems({
+        categoryId: 'cat-1',
+        likePattern: likePatternFor(search)!,
+        from: 0,
+        to: 8,
+      }),
     );
+
+  it('calls the searched-items RPC as a GET, with the category, pattern and page bounds', () => {
+    const params = searchParamsOf('coin');
+    expect(params.get('cat_id')).toBe('cat-1');
+    expect(params.get('like_pattern')).toBe(likePatternFor('coin'));
+    expect(params.get('page_from')).toBe('0');
+    expect(params.get('page_to')).toBe('8');
+    expect(
+      (
+        rawSearchCategoryItems({
+          categoryId: 'cat-1',
+          likePattern: '%coin%',
+          from: 0,
+          to: 8,
+        }) as unknown as { method: string }
+      ).method,
+    ).toBe('GET');
   });
 
   // The list is driven from item_categories itself (#618, #619) rather than
@@ -187,28 +252,13 @@ describe('the queries behind the list and the map', () => {
     expect(countBuilder('ab').url.searchParams.get('select')).toBe('item_id');
   });
 
-  it('leaves both unfiltered for a term below the minimum length', () => {
-    expect(mapQuery('ab').has('or')).toBe(false);
+  it('leaves the list unfiltered for a term below the minimum length', () => {
     expect(listQuery('ab').has('items.or')).toBe(false);
-  });
-
-  it('asks only for entries that have a place to draw', () => {
-    expect(mapQuery('').getAll('place')).toEqual(['not.is.null', 'neq.']);
-  });
-
-  it('pages the map the same way the export pages', () => {
-    expect(mapQuery('coin').get('offset')).toBe('0');
-    expect(mapQuery('coin').get('limit')).toBe(String(ITEM_PLACE_PAGE_SIZE));
   });
 
   const exportQuery = () => paramsOf(listItemsForExport('cat-1', 0, 499));
 
-  it('orders the map newest-first, the same as the list', () => {
-    // Same param, same value -- though the list now sorts on
-    // item_categories.created_at and the map still sorts on items.created_at
-    // (#618/#619's accepted semantic note: the two coincide because a
-    // mapping row is only ever written alongside its item, never later).
-    expect(mapQuery('coin').get('order')).toBe(listQuery('coin').get('order'));
+  it('orders the list newest-first', () => {
     expect(listQuery('coin').get('order')).toBe('created_at.desc');
   });
 
@@ -321,90 +371,200 @@ describe('listItems', () => {
   });
 });
 
-describe('listItemPlaces', () => {
-  it('pages past a full page and concatenates the rows', async () => {
-    const fullPage = Array.from({ length: ITEM_PLACE_PAGE_SIZE }, (_, i) => ({
-      title: `item-${i}`,
-      place: 'Berlin',
-      place_lat: 52.5,
-      place_lng: 13.4,
-    }));
-    const shortPage = [
-      { title: 'last', place: 'Berlin', place_lat: 52.5, place_lng: 13.4 },
-    ];
-    const listPage = vi
-      .fn()
-      .mockResolvedValueOnce({ data: fullPage, error: null })
-      .mockResolvedValueOnce({ data: shortPage, error: null });
+describe('listItems, once a search term earns a filter', () => {
+  function searchRow(id: string, totalCount: number) {
+    return {
+      id,
+      title: id,
+      description: null,
+      place: null,
+      place_lat: null,
+      place_lng: null,
+      tags: [],
+      total_count: totalCount,
+    };
+  }
 
-    const { data, error } = await listItemPlaces(
-      'cat-1',
-      '',
+  it('calls the search RPC instead of the plain list/count pair', async () => {
+    const rawList = vi.fn();
+    const rawCount = vi.fn();
+    const rawSearch = vi
+      .fn()
+      .mockResolvedValue({ data: [searchRow('a', 1)], error: null });
+
+    await listItems(
+      { categoryId: 'cat-1', search: 'coin', from: 0, to: 8 },
+      rawList,
+      rawCount,
+      rawSearch,
+    );
+
+    expect(rawList).not.toHaveBeenCalled();
+    expect(rawCount).not.toHaveBeenCalled();
+    expect(rawSearch).toHaveBeenCalledWith({
+      categoryId: 'cat-1',
+      likePattern: likePatternFor('coin'),
+      from: 0,
+      to: 8,
+      signal: undefined,
+    });
+  });
+
+  it('strips total_count off each row and reads the exact total from it', async () => {
+    const rawSearch = vi.fn().mockResolvedValue({
+      data: [searchRow('a', 5), searchRow('b', 5)],
+      error: null,
+    });
+
+    const { data, error, count } = await listItems(
+      { categoryId: 'cat-1', search: 'coin', from: 0, to: 8 },
       undefined,
-      listPage,
+      undefined,
+      rawSearch,
     );
 
     expect(error).toBeNull();
-    expect(data).toHaveLength(ITEM_PLACE_PAGE_SIZE + 1);
-    expect(listPage).toHaveBeenCalledTimes(2);
-    expect(listPage).toHaveBeenNthCalledWith(
-      1,
-      'cat-1',
-      '',
-      0,
-      ITEM_PLACE_PAGE_SIZE - 1,
-      undefined,
-    );
-    expect(listPage).toHaveBeenNthCalledWith(
-      2,
-      'cat-1',
-      '',
-      ITEM_PLACE_PAGE_SIZE,
-      2 * ITEM_PLACE_PAGE_SIZE - 1,
-      undefined,
-    );
+    expect(count).toBe(5);
+    expect(data).toEqual([
+      {
+        id: 'a',
+        title: 'a',
+        description: null,
+        place: null,
+        place_lat: null,
+        place_lng: null,
+        tags: [],
+      },
+      {
+        id: 'b',
+        title: 'b',
+        description: null,
+        place: null,
+        place_lat: null,
+        place_lng: null,
+        tags: [],
+      },
+    ]);
   });
 
-  it('stops on the first page that errors, returning no partial data', async () => {
-    const listPage = vi
+  it('reports a count of zero rather than null when nothing matched', async () => {
+    const rawSearch = vi.fn().mockResolvedValue({ data: [], error: null });
+
+    const { data, error, count } = await listItems(
+      { categoryId: 'cat-1', search: 'coin', from: 0, to: 8 },
+      undefined,
+      undefined,
+      rawSearch,
+    );
+
+    expect(error).toBeNull();
+    expect(count).toBe(0);
+    expect(data).toEqual([]);
+  });
+
+  it('flattens to an empty page rather than crashing when a successful response carries no rows', async () => {
+    const rawSearch = vi.fn().mockResolvedValue({ data: null, error: null });
+
+    const { data, error, count } = await listItems(
+      { categoryId: 'cat-1', search: 'coin', from: 0, to: 8 },
+      undefined,
+      undefined,
+      rawSearch,
+    );
+
+    expect(error).toBeNull();
+    expect(count).toBe(0);
+    expect(data).toEqual([]);
+  });
+
+  it('returns no data and a null count when the search request errors', async () => {
+    const rawSearch = vi
       .fn()
       .mockResolvedValue({ data: null, error: new Error('boom') });
 
-    const { data, error } = await listItemPlaces(
-      'cat-1',
-      '',
+    const { data, error, count } = await listItems(
+      { categoryId: 'cat-1', search: 'coin', from: 0, to: 8 },
       undefined,
-      listPage,
+      undefined,
+      rawSearch,
     );
 
     expect(data).toBeNull();
     expect(error).toBeInstanceOf(Error);
-    expect(listPage).toHaveBeenCalledTimes(1);
+    expect(count).toBeNull();
   });
 
-  it('stops after a single short page without a second request', async () => {
-    const listPage = vi
-      .fn()
-      .mockResolvedValue({ data: [{ title: 'only' }], error: null });
+  it('leaves the plain list/count pair in charge for a term below the minimum length', async () => {
+    const rawList = vi.fn().mockResolvedValue({ data: [], error: null });
+    const rawCount = vi.fn().mockResolvedValue({ count: 0, error: null });
+    const rawSearch = vi.fn();
 
-    const { data } = await listItemPlaces('cat-1', '', undefined, listPage);
+    await listItems(
+      { categoryId: 'cat-1', search: 'ab', from: 0, to: 8 },
+      rawList,
+      rawCount,
+      rawSearch,
+    );
 
-    expect(data).toHaveLength(1);
-    expect(listPage).toHaveBeenCalledTimes(1);
+    expect(rawSearch).not.toHaveBeenCalled();
+    expect(rawList).toHaveBeenCalled();
+    expect(rawCount).toHaveBeenCalled();
   });
+});
 
-  it('stops rather than crashing when a page comes back with no data and no error', async () => {
-    const listPage = vi.fn().mockResolvedValue({ data: null, error: null });
+describe('listCategoryPlaces', () => {
+  it('passes the rows straight through on success', async () => {
+    const rows = [
+      {
+        place: 'Bonn',
+        place_lat: 50.7,
+        place_lng: 7.1,
+        titles: ['a'],
+        ids: ['1'],
+      },
+    ];
+    const rawList = vi.fn().mockResolvedValue({ data: rows, error: null });
 
-    const { data, error } = await listItemPlaces(
+    const { data, error } = await listCategoryPlaces(
       'cat-1',
       '',
       undefined,
-      listPage,
+      rawList,
     );
 
     expect(error).toBeNull();
-    expect(data).toEqual([]);
+    expect(data).toEqual(rows);
+    expect(rawList).toHaveBeenCalledWith('cat-1', '', undefined);
+  });
+
+  it('reports the error and no data when the request fails', async () => {
+    const rawList = vi
+      .fn()
+      .mockResolvedValue({ data: null, error: new Error('rls') });
+
+    const { data, error } = await listCategoryPlaces(
+      'cat-1',
+      '',
+      undefined,
+      rawList,
+    );
+
+    expect(data).toBeNull();
+    expect(error).toBeInstanceOf(Error);
+  });
+
+  it('reports null data for a success response that carried none', async () => {
+    const rawList = vi.fn().mockResolvedValue({ data: null, error: null });
+
+    const { data, error } = await listCategoryPlaces(
+      'cat-1',
+      '',
+      undefined,
+      rawList,
+    );
+
+    expect(error).toBeNull();
+    expect(data).toBeNull();
   });
 });
 

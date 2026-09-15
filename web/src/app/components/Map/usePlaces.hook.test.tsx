@@ -2,27 +2,31 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { listItemPlaces, updateItemsPlace } from '../../data/items';
+import { listCategoryPlaces, updateItemsPlace } from '../../data/items';
 import { usePlaces } from './usePlaces';
 
 vi.mock('../../data/items', () => ({
-  listItemPlaces: vi.fn(),
+  listCategoryPlaces: vi.fn(),
   updateItemsPlace: vi.fn(),
 }));
 
 const GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
 
-function itemRow(
-  id: string,
-  place: string | null,
+// `list_category_places` (0014_list_category_places.sql) returns one row
+// per place, already carrying every title/id at it -- this builds that
+// grouped row directly, the shape the hook now consumes.
+function group(
+  place: string,
   lat: number | null = null,
   lng: number | null = null,
+  titles: string[] = ['Item a'],
+  ids: string[] = ['a'],
 ) {
-  return { id, title: `Item ${id}`, place, place_lat: lat, place_lng: lng };
+  return { place, place_lat: lat, place_lng: lng, titles, ids };
 }
 
-function listed(rows: ReturnType<typeof itemRow>[]) {
-  vi.mocked(listItemPlaces).mockResolvedValue({
+function listed(rows: ReturnType<typeof group>[]) {
+  vi.mocked(listCategoryPlaces).mockResolvedValue({
     data: rows,
     error: null,
   });
@@ -61,14 +65,14 @@ describe('usePlaces', () => {
 
     renderHook(() => usePlaces('cat-1', '', false));
 
-    expect(listItemPlaces).not.toHaveBeenCalled();
+    expect(listCategoryPlaces).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('draws a stored coordinate pair without asking the gazetteer', async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
-    listed([itemRow('a', 'Bonn', 50.7, 7.1)]);
+    listed([group('Bonn', 50.7, 7.1)]);
 
     const { result } = renderHook(() => usePlaces('cat-1', '', true));
 
@@ -85,7 +89,7 @@ describe('usePlaces', () => {
       'fetch',
       vi.fn(async () => photonHit(7.1, 50.7)),
     );
-    listed([itemRow('a', 'Bonn'), itemRow('b', 'Bonn')]);
+    listed([group('Bonn', null, null, ['Item a', 'Item b'], ['a', 'b'])]);
 
     const { result } = renderHook(() => usePlaces('cat-1', '', true));
 
@@ -109,7 +113,7 @@ describe('usePlaces', () => {
   it('remembers a geocoded place for the next time the map opens', async () => {
     const fetchSpy = vi.fn(async () => photonHit(7.1, 50.7));
     vi.stubGlobal('fetch', fetchSpy);
-    listed([itemRow('a', 'Bonn')]);
+    listed([group('Bonn')]);
 
     const first = renderHook(() => usePlaces('cat-1', '', true));
     await waitFor(() => expect(first.result.current.places).toHaveLength(1));
@@ -132,7 +136,7 @@ describe('usePlaces', () => {
       'fetch',
       vi.fn(async () => photonStatus(429)),
     );
-    listed([itemRow('a', 'Nowhere')]);
+    listed([group('Nowhere')]);
 
     const { result } = renderHook(() => usePlaces('cat-1', '', true));
     await act(async () => {
@@ -144,7 +148,7 @@ describe('usePlaces', () => {
   });
 
   it('reports no error when there was nothing to place', async () => {
-    listed([itemRow('a', null)]);
+    listed([]);
 
     const { result } = renderHook(() => usePlaces('cat-1', '', true));
 
@@ -155,7 +159,7 @@ describe('usePlaces', () => {
   it('gives up on a place the gazetteer does not know, without retrying', async () => {
     const fetchSpy = vi.fn(async () => photonStatus(404));
     vi.stubGlobal('fetch', fetchSpy);
-    listed([itemRow('a', 'Atlantis')]);
+    listed([group('Atlantis')]);
 
     const { result } = renderHook(() => usePlaces('cat-1', '', true));
 
@@ -171,7 +175,7 @@ describe('usePlaces', () => {
       .mockResolvedValueOnce(photonStatus(503))
       .mockResolvedValue(photonHit(7.1, 50.7));
     vi.stubGlobal('fetch', fetchSpy);
-    listed([itemRow('a', 'Bonn')]);
+    listed([group('Bonn')]);
 
     const { result } = renderHook(() => usePlaces('cat-1', '', true));
     await act(async () => {
@@ -189,7 +193,7 @@ describe('usePlaces', () => {
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValue(photonHit(7.1, 50.7));
     vi.stubGlobal('fetch', fetchSpy);
-    listed([itemRow('a', 'Bonn')]);
+    listed([group('Bonn')]);
 
     const { result } = renderHook(() => usePlaces('cat-1', '', true));
     await act(async () => {
@@ -201,7 +205,7 @@ describe('usePlaces', () => {
   });
 
   it('reports a failed listing as an error rather than an empty map', async () => {
-    vi.mocked(listItemPlaces).mockResolvedValue({
+    vi.mocked(listCategoryPlaces).mockResolvedValue({
       data: null,
       error: new Error('rls'),
     });
@@ -215,10 +219,10 @@ describe('usePlaces', () => {
 
   it('abandons a lookup the search has superseded', async () => {
     let signal: AbortSignal | undefined;
-    vi.mocked(listItemPlaces).mockImplementation(
+    vi.mocked(listCategoryPlaces).mockImplementation(
       async (_categoryId: string, _search: string, sig?: AbortSignal) => {
         signal = sig;
-        return { data: [itemRow('a', 'Bonn')], error: null };
+        return { data: [group('Bonn')], error: null };
       },
     );
     const { unmount } = renderHook(() => usePlaces('cat-1', '', true));
@@ -244,7 +248,7 @@ describe('usePlaces', () => {
       'fetch',
       vi.fn(async () => photonHit(7.1, 50.7)),
     );
-    listed([itemRow('a', 'Bonn')]);
+    listed([group('Bonn')]);
 
     const { result } = renderHook(() => usePlaces('cat-1', '', true));
 

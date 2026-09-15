@@ -3,9 +3,12 @@ import { test } from './test';
 import { itemsIn } from './fixtures';
 import { expectTitles, openCategory } from './helpers';
 
-// Search runs through a hand-built PostgREST `or=()` filter (buildSearchFilter).
-// Unit tests cover the string it produces; only a real database can confirm
-// what that string actually matches.
+// A term of three characters or more (likePatternFor) runs through
+// search_category_items, a SECURITY DEFINER RPC that bypasses RLS so ILIKE
+// can use the trigram indexes (#621/PERF-H4); its own authorization-boundary
+// coverage lives in e2e/signed-in/rls.spec.ts. Unit tests cover the pattern
+// it's called with; only a real database can confirm what that pattern
+// actually matches.
 test.use({ locale: 'en-GB' });
 
 const allCoins = itemsIn('Münzen').map((item) => item.title);
@@ -44,8 +47,10 @@ test.describe('searching a collection', () => {
     await expectTitles(page, ['Silberdenar']);
   });
 
-  // Below three characters a trigram index can't seed a scan, so the app
-  // deliberately skips filtering rather than showing nothing.
+  // Below three characters the app deliberately skips filtering rather than
+  // showing nothing -- not because an index needs the length (there is no
+  // index in play below the RPC path either), but to limit how often a
+  // full, filtered category scan runs at all.
   test('leaves the list alone for a term of two characters', async ({
     page,
   }) => {
@@ -68,8 +73,8 @@ test.describe('searching a collection', () => {
     await expectTitles(page, allCoins);
   });
 
-  // A percent sign is a LIKE wildcard and a comma is a delimiter in
-  // PostgREST's `or=()` grammar; both must be escaped before the query is built.
+  // A percent sign is a LIKE wildcard, so it must be escaped before it
+  // reaches ILIKE -- otherwise it would match anything rather than nothing.
   test('treats a percent sign as text rather than a wildcard', async ({
     page,
   }) => {
