@@ -27,7 +27,7 @@ const PHOTO = resolve(process.cwd(), 'public/logo.png');
 const context = () =>
   JSON.parse(readFileSync(CONTEXT_PATH, 'utf8')) as SeedContext;
 
-function storageAs(token: string) {
+function apiAs(token: string) {
   return createClient(
     process.env.E2E_SUPABASE_URL!,
     process.env.E2E_SUPABASE_ANON_KEY!,
@@ -35,19 +35,34 @@ function storageAs(token: string) {
       auth: { persistSession: false, autoRefreshToken: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     },
-  ).storage.from('item-images');
+  );
 }
 
-/** Every stored object belonging to this user, across all their entries. */
-async function storedObjects(token: string, userId: string) {
-  const { data: prefixes } = await storageAs(token).list(userId);
-  const names: string[] = [];
-  for (const prefix of prefixes ?? []) {
-    const { data } = await storageAs(token).list(`${userId}/${prefix.name}`);
-    for (const object of data ?? [])
-      names.push(`${prefix.name}/${object.name}`);
-  }
-  return names;
+function storageAs(token: string) {
+  return apiAs(token).storage.from('item-images');
+}
+
+/** The id of the (uniquely-titled) item a test just created through the UI. */
+async function itemIdFor(token: string, title: string) {
+  const { data, error } = await apiAs(token)
+    .from('items')
+    .select('id')
+    .eq('title', title)
+    .single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+/**
+ * Every stored object under one item's own prefix.
+ *
+ * Scoped to the item, not the whole account: other signed-in specs write
+ * under this same owner concurrently (`workers: 2` in CI), so listing the
+ * whole account here would pick up their objects too (#664).
+ */
+async function storedObjects(token: string, userId: string, itemId: string) {
+  const { data } = await storageAs(token).list(`${userId}/${itemId}`);
+  return (data ?? []).map((object) => object.name);
 }
 
 async function newEntry(page: import('@playwright/test').Page, title: string) {
@@ -118,22 +133,20 @@ test.describe('photographs', () => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, userId } = context();
 
-    const before = await storedObjects(token, userId);
     const title = uniqueTitle('Paarweise');
     try {
       const card = await newEntry(page, title);
+      const itemId = await itemIdFor(token, title);
       await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
       await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
 
-      const added = (await storedObjects(token, userId)).filter(
-        (name) => !before.includes(name),
-      );
-      expect(added).toHaveLength(2);
-      expect(added.filter((name) => name.endsWith('.thumb.webp'))).toHaveLength(
-        1,
-      );
+      const stored = await storedObjects(token, userId, itemId);
+      expect(stored).toHaveLength(2);
       expect(
-        added.filter(
+        stored.filter((name) => name.endsWith('.thumb.webp')),
+      ).toHaveLength(1);
+      expect(
+        stored.filter(
           (name) => name.endsWith('.webp') && !name.includes('.thumb'),
         ),
       ).toHaveLength(1);
@@ -182,21 +195,22 @@ test.describe('photographs', () => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, userId } = context();
 
-    const before = await storedObjects(token, userId);
     const title = uniqueTitle('Mit Aufräumen');
+    let itemId: string | undefined;
     try {
       const card = await newEntry(page, title);
+      itemId = await itemIdFor(token, title);
       await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
       await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
 
-      const during = await storedObjects(token, userId);
-      expect(during.length).toBeGreaterThan(before.length);
+      const during = await storedObjects(token, userId, itemId);
+      expect(during.length).toBeGreaterThan(0);
     } finally {
       await removeEntry(page, title);
     }
 
     await expect
-      .poll(() => storedObjects(token, userId), { timeout: 15_000 })
-      .toEqual(before);
+      .poll(() => storedObjects(token, userId, itemId!), { timeout: 15_000 })
+      .toEqual([]);
   });
 });
