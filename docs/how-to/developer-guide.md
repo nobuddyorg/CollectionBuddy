@@ -190,7 +190,9 @@ export differently (`web/scripts/serve-export.mjs`) and doesn't expect that syml
 open web/coverage-e2e/index.html   # after any e2e run
 ```
 
-It's an observability report, not a gate — nothing in the pre-PR checklist reads it, and there's no threshold to fail. Two things opt out: `i18n.spec.ts` (it drives its own `browser.newContext()` rather than the `page` fixture the auto fixture attaches to), and the `firefox` project (Playwright's Coverage API is Chromium-only over CDP; Firefox still runs every other assertion in `e2e/public`, just without contributing to this report). Coverage is measured against the built bundle, not the original source, since the export doesn't ship source maps (`next.config.ts` doesn't set `productionBrowserSourceMaps`) — turning those on would be a separate, deliberate call, since they'd also ship in the production static export.
+It's an observability report, not a gate — nothing in the pre-PR checklist reads it, there's no threshold to fail, and it isn't posted to the job summary. Two things opt out: `i18n.spec.ts` (it drives its own `browser.newContext()` rather than the `page` fixture the auto fixture attaches to), and the `firefox` project (Playwright's Coverage API is Chromium-only over CDP; Firefox still runs every other assertion in `e2e/public`, just without contributing to this report).
+
+By default coverage is measured against the built bundle, not the original source, since the export doesn't ship source maps (`next.config.ts` only sets `productionBrowserSourceMaps` when `E2E_COVERAGE_SOURCEMAPS=true`). CI (`ci.yml`'s `build_and_test` job) and `npm run e2e:local` (`scripts/e2e-local-stack.mjs`) both set it, so their reports map back to real `src/app/**` files and lines (`sourceFilter` in `e2e/coverage.ts` keeps vendor library source out of it); a plain local `npm run build && npm run e2e` doesn't, and reads against the minified bundle instead. `pages-deploy.yml`'s actual deploy build never sets it — turning source maps on there would ship them in the production static export, which is a separate, deliberate call this doesn't make.
 
 ## Regenerate the app icons
 

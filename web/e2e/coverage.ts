@@ -12,9 +12,13 @@ const mcr = MCR({
   name: 'CollectionBuddy e2e coverage',
   outputDir: 'coverage-e2e',
   reports: ['v8', 'console-summary'],
-  // The static export's own bundle, not the vendor chunks (React, Leaflet,
-  // Supabase) bundled alongside it.
+  // The static export's own bundle, not e.g. the service worker registered
+  // alongside it.
   entryFilter: '**/_next/**',
+  // Only meaningful once E2E_COVERAGE_SOURCEMAPS unpacks a chunk's original
+  // sources (next.config.ts): without it, every vendor library bundled
+  // alongside app code (Supabase, Leaflet, React) would swamp the report.
+  sourceFilter: '**/src/app/**',
 });
 
 export const test = base.extend<{ autoCoverage: void }>({

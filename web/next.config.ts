@@ -18,6 +18,12 @@ const nextConfig: NextConfig = {
   // build that is actually deployed.
   basePath: isProd ? EXPORT_BASE_PATH : '',
   env: { NEXT_PUBLIC_BASE_PATH: isProd ? EXPORT_BASE_PATH : '' },
+  // Off by default: this static export ships whatever `next build` produces
+  // as-is, so turning this on unconditionally would publish source maps in
+  // the production build too. Set only by the builds that feed the e2e
+  // suite's coverage report (e2e/coverage.ts), which wants line-accurate
+  // source, not pages-deploy.yml's build of the site that actually deploys.
+  productionBrowserSourceMaps: process.env.E2E_COVERAGE_SOURCEMAPS === 'true',
 };
 
 export default nextConfig;

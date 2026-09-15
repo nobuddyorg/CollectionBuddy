@@ -95,6 +95,9 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # This build feeds the e2e run below, not a deploy -- source maps
+          # make its coverage report (e2e/coverage.ts) point at real source.
+          E2E_COVERAGE_SOURCEMAPS: 'true'
 
       # After the build, not before: `next build` generates next-env.d.ts
       # (gitignored), which tsc/eslint need on a clean checkout.
