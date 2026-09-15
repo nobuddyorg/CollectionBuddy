@@ -59,6 +59,14 @@ export default defineConfig({
       testDir: './e2e/public',
       use: { ...devices['Pixel 7'] },
     },
+    // The only non-Chromium engine in the matrix. Coverage collection skips
+    // it (e2e/coverage.ts -- Playwright's Coverage API is Chromium-only via
+    // CDP) but every other assertion in e2e/public runs here too.
+    {
+      name: 'firefox',
+      testDir: './e2e/public',
+      use: { ...devices['Desktop Firefox'] },
+    },
     ...(localStack
       ? [
           {

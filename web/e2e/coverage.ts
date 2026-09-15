@@ -2,11 +2,11 @@ import { test as base } from '@playwright/test';
 import MCR from 'monocart-coverage-reports';
 
 /**
- * Every project in playwright.config.ts (`chromium`, `mobile`, `signed-in`)
- * runs on a Chromium engine, and Playwright's Coverage API only exists there
- * (it talks to the browser over CDP) -- so this is the one instrumentation-free
- * way to get real JS/CSS coverage out of the e2e suite. No Istanbul/babel
- * build step needed.
+ * Playwright's Coverage API only exists on Chromium (it talks to the browser
+ * over CDP), which is an instrumentation-free way to get real JS/CSS
+ * coverage out of most of the e2e suite -- no Istanbul/babel build step
+ * needed. `firefox` (playwright.config.ts) is the one project it can't
+ * cover; the fixture below just skips collection there rather than failing.
  */
 const mcr = MCR({
   name: 'CollectionBuddy e2e coverage',

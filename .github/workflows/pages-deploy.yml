@@ -140,7 +140,7 @@ jobs:
 
       - uses: ./.github/actions/setup-web
 
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium firefox
       # Through the environment, not the command line: `${{ }}` substitutes
       # before the shell sees it, so a quote-like value would be parsed as
       # shell. E2E_BASE_URL also tells the config not to start its own server.

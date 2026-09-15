@@ -171,7 +171,7 @@ jobs:
       # asset request a 404 this never caught. Playwright starts and stops
       # the server itself (playwright.config.ts).
       - name: Install browsers for the end-to-end suite
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
 
       - name: Run end-to-end tests
         run: npm run e2e
