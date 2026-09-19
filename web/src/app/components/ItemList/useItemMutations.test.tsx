@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from 'react';
-import { act, renderHook, screen } from '@testing-library/react';
+import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -80,7 +80,7 @@ function useHarness(
     captureItemImagePaths,
     removeImageBytes,
   });
-  return { items, ...mutations };
+  return { items, setItems, ...mutations };
 }
 
 describe('useItemMutations removeItem', () => {
@@ -268,6 +268,45 @@ describe('useItemMutations removeItem', () => {
     expect(result.current.items.map((i) => i.id)).toEqual(['a', 'b']);
     expect(captureItemImagePaths).not.toHaveBeenCalled();
     expect(deleteItem).not.toHaveBeenCalled();
+  });
+
+  // The regression this guards against: the real deleteItem() call is
+  // deferred to the toast's undo window (AUTO_DISMISS_MS, several seconds),
+  // so a reload that lands in that window -- e.g. the search box clearing
+  // right after the confirm click -- reports the row exactly as the
+  // database still has it. Applying that response verbatim would resurrect
+  // a card the user just watched disappear.
+  it('keeps a just-deleted card out of the list even when a reload reports it before the deferred delete actually runs', async () => {
+    const captureItemImagePaths = vi.fn().mockResolvedValue([]);
+    const removeImageBytes = vi.fn();
+    const reload = vi.fn();
+
+    const { result } = renderHook(
+      () =>
+        useHarness(
+          [item('a'), item('b')],
+          captureItemImagePaths,
+          removeImageBytes,
+          reload,
+        ),
+      { wrapper },
+    );
+
+    act(() => {
+      void result.current.removeItem('a');
+    });
+    await acceptDeleteConfirmation();
+    expect(result.current.items.map((i) => i.id)).toEqual(['b']);
+
+    // Stands in for useItems' own load() overwriting `items` with a fresh
+    // server response that still contains the row.
+    act(() => {
+      result.current.setItems([item('a'), item('b')]);
+    });
+
+    await waitFor(() =>
+      expect(result.current.items.map((i) => i.id)).toEqual(['b']),
+    );
   });
 
   // Nothing to snapshot for an id that was never in the list -- the undo
