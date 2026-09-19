@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
 import { deleteItem, updateItem } from '../../data/items';
@@ -38,6 +38,23 @@ export function useItemMutations({
   const toast = useToast();
   const confirm = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
+  // Ids optimistically removed but not yet actually deleted (the real
+  // deleteItem() is deferred to the undo window below) -- kept out of
+  // `items` even if a reload reports the row as still there.
+  const pendingDeleteIds = useRef<Set<string>>(new Set());
+
+  // Shared by removeItem's own removal and the effect below; returns the
+  // same reference when nothing changes so the effect can't loop forever.
+  const excludePendingDeletes = useCallback((list: ItemLite[]) => {
+    const next = list.filter((it) => !pendingDeleteIds.current.has(it.id));
+    return next.length === list.length ? list : next;
+  }, []);
+
+  // Re-applies the filter whenever `items` changes, not just the change
+  // removeItem makes itself.
+  useEffect(() => {
+    setItems(excludePendingDeletes);
+  }, [items, setItems, excludePendingDeletes]);
 
   const saveEdit = useCallback(
     async (id: string, values: ItemFormValues): Promise<boolean> => {
@@ -75,9 +92,11 @@ export function useItemMutations({
       // can run more than once.
       const index = items.findIndex((it) => it.id === id);
       const snapshot = items[index];
-      setItems((prev) => prev.filter((it) => it.id !== id));
+      pendingDeleteIds.current.add(id);
+      setItems(excludePendingDeletes);
 
       const restore = () => {
+        pendingDeleteIds.current.delete(id);
         if (!snapshot) return;
         setItems((prev) => restoreAt(prev, index, snapshot));
       };
@@ -121,6 +140,7 @@ export function useItemMutations({
     [
       items,
       setItems,
+      excludePendingDeletes,
       confirm,
       t,
       toast,
