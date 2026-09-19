@@ -38,28 +38,20 @@ export function useItemMutations({
   const toast = useToast();
   const confirm = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
-  // Ids whose deletion is confirmed but not yet actually run -- the real
-  // deleteItem() call is deferred to the toast's undo window (see below).
-  // A reload can land in that window (e.g. the search box clearing right
-  // after the confirm click) and report the row exactly as the database
-  // still has it, which would otherwise resurrect a card the user just
-  // watched disappear.
+  // Ids optimistically removed but not yet actually deleted (the real
+  // deleteItem() is deferred to the undo window below) -- kept out of
+  // `items` even if a reload reports the row as still there.
   const pendingDeleteIds = useRef<Set<string>>(new Set());
 
-  // The one place that strips pending-delete ids out of a list -- shared
-  // between the click's own optimistic removal and the effect below, so
-  // there is a single implementation, not two that happen to agree. The
-  // reference-equality return isn't just an optimization: the effect is
-  // keyed on `items`, so an updater that always returns a new array would
-  // re-trigger itself forever.
+  // Shared by removeItem's own removal and the effect below; returns the
+  // same reference when nothing changes so the effect can't loop forever.
   const excludePendingDeletes = useCallback((list: ItemLite[]) => {
     const next = list.filter((it) => !pendingDeleteIds.current.has(it.id));
     return next.length === list.length ? list : next;
   }, []);
 
-  // Reconciles `items` against pendingDeleteIds on every change, not just
-  // the one removeItem makes itself -- a reload landing in the undo window
-  // above is exactly such a change, and needs the same treatment.
+  // Re-applies the filter whenever `items` changes, not just the change
+  // removeItem makes itself.
   useEffect(() => {
     setItems(excludePendingDeletes);
   }, [items, setItems, excludePendingDeletes]);

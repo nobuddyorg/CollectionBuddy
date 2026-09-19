@@ -270,12 +270,8 @@ describe('useItemMutations removeItem', () => {
     expect(deleteItem).not.toHaveBeenCalled();
   });
 
-  // The regression this guards against: the real deleteItem() call is
-  // deferred to the toast's undo window (AUTO_DISMISS_MS, several seconds),
-  // so a reload that lands in that window -- e.g. the search box clearing
-  // right after the confirm click -- reports the row exactly as the
-  // database still has it. Applying that response verbatim would resurrect
-  // a card the user just watched disappear.
+  // Regression test: deleteItem() is deferred behind the undo window, so a
+  // stale reload can otherwise report the row as still there.
   it('keeps a just-deleted card out of the list even when a reload reports it before the deferred delete actually runs', async () => {
     const captureItemImagePaths = vi.fn().mockResolvedValue([]);
     const removeImageBytes = vi.fn();
