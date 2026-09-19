@@ -5,16 +5,17 @@ import { HeaderProps } from './types';
 import { useMenu } from './useMenu';
 import Menu from './Menu';
 
-const withBasePath = (path: string): string => {
+// The one caller below always passes a leading slash -- no normalization
+// needed for a path this function never receives any other way.
+const withBasePath = (path: `/${string}`): string => {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${basePath}${normalizedPath}`;
+  return `${basePath}${path}`;
 };
 
 export default function Header({ user, onSignOut }: HeaderProps) {
   const { open: menuOpen, toggle, close, anchorRef, panelRef } = useMenu();
   const { t } = useI18n();
-  const displayEmail = user.email ?? '';
+  const displayEmail = user.email;
 
   return (
     <header

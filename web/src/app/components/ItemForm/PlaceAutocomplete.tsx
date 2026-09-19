@@ -5,8 +5,6 @@ import { isQueryLongEnough, usePhotonSearch } from './usePhoton';
 import type { PlaceCoords } from './types';
 import { fieldClasses } from '../ui/fieldClasses';
 
-const ESTIMATED_MENU_HEIGHT = 240;
-
 // `onChange` reports null coords for hand-typed edits, so stale coordinates
 // never outlive the name they were looked up for.
 export function PlaceAutocomplete({
@@ -26,6 +24,7 @@ export function PlaceAutocomplete({
     results,
     loading,
     error,
+    searched,
     activeIdx,
     dropdownRef,
     inputRef,
@@ -40,7 +39,8 @@ export function PlaceAutocomplete({
     setQuery(value);
   }, [value, setQuery]);
 
-  const showMenu = focus && (loading || results.length > 0 || error);
+  const showMenu =
+    focus && (loading || results.length > 0 || error || searched);
 
   // The menu is positioned absolute inside the anchor, so it moves with the
   // input on scroll for free; only the below/above choice needs recomputing.
@@ -48,9 +48,8 @@ export function PlaceAutocomplete({
   useEffect(() => {
     if (!showMenu) return;
     const compute = () => {
-      const r = inputRef.current?.getBoundingClientRect();
-      if (!r) return;
-      const menuHeight = menuRef.current?.offsetHeight ?? ESTIMATED_MENU_HEIGHT;
+      const r = inputRef.current!.getBoundingClientRect();
+      const menuHeight = menuRef.current!.offsetHeight;
       const spaceBelow = window.innerHeight - r.bottom;
       setPlacement(
         spaceBelow < menuHeight && r.top > spaceBelow ? 'above' : 'below',

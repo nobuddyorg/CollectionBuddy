@@ -14,9 +14,6 @@ import {
 import { backoffDelayMs } from '../../lib/backoff';
 import { Place, PlaceCoords } from './types';
 
-// Stryker disable all: localStorage, and two try/catch wrappers whose whole
-// content is "carry on without the cache". Mutating them scores how well the
-// storage API is stubbed rather than anything about the app.
 const GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
 
 function readGeocodeCache(): Record<string, PlaceCoords> {
@@ -36,7 +33,6 @@ function writeGeocodeCache(cache: Record<string, PlaceCoords>) {
     // Best-effort: geocoding still works without a cache.
   }
 }
-// Stryker restore all
 
 /**
  * Splits the places to draw into ones that already know where they are and
@@ -60,18 +56,12 @@ export function partitionByStoredCoords(rows: PlaceGroupRow[]): {
     titles.set(place, row.titles);
     ids.set(place, row.ids);
 
-    // Not a type guard on its own -- narrows the pair to `number` for the
-    // compiler. Number.isFinite below rejects null too, so this line is
-    // unobservable at runtime.
-    // Stryker disable next-line all
-    if (lat == null || lng == null) {
-      unlocated.push(place);
-      continue;
-    }
-    // A stored NaN/Infinity would draw a pin nowhere and suppress the
-    // geocode that would have found the place properly.
+    // A stored NaN/Infinity/null would draw a pin nowhere and suppress the
+    // geocode that would have found the place properly. `Number.isFinite`
+    // already rejects `null` at runtime; the assertions below only tell the
+    // compiler what this check already guarantees.
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      located.push({ name: place, lat, lng });
+      located.push({ name: place, lat: lat!, lng: lng! });
     } else {
       unlocated.push(place);
     }
@@ -118,10 +108,7 @@ export function placeFromPhotonResponse(
   data: unknown,
 ): PlaceCoords | null {
   const features = (data as { features?: unknown })?.features;
-  // Shortcut, not a guard: an empty array falls through to the same null
-  // anyway, but "no matches" reads better stated up top.
-  // Stryker disable next-line all
-  if (!Array.isArray(features) || features.length === 0) return null;
+  if (!Array.isArray(features)) return null;
   const coords = coordsFromFeature(features[0]);
   return coords ? { name, ...coords } : null;
 }
@@ -130,22 +117,16 @@ export function placeFromPhotonResponse(
 // firing one per place at once got a batch mostly 429'd, with the map
 // silently drawing only the pins that got through. A few at a time,
 // retried on refusal.
-// Stryker disable all: a test can restate "three at a time" but can't
-// judge whether three is right.
 const GEOCODE_CONCURRENCY = 3;
 const GEOCODE_ATTEMPTS = 3;
 const RETRY_BASE_MS = 500;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-// Stryker restore all
 
 // `enabled` gates fetching behind the map actually being open, so geocoding
 // every distinct place isn't paid for far more often than the map is
 // looked at. `search` narrows to the entries the list is showing, not
 // every entry in the category.
-// Stryker disable all: hook internals -- Supabase I/O and a geocoding
-// queue, none of it reachable without stubbing the network. The four
-// exported functions above carry the logic worth scoring.
 export function usePlaces(
   categoryId: string,
   search: string,
@@ -245,10 +226,9 @@ export function usePlaces(
             // than a plain `void`. `ids` is seeded from the same rows that
             // produced `unlocated` (and therefore this queue), so every
             // place reaching this worker already has at least one id keyed
-            // here -- `?? []` guards only the type checker, not a case the
-            // Map is expected to actually hit.
-            // v8 ignore next
-            void updateItemsPlace(ids.get(place) ?? [], {
+            // here -- the assertion tells the compiler what the `Map` is
+            // already guaranteed to hold.
+            void updateItemsPlace(ids.get(place)!, {
               place_lat: entry.lat,
               place_lng: entry.lng,
               // eslint-disable-next-line sonarjs/no-nested-functions
@@ -269,8 +249,9 @@ export function usePlaces(
         if (!cancelled && placeCount > 0 && resolvedCount === 0) {
           setError(true);
         }
-      } catch {
+      } catch (err) {
         if (!cancelled) {
+          console.error('Failed to load places:', err);
           setPlaces([]);
           setError(true);
         }
@@ -289,4 +270,3 @@ export function usePlaces(
 
   return { places, loading, error };
 }
-// Stryker restore all

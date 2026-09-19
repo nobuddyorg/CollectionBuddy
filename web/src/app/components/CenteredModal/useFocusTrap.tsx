@@ -20,8 +20,8 @@ export function useFocusTrap(
       // (e.g. a card's trash button) from the DOM first, making
       // `prev.focus()` a silent no-op; fall back to the stable main
       // landmark instead of dropping focus on the floor.
-      if (prev?.isConnected) {
-        prev.focus?.();
+      if (prev!.isConnected) {
+        prev!.focus();
       } else {
         document.getElementById('main-content')?.focus();
       }
@@ -33,7 +33,6 @@ export function useFocusTrap(
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return;
       const f = getFocusable(containerRef.current);
-      if (f.length === 0) return;
       const first = f[0];
       const last = f[f.length - 1];
       const active = document.activeElement as HTMLElement | null;

@@ -71,6 +71,20 @@ describe('useCategories', () => {
       expect(result.current.cats).toEqual([COINS, STAMPS]);
     });
 
+    it('falls back to an empty list when the server returns no rows', async () => {
+      vi.mocked(listCategories).mockResolvedValue({
+        data: null,
+        error: null,
+      } as never);
+
+      const { result } = renderHook(() => useCategories(), { wrapper });
+      await act(async () => {
+        await expect(result.current.reload()).resolves.toEqual([]);
+      });
+
+      expect(result.current.cats).toEqual([]);
+    });
+
     it('reports a failed listing and leaves the strip empty', async () => {
       const consoleError = vi
         .spyOn(console, 'error')
@@ -115,6 +129,36 @@ describe('useCategories', () => {
       });
 
       expect(result.current.cats).toEqual([STAMPS]);
+    });
+
+    it('logs but does not toast a superseded request that errors', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      let releaseFirst: (value: unknown) => void = () => {};
+      vi.mocked(listCategories)
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            releaseFirst = resolve;
+          }) as never,
+        )
+        .mockResolvedValueOnce({ data: [STAMPS], error: null } as never);
+
+      const { result } = renderHook(() => useCategories(), { wrapper });
+      act(() => {
+        void result.current.reload();
+      });
+      await act(async () => {
+        await result.current.reload();
+      });
+      await act(async () => {
+        releaseFirst({ data: null, error: new Error('stale') });
+      });
+
+      expect(consoleError).toHaveBeenCalledWith(expect.any(Error));
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(result.current.cats).toEqual([STAMPS]);
+      consoleError.mockRestore();
     });
   });
 

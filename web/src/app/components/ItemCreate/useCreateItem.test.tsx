@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook, screen } from '@testing-library/react';
+import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
@@ -45,6 +45,83 @@ describe('useCreateItem', () => {
 
     expect(ok).toBe(false);
     expect(createItem).not.toHaveBeenCalled();
+  });
+
+  it('ignores a second submit while the first is still in flight', async () => {
+    let release: (value: unknown) => void = () => {};
+    vi.mocked(createItem).mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }) as never,
+    );
+    vi.mocked(linkItemToCategory).mockResolvedValue({ error: null } as never);
+
+    const { result } = renderHook(() => useCreateItem('cat-1'), { wrapper });
+
+    act(() => {
+      void result.current.create(values());
+    });
+    await waitFor(() => expect(result.current.isCreating).toBe(true));
+
+    await act(async () => {
+      await expect(result.current.create(values())).resolves.toBe(false);
+    });
+
+    expect(createItem).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      release({ data: { id: 'item-1' }, error: null });
+    });
+  });
+
+  it('sends an empty tag list when the form value is not an array', async () => {
+    vi.mocked(createItem).mockResolvedValue({
+      data: { id: 'item-1' },
+      error: null,
+    } as never);
+    vi.mocked(linkItemToCategory).mockResolvedValue({ error: null } as never);
+    const { result } = renderHook(() => useCreateItem('cat-1'), { wrapper });
+
+    await act(async () => {
+      await result.current.create({
+        ...values(),
+        tags: undefined as unknown as string[],
+      });
+    });
+
+    expect(createItem).toHaveBeenCalledWith(
+      expect.objectContaining({ tags: [] }),
+    );
+  });
+
+  it('rolls back with a generic error when createItem answers with neither data nor an error', async () => {
+    vi.mocked(createItem).mockResolvedValue({
+      data: null,
+      error: null,
+    } as never);
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    const { result } = renderHook(() => useCreateItem('cat-1'), { wrapper });
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.create(values());
+    });
+
+    expect(ok).toBe(false);
+    expect(linkItemToCategory).not.toHaveBeenCalled();
+    expect(deleteItem).not.toHaveBeenCalled();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not save this entry. Please try again.',
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      'create item',
+      expect.objectContaining({ message: 'insert failed' }),
+    );
+    expect(result.current.isCreating).toBe(false);
+    consoleError.mockRestore();
   });
 
   it('creates the item, links it to the category, and announces success', async () => {

@@ -101,12 +101,13 @@ export function useCategories() {
         const { data, error } = await renameCategoryRow(id, trimmed);
         if (error) throw error;
         // Merge the row the DB returned, not the value sent -- a trigger
-        // normalises the name before it lands.
-        if (data) {
-          setCats((prev) =>
-            prev.map((c) => (c.id === id ? { ...c, ...data } : c)),
-          );
-        }
+        // normalises the name before it lands. `.single()` guarantees
+        // `data` is non-null whenever `error` isn't (see data/categories.ts):
+        // a write RLS denies, or that matches no row, comes back as an
+        // error, never as a silent `data: null`.
+        setCats((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, ...data } : c)),
+        );
         toast.success(t('category_select.rename_success'));
         return true;
       } catch (e) {
@@ -182,7 +183,12 @@ export function useCategories() {
                   cause: linkedError,
                 });
               }
-              const keep = new Set(stillLinked ?? []);
+              // `listItemIdsLinkedElsewhere` only ever returns a null `data`
+              // alongside a non-null `error` (see data/categories.ts), and
+              // that case already threw above -- `stillLinked` is always a
+              // real array here. `new Set(null)` is well-defined anyway (an
+              // empty set), so no fallback is needed either way.
+              const keep = new Set(stillLinked);
               orphanedItemIds = itemIds.filter((itemId) => !keep.has(itemId));
             }
 
@@ -211,13 +217,18 @@ export function useCategories() {
                   imagesError,
                 );
               }
-              for (const row of imageRows ?? []) {
-                const list = orphanedImagePaths.get(row.item_id) ?? [];
-                list.push({
-                  path_full: row.path_full,
-                  path_thumb: row.path_thumb,
-                });
-                orphanedImagePaths.set(row.item_id, list);
+              // `imageRows` is genuinely nullable here (unlike the other
+              // list* calls above): `imagesError` doesn't abort, so a real
+              // failure reaches this point with `data: null`.
+              if (imageRows) {
+                for (const row of imageRows) {
+                  const list = orphanedImagePaths.get(row.item_id) ?? [];
+                  list.push({
+                    path_full: row.path_full,
+                    path_thumb: row.path_thumb,
+                  });
+                  orphanedImagePaths.set(row.item_id, list);
+                }
               }
             }
 
@@ -230,31 +241,30 @@ export function useCategories() {
             if (error) throw error;
             await reload();
 
-            if (orphanedItemIds.length) {
-              // The row is already gone, irreversibly. A failure here is a
-              // storage leak, not data loss, so every removal runs to
-              // completion rather than aborting on the first rejection.
-              const results = await Promise.allSettled(
-                orphanedItemIds.map(async (itemId) => {
-                  const paths = orphanedImagePaths.get(itemId) ?? [];
-                  const flat = paths.flatMap(storagePathsOf);
-                  if (!flat.length) return;
-                  const { error: removeError } = await removeImageObjects(flat);
-                  if (removeError) throw removeError;
-                }),
+            // No `orphanedItemIds.length` guard here: `.map()` over an
+            // empty array, and `Promise.allSettled` of an empty list, are
+            // already no-ops, so a guard around them can never change what
+            // this block does.
+            // The row is already gone, irreversibly. A failure here is a
+            // storage leak, not data loss, so every removal runs to
+            // completion rather than aborting on the first rejection.
+            const results = await Promise.allSettled(
+              orphanedItemIds.map(async (itemId) => {
+                const paths = orphanedImagePaths.get(itemId) ?? [];
+                const flat = paths.flatMap(storagePathsOf);
+                if (!flat.length) return;
+                const { error: removeError } = await removeImageObjects(flat);
+                if (removeError) throw removeError;
+              }),
+            );
+            const failures = results.filter(
+              (r): r is PromiseRejectedResult => r.status === 'rejected',
+            );
+            if (failures.length) {
+              failures.forEach((f) =>
+                console.error('Failed to clean up category images:', f.reason),
               );
-              const failures = results.filter(
-                (r): r is PromiseRejectedResult => r.status === 'rejected',
-              );
-              if (failures.length) {
-                failures.forEach((f) =>
-                  console.error(
-                    'Failed to clean up category images:',
-                    f.reason,
-                  ),
-                );
-                toast.error(t('category_select.delete_images_cleanup_error'));
-              }
+              toast.error(t('category_select.delete_images_cleanup_error'));
             }
           } catch (e) {
             toast.reportError(

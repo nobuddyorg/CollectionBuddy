@@ -56,8 +56,6 @@ export function toImgEntries(
 // real photograph beats none.
 export async function signEntries(
   perItem: ReadonlyArray<readonly [string, Map<string, ImageEntryData>]>,
-  // Stryker disable next-line all
-  // v8 ignore next
   signUrls: typeof createSignedUrls = createSignedUrls,
 ): Promise<Record<string, ImgEntry[]>> {
   const allPaths = perItem.flatMap(([, entryData]) =>

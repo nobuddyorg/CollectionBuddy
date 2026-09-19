@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import Header from './index';
@@ -40,5 +40,31 @@ describe('Header', () => {
   it('names the account menu button for assistive tech', () => {
     renderHeader();
     expect(screen.getByRole('button', { name: 'Account menu' })).toBeVisible();
+  });
+
+  describe('with a configured base path', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('prefixes the logo image with the configured base path', () => {
+      vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/collectionbuddy');
+      const { container } = renderHeader();
+      expect(container.querySelector('img')).toHaveAttribute(
+        'src',
+        '/collectionbuddy/logo-header.png',
+      );
+    });
+  });
+
+  it('falls back to the app name for the title when there is no email to show', () => {
+    render(
+      <I18nProvider>
+        <Header user={{ email: '' }} onSignOut={vi.fn()} />
+      </I18nProvider>,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Account menu' }),
+    ).toHaveAttribute('title', 'CollectionBuddy');
   });
 });

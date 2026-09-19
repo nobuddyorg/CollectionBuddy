@@ -35,6 +35,29 @@ function renderModal(onOpenChange = vi.fn()) {
   return { onOpenChange };
 }
 
+describe('EditItemModal', () => {
+  // ItemFields types `tags` as always an array, but nothing stops a stored
+  // row from actually holding null -- the form should still start empty
+  // rather than throwing.
+  it('starts with no tags when the item has none', async () => {
+    render(
+      <I18nProvider>
+        <ConfirmProvider>
+          <EditItemModal
+            open
+            item={{ ...item, tags: null as unknown as string[] }}
+            isSaving={false}
+            onOpenChange={vi.fn()}
+            onSubmit={vi.fn()}
+          />
+        </ConfirmProvider>
+      </I18nProvider>,
+    );
+    await screen.findByTestId('item-title');
+    expect(screen.getByText('0 tags')).toBeInTheDocument();
+  });
+});
+
 // A stray backdrop tap or Escape used to drop an edit with no prompt. The
 // dialog's X and the form's Cancel button funnel through the same guard, so
 // exercising Escape and Cancel here covers all four dismissal paths.

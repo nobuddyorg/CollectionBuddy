@@ -10,12 +10,15 @@ function Harness({
   open,
   useInitialFocus = false,
   removeTrigger = false,
+  empty = false,
 }: {
   open: boolean;
   useInitialFocus?: boolean;
   /** Mimics an optimistic delete: the button that opened the dialog is
    * gone from the DOM by the time the dialog closes. */
   removeTrigger?: boolean;
+  /** No focusable controls at all inside the trapped container. */
+  empty?: boolean;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const second = useRef<HTMLButtonElement>(null);
@@ -29,9 +32,15 @@ function Harness({
       {!removeTrigger && <button>outside before</button>}
       {open && (
         <div ref={container}>
-          <button>first</button>
-          <button ref={second}>second</button>
-          <button>last</button>
+          {empty ? (
+            <p>Nothing to focus</p>
+          ) : (
+            <>
+              <button>first</button>
+              <button ref={second}>second</button>
+              <button>last</button>
+            </>
+          )}
         </div>
       )}
       <button>outside after</button>
@@ -40,6 +49,25 @@ function Harness({
 }
 
 const button = (name: string) => screen.getByRole('button', { name });
+
+// Every real caller happens to unmount the trapped container in the same
+// render that `open` goes false, but the hook's own contract is that `open`
+// alone gates it -- this harness keeps the container mounted regardless, to
+// prove the hook honours that contract itself rather than merely getting
+// away with it because callers also unmount.
+function AlwaysMountedHarness({ open }: { open: boolean }) {
+  const container = useRef<HTMLDivElement>(null);
+  useFocusTrap(open, container);
+  return (
+    <div>
+      <button>outside</button>
+      <div ref={container}>
+        <button>inside first</button>
+        <button>inside last</button>
+      </div>
+    </div>
+  );
+}
 
 describe('useFocusTrap', () => {
   it('moves focus into the dialog when it opens', () => {
@@ -122,6 +150,17 @@ describe('useFocusTrap', () => {
     expect(button('first')).toHaveFocus();
   });
 
+  it('leaves Tab alone when the dialog has nothing focusable in it', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Harness open={false} empty />);
+    rerender(<Harness open empty />);
+
+    button('outside before').focus();
+    await user.tab();
+
+    expect(screen.getByText('Nothing to focus')).toBeInTheDocument();
+  });
+
   it('does nothing at all while it is closed', async () => {
     const user = userEvent.setup();
     render(<Harness open={false} />);
@@ -129,5 +168,37 @@ describe('useFocusTrap', () => {
     button('outside after').focus();
     await user.tab();
     expect(button('outside after')).not.toHaveFocus();
+  });
+
+  it('does not steal focus into an already-mounted container while closed', () => {
+    render(<AlwaysMountedHarness open={false} />);
+    expect(
+      screen.getByRole('button', { name: 'inside first' }),
+    ).not.toHaveFocus();
+  });
+
+  it('does not trap Tab inside an already-mounted container while closed', async () => {
+    const user = userEvent.setup();
+    render(<AlwaysMountedHarness open={false} />);
+
+    screen.getByRole('button', { name: 'inside last' }).focus();
+    await user.tab();
+
+    expect(
+      screen.getByRole('button', { name: 'inside first' }),
+    ).not.toHaveFocus();
+  });
+
+  it('actually removes its Tab listener once it closes, not just stops trapping in principle', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<AlwaysMountedHarness open />);
+    rerender(<AlwaysMountedHarness open={false} />);
+
+    screen.getByRole('button', { name: 'inside last' }).focus();
+    await user.tab();
+
+    expect(
+      screen.getByRole('button', { name: 'inside first' }),
+    ).not.toHaveFocus();
   });
 });

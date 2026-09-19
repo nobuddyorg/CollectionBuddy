@@ -15,8 +15,8 @@ export function useMenu() {
     if (!open) return;
     const onDocClick = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (panelRef.current?.contains(t)) return;
-      if (anchorRef.current?.contains(t)) return;
+      if (panelRef.current!.contains(t)) return;
+      if (anchorRef.current!.contains(t)) return;
       setOpen(false);
     };
     document.addEventListener('mousedown', onDocClick);
@@ -44,7 +44,7 @@ export function useMenu() {
     if (open) return;
     if (!restoreFocusRef.current) return;
     restoreFocusRef.current = false;
-    anchorRef.current?.focus();
+    anchorRef.current!.focus();
   }, [open]);
 
   return { open, toggle, close, anchorRef, panelRef };

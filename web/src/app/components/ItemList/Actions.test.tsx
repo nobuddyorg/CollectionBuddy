@@ -1,10 +1,18 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { Actions, AddPhotoPlate } from './Actions';
+
+// The edit button's own prefetch warms the lazy ItemForm chunk on intent;
+// a failure there isn't reported (the real dynamic() import retries on the
+// actual click), so it must be swallowed, not surfaced as an unhandled
+// rejection.
+vi.mock('../ItemForm', () => {
+  throw new Error('chunk load failed');
+});
 
 function renderActions(overrides: Partial<Parameters<typeof Actions>[0]> = {}) {
   const props = {
@@ -60,15 +68,30 @@ describe('Actions', () => {
     expect(onUpload).toHaveBeenCalledWith(file);
   });
 
-  it('does not call onUpload when the picker is dismissed', async () => {
+  it('does not call onUpload when the picker is dismissed with no file chosen', () => {
     const { onUpload, input } = renderActions();
-    await userEvent.upload(input, []);
+    fireEvent.change(input, { target: { files: [] } });
     expect(onUpload).not.toHaveBeenCalled();
   });
 
   it('blocks the file picker while an upload is in flight', () => {
     const { input } = renderActions({ busy: true });
     expect(input).toBeDisabled();
+  });
+
+  it('swallows a failed prefetch of the edit form rather than surfacing it', async () => {
+    const onUnhandledRejection = vi.fn();
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+    try {
+      renderActions();
+      fireEvent.focus(screen.getByRole('button', { name: 'Edit' }));
+      // Give the dynamic import's rejection a turn to reach .catch().
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(onUnhandledRejection).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+    }
   });
 
   it('fires edit and delete handlers', async () => {

@@ -70,17 +70,23 @@ function setUp({
   const onSelect = vi.fn();
   // The confirm dialog renders through the provider, so the hook needs a
   // real tree around it rather than a bare renderHook.
-  const { result } = renderHook(
-    () =>
+  const { result, rerender } = renderHook(
+    (props: {
+      selectedCat: string | null;
+      selected: Category | null;
+      categoriesState: UseCategories;
+      sharesState: UseShares;
+    }) =>
       useCategoryRemoval({
-        selectedCat,
-        selected,
+        selectedCat: props.selectedCat,
+        selected: props.selected,
         sortedCats: cats,
-        categories: categoriesState,
-        shares: sharesState,
+        categories: props.categoriesState,
+        shares: props.sharesState,
         onSelect,
       }),
     {
+      initialProps: { selectedCat, selected, categoriesState, sharesState },
       wrapper: ({ children }) => (
         <I18nProvider>
           <ToastProvider>
@@ -90,7 +96,7 @@ function setUp({
       ),
     },
   );
-  return { result, onSelect };
+  return { result, onSelect, rerender };
 }
 
 describe('useCategoryRemoval', () => {
@@ -117,6 +123,73 @@ describe('useCategoryRemoval', () => {
       // never briefly showing a category that is on its way out.
       expect(onSelect).toHaveBeenCalledWith('b');
       expect(deleteCategory).toHaveBeenCalledWith('a', expect.anything());
+    });
+
+    it('falls back to the generic warning and logs when the item count cannot be read', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const countError = new Error('rls');
+      vi.mocked(countItemsForCategory).mockResolvedValue({
+        count: null,
+        error: countError,
+      } as never);
+      const { result } = setUp({});
+
+      void result.current.onDelete();
+
+      expect(
+        await screen.findByText(
+          'Delete "Coins"? Its entries and all their photographs will be permanently deleted.',
+        ),
+      ).toBeInTheDocument();
+      expect(consoleError).toHaveBeenCalledWith(countError);
+      consoleError.mockRestore();
+    });
+
+    it('does not log anything once the item count reads successfully', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const { result } = setUp({});
+
+      void result.current.onDelete();
+      await screen.findByTestId('confirm-accept');
+
+      expect(consoleError).not.toHaveBeenCalled();
+      consoleError.mockRestore();
+    });
+
+    it('falls back to the generic warning when the count answers null with no error', async () => {
+      vi.mocked(countItemsForCategory).mockResolvedValue({
+        count: null,
+        error: null,
+      } as never);
+      const { result } = setUp({});
+
+      void result.current.onDelete();
+
+      expect(
+        await screen.findByText(
+          'Delete "Coins"? Its entries and all their photographs will be permanently deleted.',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('names the entry count in the warning when the category holds entries', async () => {
+      vi.mocked(countItemsForCategory).mockResolvedValue({
+        count: 3,
+        error: null,
+      } as never);
+      const { result } = setUp({});
+
+      void result.current.onDelete();
+
+      expect(
+        await screen.findByText(
+          'Delete "Coins"? Its 3 entries and all their photographs will be permanently deleted.',
+        ),
+      ).toBeInTheDocument();
     });
 
     it('deletes nothing when the warning is declined', async () => {
@@ -154,6 +227,39 @@ describe('useCategoryRemoval', () => {
       expect(countItemsForCategory).not.toHaveBeenCalled();
       expect(onSelect).not.toHaveBeenCalled();
     });
+
+    it('deletes whichever category is selected after a re-render, not a stale one', async () => {
+      const deleteCategory = vi.fn<UseCategories['deleteCategory']>();
+      const { result, rerender } = setUp({
+        categoriesState: categories({ deleteCategory }),
+      });
+
+      rerender({
+        selectedCat: 'b',
+        selected: cats[1],
+        categoriesState: categories({ deleteCategory }),
+        sharesState: shares(),
+      });
+
+      void result.current.onDelete();
+      await userEvent.click(await screen.findByTestId('confirm-accept'));
+
+      expect(deleteCategory).toHaveBeenCalledWith('b', expect.anything());
+    });
+
+    it('falls back to an empty name when the category is gone from the list', async () => {
+      const deleteCategory = vi.fn<UseCategories['deleteCategory']>();
+      const { result } = setUp({
+        selected: null,
+        categoriesState: categories({ deleteCategory }),
+      });
+
+      void result.current.onDelete();
+
+      expect(await screen.findByText('Delete ""?')).toBeInTheDocument();
+      await userEvent.click(screen.getByTestId('confirm-cancel'));
+      expect(deleteCategory).not.toHaveBeenCalled();
+    });
   });
 
   describe('leaving a category shared with you', () => {
@@ -171,6 +277,27 @@ describe('useCategoryRemoval', () => {
       expect(deleteShare).toHaveBeenCalledWith('share-1', expect.anything());
       expect(deleteCategory).not.toHaveBeenCalled();
       expect(onSelect).toHaveBeenCalledWith('b');
+    });
+
+    it('ends whichever grant is current after a re-render, not a stale one', async () => {
+      const deleteShare = vi.fn<UseShares['deleteShare']>();
+      const { result, rerender } = setUp({
+        categoriesState: categories(),
+        sharesState: shares({ shares: [myGrant], deleteShare }),
+      });
+
+      const otherGrant = { ...myGrant, id: 'share-2' };
+      rerender({
+        selectedCat: 'b',
+        selected: cats[1],
+        categoriesState: categories(),
+        sharesState: shares({ shares: [otherGrant], deleteShare }),
+      });
+
+      void result.current.onLeave();
+      await userEvent.click(await screen.findByTestId('confirm-accept'));
+
+      expect(deleteShare).toHaveBeenCalledWith('share-2', expect.anything());
     });
 
     it('puts the category back and re-selects it when leaving fails', async () => {
@@ -220,6 +347,19 @@ describe('useCategoryRemoval', () => {
 
     // Already gone -- another tab, or a second click -- leaves nothing to
     // undo, and so nothing to end either.
+    it('does not end the grant when the leave confirmation is declined', async () => {
+      const deleteShare = vi.fn<UseShares['deleteShare']>();
+      const { result, onSelect } = setUp({
+        sharesState: shares({ shares: [myGrant], deleteShare }),
+      });
+
+      void result.current.onLeave();
+      await userEvent.click(await screen.findByTestId('confirm-cancel'));
+
+      expect(deleteShare).not.toHaveBeenCalled();
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
     it('does not end the grant when the category was already removed', async () => {
       const deleteShare = vi.fn<UseShares['deleteShare']>();
       const { result } = setUp({

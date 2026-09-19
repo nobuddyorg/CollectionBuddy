@@ -16,7 +16,7 @@ const openCounts = new WeakMap<HTMLElement, number>();
 // an already-open modal keeps the root hidden until the last of them closes.
 export function useInertBackground(active: boolean) {
   useEffect(() => {
-    if (!active || typeof document === 'undefined') return;
+    if (!active) return;
 
     const root = document.getElementById('app-root');
     if (!root) return;
@@ -26,7 +26,7 @@ export function useInertBackground(active: boolean) {
     if (count === 1) root.inert = true;
 
     return () => {
-      const next = (openCounts.get(root) ?? 1) - 1;
+      const next = openCounts.get(root)! - 1;
       openCounts.set(root, next);
       if (next <= 0) root.inert = false;
     };

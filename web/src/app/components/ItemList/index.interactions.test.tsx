@@ -162,6 +162,37 @@ describe('the catalogue grid', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('falls back to a blank title if the entry leaves the list while its carousel is open', async () => {
+    const { rerender } = renderList();
+    await heroLoads();
+    await userEvent.click(screen.getByAltText('Seated Dime, image 1'));
+    expect(
+      screen.getByRole('dialog', { name: 'Full size image' }),
+    ).toBeVisible();
+
+    useItemsMock.mockReturnValue({
+      items: [],
+      total: 0,
+      loading: false,
+      page: 1,
+      setPage: vi.fn(),
+      totalPages: 1,
+      reload: vi.fn(),
+      setItems: vi.fn(),
+    });
+    rerender(
+      <I18nProvider>
+        <ToastProvider>
+          <ConfirmProvider>
+            <ItemList categoryId="cat-1" canEdit={true} />
+          </ConfirmProvider>
+        </ToastProvider>
+      </I18nProvider>,
+    );
+
+    expect(screen.getByAltText(', image 1')).toBeInTheDocument();
+  });
+
   it('closes the new-entry dialog from its own close button', async () => {
     renderList();
 
@@ -171,6 +202,27 @@ describe('the catalogue grid', () => {
     await userEvent.click(
       within(dialog).getByRole('button', { name: 'Close' }),
     );
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('confirms and discards an in-progress new entry when closed while dirty', async () => {
+    renderList();
+
+    await userEvent.click(screen.getByRole('button', { name: 'New entry' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(
+      await within(dialog).findByTestId('item-title'),
+      'Roman coin',
+    );
+
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Close' }),
+    );
+    expect(
+      await screen.findByText('Discard your changes?'),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('confirm-accept'));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

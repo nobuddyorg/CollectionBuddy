@@ -34,7 +34,6 @@ export default function GoogleSignInButton({
   }, []);
 
   const handleClick = useCallback(async () => {
-    if (loading) return;
     setLoading(true);
     try {
       await onClick();
@@ -42,7 +41,7 @@ export default function GoogleSignInButton({
       setLoading(false);
       onError?.(err);
     }
-  }, [loading, onClick, onError]);
+  }, [onClick, onError]);
 
   return (
     <>

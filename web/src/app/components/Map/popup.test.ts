@@ -14,6 +14,18 @@ describe('popupContent', () => {
     expect(el.querySelector('p')?.textContent).toBe('Cologne');
   });
 
+  it('styles the heading, the count line, and the title list distinctly', () => {
+    const el = popupContent('Cologne', ['Seated Dime'], '1 entry');
+    const paragraphs = el.querySelectorAll('p');
+    expect(paragraphs[0].className).toBe('font-display text-sm font-bold');
+    expect(paragraphs[1].className).toBe(
+      'font-label text-[0.6875rem] text-neutral-500',
+    );
+    expect(el.querySelector('ul')?.className).toBe(
+      'mt-1.5 max-h-40 overflow-y-auto list-disc pl-4',
+    );
+  });
+
   it('adds no count node when no count label is given', () => {
     const el = popupContent('Cologne', ['Seated Dime']);
     expect(el.querySelectorAll('p')).toHaveLength(1);

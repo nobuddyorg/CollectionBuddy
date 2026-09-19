@@ -32,10 +32,6 @@ export function resolveTheme(
   return preference;
 }
 
-/* v8 ignore start -- store plumbing and the hook; only
- * normalizePreference/resolveTheme above are gated and mutation-tested. */
-// Stryker disable all
-
 // localStorage fires `storage` in *other* tabs, never in the one that did
 // the writing, so a same-tab change needs its own announcement.
 const THEME_CHANGE_EVENT = 'collectionbuddy:theme';
@@ -98,5 +94,3 @@ export function useTheme() {
 
   return { preference, resolved, setThemePreference };
 }
-// Stryker restore all
-/* v8 ignore stop */

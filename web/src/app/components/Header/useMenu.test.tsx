@@ -78,6 +78,15 @@ describe('useMenu', () => {
     expect(menu()).toBeNull();
   });
 
+  it('ignores a key other than Escape while open', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByText('trigger'));
+
+    await user.keyboard('{a}');
+    expect(menu()).not.toBeNull();
+  });
+
   it('closes on Escape', async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -88,11 +97,14 @@ describe('useMenu', () => {
   });
 
   // Dismissing with the keyboard is the one case where focus has nowhere
-  // sensible to land, so it goes back to the trigger.
+  // sensible to land, so it goes back to the trigger. Clicking the trigger
+  // already focuses it, so that alone can't prove restoration happens --
+  // focus has to actually move away first.
   it('returns focus to the trigger after Escape', async () => {
     const user = userEvent.setup();
     render(<Harness />);
     await user.click(screen.getByText('trigger'));
+    screen.getByText('inside the menu').focus();
 
     await user.keyboard('{Escape}');
     expect(screen.getByText('trigger')).toHaveFocus();
@@ -108,6 +120,67 @@ describe('useMenu', () => {
     await user.click(screen.getByText('trigger'));
 
     await user.click(screen.getByText('elsewhere'));
+    expect(screen.getByText('trigger')).not.toHaveFocus();
+  });
+
+  // A click that closes the menu is deliberately routed through "sign out"
+  // rather than "elsewhere" here: clicking outside focuses whatever was
+  // clicked as a native side effect of the same mousedown that closes the
+  // menu, and that native refocus wins the race against any focus() this
+  // hook might call, masking the very thing these tests check. Closing via
+  // a button inside the menu removes that button from the DOM on close
+  // instead, so any leftover focus() call is the only thing left to explain
+  // where focus ends up.
+  it('actually stops listening for Escape once closed, not just stops restoring focus in principle', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.click(screen.getByText('trigger'));
+    await user.click(screen.getByText('sign out'));
+    // A stray Escape after closing must find no listener left to catch it.
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByText('trigger'));
+    await user.click(screen.getByText('sign out'));
+
+    expect(screen.getByText('trigger')).not.toHaveFocus();
+  });
+
+  it('does not attach its outside-click listener before the menu has ever been opened', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    // With the listener wrongly attached this early, `panelRef.current` is
+    // still null (the panel has never rendered) and the handler crashes on
+    // the first outside click instead of doing nothing.
+    await user.click(screen.getByText('elsewhere'));
+
+    expect(menu()).toBeNull();
+  });
+
+  it('does not attach its Escape listener before the menu has ever been opened', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByText('trigger'));
+    await user.click(screen.getByText('sign out'));
+
+    expect(screen.getByText('trigger')).not.toHaveFocus();
+  });
+
+  it('resets its own escape flag after restoring focus, so a later click-dismiss does not also restore it', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.click(screen.getByText('trigger'));
+    await user.keyboard('{Escape}');
+    expect(screen.getByText('trigger')).toHaveFocus();
+
+    await user.click(screen.getByText('trigger'));
+    await user.click(screen.getByText('sign out'));
+
     expect(screen.getByText('trigger')).not.toHaveFocus();
   });
 

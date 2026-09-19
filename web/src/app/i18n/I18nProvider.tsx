@@ -11,11 +11,7 @@ import {
 import de from './de.json';
 import en from './en.json';
 
-/* v8 ignore start -- only used by the ignored I18nProvider below. */
-// Stryker disable all: only used by the ignored I18nProvider below.
 const translations = { de, en };
-// Stryker restore all
-/* v8 ignore stop */
 
 type Language = 'de' | 'en';
 
@@ -84,10 +80,6 @@ export const I18nContext = createContext<I18nContextType | undefined>(
   undefined,
 );
 
-/* v8 ignore start -- provider internals (localStorage, DOM, navigator);
- * resolveTranslationKey above is what's gated and mutation-tested. */
-// Stryker disable all: provider internals aren't covered by tests, only
-// resolveTranslationKey above is -- mutants in here would only be noise.
 const LANG_STORAGE_KEY = 'lang';
 
 function detectLang(): Language {
@@ -170,5 +162,3 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 };
-// Stryker restore all
-/* v8 ignore stop */
