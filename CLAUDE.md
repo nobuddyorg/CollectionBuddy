@@ -231,6 +231,107 @@ the tradeoff to the user:
 If a task seems to require reversing one of these, say so explicitly and
 explain why, rather than quietly doing it.
 
+### 8. Design methods: KISS, DRY, SOLID, Clean Code
+
+These four are **mandatory for every line you write and every line you
+touch** — new code and existing code alike, in TypeScript/React, SQL,
+workflows, scripts and tooling. They are not a style preference to be traded
+against delivery speed: code that breaks one of them is not finished code.
+Almost none of this is tool-enforced — `lint`, `knip` and `depcruise` catch a
+fraction — which is exactly why it sits in the guardrails and not in a style
+guide.
+
+**Existing code** is covered by the boy-scout rule, bounded: when a change
+takes you into a function, file, or policy that breaks a rule below, bring
+*that* unit up to the rule in the same change. Bounded means bounded — this
+never licenses a refactor the task didn't ask for (guardrail 7, and
+"Smallest necessary change" below). If a rule is broken somewhere you are not
+otherwise editing, say so rather than widening the diff.
+
+**When two of them collide, this is the order:** correctness and security,
+then KISS/YAGNI, then Clean Code, then DRY, then SOLID. DRY and SOLID exist
+to remove *present* pain; the moment either argues for an abstraction that
+only pays off for a requirement nobody has, KISS wins and you write the
+obvious version. Call that choice out in the PR description.
+
+#### KISS — the simplest thing that fully solves the actual problem
+
+- Solve the problem that exists, in the most obvious way that works. This is
+  "caveman mode": no cleverness, no indirection layer, no config knob, no
+  generic helper with a single caller.
+- Obvious beats compressed. Nested ternaries, `reduce` used as a loop, and
+  one-liners that need a comment to parse are KISS violations.
+- Complexity is measured, not felt — if a function is hard to name or hard to
+  test, that is the signal, and the answer is to redesign it, not to comment
+  it.
+
+#### DRY — one home per piece of knowledge
+
+- Every rule, constant, query shape, validation, and translation key lives in
+  exactly one place. Copy-pasted logic is a bug report against the design.
+- DRY is about *knowledge*, not about characters. Two blocks that look alike
+  but change for different reasons stay apart; merging them couples things
+  that must move independently.
+- Extract on the third occurrence, not the second — two similar lines are a
+  coincidence, three are a pattern.
+- It applies outside `src/` too: a shared predicate belongs in a SQL function
+  (`has_category_read_access()` is the model), a repeated workflow step in a
+  composite action under `.github/actions/`, and a fact stated in two `docs/`
+  files will rot in one of them.
+
+#### SOLID — as module design, not as class hierarchies
+
+This is functional TypeScript and SQL. SOLID applies to modules, components,
+hooks and functions; it is never a reason to introduce classes, inheritance
+or a DI container here.
+
+- **S — Single responsibility.** One unit, one reason to change. A component
+  that fetches *and* transforms *and* renders is three: the fetch belongs in
+  `src/app/data/`, the transform in a pure function in `src/app/lib/` where
+  it can be unit-tested and mutation-scored, the rendering in the component.
+- **O — Open/closed.** Extend by adding an entry to a list or map, not by
+  reopening a growing `if`/`switch` in the caller. Adding a seam for an
+  extension nobody has asked for is YAGNI — KISS wins.
+- **L — Liskov substitution.** Anything sharing a type must be usable through
+  that type. A union member every caller has to special-case is a modelling
+  error; fix the type, don't guard it at each site.
+- **I — Interface segregation.** Props, parameters and exported types carry
+  what the consumer actually uses — don't pass a whole entity to read two
+  fields.
+- **D — Dependency inversion.** Pure logic never reaches for Supabase,
+  `window`, `fetch`, the router, or `Date.now()`; it takes values as
+  parameters and the edge supplies them. This is what keeps the files on
+  `mutation-targets.mjs` testable without mocks, and what `depcruise`'s
+  `supabase-behind-data-layer` rule enforces at the module level.
+
+#### Clean code — the explicit rules
+
+- **Names reveal intent.** No `data`, `info`, `tmp`, `handleClick2`, no
+  abbreviations, no type prefixes. Functions are verbs, types and components
+  are nouns, booleans read as predicates (`isActive`, `hasWriteAccess`).
+  A name that needs a comment to be understood is the wrong name.
+- **Functions are small and do one thing** — one level of abstraction per
+  function, guard clauses instead of deep nesting (three levels is already a
+  smell), no `else` after a `return`.
+- **Few parameters.** Zero to two; beyond that take a named object. Never a
+  boolean flag parameter — that is two functions wearing one name.
+- **Command-query separation.** A function either changes something or
+  answers something, never both. A `get`/`is`/`has` that mutates is a bug.
+- **No hidden side effects.** Pure by default; where a side effect is the
+  point, the name says so.
+- **No magic numbers or strings.** Name the constant at its one home. Every
+  user-facing string goes through `t('...')` (guardrail 6).
+- **Don't return or pass `null`/`undefined` as a signal** when a narrowed
+  type, an empty collection, or a thrown error models it honestly.
+- **Respect the Law of Demeter.** No `a.b().c().d()` chains reaching through
+  objects the caller has no business knowing about.
+- **Keep files small** — aim for under ~350 lines; split when a file grows
+  past what one concern justifies.
+- **Leave it cleaner than you found it**, within the bound stated above.
+- Rules with a single home elsewhere are not restated here: comments,
+  fail-fast error handling, dead code, and test quality are covered under
+  Engineering Principles and [TEST_STRATEGY.md](TEST_STRATEGY.md).
+
 ## Project Overview
 
 **CollectionBuddy** is a photo-first, bilingual (German/English) catalog app
@@ -306,8 +407,10 @@ above, not here.
 ## Engineering Principles
 
 Apply these across the codebase — TypeScript/React in `web/`, SQL in
-`supabase/migrations/`, workflows, and docs alike. Three meta-rules sit above
-all the others:
+`supabase/migrations/`, workflows, and docs alike. They sit alongside the
+mandatory design methods in guardrail 8 — KISS, DRY, SOLID and the clean-code
+rules — and add this project's own emphasis on top of them. Three meta-rules
+sit above all the others:
 
 1. **Measure, don't assume.** Performance, coverage, mutation score,
    complexity, and bundle size are things to run a tool and read a number
@@ -325,12 +428,6 @@ And the rest:
 - **Performance by design** — pick a reasonable approach up front (e.g. an
   index-friendly query, a set-based SQL statement) rather than shipping an
   O(n²)/one-row-at-a-time version and optimizing later.
-- **Clean code by design** — leave code in the state you'd want to find it,
-  not the state a later cleanup pass would fix.
-- **Caveman mode** — prefer the simplest solution that fully and reliably
-  solves the actual problem. No unnecessary cleverness or magic.
-- **Keep files small** — aim to stay under ~350 lines; split when a file is
-  growing past what one concern justifies.
 - **Maximize test coverage** — and when high coverage is hard to reach,
   that's usually a sign the design needs to change (extract the pure logic),
   not that the tests should be forced.
@@ -342,8 +439,6 @@ And the rest:
   the standard library / what's already in the project.
 - **YAGNI / no speculative engineering** — don't build for a requirement
   that doesn't exist yet. No "for later" abstractions.
-- **Simplicity over cleverness** — obvious, readable code beats a clever or
-  over-abstracted version of the same behavior.
 - **Redesign instead of workaround** — when security, performance,
   testability, maintainability, or complexity is the actual problem,
   question the design rather than stacking a workaround on it.
