@@ -42,14 +42,16 @@ function useSignedUrlRefresh(
     const SIGNED_URL_SERVER_TTL_MS = 3600_000;
     const REFRESH_MARGIN_MS = 5 * 60_000;
     const maybeRefresh = () => {
-      if (!lastSignedAtRef.current) return;
       if (
         Date.now() - lastSignedAtRef.current <
         SIGNED_URL_SERVER_TTL_MS - REFRESH_MARGIN_MS
       )
         return;
-      const itemIds = Object.keys(imagesRef.current);
-      if (itemIds.length) void refreshAllImages(itemIds);
+      // `refreshAllImages` itself no-ops on an empty list, and nothing ever
+      // adds an item to `imagesRef.current` without also stamping
+      // `lastSignedAtRef.current` in the same call -- so an empty item set
+      // and a never-signed ref are the same case, already handled above.
+      void refreshAllImages(Object.keys(imagesRef.current));
     };
     const interval = setInterval(maybeRefresh, 60_000);
     document.addEventListener('visibilitychange', maybeRefresh);
@@ -118,13 +120,11 @@ export function useItemImages() {
     );
     const signed = await signEntries(perItem);
 
-    const idSet = new Set(itemIds);
-    setImages((prev) => {
-      const kept = Object.fromEntries(
-        Object.entries(prev).filter(([id]) => !idSet.has(id)),
-      );
-      return { ...kept, ...signed };
-    });
+    // `signed` already carries one entry per id in `itemIds` -- `signEntries`
+    // sets every key it's given, even to an empty list -- so spreading it
+    // last already replaces exactly those keys with no need to filter them
+    // out of `prev` first.
+    setImages((prev) => ({ ...prev, ...signed }));
     setLoadingItems((prev) => {
       const next = new Set(prev);
       for (const itemId of itemIds) next.delete(itemId);

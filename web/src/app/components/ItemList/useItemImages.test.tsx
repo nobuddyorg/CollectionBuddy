@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
@@ -164,9 +172,10 @@ describe('useItemImages', () => {
       const consoleError = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
+      const listError = new Error('nope');
       vi.mocked(listImagesForItems).mockResolvedValue({
         data: null,
-        error: new Error('nope'),
+        error: listError,
       });
       const { result } = renderHook(() => useItemImages(), { wrapper });
 
@@ -174,36 +183,85 @@ describe('useItemImages', () => {
         await result.current.refreshAllImages(['item-1']);
       });
 
-      expect(consoleError).toHaveBeenCalled();
+      expect(consoleError).toHaveBeenCalledWith(
+        'Failed to list images',
+        listError,
+      );
       expect(result.current.images['item-1']).toEqual([]);
       expect(result.current.loadingItems.size).toBe(0);
       consoleError.mockRestore();
     });
 
-    it('replaces only the items it was asked about', async () => {
+    it('logs nothing when the listing succeeds', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       vi.mocked(listImagesForItems).mockResolvedValue({
         data: [row('img-1', 'item-1')],
         error: null,
       });
       const { result } = renderHook(() => useItemImages(), { wrapper });
+
       await act(async () => {
         await result.current.refreshAllImages(['item-1']);
       });
 
+      expect(consoleError).not.toHaveBeenCalled();
+      consoleError.mockRestore();
+    });
+
+    it('replaces only the items it was asked about, keeping the rest untouched', async () => {
       vi.mocked(listImagesForItems).mockResolvedValue({
-        data: [row('img-2', 'item-2')],
+        data: [row('img-1', 'item-1'), row('img-2', 'item-2')],
+        error: null,
+      });
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+      await act(async () => {
+        await result.current.refreshAllImages(['item-1', 'item-2']);
+      });
+      const untouched = result.current.images['item-2'];
+
+      vi.mocked(listImagesForItems).mockResolvedValue({
+        data: [row('img-1-b', 'item-1')],
         error: null,
       });
       await act(async () => {
-        await result.current.refreshAllImages(['item-2']);
+        await result.current.refreshAllImages(['item-1']);
       });
 
       expect(result.current.images['item-1']).toEqual([
-        entry('img-1', 'item-1'),
+        entry('img-1-b', 'item-1'),
       ]);
-      expect(result.current.images['item-2']).toEqual([
-        entry('img-2', 'item-2'),
-      ]);
+      // Not just equal in value -- the same reference, proving item-2's
+      // entry was carried over rather than rebuilt from scratch.
+      expect(result.current.images['item-2']).toBe(untouched);
+    });
+
+    it('marks the requested items as loading while the request is still in flight', async () => {
+      let resolveList!: (v: {
+        data: ReturnType<typeof row>[] | null;
+        error: unknown;
+      }) => void;
+      vi.mocked(listImagesForItems).mockReturnValue(
+        new Promise((resolve) => {
+          resolveList = resolve;
+        }) as never,
+      );
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      let pending!: Promise<void>;
+      act(() => {
+        pending = result.current.refreshAllImages(['item-1']);
+      });
+
+      expect(result.current.loadingItems.has('item-1')).toBe(true);
+
+      await act(async () => {
+        resolveList({ data: [], error: null });
+        await pending;
+      });
+
+      expect(result.current.loadingItems.has('item-1')).toBe(false);
     });
   });
 
@@ -234,15 +292,19 @@ describe('useItemImages', () => {
         }),
       );
       expect(result.current.pendingUploads['item-1']).toBeUndefined();
+      // The post-upload refresh lists exactly this item, not every item on
+      // the page or none at all.
+      expect(listImagesForItems).toHaveBeenCalledWith(['item-1']);
     });
 
     it('keeps the photograph when only the thumbnail upload fails', async () => {
       const consoleWarn = vi
         .spyOn(console, 'warn')
         .mockImplementation(() => {});
+      const thumbError = new Error('thumb');
       vi.mocked(uploadImageObject)
         .mockResolvedValueOnce({ error: null } as never)
-        .mockResolvedValueOnce({ error: new Error('thumb') } as never);
+        .mockResolvedValueOnce({ error: thumbError } as never);
       const { result } = renderHook(() => useItemImages(), { wrapper });
 
       await act(async () => {
@@ -252,7 +314,24 @@ describe('useItemImages', () => {
       expect(createImageRow).toHaveBeenCalledWith(
         expect.objectContaining({ path_thumb: null }),
       );
-      expect(consoleWarn).toHaveBeenCalled();
+      expect(consoleWarn).toHaveBeenCalledWith(
+        'Thumbnail upload failed:',
+        thumbError,
+      );
+      consoleWarn.mockRestore();
+    });
+
+    it('warns about nothing when both uploads succeed', async () => {
+      const consoleWarn = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      await act(async () => {
+        await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      });
+
+      expect(consoleWarn).not.toHaveBeenCalled();
       consoleWarn.mockRestore();
     });
 
@@ -289,6 +368,9 @@ describe('useItemImages', () => {
     });
 
     it('refuses to write anything without a verified session', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       vi.mocked(verifiedUserId).mockResolvedValue(null);
       const { result } = renderHook(() => useItemImages(), { wrapper });
 
@@ -298,6 +380,13 @@ describe('useItemImages', () => {
 
       expect(uploadImageObject).not.toHaveBeenCalled();
       expect(await screen.findByRole('alert')).toBeVisible();
+      // The specific reason (no session) is logged under the upload-image
+      // scope, distinct from every other failure this same catch handles.
+      expect(consoleError).toHaveBeenCalledWith(
+        'upload image',
+        expect.objectContaining({ message: 'No user session' }),
+      );
+      consoleError.mockRestore();
     });
 
     it('shows no photographs yet if the post-upload refresh answers with none for this item', async () => {
@@ -346,7 +435,10 @@ describe('useItemImages', () => {
         'Failed to list images',
         expect.any(Error),
       );
-      expect(result.current.images['item-1']).toBeUndefined();
+      // Not just `toBeUndefined()` -- that also passes for a key explicitly
+      // set to `undefined`, which wouldn't prove the placeholder was never
+      // written at all.
+      expect(Object.keys(result.current.images)).not.toContain('item-1');
       consoleError.mockRestore();
     });
 
@@ -381,6 +473,70 @@ describe('useItemImages', () => {
       await waitFor(() =>
         expect(result.current.pendingUploads['item-1']).toBeUndefined(),
       );
+    });
+
+    it('drops the count by one rather than clearing it, while a second upload for the same item is still pending', async () => {
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+      let releaseFull!: () => void;
+      vi.mocked(uploadImageObject).mockImplementationOnce(
+        () =>
+          new Promise<{ error: null }>((resolve) => {
+            releaseFull = () => resolve({ error: null });
+          }) as never,
+      );
+
+      act(() => {
+        void result.current.uploadImage('item-1', new File(['x'], 'a.jpg'));
+      });
+      await waitFor(() =>
+        expect(result.current.pendingUploads['item-1']).toBe(1),
+      );
+
+      // A second upload for the same item runs to completion (its own
+      // full+thumb calls fall through to the default resolved mock) while
+      // the first is still held open.
+      await act(async () => {
+        await result.current.uploadImage('item-1', new File(['y'], 'b.jpg'));
+      });
+
+      expect(result.current.pendingUploads['item-1']).toBe(1);
+
+      await act(async () => {
+        releaseFull();
+        await Promise.resolve();
+      });
+    });
+
+    it('does not let one item finishing its upload touch another item still uploading', async () => {
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+      let releaseItem1!: () => void;
+      vi.mocked(uploadImageObject).mockImplementationOnce(
+        () =>
+          new Promise<{ error: null }>((resolve) => {
+            releaseItem1 = () => resolve({ error: null });
+          }) as never,
+      );
+
+      act(() => {
+        void result.current.uploadImage('item-1', new File(['x'], 'a.jpg'));
+      });
+      await waitFor(() =>
+        expect(result.current.pendingUploads['item-1']).toBe(1),
+      );
+
+      await act(async () => {
+        await result.current.uploadImage('item-2', new File(['y'], 'b.jpg'));
+      });
+      expect(result.current.pendingUploads['item-2']).toBeUndefined();
+
+      // item-2 finishing (and clearing its own entry in the `finally`
+      // block) must not have wiped item-1's still-in-flight count.
+      expect(result.current.pendingUploads['item-1']).toBe(1);
+
+      await act(async () => {
+        releaseItem1();
+        await Promise.resolve();
+      });
     });
   });
 
@@ -489,10 +645,62 @@ describe('useItemImages', () => {
         vi.useRealTimers();
       }
     });
+
+    it('refreshes right at the margin boundary, not only once past it', async () => {
+      const { result } = await withOnePhotographAndFakeTimers();
+      try {
+        vi.mocked(listImagesForItems).mockClear();
+        // Advancing (not jumping via setSystemTime) so the 55th 60s
+        // interval tick lands at *exactly* 55 minutes elapsed --
+        // SIGNED_URL_SERVER_TTL_MS (60m) minus REFRESH_MARGIN_MS (5m) --
+        // rather than however far past it a time jump would land.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(55 * 60_000);
+        });
+
+        expect(listImagesForItems).toHaveBeenCalledWith(['item-1']);
+        expect(result.current.images['item-1']).toHaveLength(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('stops refreshing and stops listening for visibility changes once unmounted', async () => {
+      const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
+      const { unmount } = await withOnePhotographAndFakeTimers();
+      try {
+        unmount();
+        expect(removeEventListenerSpy).toHaveBeenCalledWith(
+          'visibilitychange',
+          expect.any(Function),
+        );
+
+        vi.mocked(listImagesForItems).mockClear();
+        vi.setSystemTime(Date.now() + 56 * 60_000);
+        await act(async () => {
+          document.dispatchEvent(new Event('visibilitychange'));
+          await vi.advanceTimersByTimeAsync(60_000);
+        });
+
+        expect(listImagesForItems).not.toHaveBeenCalled();
+      } finally {
+        removeEventListenerSpy.mockRestore();
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('deleteImage', () => {
     const img = entry('img-1', 'item-1');
+    let consoleErrorSpy: MockInstance<typeof console.error>;
+
+    beforeEach(() => {
+      consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+    });
 
     async function withOnePhotograph() {
       vi.mocked(listImagesForItems).mockResolvedValue({
@@ -546,6 +754,9 @@ describe('useItemImages', () => {
       act(() => {
         void result.current.deleteImage('item-1', img);
       });
+      expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+        'Delete this photograph?',
+      );
       await userEvent.click(await screen.findByTestId('confirm-cancel'));
 
       expect(result.current.images['item-1']).toEqual([img]);
@@ -616,8 +827,9 @@ describe('useItemImages', () => {
         data: { path_full: 'uid/item-1/img-1.webp', path_thumb: null },
         error: null,
       } as never);
+      const removeError = new Error('gone');
       vi.mocked(removeImageObjects).mockResolvedValue({
-        error: new Error('gone'),
+        error: removeError,
       } as never);
       const { result } = await withOnePhotograph();
 
@@ -631,6 +843,111 @@ describe('useItemImages', () => {
         'uid/item-1/img-1.webp',
       ]);
       expect(result.current.images['item-1']).toEqual([]);
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'This photograph was deleted, but its file could not be fully removed and may still count against your storage.',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'remove image bytes',
+        removeError,
+      );
+    });
+
+    it('reports a row it could not delete, tagged under its own scope', async () => {
+      const rowError = new Error('rls');
+      vi.mocked(deleteImageRow).mockResolvedValue({
+        data: null,
+        error: rowError,
+      } as never);
+      const { result } = await withOnePhotograph();
+
+      act(() => {
+        void result.current.deleteImage('item-1', img);
+      });
+      await acceptConfirmation();
+      await commitDeferredDelete();
+
+      expect(result.current.images['item-1']).toEqual([img]);
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Could not delete this image. Please try again.',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith('delete image', rowError);
+    });
+
+    it('reports nothing when the delete succeeds cleanly', async () => {
+      vi.mocked(deleteImageRow).mockResolvedValue({
+        data: { path_full: 'uid/item-1/img-1.webp', path_thumb: null },
+        error: null,
+      } as never);
+      vi.mocked(removeImageObjects).mockResolvedValue({ error: null } as never);
+      const { result } = await withOnePhotograph();
+
+      act(() => {
+        void result.current.deleteImage('item-1', img);
+      });
+      await acceptConfirmation();
+      await commitDeferredDelete();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    });
+
+    it('announces the deletion by name as a polite success toast', async () => {
+      const { result } = await withOnePhotograph();
+
+      act(() => {
+        void result.current.deleteImage('item-1', img);
+      });
+      await acceptConfirmation();
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        'Image deleted.',
+      );
+    });
+
+    describe('with several photographs on the same entry', () => {
+      const imgA = entry('img-a', 'item-1');
+      const imgB = entry('img-b', 'item-1');
+      const imgC = entry('img-c', 'item-1');
+
+      async function withThreePhotographs() {
+        vi.mocked(listImagesForItems).mockResolvedValue({
+          data: [
+            row('img-a', 'item-1'),
+            row('img-b', 'item-1'),
+            row('img-c', 'item-1'),
+          ],
+          error: null,
+        });
+        const hook = renderHook(() => useItemImages(), { wrapper });
+        await act(async () => {
+          await hook.result.current.refreshAllImages(['item-1']);
+        });
+        return hook;
+      }
+
+      it('removes only the middle photograph, leaving the others untouched', async () => {
+        const { result } = await withThreePhotographs();
+
+        act(() => {
+          void result.current.deleteImage('item-1', imgB);
+        });
+        await acceptConfirmation();
+
+        expect(result.current.images['item-1']).toEqual([imgA, imgC]);
+      });
+
+      it('restores a deleted middle photograph to its original position on undo', async () => {
+        const { result } = await withThreePhotographs();
+
+        act(() => {
+          void result.current.deleteImage('item-1', imgB);
+        });
+        await acceptConfirmation();
+        await userEvent.click(
+          await screen.findByRole('button', { name: 'Undo' }),
+        );
+
+        expect(result.current.images['item-1']).toEqual([imgA, imgB, imgC]);
+      });
     });
   });
 
@@ -660,33 +977,50 @@ describe('useItemImages', () => {
       ).resolves.toEqual([]);
     });
 
+    it('reads paths for exactly the entry being deleted', async () => {
+      vi.mocked(listImagePathsForItems).mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      await result.current.captureItemImagePaths('item-1');
+
+      expect(listImagePathsForItems).toHaveBeenCalledWith(['item-1']);
+    });
+
     it('answers with nothing when those paths cannot be read', async () => {
       const consoleError = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
+      const pathsError = new Error('nope');
       vi.mocked(listImagePathsForItems).mockResolvedValue({
         data: null,
-        error: new Error('nope'),
+        error: pathsError,
       });
       const { result } = renderHook(() => useItemImages(), { wrapper });
 
       await expect(
         result.current.captureItemImagePaths('item-1'),
       ).resolves.toEqual([]);
-      expect(consoleError).toHaveBeenCalled();
+      expect(consoleError).toHaveBeenCalledWith(
+        'Failed to read image paths before delete',
+        pathsError,
+      );
       consoleError.mockRestore();
     });
 
     it('removes every object of every photograph and forgets the item', async () => {
       vi.mocked(removeImageObjects).mockResolvedValue({ error: null } as never);
       vi.mocked(listImagesForItems).mockResolvedValue({
-        data: [row('img-1', 'item-1')],
+        data: [row('img-1', 'item-1'), row('img-2', 'item-2')],
         error: null,
       });
       const { result } = renderHook(() => useItemImages(), { wrapper });
       await act(async () => {
-        await result.current.refreshAllImages(['item-1']);
+        await result.current.refreshAllImages(['item-1', 'item-2']);
       });
+      const untouched = result.current.images['item-2'];
 
       await act(async () => {
         await result.current.removeImageBytes('item-1', [
@@ -701,6 +1035,8 @@ describe('useItemImages', () => {
         'uid/item-1/b.webp',
       ]);
       expect(result.current.images['item-1']).toBeUndefined();
+      // Forgetting item-1 must not disturb item-2's own entry.
+      expect(result.current.images['item-2']).toBe(untouched);
     });
 
     it('does not call Storage at all for an entry with no photographs', async () => {
