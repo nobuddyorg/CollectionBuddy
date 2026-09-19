@@ -23,23 +23,21 @@ const mcr = MCR({
 
 /**
  * A floor, not a target -- see TEST_STRATEGY.md and CLAUDE.md's coverage
- * guardrail. Measured from a full local run of the signed-out suite alone
- * (chromium + mobile, e2e/public), the smaller of the two suites that feed
- * this report, with a margin below what it actually achieved:
- * statements 16.43%, branches 6.87%, functions 14.16%, lines 43.34%. The
- * signed-in suite (npm run e2e:local) touches far more of the app and
- * clears this easily; it shares the same floor rather than a tighter one
- * of its own because this sandbox has no Supabase/Docker to measure it
- * against for real, and a guessed number is worse than none (see
- * "Measure, don't assume" in CLAUDE.md). Raise by hand once a real run
- * reports a higher achieved number -- never lower it to make a change fit.
+ * guardrail. One per suite, since the two never run together and reach
+ * wildly different amounts of the app: `npm run e2e` serves the built
+ * export to a signed-out visitor, `npm run e2e:local` points the same
+ * report at a real stack. A shared floor would be the signed-out one, and
+ * the signed-in suite could then lose most of its coverage unnoticed.
+ *
+ * Each is a margin below what a real run achieved -- signed-out
+ * 16.43/6.87/14.16/43.34 locally (chromium + mobile), signed-in
+ * 69.58/58.89/69.69/81.09 in CI's e2e_local_stack job, which is the only
+ * place that suite can run. Raise by hand once a real run reports a higher
+ * number -- never lower one to make a change fit.
  */
-const COVERAGE_THRESHOLDS = {
-  statements: 15,
-  branches: 6,
-  functions: 13,
-  lines: 42,
-};
+const COVERAGE_THRESHOLDS = process.env.E2E_SUPABASE_URL
+  ? { statements: 65, branches: 54, functions: 65, lines: 77 }
+  : { statements: 15, branches: 6, functions: 13, lines: 42 };
 
 export const test = base.extend<{ autoCoverage: void }>({
   autoCoverage: [
