@@ -15,19 +15,7 @@
 begin;
 select no_plan();
 
-create or replace function pg_temp.auth_as(p_user_id uuid, p_email text default null)
-returns void
-language plpgsql
-as $$
-begin
-  set local role authenticated;
-  perform set_config(
-    'request.jwt.claims',
-    jsonb_build_object('sub', p_user_id::text, 'email', p_email, 'role', 'authenticated')::text,
-    true
-  );
-end;
-$$;
+\ir _helpers.psql
 
 -- The function's own `order by created_at desc` is only observable through
 -- WITH ORDINALITY -- aggregating its output without it would re-sort the
@@ -165,8 +153,7 @@ select is(
 -- at all. 060 covers the viewer; this is the other role reaching the same
 -- rows through the same RPC.
 insert into public.category_shares (category_id, invited_email, role)
-values (:'category_id'::uuid, 'shaping-grantee@collectionbuddy.test', 'editor')
-returning id as editor_share_id \gset
+values (:'category_id'::uuid, 'shaping-grantee@collectionbuddy.test', 'editor');
 
 select pg_temp.auth_as(:'grantee_id'::uuid, 'shaping-grantee@collectionbuddy.test');
 select is(
@@ -175,36 +162,21 @@ select is(
   'an editor grant opens search on the shared collection, the same as a viewer grant does'
 );
 
--- An expired grant closes it again, with the entries still present, so
--- this is the expiry being re-evaluated per call rather than the rows
--- having gone (TEST_STRATEGY.md §7 rule 7).
-select pg_temp.auth_as(:'owner_id'::uuid, 'shaping-owner@collectionbuddy.test');
-delete from public.category_shares where id = :'editor_share_id'::uuid;
-insert into public.category_shares (category_id, invited_email, created_at, expires_at)
-values (
-  :'category_id'::uuid, 'shaping-grantee@collectionbuddy.test',
-  now() - interval '2 hours', now() - interval '1 hour'
-);
-
-select pg_temp.auth_as(:'grantee_id'::uuid, 'shaping-grantee@collectionbuddy.test');
-select is(
-  pg_temp.search_page(:'category_id'::uuid, 'Probe five', 0, 9),
-  array[]::text[],
-  'an expired grant closes search again'
-);
-select pg_temp.auth_as(:'owner_id'::uuid, 'shaping-owner@collectionbuddy.test');
-select is(
-  pg_temp.search_page(:'category_id'::uuid, 'Probe five', 0, 9),
-  array['Probe five'],
-  'and the entry was never touched by the expiry'
-);
+-- Expiry is deliberately not re-tested through search here.
+-- 020_category_shares_rls_test.sql proves an expired grant opens nothing,
+-- and 060_search_category_items_rls_test.sql proves a closed grant closes
+-- search -- both go through the same has_category_read_access, so a third
+-- assertion of the composition would cost a fixture and catch nothing the
+-- other two miss (TEST_STRATEGY.md §3.9).
 
 -- list_category_places through a grant. It is `security invoker`, so the
 -- grantee's own RLS is what decides -- which is the claim 0014 makes and
 -- nothing asserted: the owner's path is covered in
 -- 050_functions_triggers_test.sql, and a bystander getting nothing is too,
 -- but the case in between, an actual grantee, is the one the map's shared
--- view depends on.
+-- view depends on. Re-issued as a plain viewer grant, since the editor
+-- grant above is what the search cases left in place.
+select pg_temp.auth_as(:'owner_id'::uuid, 'shaping-owner@collectionbuddy.test');
 delete from public.category_shares where category_id = :'category_id'::uuid;
 insert into public.category_shares (category_id, invited_email)
 values (:'category_id'::uuid, 'shaping-grantee@collectionbuddy.test');

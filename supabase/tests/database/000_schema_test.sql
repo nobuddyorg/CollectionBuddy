@@ -18,36 +18,7 @@
 begin;
 select no_plan();
 
-create or replace function pg_temp.auth_as(p_user_id uuid, p_email text default null)
-returns void
-language plpgsql
-as $$
-begin
-  set local role authenticated;
-  perform set_config(
-    'request.jwt.claims',
-    jsonb_build_object('sub', p_user_id::text, 'email', p_email, 'role', 'authenticated')::text,
-    true
-  );
-end;
-$$;
-
--- Executes p_sql and reports whether it raised, using plpgsql's own
--- implicit savepoint so a raised statement rolls back cleanly without
--- aborting the rest of this file's transaction. Used instead of pgTAP's
--- throws_ok() so the outcome depends only on this file's own logic, not on
--- recalling throws_ok()'s exact overload for an errcode versus a message.
-create or replace function pg_temp.raises(p_sql text)
-returns boolean
-language plpgsql
-as $$
-begin
-  execute p_sql;
-  return false;
-exception when others then
-  return true;
-end;
-$$;
+\ir _helpers.psql
 
 -- delete_item_if_orphan (CLAUDE.md: "deliberately FOR EACH STATEMENT, not
 -- FOR EACH ROW -- the row-level version was a real O(n) performance bug

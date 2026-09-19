@@ -14,17 +14,7 @@
 begin;
 select no_plan();
 
-create or replace function pg_temp.raises(p_sql text)
-returns boolean
-language plpgsql
-as $$
-begin
-  execute p_sql;
-  return false;
-exception when others then
-  return true;
-end;
-$$;
+\ir _helpers.psql
 
 -- anon holds nothing at all on any of the five tables. TRUNCATE is the one
 -- that would matter most: row level security does not filter it, so the

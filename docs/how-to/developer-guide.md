@@ -143,7 +143,7 @@ supabase start   # from the repository root, if not already running
 supabase test db
 ```
 
-The suite is split by what each file is responsible for, so a schema change has an obvious home:
+The suite is split by what each file is responsible for, so a schema change has an obvious home. `_helpers.psql` holds the impersonation and error-catching fixtures the files share, included with psql's `\ir`; it is named `.psql` because `supabase test db` runs `pg_prove --ext .pg --ext .sql -r`, and any `.sql` file here would be collected as a test and fail for having no plan.
 
 | File | Covers |
 | --- | --- |

@@ -10,17 +10,7 @@
 begin;
 select no_plan();
 
-create or replace function pg_temp.raises(p_sql text)
-returns boolean
-language plpgsql
-as $$
-begin
-  execute p_sql;
-  return false;
-exception when others then
-  return true;
-end;
-$$;
+\ir _helpers.psql
 
 -- Every function in the schema pins search_path. Without it a `security
 -- definer` function resolves unqualified names through the *caller's*
