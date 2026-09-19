@@ -68,4 +68,30 @@ test.describe('the login page', () => {
     const signIn = page.getByRole('button', { name: /sign in with google/i });
     await expect(signIn).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   });
+
+  // `redirect_to` is built from the base path baked in at build time, so a
+  // wrong one lands every returning visitor on a 404 of the host's.
+  test('hands sign-in to the provider, pointed back at the app', async ({
+    page,
+    baseURL,
+  }) => {
+    let authorizeUrl: string | undefined;
+    // Intercepted, never followed: this suite also runs against production.
+    await page.route('**/auth/v1/authorize*', async (route) => {
+      authorizeUrl = route.request().url();
+      await route.fulfill({ contentType: 'text/html', body: '<html></html>' });
+    });
+
+    await page.getByRole('button', { name: /sign in with google/i }).click();
+    await expect.poll(() => authorizeUrl).toBeTruthy();
+
+    const query = new URL(authorizeUrl!).searchParams;
+    expect(query.get('provider')).toBe('google');
+
+    const app = new URL(baseURL!);
+    const back = new URL(query.get('redirect_to')!);
+    expect(back.origin).toBe(app.origin);
+    // Normalised: the app root carries a trailing slash here, not there.
+    expect(`${back.pathname.replace(/\/$/, '')}/`).toBe(app.pathname);
+  });
 });

@@ -26,7 +26,7 @@ const mcr = MCR({
  * guardrail. Measured from a full local run of the signed-out suite alone
  * (chromium + mobile, e2e/public), the smaller of the two suites that feed
  * this report, with a margin below what it actually achieved:
- * statements 15.22%, branches 6.33%, functions 12.57%, lines 42.44%. The
+ * statements 16.43%, branches 6.87%, functions 14.16%, lines 43.34%. The
  * signed-in suite (npm run e2e:local) touches far more of the app and
  * clears this easily; it shares the same floor rather than a tighter one
  * of its own because this sandbox has no Supabase/Docker to measure it
@@ -35,10 +35,10 @@ const mcr = MCR({
  * reports a higher achieved number -- never lower it to make a change fit.
  */
 const COVERAGE_THRESHOLDS = {
-  statements: 12,
-  branches: 5,
-  functions: 10,
-  lines: 35,
+  statements: 15,
+  branches: 6,
+  functions: 13,
+  lines: 42,
 };
 
 export const test = base.extend<{ autoCoverage: void }>({

@@ -11,6 +11,8 @@ const eslintConfig = [
   {
     ignores: [
       'coverage/**',
+      // The e2e coverage report ships a bundled viewer of its own.
+      'coverage-e2e/**',
       '.stryker-tmp/**',
       'reports/**',
       'out/**',
