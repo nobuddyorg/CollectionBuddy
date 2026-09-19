@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -100,6 +100,58 @@ describe('TagsInput', () => {
 
     await user.type(field, 'silver{Enter}');
     expect(screen.getByText('silver').closest('span')).toHaveClass('tag-flash');
+  });
+
+  it('drops the flash once its animation has had time to finish', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup();
+      const { field } = renderTags(['silver']);
+
+      await user.type(field, 'silver{Enter}');
+      const chip = screen.getByText('silver').closest('span')!;
+      expect(chip).toHaveClass('tag-flash');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(350);
+      });
+
+      expect(chip).not.toHaveClass('tag-flash');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('restarts the flash timer for a second duplicate before the first has cleared', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup();
+      const { field } = renderTags(['silver', 'gold']);
+
+      await user.type(field, 'silver{Enter}');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+      await user.type(field, 'gold{Enter}');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      // 400ms have passed since "silver" flashed, more than enough for its
+      // own timer to have fired -- but "gold" flashing in between must not
+      // have left it hanging: covered by the flash's normal 350ms clearing.
+      const silverChip = screen.getByText('silver').closest('span')!;
+      const goldChip = screen.getByText('gold').closest('span')!;
+      expect(silverChip).not.toHaveClass('tag-flash');
+      expect(goldChip).toHaveClass('tag-flash');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+      expect(goldChip).not.toHaveClass('tag-flash');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('removes the last tag when Backspace is pressed on an empty field', async () => {

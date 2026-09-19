@@ -169,6 +169,31 @@ describe('ItemList empty state', () => {
   });
 });
 
+describe('ItemList grid while a refetch is in flight', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('lang', 'en');
+    useItemsMock.mockReset();
+  });
+
+  // The grid dims rather than being replaced by a skeleton once entries
+  // already exist -- showSkeleton is only for the empty/first-load case.
+  it('dims the grid while re-fetching a page that already has entries', () => {
+    useItemsMock.mockReturnValue(
+      itemsState({ items: [item('1')], total: 1, loading: true }),
+    );
+    renderList();
+    expect(screen.getByRole('list')).toHaveClass('opacity-60');
+  });
+
+  it('leaves the grid at full opacity once loading finishes', () => {
+    useItemsMock.mockReturnValue(
+      itemsState({ items: [item('1')], total: 1, loading: false }),
+    );
+    renderList();
+    expect(screen.getByRole('list')).not.toHaveClass('opacity-60');
+  });
+});
+
 // #483 follow-up: a shared category is browsable but not editable. RLS
 // already refuses the writes (see design-decisions.md's RLS section) --
 // this checks that the controls offering them are gone, not merely
@@ -292,6 +317,17 @@ describe('ItemList search', () => {
     await user.click(clearButtons[clearButtons.length - 1]);
 
     expect(screen.getByTestId('search-input')).toHaveValue('');
+  });
+
+  it('announces that the term is too short to search yet, not a result count', async () => {
+    const user = userEvent.setup();
+    renderList();
+
+    await user.type(screen.getByTestId('search-input'), 'c');
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('Keep typing to search')).toBeInTheDocument();
+    });
   });
 });
 

@@ -96,7 +96,6 @@ function CategoryTablist({
   const moveTo = useCallback(
     (index: number) => {
       const target = sortedCats[index];
-      if (!target) return;
       onSelect(target.id);
       tabRefs.current.get(target.id)?.focus();
     },

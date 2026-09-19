@@ -1,9 +1,15 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
+
+// Matches .tag-flash's animation-duration in globals.css. A timer, not
+// onAnimationEnd, so the flash always clears even if the animation is
+// somehow skipped (and so this is testable with fake timers rather than a
+// native browser event nothing but a real browser dispatches).
+const FLASH_DURATION_MS = 350;
 
 export function TagsInput({
   id,
@@ -19,6 +25,12 @@ export function TagsInput({
   // Flashes the chip already covering a repeated tag, since the field
   // clearing on Enter otherwise looks identical to nothing happening.
   const [flashedTag, setFlashedTag] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!flashedTag) return;
+    const id = setTimeout(() => setFlashedTag(null), FLASH_DURATION_MS);
+    return () => clearTimeout(id);
+  }, [flashedTag]);
 
   const addTag = useCallback(() => {
     const v = tagInput.trim();
@@ -51,9 +63,6 @@ export function TagsInput({
         <span
           key={tag}
           className={`fade-up tag-chip flex items-center gap-1.5 ${tag === flashedTag ? 'tag-flash' : ''}`}
-          onAnimationEnd={() => {
-            if (tag === flashedTag) setFlashedTag(null);
-          }}
         >
           {tag}
           <button

@@ -51,7 +51,6 @@ export function ModalImage({
 
   const goTo = useCallback(
     (i: number) => {
-      if (count === 0) return;
       onIndexChange(((i % count) + count) % count);
     },
     [count, onIndexChange],

@@ -263,6 +263,27 @@ describe('ModalImage', () => {
       expect(onClose).not.toHaveBeenCalled();
     });
 
+    it('ignores a key that is not an arrow', async () => {
+      const { onIndexChange } = renderModal({ imgs, index: 0 });
+      await userEvent.keyboard('a');
+      expect(onIndexChange).not.toHaveBeenCalled();
+    });
+
+    // A keystroke another listener already claimed (e.g. a nested widget's
+    // own arrow-key handling) must not also page the carousel underneath it.
+    it('does not navigate on an arrow key another handler already claimed', () => {
+      const { onIndexChange } = renderModal({ imgs, index: 0 });
+      const event = new KeyboardEvent('keydown', {
+        key: 'ArrowRight',
+        bubbles: true,
+        cancelable: true,
+      });
+      event.preventDefault();
+      window.dispatchEvent(event);
+
+      expect(onIndexChange).not.toHaveBeenCalled();
+    });
+
     it('advances on ArrowRight', async () => {
       const { onIndexChange } = renderModal({ imgs, index: 0 });
       await userEvent.keyboard('{ArrowRight}');
@@ -340,6 +361,30 @@ describe('ModalImage', () => {
         swipe({ x: 200, y: 100 }, { x: 100, y: 100 });
         fireEvent.click(screen.getByRole('img'));
         expect(onClose).not.toHaveBeenCalled();
+      });
+
+      it('tolerates a touchstart with no touch point', () => {
+        const { onIndexChange } = renderModal({ imgs, index: 0 });
+        const dialog = screen.getByRole('dialog');
+        expect(() =>
+          fireEvent.touchStart(dialog, { touches: [] }),
+        ).not.toThrow();
+        fireEvent.touchEnd(dialog, {
+          changedTouches: [{ clientX: 100, clientY: 100 }],
+        });
+        expect(onIndexChange).not.toHaveBeenCalled();
+      });
+
+      it('tolerates a touchend with no touch point', () => {
+        const { onIndexChange } = renderModal({ imgs, index: 0 });
+        const dialog = screen.getByRole('dialog');
+        fireEvent.touchStart(dialog, {
+          touches: [{ clientX: 200, clientY: 100 }],
+        });
+        expect(() =>
+          fireEvent.touchEnd(dialog, { changedTouches: [] }),
+        ).not.toThrow();
+        expect(onIndexChange).not.toHaveBeenCalled();
       });
     });
   });

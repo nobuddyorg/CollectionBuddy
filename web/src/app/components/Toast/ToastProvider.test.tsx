@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ToastProvider, useToast } from './ToastProvider';
@@ -32,6 +38,40 @@ function SuccessTrigger({ message }: { message: string }) {
   const toast = useToast();
   return (
     <button type="button" onClick={() => toast.success(message)}>
+      {message}
+    </button>
+  );
+}
+
+function ErrorTrigger({ message }: { message: string }) {
+  const toast = useToast();
+  return (
+    <button type="button" onClick={() => toast.error(message)}>
+      {message}
+    </button>
+  );
+}
+
+function UndoableSuccessTrigger({
+  message,
+  onExpire,
+  onUndo,
+}: {
+  message: string;
+  onExpire: () => void;
+  onUndo: () => void;
+}) {
+  const toast = useToast();
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        toast.success(message, {
+          action: { label: 'Undo', onClick: onUndo },
+          onExpire,
+        })
+      }
+    >
       {message}
     </button>
   );
@@ -74,6 +114,16 @@ describe('ToastProvider', () => {
     // unless a stored preference says otherwise; pin it so this doesn't
     // depend on that incidental default.
     window.localStorage.setItem('lang', 'en');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('throws when used outside a ToastProvider', () => {
+    expect(() => renderHook(() => useToast())).toThrow(
+      'useToast must be used within a ToastProvider',
+    );
   });
 
   it('starts the polite live region empty', () => {
@@ -156,5 +206,102 @@ describe('ToastProvider', () => {
     expect(alert).toHaveTextContent('Could not save this entry.');
     expect(consoleError).toHaveBeenCalledWith('trigger', err);
     consoleError.mockRestore();
+  });
+
+  it('error() posts an assertive alert on its own, without going through reportError', async () => {
+    render(
+      <I18nProvider>
+        <ToastProvider>
+          <ErrorTrigger message="Could not load collections." />
+        </ToastProvider>
+      </I18nProvider>,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Could not load collections.' }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not load collections.',
+    );
+  });
+
+  it('dismissing a toast from its own close button still commits onExpire, same as auto-dismiss', async () => {
+    const onExpire = vi.fn();
+    render(
+      <I18nProvider>
+        <ToastProvider>
+          <UndoableSuccessTrigger
+            message="Collection deleted."
+            onExpire={onExpire}
+            onUndo={vi.fn()}
+          />
+        </ToastProvider>
+      </I18nProvider>,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Collection deleted.' }),
+    );
+    const status = await screen.findByRole('status');
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(status).not.toBeInTheDocument();
+    expect(onExpire).toHaveBeenCalledTimes(1);
+  });
+
+  it('auto-dismisses a toast on its own after the timeout, running onExpire', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const onExpire = vi.fn();
+    render(
+      <I18nProvider>
+        <ToastProvider>
+          <UndoableSuccessTrigger
+            message="Collection deleted."
+            onExpire={onExpire}
+            onUndo={vi.fn()}
+          />
+        </ToastProvider>
+      </I18nProvider>,
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Collection deleted.' }),
+    );
+    expect(screen.getByRole('status')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6000);
+    });
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(onExpire).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("runs the action's own onClick and skips onExpire when its undo is used", async () => {
+    const onExpire = vi.fn();
+    const onUndo = vi.fn();
+    render(
+      <I18nProvider>
+        <ToastProvider>
+          <UndoableSuccessTrigger
+            message="Collection deleted."
+            onExpire={onExpire}
+            onUndo={onUndo}
+          />
+        </ToastProvider>
+      </I18nProvider>,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Collection deleted.' }),
+    );
+    const status = await screen.findByRole('status');
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+
+    expect(onUndo).toHaveBeenCalledTimes(1);
+    expect(onExpire).not.toHaveBeenCalled();
+    expect(status).not.toBeInTheDocument();
   });
 });

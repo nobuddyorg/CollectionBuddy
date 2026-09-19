@@ -81,6 +81,63 @@ describe('SharingSection', () => {
     );
   });
 
+  it('shares on pressing Enter in the email field', async () => {
+    const createShare = vi.fn().mockResolvedValue(true);
+    renderSection(sharesState({ createShare }));
+
+    const emailField = screen.getByLabelText('Share with (email)');
+    await userEvent.type(emailField, 'grantee@example.com{Enter}');
+
+    expect(createShare).toHaveBeenCalledWith('grantee@example.com', null);
+  });
+
+  it('does nothing on Enter while the email field is empty', async () => {
+    const createShare = vi.fn().mockResolvedValue(true);
+    renderSection(sharesState({ createShare }));
+
+    await userEvent.type(
+      screen.getByLabelText('Share with (email)'),
+      '{Enter}',
+    );
+
+    expect(createShare).not.toHaveBeenCalled();
+  });
+
+  it('does nothing on Enter while a share is already in flight', async () => {
+    const createShare = vi.fn().mockResolvedValue(true);
+    renderSection(sharesState({ createShare, isSharing: true }));
+
+    await userEvent.type(
+      screen.getByLabelText('Share with (email)'),
+      'grantee@example.com{Enter}',
+    );
+
+    expect(createShare).not.toHaveBeenCalled();
+  });
+
+  it('shows a spinner instead of the share icon while sharing is in flight', () => {
+    renderSection(sharesState({ isSharing: true }));
+    expect(screen.getByRole('button', { name: 'Share' })).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+  });
+
+  it('keeps the entered email and date when sharing fails', async () => {
+    const createShare = vi.fn().mockResolvedValue(false);
+    renderSection(sharesState({ createShare }));
+
+    await userEvent.type(
+      screen.getByLabelText('Share with (email)'),
+      'grantee@example.com',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Share' }));
+
+    expect(
+      await screen.findByDisplayValue('grantee@example.com'),
+    ).toBeInTheDocument();
+  });
+
   it('disables Share until an email is entered', () => {
     renderSection(sharesState());
     expect(screen.getByRole('button', { name: 'Share' })).toBeDisabled();
@@ -391,5 +448,29 @@ describe('SharingSection', () => {
         errorMessage: 'Could not revoke this share. Please try again.',
       }),
     );
+  });
+
+  it('does not revoke when the confirmation is declined', async () => {
+    const deleteShare = vi.fn<UseShares['deleteShare']>();
+    renderSection(
+      sharesState({
+        shares: [
+          {
+            id: 'share-1',
+            invited_email: 'grantee@example.com',
+            expires_at: null,
+            owner_user_id: 'owner-1',
+            role: 'viewer',
+          },
+        ],
+        deleteShare,
+      }),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Revoke' }));
+    await screen.findByTestId('confirm-cancel');
+    await userEvent.click(screen.getByTestId('confirm-cancel'));
+
+    expect(deleteShare).not.toHaveBeenCalled();
   });
 });

@@ -64,15 +64,17 @@ export function isQueryLongEnough(query: string): boolean {
   return trimmed.length >= searchMinLength(trimmed);
 }
 
-/* v8 ignore start -- hook internals (fetch, timers, DOM); the extracted
- * pure helpers above are what's gated and mutation-tested. */
-// Stryker disable all
 export function usePhotonSearch(locale?: string) {
   const [query, setQuery] = useState('');
   const [focus, setFocus] = useState(false);
   const [results, setResults] = useState<PhotonFeature[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  // Distinguishes "zero results because nothing has been searched for yet"
+  // from "zero results because the search actually came back empty" --
+  // both otherwise look identical to `results`, and only the second should
+  // ever show a "no results" message.
+  const [searched, setSearched] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -104,8 +106,10 @@ export function usePhotonSearch(locale?: string) {
       setActiveIdx(-1);
       setError(false);
       setLoading(false);
+      setSearched(false);
       return;
     }
+    setSearched(false);
     const q = query.trim();
     const timer = setTimeout(() => {
       void (async () => {
@@ -132,11 +136,15 @@ export function usePhotonSearch(locale?: string) {
           // request that superseded it owns the resulting state.
           if (err instanceof DOMException && err.name === 'AbortError') return;
           if (abortRef.current !== ctl) return;
+          console.error('Place search failed:', err);
           setResults([]);
           setActiveIdx(-1);
           setError(true);
         } finally {
-          if (abortRef.current === ctl) setLoading(false);
+          if (abortRef.current === ctl) {
+            setLoading(false);
+            setSearched(true);
+          }
         }
       })();
     }, SEARCH_DEBOUNCE_MS);
@@ -150,16 +158,22 @@ export function usePhotonSearch(locale?: string) {
   }, [query, focus, lang, regionNames]);
 
   useEffect(() => {
+    // Only worth listening at all while there's a focus state to lose --
+    // otherwise every click anywhere on the page pays for a check whose
+    // answer can never matter.
+    if (!focus) return;
     const onDocClick = (e: MouseEvent) => {
       const target = e.target as Node;
-      const insideInput = inputRef.current?.contains(target);
-      const insideAnchor = dropdownRef.current?.contains(target);
+      // Always attached once PlaceAutocomplete has mounted: both are plain
+      // unconditional elements in its render, unlike `menuRef` below.
+      const insideInput = inputRef.current!.contains(target);
+      const insideAnchor = dropdownRef.current!.contains(target);
       const insideMenu = menuRef.current?.contains(target);
       if (!insideInput && !insideAnchor && !insideMenu) setFocus(false);
     };
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
-  }, []);
+  }, [focus]);
 
   const choose = useCallback(
     (hit: PhotonFeature): PlaceChoice => {
@@ -195,8 +209,11 @@ export function usePhotonSearch(locale?: string) {
         // whole form.
         e.preventDefault();
         e.stopPropagation();
-        setResults([]);
-        setActiveIdx(-1);
+        // `showMenu` (PlaceAutocomplete) checks `focus` first, so the menu
+        // is already hidden the instant this commits -- no separate reset
+        // of `results`/`activeIdx` is needed to make that so. The search
+        // effect's own `focus`-triggered cleanup clears them for real just
+        // after, same as any other blur.
         setFocus(false);
       }
     },
@@ -211,6 +228,7 @@ export function usePhotonSearch(locale?: string) {
     results,
     loading,
     error,
+    searched,
     activeIdx,
     setActiveIdx,
     dropdownRef,
@@ -221,5 +239,3 @@ export function usePhotonSearch(locale?: string) {
     formatDisplay,
   };
 }
-// Stryker restore all
-/* v8 ignore stop */

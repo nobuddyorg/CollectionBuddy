@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import CenteredModal from './index';
@@ -47,6 +48,39 @@ describe('CenteredModal', () => {
       </CenteredModal>,
     );
     expect(appRoot().inert).toBe(true);
+  });
+
+  it('closes on a backdrop click by default', async () => {
+    const onOpenChange = vi.fn();
+    render(
+      <CenteredModal open onOpenChange={onOpenChange} title="Edit entry">
+        content
+      </CenteredModal>,
+    );
+    const backdrop = document.querySelector('.z-backdrop') as HTMLElement;
+
+    await userEvent.click(backdrop);
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('ignores a backdrop click when closeOnBackdrop is false', async () => {
+    const onOpenChange = vi.fn();
+    render(
+      <CenteredModal
+        open
+        onOpenChange={onOpenChange}
+        title="Edit entry"
+        closeOnBackdrop={false}
+      >
+        content
+      </CenteredModal>,
+    );
+    const backdrop = document.querySelector('.z-backdrop') as HTMLElement;
+
+    await userEvent.click(backdrop);
+
+    expect(onOpenChange).not.toHaveBeenCalled();
   });
 
   it('restores the app root once the dialog closes', () => {

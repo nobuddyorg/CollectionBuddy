@@ -92,10 +92,11 @@ export function useItemImages() {
       console.error('Failed to list images', error);
       return undefined;
     }
-    const entryData = groupImageRows(data ?? []).get(itemId) ?? new Map();
+    const grouped = groupImageRows(data ?? []);
+    const entryData = grouped.get(itemId) ?? new Map();
     const signed = await signEntries([[itemId, entryData]]);
     lastSignedAtRef.current = Date.now();
-    return signed[itemId] ?? [];
+    return signed[itemId];
   }, []);
 
   // One query for the whole page rather than one Storage round trip per
@@ -193,7 +194,7 @@ export function useItemImages() {
         toast.reportError('upload image', err, t('item_list.upload_error'));
       } finally {
         setPendingUploads((prev) => {
-          const remaining = (prev[itemId] ?? 1) - 1;
+          const remaining = prev[itemId] - 1;
           const next = { ...prev };
           if (remaining > 0) next[itemId] = remaining;
           else delete next[itemId];
@@ -220,7 +221,7 @@ export function useItemImages() {
       const restore = () => {
         setImages((prev) => ({
           ...prev,
-          [itemId]: restoreAt(prev[itemId] || [], index, img),
+          [itemId]: restoreAt(prev[itemId], index, img),
         }));
       };
 

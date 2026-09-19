@@ -61,4 +61,16 @@ describe('LoadingOverlay', () => {
 
     expect(screen.getByRole('status').className).toContain('bg-background/80');
   });
+
+  it('draws the slow-wait notice in the app palette too, not the dark scrim colors', async () => {
+    renderOverlay({ theme: 'auto' });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(8000);
+    });
+
+    expect(screen.getByText(/taking longer/i).className).toContain(
+      'text-foreground/70',
+    );
+  });
 });

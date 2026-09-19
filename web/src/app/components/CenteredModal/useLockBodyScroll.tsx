@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 
 export function useLockBodyScroll(active: boolean) {
   useEffect(() => {
-    if (!active || typeof document === 'undefined') return;
+    if (!active) return;
     const { body } = document;
     const prev = body.style.overflow;
     body.style.overflow = 'hidden';

@@ -118,7 +118,7 @@ export default function ItemList({
     itemId: string;
     index: number;
   } | null>(null);
-  const modalImgs = modalState ? (images[modalState.itemId] ?? []) : [];
+  const modalImgs = modalState ? images[modalState.itemId] : [];
   const modalItemTitle = modalState
     ? (items.find((i) => i.id === modalState.itemId)?.title ?? '')
     : '';
@@ -130,8 +130,7 @@ export default function ItemList({
 
   const handleEditSubmit = useCallback(
     async (values: ItemFormValues) => {
-      if (!editingItem) return;
-      const ok = await saveEdit(editingItem.id, values);
+      const ok = await saveEdit(editingItem!.id, values);
       if (ok) {
         setEditOpen(false);
         setEditingItem(null);
@@ -280,12 +279,10 @@ export default function ItemList({
         index={modalState ? modalState.index : null}
         itemTitle={modalItemTitle}
         onIndexChange={(index) =>
-          setModalState((prev) => (prev ? { ...prev, index } : prev))
+          setModalState((prev) => ({ ...prev!, index }))
         }
         onClose={() => setModalState(null)}
-        onDelete={(img) => {
-          if (modalState) void deleteImage(modalState.itemId, img);
-        }}
+        onDelete={(img) => void deleteImage(modalState!.itemId, img)}
         busy={modalState ? (pendingUploads[modalState.itemId] ?? 0) > 0 : false}
         readOnly={!canEdit}
       />
@@ -294,9 +291,9 @@ export default function ItemList({
         open={editOpen}
         item={editingItem}
         isSaving={isSaving}
-        onOpenChange={(v) => {
-          setEditOpen(v);
-          if (!v) setEditingItem(null);
+        onOpenChange={() => {
+          setEditOpen(false);
+          setEditingItem(null);
         }}
         onSubmit={(values) => void handleEditSubmit(values)}
       />
@@ -310,7 +307,7 @@ export default function ItemList({
 
       <CenteredModal
         open={isCreateOpen}
-        onOpenChange={(v) => (v ? undefined : guardedCloseCreate())}
+        onOpenChange={guardedCloseCreate}
         title={t('item_create.new_entry')}
         closeLabel={t('common.close')}
       >

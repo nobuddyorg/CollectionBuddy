@@ -37,8 +37,7 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
   // still pass); falling back to focus() is what a click on the field
   // would do anyway on those.
   const openDatePicker = useCallback(() => {
-    const el = expiryInputRef.current;
-    if (!el) return;
+    const el = expiryInputRef.current!;
     if (typeof el.showPicker === 'function') {
       el.showPicker();
     } else {

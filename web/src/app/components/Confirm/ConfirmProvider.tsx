@@ -46,9 +46,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
       {children}
       <CenteredModal
         open={message !== null}
-        onOpenChange={(v) => {
-          if (!v) settle(false);
-        }}
+        onOpenChange={() => settle(false)}
         title={t('common.confirm')}
         description={message ?? ''}
         role="alertdialog"

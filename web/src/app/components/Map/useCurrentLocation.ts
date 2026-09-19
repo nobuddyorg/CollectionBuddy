@@ -11,8 +11,6 @@ export type LocationFailure = 'denied' | 'unavailable';
 export type LocationResult =
   { ok: true; location: Coords } | { ok: false; reason: LocationFailure };
 
-// Stryker disable all: a test asserting a 12-second timeout can only
-// restate the 12 seconds, not judge whether it's right.
 const FIX_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
   timeout: 12000,
@@ -41,7 +39,6 @@ const coordsOf = (position: GeolocationPosition): Coords => ({
   lat: position.coords.latitude,
   lng: position.coords.longitude,
 });
-// Stryker restore all
 
 /**
  * Separates "you said no" from every other way a fix can fail -- the two
@@ -77,15 +74,10 @@ export async function isGeolocationGranted(): Promise<boolean> {
  * `request` is a user-gesture-driven fix, the only reliable moment to raise
  * a permission prompt in a standalone PWA.
  */
-// Stryker disable all: this hook's mutants would only report on how
-// thoroughly the navigator API is stubbed. The pure functions above carry
-// the logic worth scoring.
 export function useCurrentLocation(active: boolean) {
   const [location, setLocation] = useState<Coords | null>(null);
   const [locating, setLocating] = useState(false);
 
-  /* v8 ignore start -- browser geolocation: callbacks, watch lifetime and
-   * teardown, none of it separable from the navigator API here. */
   useEffect(() => {
     if (!active) return;
     if (typeof navigator === 'undefined' || !navigator.geolocation) return;
@@ -150,8 +142,6 @@ export function useCurrentLocation(active: boolean) {
       }),
     [],
   );
-  /* v8 ignore stop */
 
   return { location, locating, request };
 }
-// Stryker restore all

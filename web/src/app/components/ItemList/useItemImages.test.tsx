@@ -146,6 +146,20 @@ describe('useItemImages', () => {
       expect(listImagesForItems).not.toHaveBeenCalled();
     });
 
+    it('treats a null answer with no error as no images for any of them', async () => {
+      vi.mocked(listImagesForItems).mockResolvedValue({
+        data: null,
+        error: null,
+      });
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      await act(async () => {
+        await result.current.refreshAllImages(['item-1']);
+      });
+
+      expect(result.current.images['item-1']).toEqual([]);
+    });
+
     it('reports a failed listing and settles the item as empty', async () => {
       const consoleError = vi
         .spyOn(console, 'error')
@@ -286,6 +300,56 @@ describe('useItemImages', () => {
       expect(await screen.findByRole('alert')).toBeVisible();
     });
 
+    it('shows no photographs yet if the post-upload refresh answers with none for this item', async () => {
+      vi.mocked(listImagesForItems).mockResolvedValue({
+        data: [row('other-img', 'other-item')],
+        error: null,
+      });
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      await act(async () => {
+        await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      });
+
+      expect(result.current.images['item-1']).toEqual([]);
+    });
+
+    it('treats a null post-upload listing as no images for this item', async () => {
+      vi.mocked(listImagesForItems).mockResolvedValue({
+        data: null,
+        error: null,
+      });
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      await act(async () => {
+        await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      });
+
+      expect(result.current.images['item-1']).toEqual([]);
+    });
+
+    it('keeps no placeholder when the post-upload refresh fails to list images', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      vi.mocked(listImagesForItems).mockResolvedValue({
+        data: null,
+        error: new Error('boom'),
+      });
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      await act(async () => {
+        await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      });
+
+      expect(consoleError).toHaveBeenCalledWith(
+        'Failed to list images',
+        expect.any(Error),
+      );
+      expect(result.current.images['item-1']).toBeUndefined();
+      consoleError.mockRestore();
+    });
+
     it('counts concurrent uploads rather than flagging one', async () => {
       const { result } = renderHook(() => useItemImages(), { wrapper });
       let held: (() => void)[] = [];
@@ -385,6 +449,32 @@ describe('useItemImages', () => {
       }
     });
 
+    it('does nothing once every tracked item has been forgotten', async () => {
+      vi.mocked(removeImageObjects).mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      const { result } = await withOnePhotographAndFakeTimers();
+      try {
+        await act(async () => {
+          await result.current.removeImageBytes('item-1', [
+            { path_full: 'uid/item-1/img-1.webp', path_thumb: null },
+          ]);
+        });
+        expect(result.current.images['item-1']).toBeUndefined();
+
+        vi.mocked(listImagesForItems).mockClear();
+        vi.setSystemTime(Date.now() + 56 * 60_000);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(60_000);
+        });
+
+        expect(listImagesForItems).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('does nothing before anything has been signed at all', async () => {
       vi.useFakeTimers();
       try {
@@ -415,6 +505,40 @@ describe('useItemImages', () => {
       });
       return hook;
     }
+
+    it('tolerates deleting a photo for an item with no tracked images yet', async () => {
+      vi.mocked(deleteImageRow).mockResolvedValue({
+        data: { path_full: 'uid/item-1/img-1.webp', path_thumb: null },
+        error: null,
+      } as never);
+      vi.mocked(removeImageObjects).mockResolvedValue({ error: null } as never);
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      act(() => {
+        void result.current.deleteImage('item-1', img);
+      });
+      await acceptConfirmation();
+      expect(result.current.images['item-1']).toEqual([]);
+
+      await commitDeferredDelete();
+      expect(deleteImageRow).toHaveBeenCalledWith('img-1');
+    });
+
+    it('tolerates undo for an item with no tracked images yet', async () => {
+      vi.mocked(deleteImageRow).mockResolvedValue({
+        data: null,
+        error: new Error('rls'),
+      } as never);
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      act(() => {
+        void result.current.deleteImage('item-1', img);
+      });
+      await acceptConfirmation();
+      await commitDeferredDelete();
+
+      expect(result.current.images['item-1']).toEqual([img]);
+    });
 
     it('keeps the photograph when the confirmation is declined', async () => {
       const { result } = await withOnePhotograph();
@@ -522,6 +646,18 @@ describe('useItemImages', () => {
       await expect(
         result.current.captureItemImagePaths('item-1'),
       ).resolves.toEqual(paths);
+    });
+
+    it('treats a null answer with no error as no paths to clean up', async () => {
+      vi.mocked(listImagePathsForItems).mockResolvedValue({
+        data: null,
+        error: null,
+      });
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      await expect(
+        result.current.captureItemImagePaths('item-1'),
+      ).resolves.toEqual([]);
     });
 
     it('answers with nothing when those paths cannot be read', async () => {

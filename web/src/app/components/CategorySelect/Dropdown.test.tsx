@@ -44,6 +44,30 @@ describe('CategorySelectDropdown', () => {
     window.localStorage.setItem('lang', 'en');
   });
 
+  it('renders a placeholder strip instead of tabs while loading', () => {
+    renderDropdown({ isLoading: true });
+    expect(
+      screen.getByRole('status', { name: 'Loading…' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+  });
+
+  it('renders nothing once loaded with no categories', () => {
+    const { container } = render(
+      <I18nProvider>
+        <CategorySelectDropdown
+          selectedCat={null}
+          onSelect={vi.fn()}
+          sortedCats={[]}
+          isLoading={false}
+          setExpanded={vi.fn()}
+          userId="owner-1"
+        />
+      </I18nProvider>,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('gives only the selected tab a tab stop', () => {
     renderDropdown({ selectedCat: 'b' });
     expect(screen.getByRole('tab', { name: 'Coins' })).toHaveAttribute(

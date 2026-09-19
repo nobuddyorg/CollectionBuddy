@@ -50,6 +50,17 @@ export const MUTATE_TARGETS = [
   'src/app/useCatalogue.ts',
   'src/app/useServiceWorker.ts',
   'src/app/useSession.ts',
+  'src/app/components/CategorySelect/useCategories.tsx',
+  'src/app/components/CategorySelect/useShares.tsx',
+  'src/app/components/CategorySelect/useCategoryRemoval.tsx',
+  'src/app/components/ItemList/useItems.tsx',
+  'src/app/components/ItemList/useItemMutations.tsx',
+  'src/app/components/ItemList/useItemImages.tsx',
+  'src/app/components/ItemCreate/useCreateItem.tsx',
+  'src/app/components/Header/useMenu.tsx',
+  'src/app/components/CenteredModal/useFocusTrap.tsx',
+  'src/app/components/CenteredModal/useInertBackground.tsx',
+  'src/app/components/CenteredModal/useLockBodyScroll.tsx',
 ];
 
 // Mutation-tested but deliberately without a per-file coverage floor -- see

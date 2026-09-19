@@ -89,6 +89,27 @@ describe('useItemMutations removeItem', () => {
     window.localStorage.setItem('lang', 'en');
   });
 
+  it('names the entry in the confirmation and the success toast', async () => {
+    const { result } = renderHook(
+      () => useHarness([item('a')], vi.fn(), vi.fn(), vi.fn()),
+      { wrapper },
+    );
+
+    act(() => {
+      void result.current.removeItem('a');
+    });
+
+    expect(
+      await screen.findByText(
+        'Delete this entry? It and every one of its photographs will be permanently deleted.',
+      ),
+    ).toBeInTheDocument();
+
+    await acceptDeleteConfirmation();
+
+    expect(await screen.findByText('Entry deleted.')).toBeInTheDocument();
+  });
+
   // The regression this guards against: capturing the index *after* the
   // optimistic removal (or just pushing the snapshot back onto the end of
   // the array) is invisible when the deleted card was last -- restoring to
@@ -102,6 +123,9 @@ describe('useItemMutations removeItem', () => {
     const captureItemImagePaths = vi.fn().mockResolvedValue([]);
     const removeImageBytes = vi.fn();
     const reload = vi.fn();
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
 
     const { result } = renderHook(
       () =>
@@ -131,6 +155,8 @@ describe('useItemMutations removeItem', () => {
     expect(captureItemImagePaths).toHaveBeenCalledWith('b');
     expect(removeImageBytes).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith('delete item', expect.anything());
+    consoleError.mockRestore();
   });
 
   // deleteItem succeeding is the point of no return: the row is gone,
@@ -174,7 +200,44 @@ describe('useItemMutations removeItem', () => {
     );
     expect(removeImageBytes).toHaveBeenCalledWith('b', capturedPaths);
     expect(reload).toHaveBeenCalledWith({ silent: true });
+    expect(consoleError).toHaveBeenCalledWith(
+      'delete item images',
+      expect.anything(),
+    );
     consoleError.mockRestore();
+  });
+
+  it('calls whichever reload function is current after a re-render, not a stale one', async () => {
+    vi.mocked(deleteItem).mockResolvedValue({ error: null } as never);
+    const staleReload = vi.fn();
+    const freshReload = vi.fn();
+    const captureItemImagePaths = vi.fn().mockResolvedValue([]);
+    const removeImageBytes = vi.fn().mockResolvedValue(undefined);
+
+    const { result, rerender } = renderHook(
+      (props: { reload: (opts?: { silent?: boolean }) => Promise<void> }) =>
+        useItemMutations({
+          items: [item('a')],
+          setItems: vi.fn(),
+          reload: props.reload,
+          captureItemImagePaths,
+          removeImageBytes,
+        }),
+      { wrapper, initialProps: { reload: staleReload } },
+    );
+
+    rerender({ reload: freshReload });
+
+    act(() => {
+      void result.current.removeItem('a');
+    });
+    await acceptDeleteConfirmation();
+    await commitDeferredDelete();
+
+    await vi.waitFor(() =>
+      expect(freshReload).toHaveBeenCalledWith({ silent: true }),
+    );
+    expect(staleReload).not.toHaveBeenCalled();
   });
 
   // The index is captured before the optimistic removal specifically so a
@@ -205,6 +268,34 @@ describe('useItemMutations removeItem', () => {
     expect(result.current.items.map((i) => i.id)).toEqual(['a', 'b']);
     expect(captureItemImagePaths).not.toHaveBeenCalled();
     expect(deleteItem).not.toHaveBeenCalled();
+  });
+
+  // Nothing to snapshot for an id that was never in the list -- the undo
+  // action must not throw trying to restore it.
+  it('does nothing to restore when undo is pressed for an id that was never in the list', async () => {
+    vi.mocked(deleteItem).mockResolvedValue({ error: null } as never);
+    const captureItemImagePaths = vi.fn().mockResolvedValue([]);
+    const removeImageBytes = vi.fn();
+    const reload = vi.fn();
+
+    const { result } = renderHook(
+      () =>
+        useHarness(
+          [item('a')],
+          captureItemImagePaths,
+          removeImageBytes,
+          reload,
+        ),
+      { wrapper },
+    );
+
+    act(() => {
+      void result.current.removeItem('missing');
+    });
+    await acceptDeleteConfirmation();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Undo' }));
+    expect(result.current.items.map((i) => i.id)).toEqual(['a']);
   });
 });
 
@@ -274,7 +365,34 @@ describe('useItemMutations saveEdit', () => {
 
     expect(ok).toBe(false);
     expect(result.current.items.map((i) => i.id)).toEqual(['a', 'b']);
-    expect(await screen.findByRole('alert')).toBeVisible();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not save changes. Please try again.',
+    );
+    consoleError.mockRestore();
+  });
+
+  it('reports an error when the save answers with no row and no error', async () => {
+    vi.mocked(updateItem).mockResolvedValue({
+      data: null,
+      error: null,
+    } as never);
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    const { result } = noopHarness([item('a')]);
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.saveEdit('a', EMPTY_ITEM_FORM_VALUES);
+    });
+
+    expect(ok).toBe(false);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not save changes. Please try again.',
+    );
+    expect(consoleError).toHaveBeenCalledWith('save item', null);
+    expect(result.current.isSaving).toBe(false);
     consoleError.mockRestore();
   });
 

@@ -106,7 +106,7 @@ export function useItems(categoryId: string, q: string) {
   // never gets that chance otherwise.
   useEffect(() => {
     void load();
-    return () => abortRef.current?.abort();
+    return () => abortRef.current!.abort();
   }, [load]);
 
   // `load` is recreated whenever the query/page/category change, but a

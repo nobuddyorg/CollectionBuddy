@@ -73,6 +73,41 @@ describe('ItemForm submission', () => {
     );
   });
 
+  it('drops stale coordinates once the place is hand-edited', async () => {
+    // Typing a long-enough query kicks off PlaceAutocomplete's own
+    // (debounced) search -- stubbed here so the test never reaches the
+    // real network, matching PlaceAutocomplete.test.tsx's own setup.
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue({ ok: true, json: async () => ({ features: [] }) }),
+    );
+    try {
+      const user = userEvent.setup();
+      const { onSubmit } = renderWithSubmit({
+        ...EMPTY_ITEM_FORM_VALUES,
+        title: 'Seated Dime',
+        place: 'Bonn',
+        place_lat: 50.7,
+        place_lng: 7.1,
+      });
+
+      await user.type(screen.getByRole('combobox'), 'x');
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          place: 'Bonnx',
+          place_lat: null,
+          place_lng: null,
+        }),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('submits no coordinates for an entry that never had any', async () => {
     const user = userEvent.setup();
     const { onSubmit } = renderWithSubmit({
@@ -85,6 +120,25 @@ describe('ItemForm submission', () => {
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ place_lat: null, place_lng: null }),
     );
+  });
+
+  // ItemFormValues types every field as required, but a value assembled from
+  // a partially-loaded record could still hand this a nullish field at
+  // runtime -- each one should fall back the same way an actually-blank
+  // value would, not throw or render "undefined".
+  it('falls back to blank values for a nullish title, description, place, or tags', () => {
+    renderForm({
+      ...EMPTY_ITEM_FORM_VALUES,
+      title: undefined,
+      description: undefined,
+      place: undefined,
+      tags: undefined,
+    } as unknown as ItemFormValues);
+
+    expect(screen.getByTestId('item-title')).toHaveValue('');
+    expect(screen.getByTestId('item-description')).toHaveValue('');
+    expect(screen.getByRole('combobox')).toHaveValue('');
+    expect(screen.getByText('0 tags')).toBeInTheDocument();
   });
 });
 

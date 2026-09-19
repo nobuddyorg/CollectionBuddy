@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -196,6 +196,35 @@ describe('CategorySelect', () => {
     expect(screen.getByLabelText('New collection')).toBeVisible();
   });
 
+  it('shows nothing selected when selectedCat names a category not in the list', () => {
+    renderSelect({ selectedCat: 'not-a-real-id' });
+    expect(screen.queryByText('None selected')).toBeInTheDocument();
+  });
+
+  it('does not rename on Enter when the value has not actually changed', async () => {
+    const renameCategory = vi.fn();
+    renderSelect({ categories: categories({ renameCategory }) });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Open collection' }),
+    );
+
+    await userEvent.type(screen.getByLabelText('Rename'), '{Enter}');
+
+    expect(renameCategory).not.toHaveBeenCalled();
+  });
+
+  it('does not create a category on Enter with no name typed', async () => {
+    const createCategory = vi.fn();
+    renderSelect({ categories: categories({ createCategory }) });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Open collection' }),
+    );
+
+    await userEvent.type(screen.getByLabelText('New collection'), '{Enter}');
+
+    expect(createCategory).not.toHaveBeenCalled();
+  });
+
   describe('Escape in the rename field', () => {
     async function openAndEdit(text: string) {
       renderSelect();
@@ -298,6 +327,20 @@ describe('CategorySelect', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Import' }));
 
       expect(click).toHaveBeenCalledTimes(1);
+    });
+
+    it('does nothing when the file picker is cancelled with no file chosen', async () => {
+      const runImport = vi.fn();
+      vi.mocked(useImportCategory).mockReturnValue(importState({ runImport }));
+      renderSelect();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Open collection' }),
+      );
+
+      const input = screen.getByTestId('import-file-input');
+      fireEvent.change(input, { target: { files: [] } });
+
+      expect(runImport).not.toHaveBeenCalled();
     });
 
     it('runs the import with the picked file, and switches to the new category', async () => {

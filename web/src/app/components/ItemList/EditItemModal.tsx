@@ -52,7 +52,7 @@ export function EditItemModal({
   return (
     <CenteredModal
       open={open}
-      onOpenChange={(v) => (v ? undefined : guardedClose())}
+      onOpenChange={guardedClose}
       title={t('item_list.edit_item')}
       closeLabel={t('common.close')}
     >
