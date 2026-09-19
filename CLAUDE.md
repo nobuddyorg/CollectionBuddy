@@ -361,14 +361,26 @@ And the rest:
   meaningless tests, artificial branches, or exclusions; the metrics should
   reflect real quality.
 - **Comments:**
-  Keep comments to a minimum. Add a comment only when it explains something
-  that is not reasonably obvious from the code itself, such as a non-obvious
-  constraint, workaround, invariant, or important external behavior.
-  Do not add comments merely to document implementation decisions, restate
-  what the code does, narrate obvious logic, or explain routine changes.
+  One line, hard cap — never a multi-line or multi-paragraph block. If the
+  reasoning doesn't fit in one line, it belongs in the commit message or PR
+  description, not the code.
+  Add a comment only when it explains something that is not reasonably
+  obvious from the code itself, such as a non-obvious constraint,
+  workaround, invariant, or important external behavior. Do not add
+  comments merely to document implementation decisions, restate what the
+  code does, narrate obvious logic, or explain routine changes.
+  State a piece of reasoning once, at its clearest site. If the same
+  rationale applies to several call sites or lines, don't repeat it at
+  each one — comment the one that explains it best and let the rest be
+  read in light of it.
   Prefer clear naming and simple code over explanatory comments.
-  Preserve existing comments unless they are incorrect, obsolete, or
-  misleading. Remove comments that no longer provide meaningful context.
+  Existing comments in this codebase are not a style precedent — several
+  predate this rule and run longer than it allows. Match the rule above
+  for anything you write or touch, not the surrounding file's existing
+  length. Preserve existing comments unless they are incorrect, obsolete,
+  or misleading; when a change already touches a comment that violates
+  this rule, tighten it rather than leaving it as found. Remove comments
+  that no longer provide meaningful context.
 - **Ui changes:** Always need a e2e test
 - **Functional changes:** Always need a unit test
 
