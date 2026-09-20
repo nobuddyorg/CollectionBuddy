@@ -1,4 +1,4 @@
-import { expect, test } from '../coverage';
+import { expect, test } from '../fixture';
 
 // What sw.test.ts cannot reach from source: registration, scope, cache, offline.
 test.use({ locale: 'en-GB' });
@@ -41,13 +41,12 @@ test.describe('the service worker', () => {
 
   // skipWaiting + clients.claim: otherwise no worker until the next visit.
   test('takes over the page that registered it, without a reload', async ({
+    on,
     page,
   }) => {
     await page.goto('login/');
     await waitForController(page);
-    await expect(
-      page.getByRole('button', { name: /sign in with google/i }),
-    ).toBeVisible();
+    await expect(on(page).login.locators.buttons.signIn).toBeVisible();
   });
 
   test('keeps the hashed bundle, and nothing from anywhere else', async ({
@@ -78,6 +77,7 @@ test.describe('the service worker', () => {
 
   // Why the worker exists: no cache headers from the host, no connection here.
   test('still opens the app with the network gone', async ({
+    on,
     page,
     context,
   }) => {
@@ -88,9 +88,7 @@ test.describe('the service worker', () => {
     await context.setOffline(true);
     try {
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await expect(
-        page.getByRole('button', { name: /sign in with google/i }),
-      ).toBeVisible();
+      await expect(on(page).login.locators.buttons.signIn).toBeVisible();
     } finally {
       await context.setOffline(false);
     }

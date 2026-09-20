@@ -74,6 +74,7 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <input
           id="share-email"
+          data-testid="share-email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -87,6 +88,7 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
           <div className="flex min-h-11 w-56 shrink-0 items-center rounded-sm bg-card ring-1 ring-inset ring-control-border focus-within:ring-foreground">
             <button
               type="button"
+              data-testid="share-expiry"
               onClick={openDatePicker}
               title={t('category_select.share_expiry_label')}
               className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-sm py-2 pl-3 pr-2 text-left hover:bg-muted transition-colors"
@@ -110,6 +112,7 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
             {expiryDate && (
               <button
                 type="button"
+                data-testid="share-expiry-clear"
                 onClick={() => setExpiryDate('')}
                 aria-label={t('category_select.share_expiry_clear')}
                 title={t('category_select.share_expiry_clear')}
@@ -126,6 +129,7 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
           <input
             ref={expiryInputRef}
             id="share-expiry"
+            data-testid="share-expiry-input"
             type="date"
             value={expiryDate}
             min={todayDateStr()}
@@ -137,6 +141,7 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
           <IconButton
             variant="primary"
             size="xl"
+            data-testid="share-submit"
             onClick={() => void onShare()}
             disabled={email.trim() === '' || isSharing}
             aria-busy={isSharing}

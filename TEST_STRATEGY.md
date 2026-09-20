@@ -503,6 +503,114 @@ variant, if layout faults tend to be viewport-specific; and **poll for
 expected state** rather than reading once, whenever the UI debounces or
 waits on a round trip.
 
+### How the browser suite addresses the UI
+
+**Address elements by a test id, not by role, accessible name, text, or
+CSS.** A name- or text-based locator breaks on every copy edit and every
+translation, and couples an assertion to wording the test isn't about; a
+class-based one breaks on every restyle. A `data-testid` is an explicit,
+greppable contract between the component and the suite: renaming a button's
+label then changes one string in one file instead of turning a journey red.
+When a test needs an element that has no id, add the id to the component —
+don't contort the locator around markup that was never built to be
+addressed.
+
+Four cases stay off test ids, deliberately:
+
+- **A third party's own DOM** (a map, a rich-text editor, an embedded
+  widget) — you don't own that markup and can't add to it. Reach it the way
+  it lets you, in the page object rather than the spec, with a one-line
+  comment where it happens.
+- **Document-level elements** — `html`, `body`, `meta`, `link`. There is
+  exactly one of each; an id adds nothing.
+- **Text that is itself the subject.** A localization case proving a page
+  arrives in the right language still finds the element by id and asserts
+  its *text*; finding it *by* that text makes the assertion circular — it
+  can only ever fail as "element not found".
+- **State carried by an attribute** (`disabled`, `aria-current`, `lang`).
+  Find by id, assert the attribute.
+
+**Wrap each screen in a page object, and hang them all off one tree.** Each
+screen exports one `init<Screen>(page)` returning its root locator as a
+callable, plus two properties: `locators` (raw handles, grouped — buttons,
+inputs, texts) and `do` (whole interactions). Nesting follows the UI, so a
+repeated row or card gets its own small object of the same shape:
+
+```ts
+export function initRecordList(page: Page) {
+  const root = page.locator('#app-root');
+  const locators = {
+    buttons: { newRecord: root.getByTestId('new-record') },
+    cards: root.getByTestId('record-card'),
+  };
+  const interactions = {
+    addRecord: async (title: string) => {
+      await locators.buttons.newRecord.click();
+      await page.getByTestId('record-title').fill(title);
+      await page.getByTestId('record-submit').click();
+      await expect(locators.cards.filter({ hasText: title })).toBeVisible();
+    },
+  };
+  return Object.assign(() => root, { locators, do: interactions });
+}
+```
+
+One tree collects them, with getters so a spec that touches one screen
+builds one screen's locators, and a fixture hands that tree to every spec:
+
+```ts
+export function createPageTree(page: Page) {
+  return {
+    get records() {
+      return initRecordList(page);
+    },
+    get form() {
+      return initRecordForm(page);
+    },
+  };
+}
+
+export const test = base.extend<{ on: typeof createPageTree }>({
+  on: async ({}, use) => {
+    await use((page) => createPageTree(page));
+  },
+});
+```
+
+A spec then reads as the journey it is, and names no selector at all:
+
+```ts
+test('files a record and finds it again', async ({ on, page }) => {
+  const app = on(page);
+  await app.records.do.addRecord('Title');
+  await expect(app.records.card('Title').locators.title).toHaveText('Title');
+});
+```
+
+Four rules keep that from decaying back into selectors sprinkled through
+specs:
+
+- **No spec names a selector.** A spec needing a new element grows the page
+  object rather than reaching past it. Grepping the spec directory for the
+  locator API (`getByTestId`, `getByRole`, `locator(`) should come back
+  empty but for the document-level exceptions above — that grep is the
+  check, so run it rather than trusting the convention.
+- **`do` holds whole actions; `locators` holds the handles.** An action
+  spanning two screens — a delete and the confirmation it raises — belongs
+  to the screen that starts it, since it is one thing the user does, with a
+  one-line comment saying why it reaches across.
+- **Waiting belongs to the page object.** An `open()` returns when the
+  screen is actually there, not when the click landed, so no spec carries a
+  wait every other spec also needs — and none carries a sleep.
+- **Assertions belong to the spec.** A page object may assert what its own
+  action promises (the row it just created is on screen), because that is
+  the action's postcondition. What the test is *about* stays in the test.
+
+The cost is real and worth naming: a page object is indirection, and a
+badly-drawn one hides the behavior instead of the markup. Keep each to a
+single screen, keep `do` methods to things a user would name, and let a
+spec drop to `locators` where the interaction is genuinely one click.
+
 ### Accessibility — two automated layers, neither proof of the whole claim
 
 **Static** (a JSX/template a11y linter) catches what's wrong before

@@ -67,8 +67,6 @@ export const test = base.extend<{ autoCoverage: void }>({
   ],
 });
 
-export { expect } from '@playwright/test';
-
 /**
  * Merges every worker's coverage (each `add()` above persists to
  * `outputDir`'s cache, not just this process's memory) into one report, then

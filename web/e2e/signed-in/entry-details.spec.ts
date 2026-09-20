@@ -1,8 +1,6 @@
 import { expect, test } from './test';
 
 import { SEED } from './fixtures';
-import { openCategory } from './helpers';
-
 // Everything on an entry besides its title: the tag chips and the place
 // autocomplete, filled in through the real form. The geocoder is a third
 // party and is always faked (TEST_STRATEGY.md §6); what is real here is
@@ -35,132 +33,120 @@ async function fakeGeocoder(page: Page) {
   );
 }
 
-async function deleteEntry(page: Page, title: string) {
-  const card = page.getByTestId('item-card').filter({ hasText: title });
-  await card.getByTestId('delete-entry').click();
-  await page.getByTestId('confirm-accept').click();
-  await expect(card).toHaveCount(0);
-}
-
 test.describe('an entry with a place and tags', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ on, page }) => {
     await fakeGeocoder(page);
-    await openCategory(page, SEED.detailCategory);
+    await on(page).categories.do.open(SEED.detailCategory);
   });
 
   test('is filled in through the form and keeps what was picked', async ({
+    on,
     page,
   }) => {
+    const app = on(page);
     const title = uniqueTitle('Beschriftet');
     try {
-      await page.getByTestId('new-entry').click();
-      await page.getByTestId('item-title').fill(title);
+      await app.catalogue.do.openEntryForm();
+      await app.form.do.fill({ title });
 
-      const place = page.getByRole('combobox', { name: 'City (e.g. Cologne)' });
-      await place.fill('Bremen');
+      await app.form.do.pickPlace('Bremen');
       // The picked option's label, not the typed text, is what is stored.
-      await page.getByRole('option').first().click();
-      await expect(place).toHaveValue('Bremen, Germany');
+      await expect(app.form.locators.inputs.place).toHaveValue(
+        'Bremen, Germany',
+      );
 
-      const tags = page.getByRole('textbox', {
-        name: 'Enter tags… (Enter/Comma)',
-      });
-      await tags.fill('hansestadt');
-      await tags.press('Enter');
-      await tags.fill('weserstadt');
-      await tags.press(',');
+      await app.form.do.addTag('hansestadt');
+      await app.form.do.addTag('weserstadt', ',');
       // The same tag twice is refused rather than duplicated.
-      await tags.fill('hansestadt');
-      await tags.press('Enter');
-      await expect(page.getByLabel('Remove tag hansestadt')).toHaveCount(1);
+      await app.form.do.addTag('hansestadt');
+      await expect(app.form.tag('hansestadt')).toHaveCount(1);
 
-      await page.getByLabel('Remove tag weserstadt').click();
-      await expect(page.getByLabel('Remove tag weserstadt')).toHaveCount(0);
+      await app.form.do.removeTag('weserstadt');
+      await expect(app.form.tag('weserstadt')).toHaveCount(0);
 
-      await page.getByTestId('item-submit').click();
+      await app.form.do.submit();
 
-      const card = page.getByTestId('item-card').filter({ hasText: title });
-      await expect(card.getByText('Bremen, Germany')).toBeVisible();
-      await expect(card.getByText('hansestadt', { exact: true })).toBeVisible();
-      await expect(card.getByText('weserstadt')).toHaveCount(0);
+      const card = app.catalogue.card(title);
+      await expect(card.locators.place).toHaveText('Bremen, Germany');
+      await expect(card.locators.tags).toHaveText(['hansestadt']);
 
       // The one assertion only a real database can make: the coordinates
       // the geocoder returned were stored, not just the name beside them.
-      await page.getByTestId('open-map').click();
-      await expect(page.locator('.leaflet-marker-icon')).toHaveCount(1);
+      await app.map.do.open();
+      await expect(app.map.locators.pins).toHaveCount(1);
     } finally {
       await page.keyboard.press('Escape');
-      await deleteEntry(page, title);
+      await app.catalogue.do.removeEntry(title);
     }
   });
 
   test('drops a tag with Backspace when the field is empty', async ({
+    on,
     page,
   }) => {
+    const app = on(page);
     const title = uniqueTitle('Rückwärts');
     try {
-      await page.getByTestId('new-entry').click();
-      await page.getByTestId('item-title').fill(title);
+      await app.catalogue.do.openEntryForm();
+      await app.form.do.fill({ title });
 
-      const tags = page.getByRole('textbox', {
-        name: 'Enter tags… (Enter/Comma)',
-      });
-      await tags.fill('vorher');
-      await tags.press('Enter');
-      await expect(page.getByLabel('Remove tag vorher')).toHaveCount(1);
+      await app.form.do.addTag('vorher');
+      await expect(app.form.tag('vorher')).toHaveCount(1);
 
-      await tags.press('Backspace');
-      await expect(page.getByLabel('Remove tag vorher')).toHaveCount(0);
+      await app.form.do.removeLastTag();
+      await expect(app.form.tag('vorher')).toHaveCount(0);
 
-      await page.getByTestId('item-submit').click();
-      const card = page.getByTestId('item-card').filter({ hasText: title });
-      await expect(card.getByText('vorher')).toHaveCount(0);
+      await app.form.do.submit();
+      await expect(app.catalogue.card(title).locators.tags).toHaveCount(0);
     } finally {
-      await deleteEntry(page, title);
+      await app.catalogue.do.removeEntry(title);
     }
   });
 
   // Every dismissal of the form routes through one guard, so a stray tap
   // cannot lose an edit more easily than pressing Cancel would.
-  test('asks before throwing away a half-written entry', async ({ page }) => {
-    await page.getByTestId('new-entry').click();
-    await page.getByTestId('item-title').fill('Halb getippt');
+  test('asks before throwing away a half-written entry', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await app.catalogue.do.openEntryForm();
+    await app.form.do.fill({ title: 'Halb getippt' });
 
     await page.keyboard.press('Escape');
-    await expect(page.getByText('Discard your changes?')).toBeVisible();
+    await expect(app.confirm.locators.message).toContainText(
+      'Discard your changes?',
+    );
 
-    await page.getByTestId('confirm-cancel').click();
-    await expect(page.getByTestId('item-title')).toHaveValue('Halb getippt');
+    await app.confirm.do.cancel();
+    await expect(app.form.locators.inputs.title).toHaveValue('Halb getippt');
 
     await page.keyboard.press('Escape');
-    await page.getByTestId('confirm-accept').click();
-    await expect(page.getByTestId('item-title')).toHaveCount(0);
+    await app.confirm.do.accept();
+    await expect(app.form.locators.inputs.title).toHaveCount(0);
   });
 
   // The edit modal is the one caller that gives the form a Cancel button,
   // and it goes through the same guard a stray dismissal would.
-  test('leaves an entry alone when an edit is cancelled', async ({ page }) => {
+  test('leaves an entry alone when an edit is cancelled', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
     const title = uniqueTitle('Unverändert');
     try {
-      await page.getByTestId('new-entry').click();
-      await page.getByTestId('item-title').fill(title);
-      await page.getByTestId('item-submit').click();
+      await app.catalogue.do.addEntry(title);
 
-      const card = page.getByTestId('item-card').filter({ hasText: title });
-      await expect(card).toBeVisible();
+      await app.catalogue.card(title).do.edit();
+      await app.form.do.pickPlace('Bremen');
 
-      await card.getByTestId('edit-entry').click();
-      const place = page.getByRole('combobox', { name: 'City (e.g. Cologne)' });
-      await place.fill('Bremen');
-      await page.getByRole('option').first().click();
+      await app.form.do.cancel();
+      await app.confirm.do.accept();
 
-      await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-      await page.getByTestId('confirm-accept').click();
-
-      await expect(page.getByTestId('item-title')).toHaveCount(0);
-      await expect(card.getByText('Bremen, Germany')).toHaveCount(0);
+      await expect(app.form.locators.inputs.title).toHaveCount(0);
+      await expect(app.catalogue.card(title).locators.place).toHaveCount(0);
     } finally {
-      await deleteEntry(page, title);
+      await app.catalogue.do.removeEntry(title);
     }
   });
 });

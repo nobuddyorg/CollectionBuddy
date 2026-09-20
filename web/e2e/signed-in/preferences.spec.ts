@@ -8,20 +8,20 @@ type Page = import('@playwright/test').Page;
 const themeAttr = (page: Page) =>
   page.evaluate(() => document.documentElement.getAttribute('data-theme'));
 
-async function openAccountMenu(page: Page) {
-  await page.goto('', { waitUntil: 'networkidle' });
-  await expect(page.getByTestId('selected-category')).not.toBeEmpty();
-  await page.getByRole('button', { name: 'Account menu' }).click();
-}
-
 test.describe('the account menu', () => {
+  test.beforeEach(async ({ on, page }) => {
+    await page.goto('', { waitUntil: 'networkidle' });
+    await expect(on(page).categories.locators.selected).not.toBeEmpty();
+    await on(page).account.do.open();
+  });
+
   test('changes the appearance, and the next visit arrives in it', async ({
+    on,
     page,
   }) => {
-    await openAccountMenu(page);
     expect(await themeAttr(page)).not.toBe('dark');
 
-    await page.getByRole('button', { name: 'Dark', exact: true }).click();
+    await on(page).account.do.chooseTheme('dark');
     await expect.poll(() => themeAttr(page)).toBe('dark');
 
     // Before hydration: the head script found it, with no flash to fix up.
@@ -30,15 +30,14 @@ test.describe('the account menu', () => {
   });
 
   test('changes the language, and the next visit arrives in it', async ({
+    on,
     page,
   }) => {
-    await openAccountMenu(page);
-
-    await page.getByRole('button', { name: 'Deutsch', exact: true }).click();
+    await on(page).account.do.chooseLanguage('de');
     await expect(page.locator('html')).toHaveAttribute('lang', 'de');
-    await expect(
-      page.getByRole('heading', { level: 2, name: 'Sammlung' }),
-    ).toBeVisible();
+    await expect(on(page).categories.locators.texts.label).toHaveText(
+      'Sammlung',
+    );
 
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.locator('html')).toHaveAttribute('lang', 'de');

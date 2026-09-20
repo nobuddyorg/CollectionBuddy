@@ -1,4 +1,4 @@
-import { expect, test } from '../coverage';
+import { expect, test } from '../fixture';
 
 import { collectPageProblems, expectNoPageProblems } from '../helpers';
 
@@ -35,12 +35,10 @@ test.describe('the deployed bundle', () => {
     await expect(page).toHaveURL(/\/login\/?$/);
   });
 
-  test('serves the login page directly, too', async ({ page }) => {
+  test('serves the login page directly, too', async ({ on, page }) => {
     const problems = collectPageProblems(page);
-    await page.goto('login/', { waitUntil: 'networkidle' });
-    await expect(
-      page.getByRole('button', { name: /sign in with google/i }),
-    ).toBeVisible();
+    await on(page).login.do.open();
+    await expect(on(page).login.locators.buttons.signIn).toBeVisible();
     expectNoPageProblems(problems);
   });
 

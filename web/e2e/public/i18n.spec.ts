@@ -3,6 +3,8 @@
 // would have nothing to attach to.
 import { expect, test } from '@playwright/test';
 
+import { createPageTree } from '../pages';
+
 // Language is decided client-side (storage, then browser); a wrong `<html lang>`
 // mispronounces the page for screen readers without any visible symptom.
 test.describe('the language a page arrives in', () => {
@@ -11,10 +13,9 @@ test.describe('the language a page arrives in', () => {
     const page = await context.newPage();
     await page.goto('login/', { waitUntil: 'networkidle' });
     await expect(page.locator('html')).toHaveAttribute('lang', 'de');
-    // Exact match: the same words also appear in the medallion engraving.
-    await expect(
-      page.getByText('Sammeln • Ordnen • Behalten', { exact: true }),
-    ).toBeVisible();
+    await expect(createPageTree(page).login.locators.tagline).toHaveText(
+      'Sammeln • Ordnen • Behalten',
+    );
     await context.close();
   });
 
@@ -23,9 +24,9 @@ test.describe('the language a page arrives in', () => {
     const page = await context.newPage();
     await page.goto('login/', { waitUntil: 'networkidle' });
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await expect(
-      page.getByText('Collect • Organize • Keep', { exact: true }),
-    ).toBeVisible();
+    await expect(createPageTree(page).login.locators.tagline).toHaveText(
+      'Collect • Organize • Keep',
+    );
     await context.close();
   });
 

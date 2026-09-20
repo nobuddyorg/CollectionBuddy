@@ -62,11 +62,13 @@ export function TagsInput({
       {tags.map((tag) => (
         <span
           key={tag}
+          data-testid="tag-chip"
           className={`fade-up tag-chip flex items-center gap-1.5 ${tag === flashedTag ? 'tag-flash' : ''}`}
         >
           {tag}
           <button
             type="button"
+            data-testid="remove-tag"
             onClick={() => removeTag(tag)}
             className="relative w-3.5 h-3.5 flex items-center justify-center rounded-full text-foreground/50 hover:text-destructive after:absolute after:-inset-2 after:content-['']"
             aria-label={t('item_create.remove_tag').replace('{tag}', tag)}
@@ -83,6 +85,7 @@ export function TagsInput({
       ))}
       <input
         id={id}
+        data-testid="item-tags"
         value={tagInput}
         onChange={(e) => setTagInput(e.target.value)}
         onKeyDown={onKeyDown}

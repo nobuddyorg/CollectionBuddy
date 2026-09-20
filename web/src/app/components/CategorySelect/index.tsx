@@ -216,6 +216,7 @@ export default function CategorySelect({
                 </label>
                 <input
                   id="rename-category"
+                  data-testid="rename-category-input"
                   value={renameValue}
                   // Shared categories keep this field in the same slot,
                   // disabled rather than hidden or readOnly: RLS's "update

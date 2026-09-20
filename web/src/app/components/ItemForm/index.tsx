@@ -168,7 +168,12 @@ export default function ItemForm({
 
       <div className="flex justify-end gap-2 pt-1">
         {onCancel && (
-          <button type="button" onClick={onCancel} className={buttonClasses()}>
+          <button
+            type="button"
+            data-testid="item-cancel"
+            onClick={onCancel}
+            className={buttonClasses()}
+          >
             {t('common.cancel')}
           </button>
         )}

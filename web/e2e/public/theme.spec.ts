@@ -1,4 +1,4 @@
-import { expect, test } from '../coverage';
+import { expect, test } from '../fixture';
 
 import { cssVar } from '../helpers';
 

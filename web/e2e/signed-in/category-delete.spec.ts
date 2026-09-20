@@ -17,8 +17,6 @@ test.use({ locale: 'en-GB' });
 test.describe.configure({ timeout: 120_000 });
 const ARRIVES = 45_000;
 
-type Page = import('@playwright/test').Page;
-
 const PHOTO = resolve(process.cwd(), 'public/logo.png');
 
 const context = () =>
@@ -53,16 +51,13 @@ async function storedObjects(token: string, userId: string, itemId: string) {
   return (data ?? []).map((object) => object.name);
 }
 
-async function expandPanel(page: Page) {
-  const expand = page.getByTestId('expand-categories');
-  if (await expand.isVisible()) await expand.click();
-}
-
 test.describe('deleting a collection that still holds things', () => {
   test('counts what it is about to destroy, and takes the photographs too', async ({
+    on,
     page,
   }, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const app = on(page);
     const { token, userId } = context();
 
     // Its own throwaway collection, created here and destroyed by the test
@@ -71,32 +66,24 @@ test.describe('deleting a collection that still holds things', () => {
     const title = `Inhalt ${Date.now()}`;
 
     await page.goto('', { waitUntil: 'networkidle' });
-    await expect(page.getByTestId('selected-category')).not.toBeEmpty();
-    await expandPanel(page);
-    await page.getByLabel('New collection').fill(name);
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
-    await expect(page.getByTestId('selected-category')).toHaveText(name);
+    await expect(app.categories.locators.selected).not.toBeEmpty();
+    await app.categories.do.create(name);
 
-    await page.getByTestId('new-entry').click();
-    await page.getByTestId('item-title').fill(title);
-    await page.getByTestId('item-submit').click();
-
-    const card = page.getByTestId('item-card').filter({ hasText: title });
-    await expect(card).toBeVisible();
+    await app.catalogue.do.addEntry(title);
+    const card = app.catalogue.card(title);
     const itemId = await itemIdFor(token, title);
-    await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
+    await card.do.uploadPhoto(PHOTO);
+    await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
     expect(await storedObjects(token, userId, itemId)).not.toEqual([]);
 
-    await expandPanel(page);
-    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    await app.categories.do.delete();
     // Named and counted, not a bare "are you sure".
-    await expect(
-      page.getByText(`Delete "${name}"? Its 1 entries`),
-    ).toBeVisible();
-    await page.getByTestId('confirm-accept').click();
+    await expect(app.confirm.locators.message).toContainText(
+      `Delete "${name}"? Its 1 entries`,
+    );
+    await app.confirm.do.accept();
 
-    await expect(page.getByTestId('selected-category')).not.toHaveText(name);
+    await expect(app.categories.locators.selected).not.toHaveText(name);
     await expect
       .poll(() => storedObjects(token, userId, itemId), { timeout: 15_000 })
       .toEqual([]);

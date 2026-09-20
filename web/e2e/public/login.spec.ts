@@ -1,4 +1,4 @@
-import { expect, test } from '../coverage';
+import { expect, test } from '../fixture';
 
 import { horizontalOverflow } from '../helpers';
 
@@ -7,56 +7,59 @@ import { horizontalOverflow } from '../helpers';
 test.use({ locale: 'en-GB' });
 
 test.describe('the login page', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('login/', { waitUntil: 'networkidle' });
+  test.beforeEach(async ({ on, page }) => {
+    await on(page).login.do.open();
   });
 
-  test('shows the wordmark in two parts', async ({ page }) => {
-    const wordmark = page.getByRole('heading', { level: 1 });
+  test('shows the wordmark in two parts', async ({ on, page }) => {
+    const wordmark = on(page).login.locators.wordmark;
     await expect(wordmark).toHaveText('CollectionBuddy');
     // Two spans: "Buddy" carries the accent colour, "Collection" the rule beneath it.
     await expect(wordmark.locator('span')).not.toHaveCount(0);
   });
 
-  test('offers a way in', async ({ page }) => {
-    const signIn = page.getByRole('button', { name: /sign in with google/i });
+  test('offers a way in', async ({ on, page }) => {
+    const signIn = on(page).login.locators.buttons.signIn;
     await expect(signIn).toBeVisible();
     await expect(signIn).toBeEnabled();
   });
 
-  test('puts the sign-in button in reach of the keyboard', async ({ page }) => {
-    const signIn = page.getByRole('button', { name: /sign in with google/i });
+  test('puts the sign-in button in reach of the keyboard', async ({
+    on,
+    page,
+  }) => {
+    const signIn = on(page).login.locators.buttons.signIn;
     await signIn.focus();
     await expect(signIn).toBeFocused();
   });
 
-  test('draws the medallion', async ({ page }) => {
-    await expect(page.locator('svg').first()).toBeVisible();
+  test('draws the medallion', async ({ on, page }) => {
+    await expect(on(page).login.locators.coin).toBeVisible();
   });
 
   // Checks opacity, not just count: an animated element can render but never
   // actually arrive on screen after a refactor.
   test('flies the collectibles out where there is room for them', async ({
+    on,
     page,
   }) => {
     await page.setViewportSize({ width: 1000, height: 900 });
     await page.reload({ waitUntil: 'networkidle' });
-    const chips = page.locator('.collectible-bob');
+    const chips = on(page).login.locators.collectibles;
     expect(await chips.count()).toBeGreaterThan(0);
     await expect(chips.first()).toBeVisible();
     await expect(chips.first()).toHaveCSS('opacity', '1');
   });
 
   test('leaves them off a phone, where they would sit on the button', async ({
+    on,
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload({ waitUntil: 'networkidle' });
     // Still in the markup -- CSS hides them, so assert hidden, not absent.
-    await expect(page.locator('.collectible-bob').first()).toBeHidden();
-    await expect(
-      page.getByRole('button', { name: /sign in with google/i }),
-    ).toBeVisible();
+    await expect(on(page).login.locators.collectibles.first()).toBeHidden();
+    await expect(on(page).login.locators.buttons.signIn).toBeVisible();
   });
 
   test('does not scroll sideways', async ({ page }) => {
@@ -64,14 +67,20 @@ test.describe('the login page', () => {
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
   });
 
-  test('keeps the Google button on its own white plate', async ({ page }) => {
-    const signIn = page.getByRole('button', { name: /sign in with google/i });
-    await expect(signIn).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  test('keeps the Google button on its own white plate', async ({
+    on,
+    page,
+  }) => {
+    await expect(on(page).login.locators.buttons.signIn).toHaveCSS(
+      'background-color',
+      'rgb(255, 255, 255)',
+    );
   });
 
   // `redirect_to` is built from the base path baked in at build time, so a
   // wrong one lands every returning visitor on a 404 of the host's.
   test('hands sign-in to the provider, pointed back at the app', async ({
+    on,
     page,
     baseURL,
   }) => {
@@ -82,7 +91,7 @@ test.describe('the login page', () => {
       await route.fulfill({ contentType: 'text/html', body: '<html></html>' });
     });
 
-    await page.getByRole('button', { name: /sign in with google/i }).click();
+    await on(page).login.do.signIn();
     await expect.poll(() => authorizeUrl).toBeTruthy();
 
     const query = new URL(authorizeUrl!).searchParams;

@@ -122,6 +122,7 @@ export function ModalImage({
     <div
       ref={panelRef}
       role="dialog"
+      data-testid="image-viewer"
       aria-modal="true"
       aria-label={t('item_list.full_size_image_alt')}
       className="fixed inset-0 z-modal bg-background/95 backdrop-blur"
@@ -132,6 +133,7 @@ export function ModalImage({
           free to take max-h-full, a button below it landed past the bottom
           of the fixed overlay and was unreachable. */}
       <button
+        data-testid="close-image"
         onClick={onClose}
         className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
         title={t('item_list.close_modal')}
@@ -147,6 +149,7 @@ export function ModalImage({
           already refuses the delete, this just doesn't offer it. */}
       {!readOnly && (
         <button
+          data-testid="delete-image"
           onClick={() => onDelete(current)}
           disabled={busy}
           className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-60 transition-colors"
@@ -168,6 +171,7 @@ export function ModalImage({
           className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 flex items-center gap-3"
         >
           <button
+            data-testid="previous-image"
             onClick={() => goTo(clampedIndex - 1)}
             className="min-w-11 min-h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
             title={t('item_list.previous_image')}
@@ -176,13 +180,17 @@ export function ModalImage({
             <Icon icon={IconType.ChevronLeft} className="w-4 h-4" />
           </button>
 
-          <span className="font-label text-xs text-muted-foreground">
+          <span
+            data-testid="image-position"
+            className="font-label text-xs text-muted-foreground"
+          >
             {t('item_list.image_position')
               .replace('{current}', String(clampedIndex + 1))
               .replace('{total}', String(count))}
           </span>
 
           <button
+            data-testid="next-image"
             onClick={() => goTo(clampedIndex + 1)}
             className="min-w-11 min-h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
             title={t('item_list.next_image')}

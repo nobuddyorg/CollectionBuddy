@@ -1,63 +1,62 @@
 import { expect, test } from './test';
 
 import { SEED, itemsIn } from './fixtures';
-import { expectTitles, openCategory, visibleTitles } from './helpers';
+import { expectTitles, visibleTitles } from './helpers';
 
 // Runs against the real Postgres and real row-level security, not a mock.
 test.use({ locale: 'en-GB' });
 
 test.describe('the catalogue', () => {
   test('opens signed in rather than bouncing to the login page', async ({
+    on,
     page,
   }) => {
     await page.goto('', { waitUntil: 'networkidle' });
     await expect(page).not.toHaveURL(/\/login/);
-    await expect(page.getByTestId('search-input')).toBeVisible();
+    await expect(on(page).catalogue.locators.inputs.search).toBeVisible();
   });
 
-  test('shows a category exactly, newest first', async ({ page }) => {
-    await openCategory(page, 'Münzen');
+  test('shows a category exactly, newest first', async ({ on, page }) => {
+    await on(page).categories.do.open('Münzen');
     await expectTitles(
       page,
       itemsIn('Münzen').map((item) => item.title),
     );
   });
 
-  test('keeps another category to itself', async ({ page }) => {
-    await openCategory(page, 'Münzen');
+  test('keeps another category to itself', async ({ on, page }) => {
+    await on(page).categories.do.open('Münzen');
     expect(await visibleTitles(page)).not.toContain('Blaue Mauritius');
 
-    await openCategory(page, 'Briefmarken');
+    await on(page).categories.do.open('Briefmarken');
     await expectTitles(page, ['Blaue Mauritius']);
   });
 
   test('shows an entry with its description, place and tags', async ({
+    on,
     page,
   }) => {
-    await openCategory(page, 'Münzen');
+    await on(page).categories.do.open('Münzen');
     const denarius = SEED.items.find((item) => item.title === 'Silberdenar')!;
-    const card = page
-      .getByTestId('item-card')
-      .filter({ hasText: denarius.title });
+    const card = on(page).catalogue.card(denarius.title);
 
-    await expect(card.getByText(denarius.description)).toBeVisible();
-    await expect(
-      card.getByText(denarius.place!, { exact: true }),
-    ).toBeVisible();
-    for (const tag of denarius.tags) {
-      await expect(card.getByText(tag, { exact: true })).toBeVisible();
-    }
+    await expect(card.locators.description).toHaveText(denarius.description);
+    await expect(card.locators.place).toHaveText(denarius.place!);
+    await expect(card.locators.tags).toHaveText([...denarius.tags]);
   });
 
   // An unphotographed entry gets an empty mount rather than no image area,
   // so every card in the stack keeps the same silhouette.
   test('gives an unphotographed entry the same shape as the rest', async ({
+    on,
     page,
   }) => {
-    await openCategory(page, 'Münzen');
-    const cards = page.getByTestId('item-card');
-    const heights = await cards.evaluateAll((nodes) =>
-      nodes.map((node) => (node as HTMLElement).getBoundingClientRect().height),
+    await on(page).categories.do.open('Münzen');
+    const heights = await on(page).catalogue.locators.cards.evaluateAll(
+      (nodes) =>
+        nodes.map(
+          (node) => (node as HTMLElement).getBoundingClientRect().height,
+        ),
     );
     expect(new Set(heights).size).toBe(1);
   });

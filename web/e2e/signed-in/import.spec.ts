@@ -1,7 +1,8 @@
 import { expect, test } from './test';
 
 import { SEED, itemsIn } from './fixtures';
-import { expectTitles, openCategory } from './helpers';
+import { expectTitles } from './helpers';
+import type { PageTree } from '../pages';
 
 // The half fake I/O cannot reach: a real download, handed to a real input.
 test.use({ locale: 'en-GB' });
@@ -9,36 +10,29 @@ test.use({ locale: 'en-GB' });
 // Two real round trips, past the 30s default under parallel load.
 test.describe.configure({ timeout: 120_000 });
 
-type Page = import('@playwright/test').Page;
-
-async function expandPanel(page: Page) {
-  const expand = page.getByTestId('expand-categories');
-  if (await expand.isVisible()) await expand.click();
-}
-
 /** Removes a category through the panel, if it is still there to remove. */
-async function removeCategory(page: Page, name: string) {
-  await expandPanel(page);
-  const tab = page.getByRole('tab', { name, exact: true });
+async function removeCategory(app: PageTree, name: string) {
+  await app.categories.do.openPanel();
+  const tab = app.categories.tab(name);
   if ((await tab.count()) === 0) return;
 
   await tab.click();
-  await expandPanel(page);
-  await page.getByRole('button', { name: 'Delete', exact: true }).click();
-  await page.getByTestId('confirm-accept').click();
-  await expect(page.getByTestId('selected-category')).not.toHaveText(name);
+  await app.categories.do.delete();
+  await app.confirm.do.accept();
+  await expect(app.categories.locators.selected).not.toHaveText(name);
 }
 
 test.describe('importing an exported archive', () => {
   test('reads a collection back as a copy beside the original', async ({
+    on,
     page,
   }) => {
-    await openCategory(page, SEED.importCategory);
-    await expandPanel(page);
+    const app = on(page);
+    await app.categories.do.open(SEED.importCategory);
 
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByTestId('export-category').click(),
+      app.categories.do.exportCollection(),
     ]);
     const archive = await download.path();
     if (!archive) throw new Error('the export did not save a file to disk');
@@ -46,10 +40,10 @@ test.describe('importing an exported archive', () => {
     // Named the way a filesystem names a second copy, never overwriting.
     const copy = `${SEED.importCategory} (2)`;
     try {
-      await page.getByTestId('import-file-input').setInputFiles(archive);
+      await app.categories.do.importArchive(archive);
 
       // Importing selects the new collection, which collapses the panel.
-      await expect(page.getByTestId('selected-category')).toHaveText(copy, {
+      await expect(app.categories.locators.selected).toHaveText(copy, {
         timeout: 60_000,
       });
       await expectTitles(
@@ -58,12 +52,12 @@ test.describe('importing an exported archive', () => {
       );
 
       // Not just the titles: an entry arrives with what was around it.
-      const card = page.getByTestId('item-card').first();
-      await expect(card.getByText('Bremen', { exact: true })).toBeVisible();
-      await expect(card.getByText('umzug', { exact: true })).toBeVisible();
+      const card = app.catalogue.card('Umzugsstück');
+      await expect(card.locators.place).toHaveText('Bremen');
+      await expect(card.locators.tags).toHaveText(['umzug']);
     } finally {
       // In `finally`, so a failed assertion leaves no copy for the next run.
-      await removeCategory(page, copy);
+      await removeCategory(app, copy);
     }
   });
 });

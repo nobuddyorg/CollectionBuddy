@@ -65,6 +65,7 @@ export function PlaceAutocomplete({
     <div className="relative" ref={dropdownRef}>
       <input
         id={id}
+        data-testid="item-place"
         ref={inputRef}
         role="combobox"
         aria-expanded={showMenu}
@@ -112,7 +113,10 @@ export function PlaceAutocomplete({
           )}
 
           {!loading && error && (
-            <div className="px-3 py-2 text-sm text-muted-foreground">
+            <div
+              data-testid="place-error"
+              className="px-3 py-2 text-sm text-muted-foreground"
+            >
               {t('item_create.search_error')}
             </div>
           )}
@@ -124,6 +128,7 @@ export function PlaceAutocomplete({
               return (
                 <button
                   key={hit.properties.osm_id}
+                  data-testid="place-option"
                   id={`${listId}-opt-${i}`}
                   role="option"
                   aria-selected={i === activeIdx}

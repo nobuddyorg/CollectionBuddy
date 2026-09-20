@@ -1,4 +1,4 @@
-import { test } from '../coverage';
+import { test } from '../fixture';
 
 import { expectNoSeriousA11yViolations } from '../axe';
 

@@ -32,7 +32,7 @@ type SeedItem = {
   tags: readonly string[];
 };
 
-/** One entry apiece, so `openCategory` has a card to wait for. */
+/** One entry apiece, so opening a collection has a card to wait for. */
 const BASELINE_ITEMS: SeedItem[] = [
   'Etikett',
   'Bildergalerie',

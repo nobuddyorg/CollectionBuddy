@@ -41,9 +41,11 @@ async function ownedCategoryId(token: string, userId: string, name: string) {
 
 test.describe('a collection shared with you', () => {
   test('is marked as someone else, refuses the owner controls, and can be left', async ({
+    on,
     page,
   }, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const app = on(page);
     const { token, userId } = context();
 
     // Issued by the owner, as sharing.spec.ts does through the panel.
@@ -61,47 +63,41 @@ test.describe('a collection shared with you', () => {
 
     try {
       await page.goto('', { waitUntil: 'networkidle' });
-      await expect(page.getByTestId('selected-category')).not.toBeEmpty();
-      await page.getByTestId('expand-categories').click();
+      await expect(app.categories.locators.selected).not.toBeEmpty();
+      await app.categories.do.openPanel();
 
-      // Named loosely: the marker is part of the tab's accessible name.
-      const tab = page.getByRole('tab', { name: SEED.grantedCategory });
       await expect(
-        tab.getByRole('img', { name: 'Shared with you' }),
+        app.categories.sharedMarkerOn(SEED.grantedCategory),
       ).toBeVisible();
-      await tab.click();
+      await app.categories.tab(SEED.grantedCategory).click();
 
-      await expect(page.getByTestId('selected-category')).toHaveText(
+      await expect(app.categories.locators.selected).toHaveText(
         SEED.grantedCategory,
       );
-      await expect(
-        page.getByTestId('item-card').filter({ hasText: 'Schatullenstück' }),
-      ).toBeVisible();
+      await expect(app.catalogue.card('Schatullenstück')()).toBeVisible();
 
       // A viewer grant reads; the one control that would write is shut.
-      await expect(page.getByTestId('new-entry')).toBeDisabled();
+      await expect(app.catalogue.locators.buttons.newEntry).toBeDisabled();
 
-      await page.getByTestId('expand-categories').click();
+      await app.categories.do.openPanel();
       // Both would be refused: the rename by RLS, the export by the prefix.
-      await expect(page.getByLabel('Rename')).toBeDisabled();
-      await expect(page.getByTestId('export-category')).toBeDisabled();
+      await expect(app.categories.locators.buttons.rename).toBeDisabled();
+      await expect(app.categories.locators.buttons.export).toBeDisabled();
       // Who else a collection is shared with is the owner's business.
-      await expect(page.getByLabel('Share with (email)')).toHaveCount(0);
+      await expect(app.sharing.locators.inputs.email).toHaveCount(0);
 
       // Same button as an owner's delete; here it ends only their access.
-      await page.getByRole('button', { name: 'Delete', exact: true }).click();
-      await expect(
-        page.getByText(`Leave "${SEED.grantedCategory}"?`),
-      ).toBeVisible();
-      await page.getByTestId('confirm-accept').click();
+      await app.categories.do.delete();
+      await expect(app.confirm.locators.message).toContainText(
+        `Leave "${SEED.grantedCategory}"?`,
+      );
+      await app.confirm.do.accept();
 
-      await expect(page.getByTestId('selected-category')).not.toHaveText(
+      await expect(app.categories.locators.selected).not.toHaveText(
         SEED.grantedCategory,
       );
-      await page.getByTestId('expand-categories').click();
-      await expect(
-        page.getByRole('tab', { name: SEED.grantedCategory }),
-      ).toHaveCount(0);
+      await app.categories.do.openPanel();
+      await expect(app.categories.tab(SEED.grantedCategory)).toHaveCount(0);
     } finally {
       // Leaving deletes the grant only after the undo window, or not at all.
       await apiAs(token).from('category_shares').delete().eq('id', grant.id);

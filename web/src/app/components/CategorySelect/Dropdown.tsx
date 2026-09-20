@@ -143,6 +143,7 @@ function CategoryTablist({
             }}
             type="button"
             role="tab"
+            data-testid="category-tab"
             id={categoryTabId(c.id)}
             aria-selected={active}
             aria-controls={CATEGORY_TABPANEL_ID}
@@ -163,6 +164,7 @@ function CategoryTablist({
               {c.user_id !== userId && (
                 <span
                   className="inline-flex shrink-0"
+                  data-testid="shared-marker"
                   title={t('category_select.shared_marker_label')}
                 >
                   <Icon

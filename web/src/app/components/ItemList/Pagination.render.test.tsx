@@ -20,6 +20,19 @@ describe('Pagination', () => {
     window.localStorage.setItem('lang', 'en');
   });
 
+  // The browser suite reaches this control by test id alone, so the ids are
+  // part of its contract rather than incidental markup.
+  it('names both bars and every control the browser suite drives', () => {
+    renderPagination(2, 3);
+
+    expect(screen.getByTestId('pagination')).toBeInTheDocument();
+    expect(screen.getByTestId('pagination-compact')).toBeInTheDocument();
+    // One pair of buttons, rendered into each bar.
+    expect(screen.getAllByTestId('page-previous')).toHaveLength(2);
+    expect(screen.getAllByTestId('page-next')).toHaveLength(2);
+    expect(screen.getAllByTestId('page-number')).toHaveLength(3);
+  });
+
   it('renders nothing when there is only one page', () => {
     const { container } = render(
       <I18nProvider>

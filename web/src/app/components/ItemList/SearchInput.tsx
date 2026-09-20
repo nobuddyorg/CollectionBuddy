@@ -33,6 +33,7 @@ export function SearchInput({
       {value && (
         <button
           type="button"
+          data-testid="search-clear"
           onClick={() => onChange('')}
           // -mr-2 only: -mt-2 would double the vertical shift that
           // -translate-y-1/2 already applies, pushing the icon high.

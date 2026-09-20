@@ -92,6 +92,26 @@ Two things worth knowing before adding tests here:
 
 Prefer `expectTitles(page, [...])` over reading the grid once: the search box debounces and then waits on a round trip, so anything that asserts immediately after typing is asserting on the previous answer.
 
+### How a spec addresses the app
+
+Every element a spec touches carries a `data-testid`, and no spec names a selector of its own. `e2e/pages/` holds one page object per screen, `createPageTree(page)` collects them, and `e2e/fixture.ts` hands that tree to every test as the `on` fixture — so a test starts `async ({ on, page })` and reads as the journey it is. TEST_STRATEGY.md §9 has the shape and the rules behind it; what is specific to this app is the list of screens:
+
+- `catalogue` — the grid, its search box and pagination, plus `card(title)` for one entry and the photographs on it
+- `categories` — the collection strip, the panel behind it, and `tab(name)`
+- `form` — the entry form, its tag chips and the place autocomplete
+- `sharing` — the invite box and `row(email)` for one grant's role, expiry and revoke
+- `map`, `viewer`, `confirm`, `toast`, `account`, `login` — the map modal, the full-size photograph, the confirmation dialog, the toast, the account menu and the signed-out page
+
+Leaflet's pins and popups are the one thing still reached by class name, inside `e2e/pages/map.ts`: that markup is the library's, not ours, and there is nowhere to put an id. Everything else — including a control a test only needs to assert is disabled — gets an id in the component rather than a role or text locator in the test.
+
+Adding a case that needs an element with no id means adding the id to the component and a locator to the page object. The grep that keeps this honest:
+
+```bash
+grep -rn 'getByTestId\|getByRole\|locator(' web/e2e --include=*.spec.ts
+```
+
+It should only turn up `html`, `body`, `meta` and `link` assertions, which are document-level and have nothing to name.
+
 ### Known E2E journey-coverage gaps
 
 A walk of README's feature list and this suite (2026-09), checking each
@@ -223,7 +243,7 @@ Two things opt out of coverage collection entirely: `i18n.spec.ts` (it drives it
 
 CI posts the `console-summary`/`markdown-summary` table to the job summary and uploads the full `web/coverage-e2e/` report as a build artifact (`e2e-coverage`/`e2e-coverage-signed-in`) on every run, pass or fail — both via `.github/actions/playwright-results`, alongside the existing Playwright HTML report. `pages-deploy.yml`'s `smoke_test` job (post-deploy check against production) doesn't use that action and isn't part of this — it stays a narrower pass/fail signal, not a coverage source.
 
-By default coverage is measured against the built bundle, not the original source, since the export doesn't ship source maps (`next.config.ts` only sets `productionBrowserSourceMaps` when `E2E_COVERAGE_SOURCEMAPS=true`). CI (`ci.yml`'s `build_and_test` job) and `npm run e2e:local` (`scripts/e2e-local-stack.mjs`) both set it, so their reports map back to real `src/app/**` files and lines (`sourceFilter` in `e2e/coverage.ts` keeps vendor library source out of it); a plain local `npm run build && npm run e2e` doesn't, and reads against the minified bundle instead. `pages-deploy.yml`'s actual deploy build never sets it — turning source maps on there would ship them in the production static export, which is a separate, deliberate call this doesn't make.
+By default coverage is measured against the built bundle, not the original source, since the export doesn't ship source maps (`next.config.ts` only sets `productionBrowserSourceMaps` when `E2E_COVERAGE_SOURCEMAPS=true`). CI (`ci.yml`'s `build_and_test` job) and `npm run e2e:local` (`scripts/e2e-local-stack.mjs`) both set it, so their reports map back to real `src/app/**` files and lines (`sourceFilter` in `e2e/coverage.ts` keeps vendor library source out of it); a plain local `npm run build && npm run e2e` doesn't, and reads against the minified bundle instead. Those two readings are different metrics, not the same metric measured twice — the minified bundle has a few dozen "lines" where the source has thousands — and `COVERAGE_THRESHOLDS` is the source-mapped one. So measure the way CI does before believing a floor failure: `E2E_COVERAGE_SOURCEMAPS=true npm run build && E2E_COVERAGE_SOURCEMAPS=true npm run e2e`. `pages-deploy.yml`'s actual deploy build never sets it — turning source maps on there would ship them in the production static export, which is a separate, deliberate call this doesn't make.
 
 ## Regenerate the app icons
 

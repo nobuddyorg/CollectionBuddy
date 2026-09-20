@@ -37,6 +37,7 @@ function CollectibleComponent({
 
   return (
     <div
+      data-testid="collectible"
       className={cx(
         'collectible-bob absolute z-0 select-none pointer-events-none',
         className,
