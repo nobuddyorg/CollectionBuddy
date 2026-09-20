@@ -31,12 +31,15 @@ const mcr = MCR({
  *
  * Each is a margin below what a real run achieved -- signed-out
  * 16.43/6.87/14.16/43.34 locally (chromium + mobile), signed-in
- * 69.58/58.89/69.69/81.09 in CI's e2e_local_stack job, which is the only
- * place that suite can run. Raise by hand once a real run reports a higher
- * number -- never lower one to make a change fit.
+ * 79.38/68.37/82.50/84.82 in CI's e2e_local_stack job, which is the only
+ * place that suite can run. The signed-in margin is ~3pp, against the
+ * ~1pp these numbers have moved between runs of an unchanged suite; a
+ * floor tighter than that buys nothing and fails green work. Raise by hand
+ * once a real run reports a higher number -- never lower one to make a
+ * change fit.
  */
 const COVERAGE_THRESHOLDS = process.env.E2E_SUPABASE_URL
-  ? { statements: 65, branches: 54, functions: 65, lines: 77 }
+  ? { statements: 76, branches: 65, functions: 79, lines: 81 }
   : { statements: 15, branches: 6, functions: 13, lines: 42 };
 
 export const test = base.extend<{ autoCoverage: void }>({
