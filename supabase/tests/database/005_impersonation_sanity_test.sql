@@ -14,17 +14,7 @@
 begin;
 select no_plan();
 
-create or replace function pg_temp.raises(p_sql text)
-returns boolean
-language plpgsql
-as $$
-begin
-  execute p_sql;
-  return false;
-exception when others then
-  return true;
-end;
-$$;
+\ir _helpers.psql
 
 -- As postgres -- the role pg_prove actually connects as -- RLS and grants
 -- are both bypassed, which is exactly what every other file in this suite

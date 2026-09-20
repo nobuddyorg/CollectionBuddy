@@ -1,5 +1,4 @@
 repos:
-  # Standard file hygiene
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -16,15 +15,11 @@ repos:
       - id: no-commit-to-branch
         args: ["--branch", "main"]
 
-  # Spell checking
   - repo: https://github.com/crate-ci/typos
     rev: v1.50.0
     hooks:
       - id: typos
-        # German prose reads as misspelled English near word-for-word, so
-        # German-language documents (incl. the e2e fixtures' German seed
-        # data) are out of scope rather than annotated line by line. The
-        # lockfile is a wall of hashes and package names.
+        # German prose reads as misspelled English near word-for-word; the lockfile is a wall of hashes.
         exclude: |
           (?x)^(
             web/src/app/i18n/(de|en)\.json|
@@ -33,37 +28,24 @@ repos:
             web/package-lock\.json
           )$
 
-  # zizmor: security analysis of the GitHub Actions workflows
+  # zizmor: security analysis of the GitHub Actions workflows.
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
     rev: v1.29.0
     hooks:
       - id: zizmor
 
-  # ShellCheck (build.sh, and anything else that appears)
-  - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.11.0.1
-    hooks:
-      - id: shellcheck
-        args: ["--severity=warning"]
-
-  # markdownlint for the docs tree (config: .markdownlint-cli2.jsonc)
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.23.2
     hooks:
       - id: markdownlint-cli2
 
-  # SQLFluff: SQL static analysis for supabase/migrations/ and
-  # supabase/tests/database/ (config: .sqlfluff). Only sqlfluff-lint, not
-  # sqlfluff-fix -- migrations are applied history and pgTAP files are
-  # already-reviewed SQL; a finding gets a config change or a PR-description
-  # exception, never an autofix.
+  # Lint only, never `sqlfluff-fix`: migrations are applied history, not reformattable source.
   - repo: https://github.com/sqlfluff/sqlfluff
     rev: 4.3.0
     hooks:
       - id: sqlfluff-lint
 
-  # The web app's own checks, run from web/ where its config lives. These
-  # are the same commands CI runs, so a passing commit is a passing build.
+  # The same commands CI runs, from web/ where their config lives.
   - repo: local
     hooks:
       - id: prettier
@@ -91,9 +73,7 @@ repos:
         files: ^web/(src/.*\.(ts|tsx)|tsconfig\.json)$
         stages: [pre-commit]
 
-      # ~1.5s against the whole web/src+e2e+scripts graph (measured on this
-      # repo) -- comfortably inside prek's budget, same reasoning as
-      # sqlfluff-lint above.
+      # ~1.5s over the whole web graph (measured here), so it runs whole rather than per changed file.
       - id: depcruise
         name: dependency-cruiser (web)
         entry: bash -c 'cd web && npm run depcruise'
@@ -102,11 +82,7 @@ repos:
         files: ^web/(src/app/.*\.(ts|tsx)|e2e/.*\.ts|scripts/.*\.mjs|tsconfig\.json|\.dependency-cruiser\.mjs)$
         stages: [pre-commit]
 
-      # ~1.6s against the whole project (measured on this repo) -- same
-      # budget as depcruise/sqlfluff-lint above. Scoped to the files that
-      # can actually change what it finds: source/test files (an added or
-      # removed one changes the unused-file/export graph), package.json
-      # (dependency changes), and its own entry-point/ignore config.
+      # Scoped to what can change the unused-file/export graph: sources, package.json, its own config.
       - id: knip
         name: Knip -- dead code and unused dependencies (web)
         entry: bash -c 'cd web && npm run knip'

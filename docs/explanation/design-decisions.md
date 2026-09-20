@@ -85,6 +85,19 @@ Line coverage answers "did this code run during a test," not "would a real bug i
 
 Stryker is scoped to exactly these. The list itself lives in [`web/mutation-targets.mjs`](../../web/mutation-targets.mjs), shared by [`stryker.config.mjs`](../../web/stryker.config.mjs) and `vitest.config.mts`'s per-file coverage floors so the two can't drift apart. Each file is paired with a `/* v8 ignore start/stop */` + `// Stryker disable all/restore all` block around the surrounding React/effect/Supabase code in the same file. Running mutation testing over the whole `src/app` tree would mean mutating JSX and Tailwind class strings too — thousands of mostly-equivalent mutants, a multi-minute run, and a score that means nothing either way. A short list of small, pure, high-consequence functions runs in seconds and produces a number worth acting on. That relative speed is why CI runs it on every PR as well as on pushes to `main` (see [`ci.yml`](../../.github/workflows/ci.yml)): it was held back at first on the theory that it was too slow and would flap, but a scoped run at a score that has been 100% throughout is not a step anyone needs protecting from. (A specific runtime figure doesn't belong here — check the `mutation_test` job's own history if the real number matters; it drifts as the scoped list grows and is not something to keep in sync by hand in prose.) Finding out on the PR is the point — learning after the merge that a test asserts nothing is learning it too late.
 
+## Why SQL linting runs `core` minus nine rules, and never autofixes
+
+[`.sqlfluff`](../../.sqlfluff) points SQLFluff at the `core` rule bundle rather than `all`, and excludes nine rules from it. The reason is the same for all nine: a migration is applied history and a pgTAP suite is already-reviewed SQL, so a finding that would only reformat one is churn on security-critical files, not a caught defect.
+
+- `aliasing.table` and the five `layout.*` entries (`functions`, `cte_newline`, `spacing`, `indent`, `long_lines`) are formatting preferences that would rewrite every migration file and every pgTAP suite in one pass.
+- `references.special_chars` objects to the quoted, space-containing RLS policy names (`"select own categories"`). Renaming a policy is real DDL against the authorization boundary, not a style fix.
+- `references.keywords` objects to `category_shares.role`, a real, documented column name ([architecture](../reference/architecture.md)). Postgres treats `role` as non-reserved; renaming it would be a schema change.
+- `references.consistent` would want every single-table column reference qualified, across migrations that are already applied in production.
+
+What is left — `ambiguous.*`, most of `structure.*`, `capitalisation.*`, and the remaining aliasing/convention/references rules — was clean across every migration and pgTAP file when the config was adopted, and still earns its place on new SQL: ambiguous joins, inconsistent `GROUP BY`/`ORDER BY` references, needless subqueries. The `capitalisation.*` policies are pinned to `lower` explicitly rather than left at `consistent`, which would only lock in whatever the first occurrence happened to be.
+
+Only `sqlfluff-lint` runs as a commit hook, never `sqlfluff-fix`: a finding gets a config change or a PR-description exception, never an autofix over applied history.
+
 ## Component-level testing strategy (issue #193)
 
 Before this decision, the coverage ratchet only ever exercised pure logic (`data/items.ts`, `Pagination.tsx`, `resolveTranslationKey`, etc.) — components, hooks, and provider internals were deliberately excluded via `/* v8 ignore */` blocks, on the reasoning that rendering-level bugs (like the hydration mismatch fixed in `008d33b`) would surface via manual QA and the post-deploy smoke test instead. That gap is real: no pure-logic unit test could have caught a hydration mismatch.

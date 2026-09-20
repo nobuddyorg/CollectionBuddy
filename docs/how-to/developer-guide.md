@@ -148,7 +148,20 @@ supabase start   # from the repository root, if not already running
 supabase test db
 ```
 
-It complements `rls.spec.ts` rather than duplicating it: pgTAP proves the policy, trigger and constraint logic fast and directly; `rls.spec.ts` proves the same properties hold through the real PostgREST-and-JWT pipeline, and is still the only place `storage.objects` and the real Storage API get exercised. See [TEST_STRATEGY.md](../../TEST_STRATEGY.md#7-security-and-authorization-testing) for the full division of labor. A policy, grant, or ownership-affecting trigger change still needs its `rls.spec.ts` case regardless of whether a pgTAP case exists alongside it — that rule (CLAUDE.md guardrail 3) is not discharged by pgTAP coverage.
+The suite is split by what each file is responsible for, so a schema change has an obvious home. `_helpers.psql` holds the impersonation and error-catching fixtures the files share, included with psql's `\ir`; it is named `.psql` because `supabase test db` runs `pg_prove --ext .pg --ext .sql -r`, and any `.sql` file here would be collected as a test and fail for having no plan.
+
+| File | Covers |
+| --- | --- |
+| `000_schema_test.sql` | Trigger shape, every constraint, and the delete cascades — attempted as real writes |
+| `001_grants_test.sql` | The grant surface: what each role may address at all, before RLS gets a say |
+| `002_function_hardening_test.sql` | `search_path` pinning, and which functions run as their owner |
+| `005_impersonation_sanity_test.sql` | That the impersonation the rest of the suite relies on actually works |
+| `010`/`020`/`025`/`030` | Ownership, viewer grants, a grant's life after issue, and the editor role |
+| `040_storage_policy_surface_test.sql` | The bucket's configuration, and the storage capabilities two security fixes removed |
+| `050`/`055` | The SQL functions and every branch of the write-path triggers |
+| `060`/`065` | The two read RPCs: who may call them, and what they return |
+
+It complements `rls.spec.ts` rather than duplicating it: pgTAP proves the policy, trigger and constraint logic fast and directly; `rls.spec.ts` proves the same properties hold through the real PostgREST-and-JWT pipeline, and is still the only place the real Storage API and the bytes behind a `storage.objects` row get exercised — pgTAP asserts that surface from the catalog only. See [TEST_STRATEGY.md](../../TEST_STRATEGY.md#7-security-and-authorization-testing) for the full division of labor. A policy, grant, or ownership-affecting trigger change still needs its `rls.spec.ts` case regardless of whether a pgTAP case exists alongside it — that rule (CLAUDE.md guardrail 3) is not discharged by pgTAP coverage.
 
 ## Run mutation testing
 
@@ -300,7 +313,7 @@ The local stack in `supabase/` and a real hosted Supabase project need the same 
 
 ## Deploy to GitHub Pages
 
-The production path is [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml): push to `main`, and it applies any pending migrations to the hosted database, then builds the static export and deploys it via GitHub's official Pages actions. `build.sh` at the repo root does the same build locally, for a sanity check before pushing — it does not deploy anything itself.
+The production path is [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml): push to `main`, and it applies any pending migrations to the hosted database, then builds the static export and deploys it via GitHub's official Pages actions. Nothing deploys from a developer machine; to reproduce just the export locally, run `npm run build` from `web/`, which is the first step of [the checks CI runs](#run-the-checks-ci-runs-locally).
 
 The `migrate` job runs first and the build depends on it, so the schema is never behind the bundle that expects it. If a migration fails, nothing is deployed and the previous bundle keeps serving against the unchanged schema.
 
