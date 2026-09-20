@@ -68,8 +68,8 @@ npm run lighthouse        # separate CI job, needs `supabase start`; run it too
 ```
 
 `prek run --all-files` (or `pre-commit run --all-files`) from the repo root
-runs the repo-wide hooks (file hygiene, `typos`, `zizmor`, `shellcheck`,
-`markdownlint`, `sqlfluff-lint`) plus the same web checks.
+runs the repo-wide hooks (file hygiene, `typos`, `zizmor`, `markdownlint`,
+`sqlfluff-lint`) plus the same web checks.
 
 Partial runs ("lint passes, I didn't run the rest") are not a stopping point,
 they're a status update.
@@ -356,8 +356,7 @@ CollectionBuddy/
 ├── CONTRIBUTING.md               # Local setup, pre-PR checklist
 ├── CLAUDE.md                     # This file
 ├── TEST_STRATEGY.md              # READ THIS before writing or changing tests
-├── build.sh                      # Convenience build wrapper
-├── .pre-commit-config.yaml       # File hygiene, spell check, zizmor, shellcheck,
+├── .pre-commit-config.yaml       # File hygiene, spell check, zizmor,
 │                                  # markdownlint, sqlfluff-lint, and web/'s own
 │                                  # checks
 ├── .sqlfluff                      # SQLFluff config for supabase/migrations/
