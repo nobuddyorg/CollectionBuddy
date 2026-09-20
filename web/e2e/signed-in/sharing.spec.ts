@@ -49,14 +49,15 @@ test.describe('sharing a collection', () => {
     await openCategory(page, SEED.shareCategory);
     await page.getByTestId('expand-categories').click();
 
-    const noExpiry = page.getByText('No expiry', { exact: true }).first();
-    await expect(noExpiry).toBeVisible();
+    // By title, not by its own text: a grant row carries the same "No
+    // expiry" wording, and the chip's text is the thing under test.
+    const chip = page.getByTitle('Expires (optional)');
+    await expect(chip).toContainText('No expiry');
 
     await page.getByLabel('Expires (optional)').fill('2099-12-31');
-    await expect(page.getByText(/^Expires /).first()).toBeVisible();
-    await expect(noExpiry).toHaveCount(0);
+    await expect(chip).toContainText(/^Expires /);
 
     await page.getByRole('button', { name: 'Clear expiry date' }).click();
-    await expect(noExpiry).toBeVisible();
+    await expect(chip).toContainText('No expiry');
   });
 });

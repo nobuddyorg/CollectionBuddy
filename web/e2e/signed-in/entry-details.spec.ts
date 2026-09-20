@@ -136,4 +136,31 @@ test.describe('an entry with a place and tags', () => {
     await page.getByTestId('confirm-accept').click();
     await expect(page.getByTestId('item-title')).toHaveCount(0);
   });
+
+  // The edit modal is the one caller that gives the form a Cancel button,
+  // and it goes through the same guard a stray dismissal would.
+  test('leaves an entry alone when an edit is cancelled', async ({ page }) => {
+    const title = uniqueTitle('Unverändert');
+    try {
+      await page.getByTestId('new-entry').click();
+      await page.getByTestId('item-title').fill(title);
+      await page.getByTestId('item-submit').click();
+
+      const card = page.getByTestId('item-card').filter({ hasText: title });
+      await expect(card).toBeVisible();
+
+      await card.getByTestId('edit-entry').click();
+      const place = page.getByRole('combobox', { name: 'City (e.g. Cologne)' });
+      await place.fill('Bremen');
+      await page.getByRole('option').first().click();
+
+      await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await page.getByTestId('confirm-accept').click();
+
+      await expect(page.getByTestId('item-title')).toHaveCount(0);
+      await expect(card.getByText('Bremen, Germany')).toHaveCount(0);
+    } finally {
+      await deleteEntry(page, title);
+    }
+  });
 });
