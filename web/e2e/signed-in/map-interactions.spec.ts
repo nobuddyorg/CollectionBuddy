@@ -59,6 +59,11 @@ test.describe('the map, with a location to show', () => {
     await expect(app.map.locators.pins).toHaveCount(3);
 
     await app.map.do.zoomToLocation();
+    // Waited for, not assumed: that button awaits a position fix before it
+    // moves the map, so framing sent straight after can land first and be
+    // undone by the zoom arriving late.
+    await expect(app.map.locators.pins.first()).not.toBeInViewport();
+
     await app.map.do.frameAllPins();
 
     // What framing promises: the pins are back on screen, not merely back
