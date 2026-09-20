@@ -38,28 +38,32 @@ function useSignedUrlRefresh(
   imagesRef: RefObject<Record<string, ImgEntry[]>>,
   refreshAllImages: (itemIds: string[]) => Promise<void>,
 ) {
-  useEffect(() => {
-    const SIGNED_URL_SERVER_TTL_MS = 3600_000;
-    const REFRESH_MARGIN_MS = 5 * 60_000;
-    const maybeRefresh = () => {
-      if (
-        Date.now() - lastSignedAtRef.current <
-        SIGNED_URL_SERVER_TTL_MS - REFRESH_MARGIN_MS
-      )
-        return;
-      // `refreshAllImages` itself no-ops on an empty list, and nothing ever
-      // adds an item to `imagesRef.current` without also stamping
-      // `lastSignedAtRef.current` in the same call -- so an empty item set
-      // and a never-signed ref are the same case, already handled above.
-      void refreshAllImages(Object.keys(imagesRef.current));
-    };
-    const interval = setInterval(maybeRefresh, 60_000);
-    document.addEventListener('visibilitychange', maybeRefresh);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', maybeRefresh);
-    };
-  }, [lastSignedAtRef, imagesRef, refreshAllImages]);
+  useEffect(
+    () => {
+      const SIGNED_URL_SERVER_TTL_MS = 3600_000;
+      const REFRESH_MARGIN_MS = 5 * 60_000;
+      const maybeRefresh = () => {
+        if (
+          Date.now() - lastSignedAtRef.current <
+          SIGNED_URL_SERVER_TTL_MS - REFRESH_MARGIN_MS
+        )
+          return;
+        // `refreshAllImages` itself no-ops on an empty list, and nothing ever
+        // adds an item to `imagesRef.current` without also stamping
+        // `lastSignedAtRef.current` in the same call -- so an empty item set
+        // and a never-signed ref are the same case, already handled above.
+        void refreshAllImages(Object.keys(imagesRef.current));
+      };
+      const interval = setInterval(maybeRefresh, 60_000);
+      document.addEventListener('visibilitychange', maybeRefresh);
+      return () => {
+        clearInterval(interval);
+        document.removeEventListener('visibilitychange', maybeRefresh);
+      };
+    },
+    // Stryker disable next-line ArrayDeclaration: these deps never change identity, so [] behaves the same.
+    [lastSignedAtRef, imagesRef, refreshAllImages],
+  );
 }
 
 export function useItemImages() {
@@ -88,50 +92,60 @@ export function useItemImages() {
   // answer. Hands entries back rather than storing them, so a caller with
   // other state to settle at the same moment (an upload's placeholder) can
   // apply both in one go instead of rendering in between.
-  const fetchItemImages = useCallback(async (itemId: string) => {
-    const { data, error } = await listImagesForItems([itemId]);
-    if (error) {
-      console.error('Failed to list images', error);
-      return undefined;
-    }
-    const grouped = groupImageRows(data ?? []);
-    const entryData = grouped.get(itemId) ?? new Map();
-    const signed = await signEntries([[itemId, entryData]]);
-    lastSignedAtRef.current = Date.now();
-    return signed[itemId];
-  }, []);
+  const fetchItemImages = useCallback(
+    async (itemId: string) => {
+      const { data, error } = await listImagesForItems([itemId]);
+      if (error) {
+        console.error('Failed to list images', error);
+        return undefined;
+      }
+      // Stryker disable next-line ArrayDeclaration: a stand-in row groups under an id nothing asks for.
+      const grouped = groupImageRows(data ?? []);
+      const entryData = grouped.get(itemId) ?? new Map();
+      const signed = await signEntries([[itemId, entryData]]);
+      lastSignedAtRef.current = Date.now();
+      return signed[itemId];
+    },
+    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
+    [],
+  );
 
   // One query for the whole page rather than one Storage round trip per
   // item -- removes the wait for the slowest item to gate the first
   // photograph on screen, so there's no per-item progressive reveal here.
-  const refreshAllImages = useCallback(async (itemIds: string[]) => {
-    if (itemIds.length === 0) return;
+  const refreshAllImages = useCallback(
+    async (itemIds: string[]) => {
+      if (itemIds.length === 0) return;
 
-    setLoadingItems((prev) => new Set([...prev, ...itemIds]));
+      setLoadingItems((prev) => new Set([...prev, ...itemIds]));
 
-    const { data, error } = await listImagesForItems(itemIds);
-    const grouped = error
-      ? new Map<string, Map<string, ImageEntryData>>()
-      : groupImageRows(data ?? []);
-    if (error) console.error('Failed to list images', error);
+      const { data, error } = await listImagesForItems(itemIds);
+      const grouped = error
+        ? new Map<string, Map<string, ImageEntryData>>()
+        : // Stryker disable next-line ArrayDeclaration: a stand-in row groups under an id nothing asks for.
+          groupImageRows(data ?? []);
+      if (error) console.error('Failed to list images', error);
 
-    const perItem = itemIds.map(
-      (itemId) => [itemId, grouped.get(itemId) ?? new Map()] as const,
-    );
-    const signed = await signEntries(perItem);
+      const perItem = itemIds.map(
+        (itemId) => [itemId, grouped.get(itemId) ?? new Map()] as const,
+      );
+      const signed = await signEntries(perItem);
 
-    // `signed` already carries one entry per id in `itemIds` -- `signEntries`
-    // sets every key it's given, even to an empty list -- so spreading it
-    // last already replaces exactly those keys with no need to filter them
-    // out of `prev` first.
-    setImages((prev) => ({ ...prev, ...signed }));
-    setLoadingItems((prev) => {
-      const next = new Set(prev);
-      for (const itemId of itemIds) next.delete(itemId);
-      return next;
-    });
-    lastSignedAtRef.current = Date.now();
-  }, []);
+      // `signed` already carries one entry per id in `itemIds` -- `signEntries`
+      // sets every key it's given, even to an empty list -- so spreading it
+      // last already replaces exactly those keys with no need to filter them
+      // out of `prev` first.
+      setImages((prev) => ({ ...prev, ...signed }));
+      setLoadingItems((prev) => {
+        const next = new Set(prev);
+        for (const itemId of itemIds) next.delete(itemId);
+        return next;
+      });
+      lastSignedAtRef.current = Date.now();
+    },
+    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
+    [],
+  );
 
   useSignedUrlRefresh(lastSignedAtRef, imagesRef, refreshAllImages);
 
@@ -202,6 +216,7 @@ export function useItemImages() {
         });
       }
     },
+    // Stryker disable next-line ArrayDeclaration: these deps never change identity, so [] behaves the same.
     [fetchItemImages, t, toast],
   );
 
@@ -212,6 +227,7 @@ export function useItemImages() {
     async (itemId: string, img: ImgEntry) => {
       if (!(await confirm(t('item_list.confirm_delete_image')))) return;
 
+      // Stryker disable next-line ArrayDeclaration: a stand-in entry matches no image id, so index stays -1.
       const index = (images[itemId] ?? []).findIndex((e) => e.id === img.id);
       setImages((prev) => ({
         ...prev,
@@ -262,14 +278,18 @@ export function useItemImages() {
   // Read-only: the caller is about to delete a row that cascades this
   // item's images rows away, and needs the paths first to clean up Storage
   // bytes afterward (images.item_id cascades, 0003_tables.sql).
-  const captureItemImagePaths = useCallback(async (itemId: string) => {
-    const { data, error } = await listImagePathsForItems([itemId]);
-    if (error) {
-      console.error('Failed to read image paths before delete', error);
-      return [];
-    }
-    return data ?? [];
-  }, []);
+  const captureItemImagePaths = useCallback(
+    async (itemId: string) => {
+      const { data, error } = await listImagePathsForItems([itemId]);
+      if (error) {
+        console.error('Failed to read image paths before delete', error);
+        return [];
+      }
+      return data ?? [];
+    },
+    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
+    [],
+  );
 
   const removeImageBytes = useCallback(
     async (
@@ -289,6 +309,7 @@ export function useItemImages() {
         return next;
       });
     },
+    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
     [],
   );
 

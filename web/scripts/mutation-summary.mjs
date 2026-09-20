@@ -11,7 +11,7 @@ import { calculateMutationTestMetrics } from 'mutation-testing-metrics';
 
 const REPORT_PATH = 'reports/mutation/mutation.json';
 // Must match stryker.config.mjs's thresholds.break.
-const BREAK_THRESHOLD = 90;
+const BREAK_THRESHOLD = 99;
 
 function formatScore(score) {
   return Number.isFinite(score) ? `${score.toFixed(2)}%` : 'n/a';

@@ -8,7 +8,9 @@ export function useMenu() {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef(false);
 
+  // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
   const close = useCallback(() => setOpen(false), []);
+  // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
   const toggle = useCallback(() => setOpen((v) => !v), []);
 
   useEffect(() => {
@@ -41,8 +43,7 @@ export function useMenu() {
   // :focus-visible, so refocusing on every close (including a click
   // outside) gave the trigger a keyboard-style outline it hadn't earned.
   useEffect(() => {
-    if (open) return;
-    if (!restoreFocusRef.current) return;
+    if (open || !restoreFocusRef.current) return;
     restoreFocusRef.current = false;
     anchorRef.current!.focus();
   }, [open]);

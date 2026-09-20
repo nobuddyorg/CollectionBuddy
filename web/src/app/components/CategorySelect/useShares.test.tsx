@@ -460,6 +460,37 @@ describe('useShares', () => {
       consoleError.mockRestore();
     });
 
+    // Undo restores by remembered index and row, so naming a grant that
+    // isn't the first one is the only way to tell a real lookup from one
+    // that always lands on index 0.
+    it('puts a grant that was not the first one back exactly where it was', async () => {
+      const second = { ...grant, id: 'share-2', invited_email: 'b@x.test' };
+      const third = { ...grant, id: 'share-3', invited_email: 'c@x.test' };
+      vi.mocked(listSharesForCategory).mockResolvedValue({
+        data: [grant, second, third],
+        error: null,
+      } as never);
+      const { result } = renderHook(() => useShares('cat-1'), { wrapper });
+      await act(async () => {
+        await result.current.reload();
+      });
+
+      act(() => {
+        result.current.deleteShare('share-2', {
+          successMessage: 'Removed.',
+          errorMessage: 'Could not remove.',
+        });
+      });
+      expect(result.current.shares).toEqual([grant, third]);
+
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Undo' }),
+      );
+
+      expect(result.current.shares).toEqual([grant, second, third]);
+      expect(deleteShareRow).not.toHaveBeenCalled();
+    });
+
     it('does nothing for a grant that is not in the list', async () => {
       const { result } = renderHook(() => useShares('cat-1'), { wrapper });
 
@@ -471,6 +502,9 @@ describe('useShares', () => {
       });
 
       expect(deleteShareRow).not.toHaveBeenCalled();
+      // No undo toast either: promising a revoke that never happened is
+      // worse than the missing row itself.
+      expect(screen.queryByRole('status')).toBeNull();
     });
   });
 

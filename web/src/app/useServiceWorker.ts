@@ -8,13 +8,17 @@ import { useEffect } from 'react';
  * replaces it when read this way, not from a variable built from it.
  */
 export function useServiceWorker(): void {
-  useEffect(() => {
-    if (!('serviceWorker' in navigator)) return;
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
-    navigator.serviceWorker
-      .register(`${basePath}/sw.js`, { scope: `${basePath}/` })
-      .catch((err: unknown) => {
-        console.error('Service worker registration failed:', err);
-      });
-  }, []);
+  useEffect(
+    () => {
+      if (!('serviceWorker' in navigator)) return;
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+      navigator.serviceWorker
+        .register(`${basePath}/sw.js`, { scope: `${basePath}/` })
+        .catch((err: unknown) => {
+          console.error('Service worker registration failed:', err);
+        });
+    },
+    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
+    [],
+  );
 }

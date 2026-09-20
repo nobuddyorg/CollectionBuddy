@@ -77,6 +77,7 @@ export function useTheme() {
   const systemPrefersDark = useSyncExternalStore(
     subscribeSystem,
     readSystemPrefersDark,
+    // Stryker disable next-line ArrowFunction: an undefined snapshot resolves to the same 'light'.
     () => false,
   );
 
@@ -86,11 +87,15 @@ export function useTheme() {
     document.documentElement.setAttribute('data-theme', resolved);
   }, [resolved]);
 
-  const setThemePreference = useCallback((next: ThemePreference) => {
-    if (next === 'system') localStorage.removeItem(THEME_STORAGE_KEY);
-    else localStorage.setItem(THEME_STORAGE_KEY, next);
-    window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
-  }, []);
+  const setThemePreference = useCallback(
+    (next: ThemePreference) => {
+      if (next === 'system') localStorage.removeItem(THEME_STORAGE_KEY);
+      else localStorage.setItem(THEME_STORAGE_KEY, next);
+      window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
+    },
+    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
+    [],
+  );
 
   return { preference, resolved, setThemePreference };
 }

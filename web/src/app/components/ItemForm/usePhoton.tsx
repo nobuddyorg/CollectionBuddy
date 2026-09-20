@@ -201,7 +201,8 @@ export function usePhotonSearch(locale?: string) {
         setActiveIdx((i) => (i <= 0 ? results.length - 1 : i - 1));
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        const sel = activeIdx >= 0 ? results[activeIdx] : results[0];
+        // Clamped, not branched: with nothing highlighted Enter picks the first.
+        const sel = results[Math.max(activeIdx, 0)];
         if (sel) return choose(sel);
       } else if (e.key === 'Escape') {
         // Without stopping it here, the keystroke bubbles past React's root

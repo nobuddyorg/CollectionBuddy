@@ -9,9 +9,11 @@
 // mutating JSX and class strings produces near-equivalent mutants by the
 // thousand and a score nobody can act on.
 //
-// Where a file still keeps a `Stryker disable` region, it is around I/O
-// that cannot be scored rather than around logic that has not been tested
-// yet; a new region needs the same justification as any other suppression.
+// Two kinds of `Stryker disable` appear in these files and nothing else
+// qualifies: a region around I/O that cannot be scored, and a single line
+// carrying a mutant no input can distinguish -- overwhelmingly a React
+// dependency list, where a constant list is as unchanging as an empty one.
+// Both spell out their reason at the suppression, and so must a new one.
 export const MUTATE_TARGETS = [
   'src/app/data/items.ts',
   'src/app/data/zip.ts',

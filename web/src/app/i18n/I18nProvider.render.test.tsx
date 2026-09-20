@@ -58,6 +58,9 @@ describe('I18nProvider', () => {
 
   it('detects a language stored from a previous visit', () => {
     localStorage.setItem('lang', 'en');
+    // Deliberately the *other* supported language, so 'en' below can only
+    // have come from storage and not from the browser's own preference.
+    vi.stubGlobal('navigator', { ...navigator, language: 'de-DE' });
     renderProbe();
 
     expect(screen.getByTestId('lang')).toHaveTextContent('en');
