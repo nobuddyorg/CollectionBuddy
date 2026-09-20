@@ -39,4 +39,24 @@ test.describe('sharing a collection', () => {
     await page.getByTestId('confirm-accept').click();
     await expect(page.getByText('Not shared with anyone yet.')).toBeVisible();
   });
+
+  // The expiry is a real column with a check constraint behind it
+  // (rls.spec.ts asserts what an expired grant then stops opening); this
+  // is the picker that sets it, whose own input is deliberately sr-only.
+  test('carries an expiry date, and lets it be taken off again', async ({
+    page,
+  }) => {
+    await openCategory(page, SEED.shareCategory);
+    await page.getByTestId('expand-categories').click();
+
+    const noExpiry = page.getByText('No expiry', { exact: true }).first();
+    await expect(noExpiry).toBeVisible();
+
+    await page.getByLabel('Expires (optional)').fill('2099-12-31');
+    await expect(page.getByText(/^Expires /).first()).toBeVisible();
+    await expect(noExpiry).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Clear expiry date' }).click();
+    await expect(noExpiry).toBeVisible();
+  });
 });

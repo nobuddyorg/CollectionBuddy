@@ -77,6 +77,11 @@ test.describe('taking a deletion back', () => {
       // pending -- what clearing the search box does for real.
       await page.getByTestId('search-input').fill(title);
       await page.getByTestId('search-input').fill('');
+      // Waits for that refetch to land before asking about the card, or
+      // the absence below is the one from before the request went out.
+      await expect(
+        page.getByTestId('item-card').filter({ hasText: 'Rückgängigstück' }),
+      ).toBeVisible();
       await expect(card).toHaveCount(0);
     } finally {
       await deleteEntry(page, title);

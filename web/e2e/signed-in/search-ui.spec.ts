@@ -21,7 +21,6 @@ test.describe('the search box', () => {
     await page.getByTestId('search-input').fill('Silberdenar');
     await expect(page.getByText('1 result', { exact: true })).toBeAttached();
 
-    await page.getByTestId('search-input').fill('e');
     await page.getByTestId('search-input').fill('si');
     await expect(
       page.getByText('Keep typing to search', { exact: true }),

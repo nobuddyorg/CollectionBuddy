@@ -79,9 +79,12 @@ test.describe('when something outside the app fails', () => {
       );
       await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
 
-      await expect(page.getByRole('alert')).toContainText(
-        'Could not upload this image.',
-      );
+      // Filtered, not bare: Next renders an empty route announcer that is
+      // also an alert. What matters is that this message is one too, so it
+      // is read out rather than quietly posted as a status.
+      await expect(
+        page.getByRole('alert').filter({ hasText: 'Could not upload this' }),
+      ).toBeVisible();
       await expect(card.locator('img')).toHaveCount(0);
     } finally {
       await page.unroute('**/storage/v1/object/**');

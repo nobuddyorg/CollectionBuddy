@@ -78,6 +78,9 @@ test.describe('a collection shared with you', () => {
         page.getByTestId('item-card').filter({ hasText: 'Schatullenstück' }),
       ).toBeVisible();
 
+      // A viewer grant reads; the one control that would write is shut.
+      await expect(page.getByTestId('new-entry')).toBeDisabled();
+
       await page.getByTestId('expand-categories').click();
       // Both would be refused: the rename by RLS, the export by the prefix.
       await expect(page.getByLabel('Rename')).toBeDisabled();
