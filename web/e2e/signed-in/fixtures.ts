@@ -32,6 +32,22 @@ type SeedItem = {
   tags: readonly string[];
 };
 
+/** One entry apiece, so `openCategory` has a card to wait for. */
+const BASELINE_ITEMS: SeedItem[] = [
+  'Etikett',
+  'Bildergalerie',
+  'Rückgängig',
+  'Pannenwerkstatt',
+].map((category) => ({
+  category,
+  title: `${category}stück`,
+  description: 'Bleibt liegen, damit die Sammlung nie leer ist.',
+  place: null,
+  place_lat: null,
+  place_lng: null,
+  tags: [],
+}));
+
 /** Two more than the grid's page of nine, so page two is not one leftover. */
 const PAGING_ITEMS: SeedItem[] = Array.from({ length: 11 }, (_, index) => ({
   category: 'Schaukasten',
@@ -85,6 +101,10 @@ export const SEED = {
     'Schatulle',
     'Umzugskiste',
     'Schaukasten',
+    'Etikett',
+    'Bildergalerie',
+    'Rückgängig',
+    'Pannenwerkstatt',
   ],
   /** For entries.spec.ts. */
   scratchCategory: 'Werkstatt',
@@ -109,6 +129,14 @@ export const SEED = {
   importCategory: 'Umzugskiste',
   /** For pagination.spec.ts -- the collection PAGING_ITEMS fills. */
   pagingCategory: 'Schaukasten',
+  /** For entry-details.spec.ts, which files entries with places and tags. */
+  detailCategory: 'Etikett',
+  /** For photo-viewer.spec.ts, which photographs an entry and opens it. */
+  viewerCategory: 'Bildergalerie',
+  /** For undo.spec.ts, which deletes an entry and takes it back. */
+  undoCategory: 'Rückgängig',
+  /** For upload-failure.spec.ts, whose uploads are made to fail. */
+  failureCategory: 'Pannenwerkstatt',
 
   // Oldest first. The list sorts newest-first, so the last one here is the
   // first card on the page.
@@ -218,6 +246,7 @@ export const SEED = {
       place_lng: 8.8017,
       tags: ['umzug'],
     },
+    ...BASELINE_ITEMS,
     ...PAGING_ITEMS,
   ],
 } as const;
