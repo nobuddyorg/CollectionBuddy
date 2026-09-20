@@ -308,7 +308,7 @@ The local stack in `supabase/` and a real hosted Supabase project need the same 
 
 ## Deploy to GitHub Pages
 
-The production path is [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml): push to `main`, and it applies any pending migrations to the hosted database, then builds the static export and deploys it via GitHub's official Pages actions. `build.sh` at the repo root does the same build locally, for a sanity check before pushing — it does not deploy anything itself.
+The production path is [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml): push to `main`, and it applies any pending migrations to the hosted database, then builds the static export and deploys it via GitHub's official Pages actions. Nothing deploys from a developer machine; to reproduce just the export locally, run `npm run build` from `web/`, which is the first step of [the checks CI runs](#run-the-checks-ci-runs-locally).
 
 The `migrate` job runs first and the build depends on it, so the schema is never behind the bundle that expects it. If a migration fails, nothing is deployed and the previous bundle keeps serving against the unchanged schema.
 

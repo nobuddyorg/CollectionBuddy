@@ -1,7 +1,6 @@
 {
   "config": {
-    // Prose wraps at whatever the author found readable; this is not a
-    // codebase where line length carries meaning.
+    // Prose wraps at whatever the author found readable; line length carries no meaning here.
     "MD013": false,
     // Bare URLs are fine in issue references and log excerpts.
     "MD034": false,
@@ -13,9 +12,7 @@
     "!**/node_modules/**",
     "!web/out/**",
     "!web/.next/**",
-    // Written verbatim by `next dev`/`next build`, not authored docs --
-    // CLAUDE.md in particular is a one-line `@AGENTS.md` import, not a
-    // heading.
+    // Written verbatim by `next dev`/`next build`, and a one-line `@AGENTS.md` import -- not authored docs.
     "!web/AGENTS.md",
     "!web/CLAUDE.md"
   ]
