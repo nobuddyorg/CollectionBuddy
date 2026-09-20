@@ -175,7 +175,7 @@ function CategoryTablist({
                   />
                 </span>
               )}
-              {c.name}
+              <span data-testid="category-tab-name">{c.name}</span>
             </span>
           </button>
         );

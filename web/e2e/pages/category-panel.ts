@@ -70,8 +70,14 @@ export function initCategoryPanel(page: Page): CategoryPanel {
       label: root.getByTestId('category-label'),
     },
   };
+  // Exact, not a substring: the import spec puts "X (2)" beside "X", and
+  // each has to be reachable without also matching the other.
   const tab = (name: string) =>
-    locators.tabs.filter({ hasText: new RegExp(`^${name}$`) });
+    locators.tabs.filter({
+      has: page
+        .getByTestId('category-tab-name')
+        .and(page.getByText(name, { exact: true })),
+    });
 
   const openPanel = async () => {
     // The strip collapses on every selection, so which button is on screen

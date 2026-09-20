@@ -15,7 +15,6 @@ interface Catalogue {
     openEntryForm(): Promise<void>;
     openMap(): Promise<void>;
     search(term: string): Promise<void>;
-    showPage(n: number): Promise<void>;
   };
   /**
    * Raw locators.
@@ -166,12 +165,6 @@ export function initCatalogue(page: Page): Catalogue {
     },
     search: async (term: string) => {
       await locators.inputs.search.fill(term);
-    },
-    showPage: async (n: number) => {
-      await pagination
-        .getByTestId('page-number')
-        .filter({ hasText: new RegExp(`^${n}$`) })
-        .click();
     },
   };
   return Object.assign(() => root, {
