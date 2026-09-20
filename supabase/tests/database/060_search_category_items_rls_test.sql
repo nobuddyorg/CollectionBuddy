@@ -11,19 +11,7 @@
 begin;
 select no_plan();
 
-create or replace function pg_temp.auth_as(p_user_id uuid, p_email text default null)
-returns void
-language plpgsql
-as $$
-begin
-  set local role authenticated;
-  perform set_config(
-    'request.jwt.claims',
-    jsonb_build_object('sub', p_user_id::text, 'email', p_email, 'role', 'authenticated')::text,
-    true
-  );
-end;
-$$;
+\ir _helpers.psql
 
 create or replace function pg_temp.search_titles(p_category_id uuid, p_term text)
 returns text[]
