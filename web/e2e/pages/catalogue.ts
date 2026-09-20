@@ -30,13 +30,8 @@ interface Catalogue {
       pageNumbers: Locator;
     };
     cards: Locator;
-    card: {
-      titles: Locator;
-      descriptions: Locator;
-      places: Locator;
-      tags: Locator;
-      images: Locator;
-    };
+    /** Every title on the page, in the order the grid shows them. */
+    cardTitles: Locator;
     inputs: {
       search: Locator;
     };
@@ -120,13 +115,7 @@ export function initCatalogue(page: Page): Catalogue {
       pageNumbers: pagination.getByTestId('page-number'),
     },
     cards: root.getByTestId('item-card'),
-    card: {
-      titles: root.getByTestId('item-card-title'),
-      descriptions: root.getByTestId('item-card-description'),
-      places: root.getByTestId('item-card-place'),
-      tags: root.getByTestId('item-card-tag'),
-      images: root.getByTestId('item-image'),
-    },
+    cardTitles: root.getByTestId('item-card-title'),
     inputs: {
       search: root.getByTestId('search-input'),
     },

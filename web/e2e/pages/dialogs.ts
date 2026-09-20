@@ -42,13 +42,11 @@ interface ImageViewer {
   (): Locator;
   do: {
     close(): Promise<void>;
-    next(): Promise<void>;
     previous(): Promise<void>;
   };
   locators: {
     buttons: {
       close: Locator;
-      next: Locator;
       previous: Locator;
     };
     position: Locator;
@@ -99,7 +97,6 @@ export function initImageViewer(page: Page): ImageViewer {
   const locators = {
     buttons: {
       close: root.getByTestId('close-image'),
-      next: root.getByTestId('next-image'),
       previous: root.getByTestId('previous-image'),
     },
     position: root.getByTestId('image-position'),
@@ -107,9 +104,6 @@ export function initImageViewer(page: Page): ImageViewer {
   const interactions = {
     close: async () => {
       await locators.buttons.close.click();
-    },
-    next: async () => {
-      await locators.buttons.next.click();
     },
     previous: async () => {
       await locators.buttons.previous.click();

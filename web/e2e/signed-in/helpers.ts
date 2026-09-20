@@ -4,7 +4,7 @@ import { createPageTree } from '../pages';
 
 /** The titles currently on the page, in the order the grid shows them. */
 export async function visibleTitles(page: Page) {
-  return createPageTree(page).catalogue.locators.card.titles.allTextContents();
+  return createPageTree(page).catalogue.locators.cardTitles.allTextContents();
 }
 
 /**

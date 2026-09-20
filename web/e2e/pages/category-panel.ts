@@ -23,7 +23,6 @@ interface CategoryPanel {
   locators: {
     buttons: {
       add: Locator;
-      collapse: Locator;
       delete: Locator;
       expand: Locator;
       export: Locator;
@@ -52,7 +51,6 @@ export function initCategoryPanel(page: Page): CategoryPanel {
   const locators = {
     buttons: {
       add: root.getByTestId('add-category'),
-      collapse: root.getByTestId('collapse-categories'),
       delete: root.getByTestId('delete-category'),
       expand: root.getByTestId('expand-categories'),
       export: root.getByTestId('export-category'),
