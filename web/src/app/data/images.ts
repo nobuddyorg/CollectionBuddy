@@ -1,4 +1,5 @@
 import { chunk } from '../lib/chunk';
+import { readAllPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
 
@@ -90,21 +91,18 @@ async function selectImagesForItems<T>(
 > {
   const rows: T[] = [];
   for (const ids of chunk(itemIds, ID_FILTER_CHUNK_SIZE)) {
-    for (let page = 0; ; page++) {
-      const from = page * ROW_PAGE_SIZE;
-      const { data, error } = await supabase
+    const paged = await readAllPages<T>(ROW_PAGE_SIZE, (from, to) =>
+      supabase
         .from('images')
         .select(select)
         .in('item_id', ids)
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
-        .range(from, from + ROW_PAGE_SIZE - 1)
-        .overrideTypes<T[], { merge: false }>();
-      if (error) return { data: null, error };
-      if (!data?.length) break;
-      rows.push(...data);
-      if (data.length < ROW_PAGE_SIZE) break;
-    }
+        .range(from, to)
+        .overrideTypes<T[], { merge: false }>(),
+    );
+    if (paged.error !== null) return paged;
+    rows.push(...paged.data);
   }
   return { data: rows, error: null };
 }

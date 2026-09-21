@@ -10,6 +10,7 @@
  */
 
 import { chunk } from '../lib/chunk';
+import { readAllPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import {
   createSignedUrls,
@@ -29,7 +30,7 @@ import {
 } from './exportFormat';
 import { createZipWriter, ZipLimitError } from './zip';
 import { runPool } from '../lib/pool';
-import { backoffDelayMs } from '../lib/backoff';
+import { attempts, backoffDelayMs } from '../lib/backoff';
 
 /** How far an export has got. `total` is 0 until items and photos are counted. */
 export type ExportProgress = {
@@ -104,21 +105,14 @@ async function fetchAllItems(
   listItems: typeof listItemsForExport,
   signal?: AbortSignal,
 ): Promise<ExportItem[]> {
-  const items: ExportItem[] = [];
-  for (let page = 0; ; page++) {
+  const paged = await readAllPages(ITEM_PAGE_SIZE, (from, to) => {
     checkCancelled(signal);
-    const from = page * ITEM_PAGE_SIZE;
-    const { data, error } = await listItems(
-      categoryId,
-      from,
-      from + ITEM_PAGE_SIZE - 1,
-    );
-    if (error) throw new ExportError('Could not read items', { cause: error });
-    if (!data?.length) break;
-    items.push(...data);
-    if (data.length < ITEM_PAGE_SIZE) break;
+    return listItems(categoryId, from, to);
+  });
+  if (paged.error !== null) {
+    throw new ExportError('Could not read items', { cause: paged.error });
   }
-  return items;
+  return paged.data;
 }
 
 function isRetryableStatus(status: number): boolean {
@@ -192,7 +186,7 @@ async function fetchPhotoBytes(
   signal?: AbortSignal,
 ): Promise<Uint8Array<ArrayBuffer>> {
   let lastErr: unknown;
-  for (let attempt = 0; attempt < PHOTO_FETCH_ATTEMPTS; attempt++) {
+  for (const attempt of attempts(PHOTO_FETCH_ATTEMPTS)) {
     checkCancelled(signal);
     if (attempt > 0) {
       await new Promise((resolve) =>

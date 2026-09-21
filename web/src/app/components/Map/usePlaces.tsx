@@ -11,7 +11,7 @@ import {
   photonLang,
   photonSearchUrl,
 } from '../../data/photon';
-import { backoffDelayMs } from '../../lib/backoff';
+import { attempts, backoffDelayMs } from '../../lib/backoff';
 import { Place, PlaceCoords } from './types';
 
 const GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
@@ -176,7 +176,7 @@ export function usePlaces(
         let resolvedCount = known.length;
 
         const geocode = async (place: string): Promise<PlaceCoords | null> => {
-          for (let attempt = 0; attempt < GEOCODE_ATTEMPTS; attempt += 1) {
+          for (const attempt of attempts(GEOCODE_ATTEMPTS)) {
             if (cancelled) return null;
             try {
               const url = photonSearchUrl(place, { limit: 1, lang });
@@ -198,9 +198,16 @@ export function usePlaces(
         // still appear as each lookup lands.
         const queue = [...pending];
         const worker = async () => {
-          for (;;) {
-            const place = queue.shift();
-            if (place === undefined || cancelled) return;
+          // Draining the queue in the loop header, not the body: the walk
+          // ends when the queue does, whatever the body did or did not do.
+          for (
+            let place = queue.shift();
+            place !== undefined;
+            place = queue.shift()
+          ) {
+            // No cancellation check of its own: `geocode` fails closed on
+            // `cancelled` before it reaches the network, so a cancelled
+            // worker only walks the rest of the queue doing nothing.
             const entry = await geocode(place);
             if (!entry) continue;
 

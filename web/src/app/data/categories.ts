@@ -1,4 +1,5 @@
 import { chunk } from '../lib/chunk';
+import { readAllPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
 import type { ShareRole } from './shares';
@@ -23,10 +24,12 @@ export function uniqueCategoryName(
 ): string {
   const taken = new Set(existingNames.map((n) => n.toLowerCase()));
   if (!taken.has(base.toLowerCase())) return base;
-  for (let n = 2; ; n++) {
-    const candidate = `${base} (${n})`;
-    if (!taken.has(candidate.toLowerCase())) return candidate;
-  }
+  // `base` itself is one of the taken names, so at most `taken.size - 1` of
+  // these suffixed candidates can also be taken: one of them is always free.
+  return Array.from(
+    { length: taken.size },
+    (_, i) => `${base} (${i + 2})`,
+  ).find((candidate) => !taken.has(candidate.toLowerCase()))!;
 }
 
 export function listCategories() {
@@ -95,20 +98,12 @@ export async function listItemIdsForCategory(
   categoryId: string,
   listPage: typeof rawListItemIdsForCategory = rawListItemIdsForCategory,
 ): Promise<{ data: string[] | null; error: unknown }> {
-  const ids: string[] = [];
-  for (let page = 0; ; page++) {
-    const from = page * ITEM_LINK_PAGE_SIZE;
-    const { data, error } = await listPage(
-      categoryId,
-      from,
-      from + ITEM_LINK_PAGE_SIZE - 1,
-    );
-    if (error) return { data: null, error };
-    if (!data?.length) break;
-    ids.push(...data.map((row) => row.item_id));
-    if (data.length < ITEM_LINK_PAGE_SIZE) break;
-  }
-  return { data: ids, error: null };
+  const paged = await readAllPages<{ item_id: string }>(
+    ITEM_LINK_PAGE_SIZE,
+    (from, to) => listPage(categoryId, from, to),
+  );
+  if (paged.error !== null) return { data: null, error: paged.error };
+  return { data: paged.data.map((row) => row.item_id), error: null };
 }
 
 // Exact count with no rows fetched, so the confirmation dialog can show the
@@ -148,19 +143,12 @@ export async function listItemIdsLinkedElsewhere(
 ): Promise<{ data: string[] | null; error: unknown }> {
   const linked = new Set<string>();
   for (const ids of chunk(itemIds, ID_FILTER_CHUNK_SIZE)) {
-    for (let page = 0; ; page++) {
-      const from = page * ITEM_LINK_PAGE_SIZE;
-      const { data, error } = await listPage(
-        ids,
-        excludingCategoryId,
-        from,
-        from + ITEM_LINK_PAGE_SIZE - 1,
-      );
-      if (error) return { data: null, error };
-      if (!data?.length) break;
-      for (const row of data) linked.add(row.item_id);
-      if (data.length < ITEM_LINK_PAGE_SIZE) break;
-    }
+    const paged = await readAllPages<{ item_id: string }>(
+      ITEM_LINK_PAGE_SIZE,
+      (from, to) => listPage(ids, excludingCategoryId, from, to),
+    );
+    if (paged.error !== null) return { data: null, error: paged.error };
+    for (const row of paged.data) linked.add(row.item_id);
   }
   return { data: Array.from(linked), error: null };
 }

@@ -41,12 +41,13 @@ const CRC32_POLYNOMIAL = 0xedb88320;
 // imported for its type alone should not spend 256 iterations proving it.
 let crcTable: Uint32Array | null = null;
 
+function crc32Step(c: number): number {
+  return c & 1 ? CRC32_POLYNOMIAL ^ (c >>> 1) : c >>> 1;
+}
+
 function crc32TableEntry(byte: number): number {
-  let c = byte;
-  for (let bit = 0; bit < 8; bit++) {
-    c = c & 1 ? CRC32_POLYNOMIAL ^ (c >>> 1) : c >>> 1;
-  }
-  return c >>> 0;
+  // One step per bit of the byte, folded rather than counted.
+  return Array.from({ length: 8 }).reduce<number>(crc32Step, byte) >>> 0;
 }
 
 export function crc32Table(): Uint32Array {

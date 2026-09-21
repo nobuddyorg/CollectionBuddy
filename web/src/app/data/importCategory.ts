@@ -34,7 +34,7 @@ import {
 } from './importFormat';
 import { readZipEntries } from './zip';
 import { runPool } from '../lib/pool';
-import { backoffDelayMs } from '../lib/backoff';
+import { attempts, backoffDelayMs } from '../lib/backoff';
 import { WEBP_COMPRESSION_OPTIONS } from '../lib/imageCompression';
 
 export type ImportProgress = {
@@ -109,7 +109,7 @@ async function uploadWithRetry(
   signal?: AbortSignal,
 ): Promise<unknown> {
   let lastErr: unknown;
-  for (let attempt = 0; attempt < PHOTO_UPLOAD_ATTEMPTS; attempt++) {
+  for (const attempt of attempts(PHOTO_UPLOAD_ATTEMPTS)) {
     checkCancelled(signal);
     if (attempt > 0) {
       await new Promise((resolve) =>
