@@ -1,0 +1,79 @@
+import { resolve } from 'node:path';
+
+// Not './test': both cases here drive the app into `toast.reportError`,
+// which logs to the console by design, and that spec's `quietConsole`
+// fixture treats a console error as a failure.
+import { expect, test } from '../fixture';
+
+import { SEED } from './fixtures';
+// The paths a collector only sees when something outside the app breaks:
+// the geocoder being down, and an upload that does not arrive. Both are
+// injected at the network boundary, so the app's own code runs for real.
+test.use({ locale: 'en-GB' });
+
+test.describe.configure({ timeout: 120_000 });
+
+const PHOTO = resolve(process.cwd(), 'public/logo.png');
+const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
+
+test.describe('when something outside the app fails', () => {
+  test.beforeEach(async ({ on, page }) => {
+    await on(page).categories.do.open(SEED.failureCategory);
+  });
+
+  // The geocoder is somebody else's service; the form has to stay usable
+  // when it is down rather than blocking an entry that needs no lookup.
+  test('a hand-typed place is still saved with the geocoder down', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await page.route('https://photon.komoot.io/**', (route) =>
+      route.fulfill({ status: 503, body: '' }),
+    );
+
+    const title = uniqueTitle('Ohne Geocoder');
+    try {
+      await app.catalogue.do.openEntryForm();
+      await app.form.do.fill({ title });
+
+      await app.form.locators.inputs.place.fill('Entenhausen');
+      await expect(app.form.locators.texts.placeError).toBeVisible();
+
+      await app.form.do.submit();
+      await expect(app.catalogue.card(title).locators.place).toHaveText(
+        'Entenhausen',
+      );
+    } finally {
+      await app.catalogue.do.removeEntry(title);
+    }
+  });
+
+  // A photograph that never reaches storage must say so and leave the
+  // entry alone, rather than showing a picture that is not there.
+  test('a photograph that cannot be stored is reported, not pretended', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const title = uniqueTitle('Upload kaputt');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+
+      await page.route('**/storage/v1/object/**', (route) =>
+        route.fulfill({ status: 500, json: { message: 'nope' } }),
+      );
+      await card.do.uploadPhoto(PHOTO);
+
+      // Read out rather than quietly posted as a status: a failed upload
+      // is the one kind of toast that interrupts.
+      await expect(app.toast()).toContainText('Could not upload this');
+      await expect(app.toast()).toHaveAttribute('role', 'alert');
+      await expect(card.locators.images).toHaveCount(0);
+    } finally {
+      await page.unroute('**/storage/v1/object/**');
+      await app.catalogue.do.removeEntry(title);
+    }
+  });
+});

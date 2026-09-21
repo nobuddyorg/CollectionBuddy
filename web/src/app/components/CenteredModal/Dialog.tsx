@@ -66,6 +66,7 @@ export function Dialog({
             {title}
           </h3>
           <button
+            data-testid="dialog-close"
             className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-card-foreground/10"
             onClick={onClose}
             aria-label={closeLabel ?? 'Close'}
@@ -83,7 +84,11 @@ export function Dialog({
           }
         >
           {description && (
-            <p id={descriptionId} className="text-sm mb-3">
+            <p
+              id={descriptionId}
+              data-testid="dialog-message"
+              className="text-sm mb-3"
+            >
               {description}
             </p>
           )}

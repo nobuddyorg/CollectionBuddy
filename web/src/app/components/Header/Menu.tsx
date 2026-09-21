@@ -10,11 +10,13 @@ function SegmentedControl<T extends string>({
   options,
   labels,
   onChange,
+  testIdPrefix,
 }: {
   value: T;
   options: readonly T[];
   labels: Record<T, string>;
   onChange: (v: T) => void;
+  testIdPrefix: string;
 }) {
   return (
     // Full width with equal segments: labels are language names, never
@@ -24,6 +26,7 @@ function SegmentedControl<T extends string>({
         <button
           key={option}
           type="button"
+          data-testid={`${testIdPrefix}-${option}`}
           aria-pressed={value === option}
           onClick={() => onChange(option)}
           className={`flex-1 px-2.5 min-h-9 text-xs transition-colors ${
@@ -68,6 +71,7 @@ export default function Menu({
           options={['de', 'en']}
           labels={{ de: 'Deutsch', en: 'English' }}
           onChange={setLang}
+          testIdPrefix="lang"
         />
       </div>
 
@@ -83,6 +87,7 @@ export default function Menu({
             dark: t('header.theme_dark'),
           }}
           onChange={setThemePreference}
+          testIdPrefix="theme"
         />
       </div>
 
@@ -90,6 +95,7 @@ export default function Menu({
 
       <button
         type="button"
+        data-testid="sign-out"
         onClick={() => {
           void (async () => {
             await onSignOut();

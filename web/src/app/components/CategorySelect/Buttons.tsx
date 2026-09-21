@@ -24,6 +24,7 @@ export function AddButton({
     <IconButton
       variant="primary"
       size="xl"
+      data-testid="add-category"
       onClick={onClick}
       disabled={disabled}
       aria-busy={isCreating}
@@ -53,6 +54,7 @@ export function RenameButton({
     <IconButton
       variant="outline"
       size="xl"
+      data-testid="rename-category"
       onClick={onClick}
       disabled={disabled}
       className="disabled:opacity-40"
@@ -79,6 +81,7 @@ export function DeleteButtonWithLabel({
       // Drawn to the same height as the field and rename button it stands
       // beside.
       size="xl"
+      data-testid="delete-category"
       onClick={onClick}
       disabled={disabled}
       className="disabled:opacity-50"

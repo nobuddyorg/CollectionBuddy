@@ -53,6 +53,7 @@ export default function Header({ user, onSignOut }: HeaderProps) {
           <button
             ref={anchorRef}
             id="user-menu-button"
+            data-testid="account-menu"
             onClick={toggle}
             className="group flex items-center gap-2 rounded-sm px-2 min-h-10
               text-foreground hover:bg-muted transition-colors"

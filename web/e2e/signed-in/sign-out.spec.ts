@@ -9,13 +9,14 @@ test.use({ locale: 'en-GB' });
 
 test.describe('signing out', () => {
   test('returns to the login page and does not restore the catalogue on reload', async ({
+    on,
     page,
   }) => {
     await page.goto('', { waitUntil: 'networkidle' });
-    await expect(page.getByTestId('selected-category')).not.toBeEmpty();
+    await expect(on(page).categories.locators.selected).not.toBeEmpty();
 
-    await page.getByRole('button', { name: 'Account menu' }).click();
-    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await on(page).account.do.open();
+    await on(page).account.do.signOut();
 
     await expect(page).toHaveURL(/\/login\/?$/);
 

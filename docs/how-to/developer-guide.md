@@ -56,7 +56,7 @@ Useful while writing tests:
 
 ```bash
 npx playwright test --ui             # pick tests, watch them run, step through
-npx playwright test e2e/theme.spec.ts
+npx playwright test e2e/public/theme.spec.ts
 npx playwright test --project=mobile # the phone viewport only
 npx playwright show-report           # after a failed run
 ```
@@ -73,7 +73,7 @@ With `E2E_BASE_URL` set it starts no server of its own. That run is what catches
 
 ### The signed-in suite
 
-`e2e/signed-in/` runs against a real database: the catalogue, search, the map, the entry forms, photographs, exporting a category, and — in `rls.spec.ts` — the row-level security boundary itself. That last one is the executable version of the RLS model, and nearly all of it deliberately bypasses the interface: one test looks at the page, and the other twenty-odd ask Postgres directly, with a real token, the questions the app would never think to ask. Change a policy in `0006_policies.sql` or `0007_storage.sql` and this is the file that says whether it still holds, including the `editor` grant — the widest one the schema can issue — in its own describe block.
+`e2e/signed-in/` runs against a real database: the catalogue, search, paging, the map, the entry forms, photographs, exporting and importing a category, sharing one and being shared with, the account menu's language and appearance, and — in `rls.spec.ts` — the row-level security boundary itself. That last one is the executable version of the RLS model, and nearly all of it deliberately bypasses the interface: one test looks at the page, and the other twenty-odd ask Postgres directly, with a real token, the questions the app would never think to ask. Change a policy in `0006_policies.sql` or `0007_storage.sql` and this is the file that says whether it still holds, including the `editor` grant — the widest one the schema can issue — in its own describe block.
 
 ```bash
 supabase start     # from the repository root
@@ -92,6 +92,26 @@ Two things worth knowing before adding tests here:
 
 Prefer `expectTitles(page, [...])` over reading the grid once: the search box debounces and then waits on a round trip, so anything that asserts immediately after typing is asserting on the previous answer.
 
+### How a spec addresses the app
+
+Every element a spec touches carries a `data-testid`, and no spec names a selector of its own. `e2e/pages/` holds one page object per screen, `createPageTree(page)` collects them, and `e2e/fixture.ts` hands that tree to every test as the `on` fixture — so a test starts `async ({ on, page })` and reads as the journey it is. TEST_STRATEGY.md §9 has the shape and the rules behind it; what is specific to this app is the list of screens:
+
+- `catalogue` — the grid, its search box and pagination, plus `card(title)` for one entry and the photographs on it
+- `categories` — the collection strip, the panel behind it, and `tab(name)`
+- `form` — the entry form, its tag chips and the place autocomplete
+- `sharing` — the invite box and `row(email)` for one grant's role, expiry and revoke
+- `map`, `viewer`, `confirm`, `toast`, `account`, `login` — the map modal, the full-size photograph, the confirmation dialog, the toast, the account menu and the signed-out page
+
+Leaflet's pins and popups are the one thing still reached by class name, inside `e2e/pages/map.ts`: that markup is the library's, not ours, and there is nowhere to put an id. Everything else — including a control a test only needs to assert is disabled — gets an id in the component rather than a role or text locator in the test.
+
+Adding a case that needs an element with no id means adding the id to the component and a locator to the page object. The grep that keeps this honest:
+
+```bash
+grep -rn 'getByTestId\|getByRole\|locator(' web/e2e --include=*.spec.ts
+```
+
+It should only turn up `html`, `body`, `meta` and `link` assertions, which are document-level and have nothing to name.
+
 ### Known E2E journey-coverage gaps
 
 A walk of README's feature list and this suite (2026-09), checking each
@@ -100,39 +120,24 @@ apparent gap is actually delegated to a component/unit test instead. Most
 of README's list is covered one way or the other: photo strips and the
 multi-photo carousel are unit-tested in `ModalImage.test.tsx`, and the
 sharing UI's mechanics (invite form, role selector) are unit-tested in
-`Sharing.test.tsx`/`useShares.test.tsx`. Two gaps found no delegation for:
+`Sharing.test.tsx`/`useShares.test.tsx`.
 
-- **Importing a category has no browser-level test.** `export.spec.ts`
-  exists specifically because "only a real browser can prove that clicking
-  Export produces a download, and that a real, independent extractor can
-  open it" (its own comment) — pagination/batching/skip-on-failure are
-  unit-tested with fake I/O in `importCategory.test.ts` and
-  `useImportCategory.test.tsx`, but nothing proves the symmetric case: that
-  selecting a real archive in a real browser and clicking Import actually
-  produces real items with real photographs in the catalogue. Since export
-  already builds an archive to a temp path, the same spec (or a sibling)
-  could round-trip it straight back through Import.
-- **Sharing through the interface has no browser-level test with two real
-  identities.** `rls.spec.ts` proves the authorization boundary — grants,
-  roles, revocation — almost entirely at the API level (one `page.get*` call
-  in the whole file); component tests prove the sharing panel's own
-  mechanics with a mocked client. Nothing drives two real signed-in browser
-  sessions through the actual UI (owner types an email into `ShareInvite`,
-  picks a role, the other identity's category list picks it up) the way
-  `rls.spec.ts` already uses two real identities at the API layer. This is
-  the one journey in README's feature list that has real, RLS-backed
-  cross-user behavior but no full-stack UI journey test — everything else
-  cross-user lives in `rls.spec.ts` by design, but that file explicitly
-  isn't meant to substitute for a UI journey (TEST_STRATEGY.md §7).
+The two gaps that walk found are closed:
 
-Local demo mode (`npm run demo`) also has no E2E coverage, but it's dev
+- Importing is round-tripped in `import.spec.ts`: a real export is
+  downloaded and handed straight back to the real file input, which is the
+  half `importCategory.test.ts`'s fake I/O structurally cannot reach.
+- Sharing is driven through the interface from both sides, with two real
+  signed-in browser sessions — `sharing.spec.ts` (the owner invites,
+  promotes to `editor`, then revokes) and `shared-with-me.spec.ts` (the
+  grantee's own session, from `OTHER_AUTH_STATE_PATH`, which sees the
+  collection marked as someone else's, finds the owner-only controls shut,
+  and leaves the share). What a grant then opens or refuses stays in
+  `rls.spec.ts`, at the API level, where it belongs.
+
+Local demo mode (`npm run demo`) still has no E2E coverage, but it's dev
 tooling rather than a production code path, so it's a lower-priority gap
-than the two above.
-
-Neither gap is large: both features already have thorough
-unit/component-level tests, so the risk this leaves open is specifically
-"the UI doesn't actually wire up to the real backend the way the unit tests
-assume" — the failure mode a mocked-client test structurally cannot catch.
+than those two were.
 
 ### The pgTAP database suite
 
@@ -143,7 +148,20 @@ supabase start   # from the repository root, if not already running
 supabase test db
 ```
 
-It complements `rls.spec.ts` rather than duplicating it: pgTAP proves the policy, trigger and constraint logic fast and directly; `rls.spec.ts` proves the same properties hold through the real PostgREST-and-JWT pipeline, and is still the only place `storage.objects` and the real Storage API get exercised. See [TEST_STRATEGY.md](../../TEST_STRATEGY.md#7-security-and-authorization-testing) for the full division of labor. A policy, grant, or ownership-affecting trigger change still needs its `rls.spec.ts` case regardless of whether a pgTAP case exists alongside it — that rule (CLAUDE.md guardrail 3) is not discharged by pgTAP coverage.
+The suite is split by what each file is responsible for, so a schema change has an obvious home. `_helpers.psql` holds the impersonation and error-catching fixtures the files share, included with psql's `\ir`; it is named `.psql` because `supabase test db` runs `pg_prove --ext .pg --ext .sql -r`, and any `.sql` file here would be collected as a test and fail for having no plan.
+
+| File | Covers |
+| --- | --- |
+| `000_schema_test.sql` | Trigger shape, every constraint, and the delete cascades — attempted as real writes |
+| `001_grants_test.sql` | The grant surface: what each role may address at all, before RLS gets a say |
+| `002_function_hardening_test.sql` | `search_path` pinning, and which functions run as their owner |
+| `005_impersonation_sanity_test.sql` | That the impersonation the rest of the suite relies on actually works |
+| `010`/`020`/`025`/`030` | Ownership, viewer grants, a grant's life after issue, and the editor role |
+| `040_storage_policy_surface_test.sql` | The bucket's configuration, and the storage capabilities two security fixes removed |
+| `050`/`055` | The SQL functions and every branch of the write-path triggers |
+| `060`/`065` | The two read RPCs: who may call them, and what they return |
+
+It complements `rls.spec.ts` rather than duplicating it: pgTAP proves the policy, trigger and constraint logic fast and directly; `rls.spec.ts` proves the same properties hold through the real PostgREST-and-JWT pipeline, and is still the only place the real Storage API and the bytes behind a `storage.objects` row get exercised — pgTAP asserts that surface from the catalog only. See [TEST_STRATEGY.md](../../TEST_STRATEGY.md#7-security-and-authorization-testing) for the full division of labor. A policy, grant, or ownership-affecting trigger change still needs its `rls.spec.ts` case regardless of whether a pgTAP case exists alongside it — that rule (CLAUDE.md guardrail 3) is not discharged by pgTAP coverage.
 
 ## Run mutation testing
 
@@ -232,13 +250,13 @@ export differently (`web/scripts/serve-export.mjs`) and doesn't expect that syml
 open web/coverage-e2e/index.html   # after any e2e run
 ```
 
-`e2e/coverage.ts`'s `COVERAGE_THRESHOLDS` gates on it: `generateCoverageReport()` throws out of `global-teardown.ts` if statements/branches/functions/lines drop below their floor, which fails the whole `npm run e2e`/`e2e:local` run the same as a failed test would. Like `vitest.config.mts`'s floor, it's not auto-ratcheted — raise it by hand when a real run reports a higher achieved number, never lower it to make a change fit. It's currently set from a full local run of the signed-out suite alone (chromium + mobile, `e2e/public` — the smaller of the two suites that feed this report), with a margin below what it actually achieved; the signed-in suite (`npm run e2e:local`) touches far more of the app and clears it easily, but shares the same floor rather than a tighter one of its own, since it hasn't been measured for real yet — see the comment above `COVERAGE_THRESHOLDS` for the exact numbers and reasoning.
+`e2e/coverage.ts`'s `COVERAGE_THRESHOLDS` gates on it: `generateCoverageReport()` throws out of `global-teardown.ts` if statements/branches/functions/lines drop below their floor, which fails the whole `npm run e2e`/`e2e:local` run the same as a failed test would. Like `vitest.config.mts`'s floor, it's not auto-ratcheted — raise it by hand when a real run reports a higher achieved number, never lower it to make a change fit. There is one floor per suite, since the two never run together and reach wildly different amounts of the app: a shared floor would have to be the signed-out one, and the signed-in suite could then lose most of its coverage without the gate noticing. Each is a margin below what a real run achieved — the signed-out one from a local run (chromium + mobile, `e2e/public`), the signed-in one from CI's `e2e_local_stack` job, the only place that suite can run. See the comment above `COVERAGE_THRESHOLDS` for the exact numbers.
 
 Two things opt out of coverage collection entirely: `i18n.spec.ts` (it drives its own `browser.newContext()` rather than the `page` fixture the auto fixture attaches to), and the `firefox` project (Playwright's Coverage API is Chromium-only over CDP; Firefox still runs every other assertion in `e2e/public`, just without contributing to this report or the gate).
 
 CI posts the `console-summary`/`markdown-summary` table to the job summary and uploads the full `web/coverage-e2e/` report as a build artifact (`e2e-coverage`/`e2e-coverage-signed-in`) on every run, pass or fail — both via `.github/actions/playwright-results`, alongside the existing Playwright HTML report. `pages-deploy.yml`'s `smoke_test` job (post-deploy check against production) doesn't use that action and isn't part of this — it stays a narrower pass/fail signal, not a coverage source.
 
-By default coverage is measured against the built bundle, not the original source, since the export doesn't ship source maps (`next.config.ts` only sets `productionBrowserSourceMaps` when `E2E_COVERAGE_SOURCEMAPS=true`). CI (`ci.yml`'s `build_and_test` job) and `npm run e2e:local` (`scripts/e2e-local-stack.mjs`) both set it, so their reports map back to real `src/app/**` files and lines (`sourceFilter` in `e2e/coverage.ts` keeps vendor library source out of it); a plain local `npm run build && npm run e2e` doesn't, and reads against the minified bundle instead. `pages-deploy.yml`'s actual deploy build never sets it — turning source maps on there would ship them in the production static export, which is a separate, deliberate call this doesn't make.
+By default coverage is measured against the built bundle, not the original source, since the export doesn't ship source maps (`next.config.ts` only sets `productionBrowserSourceMaps` when `E2E_COVERAGE_SOURCEMAPS=true`). CI (`ci.yml`'s `build_and_test` job) and `npm run e2e:local` (`scripts/e2e-local-stack.mjs`) both set it, so their reports map back to real `src/app/**` files and lines (`sourceFilter` in `e2e/coverage.ts` keeps vendor library source out of it); a plain local `npm run build && npm run e2e` doesn't, and reads against the minified bundle instead. Those two readings are different metrics, not the same metric measured twice — the minified bundle has a few dozen "lines" where the source has thousands — and `COVERAGE_THRESHOLDS` is the source-mapped one. So measure the way CI does before believing a floor failure: `E2E_COVERAGE_SOURCEMAPS=true npm run build && E2E_COVERAGE_SOURCEMAPS=true npm run e2e`. `pages-deploy.yml`'s actual deploy build never sets it — turning source maps on there would ship them in the production static export, which is a separate, deliberate call this doesn't make.
 
 ## Regenerate the app icons
 
@@ -295,7 +313,7 @@ The local stack in `supabase/` and a real hosted Supabase project need the same 
 
 ## Deploy to GitHub Pages
 
-The production path is [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml): push to `main`, and it applies any pending migrations to the hosted database, then builds the static export and deploys it via GitHub's official Pages actions. `build.sh` at the repo root does the same build locally, for a sanity check before pushing — it does not deploy anything itself.
+The production path is [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml): push to `main`, and it applies any pending migrations to the hosted database, then builds the static export and deploys it via GitHub's official Pages actions. Nothing deploys from a developer machine; to reproduce just the export locally, run `npm run build` from `web/`, which is the first step of [the checks CI runs](#run-the-checks-ci-runs-locally).
 
 The `migrate` job runs first and the build depends on it, so the schema is never behind the bundle that expects it. If a migration fails, nothing is deployed and the previous bundle keeps serving against the unchanged schema.
 

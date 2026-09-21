@@ -136,12 +136,18 @@ function ItemCardComponent({
 
       {captionReady ? (
         <div className="flex flex-1 flex-col gap-2 p-4">
-          <h3 className="font-display text-[0.95rem] leading-snug">
+          <h3
+            data-testid="item-card-title"
+            className="font-display text-[0.95rem] leading-snug"
+          >
             {item.title}
           </h3>
 
           {item.description && (
-            <p className="text-sm leading-relaxed text-muted-foreground line-clamp-2">
+            <p
+              data-testid="item-card-description"
+              className="text-sm leading-relaxed text-muted-foreground line-clamp-2"
+            >
               {item.description}
             </p>
           )}
@@ -149,13 +155,22 @@ function ItemCardComponent({
           {(item.place || !!item.tags.length) && (
             <div className="flex flex-col gap-2 border-t border-border pt-2.5 mt-0.5">
               {item.place && (
-                <div className={labelClasses('truncate')}>{item.place}</div>
+                <div
+                  data-testid="item-card-place"
+                  className={labelClasses('truncate')}
+                >
+                  {item.place}
+                </div>
               )}
 
               {!!item.tags.length && (
                 <div className="flex flex-wrap gap-1">
                   {item.tags.map((tag) => (
-                    <span key={tag} className="tag-chip">
+                    <span
+                      key={tag}
+                      data-testid="item-card-tag"
+                      className="tag-chip"
+                    >
                       {tag}
                     </span>
                   ))}

@@ -4,7 +4,12 @@ import { dirname } from 'node:path';
 import { test as setup } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-import { AUTH_STATE_PATH, CONTEXT_PATH, SEED } from './signed-in/fixtures';
+import {
+  AUTH_STATE_PATH,
+  CONTEXT_PATH,
+  OTHER_AUTH_STATE_PATH,
+  SEED,
+} from './signed-in/fixtures';
 
 // Sign-in cannot go through the UI (Google OAuth, undrivable in CI), so a
 // session is minted via the auth API and written to localStorage before the
@@ -203,16 +208,15 @@ setup('seed the stack and sign in', async ({ baseURL }) => {
       otherToken: other.token,
     }),
   );
-  writeFileSync(
-    AUTH_STATE_PATH,
+  const origin = new URL(baseURL!).origin;
+  const browserState = (minted: { key: string; value: string }) =>
     JSON.stringify({
       cookies: [],
       origins: [
-        {
-          origin: new URL(baseURL!).origin,
-          localStorage: [{ name: session.key, value: session.value }],
-        },
+        { origin, localStorage: [{ name: minted.key, value: minted.value }] },
       ],
-    }),
-  );
+    });
+  writeFileSync(AUTH_STATE_PATH, browserState(session));
+  // The grantee's own browser session -- the other side is another interface.
+  writeFileSync(OTHER_AUTH_STATE_PATH, browserState(other));
 });

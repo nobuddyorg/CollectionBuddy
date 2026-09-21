@@ -5,8 +5,6 @@ import { expect, test } from './test';
 import { createClient } from '@supabase/supabase-js';
 
 import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
-import { openCategory } from './helpers';
-
 // Decode, resize (twice), upload (twice), list, and sign -- all in the
 // browser, so a `next build` can't verify any of it. What the storage
 // policies allow is checked separately in rls.spec.ts; this checks that an
@@ -65,80 +63,74 @@ async function storedObjects(token: string, userId: string, itemId: string) {
   return (data ?? []).map((object) => object.name);
 }
 
-async function newEntry(page: import('@playwright/test').Page, title: string) {
-  await page.getByTestId('new-entry').click();
-  await page.getByTestId('item-title').fill(title);
-  await page.getByTestId('item-submit').click();
-  const card = page.getByTestId('item-card').filter({ hasText: title });
-  await expect(card).toBeVisible();
-  return card;
-}
-
-async function removeEntry(
-  page: import('@playwright/test').Page,
-  title: string,
-) {
-  const card = page.getByTestId('item-card').filter({ hasText: title });
-  await card.getByTestId('delete-entry').click();
-  await page.getByTestId('confirm-accept').click();
-  await expect(card).toHaveCount(0);
-}
-
 const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
 
 test.describe('photographs', () => {
-  test.beforeEach(async ({ page }) => {
-    await openCategory(page, SEED.photoCategory);
+  test.beforeEach(async ({ on, page }) => {
+    await on(page).categories.do.open(SEED.photoCategory);
   });
 
   test('a photograph can be added to an entry and is drawn', async ({
+    on,
     page,
   }) => {
+    const app = on(page);
     const title = uniqueTitle('Fotografiert');
     try {
-      const card = await newEntry(page, title);
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
 
-      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
+      await card.do.uploadPhoto(PHOTO);
 
       // Waits for the real picture, not the placeholder that stood in for it.
-      await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
-      await expect(card.locator('img')).toHaveAttribute('src', /token=/);
+      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+      await expect(card.locators.images).toHaveAttribute('src', /token=/);
     } finally {
       // In `finally`: reseed() only deletes database rows, never storage
       // objects, so a leaked entry here orphans an upload permanently.
-      await removeEntry(page, title);
+      await app.catalogue.do.removeEntry(title);
     }
   });
 
-  test('the photograph is still there on the next visit', async ({ page }) => {
+  test('the photograph is still there on the next visit', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
     const title = uniqueTitle('Bleibt');
     try {
-      const card = await newEntry(page, title);
-      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-      await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
+      await app.catalogue.do.addEntry(title);
+      await app.catalogue.card(title).do.uploadPhoto(PHOTO);
+      await expect(app.catalogue.card(title).locators.images).toBeVisible({
+        timeout: ARRIVES,
+      });
 
-      await openCategory(page, SEED.photoCategory);
-      const again = page.getByTestId('item-card').filter({ hasText: title });
-      await expect(again.locator('img')).toBeVisible({ timeout: ARRIVES });
+      await app.categories.do.open(SEED.photoCategory);
+      await expect(app.catalogue.card(title).locators.images).toBeVisible({
+        timeout: ARRIVES,
+      });
     } finally {
-      await removeEntry(page, title);
+      await app.catalogue.do.removeEntry(title);
     }
   });
 
   // Both files live under the owner's prefix, the segment storage policies
   // key on; a wrong path locks the photo away from its own owner.
   test('it is stored as a pair, under the owner', async ({
+    on,
     page,
   }, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const app = on(page);
     const { token, userId } = context();
 
     const title = uniqueTitle('Paarweise');
     try {
-      const card = await newEntry(page, title);
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
       const itemId = await itemIdFor(token, title);
-      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-      await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
 
       const stored = await storedObjects(token, userId, itemId);
       expect(stored).toHaveLength(2);
@@ -151,62 +143,70 @@ test.describe('photographs', () => {
         ),
       ).toHaveLength(1);
     } finally {
-      await removeEntry(page, title);
+      await app.catalogue.do.removeEntry(title);
     }
   });
 
   test('a second photograph joins the first rather than replacing it', async ({
+    on,
     page,
   }) => {
+    const app = on(page);
     const title = uniqueTitle('Zwei');
     try {
-      const card = await newEntry(page, title);
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
 
-      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-      await expect(card.locator('img')).toHaveCount(1, { timeout: ARRIVES });
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toHaveCount(1, { timeout: ARRIVES });
 
-      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-      await expect(card.locator('img')).toHaveCount(2, { timeout: ARRIVES });
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toHaveCount(2, { timeout: ARRIVES });
     } finally {
-      await removeEntry(page, title);
+      await app.catalogue.do.removeEntry(title);
     }
   });
 
-  test('a photograph can be taken off again', async ({ page }) => {
+  test('a photograph can be taken off again', async ({ on, page }) => {
+    const app = on(page);
     const title = uniqueTitle('Wieder weg');
     try {
-      const card = await newEntry(page, title);
-      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-      await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
 
-      await card.getByRole('button', { name: /delete image/i }).click();
-      await page.getByTestId('confirm-accept').click();
-      await expect(card.locator('img')).toHaveCount(0);
+      await card.locators.buttons.deleteImage.click();
+      await app.confirm.do.accept();
+      await expect(card.locators.images).toHaveCount(0);
     } finally {
-      await removeEntry(page, title);
+      await app.catalogue.do.removeEntry(title);
     }
   });
 
   // SQL cannot reach object storage, so the app must delete photographs
   // itself or they become unreachable, paid-for orphans.
   test('deleting the entry takes its photographs with it', async ({
+    on,
     page,
   }, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const app = on(page);
     const { token, userId } = context();
 
     const title = uniqueTitle('Mit Aufräumen');
     let itemId: string | undefined;
     try {
-      const card = await newEntry(page, title);
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
       itemId = await itemIdFor(token, title);
-      await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-      await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
 
       const during = await storedObjects(token, userId, itemId);
       expect(during.length).toBeGreaterThan(0);
     } finally {
-      await removeEntry(page, title);
+      await app.catalogue.do.removeEntry(title);
     }
 
     await expect

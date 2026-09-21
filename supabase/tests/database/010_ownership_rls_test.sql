@@ -12,41 +12,7 @@
 begin;
 select no_plan();
 
-create or replace function pg_temp.auth_as(p_user_id uuid, p_email text default null)
-returns void
-language plpgsql
-as $$
-begin
-  set local role authenticated;
-  perform set_config(
-    'request.jwt.claims',
-    jsonb_build_object('sub', p_user_id::text, 'email', p_email, 'role', 'authenticated')::text,
-    true
-  );
-end;
-$$;
-
-create or replace function pg_temp.auth_as_anon()
-returns void
-language plpgsql
-as $$
-begin
-  set local role anon;
-  perform set_config('request.jwt.claims', '', true);
-end;
-$$;
-
-create or replace function pg_temp.raises(p_sql text)
-returns boolean
-language plpgsql
-as $$
-begin
-  execute p_sql;
-  return false;
-exception when others then
-  return true;
-end;
-$$;
+\ir _helpers.psql
 
 select gen_random_uuid() as owner_id, gen_random_uuid() as stranger_id \gset
 

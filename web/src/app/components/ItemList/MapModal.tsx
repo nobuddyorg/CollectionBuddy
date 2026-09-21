@@ -122,7 +122,10 @@ export function MapModal({
         // A generic empty message would read as "you have no places" when
         // a search is what emptied the map, sending the reader to the
         // wrong place.
-        <p className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70">
+        <p
+          data-testid="map-empty"
+          className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70"
+        >
           {t(
             search.length >= searchMinLength(search)
               ? 'item_list.map_empty_filtered'
@@ -171,6 +174,7 @@ export function MapModal({
           <div className="absolute top-2 right-2 z-[1000] bg-white/80 backdrop-blur rounded-lg flex gap-1 p-1">
             <button
               type="button"
+              data-testid="zoom-to-location"
               onClick={() => void showCurrentLocation()}
               className="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-neutral-300 text-neutral-900 shadow-sm hover:opacity-90 disabled:opacity-50"
               aria-label={t('item_list.zoom_to_current_location')}
@@ -182,6 +186,7 @@ export function MapModal({
             </button>
             <button
               type="button"
+              data-testid="frame-all-pins"
               onClick={() => issueMapCommand('fitAll')}
               className="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-neutral-300 text-neutral-900 shadow-sm hover:opacity-90"
               aria-label={t('item_list.frame_all_pins')}

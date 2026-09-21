@@ -1,0 +1,66 @@
+-- Shared fixtures for every file in this suite, included with psql's \ir.
+--
+-- Named .psql, not .sql, deliberately: `supabase test db` runs
+-- `pg_prove --ext .pg --ext .sql -r supabase/tests`, so any .sql file here
+-- is collected as a test and a file of bare function definitions would
+-- fail the run with "No plan found in TAP output". An extension pg_prove
+-- does not collect leaves the file includable without being run. The CLI
+-- mounts the test file's own directory for exactly this purpose, so the
+-- \ir resolves both under `supabase test db` and under a bare pg_prove.
+--
+-- These are pg_temp functions, so they live and die with the one
+-- connection pg_prove opens per file -- nothing here leaks between files,
+-- and nothing persists after the run.
+
+-- Impersonate a signed-in caller the way PostgREST does: assume the
+-- `authenticated` role, and set the claims a real JWT would carry. Passing
+-- NULL for p_email models a token with no email claim, which is what makes
+-- every sharing predicate fail closed.
+--
+-- 005_impersonation_sanity_test.sql is what proves this actually works --
+-- impersonating incorrectly and silently running as postgres would bypass
+-- both grants and RLS, and make every other file in the suite pass without
+-- testing anything. Sharing one definition is what lets that proof cover
+-- what the rest of the suite runs on.
+create or replace function pg_temp.auth_as(p_user_id uuid, p_email text default null)
+returns void
+language plpgsql
+as $$
+begin
+  set local role authenticated;
+  perform set_config(
+    'request.jwt.claims',
+    jsonb_build_object('sub', p_user_id::text, 'email', p_email, 'role', 'authenticated')::text,
+    true
+  );
+end;
+$$;
+
+-- A visitor with no session at all: the anon role, and no claims.
+create or replace function pg_temp.auth_as_anon()
+returns void
+language plpgsql
+as $$
+begin
+  set local role anon;
+  perform set_config('request.jwt.claims', '', true);
+end;
+$$;
+
+-- Executes p_sql and reports whether it raised, using plpgsql's own
+-- implicit savepoint so a raised statement rolls back cleanly without
+-- aborting the rest of the calling file's transaction. Used instead of
+-- pgTAP's throws_ok() so the outcome depends only on this suite's own
+-- logic, not on recalling throws_ok()'s exact overload for an errcode
+-- versus a message.
+create or replace function pg_temp.raises(p_sql text)
+returns boolean
+language plpgsql
+as $$
+begin
+  execute p_sql;
+  return false;
+exception when others then
+  return true;
+end;
+$$;

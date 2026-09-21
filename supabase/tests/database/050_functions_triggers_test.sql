@@ -6,19 +6,7 @@
 begin;
 select no_plan();
 
-create or replace function pg_temp.auth_as(p_user_id uuid, p_email text default null)
-returns void
-language plpgsql
-as $$
-begin
-  set local role authenticated;
-  perform set_config(
-    'request.jwt.claims',
-    jsonb_build_object('sub', p_user_id::text, 'email', p_email, 'role', 'authenticated')::text,
-    true
-  );
-end;
-$$;
+\ir _helpers.psql
 
 -- normalize_text: collapses internal whitespace, trims the ends, and turns
 -- a whitespace-only input into NULL rather than an empty string -- so the

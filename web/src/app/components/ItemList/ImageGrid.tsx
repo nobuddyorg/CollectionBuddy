@@ -45,11 +45,17 @@ function Plate({
 
   return (
     <div className={`relative bg-muted ${!loaded ? 'img-skeleton' : ''}`}>
-      <button type="button" onClick={onOpen} className="block h-full w-full">
+      <button
+        type="button"
+        data-testid="open-image"
+        onClick={onOpen}
+        className="block h-full w-full"
+      >
         {/* eslint-disable-next-line @next/next/no-img-element -- next/image
             adds nothing here: the static export runs unoptimized (no
             resizing, no srcSet), so it's just <img> plus extra runtime. */}
         <img
+          data-testid="item-image"
           src={src}
           alt={alt}
           decoding="async"
@@ -165,6 +171,7 @@ export function ImageGrid({
   // sits on the photograph it affects and reads as "take this one off".
   const deleteButton = (img: ImgEntry, small: boolean) => (
     <button
+      data-testid="delete-image"
       aria-label={t('item_list.delete_image')}
       title={t('item_list.delete_image')}
       onClick={() => onDelete(img)}

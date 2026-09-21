@@ -28,7 +28,11 @@ export default function Coin({
   }, [size]);
 
   return (
-    <div className={`relative ${className ?? ''}`} style={style}>
+    <div
+      data-testid="coin"
+      className={`relative ${className ?? ''}`}
+      style={style}
+    >
       <Icon
         icon={IconType.Coin}
         className="w-full h-full"

@@ -4,7 +4,7 @@ import { expect, test } from './test';
 import { createClient } from '@supabase/supabase-js';
 
 import { CONTEXT_PATH, SEED, itemsIn, type SeedContext } from './fixtures';
-import { openCategory, visibleTitles } from './helpers';
+import { visibleTitles } from './helpers';
 
 // This app is a static export: no server, no route handlers, so Postgres
 // row-level security is the entire authorization layer. If a policy stopped
@@ -79,13 +79,16 @@ async function mineCategoryId(token: string, userId: string, name: string) {
 
 test.describe('one collection cannot reach another', () => {
   test('the interface shows nothing of the other collector', async ({
+    on,
     page,
   }) => {
-    await openCategory(page, 'Münzen');
+    const app = on(page);
+    await app.categories.do.open('Münzen');
     expect(await visibleTitles(page)).not.toContain(SEED.other.item);
-    await expect(
-      page.getByRole('tab', { name: SEED.other.category }),
-    ).toHaveCount(0);
+    // Expanded first: a collapsed strip holds no tabs at all, so the
+    // absence below would be true of any collection whatsoever.
+    await app.categories.do.openPanel();
+    await expect(app.categories.tab(SEED.other.category)).toHaveCount(0);
   });
 
   test('a plain read returns none of their entries', async ({}, testInfo) => {

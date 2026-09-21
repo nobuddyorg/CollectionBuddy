@@ -9,12 +9,55 @@ export const AUTH_STATE_PATH = resolve(
 /** Ids and access tokens of both users, for tests that check cross-user RLS directly. */
 export const CONTEXT_PATH = resolve(process.cwd(), '.e2e-auth/context.json');
 
+/** Where signed-in.setup.ts leaves the second collector's session. */
+export const OTHER_AUTH_STATE_PATH = resolve(
+  process.cwd(),
+  '.e2e-auth/signed-in-other.json',
+);
+
 export type SeedContext = {
   userId: string;
   token: string;
   otherUserId: string;
   otherToken: string;
 };
+
+type SeedItem = {
+  category: string;
+  title: string;
+  description: string;
+  place: string | null;
+  place_lat: number | null;
+  place_lng: number | null;
+  tags: readonly string[];
+};
+
+/** One entry apiece, so opening a collection has a card to wait for. */
+const BASELINE_ITEMS: SeedItem[] = [
+  'Etikett',
+  'Bildergalerie',
+  'Rückgängig',
+  'Pannenwerkstatt',
+].map((category) => ({
+  category,
+  title: `${category}stück`,
+  description: 'Bleibt liegen, damit die Sammlung nie leer ist.',
+  place: null,
+  place_lat: null,
+  place_lng: null,
+  tags: [],
+}));
+
+/** Two more than the grid's page of nine, so page two is not one leftover. */
+const PAGING_ITEMS: SeedItem[] = Array.from({ length: 11 }, (_, index) => ({
+  category: 'Schaukasten',
+  title: `Schaustück ${String(index + 1).padStart(2, '0')}`,
+  description: 'Füllt den Schaukasten über eine Seite hinaus.',
+  place: null,
+  place_lat: null,
+  place_lng: null,
+  tags: [],
+}));
 
 /**
  * The collection every signed-in test looks at.
@@ -54,6 +97,14 @@ export const SEED = {
     'Fotostudio',
     'Exportarchiv',
     'Leihgabe',
+    'Vitrine',
+    'Schatulle',
+    'Umzugskiste',
+    'Schaukasten',
+    'Etikett',
+    'Bildergalerie',
+    'Rückgängig',
+    'Pannenwerkstatt',
   ],
   /** For entries.spec.ts. */
   scratchCategory: 'Werkstatt',
@@ -70,6 +121,22 @@ export const SEED = {
    * cases need a collection of their own to take apart.
    */
   editorCategory: 'Leihgabe',
+  /** For sharing.spec.ts, which issues and revokes a grant through the panel. */
+  shareCategory: 'Vitrine',
+  /** For shared-with-me.spec.ts, which leaves the grant it is given. */
+  grantedCategory: 'Schatulle',
+  /** For import.spec.ts, which exports this one and imports the copy back. */
+  importCategory: 'Umzugskiste',
+  /** For pagination.spec.ts -- the collection PAGING_ITEMS fills. */
+  pagingCategory: 'Schaukasten',
+  /** For entry-details.spec.ts, which files entries with places and tags. */
+  detailCategory: 'Etikett',
+  /** For photo-viewer.spec.ts, which photographs an entry and opens it. */
+  viewerCategory: 'Bildergalerie',
+  /** For undo.spec.ts, which deletes an entry and takes it back. */
+  undoCategory: 'Rückgängig',
+  /** For upload-failure.spec.ts, whose uploads are made to fail. */
+  failureCategory: 'Pannenwerkstatt',
 
   // Oldest first. The list sorts newest-first, so the last one here is the
   // first card on the page.
@@ -150,6 +217,37 @@ export const SEED = {
       place_lng: null,
       tags: [],
     },
+    {
+      category: 'Vitrine',
+      title: 'Vitrinenstück',
+      description: 'Bleibt liegen, damit die Vitrine nie leer bleibt.',
+      place: null,
+      place_lat: null,
+      place_lng: null,
+      tags: [],
+    },
+    {
+      // What the grantee must be able to see through the grant.
+      category: 'Schatulle',
+      title: 'Schatullenstück',
+      description: 'Bleibt liegen, damit die Schatulle nie leer bleibt.',
+      place: null,
+      place_lat: null,
+      place_lng: null,
+      tags: [],
+    },
+    {
+      // Exported and imported back, so the copy has something to carry.
+      category: 'Umzugskiste',
+      title: 'Umzugsstück',
+      description: 'Reist einmal durch das Archiv und wieder zurück.',
+      place: 'Bremen',
+      place_lat: 53.0793,
+      place_lng: 8.8017,
+      tags: ['umzug'],
+    },
+    ...BASELINE_ITEMS,
+    ...PAGING_ITEMS,
   ],
 } as const;
 

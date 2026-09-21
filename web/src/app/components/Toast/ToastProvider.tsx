@@ -145,6 +145,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             {toasts.map((entry) => (
               <div
                 key={entry.id}
+                data-testid="toast"
                 role={entry.kind === 'error' ? 'alert' : 'status'}
                 aria-live={entry.kind === 'error' ? 'assertive' : 'polite'}
                 className={`pointer-events-auto max-w-sm w-full rounded-sm shadow-lg px-4 py-3 flex items-start gap-3 ${
@@ -157,6 +158,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 {entry.action && (
                   <button
                     type="button"
+                    data-testid="toast-action"
                     onClick={() => {
                       entry.action?.onClick();
                       remove(entry.id);
@@ -168,6 +170,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 )}
                 <button
                   type="button"
+                  data-testid="toast-close"
                   onClick={() => expire(entry.id)}
                   className="shrink-0 -m-1 p-1"
                   aria-label={t('common.close')}

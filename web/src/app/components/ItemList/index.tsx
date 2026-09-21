@@ -205,7 +205,7 @@ export default function ItemList({
       {/* searchStatus, not raw qDebounced: a too-short term earns no filter
           from listItems, so announcing a count here would pass off the
           unfiltered total as a search result. */}
-      <span className="sr-only" aria-live="polite">
+      <span data-testid="search-status" className="sr-only" aria-live="polite">
         {searchAnnouncement}
       </span>
 
@@ -218,7 +218,10 @@ export default function ItemList({
               {qDebounced ? '🔍' : '🧺'}
             </div>
             <div className="space-y-1.5">
-              <h3 className="font-display text-lg text-foreground">
+              <h3
+                data-testid="empty-title"
+                className="font-display text-lg text-foreground"
+              >
                 {searchStatus.kind === 'active'
                   ? t('item_list.no_results_title').replace('{q}', qDebounced)
                   : t('item_list.no_items_title')}
@@ -232,6 +235,7 @@ export default function ItemList({
             {qDebounced && (
               <button
                 type="button"
+                data-testid="empty-clear-search"
                 onClick={() => setQ('')}
                 className="min-h-11 px-3 font-label text-xs text-foreground underline underline-offset-4"
               >

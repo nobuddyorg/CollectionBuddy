@@ -3,8 +3,6 @@ import { resolve } from 'node:path';
 
 import { expect, test } from './test';
 import { SEED } from './fixtures';
-import { openCategory } from './helpers';
-
 // Pagination, batching, and skip-on-failure are unit-tested with fake I/O in
 // exportCategory.test.ts. Only a real browser can prove that clicking Export
 // produces a download, and that a real, independent extractor can open it.
@@ -15,30 +13,26 @@ const ARRIVES = 30_000;
 const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
 
 test.describe('exporting a category', () => {
-  test.beforeEach(async ({ page }) => {
-    await openCategory(page, SEED.exportCategory);
+  test.beforeEach(async ({ on, page }) => {
+    await on(page).categories.do.open(SEED.exportCategory);
   });
 
   test('downloads an archive containing the manifest, the CSV and the photograph', async ({
+    on,
     page,
   }) => {
+    const app = on(page);
     const title = uniqueTitle('Exportstück');
 
-    await page.getByTestId('new-entry').click();
-    await page.getByTestId('item-title').fill(title);
-    await page.getByTestId('item-submit').click();
-    const card = page.getByTestId('item-card').filter({ hasText: title });
-    await expect(card).toBeVisible();
+    await app.catalogue.do.addEntry(title);
+    const card = app.catalogue.card(title);
 
-    await card.getByTestId('upload-photo').first().setInputFiles(PHOTO);
-    await expect(card.locator('img')).toBeVisible({ timeout: ARRIVES });
-
-    // The export button only exists in the open panel.
-    await page.getByTestId('expand-categories').click();
+    await card.do.uploadPhoto(PHOTO);
+    await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
 
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByTestId('export-category').click(),
+      app.categories.do.exportCollection(),
     ]);
 
     const zipPath = await download.path();
@@ -70,8 +64,6 @@ test.describe('exporting a category', () => {
     });
     expect(csv).toContain(title);
 
-    await card.getByTestId('delete-entry').click();
-    await page.getByTestId('confirm-accept').click();
-    await expect(card).toHaveCount(0);
+    await app.catalogue.do.removeEntry(title);
   });
 });
