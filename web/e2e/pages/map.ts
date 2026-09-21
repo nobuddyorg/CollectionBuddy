@@ -12,6 +12,7 @@ interface MapView {
     frameAllPins(): Promise<void>;
     open(): Promise<void>;
     openPin(index?: number): Promise<void>;
+    zoomIn(): Promise<void>;
     zoomToLocation(): Promise<void>;
   };
   /**
@@ -23,6 +24,7 @@ interface MapView {
   locators: {
     buttons: {
       frameAll: Locator;
+      zoomIn: Locator;
       zoomToLocation: Locator;
     };
     pins: Locator;
@@ -38,6 +40,7 @@ export function initMap(page: Page): MapView {
   const locators = {
     buttons: {
       frameAll: page.getByTestId('frame-all-pins'),
+      zoomIn: page.locator('.leaflet-control-zoom-in'),
       zoomToLocation: page.getByTestId('zoom-to-location'),
     },
     pins: page.locator('.leaflet-marker-icon'),
@@ -58,6 +61,11 @@ export function initMap(page: Page): MapView {
     },
     openPin: async (index = 0) => {
       await locators.pins.nth(index).click();
+    },
+    // One step only: Leaflet swallows a second click sent mid-animation,
+    // and one is enough to carry a fitted pin off screen.
+    zoomIn: async () => {
+      await locators.buttons.zoomIn.click();
     },
     zoomToLocation: async () => {
       await locators.buttons.zoomToLocation.click();

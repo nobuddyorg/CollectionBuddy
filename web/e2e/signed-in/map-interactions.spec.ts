@@ -28,6 +28,29 @@ test.describe('the map, up close', () => {
       /Silberdenar|Goldgulden/,
     );
   });
+
+  // Driven by Leaflet's own zoom rather than the "zoom to me" control: that
+  // one awaits a position fix before it moves the map, so the framing this
+  // is about would be racing an arrival it cannot see.
+  test('frames every pin again after zooming away from them', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await openMap(app);
+    await expect(app.map.locators.pins).toHaveCount(2);
+    await expect(app.map.locators.pins.first()).toBeInViewport();
+
+    await app.map.do.zoomIn();
+    await expect(app.map.locators.pins.first()).not.toBeInViewport();
+
+    await app.map.do.frameAllPins();
+
+    // What framing promises: the pins are back on screen, not merely back
+    // in the document after the view moved away from them.
+    await expect(app.map.locators.pins).toHaveCount(2);
+    await expect(app.map.locators.pins.first()).toBeInViewport();
+  });
 });
 
 test.describe('the map, with a location to show', () => {
@@ -48,27 +71,5 @@ test.describe('the map, with a location to show', () => {
 
     await app.map.locators.pins.last().click();
     await expect(app.map.locators.popup).toContainText('You are here');
-  });
-
-  test('frames every pin again after zooming somewhere else', async ({
-    on,
-    page,
-  }) => {
-    const app = on(page);
-    await openMap(app);
-    await expect(app.map.locators.pins).toHaveCount(3);
-
-    await app.map.do.zoomToLocation();
-    // Waited for, not assumed: that button awaits a position fix before it
-    // moves the map, so framing sent straight after can land first and be
-    // undone by the zoom arriving late.
-    await expect(app.map.locators.pins.first()).not.toBeInViewport();
-
-    await app.map.do.frameAllPins();
-
-    // What framing promises: the pins are back on screen, not merely back
-    // in the document after the zoom moved away from them.
-    await expect(app.map.locators.pins).toHaveCount(3);
-    await expect(app.map.locators.pins.first()).toBeInViewport();
   });
 });
