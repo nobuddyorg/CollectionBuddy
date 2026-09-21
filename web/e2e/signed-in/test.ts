@@ -1,4 +1,4 @@
-import { test as base, expect } from '../coverage';
+import { test as base, expect } from '../fixture';
 
 /**
  * The signed-in suite's `test`, which additionally fails when the page throws

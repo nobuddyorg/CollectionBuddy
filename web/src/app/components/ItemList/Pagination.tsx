@@ -45,6 +45,7 @@ export function Pagination({
   const prevButton = (
     <button
       type="button"
+      data-testid="page-previous"
       disabled={page === 1}
       onClick={() => setPage(page - 1)}
       className="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
@@ -58,6 +59,7 @@ export function Pagination({
   const nextButton = (
     <button
       type="button"
+      data-testid="page-next"
       disabled={page === totalPages}
       onClick={() => setPage(page + 1)}
       className="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
@@ -71,6 +73,7 @@ export function Pagination({
   return (
     <>
       <nav
+        data-testid="pagination"
         aria-label={t('item_list.pagination')}
         className="hidden sm:flex flex-wrap gap-1.5 items-center justify-center pt-2"
       >
@@ -88,6 +91,7 @@ export function Pagination({
           ) : (
             <button
               key={item}
+              data-testid="page-number"
               onClick={() => setPage(item)}
               className={
                 'min-w-9 min-h-9 px-2 flex items-center justify-center rounded-sm font-label text-xs transition-colors ' +
@@ -107,6 +111,7 @@ export function Pagination({
       </nav>
 
       <nav
+        data-testid="pagination-compact"
         aria-label={t('item_list.pagination')}
         className="flex sm:hidden gap-3 items-center justify-center pt-2"
       >

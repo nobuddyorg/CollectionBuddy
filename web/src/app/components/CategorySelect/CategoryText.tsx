@@ -19,7 +19,9 @@ export function CategoryText({
 }) {
   return (
     <div className="truncate">
-      <h2 className={labelClasses('mb-1')}>{title}</h2>
+      <h2 data-testid="category-label" className={labelClasses('mb-1')}>
+        {title}
+      </h2>
       {loading ? (
         <div
           data-testid="selected-category"

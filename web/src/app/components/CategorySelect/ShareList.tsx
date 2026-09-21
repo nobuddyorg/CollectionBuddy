@@ -48,6 +48,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
     <label className={className}>
       <input
         type="checkbox"
+        data-testid="share-can-edit"
         checked={s.role === 'editor'}
         onChange={(e) =>
           void onToggleRole(s.id, s.invited_email, e.target.checked)
@@ -77,7 +78,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
   return (
     <>
       {!isLoading && list.length === 0 && (
-        <p className={labelClasses()}>
+        <p data-testid="share-list-empty" className={labelClasses()}>
           {t('category_select.share_list_empty')}
         </p>
       )}
@@ -101,6 +102,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
             return (
               <li
                 key={s.id}
+                data-testid="share-row"
                 // `sm:flex-1` on email below, not `justify-between` here:
                 // with three items, justify-between free-floats the middle
                 // one (expiry) depending on email length. `ml-4` rather
@@ -109,9 +111,17 @@ export function ShareList({ shares }: { shares: UseShares }) {
                 className="ml-4 flex flex-col gap-1.5 py-2 text-sm sm:flex-row sm:items-center sm:gap-2"
               >
                 <div className="flex min-w-0 items-center gap-1.5 sm:flex-1">
-                  <span className="truncate min-w-0">{s.invited_email}</span>
+                  <span
+                    data-testid="share-email-label"
+                    className="truncate min-w-0"
+                  >
+                    {s.invited_email}
+                  </span>
                   {s.role === 'editor' && (
-                    <span className="tag-chip shrink-0">
+                    <span
+                      data-testid="share-editor-badge"
+                      className="tag-chip shrink-0"
+                    >
                       {t('category_select.share_role_editor_badge')}
                     </span>
                   )}
@@ -119,6 +129,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
 
                 <div className="flex items-center justify-between gap-2 sm:contents">
                   <span
+                    data-testid="share-expiry-label"
                     className={`shrink-0 sm:mr-4 ${isExpired ? 'text-destructive' : 'text-muted-foreground'}`}
                   >
                     {expiryLabel}
@@ -141,6 +152,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
                     </button>
                     <button
                       type="button"
+                      data-testid="share-revoke"
                       onClick={() => void onRevoke(s.id, s.invited_email)}
                       disabled={isRevoking}
                       aria-label={t('category_select.share_revoke')}

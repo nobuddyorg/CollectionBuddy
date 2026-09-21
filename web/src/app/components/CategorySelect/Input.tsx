@@ -18,6 +18,7 @@ export function CategoryInput({
   return (
     <input
       id="new-category-name"
+      data-testid="new-category-input"
       value={name}
       onChange={(e) => setName(e.target.value)}
       placeholder={t('category_select.new_category')}

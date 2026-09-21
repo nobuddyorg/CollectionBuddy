@@ -1,4 +1,4 @@
-import { expect, test } from '../coverage';
+import { expect, test } from '../fixture';
 
 // manifest.test.ts checks the manifest's own claims on disk; this checks that
 // what it links actually resolves at the real deployed origin and base path.

@@ -5,6 +5,7 @@ import { MUTATE_TARGETS, NO_COVERAGE_FLOOR } from './mutation-targets.mjs';
 // Global floor. Only `npm test -- --coverage` enforces this (what CI runs,
 // not plain `npm test`), and CI measures ~0.1pp lower than local (pinned
 // Node version). A PR may raise these values and must not lower them.
+// Measured at 100% on all four metrics; the floor keeps a point of slack.
 //
 // Declared before PER_FILE_FLOOR on purpose: the job-summary step in ci.yml
 // (davelosert/vitest-coverage-report-action) doesn't evaluate this file, it
@@ -12,10 +13,10 @@ import { MUTATE_TARGETS, NO_COVERAGE_FLOOR } from './mutation-targets.mjs';
 // PER_FILE_FLOOR's 100s ahead of these, it picked those up as the "target"
 // instead, showing every category as red no matter the real result.
 const GLOBAL_COVERAGE_THRESHOLDS = {
-  statements: 97,
-  branches: 91,
-  functions: 97,
-  lines: 98,
+  statements: 99,
+  branches: 99,
+  functions: 99,
+  lines: 99,
 };
 
 const PER_FILE_FLOOR = {

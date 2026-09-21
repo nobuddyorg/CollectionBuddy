@@ -47,6 +47,7 @@ export default function GoogleSignInButton({
     <>
       <button
         type="button"
+        data-testid="google-sign-in"
         onClick={() => void handleClick()}
         disabled={loading}
         aria-label={label}

@@ -57,14 +57,20 @@ export default function LoginPage() {
 
   return (
     <main className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden px-6 bg-background text-foreground pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-      <h1 className="font-display text-4xl sm:text-5xl mb-3 text-center">
+      <h1
+        data-testid="wordmark"
+        className="font-display text-4xl sm:text-5xl mb-3 text-center"
+      >
         <span className="border-b-[3px] border-foreground pb-0.5">
           {t('brand.collection')}
         </span>
         <span className="text-accent">{t('brand.buddy')}</span>
       </h1>
 
-      <p className={labelClasses('text-center mt-2 mb-8 sm:mb-10')}>
+      <p
+        data-testid="tagline"
+        className={labelClasses('text-center mt-2 mb-8 sm:mb-10')}
+      >
         {t('page.footer')}
       </p>
 
