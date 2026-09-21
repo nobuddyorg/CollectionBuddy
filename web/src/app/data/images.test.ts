@@ -174,8 +174,12 @@ function mockImagesQuery(
 
 describe('listImagesForItems', () => {
   it('selects the listing columns for a single page, single chunk', async () => {
-    const { from, calls, columns } = mockImagesQuery((chunk) => ({
-      data: chunk.map((id, i) => ({ item_id: id, n: i })),
+    // Range-aware, like every other page fake here: a reader that asks for
+    // a second page has to run off the end rather than be handed the first
+    // one again for ever.
+    const { from, calls, columns } = mockImagesQuery((chunk, rangeFrom) => ({
+      data:
+        rangeFrom === 0 ? chunk.map((id, i) => ({ item_id: id, n: i })) : [],
       error: null,
     }));
     const { data, error } = await listImagesForItems(['item-1']);

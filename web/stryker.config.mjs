@@ -37,6 +37,11 @@ const config = {
     'test-results',
     'playwright-report',
   ],
+  // Raised from the 5s default: a mutant covered by a few hundred tests
+  // runs the whole suite, and a run that fails seven tests honestly was
+  // being reported as a timeout on a loaded machine. A real infinite loop
+  // still hits this ceiling; a slow-but-finite run no longer does.
+  timeoutMS: 20_000,
   // See mutation-targets.mjs for what's in this list and why -- shared with
   // vitest.config.mts's per-file coverage floors so the two can't drift.
   mutate: MUTATE_TARGETS,

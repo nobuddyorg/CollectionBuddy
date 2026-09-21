@@ -163,13 +163,12 @@ export function usePhotonSearch(locale?: string) {
     // answer can never matter.
     if (!focus) return;
     const onDocClick = (e: MouseEvent) => {
-      const target = e.target as Node;
-      // Always attached once PlaceAutocomplete has mounted: both are plain
-      // unconditional elements in its render, unlike `menuRef` below.
-      const insideInput = inputRef.current!.contains(target);
-      const insideAnchor = dropdownRef.current!.contains(target);
-      const insideMenu = menuRef.current?.contains(target);
-      if (!insideInput && !insideAnchor && !insideMenu) setFocus(false);
+      // One containment check, not three: the input and the suggestion menu
+      // are both rendered inside this anchor, so a click on either is
+      // already a click inside it. The anchor itself is unconditional, so
+      // the ref is set for as long as this listener is attached.
+      if (dropdownRef.current!.contains(e.target as Node)) return;
+      setFocus(false);
     };
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);

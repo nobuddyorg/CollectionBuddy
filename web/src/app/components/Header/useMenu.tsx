@@ -15,10 +15,16 @@ export function useMenu() {
 
   useEffect(() => {
     if (!open) return;
+    // The trigger is captured here rather than read per click: it is the
+    // one element that is always rendered, so holding it keeps this handler
+    // from reaching through a ref that a later unmount has already cleared.
+    const anchor = anchorRef.current!;
     const onDocClick = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (panelRef.current!.contains(t)) return;
-      if (anchorRef.current!.contains(t)) return;
+      if (anchor.contains(t)) return;
+      // The panel only exists while the menu is open, so it stays a ref
+      // read with its own guard.
+      if (panelRef.current && panelRef.current.contains(t)) return;
       setOpen(false);
     };
     document.addEventListener('mousedown', onDocClick);
