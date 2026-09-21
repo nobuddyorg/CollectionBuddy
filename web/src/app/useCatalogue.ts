@@ -30,14 +30,10 @@ export function useCatalogue(loading: boolean, userId: string | undefined) {
 
   // Every selection is remembered, so the next visit opens where this one
   // left off rather than on a chooser.
-  const selectCategory = useCallback(
-    (id: string | null) => {
-      setSelectedCategoryId(id);
-      storeSelectedCategory(id);
-    },
-    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
-    [],
-  );
+  const selectCategory = useCallback((id: string | null) => {
+    setSelectedCategoryId(id);
+    storeSelectedCategory(id);
+  }, []);
 
   useEffect(() => {
     if (loading || !userId) return;

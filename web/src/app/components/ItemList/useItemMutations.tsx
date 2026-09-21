@@ -45,14 +45,10 @@ export function useItemMutations({
 
   // Shared by removeItem's own removal and the effect below; returns the
   // same reference when nothing changes so the effect can't loop forever.
-  const excludePendingDeletes = useCallback(
-    (list: ItemLite[]) => {
-      const next = list.filter((it) => !pendingDeleteIds.current.has(it.id));
-      return next.length === list.length ? list : next;
-    },
-    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
-    [],
-  );
+  const excludePendingDeletes = useCallback((list: ItemLite[]) => {
+    const next = list.filter((it) => !pendingDeleteIds.current.has(it.id));
+    return next.length === list.length ? list : next;
+  }, []);
 
   // Re-applies the filter whenever `items` changes, not just the change
   // removeItem makes itself.

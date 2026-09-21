@@ -48,30 +48,26 @@ export function useCategories() {
   // older response can never clobber a newer one's result.
   const { next, isCurrent } = useRequestSequence();
 
-  const reload = useCallback(
-    async () => {
-      const mySeq = next();
-      setIsLoading(true);
-      try {
-        const { data, error } = await listCategories();
-        if (error) throw error;
-        const list = data ?? [];
-        if (isCurrent(mySeq)) setCats(list);
-        return list;
-      } catch (e) {
-        // Logged unconditionally, unlike the toast below: still worth
-        // knowing about even for a request a newer one has already
-        // superseded, which is the only thing `isCurrent` is guarding here.
-        console.error(e);
-        if (isCurrent(mySeq)) toast.error(t('category_select.load_error'));
-        return [];
-      } finally {
-        if (isCurrent(mySeq)) setIsLoading(false);
-      }
-    },
-    // Stryker disable next-line ArrayDeclaration: these deps never change identity, so [] behaves the same.
-    [t, toast, next, isCurrent],
-  );
+  const reload = useCallback(async () => {
+    const mySeq = next();
+    setIsLoading(true);
+    try {
+      const { data, error } = await listCategories();
+      if (error) throw error;
+      const list = data ?? [];
+      if (isCurrent(mySeq)) setCats(list);
+      return list;
+    } catch (e) {
+      // Logged unconditionally, unlike the toast below: still worth
+      // knowing about even for a request a newer one has already
+      // superseded, which is the only thing `isCurrent` is guarding here.
+      console.error(e);
+      if (isCurrent(mySeq)) toast.error(t('category_select.load_error'));
+      return [];
+    } finally {
+      if (isCurrent(mySeq)) setIsLoading(false);
+    }
+  }, [t, toast, next, isCurrent]);
 
   const createCategory = useCallback(
     async (name: string) => {

@@ -107,22 +107,14 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   // eslint-disable-next-line react-hooks/refs
   langRef.current = lang;
 
-  useLayoutEffect(
-    () => {
-      setLang(detectLang());
-    },
-    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
-    [],
-  );
+  useLayoutEffect(() => {
+    setLang(detectLang());
+  }, []);
 
-  const setLangAndPersist = useCallback(
-    (next: Language) => {
-      setLang(next);
-      localStorage.setItem(LANG_STORAGE_KEY, next);
-    },
-    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
-    [],
-  );
+  const setLangAndPersist = useCallback((next: Language) => {
+    setLang(next);
+    localStorage.setItem(LANG_STORAGE_KEY, next);
+  }, []);
 
   // Keeps <html lang> and the meta description in sync with the active
   // language -- otherwise screen readers use the wrong phonetics and
@@ -140,25 +132,20 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   const t = useCallback(
     (key: TranslationKey) =>
       resolveTranslationKey(translations[langRef.current], key) ?? key,
-    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
     [],
   );
 
-  const tCount = useCallback(
-    (baseKey: TranslationKey, count: number) => {
-      const dict = translations[langRef.current];
-      const category = new Intl.PluralRules(langRef.current).select(count);
-      const template =
-        (category === 'one'
-          ? resolveTranslationKey(dict, `${baseKey}_one`)
-          : undefined) ??
-        resolveTranslationKey(dict, baseKey) ??
-        baseKey;
-      return template.replace('{count}', String(count));
-    },
-    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
-    [],
-  );
+  const tCount = useCallback((baseKey: TranslationKey, count: number) => {
+    const dict = translations[langRef.current];
+    const category = new Intl.PluralRules(langRef.current).select(count);
+    const template =
+      (category === 'one'
+        ? resolveTranslationKey(dict, `${baseKey}_one`)
+        : undefined) ??
+      resolveTranslationKey(dict, baseKey) ??
+      baseKey;
+    return template.replace('{count}', String(count));
+  }, []);
 
   const value = useMemo(
     () => ({ lang, setLang: setLangAndPersist, t, tCount }),

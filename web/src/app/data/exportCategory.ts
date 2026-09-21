@@ -7,12 +7,9 @@
  * by `./zip`. The download itself (the DOM anchor click) lives in
  * `CategorySelect/downloadBlob.ts`, not here.
  *
- * The four Supabase/storage calls are accepted as parameters, like `now`
- * already was, so exportCategory.test.ts can drive this with fakes. Only
- * the real Supabase client and `fetch` stay outside the gate; see the
- * `v8 ignore` / `Stryker disable` markers below.
  */
 
+import { chunk } from '../lib/chunk';
 import { supabase } from '../supabase';
 import {
   createSignedUrls,
@@ -97,12 +94,6 @@ function checkCancelled(signal?: AbortSignal): void {
   if (signal?.aborted) throw new ExportCancelledError();
 }
 
-// A named reference rather than an inline arrow at the default-parameter
-// site below: v8 tracks an inline arrow as its own function, and since
-// tests always supply a fake, that function would show as uncalled no
-// matter how the statement itself is ignored.
-// Stryker disable next-line all
-// v8 ignore next
 function realGetSession() {
   return supabase.auth.getSession();
 }
@@ -227,29 +218,23 @@ async function fetchPhotoBytes(
   throw lastErr;
 }
 
-async function signAll(
+/** Exported for its own test: the map it builds is the whole contract --
+ * a row Storage could not sign must leave no entry behind at all. */
+export async function signAll(
   paths: string[],
   signUrls: typeof createSignedUrls,
   signal?: AbortSignal,
 ): Promise<Map<string, string>> {
   const signed = new Map<string, string>();
-  for (let i = 0; i < paths.length; i += SIGN_BATCH_SIZE) {
+  for (const batch of chunk(paths, SIGN_BATCH_SIZE)) {
     checkCancelled(signal);
-    const batch = paths.slice(i, i + SIGN_BATCH_SIZE);
-    const { data, error } = await signUrls(
-      batch,
-      EXPORT_SIGNED_URL_TTL_SECONDS,
-    );
-    if (error) {
-      throw new ExportError('Could not sign photograph URLs', { cause: error });
+    const result = await signUrls(batch, EXPORT_SIGNED_URL_TTL_SECONDS);
+    if (result.error) {
+      throw new ExportError('Could not sign photograph URLs', {
+        cause: result.error,
+      });
     }
-    // Stryker disable next-line ArrayDeclaration: any placeholder here still
-    // fails the row.path/row.signedUrl guard below just as `[]` does.
-    for (const row of data ?? []) {
-      // Stryker disable next-line all: a null path becomes a Map key no
-      // real photograph path ever looks up, and a null signedUrl fails the
-      // `!url` check downstream the same way a dropped entry does -- not
-      // observable from outside signAll either way.
+    for (const row of result.data) {
       if (row.path && row.signedUrl) signed.set(row.path, row.signedUrl);
     }
   }
@@ -272,14 +257,8 @@ export async function exportCategory({
   signal,
   // The four raw calls this file makes: real by default, faked in tests.
   getSession = realGetSession,
-  // Stryker disable next-line all
-  // v8 ignore next
   listItems = listItemsForExport,
-  // Stryker disable next-line all
-  // v8 ignore next
   listImages = listExportImagesForItems,
-  // Stryker disable next-line all
-  // v8 ignore next
   signUrls = createSignedUrls,
   confirmLargeExport,
 }: {

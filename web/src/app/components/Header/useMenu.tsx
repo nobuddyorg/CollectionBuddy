@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export function useMenu() {
   const [open, setOpen] = useState(false);
@@ -8,10 +8,10 @@ export function useMenu() {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef(false);
 
-  // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
-  const close = useCallback(() => setOpen(false), []);
-  // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
-  const toggle = useCallback(() => setOpen((v) => !v), []);
+  // Not memoized: both go straight onto elements in a component nothing
+  // memoizes, and no effect lists them, so a stable identity buys nothing.
+  const close = () => setOpen(false);
+  const toggle = () => setOpen((v) => !v);
 
   useEffect(() => {
     if (!open) return;

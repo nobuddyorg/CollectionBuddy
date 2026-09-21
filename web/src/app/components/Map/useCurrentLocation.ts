@@ -140,7 +140,6 @@ export function useCurrentLocation(active: boolean) {
           REQUEST_OPTIONS,
         );
       }),
-    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
     [],
   );
 

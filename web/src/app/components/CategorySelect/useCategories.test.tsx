@@ -258,10 +258,10 @@ describe('useCategories deleteCategory', () => {
     consoleError.mockRestore();
   });
 
-  it('treats a null image-paths answer as no photographs to remove', async () => {
+  it('treats an empty image-paths answer as no photographs to remove', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     vi.mocked(listImagePathsForItems).mockResolvedValue({
-      data: null,
+      data: [],
       error: null,
     });
     const { result } = renderHook(() => useCategories(), { wrapper });

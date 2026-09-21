@@ -87,8 +87,6 @@ const PHOTO_UPLOAD_RETRY_BASE_MS = 500;
  * same way `useItemImages.tsx`'s upload path does, from the already-sized
  * image rather than some larger original that no longer exists.
  */
-// Stryker disable all
-/* v8 ignore start -- the real browser call; every test injects a fake. */
 async function realCompressThumb(
   bytes: Uint8Array<ArrayBuffer>,
 ): Promise<Blob> {
@@ -100,8 +98,6 @@ async function realCompressThumb(
     ...WEBP_COMPRESSION_OPTIONS,
   });
 }
-/* v8 ignore stop */
-// Stryker restore all
 
 /** Storage doesn't reliably attach a status the way a `fetch` response does,
  * so (unlike the export's download retry) every failure here is treated as
@@ -111,7 +107,7 @@ async function uploadWithRetry(
   blob: Blob,
   uploadImage: typeof uploadImageObject,
   signal?: AbortSignal,
-): Promise<{ error: unknown }> {
+): Promise<unknown> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < PHOTO_UPLOAD_ATTEMPTS; attempt++) {
     checkCancelled(signal);
@@ -124,14 +120,10 @@ async function uploadWithRetry(
       );
     }
     const { error } = await uploadImage(path, blob);
-    // Stryker disable next-line ObjectLiteral: every caller only ever
-    // checks this for truthiness, so `{}` (error: undefined) and
-    // `{ error: null }` are indistinguishable at runtime -- an equivalent
-    // mutant, not a gap.
-    if (!error) return { error: null };
+    if (!error) return null;
     lastErr = error;
   }
-  return { error: lastErr };
+  return lastErr;
 }
 
 type PhotoTask = { itemId: string; archivePath: string };
@@ -213,7 +205,7 @@ async function importPhoto(
     const thumb = await compressThumb(bytes);
     const base = crypto.randomUUID();
     const pathBase = `${imagePrefix(uid, task.itemId)}/${base}`;
-    const { error: fullError } = await uploadWithRetry(
+    const fullError = await uploadWithRetry(
       `${pathBase}.webp`,
       new Blob([bytes], { type: 'image/webp' }),
       uploadImage,
@@ -222,7 +214,7 @@ async function importPhoto(
     if (fullError) {
       throw new Error('Could not upload photograph', { cause: fullError });
     }
-    const { error: thumbError } = await uploadWithRetry(
+    const thumbError = await uploadWithRetry(
       `${pathBase}.thumb.webp`,
       thumb,
       uploadImage,
@@ -308,14 +300,9 @@ export async function importCategory({
   if (!manifestPath) {
     throw new ImportFormatError('Not a CollectionBuddy export archive');
   }
-  const manifestBytes = entries.get(manifestPath);
-  // findManifestPath only ever returns a name it read out of `entries`
-  // itself, so this can't actually be null -- guarded only to satisfy the
-  // type checker, not because the Map is expected to disagree with its own
-  // keys.
-  // Stryker disable next-line all: unreachable defensive guard, see above
-  // v8 ignore next
-  if (!manifestBytes) throw new ImportFormatError('Archive is corrupt');
+  // Non-null because findManifestPath only ever returns a name it read out
+  // of `entries` itself -- the Map cannot disagree with its own keys.
+  const manifestBytes = entries.get(manifestPath)!;
 
   let manifestItems: ManifestItem[];
   try {

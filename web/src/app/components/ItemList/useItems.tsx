@@ -121,7 +121,6 @@ export function useItems(categoryId: string, q: string) {
 
   const reload = useCallback(
     (opts?: { silent?: boolean }) => loadRef.current(opts),
-    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
     [],
   );
 

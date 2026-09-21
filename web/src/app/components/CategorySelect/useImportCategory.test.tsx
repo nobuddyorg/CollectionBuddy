@@ -272,16 +272,33 @@ describe('useImportCategory', () => {
     expect(() => result.current.cancelImport()).not.toThrow();
   });
 
-  // A changing identity would re-fire every effect that depends on it.
-  it('keeps one cancel function across re-renders', () => {
-    const { result, rerender } = renderHook(() => useImportCategory([]), {
-      wrapper,
+  // What the controller ref buys, rather than the memoization that used to
+  // stand in for it: a cancel captured before the run began still reaches
+  // the run actually in flight.
+  it('aborts the current run even when cancelled through a reference taken before it started', async () => {
+    let signal: AbortSignal | undefined;
+    let release: (() => void) | undefined;
+    vi.mocked(importCategory).mockImplementation((args) => {
+      signal = args.signal;
+      return new Promise((resolve) => {
+        release = () => resolve(imported());
+      });
     });
-    const first = result.current.cancelImport;
+    const { result } = renderHook(() => useImportCategory([]), { wrapper });
+    const cancelFromBefore = result.current.cancelImport;
 
-    rerender();
+    act(() => {
+      void result.current.runImport(FILE);
+    });
+    await waitFor(() => expect(signal).toBeDefined());
+    act(() => {
+      cancelFromBefore();
+    });
 
-    expect(result.current.cancelImport).toBe(first);
+    expect(signal!.aborted).toBe(true);
+    await act(async () => {
+      release?.();
+    });
   });
 
   it('aborts the run in flight when cancelled', async () => {

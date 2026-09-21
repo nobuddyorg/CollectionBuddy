@@ -41,28 +41,28 @@ const CRC32_POLYNOMIAL = 0xedb88320;
 // imported for its type alone should not spend 256 iterations proving it.
 let crcTable: Uint32Array | null = null;
 
+function crc32TableEntry(byte: number): number {
+  let c = byte;
+  for (let bit = 0; bit < 8; bit++) {
+    c = c & 1 ? CRC32_POLYNOMIAL ^ (c >>> 1) : c >>> 1;
+  }
+  return c >>> 0;
+}
+
 export function crc32Table(): Uint32Array {
   if (crcTable) return crcTable;
-  const table = new Uint32Array(256);
-  // Stryker disable next-line EqualityOperator: a typed array silently
-  // drops a write past its end, so `<= 256` builds the same 256 entries.
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let bit = 0; bit < 8; bit++) {
-      c = c & 1 ? CRC32_POLYNOMIAL ^ (c >>> 1) : c >>> 1;
-    }
-    table[i] = c >>> 0;
-  }
-  crcTable = table;
-  return table;
+  crcTable = Uint32Array.from({ length: 256 }, (_, byte) =>
+    crc32TableEntry(byte),
+  );
+  return crcTable;
 }
 
 /** IEEE CRC-32 of `bytes`, as the unsigned value the headers carry. */
 export function crc32(bytes: Uint8Array): number {
   const table = crc32Table();
   let crc = 0xffffffff;
-  for (let i = 0; i < bytes.length; i++) {
-    crc = table[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+  for (const byte of bytes) {
+    crc = table[(crc ^ byte) & 0xff] ^ (crc >>> 8);
   }
   return (crc ^ 0xffffffff) >>> 0;
 }
@@ -110,24 +110,31 @@ function view(length: number): {
   return { bytes, dv: new DataView(bytes.buffer) };
 }
 
+// Every multi-byte field in a ZIP header is little-endian, stated here once
+// rather than at each of the writes below.
+function u16(dv: DataView, offset: number, value: number): void {
+  dv.setUint16(offset, value, true);
+}
+
+function u32(dv: DataView, offset: number, value: number): void {
+  dv.setUint32(offset, value, true);
+}
+
 /** The 30-byte header (plus name) that precedes an entry's bytes. */
 export function localFileHeader(entry: ZipEntry): Uint8Array<ArrayBuffer> {
   const name = encodePath(entry.path);
   const { bytes, dv } = view(LOCAL_HEADER_BYTES + name.length);
-  dv.setUint32(0, LOCAL_HEADER_SIGNATURE, true);
-  dv.setUint16(4, VERSION, true);
-  dv.setUint16(6, FLAG_UTF8, true);
-  // Stryker disable next-line BooleanLiteral: the value is zero, so the
-  // byte order this is written in cannot be observed. Stated anyway --
-  // "stored" is the one decision this whole writer rests on.
-  dv.setUint16(8, METHOD_STORE, true);
-  dv.setUint16(10, entry.time, true);
-  dv.setUint16(12, entry.date, true);
-  dv.setUint32(14, entry.crc, true);
+  u32(dv, 0, LOCAL_HEADER_SIGNATURE);
+  u16(dv, 4, VERSION);
+  u16(dv, 6, FLAG_UTF8);
+  u16(dv, 8, METHOD_STORE);
+  u16(dv, 10, entry.time);
+  u16(dv, 12, entry.date);
+  u32(dv, 14, entry.crc);
   // Stored, so the compressed and uncompressed sizes are the same number.
-  dv.setUint32(18, entry.size, true);
-  dv.setUint32(22, entry.size, true);
-  dv.setUint16(26, name.length, true);
+  u32(dv, 18, entry.size);
+  u32(dv, 22, entry.size);
+  u16(dv, 26, name.length);
   // Extra-field length is zero, which the zero-filled buffer already says.
   bytes.set(name, LOCAL_HEADER_BYTES);
   return bytes;
@@ -139,22 +146,21 @@ export function centralDirectoryEntry(
 ): Uint8Array<ArrayBuffer> {
   const name = encodePath(entry.path);
   const { bytes, dv } = view(CENTRAL_HEADER_BYTES + name.length);
-  dv.setUint32(0, CENTRAL_HEADER_SIGNATURE, true);
-  dv.setUint16(4, VERSION, true);
-  dv.setUint16(6, VERSION, true);
-  dv.setUint16(8, FLAG_UTF8, true);
-  // Stryker disable next-line BooleanLiteral: zero, as in the local header.
-  dv.setUint16(10, METHOD_STORE, true);
-  dv.setUint16(12, entry.time, true);
-  dv.setUint16(14, entry.date, true);
-  dv.setUint32(16, entry.crc, true);
-  dv.setUint32(20, entry.size, true);
-  dv.setUint32(24, entry.size, true);
-  dv.setUint16(28, name.length, true);
+  u32(dv, 0, CENTRAL_HEADER_SIGNATURE);
+  u16(dv, 4, VERSION);
+  u16(dv, 6, VERSION);
+  u16(dv, 8, FLAG_UTF8);
+  u16(dv, 10, METHOD_STORE);
+  u16(dv, 12, entry.time);
+  u16(dv, 14, entry.date);
+  u32(dv, 16, entry.crc);
+  u32(dv, 20, entry.size);
+  u32(dv, 24, entry.size);
+  u16(dv, 28, name.length);
   // Extra, comment, disk number, internal attributes, external attributes:
   // all zero. The zeroed array already says so; they are named here only
   // because their absence is otherwise indistinguishable from an omission.
-  dv.setUint32(42, entry.offset, true);
+  u32(dv, 42, entry.offset);
   bytes.set(name, CENTRAL_HEADER_BYTES);
   return bytes;
 }
@@ -170,13 +176,13 @@ export function endOfCentralDirectory({
   offset: number;
 }): Uint8Array<ArrayBuffer> {
   const { bytes, dv } = view(END_OF_CENTRAL_DIR_BYTES);
-  dv.setUint32(0, END_OF_CENTRAL_DIR_SIGNATURE, true);
+  u32(dv, 0, END_OF_CENTRAL_DIR_SIGNATURE);
   // This disk's number, and the disk the directory starts on: both zero in
   // a single-disk archive, and the zero-filled buffer already says so.
-  dv.setUint16(8, entries, true);
-  dv.setUint16(10, entries, true);
-  dv.setUint32(12, size, true);
-  dv.setUint32(16, offset, true);
+  u16(dv, 8, entries);
+  u16(dv, 10, entries);
+  u32(dv, 12, size);
+  u32(dv, 16, offset);
   // Archive comment length: zero, already in the buffer.
   return bytes;
 }

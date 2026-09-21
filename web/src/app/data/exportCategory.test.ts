@@ -5,6 +5,7 @@ import {
   ExportError,
   exportCategory,
   ITEM_PAGE_SIZE,
+  signAll,
   LARGE_EXPORT_WARN_BYTES,
   PHOTO_DOWNLOAD_CONCURRENCY,
   PHOTO_FETCH_TIMEOUT_MS,
@@ -230,9 +231,9 @@ describe('exportCategory', () => {
     ).rejects.toThrow(ExportError);
   });
 
-  it('treats a null signed-URL list the same as one with no rows, skipping every photograph it covered', async () => {
+  it('skips every photograph a signing call came back empty for', async () => {
     const signUrls = (async () => ({
-      data: null,
+      data: [],
       error: null,
     })) as unknown as SignUrls;
     const result = await exportCategory({
@@ -244,6 +245,50 @@ describe('exportCategory', () => {
     });
     expect(result.skippedPhotoCount).toBe(1);
     expect(result.photoCount).toBe(0);
+  });
+
+  it('ignores a signed-URL row missing either half, rather than keying the map on a null', async () => {
+    const signUrls = (async (paths: string[]) => ({
+      data: [
+        { path: paths[0], signedUrl: null },
+        { path: null, signedUrl: 'https://example.test/orphan' },
+      ],
+      error: null,
+    })) as unknown as SignUrls;
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    try {
+      const result = await exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        getSession: fakeGetSession('uid'),
+        listItems: paginatedListItems([item({ id: 'a' })]),
+        listImages: fakeListImages({ a: ['1.webp'] }),
+        signUrls,
+      });
+
+      expect(result.skippedPhotoCount).toBe(1);
+      expect(result.photoCount).toBe(0);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it('leaves no entry at all for a path Storage could not sign', async () => {
+    const signUrls = (async (paths: string[]) => ({
+      data: [
+        { path: paths[0], signedUrl: 'https://example.test/0' },
+        { path: paths[1], signedUrl: null },
+        { path: null, signedUrl: 'https://example.test/orphan' },
+      ],
+      error: null,
+    })) as unknown as SignUrls;
+
+    const signed = await signAll(['a', 'b', 'c'], signUrls!);
+
+    // Not "b maps to null" and not "null maps to something": a half-filled
+    // row is Storage saying it could not sign that path.
+    expect([...signed]).toEqual([['a', 'https://example.test/0']]);
   });
 
   it('throws when signing fails, rather than exporting with unreadable photo URLs', async () => {
@@ -824,7 +869,7 @@ describe('exportCategory', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
     const signUrls = (async () => ({
-      data: null,
+      data: [],
       error: null,
     })) as unknown as SignUrls;
     try {

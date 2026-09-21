@@ -13,9 +13,7 @@ import { useCallback, useRef } from 'react';
  */
 export function useRequestSequence() {
   const seq = useRef(0);
-  // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
   const next = useCallback(() => ++seq.current, []);
-  // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
   const isCurrent = useCallback((mySeq: number) => mySeq === seq.current, []);
   return { next, isCurrent };
 }

@@ -24,31 +24,25 @@ export function useSession(): SessionState {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(
-    () => {
-      const load = async () => {
-        // getSession() reads the persisted session locally, no network round
-        // trip; getUser() would revalidate and block first paint.
-        // onAuthStateChange below still catches a session that turns out
-        // to be stale. A response landing after unmount is a safe no-op --
-        // React 18+ silently drops a state update for an unmounted fiber.
-        const { data } = await supabase.auth.getSession();
-        setUser(sessionUserFrom(data.session?.user));
-        setLoading(false);
-      };
-      void load();
-      const { data: sub } = supabase.auth.onAuthStateChange(
-        (_event, session) => {
-          setUser(sessionUserFrom(session?.user));
-        },
-      );
-      return () => {
-        sub.subscription.unsubscribe();
-      };
-    },
-    // Stryker disable next-line ArrayDeclaration: a constant dep list never changes either.
-    [],
-  );
+  useEffect(() => {
+    const load = async () => {
+      // getSession() reads the persisted session locally, no network round
+      // trip; getUser() would revalidate and block first paint.
+      // onAuthStateChange below still catches a session that turns out
+      // to be stale. A response landing after unmount is a safe no-op --
+      // React 18+ silently drops a state update for an unmounted fiber.
+      const { data } = await supabase.auth.getSession();
+      setUser(sessionUserFrom(data.session?.user));
+      setLoading(false);
+    };
+    void load();
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(sessionUserFrom(session?.user));
+    });
+    return () => {
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
   return { user, loading };
 }

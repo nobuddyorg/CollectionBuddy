@@ -1,3 +1,4 @@
+import { chunk } from '../lib/chunk';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
 import type { ShareRole } from './shares';
@@ -146,12 +147,11 @@ export async function listItemIdsLinkedElsewhere(
   listPage: typeof rawListItemIdsLinkedElsewhere = rawListItemIdsLinkedElsewhere,
 ): Promise<{ data: string[] | null; error: unknown }> {
   const linked = new Set<string>();
-  for (let i = 0; i < itemIds.length; i += ID_FILTER_CHUNK_SIZE) {
-    const chunk = itemIds.slice(i, i + ID_FILTER_CHUNK_SIZE);
+  for (const ids of chunk(itemIds, ID_FILTER_CHUNK_SIZE)) {
     for (let page = 0; ; page++) {
       const from = page * ITEM_LINK_PAGE_SIZE;
       const { data, error } = await listPage(
-        chunk,
+        ids,
         excludingCategoryId,
         from,
         from + ITEM_LINK_PAGE_SIZE - 1,
