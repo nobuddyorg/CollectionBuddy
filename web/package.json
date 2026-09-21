@@ -21,12 +21,12 @@
     "lighthouse:summary": "node scripts/lighthouse-summary.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.115.0",
+    "@supabase/supabase-js": "^2.116.0",
     "browser-image-compression": "^2.0.2",
     "leaflet": "^1.9.4",
     "next": "16.3.4",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
