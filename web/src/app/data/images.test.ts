@@ -174,8 +174,12 @@ function mockImagesQuery(
 
 describe('listImagesForItems', () => {
   it('selects the listing columns for a single page, single chunk', async () => {
-    const { from, calls, columns } = mockImagesQuery((chunk) => ({
-      data: chunk.map((id, i) => ({ item_id: id, n: i })),
+    // Range-aware, like every other page fake here: a reader that asks for
+    // a second page has to run off the end rather than be handed the first
+    // one again for ever.
+    const { from, calls, columns } = mockImagesQuery((chunk, rangeFrom) => ({
+      data:
+        rangeFrom === 0 ? chunk.map((id, i) => ({ item_id: id, n: i })) : [],
       error: null,
     }));
     const { data, error } = await listImagesForItems(['item-1']);
@@ -245,18 +249,18 @@ describe('listImagesForItems', () => {
     expect(calls[1].chunk[0]).toBe('item-100');
   });
 
+  // Paged out of a fixed table rather than scripted per call, so a walk
+  // that asks for one page too many runs off the end instead of being
+  // handed the same rows again for ever.
   it('keeps paging a chunk while a page comes back full', async () => {
-    const fullPage = Array.from({ length: 1000 }, (_, i) => ({
+    const all = Array.from({ length: 1001 }, (_, i) => ({
       item_id: 'item-1',
       n: i,
     }));
-    let call = 0;
-    const { calls } = mockImagesQuery(() => {
-      call += 1;
-      return call === 1
-        ? { data: fullPage, error: null }
-        : { data: [{ item_id: 'item-1', n: 1000 }], error: null };
-    });
+    const { calls } = mockImagesQuery((_chunk, from, to) => ({
+      data: all.slice(from, to + 1),
+      error: null,
+    }));
     const { data, error } = await listImagesForItems(['item-1']);
     expect(error).toBeNull();
     expect(data).toHaveLength(1001);

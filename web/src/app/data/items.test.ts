@@ -4,6 +4,11 @@ import {
   SEARCH_MIN_LENGTH,
   SEARCH_MIN_LENGTH_NON_ASCII,
   buildSearchFilter,
+  createItem,
+  deleteItem,
+  linkItemToCategory,
+  rawUpdateItemsPlace,
+  updateItem,
   likePatternFor,
   listCategoryPlaces,
   listItems,
@@ -161,10 +166,79 @@ describe('the queries behind the list and the map', () => {
     const params = mapQuery('coin');
     expect(params.get('cat_id')).toBe('cat-1');
     expect(params.get('like_pattern')).toBe('%coin%');
+    const builder = rawListCategoryPlaces('cat-1', 'coin') as unknown as {
+      method: string;
+      url: URL;
+    };
+    expect(builder.method).toBe('GET');
+    // Naming the wrong function is a 404 at runtime and nothing at compile
+    // time, so the function actually addressed is worth pinning.
+    expect(builder.url.pathname).toMatch(/\/rpc\/list_category_places$/);
+  });
+
+  it('carries an abort signal through to each cancellable query', () => {
+    const controller = new AbortController();
+    const signalOf = (builder: unknown) =>
+      (builder as { signal?: AbortSignal }).signal;
+
     expect(
-      (rawListCategoryPlaces('cat-1', 'coin') as unknown as { method: string })
-        .method,
-    ).toBe('GET');
+      signalOf(
+        rawListItems({
+          categoryId: 'cat-1',
+          search: '',
+          from: 0,
+          to: 8,
+          signal: controller.signal,
+        }),
+      ),
+    ).toBe(controller.signal);
+    expect(
+      signalOf(
+        rawCountItems({
+          categoryId: 'cat-1',
+          search: '',
+          signal: controller.signal,
+        }),
+      ),
+    ).toBe(controller.signal);
+    expect(
+      signalOf(
+        rawCountItems({
+          categoryId: 'cat-1',
+          search: 'coin',
+          signal: controller.signal,
+        }),
+      ),
+    ).toBe(controller.signal);
+    expect(
+      signalOf(
+        rawSearchCategoryItems({
+          categoryId: 'cat-1',
+          likePattern: '%coin%',
+          from: 0,
+          to: 8,
+          signal: controller.signal,
+        }),
+      ),
+    ).toBe(controller.signal);
+    expect(
+      signalOf(rawListCategoryPlaces('cat-1', 'coin', controller.signal)),
+    ).toBe(controller.signal);
+  });
+
+  it('leaves a query with nothing to cancel without a signal', () => {
+    expect(
+      (
+        rawListItems({
+          categoryId: 'cat-1',
+          search: '',
+          from: 0,
+          to: 8,
+        }) as unknown as {
+          signal?: AbortSignal;
+        }
+      ).signal,
+    ).toBeUndefined();
   });
 
   it('omits like_pattern rather than sending it as the literal text "null"', () => {
@@ -188,6 +262,16 @@ describe('the queries behind the list and the map', () => {
     );
 
   it('calls the searched-items RPC as a GET, with the category, pattern and page bounds', () => {
+    expect(
+      (
+        rawSearchCategoryItems({
+          categoryId: 'cat-1',
+          likePattern: '%coin%',
+          from: 0,
+          to: 8,
+        }) as unknown as { url: URL }
+      ).url.pathname,
+    ).toMatch(/\/rpc\/search_category_items$/);
     const params = searchParamsOf('coin');
     expect(params.get('cat_id')).toBe('cat-1');
     expect(params.get('like_pattern')).toBe(likePatternFor('coin'));
@@ -234,6 +318,11 @@ describe('the queries behind the list and the map', () => {
     expect(countBuilder('').url.searchParams.get('category_id')).toBe(
       'eq.cat-1',
     );
+    // And still does once the search filter brings the items join back:
+    // a count over the whole table would report someone else's total.
+    expect(countBuilder('coin').url.searchParams.get('category_id')).toBe(
+      'eq.cat-1',
+    );
   });
 
   it('brings the items join back into the count only once a search filter applies', () => {
@@ -268,6 +357,13 @@ describe('the queries behind the list and the map', () => {
 
   it('never filters the export by search', () => {
     expect(exportQuery().has('or')).toBe(false);
+  });
+
+  it('exports every listed field plus the timestamp, joined through the category', () => {
+    expect(exportQuery().get('select')).toBe(
+      'id,title,description,place,place_lat,place_lng,tags,created_at,item_categories!inner(category_id)',
+    );
+    expect(exportQuery().get('item_categories.category_id')).toBe('eq.cat-1');
   });
 
   it('pages the export the same way range() was asked to', () => {
@@ -626,5 +722,89 @@ describe('updateItemsPlace', () => {
 
     expect(error).toBeInstanceOf(Error);
     expect(updatePage).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Same trick as the read queries above: a PostgREST builder composes its
+// request eagerly and only sends it when awaited, so each write can be read
+// back without a server.
+describe('the queries behind creating, editing and deleting an entry', () => {
+  const requestOf = (builder: unknown) =>
+    builder as {
+      url: URL;
+      method: string;
+      headers: Headers;
+      body?: unknown;
+    };
+
+  const fields = {
+    title: 'Sixpence',
+    description: null,
+    place: null,
+    place_lat: null,
+    place_lng: null,
+    tags: [],
+  };
+
+  it('inserts an entry into items and asks only for the new id back', () => {
+    const req = requestOf(createItem(fields));
+
+    expect(req.url.pathname).toMatch(/\/items$/);
+    expect(req.method).toBe('POST');
+    expect(req.url.searchParams.get('select')).toBe('id');
+    expect(req.headers.get('Accept')).toContain('pgrst.object');
+  });
+
+  // enforce_user_id() (0002_functions.sql) fills user_id in from the JWT.
+  // A client that sent one of its own would be handing the row to whoever
+  // it named, so the payload going over the wire must be the fields alone.
+  it('sends the entry fields and nothing else -- never a user_id', () => {
+    const req = requestOf(createItem(fields));
+
+    expect(req.body).toEqual(fields);
+  });
+
+  it('updates exactly the named row and reads back every field the list shows', () => {
+    const req = requestOf(updateItem('item-1', { title: 'Renamed' }));
+
+    expect(req.url.pathname).toMatch(/\/items$/);
+    expect(req.method).toBe('PATCH');
+    expect(req.url.searchParams.get('id')).toBe('eq.item-1');
+    expect(req.url.searchParams.get('select')).toBe(
+      'id,title,description,place,place_lat,place_lng,tags',
+    );
+    expect(req.body).toEqual({ title: 'Renamed' });
+    expect(req.headers.get('Accept')).toContain('pgrst.object');
+  });
+
+  it('writes one place over a whole chunk of ids in a single request', () => {
+    const req = requestOf(
+      rawUpdateItemsPlace(['a', 'b'], { place_lat: 1.5, place_lng: 2.5 }),
+    );
+
+    expect(req.url.pathname).toMatch(/\/items$/);
+    expect(req.method).toBe('PATCH');
+    expect(req.url.searchParams.get('id')).toBe('in.(a,b)');
+    expect(req.body).toEqual({ place_lat: 1.5, place_lng: 2.5 });
+  });
+
+  // A bare .delete() reports an RLS refusal as `{ error: null }`; asking for
+  // the deleted id back is what turns "zero rows affected" into an error.
+  it('deletes exactly the named row and asks for its id back', () => {
+    const req = requestOf(deleteItem('item-1'));
+
+    expect(req.url.pathname).toMatch(/\/items$/);
+    expect(req.method).toBe('DELETE');
+    expect(req.url.searchParams.get('id')).toBe('eq.item-1');
+    expect(req.url.searchParams.get('select')).toBe('id');
+    expect(req.headers.get('Accept')).toContain('pgrst.object');
+  });
+
+  it('links an entry to a category by both ids, and derives the rest server-side', () => {
+    const req = requestOf(linkItemToCategory('item-1', 'cat-1'));
+
+    expect(req.url.pathname).toMatch(/\/item_categories$/);
+    expect(req.method).toBe('POST');
+    expect(req.body).toEqual({ item_id: 'item-1', category_id: 'cat-1' });
   });
 });

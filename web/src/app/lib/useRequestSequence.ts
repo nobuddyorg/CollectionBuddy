@@ -9,9 +9,7 @@ import { useCallback, useRef } from 'react';
  *
  * `next`/`isCurrent` are stable across renders (useCallback, no
  * dependencies) so including them in another callback's dependency array
- * doesn't defeat that callback's own memoization. A mutant that fills those
- * empty dependency lists with a constant is equivalent, since React sees the
- * same contents on every render either way.
+ * doesn't defeat that callback's own memoization.
  */
 export function useRequestSequence() {
   const seq = useRef(0);

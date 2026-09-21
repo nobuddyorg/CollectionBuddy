@@ -35,9 +35,6 @@ export function exportProgressMessage(
   return t('category_select.export_packing');
 }
 
-/* v8 ignore start -- React state around one async I/O call;
- * exportProgressMessage above is the pure part and is what's tested. */
-// Stryker disable all: hook internals aren't covered by tests.
 export function useExportCategory() {
   const { t } = useI18n();
   const toast = useToast();
@@ -114,9 +111,11 @@ export function useExportCategory() {
     [progress, t, toast, confirm],
   );
 
-  const cancelExport = useCallback(() => {
+  // Not memoized: it goes straight onto a button in a component nothing
+  // memoizes, so a stable identity would buy nothing.
+  const cancelExport = () => {
     controllerRef.current?.abort();
-  }, []);
+  };
 
   // An export can run for minutes; closing the tab mid-run would silently
   // discard it with no way back.
@@ -137,5 +136,3 @@ export function useExportCategory() {
     cancelExport,
   };
 }
-// Stryker restore all
-/* v8 ignore stop */

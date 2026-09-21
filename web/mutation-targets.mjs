@@ -9,9 +9,12 @@
 // mutating JSX and class strings produces near-equivalent mutants by the
 // thousand and a score nobody can act on.
 //
-// Where a file still keeps a `Stryker disable` region, it is around I/O
-// that cannot be scored rather than around logic that has not been tested
-// yet; a new region needs the same justification as any other suppression.
+// Nothing in these files is suppressed: no `Stryker disable`, no
+// `/* v8 ignore */`. A raw call is reached through an injected parameter so
+// a test can drive it, and a query builder is asserted by the request it
+// composed. A mutant that survives is a missing assertion or dead code --
+// the only class no test can reach is a React dependency list, which
+// Stryker fills with a constant React reads as unchanged on every render.
 export const MUTATE_TARGETS = [
   'src/app/data/items.ts',
   'src/app/data/zip.ts',
@@ -21,6 +24,8 @@ export const MUTATE_TARGETS = [
   'src/app/data/photon.ts',
   'src/app/lib/pool.ts',
   'src/app/lib/backoff.ts',
+  'src/app/lib/chunk.ts',
+  'src/app/lib/pages.ts',
   'src/app/components/CategorySelect/useExportCategory.tsx',
   'src/app/components/ItemList/Pagination.tsx',
   'src/app/components/ItemList/imageEntries.ts',

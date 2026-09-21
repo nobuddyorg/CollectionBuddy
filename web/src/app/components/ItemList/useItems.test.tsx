@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { act, renderHook, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 
@@ -314,6 +320,22 @@ describe('useItems', () => {
     const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
 
     expect(result.current.loading).toBe(true);
+  });
+
+  // The mount effect raises `loading` itself, so reading it once effects
+  // have flushed cannot tell a `true` seed from a corrected `false` one --
+  // this looks at the render pass that actually reaches the screen first.
+  it('paints its very first render already loading, never flashing the empty-category state', () => {
+    listItemsMock.mockReturnValue(new Promise(() => {}));
+    const passes: boolean[] = [];
+    function Probe() {
+      passes.push(useItems('cat1', '').loading);
+      return null;
+    }
+
+    render(<Probe />, { wrapper });
+
+    expect(passes[0]).toBe(true);
   });
 
   it('resets to page 1 when the search term changes while on a later page', async () => {

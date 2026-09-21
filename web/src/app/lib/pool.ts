@@ -17,17 +17,17 @@ export async function runPool<T>(
   concurrency: number,
   worker: (item: T) => Promise<void>,
 ): Promise<void> {
-  let next = 0;
+  // One iterator shared by every runner is the hand-off itself: each pull
+  // claims the next item exactly once, with no cursor to keep in step.
+  const remaining = items[Symbol.iterator]();
   let poolError: unknown;
   const runners = Array.from(
     { length: Math.min(concurrency, items.length) },
     async () => {
-      for (;;) {
+      for (let it = remaining.next(); !it.done; it = remaining.next()) {
         if (poolError !== undefined) return;
-        const i = next++;
-        if (i >= items.length) return;
         try {
-          await worker(items[i]);
+          await worker(it.value);
         } catch (err) {
           if (poolError === undefined) poolError = err;
           return;

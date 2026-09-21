@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, renderHook } from '@testing-library/react';
+import { act, render, renderHook } from '@testing-library/react';
+import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -243,6 +244,35 @@ describe('usePhotonSearch initial state', () => {
     expect(result.current.error).toBe(false);
     expect(result.current.searched).toBe(false);
     expect(result.current.activeIdx).toBe(-1);
+  });
+
+  // The mount effect resets all five, so reading them after effects have
+  // flushed cannot tell a wrong seed from a corrected one -- this looks at
+  // the render pass the user actually sees first.
+  it('paints its very first render already empty, never flashing a menu, a spinner or an error', () => {
+    const passes: {
+      results: PhotonFeature[];
+      loading: boolean;
+      error: boolean;
+      searched: boolean;
+      activeIdx: number;
+    }[] = [];
+    function Probe() {
+      const { results, loading, error, searched, activeIdx } =
+        usePhotonSearch('en');
+      passes.push({ results, loading, error, searched, activeIdx });
+      return null;
+    }
+
+    render(createElement(Probe));
+
+    expect(passes[0]).toEqual({
+      results: [],
+      loading: false,
+      error: false,
+      searched: false,
+      activeIdx: -1,
+    });
   });
 });
 

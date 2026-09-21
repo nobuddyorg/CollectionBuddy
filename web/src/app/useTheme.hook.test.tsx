@@ -113,6 +113,23 @@ describe('useTheme', () => {
     expect(result.current.preference).toBe('system');
   });
 
+  // Both sides spelled out, like the layout.tsx pair in useTheme.test.ts:
+  // the announcement travels over window, a namespace the whole page
+  // shares, so the name it travels under is a contract, not an internal.
+  it('announces a same-tab change on its own namespaced window event', () => {
+    mockMatchMedia(false);
+    const { result } = renderHook(() => useTheme());
+    const heard = vi.fn();
+    window.addEventListener('collectionbuddy:theme', heard);
+
+    act(() => {
+      result.current.setThemePreference('dark');
+    });
+    window.removeEventListener('collectionbuddy:theme', heard);
+
+    expect(heard).toHaveBeenCalledTimes(1);
+  });
+
   it('picks up a preference change made from another tab', () => {
     mockMatchMedia(false);
     const { result } = renderHook(() => useTheme());
