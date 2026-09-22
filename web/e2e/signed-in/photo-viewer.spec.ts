@@ -16,6 +16,8 @@ test.describe.configure({ timeout: 120_000 });
 const ARRIVES = 45_000;
 
 const PHOTO = resolve(process.cwd(), 'public/logo.png');
+// A file input ignores the very file it already holds, so repeated uploads alternate.
+const PHOTOS = [PHOTO, resolve(process.cwd(), 'public/icon-192.png')];
 const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
 
 const context = () =>
@@ -108,7 +110,7 @@ test.describe('looking at a photograph full size', () => {
         await expect(
           app.catalogue.card(title).locators.uploadInput,
         ).toBeEnabled({ timeout: ARRIVES });
-        await app.catalogue.card(title).do.uploadPhoto(PHOTO);
+        await app.catalogue.card(title).do.uploadPhoto(PHOTOS[upload % 2]);
         await expect
           .poll(() => photoCount(token, itemId), { timeout: ARRIVES })
           .toBe(upload);
