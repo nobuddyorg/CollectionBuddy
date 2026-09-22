@@ -49,4 +49,50 @@ test.describe('looking at a photograph full size', () => {
       await app.catalogue.do.removeEntry(title);
     }
   });
+
+  // A card signs only the photographs it can show (hero and a strip of four);
+  // the rest are signed once the carousel opens (#630).
+  test('shows a photograph past the card once the carousel reaches it', async ({
+    on,
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    const app = on(page);
+    await app.categories.do.open(SEED.viewerCategory);
+
+    const title = uniqueTitle('Sechsfach');
+    try {
+      await app.catalogue.do.addEntry(title);
+      // Past five the card shows no more plates, so each upload is awaited
+      // by the photograph row it ends with rather than by the grid.
+      for (let upload = 0; upload < 6; upload++) {
+        const recorded = page.waitForResponse(
+          (response) =>
+            response.url().includes('/rest/v1/images') &&
+            response.request().method() === 'POST',
+          { timeout: ARRIVES },
+        );
+        await app.catalogue.card(title).do.uploadPhoto(PHOTO);
+        expect((await recorded).ok()).toBe(true);
+      }
+
+      // A fresh page read, so nothing past the card is signed yet.
+      await app.categories.do.open(SEED.viewerCategory);
+      const card = app.catalogue.card(title);
+      await expect(card.locators.images).toHaveCount(5, { timeout: ARRIVES });
+
+      await card.do.openImage();
+      for (let step = 0; step < 5; step++)
+        await page.keyboard.press('ArrowRight');
+      await expect(app.viewer.locators.position).toHaveText('6 / 6');
+      await expect(app.viewer.locators.photo).toHaveAttribute(
+        'src',
+        /\/object\/sign\//,
+      );
+
+      await page.keyboard.press('Escape');
+    } finally {
+      await app.catalogue.do.removeEntry(title);
+    }
+  });
 });

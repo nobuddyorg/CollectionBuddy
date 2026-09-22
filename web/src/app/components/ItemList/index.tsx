@@ -100,6 +100,7 @@ export default function ItemList({
     loadingItems,
     refreshAllImages,
     showImages,
+    signAllFor,
     uploadImage,
     deleteImage,
     captureItemImagePaths,
@@ -136,6 +137,11 @@ export default function ItemList({
     index: number;
   } | null>(null);
   const modalImgs = modalState ? images[modalState.itemId] : [];
+  const modalItemId = modalState?.itemId;
+  const modalNeedsSigning = modalImgs.some((img) => !img.urlFull);
+  useEffect(() => {
+    if (modalItemId && modalNeedsSigning) void signAllFor(modalItemId);
+  }, [modalItemId, modalNeedsSigning, signAllFor]);
   const modalItemTitle = modalState
     ? (items.find((i) => i.id === modalState.itemId)?.title ?? '')
     : '';

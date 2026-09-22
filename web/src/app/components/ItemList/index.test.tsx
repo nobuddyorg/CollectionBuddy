@@ -42,6 +42,7 @@ function defaultImagesState() {
     loadingItems: new Set<string>(),
     refreshAllImages: vi.fn(),
     showImages: vi.fn(),
+    signAllFor: vi.fn(),
     uploadImage: vi.fn(),
     deleteImage: vi.fn(),
     deleteAllItemImages: vi.fn(),

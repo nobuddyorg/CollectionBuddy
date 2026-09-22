@@ -49,6 +49,7 @@ interface ImageViewer {
       close: Locator;
       previous: Locator;
     };
+    photo: Locator;
     position: Locator;
   };
 }
@@ -99,6 +100,7 @@ export function initImageViewer(page: Page): ImageViewer {
       close: root.getByTestId('close-image'),
       previous: root.getByTestId('previous-image'),
     },
+    photo: root.getByTestId('viewer-photo'),
     position: root.getByTestId('image-position'),
   };
   const interactions = {

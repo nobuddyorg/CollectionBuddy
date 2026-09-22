@@ -312,6 +312,59 @@ describe('useItemImages', () => {
     });
   });
 
+  describe('signAllFor', () => {
+    it('signs the photographs past the plates and shows them signed', async () => {
+      vi.mocked(listImagesForItems).mockResolvedValue({
+        data: Array.from({ length: 6 }, (_, i) => row(`img-${i}`, 'item-1')),
+        error: null,
+      });
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+      await act(async () => {
+        await result.current.refreshAllImages(['item-1']);
+      });
+      expect(result.current.images['item-1'][5].urlFull).toBeUndefined();
+
+      await act(async () => {
+        await result.current.signAllFor('item-1');
+      });
+
+      expect(vi.mocked(createSignedUrls).mock.calls.at(-1)?.[0]).toEqual([
+        'uid/item-1/img-5.webp',
+      ]);
+      expect(result.current.images['item-1'][5]).toEqual(
+        entry('img-5', 'item-1'),
+      );
+    });
+
+    it('asks for nothing when every photograph is already signed', async () => {
+      vi.mocked(listImagesForItems).mockResolvedValue({
+        data: [row('img-1', 'item-1')],
+        error: null,
+      });
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+      await act(async () => {
+        await result.current.refreshAllImages(['item-1']);
+      });
+      vi.mocked(createSignedUrls).mockClear();
+
+      await act(async () => {
+        await result.current.signAllFor('item-1');
+      });
+
+      expect(createSignedUrls).not.toHaveBeenCalled();
+    });
+
+    it('asks for nothing for an item it has no photographs of', async () => {
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      await act(async () => {
+        await result.current.signAllFor('item-unknown');
+      });
+
+      expect(createSignedUrls).not.toHaveBeenCalled();
+    });
+  });
+
   describe('uploadImage', () => {
     it('stores a full size and a thumbnail under the uploader own prefix, then records the row', async () => {
       const { result } = renderHook(() => useItemImages(), { wrapper });

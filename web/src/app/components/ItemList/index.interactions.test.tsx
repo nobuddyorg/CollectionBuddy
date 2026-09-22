@@ -58,6 +58,7 @@ function imagesState(overrides: Record<string, unknown> = {}) {
     loadingItems: new Set<string>(),
     refreshAllImages: vi.fn(),
     showImages: vi.fn(),
+    signAllFor: vi.fn(),
     uploadImage: vi.fn(),
     deleteImage: vi.fn(),
     captureItemImagePaths: vi.fn().mockResolvedValue([]),
@@ -192,6 +193,33 @@ describe('the catalogue grid', () => {
     );
 
     expect(screen.getByAltText(', image 1')).toBeInTheDocument();
+  });
+
+  it('signs the photographs past the card once its carousel opens, and not before', async () => {
+    const images = imagesState({
+      images: {
+        'item-1': [PHOTO, { id: 'img-9', pathFull: 'uid/item-1/z.webp' }],
+      },
+    });
+    useItemImagesMock.mockReturnValue(images);
+    renderList();
+    await heroLoads();
+    expect(images.signAllFor).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByAltText('Seated Dime, image 1'));
+
+    expect(images.signAllFor).toHaveBeenCalledWith('item-1');
+  });
+
+  it('asks for no top-up when every photograph is already signed', async () => {
+    const images = imagesState();
+    useItemImagesMock.mockReturnValue(images);
+    renderList();
+    await heroLoads();
+
+    await userEvent.click(screen.getByAltText('Seated Dime, image 1'));
+
+    expect(images.signAllFor).not.toHaveBeenCalled();
   });
 
   it('closes the new-entry dialog from its own close button', async () => {

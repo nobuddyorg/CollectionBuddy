@@ -290,4 +290,14 @@ describe('ImageGrid', () => {
       );
     });
   });
+
+  // Only after a failed signing: an unsigned photograph moved into a plate.
+  it('holds a loading frame for a plate whose photograph is not signed yet', () => {
+    renderGrid([img('a'), img('b'), { id: 'id-c', pathFull: 'c.webp' }]);
+
+    expect(
+      screen.getByRole('status', { name: 'Loading…' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('img')).toHaveLength(2);
+  });
 });

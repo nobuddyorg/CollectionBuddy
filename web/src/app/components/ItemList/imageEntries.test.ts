@@ -6,9 +6,13 @@ import {
   getCachedSignedUrl,
 } from './imageCache';
 import {
+  entryDataOf,
   groupImageRows,
   pageImageRowsFor,
+  RENDERABLE_PLATES,
+  signAllEntries,
   signEntries,
+  STRIP_MAX,
   toImgEntries,
   type ImageEntryData,
 } from './imageEntries';
@@ -256,5 +260,128 @@ describe('pageImageRowsFor', () => {
 
   it('has nothing when the read carried no rows', () => {
     expect(pageImageRowsFor(null, 'a,b')).toBeNull();
+  });
+});
+
+// Seven photographs of one item: more than a card's hero and strip can show.
+function sevenPhotos(): Map<string, ImageEntryData> {
+  return new Map(
+    Array.from({ length: 7 }, (_, i) => [
+      `img-${i}`,
+      {
+        id: `img-${i}`,
+        pathFull: `p/${i}.webp`,
+        pathThumb: `p/${i}.thumb.webp`,
+      },
+    ]),
+  );
+}
+
+function signsEverything() {
+  return vi.fn(async (paths: string[]) => ({
+    data: paths.map((path) => ({ path, signedUrl: `https://signed/${path}` })),
+    error: null,
+  }));
+}
+
+describe('what a card can render', () => {
+  it('is the hero plus a strip of four', () => {
+    expect(STRIP_MAX).toBe(4);
+    expect(RENDERABLE_PLATES).toBe(5);
+  });
+});
+
+describe('toImgEntries past the plates', () => {
+  it('keeps an unsigned photograph past the plates, so it still counts', () => {
+    const result = toImgEntries(sevenPhotos(), new Map());
+    // The first five are dropped unsigned, as before; the last two are kept.
+    expect(result.map((e) => e.id)).toEqual(['img-5', 'img-6']);
+    expect(result[0].urlFull).toBeUndefined();
+  });
+});
+
+describe('signing only what a card can render', () => {
+  beforeEach(() => {
+    clearImageCache();
+  });
+
+  it("signs each item's first five photographs and keeps the rest unsigned", async () => {
+    const signUrls = signsEverything();
+
+    const result = await signEntries(
+      [['item-1', sevenPhotos()]],
+      signUrls as never,
+    );
+
+    expect(signUrls).toHaveBeenCalledOnce();
+    expect(signUrls.mock.calls[0][0]).toEqual(
+      Array.from({ length: 5 }, (_, i) => [
+        `p/${i}.webp`,
+        `p/${i}.thumb.webp`,
+      ]).flat(),
+    );
+    expect(result['item-1']).toHaveLength(7);
+    expect(result['item-1'].map((e) => Boolean(e.urlFull))).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+    ]);
+  });
+
+  it('uses a signature already cached for a photograph past the plates', async () => {
+    cacheSignedUrls([['p/6.webp', 'https://cached/6']]);
+
+    const result = await signEntries(
+      [['item-1', sevenPhotos()]],
+      signsEverything() as never,
+    );
+
+    expect(result['item-1'][6].urlFull).toBe('https://cached/6');
+  });
+
+  it('tops up every photograph for the carousel, signing only what is missing', async () => {
+    const first = await signEntries(
+      [['item-1', sevenPhotos()]],
+      signsEverything() as never,
+    );
+    const signUrls = signsEverything();
+
+    const result = await signAllEntries(
+      [['item-1', entryDataOf(first['item-1'])]],
+      signUrls as never,
+    );
+
+    expect(signUrls.mock.calls[0][0]).toEqual([
+      'p/5.webp',
+      'p/5.thumb.webp',
+      'p/6.webp',
+      'p/6.thumb.webp',
+    ]);
+    expect(result['item-1'].every((e) => e.urlFull)).toBe(true);
+    // Already-signed plates keep the signature they had.
+    expect(result['item-1'][0].urlFull).toBe(first['item-1'][0].urlFull);
+  });
+});
+
+describe('entryDataOf', () => {
+  it('gives back the paths each shown entry was signed from, in order', () => {
+    const data = entryDataOf([
+      {
+        id: 'a',
+        pathFull: 'p/a.webp',
+        urlFull: 'u',
+        pathThumb: 'p/a.thumb.webp',
+      },
+      { id: 'b', pathFull: 'p/b.webp' },
+    ]);
+
+    expect([...data]).toEqual([
+      ['a', { id: 'a', pathFull: 'p/a.webp', pathThumb: 'p/a.thumb.webp' }],
+      ['b', { id: 'b', pathFull: 'p/b.webp', pathThumb: undefined }],
+    ]);
   });
 });

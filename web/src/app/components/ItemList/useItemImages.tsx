@@ -22,7 +22,9 @@ import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
 import { useI18n } from '../../i18n/useI18n';
 import {
+  entryDataOf,
   groupImageRows,
+  signAllEntries,
   signEntries,
   type ImageEntryData,
 } from './imageEntries';
@@ -155,6 +157,14 @@ export function useItemImages() {
     },
     [applyGroupedImages],
   );
+
+  // The carousel's top-up: signs the photographs past the card's plates,
+  // through the same cache, only once someone opens them (#630).
+  const signAllFor = useCallback(async (itemId: string) => {
+    const entries = imagesRef.current[itemId] ?? [];
+    const signed = await signAllEntries([[itemId, entryDataOf(entries)]]);
+    setImages((prev) => ({ ...prev, ...signed }));
+  }, []);
 
   useSignedUrlRefresh(lastSignedAtRef, imagesRef, refreshAllImages);
 
@@ -320,6 +330,7 @@ export function useItemImages() {
     loadingItems,
     refreshAllImages,
     showImages,
+    signAllFor,
     uploadImage,
     deleteImage,
     captureItemImagePaths,
