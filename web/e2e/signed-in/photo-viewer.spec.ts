@@ -104,6 +104,10 @@ test.describe('looking at a photograph full size', () => {
       // by its photograph row, read back the way any client could.
       const itemId = await itemIdFor(token, title);
       for (let upload = 1; upload <= 6; upload++) {
+        // The control stays disabled until the card has shown the last one.
+        await expect(
+          app.catalogue.card(title).locators.uploadInput,
+        ).toBeEnabled({ timeout: ARRIVES });
         await app.catalogue.card(title).do.uploadPhoto(PHOTO);
         await expect
           .poll(() => photoCount(token, itemId), { timeout: ARRIVES })
