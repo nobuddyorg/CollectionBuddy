@@ -383,7 +383,7 @@ describe('exportCategory', () => {
       };
     }) as unknown as SignUrls;
 
-    const signed = await signAll(paths, signUrls);
+    const signed = await signAll(paths, signUrls!);
 
     expect(signed.size).toBe(paths.length);
     expect(peak).toBe(SIGN_CONCURRENCY);
@@ -400,7 +400,7 @@ describe('exportCategory', () => {
     }));
 
     await expect(
-      signAll(paths, signUrls as unknown as SignUrls),
+      signAll(paths, signUrls as unknown as NonNullable<SignUrls>),
     ).rejects.toThrow('Could not sign photograph URLs');
     expect(signUrls.mock.calls.length).toBeLessThan(SIGN_CONCURRENCY + 4);
   });

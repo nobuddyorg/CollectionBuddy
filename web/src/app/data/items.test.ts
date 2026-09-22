@@ -5,8 +5,11 @@ import {
   SEARCH_MIN_LENGTH_NON_ASCII,
   buildSearchFilter,
   createItem,
+  createItems,
   deleteItem,
+  deleteItems,
   linkItemToCategory,
+  linkItemsToCategory,
   rawUpdateItemsPlace,
   updateItem,
   likePatternFor,
@@ -924,5 +927,37 @@ describe('the queries behind creating, editing and deleting an entry', () => {
     expect(req.url.pathname).toMatch(/\/item_categories$/);
     expect(req.method).toBe('POST');
     expect(req.body).toEqual({ item_id: 'item-1', category_id: 'cat-1' });
+  });
+
+  it("inserts a whole import batch in one request, with the caller's ids and timestamps but no user_id", () => {
+    const rows = [
+      { ...fields, id: 'a', created_at: '2026-01-01T00:00:00.000Z' },
+      { ...fields, id: 'b', created_at: '2026-01-01T00:00:00.001Z' },
+    ];
+    const req = requestOf(createItems(rows));
+
+    expect(req.url.pathname).toMatch(/\/items$/);
+    expect(req.method).toBe('POST');
+    expect(req.body).toEqual(rows);
+  });
+
+  it('links a whole import batch to its category in one request', () => {
+    const links = [
+      { item_id: 'a', category_id: 'cat-1', created_at: 't1' },
+      { item_id: 'b', category_id: 'cat-1', created_at: 't2' },
+    ];
+    const req = requestOf(linkItemsToCategory(links));
+
+    expect(req.url.pathname).toMatch(/\/item_categories$/);
+    expect(req.method).toBe('POST');
+    expect(req.body).toEqual(links);
+  });
+
+  it('deletes a batch of entries by id in one request', () => {
+    const req = requestOf(deleteItems(['a', 'b']));
+
+    expect(req.url.pathname).toMatch(/\/items$/);
+    expect(req.method).toBe('DELETE');
+    expect(req.url.searchParams.get('id')).toBe('in.(a,b)');
   });
 });

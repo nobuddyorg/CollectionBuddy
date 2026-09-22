@@ -53,3 +53,15 @@ export function findManifestPath(entryNames: Iterable<string>): string | null {
 export function rootFolderOf(manifestPath: string): string {
   return manifestPath.slice(0, -'/collection.json'.length);
 }
+
+/**
+ * One `created_at` per imported item, 1 ms apart and ending at `now`, so a
+ * batch inserted in one statement keeps the archive's order instead of
+ * sharing one transaction timestamp.
+ */
+export function importTimestamps(count: number, now: Date): string[] {
+  const last = now.getTime();
+  return Array.from({ length: count }, (_, i) =>
+    new Date(last - (count - 1 - i)).toISOString(),
+  );
+}

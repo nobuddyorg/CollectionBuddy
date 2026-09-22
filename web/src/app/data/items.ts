@@ -353,6 +353,32 @@ export function linkItemToCategory(itemId: string, categoryId: string) {
   } as Database['public']['Tables']['item_categories']['Insert']);
 }
 
+/** A row an import writes in bulk: its id and timestamp are chosen by the caller. */
+export type ImportedItemInsert = Pick<ItemInsert, ItemEditableFieldKey> & {
+  id: string;
+  created_at: string;
+};
+
+// user_id is filled in by enforce_user_id(), exactly as for createItem.
+export function createItems(rows: ImportedItemInsert[]) {
+  return supabase.from('items').insert(rows as ItemInsert[]);
+}
+
+// tg_item_categories_enforce() derives and rechecks user_id per row.
+export function linkItemsToCategory(
+  links: { item_id: string; category_id: string; created_at: string }[],
+) {
+  return supabase
+    .from('item_categories')
+    .insert(
+      links as Database['public']['Tables']['item_categories']['Insert'][],
+    );
+}
+
+export function deleteItems(ids: string[]) {
+  return supabase.from('items').delete().in('id', ids);
+}
+
 // Narrowed by the same search as the list (via likePatternFor, the same
 // gate and escaping as searchFilterFor), so the map is the same set of
 // entries seen from above. Grouped by place in Postgres itself

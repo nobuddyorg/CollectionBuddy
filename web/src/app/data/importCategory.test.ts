@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ImportCancelledError,
   importCategory,
+  ITEM_INSERT_BATCH_SIZE,
   PHOTO_UPLOAD_CONCURRENCY,
   type ImportProgress,
 } from './importCategory';
@@ -21,8 +22,9 @@ type ImportParams = Parameters<typeof importCategory>[0];
 type GetUid = ImportParams['getUid'];
 type CreateCategoryRow = ImportParams['createCategoryRow'];
 type DeleteCategoryRow = ImportParams['deleteCategoryRow'];
-type CreateItemRow = ImportParams['createItemRow'];
-type LinkItemToCategoryRow = ImportParams['linkItemToCategoryRow'];
+type CreateItemRows = ImportParams['createItemRows'];
+type LinkItemRows = ImportParams['linkItemRows'];
+type DeleteItemRows = ImportParams['deleteItemRows'];
 type UploadImage = ImportParams['uploadImage'];
 type CreateImage = ImportParams['createImage'];
 type CompressThumb = ImportParams['compressThumb'];
@@ -100,19 +102,25 @@ function fakeDeleteCategory(): DeleteCategoryRow {
   return vi.fn(async () => ({ error: null })) as unknown as DeleteCategoryRow;
 }
 
-function fakeCreateItem(): CreateItemRow {
-  let n = 0;
-  return vi.fn(async () => ({
-    data: { id: `new-item-${++n}` },
-    error: null,
-  })) as unknown as CreateItemRow;
+function fakeCreateItems(): CreateItemRows {
+  return vi.fn(async () => ({ error: null })) as unknown as CreateItemRows;
 }
 
-function fakeLinkItemToCategory(): LinkItemToCategoryRow {
-  return vi.fn(async () => ({
-    error: null,
-  })) as unknown as LinkItemToCategoryRow;
+function fakeLinkItems(): LinkItemRows {
+  return vi.fn(async () => ({ error: null })) as unknown as LinkItemRows;
 }
+
+function fakeDeleteItems(): DeleteItemRows {
+  return vi.fn(async () => ({ error: null })) as unknown as DeleteItemRows;
+}
+
+// Sequential, so each new item's id is predictable: new-item-1, -2, ...
+function fakeNewItemId(): () => string {
+  let n = 0;
+  return () => `new-item-${++n}`;
+}
+
+const NOW = new Date('2026-08-07T12:00:00.000Z');
 
 function fakeUploadImage(): UploadImage {
   return vi.fn(async () => ({ error: null })) as unknown as UploadImage;
@@ -134,8 +142,11 @@ function baseFakes() {
     getUid: fakeGetUid('uid'),
     createCategoryRow: fakeCreateCategory(),
     deleteCategoryRow: fakeDeleteCategory(),
-    createItemRow: fakeCreateItem(),
-    linkItemToCategoryRow: fakeLinkItemToCategory(),
+    createItemRows: fakeCreateItems(),
+    linkItemRows: fakeLinkItems(),
+    deleteItemRows: fakeDeleteItems(),
+    newItemId: fakeNewItemId(),
+    now: () => NOW,
     uploadImage: fakeUploadImage(),
     createImage: fakeCreateImage(),
     compressThumb: fakeCompressThumb(),
@@ -234,7 +245,7 @@ describe('importCategory', () => {
     expect(createCategoryRow).toHaveBeenCalledWith('Coins (2)');
   });
 
-  it('creates one item per manifest entry, linked to the new category', async () => {
+  it('creates every manifest entry in one insert, and links them all in one more', async () => {
     const archive = await buildArchive({
       items: [
         item({ id: 'a', title: 'Dime' }),
@@ -242,42 +253,129 @@ describe('importCategory', () => {
       ],
       photosByItemId: {},
     });
-    const createItemRow = fakeCreateItem();
-    const linkItemToCategoryRow = fakeLinkItemToCategory();
+    const createItemRows = fakeCreateItems();
+    const linkItemRows = fakeLinkItems();
     const createCategoryRow = fakeCreateCategory('new-cat-1');
     const result = await importCategory({
       file: archive,
       categoryName: 'Coins',
       ...baseFakes(),
       createCategoryRow,
-      createItemRow,
-      linkItemToCategoryRow,
+      createItemRows,
+      linkItemRows,
     });
 
-    expect(createItemRow).toHaveBeenCalledTimes(2);
-    expect(createItemRow).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'Dime' }),
-    );
-    expect(createItemRow).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'Nickel' }),
-    );
-    expect(linkItemToCategoryRow).toHaveBeenCalledWith(
-      'new-item-1',
-      'new-cat-1',
-    );
-    expect(linkItemToCategoryRow).toHaveBeenCalledWith(
-      'new-item-2',
-      'new-cat-1',
-    );
+    expect(createItemRows).toHaveBeenCalledOnce();
+    expect(createItemRows).toHaveBeenCalledWith([
+      {
+        id: 'new-item-1',
+        created_at: '2026-08-07T11:59:59.999Z',
+        title: 'Dime',
+        description: null,
+        place: null,
+        place_lat: null,
+        place_lng: null,
+        tags: [],
+      },
+      expect.objectContaining({
+        id: 'new-item-2',
+        created_at: '2026-08-07T12:00:00.000Z',
+        title: 'Nickel',
+      }),
+    ]);
+    expect(linkItemRows).toHaveBeenCalledOnce();
+    expect(linkItemRows).toHaveBeenCalledWith([
+      {
+        item_id: 'new-item-1',
+        category_id: 'new-cat-1',
+        created_at: '2026-08-07T11:59:59.999Z',
+      },
+      {
+        item_id: 'new-item-2',
+        category_id: 'new-cat-1',
+        created_at: '2026-08-07T12:00:00.000Z',
+      },
+    ]);
     expect(result.itemCount).toBe(2);
   });
 
-  it('cleans up and rethrows when linking the item to the category fails', async () => {
+  it('carries every manifest field over to the new row', async () => {
+    const archive = await buildArchive({
+      items: [
+        item({
+          id: 'a',
+          title: 'Dime',
+          description: 'Worn',
+          place: 'Berlin',
+          place_lat: 52.5,
+          place_lng: 13.4,
+          tags: ['silver'],
+        }),
+      ],
+      photosByItemId: {},
+    });
+    const createItemRows = fakeCreateItems();
+    await importCategory({
+      file: archive,
+      categoryName: 'Coins',
+      ...baseFakes(),
+      createItemRows,
+    });
+
+    expect(createItemRows).toHaveBeenCalledWith([
+      {
+        id: 'new-item-1',
+        created_at: NOW.toISOString(),
+        title: 'Dime',
+        description: 'Worn',
+        place: 'Berlin',
+        place_lat: 52.5,
+        place_lng: 13.4,
+        tags: ['silver'],
+      },
+    ]);
+  });
+
+  it('inserts ITEM_INSERT_BATCH_SIZE items per request, reporting progress per batch', async () => {
+    const count = ITEM_INSERT_BATCH_SIZE + 1;
+    const archive = await buildArchive({
+      items: Array.from({ length: count }, (_, i) => item({ id: `o${i}` })),
+      photosByItemId: {},
+    });
+    const createItemRows = fakeCreateItems();
+    const linkItemRows = fakeLinkItems();
+    const onProgress = vi.fn<(progress: ImportProgress) => void>();
+    await importCategory({
+      file: archive,
+      categoryName: 'Coins',
+      ...baseFakes(),
+      createItemRows,
+      linkItemRows,
+      onProgress,
+    });
+
+    const sizes = (fn: unknown) =>
+      (fn as ReturnType<typeof vi.fn>).mock.calls.map(
+        ([rows]) => (rows as unknown[]).length,
+      );
+    expect(sizes(createItemRows)).toEqual([ITEM_INSERT_BATCH_SIZE, 1]);
+    expect(sizes(linkItemRows)).toEqual([ITEM_INSERT_BATCH_SIZE, 1]);
+    expect(
+      onProgress.mock.calls.map(([p]) => p).filter((p) => p.phase === 'items'),
+    ).toEqual([
+      { phase: 'items', done: 0, total: count },
+      { phase: 'items', done: ITEM_INSERT_BATCH_SIZE, total: count },
+      { phase: 'items', done: count, total: count },
+    ]);
+  });
+
+  it('cleans up and rethrows when linking the items to the category fails', async () => {
     const archive = await buildArchive();
     const linkError = new Error('link failed');
-    const linkItemToCategoryRow = vi.fn(async () => ({
+    const linkItemRows = vi.fn(async () => ({
       error: linkError,
-    })) as unknown as LinkItemToCategoryRow;
+    })) as unknown as LinkItemRows;
+    const deleteItemRows = fakeDeleteItems();
     const deleteCategoryRow = fakeDeleteCategory();
     const createCategoryRow = fakeCreateCategory('new-cat-1');
     const consoleError = vi
@@ -289,17 +387,48 @@ describe('importCategory', () => {
       categoryName: 'Coins',
       ...baseFakes(),
       createCategoryRow,
-      linkItemToCategoryRow,
+      linkItemRows,
+      deleteItemRows,
       deleteCategoryRow,
     });
 
-    await expect(failure).rejects.toThrow('Could not link item to category');
+    await expect(failure).rejects.toThrow('Could not link items to category');
     await expect(failure).rejects.toHaveProperty('cause', linkError);
+    // Unlinked items are out of the category cascade's reach, so they go
+    // by id; the category itself goes too.
+    expect(deleteItemRows).toHaveBeenCalledWith(['new-item-1']);
     expect(deleteCategoryRow).toHaveBeenCalledWith('new-cat-1');
     // The cleanup itself succeeded here, so nothing about it should be
     // logged -- only a failed cleanup earns a console.error (see the
-    // dedicated "logs, without throwing" test below).
+    // dedicated "logs, without throwing" tests below).
     expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('logs, without throwing, when deleting the unlinked items fails too', async () => {
+    const archive = await buildArchive();
+    const cleanupError = new Error('delete failed');
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    const failure = importCategory({
+      file: archive,
+      categoryName: 'Coins',
+      ...baseFakes(),
+      linkItemRows: vi.fn(async () => ({
+        error: new Error('link failed'),
+      })) as unknown as LinkItemRows,
+      deleteItemRows: vi.fn(async () => ({
+        error: cleanupError,
+      })) as unknown as DeleteItemRows,
+    });
+
+    await expect(failure).rejects.toThrow('Could not link items to category');
+    expect(consoleError).toHaveBeenCalledWith(
+      'Could not clean up unlinked items',
+      cleanupError,
+    );
     consoleError.mockRestore();
   });
 
@@ -621,13 +750,13 @@ describe('importCategory', () => {
     }
   });
 
-  it('cleans up the new category when creating an item fails, and rethrows', async () => {
+  it('cleans up the new category when creating the items fails, and rethrows', async () => {
     const archive = await buildArchive();
     const itemError = new Error('insert failed');
-    const createItemRow = vi.fn(async () => ({
-      data: null,
+    const createItemRows = vi.fn(async () => ({
       error: itemError,
-    })) as unknown as CreateItemRow;
+    })) as unknown as CreateItemRows;
+    const linkItemRows = fakeLinkItems();
     const deleteCategoryRow = fakeDeleteCategory();
     const createCategoryRow = fakeCreateCategory('new-cat-1');
 
@@ -636,32 +765,16 @@ describe('importCategory', () => {
       categoryName: 'Coins',
       ...baseFakes(),
       createCategoryRow,
-      createItemRow,
+      createItemRows,
+      linkItemRows,
       deleteCategoryRow,
     });
 
+    await expect(failure).rejects.toThrow('Could not create items');
     await expect(failure).rejects.toHaveProperty('name', 'ImportError');
     await expect(failure).rejects.toHaveProperty('cause', itemError);
+    expect(linkItemRows).not.toHaveBeenCalled();
     expect(deleteCategoryRow).toHaveBeenCalledWith('new-cat-1');
-  });
-
-  it('treats a missing item row as a failure even without an explicit error', async () => {
-    // `error` and `!data` are checked with `||`, not `&&` -- either alone
-    // is enough to mean the write didn't really happen.
-    const archive = await buildArchive();
-    const createItemRow = vi.fn(async () => ({
-      data: null,
-      error: null,
-    })) as unknown as CreateItemRow;
-
-    const failure = importCategory({
-      file: archive,
-      categoryName: 'Coins',
-      ...baseFakes(),
-      createItemRow,
-    });
-
-    await expect(failure).rejects.toThrow('Could not create item');
   });
 
   it('does not touch the category at all when creating it fails -- nothing to clean up', async () => {
@@ -709,10 +822,9 @@ describe('importCategory', () => {
 
   it('logs, without throwing, when the cleanup delete itself fails', async () => {
     const archive = await buildArchive();
-    const createItemRow = vi.fn(async () => ({
-      data: null,
+    const createItemRows = vi.fn(async () => ({
       error: new Error('insert failed'),
-    })) as unknown as CreateItemRow;
+    })) as unknown as CreateItemRows;
     const cleanupError = new Error('delete also failed');
     const deleteCategoryRow = vi.fn(async () => ({
       error: cleanupError,
@@ -727,12 +839,12 @@ describe('importCategory', () => {
       categoryName: 'Coins',
       ...baseFakes(),
       createCategoryRow,
-      createItemRow,
+      createItemRows,
       deleteCategoryRow,
     });
 
     // The original error, not the cleanup's, is what surfaces.
-    await expect(failure).rejects.toThrow('Could not create item');
+    await expect(failure).rejects.toThrow('Could not create items');
     expect(consoleError).toHaveBeenCalledWith(
       'Could not clean up partially-imported category',
       'new-cat-1',
@@ -764,21 +876,21 @@ describe('importCategory', () => {
     expect(createCategoryRow).not.toHaveBeenCalled();
   });
 
-  it('cleans up the new category when cancelled mid-import', async () => {
+  it('cleans up the new category when cancelled between item batches', async () => {
     const archive = await buildArchive({
-      items: [item({ id: 'a' }), item({ id: 'b' }), item({ id: 'c' })],
+      items: Array.from({ length: ITEM_INSERT_BATCH_SIZE + 1 }, (_, i) =>
+        item({ id: `o${i}` }),
+      ),
       photosByItemId: {},
     });
     const controller = new AbortController();
-    let calls = 0;
-    const createItemRow = vi.fn(async () => {
-      calls++;
-      // Aborted during the second item -- caught by the cancellation check
-      // at the top of the third loop iteration, the same way a real signal
-      // firing mid-await is only ever noticed at the next checkpoint.
-      if (calls === 2) controller.abort();
-      return { data: { id: `new-item-${calls}` }, error: null };
-    }) as unknown as CreateItemRow;
+    // Aborted during the first batch -- caught by the cancellation check
+    // before the second, the same way a real signal firing mid-await is
+    // only ever noticed at the next checkpoint.
+    const createItemRows = vi.fn(async () => {
+      controller.abort();
+      return { error: null };
+    }) as unknown as CreateItemRows;
     const deleteCategoryRow = fakeDeleteCategory();
     const createCategoryRow = fakeCreateCategory('new-cat-1');
 
@@ -787,12 +899,13 @@ describe('importCategory', () => {
       categoryName: 'Coins',
       ...baseFakes(),
       createCategoryRow,
-      createItemRow,
+      createItemRows,
       deleteCategoryRow,
       signal: controller.signal,
     });
 
     await expect(failure).rejects.toBeInstanceOf(ImportCancelledError);
+    expect(createItemRows).toHaveBeenCalledOnce();
     expect(deleteCategoryRow).toHaveBeenCalledWith('new-cat-1');
   });
 
