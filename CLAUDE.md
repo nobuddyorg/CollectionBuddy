@@ -172,7 +172,8 @@ npm run depcruise         # architectural boundaries
 npm run knip              # dead code / unused dependencies
 npm test -- --coverage
 npm run e2e
-npm run test:mutation
+npm run test:mutation     # if you changed code in a file listed in web/mutation-targets.mjs;
+                          # comments produce no new mutants (TEST_STRATEGY.md §14, gate scope)
 npm run e2e:local         # needs `supabase start`; required if you touched catalogue,
                           # search, map, entry forms, photos, sharing, export, or RLS
 supabase test db          # repo root, needs `supabase start`; required alongside
