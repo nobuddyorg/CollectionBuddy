@@ -162,9 +162,8 @@ select ok(
 );
 select pg_temp.auth_as(:'owner_id'::uuid, 'schema-test-owner@collectionbuddy.test');
 
--- tags is addressed as a flat list everywhere (join_tags, the containment
--- index, the tag filter), and PostgreSQL's array type would happily accept
--- a nested one. items_tags_1d is the backstop; what actually answers a
+-- tags is addressed as a flat list everywhere (join_tags, the tag filter),
+-- and PostgreSQL's array type would happily accept a nested one. items_tags_1d is the backstop; what actually answers a
 -- nested array first is tg_items_normalize, whose unnest() flattens it --
 -- so the constraint never sees one, and the row that lands is still
 -- one-dimensional. Asserted as it behaves rather than as the constraint
@@ -258,6 +257,9 @@ select is(
   0::bigint,
   'and the photograph records of the removed item cascade away with it'
 );
+
+-- Nothing filters tags by array containment, so no GIN index on the array (0016).
+select hasnt_index('public', 'items', 'idx_items_tags_gin', 'items.tags carries no unread GIN index');
 
 select * from finish();
 rollback;

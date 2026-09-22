@@ -23,6 +23,7 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | [`0013_item_categories_cat_created_idx.sql`](../../supabase/migrations/0013_item_categories_cat_created_idx.sql) | `(category_id, created_at desc, item_id)` on `item_categories`, the catalogue page's driving index. |
 | [`0014_list_category_places.sql`](../../supabase/migrations/0014_list_category_places.sql) | `list_category_places()` RPC for the map. |
 | [`0015_search_category_items.sql`](../../supabase/migrations/0015_search_category_items.sql) | `search_category_items()` RPC for the catalogue's search. |
+| [`0016_drop_items_tags_gin.sql`](../../supabase/migrations/0016_drop_items_tags_gin.sql) | Drops the GIN index on `items.tags`, which no query read. |
 
 ### Tables
 
@@ -95,7 +96,7 @@ Every function pins `set search_path = ''`, and every one revokes `execute` from
 
 - Unique `(user_id, lower(name))` on `categories`.
 - `(user_id, created_at desc)` on `items`.
-- Trigram GIN (`pg_trgm`) on `items.title`, `.description`, `.place`, `.tags_text`; plain GIN on `items.tags` for containment.
+- Trigram GIN (`pg_trgm`) on `items.title`, `.description`, `.place`, `.tags_text`. No index on the `items.tags` array: nothing filters by containment (`0016_drop_items_tags_gin.sql`).
 - `item_id`, `category_id`, `user_id` and `(category_id, created_at desc, item_id)` on `item_categories` — the catalogue page is driven from this table so one index serves ordering and scoping.
 - `(item_id, created_at asc, id)` and `user_id` on `images`.
 
