@@ -1,97 +1,64 @@
 # Contributing to CollectionBuddy
 
-## Local development
+CollectionBuddy needs a Supabase backend to run at all; there is no mock
+mode. The local stack in [`supabase/`](supabase/) runs one in Docker.
 
-CollectionBuddy needs a Supabase backend (Postgres + Auth + Storage) to run
-at all. There is no mock/offline mode. The steps below set up the local
-stack that ships in [`supabase/`](supabase/).
+## Prerequisites
 
-1. Prerequisites:
-    - **Node.js 22 or newer.** CI pins 22.x; the test setup relies on Node 22+ behaviour.
-    - **Docker**, running: the Supabase CLI runs the local stack in containers.
-    - **[Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)
-      2.110.0.** Both workflows pin that version, so it is the one the migrations are
-      exercised against.
-
-2. From the repository root, start the local stack and apply migrations:
-
-    ```bash
-    supabase start
-    supabase db reset
-    ```
-
-    This runs Postgres, Auth (GoTrue), Storage, Studio, and Mailpit. `supabase start`
-    prints the local API URL and anon key. They match the defaults in
-    `web/.env.example`, so you normally don't need to change anything.
-
-    Google is the only sign-in provider, and it needs OAuth credentials even
-    for local development. Without them, sign-in fails silently on an
-    otherwise-normal-looking dev server. Export these before `supabase start`
-    (a [Google OAuth client](https://console.cloud.google.com/apis/credentials)
-    with `http://127.0.0.1:54321/auth/v1/callback` as an authorized redirect URI works):
-
-    ```bash
-    export GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID=...
-    export GOTRUE_EXTERNAL_GOOGLE_SECRET=...
-    ```
-
-3. Set up the web app's environment and dependencies:
-
-    ```bash
-    cd web
-    cp .env.example .env.local
-    npm install
-    npm run dev
-    ```
-
-    The app is now at `http://localhost:3000`.
+- **Node.js 22** — CI pins 22.x, and the test setup relies on Node 22
+  behaviour.
+- **Docker**, running.
+- **[Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)
+  2.110.0** — the version CI pins and applies the migrations with.
 
 ## Try the local demo
 
-Want to see the app without a Google account or OAuth credentials? Skip
-step 2's Google setup above and run the demo build instead of `npm run dev`:
+The fastest way to run the app. No Google account, no OAuth credentials:
 
 ```bash
-supabase start
-supabase db reset
-cd web
-npm install
-npm run demo
+supabase start && supabase db reset   # repository root
+cd web && npm install && npm run demo # http://localhost:3000
 ```
 
-`npm run demo` points the app at your local stack and turns on demo mode:
-every visitor is signed in automatically, as a fresh anonymous Supabase
-user, so there's no login screen and nothing to sign up for. It's meant
-for one person browsing on their own machine — there's no sharing between
-anonymous users, and signing out (the account menu in the header) starts a
-new, empty one. The data itself lives in the Docker volume `supabase
-start` created, so it survives restarts until you run `supabase db reset`
-or tear the stack down.
+Demo mode signs every visitor in as a fresh anonymous Supabase user, so there
+is no login screen. It is for one person on their own machine: anonymous
+users cannot share with each other, and signing out starts a new, empty one.
+Data lives in the Docker volume until `supabase db reset` or `supabase stop`.
+
+## Local development
+
+Google OAuth is the only real sign-in, and it needs credentials even locally
+— without them the dev server looks normal and sign-in fails silently.
+
+1. Create a [Google OAuth client](https://console.cloud.google.com/apis/credentials)
+   with `http://127.0.0.1:54321/auth/v1/callback` as an authorized redirect URI.
+2. Export its credentials **before** starting the stack, then run the app:
+
+   ```bash
+   export GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID=...
+   export GOTRUE_EXTERNAL_GOOGLE_SECRET=...
+   supabase start && supabase db reset      # repository root
+   cd web && cp .env.example .env.local && npm install && npm run dev
+   ```
+
+`.env.example` already holds the local stack's URL and anon key.
 
 ## Commit hooks
 
-[prek](https://github.com/j178/prek) runs the checks in
-[`.pre-commit-config.yaml`](.pre-commit-config.yaml) against each commit:
-file hygiene, spell checking, SQL linting (`sqlfluff`, over
-`supabase/migrations/` and `supabase/tests/database/`, config in
-[`.sqlfluff`](.sqlfluff)), and (for `web/`) the same lint/format/type checks
-CI runs. Install it once, then install the hook:
+[prek](https://github.com/j178/prek) runs [`.pre-commit-config.yaml`](.pre-commit-config.yaml)
+on every commit: file hygiene, `typos`, `zizmor`, `markdownlint`, `sqlfluff-lint`
+over `supabase/`, and the same format/lint/type/architecture/dead-code checks
+CI runs in `web/`. `pre-commit` reads the same file.
 
 ```bash
-prek install
-```
-
-`pre-commit` works too. The config is the standard format, and prek is just
-a faster runner for it. To run everything over the whole repo without
-committing:
-
-```bash
-prek run --all-files
+prek install           # once
+prek run --all-files   # everything, without committing
 ```
 
 ## Before opening a pull request
 
-From `web/`, in this order:
+From `web/`, in this order — `build` generates `next-env.d.ts`, which `tsc`
+and ESLint need:
 
 ```bash
 npm run build
@@ -105,94 +72,38 @@ npm run e2e
 npm run test:mutation
 ```
 
-These are the same checks CI runs. See the [developer
-guide](docs/how-to/developer-guide.md#run-the-checks-ci-runs-locally) for why
-the order matters and what each one catches.
+These are CI's `build_and_test` and `mutation_test` jobs. The rest of CI needs
+the local stack (`supabase start` from the repository root) and is required
+when your change touches what it covers:
 
-### General-purpose static analysis (Opengrep)
+| Command | Required when you touched | CI job |
+| --- | --- | --- |
+| `npm run e2e:local` | catalogue, search, map, entry forms, photos, sharing, export/import, or any RLS policy | `e2e_local_stack` |
+| `supabase test db` (repository root) | RLS policies, grants, triggers, functions, or the schema | `e2e_local_stack` |
+| `opengrep scan --config auto web/src web/scripts web/e2e supabase` | anything under those paths | `opengrep` |
+| `npm run lighthouse` | anything that ships in the bundle | `lighthouse` |
+| OWASP ZAP baseline | response headers, CSP, the login page | `zap_baseline` |
 
-CI also runs [Opengrep](https://opengrep.dev/) (an LGPL fork of the Semgrep
-engine) over `web/src`, `web/scripts`, `web/e2e` and `supabase`, uploading
-SARIF to GitHub's code-scanning Security tab. It's a standalone binary, not
-an npm dependency, so it isn't part of the `web/` checklist above; to
-reproduce a run locally:
+The [developer guide](docs/how-to/developer-guide.md) has each one's install
+steps, what it reads, and how to interpret a failure. On a PR, CI skips jobs
+whose paths did not change; the local list above is not conditional.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash -s -- -v v1.30.0
-"$HOME/.opengrep/cli/latest/opengrep" scan --config auto \
-  web/src web/scripts web/e2e supabase
-```
+## What a pull request says
 
-`--config auto` fetches Semgrep's public community rule pack anonymously (no
-account or API key); see [TEST_STRATEGY.md](TEST_STRATEGY.md) for what it
-covers and why it's CI-only rather than a `prek` hook.
+- **Any change under `supabase/migrations/`** is called out as
+  security-relevant, with one line on what it now allows or denies. RLS is
+  this app's only authorization boundary.
+- **A migration that alters an existing table** or adds a constraint or index
+  to one was tested against a populated local database, and the PR says so —
+  CI only proves it applies from scratch, production applies it to live rows
+  with no staging in between. Recipe: [Change the database schema](docs/how-to/developer-guide.md#change-the-database-schema).
+- **A policy, grant, or ownership-trigger change** ships its case in
+  `web/e2e/signed-in/rls.spec.ts` in the same PR.
+- **A UI change** ships an end-to-end case for its journey; **a functional
+  change** ships a unit test. Which layer proves what:
+  [TEST_STRATEGY.md](TEST_STRATEGY.md).
+- **A deliberate trade-off** — the obvious version over an abstraction, a
+  suppression with its reason — is named, not left for review to find.
 
-Any **ERROR**-severity finding fails the CI job (WARNING/INFO are
-report-only, surfaced for human triage rather than blocking) — the local
-command above prints the same findings the CI step reads, so an ERROR-level
-one there means CI will fail on it too.
-
-If your change touches the catalogue, search, the map, the entry forms,
-photographs, sharing, exporting, or any row-level security policy, also run
-the signed-in suite against a local database:
-
-```bash
-supabase start   # from the repository root
-cd web && npm run e2e:local
-```
-
-### Performance budgets (Lighthouse CI)
-
-CI also runs [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci)
-against the real production export — signed out (the plain static build) and
-signed in (demo mode against a local Supabase stack) — never against `next
-dev`. It's CI-only, not part of the `web/` checklist above or a `prek` hook:
-building twice, serving each build, and running headless Chrome against it is
-the same cost class as the e2e suite, which is already CI-only. To reproduce
-a run locally:
-
-```bash
-supabase start   # from the repository root
-cd web && npm run lighthouse
-```
-
-The actual thresholds (and the measured baseline they were set against) live
-in `web/lighthouserc.signed-out.json`/`.signed-in.json`; see
-[TEST_STRATEGY.md](TEST_STRATEGY.md) §12 for the general approach (measure a
-real baseline, set the gate with margin, never the tool's generic defaults)
-and how the accessibility-category overlap with `@axe-core/playwright`
-(above) is handled.
-
-If your change touches a row-level security policy, a grant, an
-ownership-affecting trigger, or the schema more generally, also run the
-pgTAP database suite (`supabase/tests/database/`) against the local stack.
-It complements `e2e:local`'s `rls.spec.ts` rather than duplicating it: pgTAP
-runs fast, function/schema-level assertions directly against Postgres,
-inside a transaction that rolls back, by impersonating the `authenticated`
-and `anon` roles the way PostgREST itself does; the Playwright suite is
-what proves the same policies hold through a real request carrying a real
-JWT. See [TEST_STRATEGY.md](TEST_STRATEGY.md) for the full division of
-labor.
-
-```bash
-supabase start   # from the repository root, if not already running
-supabase test db
-```
-
-If your migration alters an existing table, or adds a constraint or index to
-one, also test it against a populated database, not just the empty one
-`supabase start`/`supabase db reset` gives you — CI only proves a migration
-applies from scratch, while production applies it to a database full of
-rows on every merge to `main`, with no staging environment in between:
-
-```bash
-supabase db reset          # from the repository root
-# seed the affected tables, e.g. the e2e/signed-in.setup.ts seed
-# then apply the new migration file on top of that populated database
-```
-
-Say in the PR description that you did this.
-
-For anything past this checklist (changing the database schema, deploying,
-setting up a new Supabase environment), see the [developer
-guide](docs/how-to/developer-guide.md).
+Never lower a coverage or mutation threshold to get to green, and never
+commit to `main` — the hook blocks it, and `--no-verify` is not the answer.

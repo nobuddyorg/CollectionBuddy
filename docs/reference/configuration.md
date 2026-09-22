@@ -2,89 +2,81 @@
 
 ## Web app environment variables
 
-Set in `web/.env.local` (see `web/.env.example`). Both are required — the Supabase client throws at import time if either is missing.
+`web/.env.local`, from `web/.env.example`. Both are required; the Supabase client throws at import time without them.
 
-| Variable                        | Local default                                           | Production                       |
-| ------------------------------- | ------------------------------------------------------- | -------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | `http://127.0.0.1:54321` (matches `supabase start`)     | Your Supabase project's API URL  |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase's well-known local dev anon key (not a secret) | Your Supabase project's anon key |
+| Variable | Local | Production |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | `http://127.0.0.1:54321` | The project's API URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase's well-known local anon key | The project's anon key |
+| `NEXT_PUBLIC_DEMO_MODE` | `true` signs every visitor in anonymously; `npm run demo` sets it | unset |
 
-There's no separate API key for place search/geocoding — that uses the free public [Photon](https://photon.komoot.io/) API directly from the client, unauthenticated.
+Place search uses the public [Photon](https://photon.komoot.io/) API unauthenticated; there is no key.
 
 ## Google OAuth
 
-Required even for local development — see [CONTRIBUTING.md](../../CONTRIBUTING.md#local-development) for the exact steps (creating the OAuth client, the redirect URI, and the two `GOTRUE_EXTERNAL_GOOGLE_*` environment variables `supabase start` needs). Those map into `supabase/config.toml`'s `[auth.external.google]` block.
+`supabase start` reads `GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID` and `GOTRUE_EXTERNAL_GOOGLE_SECRET` into `supabase/config.toml`'s `[auth.external.google]` block. Setup: [CONTRIBUTING.md](../../CONTRIBUTING.md#local-development).
 
-## Local Supabase stack ports
+## Local Supabase stack
 
-From `supabase/config.toml`:
-
-| Service                       | Port  |
-| ----------------------------- | ----- |
-| API                           | 54321 |
-| Postgres                      | 54322 |
-| Studio (dashboard UI)         | 54323 |
-| Mailpit (local mail capture)  | 54324 |
-
-Project-level storage limit is 50 MiB (`[storage]`), though the `item-images` bucket itself is further restricted to 5 MiB per file and `image/webp`/`image/jpeg`/`image/png` only (see [Architecture reference](architecture.md#storage)).
+From `supabase/config.toml`: API `54321`, Postgres `54322`, Studio `54323`, Mailpit `54324`. Anonymous sign-ins are enabled for demo mode. The project-level storage limit is 50 MiB; the `item-images` bucket is further restricted to 5 MiB per file and `image/webp`, `image/jpeg`, `image/png` ([Architecture](architecture.md#storage)).
 
 ## GitHub Actions secrets
 
-| Secret                          | Used by                                                                       | Required?                                                                                                                                              |
-| ------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`      | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml` | Yes                                                                                                                                                    |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`                                | Yes                                                                                                                                                    |
-| `SUPABASE_DB_URL`               | `pages-deploy.yml` (`migrate` job)                                            | Yes — session-pooler connection string; `db push` uses it                                                                                              |
-| `SUPABASE_ACCESS_TOKEN`         | `pages-deploy.yml` (`migrate` job), `cleanup-orphaned-photos.yml`             | Yes — management-API token, used for the PostgREST schema reload and, in the cleanup job, to run the orphan query and fetch a fresh `service_role` key |
-| `SUPABASE_PROJECT_REF`          | `pages-deploy.yml` (`migrate` job), `cleanup-orphaned-photos.yml`             | Yes — names the project for those same calls                                                                                                           |
-| `STRYKER_DASHBOARD_API_KEY`     | `ci.yml` (`mutation_test` job)                                                | No — without it, Stryker just skips the dashboard reporter and writes a local HTML report instead.                                                     |
+| Secret | Used by | Notes |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml` | Required |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml` | Required |
+| `SUPABASE_DB_URL` | `pages-deploy.yml` (`migrate`) | Required. The **session pooler** string (`aws-0-<region>.pooler.supabase.com`), password percent-encoded. The direct `db.<ref>.supabase.co` host is IPv6-only and unreachable from GitHub runners; `supabase link` reports success anyway and the push fails. |
+| `SUPABASE_ACCESS_TOKEN` | `pages-deploy.yml` (`migrate`), `cleanup-orphaned-photos.yml` | Required. Management-API token: reloads the PostgREST schema cache after a migration; in the cleanup job, runs the orphan query and fetches a fresh `service_role` key. Without it `migrate` returns 401 and the deploy stops. |
+| `SUPABASE_PROJECT_REF` | same two | Required |
+| `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test`) | Optional; without it Stryker writes a local HTML report only |
 
 ## Coverage and mutation thresholds
 
-Defined in [`web/vitest.config.mts`](../../web/vitest.config.mts) (`test.coverage.thresholds`) and [`web/stryker.config.mjs`](../../web/stryker.config.mjs):
+| Gate | Where | Value |
+| --- | --- | --- |
+| Unit coverage, global | `web/vitest.config.mts` `GLOBAL_COVERAGE_THRESHOLDS` | 99% statements, branches, functions, lines |
+| Unit coverage, per file | same file, `PER_FILE_FLOOR`, over `mutation-targets.mjs` | 100%, except the two `Map/` hooks in `NO_COVERAGE_FLOOR` |
+| Mutation score | `web/stryker.config.mjs` `thresholds.break` | 99 — one below the measured 100, so a single new equivalent mutant cannot block unrelated work |
+| E2E JS/CSS coverage | `web/e2e/coverage.ts` `COVERAGE_THRESHOLDS` | One floor for the signed-out suite, one for signed-in; source-mapped (`E2E_COVERAGE_SOURCEMAPS=true`) |
+| Lighthouse | `web/lighthouserc.signed-out.json`, `.signed-in.json` | Performance, best-practices and SEO scores plus LCP, TBT, CLS; set from a measured baseline with margin |
 
-- Global coverage floor is raised **by hand** (`autoUpdate: false`) as real coverage improves, and never edited down — so a regression fails CI. It auto-ratcheted once and was turned off: it wrote the local measurement straight back into the file after every run, including values CI could not reach, so a green local run kept producing a red PR.
-- Most of the pure, high-risk modules (see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files)) additionally have a 100% per-file coverage floor and a mutation-score break threshold of 99 (the two `Map/` hooks, `usePlaces.tsx` and `useCurrentLocation.ts`, are mutation-tested without a per-file floor).
-- Mutation testing runs on every PR, not only on `main`. Only `main` publishes to the dashboard, so the badge tracks one branch.
-- Stryker's internal test runs use [`web/vitest.mutation.config.mts`](../../web/vitest.mutation.config.mts) instead of `vitest.config.mts` directly (`stryker.config.mjs`'s `vitest.configFile`). It only overrides `test.reporters`: Vitest auto-adds a `github-actions` annotation reporter whenever `GITHUB_ACTIONS` is set, and a mutant being killed means its test run is _expected_ to fail, so left alone that reporter turned every kill into a workflow annotation. `npm test` itself (`vitest.config.mts`, unchanged) still gets real annotations on a real failure.
+Every floor is raised by hand when a real run reports a higher number, and never lowered to make a change fit. `autoUpdate` is off in Vitest: it wrote the local measurement back into the config after every run, so a green local run produced a red PR.
+
+Stryker runs Vitest through `web/vitest.mutation.config.mts`, which only changes `test.reporters`: Vitest adds a `github-actions` annotation reporter under `GITHUB_ACTIONS`, and a killed mutant is an expected test failure that would otherwise become a workflow annotation.
 
 ## CI job summaries
 
-Every check that produces a report writes it to the job's own [Actions summary](https://github.blog/news-insights/product-news/supercharging-github-actions-with-job-summaries/) (`$GITHUB_STEP_SUMMARY`) instead of, or in addition to, its usual output — open the workflow run and look at the job in question:
+Each job writes its report to its own Actions summary (`$GITHUB_STEP_SUMMARY`); nothing posts a PR comment, and Codecov's comment is off in [`codecov.yml`](../../codecov.yml).
 
-| Job | What's in the summary | How |
-| ----------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `build_and_test` | Coverage totals against the thresholds above | [`davelosert/vitest-coverage-report-action`](https://github.com/davelosert/vitest-coverage-report-action), reading the `json-summary` coverage reporter |
-| `build_and_test` | Signed-out end-to-end results | [`daun/playwright-report-summary`](https://github.com/daun/playwright-report-summary), reading the `json` Playwright reporter |
-| `build_and_test` | Architectural boundary check (pass/fail + any violations) | The step's own text output, `tee`'d to a file and cat'd into the summary — dependency-cruiser's default `err` reporter is already the same text a human reads on a failure |
-| `build_and_test` | Dead-code/unused-dependency findings | Same `tee`-and-cat approach, against Knip's default reporter output |
-| `e2e_local_stack` | Signed-in end-to-end results | Same Playwright action, run again against that job's own report |
-| `e2e_local_stack` | pgTAP results | Same `tee`-and-cat approach, against `supabase test db`'s own `pg_prove` output |
-| `mutation_test` | Mutation score, overall and per file | [`web/scripts/mutation-summary.mjs`](../../web/scripts/mutation-summary.mjs), reading Stryker's `json` reporter output via `mutation-testing-metrics` — not the console log, which is mostly the _expected_ per-mutant test "failures" that killing a mutant produces |
-| `opengrep` | Finding count, total and by rule | `jq` (already on the runner image) against the same SARIF file uploaded to code scanning — no new dependency for a one-line count |
-| `lighthouse` | Performance/best-practices/SEO scores, LCP, CLS, against each page's thresholds | [`web/scripts/lighthouse-summary.mjs`](../../web/scripts/lighthouse-summary.mjs), reading each target's `manifest.json` and its representative run's own report |
-| `build_and_test`, `e2e_local_stack` | Non-blocking (moderate/minor) accessibility findings, when any exist | [`web/e2e/axe.ts`](../../web/e2e/axe.ts)'s `reportNonBlockingFindings`, called from inside the Playwright test itself (in CI only — it checks for `$GITHUB_STEP_SUMMARY` before writing) since these findings never fail a test and would otherwise only exist as a downloadable attachment nobody opens |
-| `zap_baseline` | Passive DAST findings, PASS/WARN/IGNORE/FAIL per rule, once per pass (signed out, signed in) | `report_md.md`, written by `zaproxy/action-baseline` itself into the workspace, cat'd straight in before each pass's build overwrites it — no summary script needed on our side this time |
-
-Codecov's own pull-request comment is turned off ([`codecov.yml`](../../codecov.yml), `comment: false`) now that the same numbers are in the job summary; its commit status checks are untouched. None of the summary actions post a PR comment either (`create-comment: false` / `comment-on: none`) — job summary only, by design, so nothing new shows up as bot noise on the PR itself.
+| Job | Summary | Source |
+| --- | --- | --- |
+| `build_and_test` | Coverage against the thresholds above | `davelosert/vitest-coverage-report-action` over the `json-summary` reporter |
+| `build_and_test` | Signed-out e2e results | `daun/playwright-report-summary` over the `json` reporter |
+| `build_and_test` | `depcruise` and `knip` output | The step's text, `tee`'d into the summary |
+| `e2e_local_stack` | pgTAP results; signed-in e2e results | `pg_prove` output; the same Playwright action |
+| `mutation_test` | Mutation score, overall and per file | `web/scripts/mutation-summary.mjs` over Stryker's `json` reporter |
+| `opengrep` | Finding count, total and by rule | `jq` over the uploaded SARIF |
+| `lighthouse` | Scores, LCP, CLS against each page's thresholds | `web/scripts/lighthouse-summary.mjs` over each target's `manifest.json` |
+| `build_and_test`, `e2e_local_stack` | Non-blocking accessibility findings | `web/e2e/axe.ts` `reportNonBlockingFindings`, from inside the test, CI only |
+| `zap_baseline` | PASS/WARN/IGNORE/FAIL per rule, per pass | `report_md.md` written by `zaproxy/action-baseline` |
 
 ## End-to-end tests
 
-[`web/playwright.config.ts`](../../web/playwright.config.ts), specs in `web/e2e/`. Two projects — desktop Chrome and a Pixel 7 viewport — run against the built export in CI and against the deployed site after a release.
+[`web/playwright.config.ts`](../../web/playwright.config.ts), specs in `web/e2e/`. Projects: `chromium` (Desktop Chrome), `mobile` (Pixel 7), `firefox`; with a local stack also `setup` and `signed-in`.
 
-| Variable                   | Effect                                                                                                         |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| _(unset)_                  | Builds nothing; serves `web/out` under the base path and tests that.                                           |
-| `E2E_BASE_URL`             | Tests a deployed origin instead, and starts no server.                                                         |
-| `E2E_PORT`                 | Port for the local server (default `4173`).                                                                    |
-| `E2E_SUPABASE_URL`         | Adds the `setup` and `signed-in` projects. Unset, they do not exist, so `npm run e2e` needs nothing installed. |
-| `E2E_SUPABASE_ANON_KEY`    | Used by the setup step to sign the test user in.                                                               |
-| `E2E_SUPABASE_SERVICE_KEY` | Used _only_ to create that user — `service_role` has no table grants.                                          |
+| Variable | Effect |
+| --- | --- |
+| _(unset)_ | Serves `web/out` under the base path and tests it |
+| `E2E_BASE_URL` | Tests that origin instead; starts no server; `retries: 2` |
+| `E2E_PORT` | Local server port, default `4173` |
+| `E2E_SUPABASE_URL` | Enables the `setup` and `signed-in` projects |
+| `E2E_SUPABASE_ANON_KEY` | Signs the test user in |
+| `E2E_SUPABASE_SERVICE_KEY` | Creates the test user, nothing else — `service_role` has no table grants |
+| `E2E_COVERAGE_SOURCEMAPS` | `true` makes `next build` emit source maps so the coverage report maps to `src/app/**` |
 
-`npm run e2e:local` sets all three from `supabase status` and builds the bundle against the local stack. Point it at anything other than a local stack and it would seed a real database, which is why nothing reads these from a deployed project's secrets.
-
-No retries locally — a page that fails one run in ten fails for a tenth of visitors — and two against a remote target, where a retry separates a broken deploy from a dropped connection.
+`npm run e2e:local` sets the three `E2E_SUPABASE_*` values from `supabase status` and builds the bundle against the local stack; nothing reads them from a deployed project's secrets, because the suite seeds whatever database it is pointed at. Retries are `0` locally: a page that fails one run in ten fails for a tenth of visitors.
 
 ## i18n
 
-Two languages, German (`de`, default) and English (`en`) — [`web/src/app/i18n/de.json`](../../web/src/app/i18n/de.json) / `en.json`. Keys are grouped by feature area: `brand`, `page`, `header`, `category_select`, `item_create`, `item_list`, `google_sign_in_button`, `login_page`, `common`. A parity test (`web/src/app/i18n/parity.test.ts`) scans every `t('…')` call site in the source and fails if a key is missing from either JSON file, or if the two files don't declare exactly the same set of keys — so a key can't be renamed in code without updating both translations, and a translation can't be added to one language and silently missing from the other.
+German (`de`, default) and English (`en`): [`web/src/app/i18n/de.json`](../../web/src/app/i18n/de.json), `en.json`, keys grouped by area (`brand`, `page`, `header`, `category_select`, `item_create`, `item_list`, `google_sign_in_button`, `login_page`, `common`). `web/src/app/i18n/parity.test.ts` scans every `t('…')` call site and fails on a key missing from either file or on the two files declaring different key sets.

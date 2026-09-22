@@ -1,203 +1,241 @@
 # Developer guide
 
-Task-oriented recipes for contributing to or operating CollectionBuddy. For the day-to-day local setup (Docker, Supabase, Google OAuth, `npm run dev`) and the pre-PR checklist, see [CONTRIBUTING.md](../../CONTRIBUTING.md) — this guide covers everything past that.
+Recipes for contributing to and operating CollectionBuddy. Local setup and the
+pre-PR checklist are in [CONTRIBUTING.md](../../CONTRIBUTING.md); this guide
+covers each check in depth, and everything past the checklist.
 
 ## Run the checks CI runs, locally
 
-From `web/`, in this order — the build comes first on purpose. `next build` generates
-`next-env.d.ts` (gitignored), and both `tsc` and ESLint need it on a clean checkout to
-resolve the ambient module types it references:
+The checklist in [CONTRIBUTING.md](../../CONTRIBUTING.md#before-opening-a-pull-request)
+is CI's `build_and_test` job step for step, plus `mutation_test`. The
+stack-dependent jobs — `e2e_local_stack`, `opengrep`, `lighthouse`,
+`zap_baseline` — each have a section below.
 
-```bash
-npm run build
-npx tsc --noEmit
-npx prettier --check .
-npm run lint
-npm test -- --coverage
-npm run e2e
-```
-
-That is the `build_and_test` job in [`ci.yml`](../../.github/workflows/ci.yml), step for
-step. Two more jobs run alongside it rather than after it, so run them separately:
-
-```bash
-npm run test:mutation   # the mutation_test job
-supabase test db        # part of the e2e_local_stack job; needs `supabase start` first
-npm run e2e:local       # the rest of the e2e_local_stack job; same prerequisite
-```
-
-A fourth job, `prek`, runs the repo-wide hooks — `prek run --all-files` from the repository
-root is the same thing.
-
-A fifth job, `changes`, decides whether `build_and_test`, `mutation_test`, and
-`e2e_local_stack` run at all: on a PR, each is skipped unless the paths it
-actually covers changed — see `.github/workflows/ci.yml`'s `changes` job for
-exactly which, and [TEST_STRATEGY.md](../../TEST_STRATEGY.md) §13 for the
-general rationale. Don't be surprised to see one of them missing on a
-docs-only or SQL-only PR — the local commands above still all run and are
-still worth running before opening one, since nothing about the local
-pre-PR checklist is conditional.
-
-Coverage, mutation score, and end-to-end results all show up as a table in their job's own
-Actions summary rather than as a PR comment — see [Configuration
-reference](../reference/configuration.md#ci-job-summaries).
+On a pull request, CI's `changes` job skips `build_and_test`, `mutation_test`,
+`lighthouse` and `zap_baseline` unless `web/**` changed, and `e2e_local_stack`
+and `opengrep` unless `web/**` or `supabase/**` changed; a push to `main` runs
+everything. A skipped job reports as passed. Every job writes its report to its
+own Actions summary rather than a PR comment — see
+[Configuration](../reference/configuration.md#ci-job-summaries).
 
 ## Run the end-to-end suite
 
 ```bash
 cd web
-npm run build   # e2e drives the built export, not the dev server
+npm run build   # the suite drives the built export, not the dev server
 npm run e2e
 ```
 
-Playwright starts and stops the server itself. It serves `out/` **under the base path**, because that is where GitHub Pages puts it and `next build` bakes that path into every asset URL, router link and manifest entry — an export served at `/` 404s on nearly everything it asks for. `scripts/serve-export.mjs` builds a directory for that, and takes the path from `EXPORT_BASE_PATH` in [`next.config.ts`](../../web/next.config.ts) so the name exists in one place.
-
-Useful while writing tests:
+Playwright starts and stops the server itself, serving `out/` **under the base
+path** (`/CollectionBuddy`) the way GitHub Pages does — `next build` bakes that
+path into every asset URL, so an export served at `/` 404s on nearly
+everything. `scripts/serve-export.mjs` builds the directory for that, reading
+the path from `next.config.ts`.
 
 ```bash
-npx playwright test --ui             # pick tests, watch them run, step through
+npx playwright test --ui               # pick tests, watch, step through
 npx playwright test e2e/public/theme.spec.ts
-npx playwright test --project=mobile # the phone viewport only
-npx playwright show-report           # after a failed run
+npx playwright test --project=mobile   # the Pixel 7 viewport only
+npx playwright show-report             # after a failed run
 ```
 
-The same suite runs against the deployed site after every release, pointed at another origin:
+The same suite runs against the deployed site after every release:
 
 ```bash
 E2E_BASE_URL="https://nobuddyorg.github.io/CollectionBuddy/" npm run e2e
 ```
 
-With `E2E_BASE_URL` set it starts no server of its own. That run is what catches the failures only production can have — a base path that doesn't match, an icon that 404s once deployed, a stale asset from the CDN.
-
-**Everything in `e2e/public/` has to hold for a signed-out visitor.** Those runs have no Supabase session, which is what keeps a run against production read-only.
+With `E2E_BASE_URL` set it starts no server. That run catches what only
+production has: a wrong base path, an icon that 404s, a stale CDN asset.
+**Everything in `e2e/public/` must hold for a signed-out visitor** — that is
+what keeps a run against production read-only.
 
 ### The signed-in suite
 
-`e2e/signed-in/` runs against a real database: the catalogue, search, paging, the map, the entry forms, photographs, exporting and importing a category, sharing one and being shared with, the account menu's language and appearance, and — in `rls.spec.ts` — the row-level security boundary itself. That last one is the executable version of the RLS model, and nearly all of it deliberately bypasses the interface: one test looks at the page, and the other twenty-odd ask Postgres directly, with a real token, the questions the app would never think to ask. Change a policy in `0006_policies.sql` or `0007_storage.sql` and this is the file that says whether it still holds, including the `editor` grant — the widest one the schema can issue — in its own describe block.
+`e2e/signed-in/` runs against a real database: catalogue, search, paging, map,
+entry forms, photos, export and import, sharing from both sides, the account
+menu, and — in `rls.spec.ts` — the row-level security boundary itself.
+`rls.spec.ts` bypasses the interface almost entirely: it asks Postgres, with a
+real token, the questions the app never would, including the `editor` grant in
+its own describe block. Change a policy and this file says whether it holds.
 
 ```bash
-supabase start     # from the repository root
+supabase start     # repository root
 cd web
 npm run e2e:local
 ```
 
-That one script reads the stack's own keys, **builds the bundle against it** — the Supabase URL is baked in at build time, so a build pointed elsewhere would produce a suite that passes while testing a bundle talking to production — and runs the suite. CI runs the same script, so the two cannot drift.
+`e2e:local` reads the stack's keys, **builds the bundle against it** — the
+Supabase URL is baked in at build time, so a build pointed elsewhere would test
+a bundle talking to production — and runs the suite. CI runs the same script.
 
-Sign-in does not go through the interface, because the only way in is Google OAuth and no runner can drive it. `e2e/signed-in.setup.ts` creates a user through the auth admin API, signs in, and writes the session into `localStorage` as Playwright storage state. It does not spell out the storage key: supabase-js derives that from the project URL, so the setup hands the same library somewhere to write and reads back what it wrote.
+Sign-in does not go through the interface, since no runner can drive Google
+OAuth. `e2e/signed-in.setup.ts` creates a user through the auth admin API,
+signs in, and writes the session into `localStorage` as Playwright storage
+state. Before adding tests here:
 
-Two things worth knowing before adding tests here:
-
-- **Seeding runs as the user, not as `service_role`.** That role is granted nothing on these tables — [`0006_policies.sql`](../../supabase/migrations/0006_policies.sql) grants `authenticated` and no one else, because row-level security is this app's only authorization layer. The service key opens exactly one door: creating the user. Everything else goes through the same policies the app does, so a fixture cannot set up a state the app itself could not reach.
-- **Spec files run in parallel against one database.** Tests that write use their own category (`SEED.scratchCategory`); the collections the reading tests describe are never touched. A test that creates an entry in a collection another file is counting would make both wrong, at random.
-
-Prefer `expectTitles(page, [...])` over reading the grid once: the search box debounces and then waits on a round trip, so anything that asserts immediately after typing is asserting on the previous answer.
+- **Seeding runs as the user, not as `service_role`.** That role has no table
+  grants; its key opens one door, creating the user. Everything else goes
+  through the same policies the app does, so a fixture cannot reach a state
+  the app could not.
+- **Spec files run in parallel against one database.** Tests that write use
+  `SEED.scratchCategory`; the collections the reading tests describe are never
+  touched.
+- **Poll, don't read once.** `expectTitles(page, [...])` waits for the
+  debounced search round trip; an assertion straight after typing reads the
+  previous answer.
 
 ### How a spec addresses the app
 
-Every element a spec touches carries a `data-testid`, and no spec names a selector of its own. `e2e/pages/` holds one page object per screen, `createPageTree(page)` collects them, and `e2e/fixture.ts` hands that tree to every test as the `on` fixture — so a test starts `async ({ on, page })` and reads as the journey it is. TEST_STRATEGY.md §9 has the shape and the rules behind it; what is specific to this app is the list of screens:
+Every element a spec touches carries a `data-testid`, and no spec names a
+selector of its own. `e2e/pages/` holds one page object per screen,
+`createPageTree(page)` collects them, and `e2e/fixture.ts` hands that tree to
+every test as the `on` fixture, so a test starts `async ({ on, page })` and
+reads as the journey it is. [TEST_STRATEGY.md](../../TEST_STRATEGY.md) §9 has
+the shape and the rules; the screens are:
 
-- `catalogue` — the grid, its search box and pagination, plus `card(title)` for one entry and the photographs on it
-- `categories` — the collection strip, the panel behind it, and `tab(name)`
-- `form` — the entry form, its tag chips and the place autocomplete
-- `sharing` — the invite box and `row(email)` for one grant's role, expiry and revoke
-- `map`, `viewer`, `confirm`, `toast`, `account`, `login` — the map modal, the full-size photograph, the confirmation dialog, the toast, the account menu and the signed-out page
+- `catalogue` — grid, search box, pagination; `card(title)` for one entry and
+  its photos
+- `categories` — the collection strip, the panel behind it, `tab(name)`
+- `form` — the entry form, tag chips, place autocomplete
+- `sharing` — the invite box; `row(email)` for a grant's role, expiry, revoke
+- `map`, `viewer`, `confirm`, `toast`, `account`, `login`
 
-Leaflet's pins and popups are the one thing still reached by class name, inside `e2e/pages/map.ts`: that markup is the library's, not ours, and there is nowhere to put an id. Everything else — including a control a test only needs to assert is disabled — gets an id in the component rather than a role or text locator in the test.
-
-Adding a case that needs an element with no id means adding the id to the component and a locator to the page object. The grep that keeps this honest:
+Leaflet's pins and popups are the one thing reached by class name, inside
+`e2e/pages/map.ts`: that markup is the library's. A new case that needs an
+element with no id adds the id to the component and a locator to the page
+object. The grep that keeps this honest should return only `html`, `body`,
+`meta` and `link` assertions:
 
 ```bash
 grep -rn 'getByTestId\|getByRole\|locator(' web/e2e --include=*.spec.ts
 ```
 
-It should only turn up `html`, `body`, `meta` and `link` assertions, which are document-level and have nothing to name.
+### The e2e coverage report
 
-### Known E2E journey-coverage gaps
+`npm run e2e` and `npm run e2e:local` collect JS/CSS coverage through
+Playwright's own `page.coverage` (Chromium CDP, no instrumentation step);
+`e2e/global-teardown.ts` merges every worker's data into
+`web/coverage-e2e/index.html` and fails the run if it drops below the floor in
+`e2e/coverage.ts` — one floor per suite, since the two reach very different
+amounts of the app. `i18n.spec.ts` (own browser context) and the `firefox`
+project (no CDP) do not contribute.
 
-A walk of README's feature list and this suite (2026-09), checking each
-feature against `e2e/signed-in/` and — per TEST_STRATEGY.md §9 — whether an
-apparent gap is actually delegated to a component/unit test instead. Most
-of README's list is covered one way or the other: photo strips and the
-multi-photo carousel are unit-tested in `ModalImage.test.tsx`, and the
-sharing UI's mechanics (invite form, role selector) are unit-tested in
-`Sharing.test.tsx`/`useShares.test.tsx`.
-
-The two gaps that walk found are closed:
-
-- Importing is round-tripped in `import.spec.ts`: a real export is
-  downloaded and handed straight back to the real file input, which is the
-  half `importCategory.test.ts`'s fake I/O structurally cannot reach.
-- Sharing is driven through the interface from both sides, with two real
-  signed-in browser sessions — `sharing.spec.ts` (the owner invites,
-  promotes to `editor`, then revokes) and `shared-with-me.spec.ts` (the
-  grantee's own session, from `OTHER_AUTH_STATE_PATH`, which sees the
-  collection marked as someone else's, finds the owner-only controls shut,
-  and leaves the share). What a grant then opens or refuses stays in
-  `rls.spec.ts`, at the API level, where it belongs.
-
-Local demo mode (`npm run demo`) still has no E2E coverage, but it's dev
-tooling rather than a production code path, so it's a lower-priority gap
-than those two were.
-
-### The pgTAP database suite
-
-`supabase/tests/database/` runs [pgTAP](https://pgtap.org/) directly against Postgres — no PostgREST, no browser — by impersonating the `authenticated` and `anon` roles the way a real request does: `set local role`, plus a `request.jwt.claims` GUC carrying the claims a JWT would. It runs in the same job as the signed-in suite, right after `supabase start`, because a schema or policy regression is cheaper to catch there than after paying for Playwright's browser install too.
+Measure the way CI does before believing a floor failure: CI and `e2e:local`
+set `E2E_COVERAGE_SOURCEMAPS=true`, so the report maps to `src/app/**` lines;
+a plain `npm run build && npm run e2e` reads the minified bundle instead, a
+different metric with a few dozen "lines". The production deploy never sets
+it — that would ship source maps.
 
 ```bash
-supabase start   # from the repository root, if not already running
+E2E_COVERAGE_SOURCEMAPS=true npm run build && E2E_COVERAGE_SOURCEMAPS=true npm run e2e
+```
+
+## Run the pgTAP database suite
+
+`supabase/tests/database/` runs [pgTAP](https://pgtap.org/) directly against
+Postgres, impersonating `authenticated` and `anon` the way PostgREST does —
+`set local role` plus a `request.jwt.claims` GUC — inside a transaction that
+rolls back.
+
+```bash
+supabase start   # repository root
 supabase test db
 ```
 
-The suite is split by what each file is responsible for, so a schema change has an obvious home. `_helpers.psql` holds the impersonation and error-catching fixtures the files share, included with psql's `\ir`; it is named `.psql` because `supabase test db` runs `pg_prove --ext .pg --ext .sql -r`, and any `.sql` file here would be collected as a test and fail for having no plan.
-
 | File | Covers |
 | --- | --- |
-| `000_schema_test.sql` | Trigger shape, every constraint, and the delete cascades — attempted as real writes |
-| `001_grants_test.sql` | The grant surface: what each role may address at all, before RLS gets a say |
-| `002_function_hardening_test.sql` | `search_path` pinning, and which functions run as their owner |
-| `005_impersonation_sanity_test.sql` | That the impersonation the rest of the suite relies on actually works |
-| `010`/`020`/`025`/`030` | Ownership, viewer grants, a grant's life after issue, and the editor role |
-| `040_storage_policy_surface_test.sql` | The bucket's configuration, and the storage capabilities two security fixes removed |
-| `050`/`055` | The SQL functions and every branch of the write-path triggers |
-| `060`/`065` | The two read RPCs: who may call them, and what they return |
+| `000_schema_test.sql` | Trigger shape, every constraint, the delete cascades — as real writes |
+| `001_grants_test.sql` | What each role may address at all, before RLS runs |
+| `002_function_hardening_test.sql` | `search_path` pinning; which functions run as their owner |
+| `005_impersonation_sanity_test.sql` | That the impersonation the suite relies on works |
+| `010`, `020`, `025`, `030` | Ownership, viewer grants, a grant's lifecycle, the editor role |
+| `040_storage_policy_surface_test.sql` | Bucket configuration; the storage verbs two security fixes removed |
+| `050`, `055` | The SQL functions and every branch of the write-path triggers |
+| `060`, `065` | The two read RPCs: who may call them, what they return |
 
-It complements `rls.spec.ts` rather than duplicating it: pgTAP proves the policy, trigger and constraint logic fast and directly; `rls.spec.ts` proves the same properties hold through the real PostgREST-and-JWT pipeline, and is still the only place the real Storage API and the bytes behind a `storage.objects` row get exercised — pgTAP asserts that surface from the catalog only. See [TEST_STRATEGY.md](../../TEST_STRATEGY.md#7-security-and-authorization-testing) for the full division of labor. A policy, grant, or ownership-affecting trigger change still needs its `rls.spec.ts` case regardless of whether a pgTAP case exists alongside it — that rule (CLAUDE.md guardrail 3) is not discharged by pgTAP coverage.
+`_helpers.psql` holds the shared fixtures; it is `.psql` because
+`supabase test db` collects every `.sql` file as a test. pgTAP proves the
+policy, trigger and constraint logic fast; `rls.spec.ts` proves the same
+properties through the real PostgREST-and-JWT pipeline and is the only place
+the Storage API and the bytes behind a `storage.objects` row are exercised. A
+policy, grant, or ownership-trigger change needs its `rls.spec.ts` case
+regardless of pgTAP coverage.
 
 ## Run mutation testing
-
-Line coverage counts lines that _ran_; mutation testing counts lines that are actually _checked_. It is the number worth reading — see [Design decisions](../explanation/design-decisions.md#why-mutation-testing-is-scoped-to-a-handful-of-files) for why it's scoped the way it is.
 
 ```bash
 cd web
 npm run test:mutation
 ```
 
-CI runs this on **every** PR as well as on pushes to `main` — check the `mutation_test` job's own duration on a recent run rather than trusting a number written here, since the mutant count and runtime both drift as files are added to the scoped list. There is no `Stryker disable` or `/* v8 ignore */` left in `src/`, so the score is over every mutant the scoped files produce, with nothing held back. Only main publishes to the [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main), so the badge keeps tracking one branch — locally, without `STRYKER_DASHBOARD_API_KEY`, it writes an HTML report to `web/reports/mutation/index.html`.
+Stryker mutates exactly the files in [`mutation-targets.mjs`](../../web/mutation-targets.mjs),
+which `vitest.config.mts` also reads for its per-file 100% coverage floors, so
+the two cannot drift. A file goes on the list once its logic is reachable from
+tests without faking the world: take the raw call as an injected parameter and
+assert the request it composed. There is no `Stryker disable` or
+`/* v8 ignore */` in `src/`; a survivor is a missing assertion or dead code to
+delete, except the React dependency-list class explained in
+[Design decisions](../explanation/design-decisions.md#what-still-survives-and-why-no-test-can-kill-it).
 
-The list of mutated files is [`mutation-targets.mjs`](../../web/mutation-targets.mjs), which [`stryker.config.mjs`](../../web/stryker.config.mjs) and `vitest.config.mts`'s per-file coverage floors both read, so the two can't drift apart — a file on that list carries a 100% coverage floor too, unless it is one of the handful named in the same file's `NO_COVERAGE_FLOOR`. Adding one to that list means everything in it gets scored, I/O included: take the raw call as an injected parameter so a test can drive it, and assert the request it composed rather than the network it would have reached. Where a mutant survives anyway, the two honest endings are a missing assertion or genuinely dead code to delete — not a suppression. The one class nothing can kill is a React dependency list, which Stryker fills with a constant React reads as unchanged on every render; those are left visible in the report rather than commented away ([Design decisions](../explanation/design-decisions.md#what-still-survives-and-why-no-test-can-kill-it)).
+CI runs this on every PR. Only `main` publishes to the
+[Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main);
+locally, the report is `web/reports/mutation/index.html`.
+
+## Run Opengrep
+
+CI's `opengrep` job scans `web/src`, `web/scripts`, `web/e2e` and `supabase`
+with [Opengrep](https://opengrep.dev/) and uploads SARIF to the Security tab.
+It is a standalone binary, not an npm dependency:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash -s -- -v v1.30.0
+"$HOME/.opengrep/cli/latest/opengrep" scan --config auto \
+  web/src web/scripts web/e2e supabase
+```
+
+`--config auto` fetches Semgrep's public community rules anonymously. An
+**ERROR** finding fails the job; WARNING and INFO are surfaced for triage. It
+runs in CI rather than as a commit hook because of that network fetch.
+
+## Run Lighthouse
+
+CI's `lighthouse` job runs [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci)
+against the production export twice — signed out, and signed in through demo
+mode — never against `next dev`:
+
+```bash
+supabase start   # repository root
+cd web && npm run lighthouse
+```
+
+Thresholds and the baseline they were measured against are in
+`web/lighthouserc.signed-out.json` and `.signed-in.json`. The performance
+category is the gate; accessibility findings belong to `@axe-core/playwright`
+in the e2e suite, so they are not double-asserted here. A fresh demo account
+has no categories, so the signed-in pass measures a different code path than a
+populated catalogue.
 
 ## Run the OWASP ZAP baseline scan
 
-`ci.yml`'s `zap_baseline` job runs a passive DAST scan against the built static export, twice
-— signed out, then signed in via demo mode — see [TEST_STRATEGY.md](../../TEST_STRATEGY.md)'s
-§6 "Dynamic scanning (DAST)" for what this kind of scan covers and what it deliberately
-doesn't (it is not a substitute for `rls.spec.ts`). Both passes need the local stack up first
-(`supabase start` from the repo root); from `web/`:
+CI's `zap_baseline` job runs a passive scan against the built export, signed
+out and then signed in through demo mode. It reports headers, cookie flags and
+passive-injection findings; it says nothing about authorization
+([TEST_STRATEGY.md](../../TEST_STRATEGY.md) §6). Both passes need the stack:
 
 ```bash
+supabase start   # repository root
 cd web
 status=$(supabase status -o json)
 export NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL <<< "$status")
 export NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .ANON_KEY <<< "$status")
-
 npm run build
-ln -s . out/CollectionBuddy   # see the job's own comment for why this is needed
+ln -s . out/CollectionBuddy   # zap-baseline.py always spiders from the host root
 npx serve out -l 4173
 ```
 
-Then, from the repository root, in a second terminal (Docker Desktop users: swap
-`--network host` for `-t http://host.docker.internal:4173/` below; that flag only works on
-Linux):
+In a second terminal, from the repository root (Docker Desktop: replace
+`--network host` with `-t http://host.docker.internal:4173/`):
 
 ```bash
 docker run --rm -v "$(pwd):/zap/wrk/:rw" --network host \
@@ -206,124 +244,100 @@ docker run --rm -v "$(pwd):/zap/wrk/:rw" --network host \
   -r /zap/wrk/zap-report-signed-out.html
 ```
 
-The self-referencing symlink is required, not cosmetic: `zap-baseline.py` always resets its
-spider to the target's host root regardless of any path in the URL you give it, but the
-export only renders under `/CollectionBuddy/` (`next.config.ts` bakes that in). The symlink
-makes the one build answer identically at both.
+For the signed-in pass: stop `serve`, `rm out/CollectionBuddy`, rebuild with
+`NEXT_PUBLIC_DEMO_MODE=true npm run build`, recreate the symlink, serve on
+`4174`, and run the same `docker` command against that port with
+`-r /zap/wrk/zap-report-signed-in.html`.
 
-For the signed-in pass, stop the first `serve` (`Ctrl-C`), remove the symlink
-(`rm out/CollectionBuddy`), then rebuild with demo mode on and repeat against a different port
-so nothing from the first pass lingers:
-
-```bash
-NEXT_PUBLIC_DEMO_MODE=true npm run build
-ln -s . out/CollectionBuddy
-npx serve out -l 4174
-```
-
-```bash
-docker run --rm -v "$(pwd):/zap/wrk/:rw" --network host \
-  ghcr.io/zaproxy/zaproxy:stable \
-  zap-baseline.py -t http://127.0.0.1:4174/ -c /zap/wrk/.zap/rules.tsv -I \
-  -r /zap/wrk/zap-report-signed-in.html
-```
-
-Worth knowing before reading too much into the signed-in pass's report: a fresh demo-mode
-account has zero categories (same caveat `scripts/lighthouse.mjs` already carries), so it
-scans a different code path and a larger bundle, not real seeded catalogue content.
-
-Both `zap-report-*.html` files land at the repository root (delete them afterward — they
-aren't build artifacts anything else expects to find there). Remove `out/CollectionBuddy`
-before running `npm run e2e`/`npm run e2e:local` afterward; the real e2e suite serves the
-export differently (`web/scripts/serve-export.mjs`) and doesn't expect that symlink to exist.
-`supabase stop` when done.
-
-## Coverage floors
-
-`vitest.config.mts` carries a global floor plus per-file 100% floors for the pure, high-risk modules. The global floor is not auto-updated: raise it by hand when coverage genuinely improves, and never lower it to make a change fit. It had been left about 16 points below what the suite actually achieved, which meant half the tests could have been deleted with CI still green.
-
-## Read the e2e JS/CSS coverage report
-
-`npm run e2e` and `npm run e2e:local` both collect JS/CSS coverage automatically, via Playwright's own `page.coverage` (Chromium's CDP coverage collector, so this needs no Istanbul/babel instrumentation step). `e2e/coverage.ts` wires it into every test through an auto fixture; `e2e/global-teardown.ts` merges what each worker collected into one report after all projects finish, via [`monocart-coverage-reports`](https://github.com/cenfun/monocart-coverage-reports).
-
-```bash
-open web/coverage-e2e/index.html   # after any e2e run
-```
-
-`e2e/coverage.ts`'s `COVERAGE_THRESHOLDS` gates on it: `generateCoverageReport()` throws out of `global-teardown.ts` if statements/branches/functions/lines drop below their floor, which fails the whole `npm run e2e`/`e2e:local` run the same as a failed test would. Like `vitest.config.mts`'s floor, it's not auto-ratcheted — raise it by hand when a real run reports a higher achieved number, never lower it to make a change fit. There is one floor per suite, since the two never run together and reach wildly different amounts of the app: a shared floor would have to be the signed-out one, and the signed-in suite could then lose most of its coverage without the gate noticing. Each is a margin below what a real run achieved, both read off CI, whose `e2e_local_stack` job is the only place the signed-in suite can run. See the comment above `COVERAGE_THRESHOLDS` for the exact numbers, and for why `functions` is the one floor a refactor can move on its own: its denominator is every function in `src/app`, so extracting a shared helper out of several call sites lowers the ratio without the suite reaching one function less.
-
-Two things opt out of coverage collection entirely: `i18n.spec.ts` (it drives its own `browser.newContext()` rather than the `page` fixture the auto fixture attaches to), and the `firefox` project (Playwright's Coverage API is Chromium-only over CDP; Firefox still runs every other assertion in `e2e/public`, just without contributing to this report or the gate).
-
-CI posts the `console-summary`/`markdown-summary` table to the job summary and uploads the full `web/coverage-e2e/` report as a build artifact (`e2e-coverage`/`e2e-coverage-signed-in`) on every run, pass or fail — both via `.github/actions/playwright-results`, alongside the existing Playwright HTML report. `pages-deploy.yml`'s `smoke_test` job (post-deploy check against production) doesn't use that action and isn't part of this — it stays a narrower pass/fail signal, not a coverage source.
-
-By default coverage is measured against the built bundle, not the original source, since the export doesn't ship source maps (`next.config.ts` only sets `productionBrowserSourceMaps` when `E2E_COVERAGE_SOURCEMAPS=true`). CI (`ci.yml`'s `build_and_test` job) and `npm run e2e:local` (`scripts/e2e-local-stack.mjs`) both set it, so their reports map back to real `src/app/**` files and lines (`sourceFilter` in `e2e/coverage.ts` keeps vendor library source out of it); a plain local `npm run build && npm run e2e` doesn't, and reads against the minified bundle instead. Those two readings are different metrics, not the same metric measured twice — the minified bundle has a few dozen "lines" where the source has thousands — and `COVERAGE_THRESHOLDS` is the source-mapped one. So measure the way CI does before believing a floor failure: `E2E_COVERAGE_SOURCEMAPS=true npm run build && E2E_COVERAGE_SOURCEMAPS=true npm run e2e`. `pages-deploy.yml`'s actual deploy build never sets it — turning source maps on there would ship them in the production static export, which is a separate, deliberate call this doesn't make.
+Afterwards delete the two `zap-report-*.html` files and `out/CollectionBuddy`;
+`npm run e2e` serves the export differently and does not expect the symlink.
 
 ## Regenerate the app icons
-
-The home-screen and splash-screen icons in `web/public/` are rendered from a single piece of artwork, `web/public/logo.png`:
 
 ```bash
 cd web
 npm run icons
 ```
 
-Run it after changing `logo.png`, and commit what it writes — it needs a headless browser, so it is not part of the build. It only ever scales the artwork down, and refuses to write an icon that would need scaling up: `logo.png` is 414px across, which is the hard ceiling on how sharp any icon can be. Raising that ceiling means a vector source, not a bigger export of the same raster.
-
-`site.webmanifest` lists the results by hand. `src/app/manifest.test.ts` checks that every icon it names exists, is the size it claims, and covers what a launcher needs — so an entry added there without a file (or the other way round) fails the suite rather than a phone.
+Renders every icon in `web/public/` from `web/public/logo.png` (414 px, the
+ceiling on icon sharpness — a bigger raster does not help, a vector would).
+Needs a headless browser, so it is not part of the build; commit what it
+writes. `src/app/manifest.test.ts` checks that every icon `site.webmanifest`
+names exists at the size it claims.
 
 ## Change the database schema
 
-Every schema change goes through a new migration file, never an edit to an existing one:
+1. Add `supabase/migrations/NNNN_description.sql`, numbered after the highest
+   existing file. Never edit an existing migration.
+2. Apply it: `supabase db reset` (re-runs every migration from scratch).
+3. Regenerate `web/src/app/data/database.types.ts`:
+   `supabase gen types typescript --local`. CI fails if it drifts.
+4. Check [Architecture](../reference/architecture.md#database-schema) so the
+   migration does not duplicate an existing table, trigger or index.
+5. Merge to `main` applies it to production. Nothing is applied by hand.
 
-1. Add a new `supabase/migrations/NNNN_description.sql` file (next number after the highest existing one — check `ls supabase/migrations/`).
-2. Apply it locally: `supabase db reset` (re-runs every migration from scratch against your local stack).
-3. Update `web/src/app/data/database.types.ts` to match — `supabase gen types typescript --local`, or by hand.
-4. See [Architecture reference](../reference/architecture.md#database-schema) for what's already there, so your migration doesn't duplicate an existing table, trigger, or index.
-5. Merging to `main` applies it to production — see below. Nothing needs applying by hand.
+Three things a from-scratch reset will not tell you:
 
-`supabase db reset` only proves the migration applies against an **empty**
-database — that's all CI checks too. Production applies it with `db push`
-against a database full of rows, unattended, with no staging in between: a
-`not null` column with no default, a unique index existing rows violate, or a
-check constraint existing data fails would pass every automated check and
-only fail there. If your migration alters an existing table, or adds a
-constraint or index to one, reset and seed the local database (the
-`e2e/signed-in.setup.ts` seed covers most shapes), apply the new migration
-file on top of that populated database rather than through a fresh reset,
-and say in the PR description that you did.
-
-If you ever apply a migration outside the pipeline (SQL editor, `db push` by hand), send `notify pgrst, 'reload schema'` afterwards. PostgREST serves from a cached schema, so until it reloads, every write naming a newly added column fails with `PGRST204: Could not find the 'x' column of 'items' in the schema cache` — the table is fine, the API just hasn't noticed. Most Supabase projects have a `pgrst_ddl_watch` event trigger that does this automatically; this one doesn't, and can't, since creating an event trigger needs superuser and `postgres` isn't. The `migrate` job sends it on every run, so migrations that go through `main` are covered.
-
-A migration that touches `storage.objects` can create and drop _policies_ on it, but not indexes or anything else needing ownership: hosted Supabase owns that table as `supabase_storage_admin` and never grants it to `postgres`, so `create index` on it raises `42501` for every role available to us. An earlier migration carried such an index for a year, which meant that file — one transaction — had never applied anywhere, locally or in production, while the repo and its docs described it as live.
+- **Populated data.** Production applies the migration to live rows,
+  unattended. A `not null` column without a default, a unique index existing
+  rows violate, or a check constraint existing data fails passes CI and fails
+  there. If the migration alters an existing table or adds a constraint or
+  index to one: `supabase db reset`, seed rows into the affected tables
+  (`web/e2e/signed-in.setup.ts` covers most shapes), apply the new file on top,
+  and say in the PR that you did.
+- **`storage.objects` DDL.** Policies on it are fine; `create index` or any
+  other DDL raises `42501` on hosted Supabase, which owns that table as
+  `supabase_storage_admin` and never grants it to `postgres`.
+- **The PostgREST schema cache.** A migration applied outside the pipeline
+  (SQL editor, `db push` by hand) needs `notify pgrst, 'reload schema'`
+  afterwards, or every write naming a new column fails with `PGRST204`. The
+  `migrate` job sends it on every run.
 
 ### Squashing migrations again
 
-`supabase/migrations/` has been squashed twice, most recently in #580. It holds the resulting seven-file baseline (`0001` to `0007`) plus the migrations that have landed since (`0008` onward — see the [architecture reference](../reference/architecture.md#database-schema) for what each one changes). See [Design decisions](../explanation/design-decisions.md#why-the-migrations-were-squashed) for what each round folded in and how the result was verified. Squashing is a deliberate, occasional act, not routine, and it folds the whole current set, not just whatever has accumulated since the last time.
+The chain has been squashed twice (most recently #580) into the 0001–0007
+baseline plus whatever landed since. Squashing is a deliberate, occasional act
+that folds the whole current set, never a side effect of another change. Do it
+the way the last one was verified: reset the local stack from the new files,
+introspect old and new databases down to column defaults, constraint
+expressions, index definitions, function bodies, trigger timing, policy
+predicates and grants, and diff them. Afterwards clear
+`supabase_migrations.schema_migrations` on the hosted project so the new files
+are recorded as themselves — that table is the only reason the chain cannot be
+rewritten in place.
 
-If you do it: verify it the same way, by introspecting both databases down to column defaults, constraint expressions, index definitions, function bodies, trigger timing, policy predicates and grants, and diffing them. Afterward, clear `supabase_migrations.schema_migrations` on the hosted project so the new files are recorded as themselves. That table is the only reason the chain can't simply be rewritten in place.
+## Set up a new Supabase environment
 
-## Set up a new Supabase environment (e.g. for a fork, or production)
+For a fork, or a new production project:
 
-The local stack in `supabase/` and a real hosted Supabase project need the same setup, done twice:
-
-1. Create a Supabase project (or use the local CLI stack — see CONTRIBUTING.md).
-2. Apply every migration in `supabase/migrations/`, in order — `supabase link --project-ref <ref>` then `supabase db push`. Pasting files into the SQL editor also works, but note that it leaves `supabase_migrations.schema_migrations` untouched, so the project ends up not knowing what it has run; `supabase migration repair --status applied <version>` is what reconciles that afterwards.
-3. In the project's Auth settings, enable **Google** as a provider and set the same (or a new) OAuth client ID/secret, with a redirect URI of `<project-url>/auth/v1/callback`.
-4. Note the project's API URL and anon key (Project Settings → API) — these become `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+1. Create a Supabase project.
+2. `supabase link --project-ref <ref>` then `supabase db push`. Pasting files
+   into the SQL editor also works but leaves `supabase_migrations.schema_migrations`
+   untouched; `supabase migration repair --status applied <version>` reconciles it.
+3. Auth settings: enable **Google** with an OAuth client whose redirect URI is
+   `<project-url>/auth/v1/callback`.
+4. Note the API URL and anon key (Project Settings → API); they become
+   `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 
 ## Deploy to GitHub Pages
 
-The production path is [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml): push to `main`, and it applies any pending migrations to the hosted database, then builds the static export and deploys it via GitHub's official Pages actions. Nothing deploys from a developer machine; to reproduce just the export locally, run `npm run build` from `web/`, which is the first step of [the checks CI runs](#run-the-checks-ci-runs-locally).
+[`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) runs on every
+push to `main`: `migrate` applies pending migrations and reloads the PostgREST
+schema cache, `build` exports the site, `deploy` publishes it, `smoke_test`
+runs the signed-out suite against the live URL. Each job depends on the last,
+so a failed migration leaves the previous bundle serving the previous schema.
+Nothing deploys from a developer machine.
 
-The `migrate` job runs first and the build depends on it, so the schema is never behind the bundle that expects it. If a migration fails, nothing is deployed and the previous bundle keeps serving against the unchanged schema.
+One-time setup for a fork:
 
-One-time setup for a new fork or a repo renamed away from `CollectionBuddy`:
-
-1. Repo Settings → Pages → set the source to **GitHub Actions**.
-2. Add repository secrets `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, pointed at your (non-local) Supabase project.
-3. Add `SUPABASE_DB_URL` — the **session pooler** connection string, Project Settings → Database → Connection string → Session pooler, with the password filled in and percent-encoded. It must be the pooler host (`aws-0-<region>.pooler.supabase.com`), not `db.<ref>.supabase.co`: the direct host is IPv6-only and GitHub runners have no IPv6, and `supabase link` does not paper over this — it reports success and the subsequent push fails anyway.
-4. Add `SUPABASE_ACCESS_TOKEN` (a personal access token from <https://supabase.com/dashboard/account/tokens>) and `SUPABASE_PROJECT_REF` (the project ref from your project URL). The `migrate` job's last step uses these to send `notify pgrst, 'reload schema'` over the management API — without them that step returns 401, and because `build` declares `needs: migrate`, the whole deploy stops.
-5. If the repo isn't named `CollectionBuddy`, update the `repo` constant in `web/next.config.ts` — the production `basePath` (`/CollectionBuddy`) is derived from it, and a mismatch breaks every static asset path on Pages.
-6. Optional: add `STRYKER_DASHBOARD_API_KEY` as a secret if you want mutation-test reports published (see above).
-7. Optional: if your Supabase project is on the free tier, keep [`keep-alive.yml`](../../.github/workflows/keep-alive.yml) enabled (it's on by default) — it pings a `keepalive()` RPC daily so the project doesn't auto-pause from inactivity.
-8. The README's CodeQL badge links to this repo's code-scanning results, but `.github/workflows/` carries no CodeQL workflow file — it relies on GitHub's "default setup" (repo Settings → Code security → Code scanning), a per-repo setting that does not carry over from the upstream repo. Switch it on there, or the badge renders green while scanning nothing.
+1. Repo Settings → Pages → source **GitHub Actions**.
+2. Secrets: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+   `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF` — what
+   each is and why the DB URL must be the session pooler:
+   [Configuration](../reference/configuration.md#github-actions-secrets).
+3. If the repository is not named `CollectionBuddy`, change `repo` in
+   `web/next.config.ts`; the production `basePath` derives from it.
+4. Optional: `STRYKER_DASHBOARD_API_KEY` to publish mutation reports;
+   `keep-alive.yml` stays enabled on a free-tier project.
+5. The README's CodeQL badge relies on GitHub's default code-scanning setup
+   (Settings → Code security), a per-repo setting that does not carry over.

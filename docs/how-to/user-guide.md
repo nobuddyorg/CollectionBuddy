@@ -1,83 +1,121 @@
 # User guide
 
-Task-oriented recipes for using CollectionBuddy. If you haven't used the app before, [Getting started](../tutorials/getting-started.md) is a better first read; come back here when you need a specific answer.
+Recipes for specific tasks. New to the app? Start with
+[Getting started](../tutorials/getting-started.md).
 
-## Sign in / sign out
+## Sign in and out
 
-Google is the only sign-in provider (`/login`). Signing out (user menu → **Sign out**) revokes the session on the server; if that call fails (e.g. you're offline), it falls back to clearing the session locally so you're never stuck "signed in" on a device with no network.
+Google is the only sign-in (`/login`). **Sign out** is in the user menu (click
+your email in the header). If the sign-out request fails — you are offline,
+say — the session is cleared locally anyway, so you are never stuck signed in
+on a device without network.
 
-## Manage categories
+## Categories
 
-Categories are the top-level grouping — you always browse one at a time.
+You always browse one category at a time.
 
-- **Create**: type a name in the category picker and click **+**. Names must be non-blank and are unique per account, case-insensitively (`Coins` and `coins` collide).
-- **Switch**: open the picker (if collapsed, click the expand button next to the current category name) and pick from the dropdown.
-- **Rename**: open the picker, select the category, edit the name in the text field, and confirm. The same rules as creation apply — non-blank, and unique per account case-insensitively — and the server normalises what you typed, so the name that comes back is what gets stored.
-- **Delete**: select the category, clear the search/name field, click delete, confirm. Deleting a category also deletes any items that would be left belonging to _no_ category as a result — items shared with another category survive.
+- **Create**: type a name in the category picker, click **+**. Names must be
+  non-blank and are unique per account, case-insensitively — `Coins` and
+  `coins` collide.
+- **Switch**: open the picker (the expand button next to the current name) and
+  pick from the list.
+- **Rename**: select the category, edit the name in the text field, confirm.
+  Same rules as creation. Whitespace is trimmed and collapsed on save.
+- **Delete**: select the category, clear the text field, click delete, confirm.
+  Items that would be left with no category are deleted too; items that also
+  belong to another category stay.
 
-The picker opens collapsed, on whichever category you had selected last, so you won't see the dropdown at all unless you open it yourself or haven't picked one before.
+The picker opens collapsed on the category you had selected last.
 
 ## Share a category
 
-Sharing gives another CollectionBuddy account access to one category: its items, tags, places, and photographs. It starts read-only, and you can upgrade it to let them make changes. There's no public-link option — only an existing account can be granted access.
+Sharing gives another CollectionBuddy account access to one category: its
+items, tags, places, and photos. There is no public link — only an account
+can be granted access, and it is read-only until you say otherwise.
 
-- **Share**: open the category picker, select the category, and enter the other person's email in the share field. Optionally pick an expiry date. Click the share icon. There's no separate accept step — the grant starts working the moment that email signs in, even if it's the first time.
-- **Let someone edit**: a new share can look but not touch. Tick **Can edit** beside their name (on a narrow screen, the pen icon opens the same choice) and confirm, and they can add, change and delete entries and photographs in that category. They still can't rename it, delete it, or share it with anyone else — those stay with you, and so does the ability to take edit access away again by unticking the box. People with edit access are marked **Editor** in the shared-with list.
-- **Set an expiry**: pick a date before sharing; access ends at the end of that day. Leave it blank for no expiry.
-- **Revoke access**: find the person in the shared-with list and click the trash icon beside their email, confirm.
-- **Leave a category shared with you**: a category someone else shared with you shows the same delete control as your own categories — for a shared one it leaves it instead, and doesn't affect the owner's copy.
+- **Share**: select the category, enter the other person's email in the share
+  field, optionally pick an expiry date, click the share icon. There is no
+  accept step: the grant works the moment that email signs in, even for the
+  first time.
+- **Let someone edit**: tick **Can edit** beside their name (on a narrow screen,
+  the pen icon opens the same choice) and confirm. They can then add, change
+  and delete items and photos in that category — marked **Editor** in the
+  list. They still cannot rename it, delete it, or share it; those stay with
+  you, as does taking edit access away again.
+- **Expiry**: access ends at the end of the chosen day. Blank means no expiry.
+- **Revoke**: trash icon beside the email in the shared-with list, confirm.
+- **Leave a category shared with you**: the delete control on a shared category
+  leaves it instead. The owner's copy is untouched.
 
 ## Import and export a category
 
-- **Export**: select a category, click **Export**. Downloads a `.zip` archive containing every item's metadata and photographs. Large categories can take a while — the button reports progress, and **Cancel** stops it mid-run.
-- **Import**: click **Import** and pick a `.zip` file previously exported from CollectionBuddy. Creates a new category from its contents. If the name is already taken, it's suffixed automatically (`Coins (2)`) rather than overwriting or failing.
+- **Export**: select a category, click **Export**. You get a `.zip` with every
+  item's data and photos. Large categories take a while; the button shows
+  progress and **Cancel** stops it.
+- **Import**: click **Import**, pick a `.zip` exported from CollectionBuddy. It
+  becomes a new category. A taken name gets a suffix (`Coins (2)`) rather than
+  overwriting or failing.
 
-## Add, edit, and delete items
+## Items
 
-- **Add**: with a category open, click the **+** button above the item grid.
-- **Edit**: hover a card (or tap **⋯** on touch) to reveal its action row, click the pencil icon. Same form as creation, pre-filled.
-- **Delete**: trash icon on the action row, then confirm. This deletes the item's uploaded images first, then the item itself.
+- **Add**: **+** above the item grid.
+- **Edit**: hover a card (tap **⋯** on touch) for its action row, then the
+  pencil icon.
+- **Delete**: trash icon on the action row, confirm. Photos are deleted first,
+  then the item.
 
-Fields:
+| Field | Notes |
+| --- | --- |
+| Title | Required. |
+| Description | Optional. |
+| Place | Optional. Suggestions appear from the third character, from the [Photon](https://photon.komoot.io/) geocoder. Pick a suggestion if you want the item on the map; free text is kept but not pinned. |
+| Tags | Optional. Enter or comma adds a chip; Backspace on an empty tag field removes the last one. Duplicates are ignored. |
 
-| Field       | Notes                                                                                                                                                                                             |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Title       | Required.                                                                                                                                                                                         |
-| Description | Optional, free text.                                                                                                                                                                              |
-| Place       | Optional. Autocompletes after 3 characters via the [Photon](https://photon.komoot.io/) geocoding API — pick a suggestion rather than typing free text if you want the item to show up on the map. |
-| Tags        | Optional. Type a word, press Enter or comma to add it as a chip; Backspace on an empty tag field removes the last chip. Duplicates are ignored.                                                   |
+On save, whitespace is trimmed, blank fields become empty, and tags are
+deduplicated and sorted.
 
-The server trims whitespace, drops blank fields to empty, and normalizes/sorts tags — what you see after saving may be tidied up slightly from what you typed.
+## Photos
 
-## Manage photos
+- **Upload**: action row → upload icon → any image your browser can read. It
+  is compressed to WebP with a thumbnail before upload, so there is no size to
+  worry about.
+- **View full size**: click a thumbnail. Escape or the backdrop closes it.
+- **Delete**: from the full-size view or the per-photo control, confirm.
 
-- **Upload**: action row → upload-image icon → pick a file (any image format your browser can read; a full-size phone photo is fine). It's compressed and converted to WebP client-side before upload, with a thumbnail generated alongside it — no manual resizing needed.
-- **View full size**: click a thumbnail to open it in a lightbox (Escape or the backdrop closes it).
-- **Delete**: open the lightbox or use the per-image delete control, confirm.
+An item can have any number of photos, in the order you added them.
 
-An item can have any number of photos.
+## Search and pages
 
-## Search and pagination
+The search box above the grid matches title, description, place, and tags at
+once, from the third character; one or two characters show the unfiltered
+list. **×** clears it.
 
-Type into the search box above the item grid — it searches title, description, place, and tags together, starting from the third character (shorter queries show the unfiltered list rather than empty results). Clear it with the **×** button once there's text.
+Nine items per page. Up to seven pages, every page number is shown; beyond
+that the control shows first, last, and a window around the current page.
 
-Up to seven pages — 63 items, at nine per page — every page number is shown. Beyond that the control collapses to first/last plus a sliding window around your current page, with `…` in between.
+## Map
 
-## View items on a map
+The map icon next to **+** opens a map of every item in the category that has
+a place. An active search narrows the pins the same way it narrows the grid,
+but the map is not paged — it draws every match. Geocoding results are cached
+in your browser, so reopening the map for the same category does not look
+places up again.
 
-Click the map icon (next to **+**) to open a map of the items in the current category that have a place set. Geocoding results are cached in your browser, so reopening the map for the same category won't look places up again. If you allow location access, your current position shows as a red marker; the "zoom to current location" and "frame all pins" buttons in the map are quick ways to reorient.
-
-The map shows the same items the grid does: an active search narrows the pins too, and the same third-character threshold applies, so a one- or two-character query leaves both unfiltered. Unlike the grid, the map is not paginated — it draws every match, not just the page you're on. Changing the search while the map is open re-draws and re-frames it.
-
-Only items with a **place** set appear — an item without one simply won't show on the map.
+If you allow location access, your position shows as a red marker; the map has
+buttons to zoom to it and to frame all pins.
 
 ## Language and theme
 
-Open the user menu (click your email in the header) for two independent toggles:
+Two independent settings in the user menu:
 
-- **Language** (_Sprache_): Deutsch / English. Auto-detected from your browser on first visit, then remembered.
-- **Appearance** (_Darstellung_): System / Light / Dark. The default is System, which tracks your OS setting live — including a change made while the app is open. Picking Light or Dark overrides the OS until you switch back to System. Either way the page changes as you click, and the choice is remembered on the next visit.
+- **Language** (_Sprache_): Deutsch / English. Detected from your browser on
+  first visit, then remembered.
+- **Appearance** (_Darstellung_): System / Light / Dark. System follows your
+  OS setting live. Light or Dark overrides it until you switch back.
 
 ## Accessibility
 
-The app is built to work with a keyboard and screen reader: dialogs trap focus and close on Escape, destructive-confirmation dialogs default focus to **Cancel** rather than the destructive action, and live regions announce result counts for search and place autocomplete since their dropdowns render outside normal reading order.
+The app works with a keyboard and a screen reader: dialogs trap focus and close
+on Escape, confirmation dialogs focus **Cancel** rather than the destructive
+action, and result counts for search and place suggestions are announced,
+since their dropdowns render outside normal reading order.
