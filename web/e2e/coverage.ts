@@ -13,16 +13,15 @@ const mcr = MCR({
 });
 
 // Floors ~3pp under a measured `npm run e2e:local` run; raised by hand, never lowered (CLAUDE.md).
-const LOCAL_STACK_COVERAGE_THRESHOLDS = {
+const COVERAGE_THRESHOLDS = {
   statements: 79,
   branches: 68,
   functions: 84,
   lines: 83,
 };
 
-// Only the local-stack run is gated: it is the one run with source maps and every project. A deployed bundle has no source maps, so its numbers are minified-line counts.
-const COVERAGE_THRESHOLDS: Partial<typeof LOCAL_STACK_COVERAGE_THRESHOLDS> =
-  process.env.E2E_SUPABASE_URL ? LOCAL_STACK_COVERAGE_THRESHOLDS : {};
+// Only the local-stack run collects: it is the one run with source maps and every Chromium project. A deployed bundle has no source maps, so its numbers would be minified-line counts.
+const COLLECT = Boolean(process.env.E2E_SUPABASE_URL);
 
 type PageCoverage = Page['coverage'];
 
@@ -62,7 +61,7 @@ function flushBeforeNavigation(page: Page) {
 export const test = base.extend<{ autoCoverage: void }>({
   autoCoverage: [
     async ({ page, browserName }, use) => {
-      const collect = browserName === 'chromium';
+      const collect = COLLECT && browserName === 'chromium';
       if (collect) {
         flushBeforeNavigation(page);
         await startCollecting(page.coverage);
@@ -78,6 +77,7 @@ export const test = base.extend<{ autoCoverage: void }>({
 
 // Called once from globalTeardown; each worker's `add()` persisted to `outputDir`, and throwing here fails the whole run.
 export async function generateCoverageReport() {
+  if (!COLLECT) return;
   const results = await mcr.generate();
   if (!results) return;
 

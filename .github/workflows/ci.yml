@@ -77,8 +77,6 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          # Source maps let the e2e coverage report (e2e/coverage.ts) point at real source.
-          E2E_COVERAGE_SOURCEMAPS: 'true'
 
       # After the build: `next build` generates the gitignored next-env.d.ts that tsc and ESLint need.
       - name: Type-check
@@ -137,7 +135,7 @@ jobs:
           comment-on: 'none'
           # No threshold-icons: setting them forces one shared cutoff for all four categories and warns on every run.
 
-      # Playwright starts and stops its own server, serving the export under the base path (playwright.config.ts).
+      # Firefox and the production-config bundle live only here; coverage is e2e_local_stack's job. Playwright serves the export under the base path itself (playwright.config.ts).
       - name: Install browsers for the end-to-end suite
         run: npx playwright install --with-deps chromium firefox
 
@@ -151,7 +149,6 @@ jobs:
           title: 'End-to-end tests -- signed-out (public)'
           tag: 'e2e (signed-out)'
           artifact-name: playwright-report
-          coverage-artifact-name: e2e-coverage
           job-status: ${{ job.status }}
 
   # Schema, pgTAP and the signed-in journeys share one running stack, so either `web` or `sql` changing runs the whole job.

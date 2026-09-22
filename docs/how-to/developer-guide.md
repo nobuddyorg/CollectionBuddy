@@ -122,13 +122,13 @@ on a full navigation, whatever `resetOnNavigation` says, so the fixture
 flushes them before every `page.goto` and `page.reload`; a navigation the
 app triggers itself (the OAuth redirect) still loses what ran before it.
 
-Only `npm run e2e:local` is gated, by the floor in `e2e/coverage.ts`: it runs
-every Chromium-based project (`chromium`, `mobile`, `signed-in`) against a
-source-mapped build, so its report is the one complete picture. `npm run e2e`
-reports without a floor. A build without `E2E_COVERAGE_SOURCEMAPS=true`, such
-as the production deploy the smoke test runs against, has no `src/app/**`
-paths to map to, and its "lines" are a few dozen minified ones — a different
-metric, not a regression.
+Only `npm run e2e:local` collects, and it is gated by the floor in
+`e2e/coverage.ts`: it runs every Chromium-based project (`chromium`, `mobile`,
+`signed-in`) against a source-mapped build, so its report is the one complete
+picture. `npm run e2e` collects nothing: its job is Firefox and the
+production-config bundle, and a build without `E2E_COVERAGE_SOURCEMAPS=true`
+(the deploy the smoke test runs against) has no `src/app/**` paths to map to,
+so its "lines" would be a few dozen minified ones.
 
 ## Run the pgTAP database suite
 
