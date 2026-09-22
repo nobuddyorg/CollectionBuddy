@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   findManifestPath,
   ImportFormatError,
+  importTimestamps,
   parseManifest,
   rootFolderOf,
 } from './importFormat';
@@ -87,5 +88,25 @@ describe('rootFolderOf', () => {
     expect(
       rootFolderOf('CollectionBuddy-coins-2026-08-06/collection.json'),
     ).toBe('CollectionBuddy-coins-2026-08-06');
+  });
+});
+
+describe('importTimestamps', () => {
+  const now = new Date('2026-08-07T12:00:00.000Z');
+
+  it('ends at now, one millisecond apart, oldest first', () => {
+    expect(importTimestamps(3, now)).toEqual([
+      '2026-08-07T11:59:59.998Z',
+      '2026-08-07T11:59:59.999Z',
+      '2026-08-07T12:00:00.000Z',
+    ]);
+  });
+
+  it('gives a single item now itself', () => {
+    expect(importTimestamps(1, now)).toEqual(['2026-08-07T12:00:00.000Z']);
+  });
+
+  it('has nothing to stamp for no items', () => {
+    expect(importTimestamps(0, now)).toEqual([]);
   });
 });

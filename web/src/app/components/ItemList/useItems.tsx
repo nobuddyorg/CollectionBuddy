@@ -6,13 +6,16 @@ import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { listItems } from '../../data/items';
 import { clampPage, pageCount, pageRange } from './paging';
+import { takePrefetchedFirstPage } from './firstPagePrefetch';
 import { useRequestSequence } from '../../lib/useRequestSequence';
+import type { PageImages } from './imageEntries';
 import type { ItemLite } from './types';
 
 export function useItems(categoryId: string, q: string) {
   const { t } = useI18n();
   const toast = useToast();
   const [items, setItems] = useState<ItemLite[]>([]);
+  const [pageImages, setPageImages] = useState<PageImages | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   // Starts true: mounting always fetches, and starting false gave one
@@ -62,14 +65,20 @@ export function useItems(categoryId: string, q: string) {
 
       try {
         const { from, to } = pageRange(currentPage);
+        const search = q.trim();
+        const prefetched =
+          !silent && currentPage === 1 && !search
+            ? takePrefetchedFirstPage(categoryId)
+            : null;
 
-        const { data, error, count } = await listItems({
-          categoryId,
-          search: q.trim(),
-          from,
-          to,
-          signal: controller.signal,
-        });
+        const { data, error, count, imageRows } = await (prefetched ??
+          listItems({
+            categoryId,
+            search,
+            from,
+            to,
+            signal: controller.signal,
+          }));
 
         if (!isCurrent(mySeq)) return;
         if (error) {
@@ -77,16 +86,21 @@ export function useItems(categoryId: string, q: string) {
           return;
         }
 
-        setItems(
-          (data ?? []).map((d) => ({
-            id: d.id,
-            title: d.title,
-            description: d.description,
-            place: d.place ?? null,
-            place_lat: d.place_lat ?? null,
-            place_lng: d.place_lng ?? null,
-            tags: d.tags ?? [],
-          })),
+        const loaded = (data ?? []).map((d) => ({
+          id: d.id,
+          title: d.title,
+          description: d.description,
+          place: d.place ?? null,
+          place_lat: d.place_lat ?? null,
+          place_lng: d.place_lng ?? null,
+          tags: d.tags ?? [],
+        }));
+        setItems(loaded);
+        setPageImages(
+          imageRows && {
+            itemIdsKey: loaded.map((item) => item.id).join(','),
+            rows: imageRows,
+          },
         );
         setTotal(count || 0);
       } finally {
@@ -126,6 +140,7 @@ export function useItems(categoryId: string, q: string) {
 
   return {
     items,
+    pageImages,
     total,
     loading,
     page: currentPage,

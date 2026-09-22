@@ -1562,3 +1562,77 @@ test.describe('search_category_items (the search RPC)', () => {
     }
   });
 });
+
+// 0009_user_quotas.sql: ceilings per owner, enforced in the database, so a
+// client talking to PostgREST directly meets them too. Each over-the-limit
+// write is one statement, refused whole whatever else the owner holds, so
+// these persist nothing and cannot collide with specs running alongside.
+test.describe('per-owner quotas', () => {
+  test('a write that would pass 50,000 entries is refused, with the quota code', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token } = context();
+
+    const { error } = await apiAs(token)
+      .from('items')
+      .insert(Array.from({ length: 50_001 }, () => ({ title: 'q' })));
+
+    expect(error?.code).toBe('PT507');
+    expect(error?.message).toBe('entry quota of 50000 reached');
+  });
+
+  test('photographs that would pass 1 GiB are refused, however small the client says they are', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { otherToken, otherUserId } = context();
+    const { data: item } = await apiAs(otherToken)
+      .from('items')
+      .select('id')
+      .eq('title', SEED.other.item)
+      .single();
+
+    // 205 rows with nothing stored behind them each count as the bucket's
+    // 5 MiB cap: past 1 GiB even for an owner holding no photographs at all.
+    const { error } = await apiAs(otherToken)
+      .from('images')
+      .insert(
+        Array.from({ length: 205 }, (_, i) => ({
+          item_id: item!.id,
+          path_full: `${otherUserId}/${item!.id}/quota-probe-${i}.webp`,
+          size_bytes: 1,
+        })),
+      );
+
+    expect(error?.code).toBe('PT507');
+    expect(error?.message).toBe('photo storage quota of 1 GiB reached');
+  });
+
+  test('a photograph is recorded at the size Storage holds, not the size claimed', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId } = context();
+    const { data: item } = await apiAs(token)
+      .from('items')
+      .insert({ title: `Quota size probe ${Date.now()}` })
+      .select('id')
+      .single();
+    const path = `${userId}/${item!.id}/size-probe.png`;
+    const bytes = new Uint8Array(1234);
+
+    try {
+      const { error: uploadError } = await apiAs(token)
+        .storage.from('item-images')
+        .upload(path, new Blob([bytes], { type: 'image/png' }));
+      expect(uploadError).toBeNull();
+
+      const { data: row, error } = await apiAs(token)
+        .from('images')
+        .insert({ item_id: item!.id, path_full: path, size_bytes: 1 })
+        .select('size_bytes')
+        .single();
+
+      expect(error).toBeNull();
+      expect(row!.size_bytes).toBe(bytes.length);
+    } finally {
+      await apiAs(token).storage.from('item-images').remove([path]);
+      await apiAs(token).from('items').delete().eq('id', item!.id);
+    }
+  });
+});

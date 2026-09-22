@@ -7,6 +7,7 @@ import {
   storeSelectedCategory,
 } from './components/CategorySelect/selection';
 import { useCategories } from './components/CategorySelect/useCategories';
+import { prefetchFirstPage } from './components/ItemList/firstPagePrefetch';
 
 /**
  * The signed-in catalogue: the category list, which one is selected, and
@@ -37,13 +38,14 @@ export function useCatalogue(loading: boolean, userId: string | undefined) {
 
   useEffect(() => {
     if (loading || !userId) return;
+    const storedId = readStoredCategory();
+    if (storedId) prefetchFirstPage(storedId);
     void reload().then((catsData) => {
       // Whatever was last on screen, or the first category. Auto-selecting
       // only a lone category meant owning a second one turned every
       // sign-in into a decision.
       setSelectedCategoryId(
-        (current) =>
-          current ?? pickInitialCategory(catsData, readStoredCategory()),
+        (current) => current ?? pickInitialCategory(catsData, storedId),
       );
       setCatalogueReady(true);
     });

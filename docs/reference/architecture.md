@@ -13,6 +13,11 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 
 [`supabase/migrations/`](../../supabase/migrations/), applied in filename order: seven files ordered by dependency, not history — extensions, functions, tables, triggers, indexes, policies, storage — and none of them patches another. A change to the schema is a new `0008_*.sql`; the chain is folded back into the seven only by a deliberate squash ([why](../explanation/design-decisions.md#why-the-migrations-were-squashed)).
 
+| File | Changes |
+| --- | --- |
+| [`0008_drop_items_tags_gin.sql`](../../supabase/migrations/0008_drop_items_tags_gin.sql) | Drops the GIN index on `items.tags`, which no query read. |
+| [`0009_user_quotas.sql`](../../supabase/migrations/0009_user_quotas.sql) | Per-owner quotas: 1 GiB of full-size photographs and 50,000 entries, with photograph sizes taken from Storage rather than the client. |
+
 ### Tables
 
 | Table | Columns | Notes |
@@ -71,6 +76,8 @@ Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql
 - `tg_item_categories_enforce()` — verifies both rows exist, requires write access to the category, sets `user_id` from the item's owner, and rejects the row if that owner is not the caller.
 - `tg_category_shares_enforce()` — see Sharing.
 - `tg_images_enforce()` — derives `images.user_id` from the item's owner; rejects an insert whose item the caller neither owns nor has write access to.
+- `tg_images_size_from_storage()` — sets `images.size_bytes` to the size Storage recorded for `path_full`, or the bucket's 5 MiB cap while nothing is stored there; the client's claim is ignored.
+- `tg_images_quota()`, `tg_items_quota()` — `FOR EACH STATEMENT` after insert: refuse with SQLSTATE `PT507` (HTTP 507) a write that takes an owner past 1 GiB of photographs or 50,000 entries ([why](../explanation/design-decisions.md#why-quotas-are-counted-in-the-database)).
 - `delete_item_if_orphan()` — after `item_categories` rows are deleted, deletes items now in zero categories. `FOR EACH STATEMENT` with a transition table ([why](../explanation/design-decisions.md#why-the-orphan-cleanup-trigger-is-statement-level)).
 - `tg_set_updated_at()` — on `categories` and `items`.
 - `storage_item_id()` — parses the item id out of a storage path, returning `NULL` rather than raising; see Storage.
@@ -84,7 +91,7 @@ Every function pins `set search_path = ''`, and every one revokes `execute` from
 
 - Unique `(user_id, lower(name))` on `categories`.
 - `(user_id, created_at desc)` on `items`.
-- Trigram GIN (`pg_trgm`) on `items.title`, `.description`, `.place`, `.tags_text`; plain GIN on `items.tags` for containment.
+- Trigram GIN (`pg_trgm`) on `items.title`, `.description`, `.place`, `.tags_text`. No index on the `items.tags` array: nothing filters by containment (`0008_drop_items_tags_gin.sql`).
 - `item_id`, `category_id`, `user_id` and `(category_id, created_at desc, item_id)` on `item_categories` — the catalogue page is driven from this table so one index serves ordering and scoping.
 - `(item_id, created_at asc, id)` and `user_id` on `images`.
 
@@ -103,7 +110,7 @@ Because `has_category_read_access()` excludes ownership and an owner cannot shar
 
 ### Images
 
-`public.images` is the queryable index of what is in Storage, written by the client at upload time — one indexed query for a page's photos instead of one `storage.list()` per item. Its RLS mirrors `item_categories`. Storage remains the authority on what exists; the client deletes objects first and lets the row cascade ([why](../explanation/design-decisions.md#why-images-are-deleted-client-side-before-the-database-row)). Objects nothing references are swept by `cleanup-orphaned-photos.yml`.
+`public.images` is the queryable index of what is in Storage, written by the client at upload time — a page's photos come embedded in the unsearched page read itself (a search lists them in one indexed query), instead of one `storage.list()` per item. Its RLS mirrors `item_categories`. Storage remains the authority on what exists; the client deletes objects first and lets the row cascade ([why](../explanation/design-decisions.md#why-images-are-deleted-client-side-before-the-database-row)). Objects nothing references are swept by `cleanup-orphaned-photos.yml`.
 
 ## Client data-access layer
 
@@ -133,5 +140,5 @@ Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (N
 | `ci.yml` (`zap_baseline`) | `web` changed | OWASP ZAP passive scan against the export, signed out and in demo mode, served on the runner. |
 | `pages-deploy.yml` (`migrate` → `build` → `deploy` → `smoke_test`) | push to `main`, manual | Apply pending migrations and reload the PostgREST cache; export; publish to Pages; run the signed-out suite against the live site. |
 | `keep-alive.yml` | daily, manual | Calls `keepalive()` so a free-tier project does not pause. |
-| `cleanup-orphaned-photos.yml` | daily (`30 4 * * *`), manual | Deletes Storage objects no `images` row references as `path_full` or `path_thumb`, older than 48 h. Manual runs are dry runs unless opted out. |
+| `cleanup-orphaned-photos.yml` | daily (`30 4 * * *`), manual | Deletes Storage objects no `images` row references as `path_full` or `path_thumb`, older than 48 h — at most 10,000 per run, in requests of 1,000 (Storage's bulk-delete cap). Manual runs are dry runs unless opted out. |
 | `auto-merge.yml` | PR events | Auto-merges Dependabot patch-level devDependency bumps once checks pass; does not approve. |

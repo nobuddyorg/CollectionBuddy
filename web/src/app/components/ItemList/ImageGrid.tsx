@@ -2,10 +2,9 @@
 import { useState } from 'react';
 import Icon, { IconType } from '../Icon';
 import type { ImgEntry } from './types';
+import { STRIP_MAX } from './imageEntries';
 import { useI18n } from '../../i18n/useI18n';
 import { Spinner } from '../ui/Spinner';
-
-const STRIP_MAX = 4;
 
 // A signed URL existing doesn't mean the image has arrived; holds the frame
 // and fades the photograph in over it instead of showing blank white.
@@ -223,6 +222,16 @@ export function ImageGrid({
           ratio={ratio}
           small={small}
           label={t('item_list.uploading')}
+        />
+      );
+    // Only reachable after a failed signing moved an unsigned photograph up.
+    if (!img.urlFull)
+      return (
+        <PendingPlate
+          key={img.pathFull}
+          ratio={ratio}
+          small={small}
+          label={t('common.loading')}
         />
       );
 

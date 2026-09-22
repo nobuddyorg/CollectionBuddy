@@ -16,10 +16,10 @@ import { useConfirm } from '../Confirm/ConfirmProvider';
 import { ZipLimitError } from '../../data/zip';
 
 /**
- * What to say while an export runs. Reading rows and packing the archive
- * are short and get a word each; fetching photographs is the long part and
- * the only phase worth a count. A photo phase with nothing to fetch falls
- * back to the packing wording instead of reading "0 of 0".
+ * What to say while an export runs. Reading rows counts up once a page has
+ * landed, since a large category takes a while; packing gets a word; photos
+ * count against their total. A photo phase with nothing to fetch falls back
+ * to the packing wording instead of reading "0 of 0".
  */
 export function exportProgressMessage(
   progress: ExportProgress | null,
@@ -30,6 +30,12 @@ export function exportProgressMessage(
     return t('category_select.export_photos')
       .replace('{done}', String(progress.done))
       .replace('{total}', String(progress.total));
+  }
+  if (progress.phase === 'items' && progress.done > 0) {
+    return t('category_select.export_reading_count').replace(
+      '{done}',
+      String(progress.done),
+    );
   }
   if (progress.phase === 'items') return t('category_select.export_reading');
   return t('category_select.export_packing');

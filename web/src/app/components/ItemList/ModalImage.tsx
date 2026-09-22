@@ -10,6 +10,7 @@ import { useInertBackground } from '../CenteredModal/useInertBackground';
 import { useLockBodyScroll } from '../CenteredModal/useLockBodyScroll';
 import Icon, { IconType } from '../Icon';
 import type { ImgEntry } from './types';
+import { Spinner } from '../ui/Spinner';
 
 export function ModalImage({
   imgs,
@@ -211,25 +212,35 @@ export function ModalImage({
             close button above and Escape (useEscapeToClose) already cover
             the keyboard path, and this element only wants tap/click, not
             focus. */}
-        {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
-        <img
-          key={current.pathFull}
-          src={current.urlFull}
-          alt={alt}
-          decoding="async"
-          // Same reasoning as the grid: see the note in ImageGrid.tsx.
-          crossOrigin="anonymous"
-          className="w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg"
-          // A tap on the photo closes the modal, except the tail end of a
-          // swipe that just paged, which onTouchEnd above flags to prevent.
-          onClick={() => {
-            if (suppressImageClickRef.current) {
-              suppressImageClickRef.current = false;
-              return;
-            }
-            onClose();
-          }}
-        />
+        {current.urlFull ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
+            <img
+              key={current.pathFull}
+              data-testid="viewer-photo"
+              src={current.urlFull}
+              alt={alt}
+              decoding="async"
+              // Same reasoning as the grid: see the note in ImageGrid.tsx.
+              crossOrigin="anonymous"
+              className="w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg"
+              // A tap on the photo closes the modal, except the tail end of a
+              // swipe that just paged, which onTouchEnd above flags to prevent.
+              onClick={() => {
+                if (suppressImageClickRef.current) {
+                  suppressImageClickRef.current = false;
+                  return;
+                }
+                onClose();
+              }}
+            />
+          </>
+        ) : (
+          // Past the card's plates, this photograph is signed only now (#630).
+          <div role="status" aria-label={t('common.loading')}>
+            <Spinner size="lg" />
+          </div>
+        )}
       </div>
     </div>,
     document.body,

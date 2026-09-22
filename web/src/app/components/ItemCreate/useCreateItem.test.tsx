@@ -144,6 +144,29 @@ describe('useCreateItem', () => {
     expect(liveRegion()).toHaveTextContent('Entry added.');
   });
 
+  it('says the entry limit is reached when the database refuses the entry for its quota', async () => {
+    vi.mocked(createItem).mockResolvedValue({
+      data: null,
+      error: { code: 'PT507', message: 'entry quota of 50000 reached' },
+    } as never);
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    const { result } = renderHook(() => useCreateItem('cat-1'), { wrapper });
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.create(values());
+    });
+
+    expect(ok).toBe(false);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'You have reached the limit of 50,000 entries.',
+    );
+    consoleError.mockRestore();
+  });
+
   // The rollback this guards: a row that exists but belongs to no category
   // is invisible to every view the app has, and permanently unreachable.
   it('deletes the created item when linking it to the category fails', async () => {

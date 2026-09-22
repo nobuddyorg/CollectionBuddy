@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
+import { chunk } from '../../lib/chunk';
 import { restoreAt } from '../../lib/optimistic';
 import { useRequestSequence } from '../../lib/useRequestSequence';
 import { useToast } from '../Toast/ToastProvider';
@@ -14,13 +15,15 @@ import {
   listItemIdsLinkedElsewhere,
   renameCategory as renameCategoryRow,
 } from '../../data/categories';
-import { listImagePathsForItems, removeImageObjects } from '../../data/images';
+import {
+  listImagePathsForItems,
+  REMOVE_OBJECTS_BATCH_SIZE,
+  removeImageObjects,
+} from '../../data/images';
 import type { CategorySummary } from '../../data/categories';
 
 export type UseCategories = ReturnType<typeof useCategories>;
 
-// Pulled out of the orphan-cleanup loop below purely to keep that loop's
-// nesting shallow -- no closure over anything but its own argument.
 function storagePathsOf(image: {
   path_full: string;
   path_thumb: string | null;
@@ -204,10 +207,7 @@ export function useCategories() {
             // Getting *this* wrong only means fewer paths to clean up
             // afterward -- logged, not fatal to the category the user
             // asked to delete.
-            const orphanedImagePaths = new Map<
-              string,
-              { path_full: string; path_thumb: string | null }[]
-            >();
+            let orphanedPaths: string[] = [];
             if (orphanedItemIds.length) {
               const { data: imageRows, error: imagesError } =
                 await listImagePathsForItems(orphanedItemIds);
@@ -220,16 +220,11 @@ export function useCategories() {
               // `imageRows` is genuinely nullable here (unlike the other
               // list* calls above): `imagesError` doesn't abort, so a real
               // failure reaches this point with `data: null`.
-              if (imageRows) {
-                for (const row of imageRows) {
-                  const list = orphanedImagePaths.get(row.item_id) ?? [];
-                  list.push({
-                    path_full: row.path_full,
-                    path_thumb: row.path_thumb,
-                  });
-                  orphanedImagePaths.set(row.item_id, list);
-                }
-              }
+              const orphaned = new Set(orphanedItemIds);
+              orphanedPaths =
+                imageRows
+                  ?.filter((row) => orphaned.has(row.item_id))
+                  .flatMap(storagePathsOf) ?? [];
             }
 
             // The row before the bytes: deleting the category row first
@@ -241,21 +236,17 @@ export function useCategories() {
             if (error) throw error;
             await reload();
 
-            // No `orphanedItemIds.length` guard here: `.map()` over an
-            // empty array, and `Promise.allSettled` of an empty list, are
-            // already no-ops, so a guard around them can never change what
-            // this block does.
             // The row is already gone, irreversibly. A failure here is a
-            // storage leak, not data loss, so every removal runs to
+            // storage leak, not data loss, so every batch runs to
             // completion rather than aborting on the first rejection.
             const results = await Promise.allSettled(
-              orphanedItemIds.map(async (itemId) => {
-                const paths = orphanedImagePaths.get(itemId) ?? [];
-                const flat = paths.flatMap(storagePathsOf);
-                if (!flat.length) return;
-                const { error: removeError } = await removeImageObjects(flat);
-                if (removeError) throw removeError;
-              }),
+              chunk(orphanedPaths, REMOVE_OBJECTS_BATCH_SIZE).map(
+                async (paths) => {
+                  const { error: removeError } =
+                    await removeImageObjects(paths);
+                  if (removeError) throw removeError;
+                },
+              ),
             );
             const failures = results.filter(
               (r): r is PromiseRejectedResult => r.status === 'rejected',

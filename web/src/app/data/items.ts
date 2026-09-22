@@ -1,6 +1,7 @@
 import { chunk } from '../lib/chunk';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
+import type { ImageListRow } from './images';
 
 type ItemRow = Database['public']['Tables']['items']['Row'];
 export type ItemInsert = Database['public']['Tables']['items']['Insert'];
@@ -25,8 +26,8 @@ export type ItemEditableFieldKey = Exclude<
   'id'
 >;
 /** What a page read returns per matching `item_categories` row, before
- * `listItems` flattens it to the item itself. */
-type ItemCategoryPageRow = { items: ItemFields };
+ * `listItems` flattens it to the item and its photographs. */
+type ItemCategoryPageRow = { items: ItemFields & { images: ImageListRow[] } };
 
 /**
  * One distinct place in a category, already folded down from every item
@@ -55,6 +56,9 @@ const ITEM_FIELDS_SELECT = ITEM_FIELD_KEYS.join(',');
 // (0005_indexes.sql) instead of scanning every item
 // in the category before sorting (#618, #619).
 const ITEM_CATEGORY_PAGE_SELECT = `items!inner(${ITEM_FIELDS_SELECT})`;
+// The page also embeds each item's photograph rows, saving the separate
+// `images` round trip before signing (#627).
+const ITEM_CATEGORY_PAGE_WITH_IMAGES_SELECT = `items!inner(${ITEM_FIELDS_SELECT},images(id,item_id,path_full,path_thumb))`;
 
 // Escapes LIKE metacharacters (and a literal backslash, so it survives as
 // one once ILIKE unescapes it) and wraps the term for a substring match.
@@ -148,14 +152,17 @@ export function rawListItems({
   // here as `count: 'exact'`.
   let query = supabase
     .from('item_categories')
-    .select(ITEM_CATEGORY_PAGE_SELECT)
+    .select(ITEM_CATEGORY_PAGE_WITH_IMAGES_SELECT)
     .eq('category_id', categoryId);
 
   const filter = searchFilterFor(search);
   if (filter) query = query.or(filter, { referencedTable: 'items' });
 
+  // Photographs oldest-first per item, as listImagesForItems orders them.
   return withSignal(query, signal)
     .order('created_at', { ascending: false })
+    .order('created_at', { referencedTable: 'items.images', ascending: true })
+    .order('id', { referencedTable: 'items.images', ascending: true })
     .range(from, to)
     .overrideTypes<ItemCategoryPageRow[], { merge: false }>();
 }
@@ -235,6 +242,19 @@ export function rawSearchCategoryItems({
 
 type SearchItemRow = ItemFields & { total_count: number };
 
+/** Just the item's own fields, dropping whatever a read carried alongside. */
+function itemFieldsOf({
+  id,
+  title,
+  description,
+  place,
+  place_lat,
+  place_lng,
+  tags,
+}: ItemFields): ItemFields {
+  return { id, title, description, place, place_lat, place_lng, tags };
+}
+
 /**
  * The catalogue page: every item currently linked into `categoryId`,
  * newest first. A search that has earned a filter (likePatternFor) goes
@@ -244,7 +264,8 @@ type SearchItemRow = ItemFields & { total_count: number };
  * otherwise -- kept outside the ignored block above (unlike those builders)
  * because unwrapping the response is real logic worth a real test.
  * `rawList`/`rawCount`/`rawSearch` are parameters for exactly that test,
- * not for production callers.
+ * not for production callers. `imageRows` is the page's photograph rows
+ * when the read carried them (the unfiltered path), else null.
  */
 export async function listItems(
   params: {
@@ -261,6 +282,7 @@ export async function listItems(
   data: ItemFields[] | null;
   error: unknown;
   count: number | null;
+  imageRows: ImageListRow[] | null;
 }> {
   const likePattern = likePatternFor(params.search);
   if (likePattern) {
@@ -271,30 +293,32 @@ export async function listItems(
       to: params.to,
       signal: params.signal,
     });
-    if (error) return { data: null, error, count: null };
+    if (error) return { data: null, error, count: null, imageRows: null };
     const rows = data ?? [];
     const count = rows.length > 0 ? rows[0].total_count : 0;
-    const items = rows.map(
-      ({ id, title, description, place, place_lat, place_lng, tags }) => ({
-        id,
-        title,
-        description,
-        place,
-        place_lat,
-        place_lng,
-        tags,
-      }),
-    );
-    return { data: items, error: null, count };
+    return {
+      data: rows.map(itemFieldsOf),
+      error: null,
+      count,
+      imageRows: null,
+    };
   }
 
   const [{ data, error }, { count, error: countError }] = await Promise.all([
     rawList(params),
     rawCount(params),
   ]);
-  if (error) return { data: null, error, count: null };
-  if (countError) return { data: null, error: countError, count: null };
-  return { data: (data ?? []).map((row) => row.items), error: null, count };
+  if (error) return { data: null, error, count: null, imageRows: null };
+  if (countError) {
+    return { data: null, error: countError, count: null, imageRows: null };
+  }
+  const rows = data ?? [];
+  return {
+    data: rows.map((row) => itemFieldsOf(row.items)),
+    error: null,
+    count,
+    imageRows: rows.flatMap((row) => row.items.images),
+  };
 }
 
 export function createItem(payload: Pick<ItemInsert, ItemEditableFieldKey>) {
@@ -353,6 +377,32 @@ export function linkItemToCategory(itemId: string, categoryId: string) {
   } as Database['public']['Tables']['item_categories']['Insert']);
 }
 
+/** A row an import writes in bulk: its id and timestamp are chosen by the caller. */
+export type ImportedItemInsert = Pick<ItemInsert, ItemEditableFieldKey> & {
+  id: string;
+  created_at: string;
+};
+
+// user_id is filled in by enforce_user_id(), exactly as for createItem.
+export function createItems(rows: ImportedItemInsert[]) {
+  return supabase.from('items').insert(rows as ItemInsert[]);
+}
+
+// tg_item_categories_enforce() derives and rechecks user_id per row.
+export function linkItemsToCategory(
+  links: { item_id: string; category_id: string; created_at: string }[],
+) {
+  return supabase
+    .from('item_categories')
+    .insert(
+      links as Database['public']['Tables']['item_categories']['Insert'][],
+    );
+}
+
+export function deleteItems(ids: string[]) {
+  return supabase.from('items').delete().in('id', ids);
+}
+
 // Narrowed by the same search as the list (via likePatternFor, the same
 // gate and escaping as searchFilterFor), so the map is the same set of
 // entries seen from above. Grouped by place in Postgres itself
@@ -380,28 +430,75 @@ export function rawListCategoryPlaces(
   >();
 }
 
+/** Where the next export page starts: the last page's final link row. */
+export type ExportCursor = { linkedAt: string; itemId: string };
+
+/**
+ * Rows strictly after `cursor` in (created_at, item_id) order, as a PostgREST
+ * or=() filter. Both values come from the database, and are quoted anyway
+ * since a timestamp carries `.` and `:`.
+ */
+export function exportCursorFilter(cursor: ExportCursor): string {
+  const at = `"${cursor.linkedAt}"`;
+  return `created_at.gt.${at},and(created_at.eq.${at},item_id.gt."${cursor.itemId}")`;
+}
+
 // Unfiltered by the search box on purpose: an export is of a category, not
 // of whatever happens to be typed into the field when the button is
-// pressed. Ordered oldest-first, the reverse of the list, so the archive
-// numbers its folders from the collection's first entry and stays stable
-// across re-exports. `created_at` alone isn't unique -- rows from the same
-// transaction can share a timestamp, and Postgres gives ties no stable
-// order across a .range() boundary -- so `id` breaks ties deterministically.
-export function listItemsForExport(
+// pressed. Oldest-first, so the archive numbers its folders from the
+// collection's first entry, `item_id` breaking ties. Driven from
+// item_categories and paged by keyset rather than offset, so every page walks
+// idx_item_categories_cat_created and stops, instead of re-sorting the whole
+// category per page (#625). The `gte` repeats the cursor's lower bound so the
+// index scan can start there; the or=() then drops the ties already read.
+export function rawListItemsForExport(
   categoryId: string,
-  from: number,
-  to: number,
+  page: { after: ExportCursor | null; size: number },
 ) {
-  return supabase
-    .from('items')
-    .select(
-      `${ITEM_FIELDS_SELECT},created_at,item_categories!inner(category_id)`,
-    )
-    .eq('item_categories.category_id', categoryId)
+  let query = supabase
+    .from('item_categories')
+    .select(`created_at,item_id,items!inner(${ITEM_FIELDS_SELECT},created_at)`)
+    .eq('category_id', categoryId);
+  if (page.after) {
+    query = query
+      .gte('created_at', page.after.linkedAt)
+      .or(exportCursorFilter(page.after));
+  }
+  return query
     .order('created_at')
-    .order('id')
-    .range(from, to)
-    .overrideTypes<ExportItemRow[], { merge: false }>();
+    .order('item_id')
+    .limit(page.size)
+    .overrideTypes<ExportLinkRow[], { merge: false }>();
+}
+
+type ExportLinkRow = {
+  created_at: string;
+  item_id: string;
+  items: ExportItemRow;
+};
+
+/**
+ * One export page, flattened to its items, with the cursor for the next page
+ * -- or none once a page comes back short. `rawList` is a parameter for the
+ * test, not for production callers.
+ */
+export async function listItemsForExport(
+  categoryId: string,
+  page: { after: ExportCursor | null; size: number },
+  rawList: typeof rawListItemsForExport = rawListItemsForExport,
+): Promise<
+  | { data: { items: ExportItemRow[]; next: ExportCursor | null }; error: null }
+  | { data: null; error: NonNullable<unknown> }
+> {
+  const { data, error } = await rawList(categoryId, page);
+  if (error) return { data: null, error };
+  const rows = data ?? [];
+  const last = rows.at(-1);
+  const next =
+    last && rows.length === page.size
+      ? { linkedAt: last.created_at, itemId: last.item_id }
+      : null;
+  return { data: { items: rows.map((row) => row.items), next }, error: null };
 }
 
 export type ExportItemRow = ItemFields & { created_at: string };

@@ -20,19 +20,21 @@ import {
   type CategorySummary,
 } from './categories';
 import {
-  createItem,
-  linkItemToCategory,
-  type ItemEditableFieldKey,
-  type ItemInsert,
+  createItems,
+  deleteItems,
+  linkItemsToCategory,
+  type ImportedItemInsert,
 } from './items';
 import { createImageRow, imagePrefix, uploadImageObject } from './images';
 import {
   findManifestPath,
   ImportFormatError,
+  importTimestamps,
   parseManifest,
   rootFolderOf,
 } from './importFormat';
 import { readZipEntries } from './zip';
+import { chunk } from '../lib/chunk';
 import { runPool } from '../lib/pool';
 import { attempts, backoffDelayMs } from '../lib/backoff';
 import { WEBP_COMPRESSION_OPTIONS } from '../lib/imageCompression';
@@ -76,6 +78,10 @@ function checkCancelled(signal?: AbortSignal): void {
 /** Bounded, like exportCategory.ts's PHOTO_DOWNLOAD_CONCURRENCY, so only a
  * handful of Blobs are held in memory at once. */
 export const PHOTO_UPLOAD_CONCURRENCY = 6;
+
+/** Items per insert request; also the id count of a cleanup's `.in()` filter,
+ * kept at the URL-length-safe size the data layer uses everywhere else. */
+export const ITEM_INSERT_BATCH_SIZE = 100;
 
 const PHOTO_UPLOAD_ATTEMPTS = 3;
 const PHOTO_UPLOAD_RETRY_BASE_MS = 500;
@@ -148,36 +154,52 @@ type ManifestItem = {
   photos: string[];
 };
 
+type ItemToCreate = { item: ManifestItem; id: string; createdAt: string };
+
+type ItemBatchCalls = {
+  categoryId: string;
+  createItemRows: typeof createItems;
+  linkItemRows: typeof linkItemsToCategory;
+  deleteItemRows: typeof deleteItems;
+};
+
 /**
- * Recreates one manifest item's row, linked to `categoryId`. Returns its new
- * id so the photo-upload phase knows which item's storage prefix to write
- * under.
+ * Recreates one batch of manifest items, linked to `categoryId`, in two
+ * requests. A batch whose links fail is deleted again (best effort), since
+ * the category's cleanup cascade only reaches linked items.
  */
-async function createImportedItem(
-  item: ManifestItem,
-  categoryId: string,
-  createItemRow: typeof createItem,
-  linkItemToCategoryRow: typeof linkItemToCategory,
-): Promise<string> {
-  const payload: Pick<ItemInsert, ItemEditableFieldKey> = {
+async function createImportedItems(
+  batch: ItemToCreate[],
+  { categoryId, createItemRows, linkItemRows, deleteItemRows }: ItemBatchCalls,
+): Promise<void> {
+  const rows: ImportedItemInsert[] = batch.map(({ item, id, createdAt }) => ({
+    id,
+    created_at: createdAt,
     title: item.title,
     description: item.description,
     place: item.place,
     place_lat: item.place_lat,
     place_lng: item.place_lng,
     tags: item.tags,
-  };
-  const { data, error } = await createItemRow(payload);
-  if (error || !data) {
-    throw new ImportError('Could not create item', { cause: error });
+  }));
+  const { error } = await createItemRows(rows);
+  if (error) throw new ImportError('Could not create items', { cause: error });
+
+  const { error: linkError } = await linkItemRows(
+    batch.map(({ id, createdAt }) => ({
+      item_id: id,
+      category_id: categoryId,
+      created_at: createdAt,
+    })),
+  );
+  if (!linkError) return;
+  const { error: cleanupError } = await deleteItemRows(batch.map((b) => b.id));
+  if (cleanupError) {
+    console.error('Could not clean up unlinked items', cleanupError);
   }
-  const { error: linkError } = await linkItemToCategoryRow(data.id, categoryId);
-  if (linkError) {
-    throw new ImportError('Could not link item to category', {
-      cause: linkError,
-    });
-  }
-  return data.id;
+  throw new ImportError('Could not link items to category', {
+    cause: linkError,
+  });
 }
 
 /**
@@ -258,8 +280,11 @@ export async function importCategory({
   readZip = readZipEntries,
   createCategoryRow = createCategory,
   deleteCategoryRow = deleteCategory,
-  createItemRow = createItem,
-  linkItemToCategoryRow = linkItemToCategory,
+  createItemRows = createItems,
+  linkItemRows = linkItemsToCategory,
+  deleteItemRows = deleteItems,
+  newItemId = () => crypto.randomUUID(),
+  now = () => new Date(),
   uploadImage = uploadImageObject,
   createImage = createImageRow,
   compressThumb = realCompressThumb,
@@ -275,8 +300,11 @@ export async function importCategory({
   readZip?: typeof readZipEntries;
   createCategoryRow?: typeof createCategory;
   deleteCategoryRow?: typeof deleteCategory;
-  createItemRow?: typeof createItem;
-  linkItemToCategoryRow?: typeof linkItemToCategory;
+  createItemRows?: typeof createItems;
+  linkItemRows?: typeof linkItemsToCategory;
+  deleteItemRows?: typeof deleteItems;
+  newItemId?: () => string;
+  now?: () => Date;
   uploadImage?: typeof uploadImageObject;
   createImage?: typeof createImageRow;
   compressThumb?: (bytes: Uint8Array<ArrayBuffer>) => Promise<Blob>;
@@ -333,26 +361,32 @@ export async function importCategory({
   // original error is the one worth reporting.
   try {
     onProgress?.({ phase: 'items', done: 0, total: manifestItems.length });
-    const photoTasks: PhotoTask[] = [];
+    const createdAts = importTimestamps(manifestItems.length, now());
+    const toCreate = manifestItems.map((item, i) => ({
+      item,
+      id: newItemId(),
+      createdAt: createdAts[i],
+    }));
+    const calls = {
+      categoryId: category.id,
+      createItemRows,
+      linkItemRows,
+      deleteItemRows,
+    };
     let itemsDone = 0;
-    for (const item of manifestItems) {
+    for (const batch of chunk(toCreate, ITEM_INSERT_BATCH_SIZE)) {
       checkCancelled(signal);
-      const itemId = await createImportedItem(
-        item,
-        category.id,
-        createItemRow,
-        linkItemToCategoryRow,
-      );
-      for (const archivePath of item.photos) {
-        photoTasks.push({ itemId, archivePath });
-      }
-      itemsDone++;
+      await createImportedItems(batch, calls);
+      itemsDone += batch.length;
       onProgress?.({
         phase: 'items',
         done: itemsDone,
         total: manifestItems.length,
       });
     }
+    const photoTasks: PhotoTask[] = toCreate.flatMap(({ item, id }) =>
+      item.photos.map((archivePath) => ({ itemId: id, archivePath })),
+    );
 
     const total = photoTasks.length;
     let done = 0;

@@ -1,5 +1,5 @@
 import { chunk } from '../lib/chunk';
-import { readAllPages } from '../lib/pages';
+import { readAllChunks, readAllPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
 
@@ -18,6 +18,9 @@ export function createSignedUrls(paths: string[], expiresInSeconds = 3600) {
 export function uploadImageObject(path: string, file: Blob) {
   return supabase.storage.from(ITEM_IMAGES_BUCKET).upload(path, file);
 }
+
+// Storage's bulk delete refuses more than 1,000 objects per request.
+export const REMOVE_OBJECTS_BATCH_SIZE = 1000;
 
 export function removeImageObjects(paths: string[]) {
   return supabase.storage.from(ITEM_IMAGES_BUCKET).remove(paths);
@@ -81,17 +84,16 @@ const ROW_PAGE_SIZE = 1000;
 // UUIDs would hit a URL length limit long before the row cap did.
 const ID_FILTER_CHUNK_SIZE = 100;
 
-// Chunks an id list (URL-length concern) and pages each chunk (row-cap
-// concern), generalized over which columns the caller wants.
-async function selectImagesForItems<T>(
+// Chunks an id list (URL-length concern), pages each chunk (row-cap concern)
+// and reads a few chunks at once, generalized over which columns the caller wants.
+function selectImagesForItems<T>(
   itemIds: string[],
   select: string,
 ): Promise<
   { data: T[]; error: null } | { data: null; error: NonNullable<unknown> }
 > {
-  const rows: T[] = [];
-  for (const ids of chunk(itemIds, ID_FILTER_CHUNK_SIZE)) {
-    const paged = await readAllPages<T>(ROW_PAGE_SIZE, (from, to) =>
+  return readAllChunks(chunk(itemIds, ID_FILTER_CHUNK_SIZE), (ids) =>
+    readAllPages<T>(ROW_PAGE_SIZE, (from, to) =>
       supabase
         .from('images')
         .select(select)
@@ -100,11 +102,8 @@ async function selectImagesForItems<T>(
         .order('id', { ascending: true })
         .range(from, to)
         .overrideTypes<T[], { merge: false }>(),
-    );
-    if (paged.error !== null) return paged;
-    rows.push(...paged.data);
-  }
-  return { data: rows, error: null };
+    ),
+  );
 }
 
 // Ordered oldest-first, `id` breaking a tie between two photographs

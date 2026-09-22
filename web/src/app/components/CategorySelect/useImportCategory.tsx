@@ -17,6 +17,7 @@ import {
 } from '../../data/importFormat';
 import { uniqueCategoryName } from '../../data/categories';
 import { readZipEntries } from '../../data/zip';
+import { isQuotaExceeded } from '../../data/quota';
 
 /** What to say while an import runs. Same shape as exportProgressMessage. */
 export function importProgressMessage(
@@ -105,7 +106,9 @@ export function useImportCategory(existingCategoryNames: string[]) {
           toast.reportError(
             'import category',
             e,
-            t('category_select.import_error'),
+            isQuotaExceeded(e)
+              ? t('category_select.import_quota_error')
+              : t('category_select.import_error'),
           );
         }
       } finally {

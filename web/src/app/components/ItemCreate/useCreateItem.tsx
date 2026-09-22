@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { createItem, deleteItem, linkItemToCategory } from '../../data/items';
+import { isQuotaExceeded } from '../../data/quota';
 import type { ItemFormValues } from '../ItemForm';
 
 export function useCreateItem(categoryId: string) {
@@ -41,7 +42,13 @@ export function useCreateItem(categoryId: string) {
         if (itemId) {
           await deleteItem(itemId);
         }
-        toast.reportError('create item', e, t('item_create.save_error'));
+        toast.reportError(
+          'create item',
+          e,
+          isQuotaExceeded(e)
+            ? t('item_create.quota_error')
+            : t('item_create.save_error'),
+        );
         return false;
       } finally {
         setIsCreating(false);

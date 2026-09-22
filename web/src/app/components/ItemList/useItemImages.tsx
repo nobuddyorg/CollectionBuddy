@@ -15,13 +15,17 @@ import {
   listImagesForItems,
   removeImageObjects,
   uploadImageObject,
+  type ImageListRow,
 } from '../../data/images';
+import { isQuotaExceeded } from '../../data/quota';
 import type { ImgEntry } from './types';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
 import { useI18n } from '../../i18n/useI18n';
 import {
+  entryDataOf,
   groupImageRows,
+  signAllEntries,
   signEntries,
   type ImageEntryData,
 } from './imageEntries';
@@ -101,38 +105,66 @@ export function useItemImages() {
     return signed[itemId];
   }, []);
 
+  // Signs grouped rows and shows them, in one update for the page.
+  const applyGroupedImages = useCallback(
+    async (
+      itemIds: string[],
+      grouped: Map<string, Map<string, ImageEntryData>>,
+    ) => {
+      const perItem = itemIds.map(
+        (itemId) => [itemId, grouped.get(itemId) ?? new Map()] as const,
+      );
+      const signed = await signEntries(perItem);
+
+      // `signed` already carries one entry per id in `itemIds` --
+      // `signEntries` sets every key it's given, even to an empty list -- so
+      // spreading it last already replaces exactly those keys with no need
+      // to filter them out of `prev` first.
+      setImages((prev) => ({ ...prev, ...signed }));
+      setLoadingItems((prev) => {
+        const next = new Set(prev);
+        for (const itemId of itemIds) next.delete(itemId);
+        return next;
+      });
+      lastSignedAtRef.current = Date.now();
+    },
+    [],
+  );
+
   // One query for the whole page rather than one Storage round trip per
   // item -- removes the wait for the slowest item to gate the first
   // photograph on screen, so there's no per-item progressive reveal here.
-  const refreshAllImages = useCallback(async (itemIds: string[]) => {
-    if (itemIds.length === 0) return;
+  const refreshAllImages = useCallback(
+    async (itemIds: string[]) => {
+      if (itemIds.length === 0) return;
+      setLoadingItems((prev) => new Set([...prev, ...itemIds]));
+      const listed = await listImagesForItems(itemIds);
+      const grouped =
+        listed.error !== null
+          ? new Map<string, Map<string, ImageEntryData>>()
+          : groupImageRows(listed.data);
+      if (listed.error !== null)
+        console.error('Failed to list images', listed.error);
+      await applyGroupedImages(itemIds, grouped);
+    },
+    [applyGroupedImages],
+  );
 
-    setLoadingItems((prev) => new Set([...prev, ...itemIds]));
+  // For rows the page read already carried (#627): signing is all that's left.
+  const showImages = useCallback(
+    async (itemIds: string[], rows: ImageListRow[]) => {
+      setLoadingItems((prev) => new Set([...prev, ...itemIds]));
+      await applyGroupedImages(itemIds, groupImageRows(rows));
+    },
+    [applyGroupedImages],
+  );
 
-    const listed = await listImagesForItems(itemIds);
-    const grouped =
-      listed.error !== null
-        ? new Map<string, Map<string, ImageEntryData>>()
-        : groupImageRows(listed.data);
-    if (listed.error !== null)
-      console.error('Failed to list images', listed.error);
-
-    const perItem = itemIds.map(
-      (itemId) => [itemId, grouped.get(itemId) ?? new Map()] as const,
-    );
-    const signed = await signEntries(perItem);
-
-    // `signed` already carries one entry per id in `itemIds` -- `signEntries`
-    // sets every key it's given, even to an empty list -- so spreading it
-    // last already replaces exactly those keys with no need to filter them
-    // out of `prev` first.
+  // The carousel's top-up: signs the photographs past the card's plates,
+  // through the same cache, only once someone opens them (#630).
+  const signAllFor = useCallback(async (itemId: string) => {
+    const entries = imagesRef.current[itemId] ?? [];
+    const signed = await signAllEntries([[itemId, entryDataOf(entries)]]);
     setImages((prev) => ({ ...prev, ...signed }));
-    setLoadingItems((prev) => {
-      const next = new Set(prev);
-      for (const itemId of itemIds) next.delete(itemId);
-      return next;
-    });
-    lastSignedAtRef.current = Date.now();
   }, []);
 
   useSignedUrlRefresh(lastSignedAtRef, imagesRef, refreshAllImages);
@@ -193,7 +225,13 @@ export function useItemImages() {
         const entries = await fetchItemImages(itemId);
         if (entries) setImages((prev) => ({ ...prev, [itemId]: entries }));
       } catch (err: unknown) {
-        toast.reportError('upload image', err, t('item_list.upload_error'));
+        toast.reportError(
+          'upload image',
+          err,
+          isQuotaExceeded(err)
+            ? t('item_list.photo_quota_error')
+            : t('item_list.upload_error'),
+        );
       } finally {
         setPendingUploads((prev) => {
           const remaining = prev[itemId] - 1;
@@ -298,6 +336,8 @@ export function useItemImages() {
     images,
     loadingItems,
     refreshAllImages,
+    showImages,
+    signAllFor,
     uploadImage,
     deleteImage,
     captureItemImagePaths,

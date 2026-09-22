@@ -24,6 +24,14 @@ Every squash was verified rather than asserted: the local stack was reset from t
 
 Since the third squash every function lives in `0002_functions.sql`. The `language sql` ones that read tables are created with `check_function_bodies` off, as `pg_dump` restores them, because Postgres would otherwise parse their bodies before `0003_tables.sql` exists; the pgTAP suite calls every one of them, so a broken body still fails CI.
 
+## Why quotas are counted in the database
+
+Any signed-in collector could otherwise create rows and upload 5 MiB objects without end, and on a free-tier project that is the likeliest way to take the app down (#637). There is no server to rate-limit at, so the ceilings are triggers: 1 GiB of full-size photographs and 50,000 entries per owner. A photograph added by an editor lands on the owner's row, so it counts against the owner's quota.
+
+The byte count cannot trust the client, which sends `size_bytes` itself. `tg_images_size_from_storage()` replaces it with the size Storage recorded for the object, which Storage writes before the upload request returns. A row inserted before its object exists counts the bucket's 5 MiB cap, so under-reporting a size buys nothing. The counts are statement-level, so a batch insert is checked once per owner. A refusal carries SQLSTATE `PT507`, which PostgREST turns into HTTP 507, and the app shows a message naming the limit rather than a generic failure.
+
+What this does not bound: bytes uploaded to Storage that never get an `images` row. Policies on `storage.objects` can't sum an owner's usage without scanning the table on every upload, and DDL there is refused. Those objects count as orphans and go in the daily sweep after 48 h.
+
 ## Why images are deleted client-side before the database row
 
 Only the Storage API can delete file bytes; SQL reaches the `storage.objects` metadata row and nothing more. So the client removes the objects _first_, then deletes the item or category row. Reversing the order orphans the files with no way to find them again.
@@ -67,6 +75,21 @@ React compares a dependency array against the **previous render's** array elemen
 Where the memoization those lists guard was not load-bearing, it is gone — callbacks handed straight to elements nothing memoizes earned nothing from `useCallback`. What remains is where identity really is a contract: a mount-only `useEffect`, or a callback another hook lists in its own dependencies. Those survive, deliberately unsuppressed, so the report keeps showing them.
 
 The other class is the **timeout**, which Stryker counts as a kill. Most were avoidable and the fixes were worth having: counters replaced by iteration over the thing being counted (`chunk()`, `attempts()`, the pool's shared iterator); page fakes backed by a finite table so a walk that asks for one page too many gets nothing instead of spinning; and `timeoutMS` raised to 20 s, since with the 5 s default a mutant covered by a few hundred tests was reported as a timeout after failing seven of them honestly. Three remain, each a mutant whose only effect is non-termination: two in `excludePendingDeletes`, whose job is returning the same reference when nothing changed (break that and the effect reading it re-renders for ever — the bug the line prevents), and `readAllPages`' one unbounded walk, which cannot know how many pages it needs.
+
+## Why four functions have property tests
+
+`buildSearchFilter`, `csvCell`, `dosDateTime` and `clampPage`/`pageRange` take
+input that is adversarial or unbounded (any search term, any user text, any
+date, any page and total), and each has a property that is easy to state: the
+filter is always exactly four quoted conditions that match the term literally;
+a CSV cell always parses back to the text, apostrophe-guarded exactly when it
+would start a formula; a DOS timestamp always decodes to a valid date and
+clamps rather than wraps; a page range always holds an entry when there is
+one. The generic playbook adopts property testing only after a near-miss;
+these were adopted at the maintainer's request (#616) without one. They run
+seeded and deterministic, with one dependency (`fast-check`), beside the
+example tests, in about two seconds. Everything else keeps example tests
+alone: small, enumerable inputs gain nothing from generated ones.
 
 ## Why component tests run in jsdom, and two things that bite
 

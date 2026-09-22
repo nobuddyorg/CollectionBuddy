@@ -265,6 +265,106 @@ describe('useItemImages', () => {
     });
   });
 
+  describe('showImages', () => {
+    it('signs rows the page read already carried, without listing again', async () => {
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      await act(async () => {
+        await result.current.showImages(
+          ['item-1', 'item-2'],
+          [row('img-1', 'item-1')],
+        );
+      });
+
+      expect(listImagesForItems).not.toHaveBeenCalled();
+      expect(result.current.images).toEqual({
+        'item-1': [entry('img-1', 'item-1')],
+        'item-2': [],
+      });
+      expect(result.current.loadingItems.size).toBe(0);
+    });
+
+    it('marks the items as loading until their signatures are back', async () => {
+      let resolveSign!: (v: unknown) => void;
+      vi.mocked(createSignedUrls).mockReturnValue(
+        new Promise((resolve) => {
+          resolveSign = resolve;
+        }) as never,
+      );
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      let pending!: Promise<void>;
+      act(() => {
+        pending = result.current.showImages(
+          ['item-1'],
+          [row('img-1', 'item-1')],
+        );
+      });
+
+      expect(result.current.loadingItems.has('item-1')).toBe(true);
+
+      await act(async () => {
+        resolveSign({ data: [], error: null });
+        await pending;
+      });
+
+      expect(result.current.loadingItems.has('item-1')).toBe(false);
+    });
+  });
+
+  describe('signAllFor', () => {
+    it('signs the photographs past the plates and shows them signed', async () => {
+      vi.mocked(listImagesForItems).mockResolvedValue({
+        data: Array.from({ length: 6 }, (_, i) => row(`img-${i}`, 'item-1')),
+        error: null,
+      });
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+      await act(async () => {
+        await result.current.refreshAllImages(['item-1']);
+      });
+      expect(result.current.images['item-1'][5].urlFull).toBeUndefined();
+
+      await act(async () => {
+        await result.current.signAllFor('item-1');
+      });
+
+      expect(vi.mocked(createSignedUrls).mock.calls.at(-1)?.[0]).toEqual([
+        'uid/item-1/img-5.webp',
+      ]);
+      expect(result.current.images['item-1'][5]).toEqual(
+        entry('img-5', 'item-1'),
+      );
+    });
+
+    it('asks for nothing when every photograph is already signed', async () => {
+      vi.mocked(listImagesForItems).mockResolvedValue({
+        data: [row('img-1', 'item-1')],
+        error: null,
+      });
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+      await act(async () => {
+        await result.current.refreshAllImages(['item-1']);
+      });
+      vi.mocked(createSignedUrls).mockClear();
+
+      await act(async () => {
+        await result.current.signAllFor('item-1');
+      });
+
+      expect(createSignedUrls).not.toHaveBeenCalled();
+    });
+
+    it('asks for nothing for an item it has no photographs of', async () => {
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      await act(async () => {
+        await result.current.signAllFor('item-unknown');
+      });
+
+      expect(createSignedUrls).not.toHaveBeenCalled();
+    });
+  });
+
   describe('uploadImage', () => {
     it('stores a full size and a thumbnail under the uploader own prefix, then records the row', async () => {
       const { result } = renderHook(() => useItemImages(), { wrapper });
@@ -350,6 +450,24 @@ describe('useItemImages', () => {
         'Could not upload this image. Please try again.',
       );
       expect(result.current.pendingUploads['item-1']).toBeUndefined();
+    });
+
+    it('says the photograph limit is reached when the row is refused for its quota', async () => {
+      vi.mocked(createImageRow).mockResolvedValue({
+        error: {
+          code: 'PT507',
+          message: 'photo storage quota of 1 GiB reached',
+        },
+      } as never);
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      await act(async () => {
+        await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      });
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'The limit of 1 GiB of photographs is reached. Delete some to add more.',
+      );
     });
 
     it('reports a photograph whose row cannot be recorded', async () => {

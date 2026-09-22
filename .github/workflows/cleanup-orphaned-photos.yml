@@ -26,19 +26,28 @@ jobs:
           # Text compared to text cannot raise; a uuid cast of a malformed path would abort the whole query instead of not matching.
           read -r -d '' QUERY <<'SQL' || true
           select
-            json_agg(o.name) as paths,
+            json_agg(batch.name) as paths,
             count(*) as object_count,
-            coalesce(sum((o.metadata->>'size')::bigint), 0) as total_bytes
-          from storage.objects o
-          where o.bucket_id = 'item-images'
-            and o.created_at < now() - interval '48 hours'
-            and not exists (
-              select 1 from public.images im where im.path_full = o.name
-            )
-            and not exists (
-              select 1 from public.images im where im.path_thumb = o.name
-            );
+            coalesce(sum((batch.metadata->>'size')::bigint), 0) as total_bytes
+          from (
+            select o.name, o.metadata
+            from storage.objects o
+            where o.bucket_id = 'item-images'
+              and o.created_at < now() - interval '48 hours'
+              and not exists (
+                select 1 from public.images im where im.path_full = o.name
+              )
+              and not exists (
+                select 1 from public.images im where im.path_thumb = o.name
+              )
+            order by o.created_at
+            limit $MAX_OBJECTS_PER_RUN
+          ) batch;
           SQL
+
+          # Bounds the query's response and this run's deletes; the next daily run takes the rest.
+          MAX_OBJECTS_PER_RUN=10000
+          QUERY=${QUERY//'$MAX_OBJECTS_PER_RUN'/$MAX_OBJECTS_PER_RUN}
 
           payload=$(jq -n --arg q "$QUERY" '{query: $q}')
           result=$(curl -sS --fail-with-body -X POST \
@@ -88,16 +97,22 @@ jobs:
             exit 1
           fi
 
-          paths=$(echo "$result" | jq -c '.[0].paths')
-          remove_payload=$(jq -n --argjson prefixes "$paths" '{prefixes: $prefixes}')
-          curl -sS --fail-with-body -X DELETE \
-            "$NEXT_PUBLIC_SUPABASE_URL/storage/v1/object/item-images" \
-            -H "apikey: $service_role_key" \
-            -H "Authorization: Bearer $service_role_key" \
-            -H "Content-Type: application/json" \
-            --data "$remove_payload" > /dev/null
+          # Storage's bulk delete refuses more than 1,000 objects per request.
+          echo "$result" \
+            | jq -c '.[0].paths | range(0; length; 1000) as $i | {prefixes: .[$i:$i + 1000]}' \
+            | while IFS= read -r remove_payload; do
+                curl -sS --fail-with-body -X DELETE \
+                  "$NEXT_PUBLIC_SUPABASE_URL/storage/v1/object/item-images" \
+                  -H "apikey: $service_role_key" \
+                  -H "Authorization: Bearer $service_role_key" \
+                  -H "Content-Type: application/json" \
+                  --data "$remove_payload" > /dev/null
+              done
 
           echo "Removed $count orphaned object(s), reclaiming $bytes bytes." | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$count" = "$MAX_OBJECTS_PER_RUN" ]; then
+            echo "Hit the per-run cap of $MAX_OBJECTS_PER_RUN; the next run continues." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}

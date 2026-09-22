@@ -23,6 +23,7 @@ vi.mock('../../data/categories', () => ({
 vi.mock('../../data/images', () => ({
   listImagePathsForItems: vi.fn(),
   removeImageObjects: vi.fn(),
+  REMOVE_OBJECTS_BATCH_SIZE: 1000,
 }));
 
 function wrapper({ children }: { children: React.ReactNode }) {

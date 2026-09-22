@@ -5,14 +5,19 @@ import {
   SEARCH_MIN_LENGTH_NON_ASCII,
   buildSearchFilter,
   createItem,
+  createItems,
   deleteItem,
+  deleteItems,
   linkItemToCategory,
+  linkItemsToCategory,
   rawUpdateItemsPlace,
   updateItem,
   likePatternFor,
   listCategoryPlaces,
   listItems,
+  exportCursorFilter,
   listItemsForExport,
+  rawListItemsForExport,
   rawCountItems,
   rawListCategoryPlaces,
   rawListItems,
@@ -297,9 +302,15 @@ describe('the queries behind the list and the map', () => {
     expect(listQuery('coin').get('category_id')).toBe('eq.cat-1');
   });
 
-  it('drives the list from item_categories, embedding items as the inner join that carries the search filter', () => {
+  it('drives the list from item_categories, embedding items as the inner join that carries the search filter, and their photographs', () => {
     expect(listQuery('coin').get('select')).toBe(
-      'items!inner(id,title,description,place,place_lat,place_lng,tags)',
+      'items!inner(id,title,description,place,place_lat,place_lng,tags,images(id,item_id,path_full,path_thumb))',
+    );
+  });
+
+  it("orders each item's embedded photographs oldest-first, id breaking ties", () => {
+    expect(listQuery('').get('items.images.order')).toBe(
+      'created_at.asc,id.asc',
     );
   });
 
@@ -345,30 +356,146 @@ describe('the queries behind the list and the map', () => {
     expect(listQuery('ab').has('items.or')).toBe(false);
   });
 
-  const exportQuery = () => paramsOf(listItemsForExport('cat-1', 0, 499));
+  const cursor = {
+    linkedAt: '2026-01-02T03:04:05.123456+00:00',
+    itemId: 'item-9',
+  };
+  const exportQuery = (after: typeof cursor | null = null) =>
+    paramsOf(rawListItemsForExport('cat-1', { after, size: 500 }));
 
   it('orders the list newest-first', () => {
     expect(listQuery('coin').get('order')).toBe('created_at.desc');
   });
 
-  it('orders the export oldest-first with id as a tiebreaker', () => {
-    expect(exportQuery().get('order')).toBe('created_at.asc,id.asc');
+  it('orders the export oldest-first with the item id as a tiebreaker', () => {
+    expect(exportQuery().get('order')).toBe('created_at.asc,item_id.asc');
   });
 
   it('never filters the export by search', () => {
     expect(exportQuery().has('or')).toBe(false);
   });
 
-  it('exports every listed field plus the timestamp, joined through the category', () => {
+  it('drives the export from the category link, embedding every listed field plus the timestamp', () => {
     expect(exportQuery().get('select')).toBe(
-      'id,title,description,place,place_lat,place_lng,tags,created_at,item_categories!inner(category_id)',
+      'created_at,item_id,items!inner(id,title,description,place,place_lat,place_lng,tags,created_at)',
     );
-    expect(exportQuery().get('item_categories.category_id')).toBe('eq.cat-1');
+    expect(exportQuery().get('category_id')).toBe('eq.cat-1');
   });
 
-  it('pages the export the same way range() was asked to', () => {
-    expect(exportQuery().get('offset')).toBe('0');
+  it('asks for one page of the requested size, with no offset', () => {
     expect(exportQuery().get('limit')).toBe('500');
+    expect(exportQuery().has('offset')).toBe(false);
+  });
+
+  it('starts the first page at the beginning, with no cursor bound', () => {
+    expect(exportQuery().has('created_at')).toBe(false);
+  });
+
+  it('starts a later page strictly after the cursor row', () => {
+    const params = exportQuery(cursor);
+    expect(params.get('created_at')).toBe(
+      'gte.2026-01-02T03:04:05.123456+00:00',
+    );
+    expect(params.get('or')).toBe(`(${exportCursorFilter(cursor)})`);
+  });
+});
+
+describe('exportCursorFilter', () => {
+  it('matches a later timestamp, or the same one with a later item id, both quoted', () => {
+    expect(
+      exportCursorFilter({
+        linkedAt: '2026-01-02T03:04:05+00:00',
+        itemId: 'b',
+      }),
+    ).toBe(
+      'created_at.gt."2026-01-02T03:04:05+00:00",and(created_at.eq."2026-01-02T03:04:05+00:00",item_id.gt."b")',
+    );
+  });
+});
+
+describe('listItemsForExport', () => {
+  function link(id: string) {
+    return {
+      created_at: `2026-01-0${id}T00:00:00+00:00`,
+      item_id: id,
+      items: {
+        id,
+        title: id,
+        description: null,
+        place: null,
+        place_lat: null,
+        place_lng: null,
+        tags: [],
+        created_at: `item-created-${id}`,
+      },
+    };
+  }
+  const rawReturning = (result: unknown) =>
+    vi.fn(async () => result) as unknown as typeof rawListItemsForExport;
+
+  it('passes the category and page through to the query', async () => {
+    const raw = rawReturning({ data: [], error: null });
+    const page = { after: null, size: 2 };
+
+    await listItemsForExport('cat-1', page, raw);
+
+    expect(raw).toHaveBeenCalledWith('cat-1', page);
+  });
+
+  it('flattens a full page to its items, pointing the cursor at its last link', async () => {
+    const raw = rawReturning({
+      data: [link('1'), link('2'), link('3')],
+      error: null,
+    });
+
+    const result = await listItemsForExport(
+      'cat-1',
+      { after: null, size: 3 },
+      raw,
+    );
+
+    expect(result).toEqual({
+      data: {
+        items: [link('1').items, link('2').items, link('3').items],
+        next: { linkedAt: '2026-01-03T00:00:00+00:00', itemId: '3' },
+      },
+      error: null,
+    });
+  });
+
+  it('ends the walk on a short page', async () => {
+    const raw = rawReturning({ data: [link('1')], error: null });
+
+    const result = await listItemsForExport(
+      'cat-1',
+      { after: null, size: 2 },
+      raw,
+    );
+
+    expect(result.data?.next).toBeNull();
+  });
+
+  it('ends the walk on an empty or missing page', async () => {
+    for (const data of [[], null]) {
+      const result = await listItemsForExport(
+        'cat-1',
+        { after: null, size: 2 },
+        rawReturning({ data, error: null }),
+      );
+      expect(result).toEqual({ data: { items: [], next: null }, error: null });
+    }
+  });
+
+  it('hands back an error with no partial page', async () => {
+    const boom = { message: 'boom' };
+
+    const result = await listItemsForExport(
+      'cat-1',
+      { after: null, size: 2 },
+      rawReturning({ data: [link('1'), link('2')], error: boom }),
+    );
+
+    expect(result).toEqual({ data: null, error: boom });
   });
 });
 
@@ -384,10 +511,14 @@ describe('listItems', () => {
       tags: [],
     };
   }
+  // What the page read embeds per link row: the item plus its photographs.
+  function pageRow(id: string, images: unknown[] = []) {
+    return { items: { ...item(id), images } };
+  }
 
   it('unwraps each row to the item it embeds, combining it with the count from the separate count request', async () => {
     const rawList = vi.fn().mockResolvedValue({
-      data: [{ items: item('a') }, { items: item('b') }],
+      data: [pageRow('a'), pageRow('b')],
       error: null,
     });
     const rawCount = vi.fn().mockResolvedValue({ count: 2, error: null });
@@ -415,6 +546,36 @@ describe('listItems', () => {
     });
   });
 
+  it("hands back the page's photograph rows alongside its items, in item order", async () => {
+    const photo = (id: string, itemId: string) => ({
+      id,
+      item_id: itemId,
+      path_full: `u/${itemId}/${id}.webp`,
+      path_thumb: null,
+    });
+    const rawList = vi.fn().mockResolvedValue({
+      data: [
+        pageRow('a', [photo('p1', 'a'), photo('p2', 'a')]),
+        pageRow('b', [photo('p3', 'b')]),
+      ],
+      error: null,
+    });
+    const rawCount = vi.fn().mockResolvedValue({ count: 2, error: null });
+
+    const { data, imageRows } = await listItems(
+      { categoryId: 'cat-1', search: '', from: 0, to: 8 },
+      rawList,
+      rawCount,
+    );
+
+    expect(data).toEqual([item('a'), item('b')]);
+    expect(imageRows).toEqual([
+      photo('p1', 'a'),
+      photo('p2', 'a'),
+      photo('p3', 'b'),
+    ]);
+  });
+
   it('returns no data and a null count when the page request errors, without touching the rows', async () => {
     const rawList = vi
       .fn()
@@ -435,7 +596,7 @@ describe('listItems', () => {
   it('returns no data and a null count when the count request errors, even though the page succeeded', async () => {
     const rawList = vi
       .fn()
-      .mockResolvedValue({ data: [{ items: item('a') }], error: null });
+      .mockResolvedValue({ data: [pageRow('a')], error: null });
     const rawCount = vi
       .fn()
       .mockResolvedValue({ count: null, error: new Error('boom') });
@@ -512,7 +673,7 @@ describe('listItems, once a search term earns a filter', () => {
       error: null,
     });
 
-    const { data, error, count } = await listItems(
+    const { data, error, count, imageRows } = await listItems(
       { categoryId: 'cat-1', search: 'coin', from: 0, to: 8 },
       undefined,
       undefined,
@@ -521,6 +682,8 @@ describe('listItems, once a search term earns a filter', () => {
 
     expect(error).toBeNull();
     expect(count).toBe(5);
+    // The RPC carries no photographs; the caller lists those itself.
+    expect(imageRows).toBeNull();
     expect(data).toEqual([
       {
         id: 'a',
@@ -806,5 +969,37 @@ describe('the queries behind creating, editing and deleting an entry', () => {
     expect(req.url.pathname).toMatch(/\/item_categories$/);
     expect(req.method).toBe('POST');
     expect(req.body).toEqual({ item_id: 'item-1', category_id: 'cat-1' });
+  });
+
+  it("inserts a whole import batch in one request, with the caller's ids and timestamps but no user_id", () => {
+    const rows = [
+      { ...fields, id: 'a', created_at: '2026-01-01T00:00:00.000Z' },
+      { ...fields, id: 'b', created_at: '2026-01-01T00:00:00.001Z' },
+    ];
+    const req = requestOf(createItems(rows));
+
+    expect(req.url.pathname).toMatch(/\/items$/);
+    expect(req.method).toBe('POST');
+    expect(req.body).toEqual(rows);
+  });
+
+  it('links a whole import batch to its category in one request', () => {
+    const links = [
+      { item_id: 'a', category_id: 'cat-1', created_at: 't1' },
+      { item_id: 'b', category_id: 'cat-1', created_at: 't2' },
+    ];
+    const req = requestOf(linkItemsToCategory(links));
+
+    expect(req.url.pathname).toMatch(/\/item_categories$/);
+    expect(req.method).toBe('POST');
+    expect(req.body).toEqual(links);
+  });
+
+  it('deletes a batch of entries by id in one request', () => {
+    const req = requestOf(deleteItems(['a', 'b']));
+
+    expect(req.url.pathname).toMatch(/\/items$/);
+    expect(req.method).toBe('DELETE');
+    expect(req.url.searchParams.get('id')).toBe('in.(a,b)');
   });
 });

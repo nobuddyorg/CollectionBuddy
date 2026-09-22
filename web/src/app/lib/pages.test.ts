@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { readAllPages } from './pages';
+import { readAllChunks, readAllPages } from './pages';
 
 /** Pages a fixed array the way a ranged reader does -- `to` inclusive. */
 function reader<T>(all: T[]) {
@@ -81,5 +81,95 @@ describe('readAllPages', () => {
 
     expect(await readAllPages(10, readPage)).toEqual({ data: [], error: null });
     expect(readPage).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** Resolves when `release` is called, so a test decides the finishing order. */
+function deferred<T>() {
+  let release!: (value: T) => void;
+  const promise = new Promise<T>((resolve) => {
+    release = resolve;
+  });
+  return { promise, release };
+}
+
+describe('readAllChunks', () => {
+  it('joins every chunk in chunk order, whatever order they finish in', async () => {
+    const first = deferred<{ data: string[]; error: null }>();
+    const second = deferred<{ data: string[]; error: null }>();
+    const reads = { a: first.promise, b: second.promise };
+
+    const result = readAllChunks(['a', 'b'] as const, (chunk) => reads[chunk]);
+    second.release({ data: ['b1', 'b2'], error: null });
+    first.release({ data: ['a1'], error: null });
+
+    expect(await result).toEqual({ data: ['a1', 'b1', 'b2'], error: null });
+  });
+
+  it('reads nothing and answers empty for no chunks', async () => {
+    const readChunk = vi.fn();
+
+    expect(await readAllChunks([], readChunk)).toEqual({
+      data: [],
+      error: null,
+    });
+    expect(readChunk).not.toHaveBeenCalled();
+  });
+
+  it('keeps at most six chunk reads in flight', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    await readAllChunks(
+      Array.from({ length: 20 }, (_, i) => i),
+      async (chunk) => {
+        inFlight++;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        inFlight--;
+        return { data: [chunk], error: null };
+      },
+    );
+
+    expect(peak).toBe(6);
+  });
+
+  it('returns the first failure with no partial data, and starts no further chunks', async () => {
+    const boom = { message: 'boom' };
+    const readChunk = vi.fn(async (chunk: number) =>
+      chunk === 0
+        ? { data: null, error: boom }
+        : { data: [chunk], error: null },
+    );
+
+    const result = await readAllChunks(
+      Array.from({ length: 10 }, (_, i) => i),
+      readChunk,
+    );
+
+    expect(result).toEqual({ data: null, error: boom });
+    expect(readChunk.mock.calls.length).toBeLessThan(10);
+  });
+
+  it('reports the earliest failure when a later chunk also fails', async () => {
+    const early = deferred<{ data: null; error: { message: string } }>();
+    const late = deferred<{ data: null; error: { message: string } }>();
+    const reads = [early.promise, late.promise];
+
+    const result = readAllChunks([0, 1], (chunk) => reads[chunk]);
+    early.release({ data: null, error: { message: 'early' } });
+    await Promise.resolve();
+    late.release({ data: null, error: { message: 'late' } });
+
+    expect(await result).toEqual({ data: null, error: { message: 'early' } });
+  });
+
+  it('turns a chunk read that throws into the returned error', async () => {
+    const offline = new Error('offline');
+
+    const result = await readAllChunks([0], async () => {
+      throw offline;
+    });
+
+    expect(result).toEqual({ data: null, error: offline });
   });
 });

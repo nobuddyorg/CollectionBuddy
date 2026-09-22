@@ -1,3 +1,8 @@
+import { runPool } from './pool';
+
+type ReadResult<T> =
+  { data: T[]; error: null } | { data: null; error: NonNullable<unknown> };
+
 /**
  * Every row a ranged reader will give, one page at a time until a page comes
  * back short -- how a read gets past the API's row cap without silently
@@ -16,9 +21,7 @@ export async function readAllPages<T>(
     from: number,
     to: number,
   ) => PromiseLike<{ data: T[] | null; error: unknown }>,
-): Promise<
-  { data: T[]; error: null } | { data: null; error: NonNullable<unknown> }
-> {
+): Promise<ReadResult<T>> {
   const rows: T[] = [];
   for (let page = 0; ; page++) {
     const from = page * pageSize;
@@ -29,4 +32,38 @@ export async function readAllPages<T>(
     if (data.length < pageSize) break;
   }
   return { data: rows, error: null };
+}
+
+// Bounded like the photo pools in exportCategory.ts and importCategory.ts.
+const CHUNK_READ_CONCURRENCY = 6;
+
+/**
+ * Every row from a set of independent chunked reads, a few in flight at a
+ * time, joined in chunk order. The first failed chunk stops new ones starting
+ * and is returned as the error, with no partial data.
+ */
+export async function readAllChunks<C, T>(
+  chunks: readonly C[],
+  readChunk: (chunk: C) => PromiseLike<ReadResult<T>>,
+): Promise<ReadResult<T>> {
+  const results: T[][] = [];
+  let firstError: NonNullable<unknown> | undefined;
+  try {
+    await runPool(
+      chunks.map((chunk, index) => ({ chunk, index })),
+      CHUNK_READ_CONCURRENCY,
+      async ({ chunk, index }) => {
+        const result = await readChunk(chunk);
+        if (result.error !== null) {
+          firstError ??= result.error;
+          // Only stops the pool; the caller is handed firstError itself.
+          throw new Error();
+        }
+        results[index] = result.data;
+      },
+    );
+  } catch (err) {
+    return { data: null, error: firstError ?? (err as NonNullable<unknown>) };
+  }
+  return { data: results.flat(), error: null };
 }

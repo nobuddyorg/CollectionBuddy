@@ -399,4 +399,13 @@ describe('ModalImage', () => {
     });
     expect(onIndexChange).not.toHaveBeenCalled();
   });
+
+  it('shows it is loading a photograph whose signature is still on its way', () => {
+    renderModal({ imgs: [{ id: 'id-z', pathFull: 'z.webp' }] });
+
+    expect(
+      screen.getByRole('status', { name: 'Loading…' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
 });
