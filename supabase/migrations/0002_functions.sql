@@ -1,21 +1,9 @@
--- Before the tables, not after: `items.tags_text`'s generated-column
--- expression calls `join_tags`, which must already exist. The plpgsql
--- trigger functions below reference tables that don't exist until 0003 --
--- fine, since plpgsql defers name resolution to first call. Not every
--- function here gets that for free: has_category_write_access and
--- has_category_read_access are `language sql`, which Postgres resolves at
--- CREATE FUNCTION time, so those two live in 0006_policies.sql instead,
--- after the tables they query exist.
---
--- All of them pin `search_path = ''` so every reference is schema-qualified
--- -- without it, a `security definer` function resolves names through the
--- *caller's* search_path, letting anyone who can create objects run code as
--- the owner.
+-- Every function pins `search_path = ''`: a security-definer body must never resolve names through the caller.
+-- Postgres grants EXECUTE to PUBLIC by default, so each callable helper revokes it and grants `authenticated` only.
 begin;
 
--- Returns NULL, not '', for a whitespace-only input -- otherwise it would
--- survive `is not null` filters and get geocoded as a blank query.
-create or replace function public.normalize_text(txt text)
+-- NULL, not '', for whitespace-only input, so it fails `is not null` filters instead of being stored blank.
+create function public.normalize_text(txt text)
 returns text
 language sql
 immutable
@@ -25,7 +13,8 @@ as $$
   select nullif(btrim(regexp_replace(coalesce($1, ''), '\s+', ' ', 'g')), '')
 $$;
 
-create or replace function public.join_tags(tags text[])
+-- Backs items.tags_text, the generated column that gives tag search an ILIKE branch.
+create function public.join_tags(tags text[])
 returns text
 language sql
 immutable
@@ -35,16 +24,13 @@ as $$
   select coalesce(pg_catalog.array_to_string($1, ' '), '')
 $$;
 
--- Postgres grants EXECUTE on a new function to PUBLIC by default; neither
--- is meant as more than an internal helper.
 revoke execute on function public.normalize_text(text), public.join_tags(text[])
 from public;
 grant execute on function public.normalize_text(text), public.join_tags(text[])
 to authenticated;
 
--- Pinged on a schedule (.github/workflows/keep-alive.yml) to stop the
--- free-tier project auto-pausing -- the one thing `anon` may do.
-create or replace function public.keepalive()
+-- Pinged by keep-alive.yml to stop the free-tier project auto-pausing; the one thing `anon` may call.
+create function public.keepalive()
 returns void
 language sql
 security invoker
@@ -55,9 +41,22 @@ $$;
 
 grant execute on function public.keepalive() to anon, authenticated;
 
--- user_id is never trusted from the client: set from the JWT on insert, and
--- reverted (not rejected) on any update attempt to change it.
-create or replace function public.enforce_user_id()
+-- lower(btrim()) on both sides of every sharing comparison; tg_category_shares_enforce stores the same shape.
+create function public.caller_email()
+returns text
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select lower(btrim((select auth.jwt() ->> 'email')))
+$$;
+
+revoke execute on function public.caller_email() from public;
+grant execute on function public.caller_email() to authenticated;
+
+-- user_id is never trusted from the client: set from the JWT on insert, reverted (not rejected) on update.
+create function public.enforce_user_id()
 returns trigger
 language plpgsql
 security definer
@@ -77,7 +76,7 @@ begin
 end
 $$;
 
-create or replace function public.tg_set_updated_at()
+create function public.tg_set_updated_at()
 returns trigger
 language plpgsql
 security definer
@@ -89,7 +88,7 @@ begin
 end
 $$;
 
-create or replace function public.tg_categories_normalize()
+create function public.tg_categories_normalize()
 returns trigger
 language plpgsql
 security definer
@@ -101,7 +100,7 @@ begin
 end
 $$;
 
-create or replace function public.tg_items_normalize()
+create function public.tg_items_normalize()
 returns trigger
 language plpgsql
 security definer
@@ -127,11 +126,8 @@ begin
 end
 $$;
 
--- Cross-tenant assignment is rejected unless the caller has write access to
--- the target category (has_category_write_access, below) -- ownership of
--- *this* category alone isn't enough, since an editor may assign their own
--- item into someone else's shared category too.
-create or replace function public.tg_item_categories_enforce()
+-- Write access to the target category, not ownership: an editor may file their own item into a shared category.
+create function public.tg_item_categories_enforce()
 returns trigger
 language plpgsql
 security definer
@@ -162,10 +158,8 @@ begin
 end
 $$;
 
--- Statement-level, not row-level, with a transition table: deleting a
--- category that cascades N item_categories mappings runs one set-based
--- delete instead of N.
-create or replace function public.delete_item_if_orphan()
+-- Statement-level with a transition table: one set-based delete, never one probe per unlinked item.
+create function public.delete_item_if_orphan()
 returns trigger
 language plpgsql
 security definer
@@ -181,25 +175,7 @@ begin
 end
 $$;
 
-create or replace function public.caller_email()
-returns text
-language sql
-stable
-security invoker
-set search_path = ''
-as $$
-  select lower((select auth.jwt() ->> 'email'))
-$$;
-
-revoke execute on function public.caller_email() from public;
-grant execute on function public.caller_email() to authenticated;
-
--- has_category_write_access and has_category_read_access live in
--- 0006_policies.sql, not here: both are `language sql`, resolved against
--- the catalog at CREATE FUNCTION time (unlike plpgsql), so they can't be
--- created before the tables they query (0003) exist.
-
-create or replace function public.tg_category_shares_enforce()
+create function public.tg_category_shares_enforce()
 returns trigger
 language plpgsql
 security definer
@@ -210,8 +186,7 @@ declare
   caller_email text;
 begin
   if tg_op = 'UPDATE' then
-    -- Only role may move -- re-sharing with a different email or category
-    -- is a new invite, not a patch to this one.
+    -- Only role may change; a different email or category is a new invite.
     if new.category_id <> old.category_id
       or new.invited_email <> old.invited_email
       or new.owner_user_id <> old.owner_user_id
@@ -251,11 +226,8 @@ begin
 end
 $$;
 
--- A raised error in an RLS USING clause aborts the whole statement, not
--- just the one row -- so a path that doesn't parse as `<uid>/<itemId>/<file>`
--- is caught and answered as NULL, letting that one policy simply not match
--- instead of taking the read down with it.
-create or replace function public.storage_item_id(path text)
+-- NULL, never an error: a raise inside an RLS USING clause aborts the whole statement, not just that row.
+create function public.storage_item_id(path text)
 returns uuid
 language plpgsql
 immutable
@@ -271,9 +243,8 @@ $$;
 
 grant execute on function public.storage_item_id(text) to authenticated;
 
--- new.user_id still follows the item's own owner; the write-access check
--- only widens who may *insert* the row.
-create or replace function public.tg_images_enforce()
+-- user_id follows the item's owner; write access only widens who may insert the row.
+create function public.tg_images_enforce()
 returns trigger
 language plpgsql
 security definer
@@ -302,5 +273,153 @@ begin
   return new;
 end
 $$;
+
+-- The rest are `language sql` over tables 0003 creates; unlike plpgsql, Postgres parses those bodies at CREATE.
+set local check_function_bodies = off;
+
+-- Bundles category ownership in, so every write policy calling this can drop its own ownership check.
+create function public.has_category_write_access(cat_id uuid)
+returns boolean
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.categories c
+    where c.id = cat_id
+      and c.user_id = auth.uid()
+  )
+  or exists (
+    select 1
+    from public.category_shares s
+    where s.category_id = cat_id
+      and s.invited_email = public.caller_email()
+      and s.role = 'editor'
+      and (s.expires_at is null or s.expires_at > now())
+  )
+$$;
+
+revoke execute on function public.has_category_write_access(uuid) from public;
+grant execute on function public.has_category_write_access(uuid) to authenticated;
+
+-- Deliberately excludes ownership: an owner must not see an item an editor merely filed into their category.
+create function public.has_category_read_access(cat_id uuid)
+returns boolean
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.category_shares s
+    where s.category_id = cat_id
+      and s.invited_email = public.caller_email()
+      and (s.expires_at is null or s.expires_at > now())
+  )
+$$;
+
+revoke execute on function public.has_category_read_access(uuid) from public;
+grant execute on function public.has_category_read_access(uuid) to authenticated;
+
+-- The map's distinct places for one category; `security invoker`, so the caller's own RLS shapes the rows.
+create function public.list_category_places(
+  cat_id uuid,
+  like_pattern text default null
+)
+returns table (
+  place text,
+  place_lat double precision,
+  place_lng double precision,
+  titles text[],
+  ids uuid[]
+)
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select
+    i.place,
+    -- The newest item's coordinates, if any row has them.
+    (array_agg(i.place_lat order by i.created_at desc)
+      filter (where i.place_lat is not null and i.place_lng is not null))[1],
+    (array_agg(i.place_lng order by i.created_at desc)
+      filter (where i.place_lat is not null and i.place_lng is not null))[1],
+    array_agg(i.title order by i.created_at desc),
+    array_agg(i.id order by i.created_at desc)
+  from public.items i
+  join public.item_categories ic on ic.item_id = i.id
+  where ic.category_id = cat_id
+    and i.place is not null
+    and i.place <> ''
+    and (
+      like_pattern is null
+      or i.title ilike like_pattern
+      or i.description ilike like_pattern
+      or i.place ilike like_pattern
+      or i.tags_text ilike like_pattern
+    )
+  group by i.place
+$$;
+
+revoke execute on function public.list_category_places(uuid, text) from public;
+grant execute on function public.list_category_places(uuid, text) to authenticated;
+
+-- SECURITY DEFINER so the trigram indexes are reachable; its WHERE must equal what an RLS-scoped read allows.
+create function public.search_category_items(
+  cat_id uuid,
+  like_pattern text,
+  page_from int,
+  page_to int
+)
+returns table (
+  id uuid,
+  title text,
+  description text,
+  place text,
+  place_lat double precision,
+  place_lng double precision,
+  tags text[],
+  total_count bigint
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select
+    i.id,
+    i.title,
+    i.description,
+    i.place,
+    i.place_lat,
+    i.place_lng,
+    i.tags,
+    count(*) over () as total_count
+  from public.items i
+  join public.item_categories ic on ic.item_id = i.id
+  where ic.category_id = cat_id
+    and (
+      i.user_id = auth.uid()
+      or public.has_category_read_access(cat_id)
+    )
+    and (
+      i.title ilike like_pattern
+      or i.description ilike like_pattern
+      or i.place ilike like_pattern
+      or i.tags_text ilike like_pattern
+    )
+  order by i.created_at desc
+  offset page_from
+  limit (page_to - page_from + 1)
+$$;
+
+revoke execute on function public.search_category_items(uuid, text, int, int)
+from public;
+grant execute on function public.search_category_items(uuid, text, int, int)
+to authenticated;
 
 commit;

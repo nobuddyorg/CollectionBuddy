@@ -1,13 +1,4 @@
--- `search_category_items` (0015_search_category_items.sql) is `SECURITY
--- DEFINER`: it queries with RLS bypassed so ILIKE can reach the trigram
--- indexes (#621/PERF-H4), which makes it an authorization boundary in its
--- own right rather than RLS re-expressed for convenience. It must
--- reproduce -- not widen -- exactly what an ordinary, RLS-scoped read of
--- `items` scoped to one category already allows. This is the direct-
--- database half of that guarantee; e2e/signed-in/rls.spec.ts's
--- "search_category_items (the search RPC)" describe block is the matching
--- end-to-end case (TEST_STRATEGY.md #7: a direct-database case is
--- encouraged alongside the end-to-end one, but doesn't discharge it).
+-- search_category_items (0002_functions.sql) is SECURITY DEFINER, so it must reproduce, never widen, an RLS-scoped read; rls.spec.ts holds the end-to-end half.
 begin;
 select no_plan();
 

@@ -295,16 +295,23 @@ Three things a from-scratch reset will not tell you:
 
 ### Squashing migrations again
 
-The chain has been squashed twice (most recently #580) into the 0001–0007
-baseline plus whatever landed since. Squashing is a deliberate, occasional act
-that folds the whole current set, never a side effect of another change. Do it
-the way the last one was verified: reset the local stack from the new files,
-introspect old and new databases down to column defaults, constraint
-expressions, index definitions, function bodies, trigger timing, policy
-predicates and grants, and diff them. Afterwards clear
-`supabase_migrations.schema_migrations` on the hosted project so the new files
-are recorded as themselves — that table is the only reason the chain cannot be
-rewritten in place.
+The chain has been squashed three times (most recently on 2026-09-22) into the
+0001–0007 baseline plus whatever landed since. Squashing is a deliberate,
+occasional act that folds the whole current set, never a side effect of
+another change. Do it the way the last one was verified: reset the local stack
+from the old files and introspect, reset from the new files and introspect
+again — column defaults, constraint expressions, index definitions, function
+bodies, trigger timing, policy predicates, grants — and diff the two. Then, in
+the hosted project's SQL editor and right before merging, delete the rows of
+the files that no longer exist so `db push` stops looking for them:
+
+```sql
+delete from supabase_migrations.schema_migrations where version > '0007';
+```
+
+That table is the only reason the chain cannot be rewritten in place. Versions
+0001–0007 stay recorded as applied, so the new files never run on the populated
+database; the diff above is what proves they would have produced it.
 
 ## Set up a new Supabase environment
 

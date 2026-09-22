@@ -24,8 +24,7 @@ select ok(
   'as the postgres role, reading categories raises nothing (RLS and grants both bypassed, as expected of a superuser)'
 );
 
--- Switching to anon: the identical query is now refused outright, because
--- anon holds no grant on the table (0006_policies.sql, 0011_least_privilege_grants.sql).
+-- Switching to anon: the identical query is refused outright, since anon holds no grant on the table (0006_policies.sql).
 set local role anon;
 select ok(
   pg_temp.raises('select 1 from public.categories limit 1'),

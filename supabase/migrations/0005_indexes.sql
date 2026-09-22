@@ -1,90 +1,62 @@
--- Search is substring ILIKE across four text columns OR'd together
--- (buildSearchFilter/likePatternFor, items.ts), so all four need a trigram
--- index: one unindexed branch collapses the whole query onto a sequential
--- scan. tags_text exists solely to give the tags array a fourth ILIKE-able
--- branch.
---
--- These indexes are *not*, on their own, reachable by an ordinary
--- `authenticated` query: `texticlike` (ILIKE's underlying function) is not
--- leakproof, and Postgres will not evaluate a non-leakproof qual before a
--- relation's RLS security qual, so under RLS these can never become an
--- index condition for a role RLS applies to (#621/PERF-H4). They earn their
--- keep only through `search_category_items` (0015_search_category_items.sql),
--- a `SECURITY DEFINER` function that re-implements the read-access check
--- itself and then queries with RLS bypassed, so the planner can reach them.
--- Every other read of `items` -- including the map's own place search
--- (`list_category_places`, 0014_list_category_places.sql), which stays
--- `SECURITY INVOKER` -- still runs under ordinary RLS and still cannot use
--- them.
+-- Trigram indexes are reachable only through search_category_items: ILIKE is not leakproof, so RLS-scoped reads never use them.
 begin;
 
 -- Case-insensitive uniqueness of category names, per user.
-create unique index if not exists categories_user_lower_name_idx
+create unique index categories_user_lower_name_idx
 on public.categories (user_id, lower(name));
 
--- The list view: a user's items, newest first.
-create index if not exists idx_items_user_created_at
+-- A user's items, newest first.
+create index idx_items_user_created_at
 on public.items (user_id, created_at desc);
 
--- The four ILIKE branches.
-create index if not exists idx_items_title_trgm
+-- The four ILIKE branches of the search.
+create index idx_items_title_trgm
 on public.items using gin (title extensions.gin_trgm_ops);
 
-create index if not exists idx_items_description_trgm
+create index idx_items_description_trgm
 on public.items using gin (description extensions.gin_trgm_ops);
 
-create index if not exists idx_items_place_trgm
+create index idx_items_place_trgm
 on public.items using gin (place extensions.gin_trgm_ops);
 
-create index if not exists idx_items_tags_text_trgm
+create index idx_items_tags_text_trgm
 on public.items using gin (tags_text extensions.gin_trgm_ops);
 
--- Tag filtering by containment, which is an array operation rather than a
--- substring one and needs the array itself.
-create index if not exists idx_items_tags_gin
+-- Tag filtering by containment, an array operation on the array itself.
+create index idx_items_tags_gin
 on public.items using gin (tags);
 
--- Both directions of the mapping, plus the FK cover Postgres wants for
--- cascading deletes.
-create index if not exists idx_item_categories_item
+-- Both directions of the mapping, plus the FK cover cascading deletes want.
+create index idx_item_categories_item
 on public.item_categories (item_id);
 
-create index if not exists idx_item_categories_category
+create index idx_item_categories_category
 on public.item_categories (category_id);
 
-create index if not exists idx_item_categories_user
+create index idx_item_categories_user
 on public.item_categories (user_id);
 
--- No separate index on category_id alone --
--- category_shares_category_email_unique's own backing index already
--- covers a category_id-first lookup.
-create index if not exists idx_category_shares_owner
+-- The catalogue page drives from item_categories: scoped by category, already in page order, item_id covering.
+create index idx_item_categories_cat_created
+on public.item_categories (category_id, created_at desc, item_id);
+
+-- No index on category_id alone: category_shares_category_email_unique already covers that prefix.
+create index idx_category_shares_owner
 on public.category_shares (owner_user_id);
 
-create index if not exists idx_category_shares_email
+create index idx_category_shares_email
 on public.category_shares (invited_email);
 
--- A thumbnail path is exactly as unique as a full one -- partial, since
--- path_thumb is nullable and a photograph whose thumbnail upload failed
--- (an existing, accepted failure mode -- see uploadImage in
--- useItemImages.tsx) has none.
-create unique index if not exists images_path_thumb_key
+-- Partial: a photograph whose thumbnail upload failed has no path_thumb.
+create unique index images_path_thumb_key
 on public.images (path_thumb)
 where path_thumb is not null;
 
--- The read path: an item's photographs oldest-first, and what capturing
--- paths ahead of an item/category delete filters by. `id` breaks a tie
--- between two photographs uploaded in the same instant, the same reason
--- listItemsForExport orders by (created_at, id) rather than created_at
--- alone.
-create index if not exists idx_images_item_created_at
+-- An item's photographs oldest-first; id breaks ties between uploads in the same instant.
+create index idx_images_item_created_at
 on public.images (item_id, created_at asc, id);
 
--- Same precedent as item_categories above: index user_id even though
--- item_id already narrows most queries, since RLS is a user_id check and a
--- verification/backfill query wants "every image row this user has"
--- without joining through items.
-create index if not exists idx_images_user
+create index idx_images_user
 on public.images (user_id);
 
 commit;

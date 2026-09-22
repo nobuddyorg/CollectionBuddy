@@ -1,8 +1,4 @@
--- The grant surface underneath the policies: what each role may address at
--- all, before RLS gets a say. 0011_least_privilege_grants.sql exists
--- entirely because this layer had drifted -- `anon` still held full DML on
--- one table, `authenticated` held TRUNCATE (which RLS does not filter at
--- all) on all five -- and nothing asserted it either way.
+-- The grant surface underneath the policies (0006_policies.sql): what each role may address at all, before RLS gets a say.
 --
 -- Every assertion below states the *complete* privilege set rather than
 -- probing one verb at a time, so a privilege nobody meant to grant fails

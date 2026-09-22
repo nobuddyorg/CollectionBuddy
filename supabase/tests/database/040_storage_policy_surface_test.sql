@@ -37,13 +37,7 @@ select is(
   'the per-file size cap is 5 MiB'
 );
 
--- An object's path can never change (CLAUDE.md's settled decision, and
--- 0008_storage_no_update.sql's security fix). The capability is gone in
--- both layers -- no policy authorizes an UPDATE, and the privilege
--- underneath it is revoked -- so neither alone is load-bearing. Restoring
--- either reopens a real, previously exploited escalation: an editor moving
--- the owner's photograph into their own namespace, past revocation and
--- past the nightly sweep.
+-- An object's path never changes: no policy authorizes an UPDATE on storage.objects (0007_storage.sql, design-decisions.md).
 select is(
   (select array_agg(policyname::text order by policyname)
    from pg_catalog.pg_policies
@@ -52,28 +46,9 @@ select is(
   'no policy on storage.objects authorizes an UPDATE -- an object''s path is fixed once written'
 );
 
--- The privilege underneath that policy is NOT asserted, and the reason is
--- worth recording: 0008_storage_no_update.sql revokes UPDATE on
--- storage.objects from authenticated, but the revoke does not survive on a
--- running stack. Supabase's own bootstrap grants ALL on storage.objects to
--- anon, authenticated and service_role, and storage-api re-applies its
--- migrations on start -- so the privilege is back, and this suite measured
--- it back (the assertion was written, and failed here while passing against
--- a hand-built schema). Asserting it true would lock in a weakness;
--- asserting it false fails on every real stack.
---
--- What follows from that: on a live database the *absence of an UPDATE
--- policy* above is the only thing denying an update, not one of two
--- independent layers. That makes the assertion above load-bearing rather
--- than belt-and-braces, which is exactly why it is stated first.
+-- The UPDATE privilege is NOT asserted: Supabase's bootstrap grants ALL on storage.objects and storage-api re-applies it on start, so the missing policy above is the only denial.
 
--- An object may only be created under the uploader's own uid prefix
--- (0010_storage_pin_upload_prefix.sql). "write shared objects" constrained
--- the *item* segment and said nothing about the uid segment, which let an
--- editor store bytes of their choosing under the owner's prefix -- served
--- back to her by her own read policy, and attributable to her by path
--- alone. It was dropped rather than amended, so the assertion is that
--- exactly one policy can authorize an insert at all.
+-- Exactly one policy admits an insert: an object may only be created under the uploader's own uid prefix (0007_storage.sql).
 select is(
   (select array_agg(policyname::text order by policyname)
    from pg_catalog.pg_policies

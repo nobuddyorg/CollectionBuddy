@@ -16,7 +16,7 @@ function photon(coordinates: unknown) {
   return { features: [{ geometry: { coordinates } }] };
 }
 
-// `list_category_places` (0014_list_category_places.sql) already folds
+// `list_category_places` (0002_functions.sql) already folds
 // every item at a place into one row, newest first -- this builds that
 // row directly rather than the per-item rows the SQL now groups.
 function group(
