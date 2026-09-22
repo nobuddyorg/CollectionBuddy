@@ -1,5 +1,5 @@
 name: Start the local Supabase stack
-description: Installs the pinned Supabase CLI and runs `supabase start` from the repo root, applying every migration from scratch. The caller stops it with `supabase stop` under `if: always()`.
+description: "Installs the pinned Supabase CLI and runs `supabase start` from the repo root, applying every migration from scratch. The caller stops it with `supabase stop` under `if: always()`."
 
 runs:
   using: composite

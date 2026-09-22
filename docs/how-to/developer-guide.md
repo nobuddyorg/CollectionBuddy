@@ -117,7 +117,10 @@ grep -rn 'getByTestId\|getByRole\|locator(' web/e2e --include=*.spec.ts
 Playwright's own `page.coverage` (Chromium CDP, no instrumentation step);
 `e2e/global-teardown.ts` merges every worker's data into
 `web/coverage-e2e/index.html`. `i18n.spec.ts` (own browser context) and the
-`firefox` project (no CDP) do not contribute.
+`firefox` project (no CDP) do not contribute. V8 discards a document's counts
+on a full navigation, whatever `resetOnNavigation` says, so the fixture
+flushes them before every `page.goto` and `page.reload`; a navigation the
+app triggers itself (the OAuth redirect) still loses what ran before it.
 
 Only `npm run e2e:local` is gated, by the floor in `e2e/coverage.ts`: it runs
 every Chromium-based project (`chromium`, `mobile`, `signed-in`) against a
