@@ -41,6 +41,7 @@ function defaultImagesState() {
     images: {} as Record<string, unknown>,
     loadingItems: new Set<string>(),
     refreshAllImages: vi.fn(),
+    showImages: vi.fn(),
     uploadImage: vi.fn(),
     deleteImage: vi.fn(),
     deleteAllItemImages: vi.fn(),
@@ -85,6 +86,15 @@ function itemsState(overrides: Partial<ReturnType<typeof defaultState>> = {}) {
 function defaultState() {
   return {
     items: [] as ItemLite[],
+    pageImages: null as {
+      itemIdsKey: string;
+      rows: {
+        id: string;
+        item_id: string;
+        path_full: string;
+        path_thumb: null;
+      }[];
+    } | null,
     total: 0,
     loading: false,
     page: 1,
@@ -452,5 +462,61 @@ describe('ItemList image carousel', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('ItemList photographs for the page', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('lang', 'en');
+    useItemsMock.mockReset();
+  });
+
+  const rows = [
+    { id: 'p1', item_id: 'a', path_full: 'u/a/p1.webp', path_thumb: null },
+  ];
+
+  it('signs the rows the page read carried, rather than listing them again', () => {
+    const images = defaultImagesState();
+    useItemImagesMock.mockReturnValue(images);
+    useItemsMock.mockReturnValue(
+      itemsState({
+        items: [item('a'), item('b')],
+        total: 2,
+        pageImages: { itemIdsKey: 'a,b', rows },
+      }),
+    );
+
+    renderList();
+
+    expect(images.showImages).toHaveBeenCalledWith(['a', 'b'], rows);
+    expect(images.refreshAllImages).not.toHaveBeenCalled();
+  });
+
+  it('lists the photographs itself when the carried rows are for other items', () => {
+    const images = defaultImagesState();
+    useItemImagesMock.mockReturnValue(images);
+    useItemsMock.mockReturnValue(
+      itemsState({
+        items: [item('b')],
+        total: 1,
+        pageImages: { itemIdsKey: 'a,b', rows },
+      }),
+    );
+
+    renderList();
+
+    expect(images.refreshAllImages).toHaveBeenCalledWith(['b']);
+    expect(images.showImages).not.toHaveBeenCalled();
+  });
+
+  it('asks for no photographs for an empty page', () => {
+    const images = defaultImagesState();
+    useItemImagesMock.mockReturnValue(images);
+    useItemsMock.mockReturnValue(itemsState());
+
+    renderList();
+
+    expect(images.refreshAllImages).not.toHaveBeenCalled();
+    expect(images.showImages).not.toHaveBeenCalled();
   });
 });

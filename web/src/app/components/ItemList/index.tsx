@@ -9,9 +9,11 @@ import { ModalImage } from './ModalImage';
 import { GridSkeleton } from './Skeleton';
 import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
+import { pageImageRowsFor } from './imageEntries';
 import { useItemMutations } from './useItemMutations';
 import { searchStatusFor } from './searchStatus';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
+import { useSyncedRef } from '../../lib/useSyncedRef';
 import { useGuardedModalClose } from '../../lib/useGuardedModalClose';
 import { EditItemModal } from './EditItemModal';
 import { MapModal } from './MapModal';
@@ -69,8 +71,17 @@ export default function ItemList({
 
   const [mapOpen, setMapOpen] = useState(false);
 
-  const { items, total, loading, page, setPage, totalPages, reload, setItems } =
-    useItems(categoryId, qDebounced);
+  const {
+    items,
+    pageImages,
+    total,
+    loading,
+    page,
+    setPage,
+    totalPages,
+    reload,
+    setItems,
+  } = useItems(categoryId, qDebounced);
   const searchStatus = searchStatusFor(qDebounced, total);
 
   const handleCreated = useCallback(() => {
@@ -88,6 +99,7 @@ export default function ItemList({
     images,
     loadingItems,
     refreshAllImages,
+    showImages,
     uploadImage,
     deleteImage,
     captureItemImagePaths,
@@ -95,11 +107,16 @@ export default function ItemList({
     pendingUploads,
   } = useItemImages();
 
+  // Read through a ref so a reload that keeps the same items re-signs nothing.
+  const pageImagesRef = useSyncedRef(pageImages);
   const itemIdsKey = items.map((i) => i.id).join(',');
   useEffect(() => {
     if (!itemIdsKey) return;
-    void refreshAllImages(itemIdsKey.split(','));
-  }, [itemIdsKey, refreshAllImages]);
+    const itemIds = itemIdsKey.split(',');
+    const carried = pageImageRowsFor(pageImagesRef.current, itemIdsKey);
+    if (carried) void showImages(itemIds, carried);
+    else void refreshAllImages(itemIds);
+  }, [itemIdsKey, pageImagesRef, refreshAllImages, showImages]);
 
   const { saveEdit, isSaving, removeItem } = useItemMutations({
     items,

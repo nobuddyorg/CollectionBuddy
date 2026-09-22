@@ -12,6 +12,18 @@ export type ImageEntryData = {
   pathThumb?: string;
 };
 
+/** Photograph rows a page read carried, tagged with the items they cover. */
+export type PageImages = { itemIdsKey: string; rows: ImageListRow[] };
+
+/** The carried rows, but only for the exact item set they were read with --
+ * any other set (an optimistic removal, a later page) must re-list. */
+export function pageImageRowsFor(
+  pageImages: PageImages | null,
+  itemIdsKey: string,
+): ImageListRow[] | null {
+  return pageImages?.itemIdsKey === itemIdsKey ? pageImages.rows : null;
+}
+
 // Query order is preserved per item, which is what keeps an item's first
 // photograph in the hero slot as more are added.
 export function groupImageRows(

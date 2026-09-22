@@ -4,11 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SELECTED_CATEGORY_KEY } from './components/CategorySelect/selection';
 import { useCategories } from './components/CategorySelect/useCategories';
+import { prefetchFirstPage } from './components/ItemList/firstPagePrefetch';
 import { useCatalogue } from './useCatalogue';
 import type { UseCategories } from './components/CategorySelect/useCategories';
 
 vi.mock('./components/CategorySelect/useCategories', () => ({
   useCategories: vi.fn(),
+}));
+
+vi.mock('./components/ItemList/firstPagePrefetch', () => ({
+  prefetchFirstPage: vi.fn(),
 }));
 
 const cats = [
@@ -37,7 +42,34 @@ function categoriesState(
 describe('useCatalogue', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    vi.mocked(prefetchFirstPage).mockClear();
     vi.mocked(useCategories).mockReturnValue(categoriesState());
+  });
+
+  it("starts the stored category's first page alongside the category list, not after it", () => {
+    window.localStorage.setItem(SELECTED_CATEGORY_KEY, 'b');
+    const reload = vi.fn(() => new Promise<typeof cats>(() => {}));
+    vi.mocked(useCategories).mockReturnValue(categoriesState({ reload }));
+
+    renderHook(() => useCatalogue(false, 'user-1'));
+
+    // The list has not answered (and never will here), yet the page is on its way.
+    expect(reload).toHaveBeenCalled();
+    expect(prefetchFirstPage).toHaveBeenCalledWith('b');
+  });
+
+  it('prefetches nothing when no category was stored', () => {
+    renderHook(() => useCatalogue(false, 'user-1'));
+
+    expect(prefetchFirstPage).not.toHaveBeenCalled();
+  });
+
+  it('prefetches nothing before the session has resolved', () => {
+    window.localStorage.setItem(SELECTED_CATEGORY_KEY, 'b');
+
+    renderHook(() => useCatalogue(true, 'user-1'));
+
+    expect(prefetchFirstPage).not.toHaveBeenCalled();
   });
 
   it('does not load while the session is still resolving', () => {

@@ -115,7 +115,7 @@ Because `has_category_read_access()` excludes ownership and an owner cannot shar
 
 ### Images
 
-`public.images` is the queryable index of what is in Storage, written by the client at upload time — one indexed query for a page's photos instead of one `storage.list()` per item. Its RLS mirrors `item_categories`. Storage remains the authority on what exists; the client deletes objects first and lets the row cascade ([why](../explanation/design-decisions.md#why-images-are-deleted-client-side-before-the-database-row)). Objects nothing references are swept by `cleanup-orphaned-photos.yml`.
+`public.images` is the queryable index of what is in Storage, written by the client at upload time — a page's photos come embedded in the unsearched page read itself (a search lists them in one indexed query), instead of one `storage.list()` per item. Its RLS mirrors `item_categories`. Storage remains the authority on what exists; the client deletes objects first and lets the row cascade ([why](../explanation/design-decisions.md#why-images-are-deleted-client-side-before-the-database-row)). Objects nothing references are swept by `cleanup-orphaned-photos.yml`.
 
 ## Client data-access layer
 

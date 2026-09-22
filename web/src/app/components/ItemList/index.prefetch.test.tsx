@@ -70,6 +70,7 @@ describe('ItemList prefetch failures', () => {
       images: {},
       loadingItems: new Set(),
       refreshAllImages: vi.fn(),
+      showImages: vi.fn(),
       uploadImage: vi.fn(),
       deleteImage: vi.fn(),
       captureItemImagePaths: vi.fn(),

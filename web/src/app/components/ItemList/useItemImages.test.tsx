@@ -265,6 +265,53 @@ describe('useItemImages', () => {
     });
   });
 
+  describe('showImages', () => {
+    it('signs rows the page read already carried, without listing again', async () => {
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      await act(async () => {
+        await result.current.showImages(
+          ['item-1', 'item-2'],
+          [row('img-1', 'item-1')],
+        );
+      });
+
+      expect(listImagesForItems).not.toHaveBeenCalled();
+      expect(result.current.images).toEqual({
+        'item-1': [entry('img-1', 'item-1')],
+        'item-2': [],
+      });
+      expect(result.current.loadingItems.size).toBe(0);
+    });
+
+    it('marks the items as loading until their signatures are back', async () => {
+      let resolveSign!: (v: unknown) => void;
+      vi.mocked(createSignedUrls).mockReturnValue(
+        new Promise((resolve) => {
+          resolveSign = resolve;
+        }) as never,
+      );
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      let pending!: Promise<void>;
+      act(() => {
+        pending = result.current.showImages(
+          ['item-1'],
+          [row('img-1', 'item-1')],
+        );
+      });
+
+      expect(result.current.loadingItems.has('item-1')).toBe(true);
+
+      await act(async () => {
+        resolveSign({ data: [], error: null });
+        await pending;
+      });
+
+      expect(result.current.loadingItems.has('item-1')).toBe(false);
+    });
+  });
+
   describe('uploadImage', () => {
     it('stores a full size and a thumbnail under the uploader own prefix, then records the row', async () => {
       const { result } = renderHook(() => useItemImages(), { wrapper });

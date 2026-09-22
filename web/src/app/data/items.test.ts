@@ -302,9 +302,15 @@ describe('the queries behind the list and the map', () => {
     expect(listQuery('coin').get('category_id')).toBe('eq.cat-1');
   });
 
-  it('drives the list from item_categories, embedding items as the inner join that carries the search filter', () => {
+  it('drives the list from item_categories, embedding items as the inner join that carries the search filter, and their photographs', () => {
     expect(listQuery('coin').get('select')).toBe(
-      'items!inner(id,title,description,place,place_lat,place_lng,tags)',
+      'items!inner(id,title,description,place,place_lat,place_lng,tags,images(id,item_id,path_full,path_thumb))',
+    );
+  });
+
+  it("orders each item's embedded photographs oldest-first, id breaking ties", () => {
+    expect(listQuery('').get('items.images.order')).toBe(
+      'created_at.asc,id.asc',
     );
   });
 
@@ -505,10 +511,14 @@ describe('listItems', () => {
       tags: [],
     };
   }
+  // What the page read embeds per link row: the item plus its photographs.
+  function pageRow(id: string, images: unknown[] = []) {
+    return { items: { ...item(id), images } };
+  }
 
   it('unwraps each row to the item it embeds, combining it with the count from the separate count request', async () => {
     const rawList = vi.fn().mockResolvedValue({
-      data: [{ items: item('a') }, { items: item('b') }],
+      data: [pageRow('a'), pageRow('b')],
       error: null,
     });
     const rawCount = vi.fn().mockResolvedValue({ count: 2, error: null });
@@ -536,6 +546,36 @@ describe('listItems', () => {
     });
   });
 
+  it("hands back the page's photograph rows alongside its items, in item order", async () => {
+    const photo = (id: string, itemId: string) => ({
+      id,
+      item_id: itemId,
+      path_full: `u/${itemId}/${id}.webp`,
+      path_thumb: null,
+    });
+    const rawList = vi.fn().mockResolvedValue({
+      data: [
+        pageRow('a', [photo('p1', 'a'), photo('p2', 'a')]),
+        pageRow('b', [photo('p3', 'b')]),
+      ],
+      error: null,
+    });
+    const rawCount = vi.fn().mockResolvedValue({ count: 2, error: null });
+
+    const { data, imageRows } = await listItems(
+      { categoryId: 'cat-1', search: '', from: 0, to: 8 },
+      rawList,
+      rawCount,
+    );
+
+    expect(data).toEqual([item('a'), item('b')]);
+    expect(imageRows).toEqual([
+      photo('p1', 'a'),
+      photo('p2', 'a'),
+      photo('p3', 'b'),
+    ]);
+  });
+
   it('returns no data and a null count when the page request errors, without touching the rows', async () => {
     const rawList = vi
       .fn()
@@ -556,7 +596,7 @@ describe('listItems', () => {
   it('returns no data and a null count when the count request errors, even though the page succeeded', async () => {
     const rawList = vi
       .fn()
-      .mockResolvedValue({ data: [{ items: item('a') }], error: null });
+      .mockResolvedValue({ data: [pageRow('a')], error: null });
     const rawCount = vi
       .fn()
       .mockResolvedValue({ count: null, error: new Error('boom') });
@@ -633,7 +673,7 @@ describe('listItems, once a search term earns a filter', () => {
       error: null,
     });
 
-    const { data, error, count } = await listItems(
+    const { data, error, count, imageRows } = await listItems(
       { categoryId: 'cat-1', search: 'coin', from: 0, to: 8 },
       undefined,
       undefined,
@@ -642,6 +682,8 @@ describe('listItems, once a search term earns a filter', () => {
 
     expect(error).toBeNull();
     expect(count).toBe(5);
+    // The RPC carries no photographs; the caller lists those itself.
+    expect(imageRows).toBeNull();
     expect(data).toEqual([
       {
         id: 'a',

@@ -7,6 +7,7 @@ import {
 } from './imageCache';
 import {
   groupImageRows,
+  pageImageRowsFor,
   signEntries,
   toImgEntries,
   type ImageEntryData,
@@ -237,5 +238,23 @@ describe('signEntries', () => {
 
     expect(signUrls).not.toHaveBeenCalled();
     expect(result['item-5']).toEqual([]);
+  });
+});
+
+describe('pageImageRowsFor', () => {
+  const rows = [
+    { id: 'p1', item_id: 'a', path_full: 'u/a/p1.webp', path_thumb: null },
+  ];
+
+  it('hands back the carried rows for the exact item set they were read with', () => {
+    expect(pageImageRowsFor({ itemIdsKey: 'a,b', rows }, 'a,b')).toBe(rows);
+  });
+
+  it('refuses them for any other item set', () => {
+    expect(pageImageRowsFor({ itemIdsKey: 'a,b', rows }, 'b')).toBeNull();
+  });
+
+  it('has nothing when the read carried no rows', () => {
+    expect(pageImageRowsFor(null, 'a,b')).toBeNull();
   });
 });

@@ -1,6 +1,7 @@
 import { chunk } from '../lib/chunk';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
+import type { ImageListRow } from './images';
 
 type ItemRow = Database['public']['Tables']['items']['Row'];
 export type ItemInsert = Database['public']['Tables']['items']['Insert'];
@@ -25,8 +26,8 @@ export type ItemEditableFieldKey = Exclude<
   'id'
 >;
 /** What a page read returns per matching `item_categories` row, before
- * `listItems` flattens it to the item itself. */
-type ItemCategoryPageRow = { items: ItemFields };
+ * `listItems` flattens it to the item and its photographs. */
+type ItemCategoryPageRow = { items: ItemFields & { images: ImageListRow[] } };
 
 /**
  * One distinct place in a category, already folded down from every item
@@ -55,6 +56,9 @@ const ITEM_FIELDS_SELECT = ITEM_FIELD_KEYS.join(',');
 // (0013_item_categories_cat_created_idx.sql) instead of scanning every item
 // in the category before sorting (#618, #619).
 const ITEM_CATEGORY_PAGE_SELECT = `items!inner(${ITEM_FIELDS_SELECT})`;
+// The page also embeds each item's photograph rows, saving the separate
+// `images` round trip before signing (#627).
+const ITEM_CATEGORY_PAGE_WITH_IMAGES_SELECT = `items!inner(${ITEM_FIELDS_SELECT},images(id,item_id,path_full,path_thumb))`;
 
 // Escapes LIKE metacharacters (and a literal backslash, so it survives as
 // one once ILIKE unescapes it) and wraps the term for a substring match.
@@ -148,14 +152,17 @@ export function rawListItems({
   // here as `count: 'exact'`.
   let query = supabase
     .from('item_categories')
-    .select(ITEM_CATEGORY_PAGE_SELECT)
+    .select(ITEM_CATEGORY_PAGE_WITH_IMAGES_SELECT)
     .eq('category_id', categoryId);
 
   const filter = searchFilterFor(search);
   if (filter) query = query.or(filter, { referencedTable: 'items' });
 
+  // Photographs oldest-first per item, as listImagesForItems orders them.
   return withSignal(query, signal)
     .order('created_at', { ascending: false })
+    .order('created_at', { referencedTable: 'items.images', ascending: true })
+    .order('id', { referencedTable: 'items.images', ascending: true })
     .range(from, to)
     .overrideTypes<ItemCategoryPageRow[], { merge: false }>();
 }
@@ -235,6 +242,19 @@ export function rawSearchCategoryItems({
 
 type SearchItemRow = ItemFields & { total_count: number };
 
+/** Just the item's own fields, dropping whatever a read carried alongside. */
+function itemFieldsOf({
+  id,
+  title,
+  description,
+  place,
+  place_lat,
+  place_lng,
+  tags,
+}: ItemFields): ItemFields {
+  return { id, title, description, place, place_lat, place_lng, tags };
+}
+
 /**
  * The catalogue page: every item currently linked into `categoryId`,
  * newest first. A search that has earned a filter (likePatternFor) goes
@@ -244,7 +264,8 @@ type SearchItemRow = ItemFields & { total_count: number };
  * otherwise -- kept outside the ignored block above (unlike those builders)
  * because unwrapping the response is real logic worth a real test.
  * `rawList`/`rawCount`/`rawSearch` are parameters for exactly that test,
- * not for production callers.
+ * not for production callers. `imageRows` is the page's photograph rows
+ * when the read carried them (the unfiltered path), else null.
  */
 export async function listItems(
   params: {
@@ -261,6 +282,7 @@ export async function listItems(
   data: ItemFields[] | null;
   error: unknown;
   count: number | null;
+  imageRows: ImageListRow[] | null;
 }> {
   const likePattern = likePatternFor(params.search);
   if (likePattern) {
@@ -271,30 +293,32 @@ export async function listItems(
       to: params.to,
       signal: params.signal,
     });
-    if (error) return { data: null, error, count: null };
+    if (error) return { data: null, error, count: null, imageRows: null };
     const rows = data ?? [];
     const count = rows.length > 0 ? rows[0].total_count : 0;
-    const items = rows.map(
-      ({ id, title, description, place, place_lat, place_lng, tags }) => ({
-        id,
-        title,
-        description,
-        place,
-        place_lat,
-        place_lng,
-        tags,
-      }),
-    );
-    return { data: items, error: null, count };
+    return {
+      data: rows.map(itemFieldsOf),
+      error: null,
+      count,
+      imageRows: null,
+    };
   }
 
   const [{ data, error }, { count, error: countError }] = await Promise.all([
     rawList(params),
     rawCount(params),
   ]);
-  if (error) return { data: null, error, count: null };
-  if (countError) return { data: null, error: countError, count: null };
-  return { data: (data ?? []).map((row) => row.items), error: null, count };
+  if (error) return { data: null, error, count: null, imageRows: null };
+  if (countError) {
+    return { data: null, error: countError, count: null, imageRows: null };
+  }
+  const rows = data ?? [];
+  return {
+    data: rows.map((row) => itemFieldsOf(row.items)),
+    error: null,
+    count,
+    imageRows: rows.flatMap((row) => row.items.images),
+  };
 }
 
 export function createItem(payload: Pick<ItemInsert, ItemEditableFieldKey>) {

@@ -57,6 +57,7 @@ function imagesState(overrides: Record<string, unknown> = {}) {
     images: { 'item-1': [PHOTO] } as Record<string, ImgEntry[]>,
     loadingItems: new Set<string>(),
     refreshAllImages: vi.fn(),
+    showImages: vi.fn(),
     uploadImage: vi.fn(),
     deleteImage: vi.fn(),
     captureItemImagePaths: vi.fn().mockResolvedValue([]),
