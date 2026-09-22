@@ -1,531 +1,190 @@
 # CLAUDE.md
 
-This file guides Claude Code (and any other AI assistant) when working in this
-repository. It is project-wide: `web/CLAUDE.md` adds Next.js-specific context
-on top of this file and does not replace it.
+Standing instructions for Claude Code and any other AI assistant working in
+this repository. `web/CLAUDE.md` adds Next.js-specific context on top of this
+file. Read this file and [TEST_STRATEGY.md](TEST_STRATEGY.md) before writing
+anything.
 
-**Required reading before you write anything**: this file, and
-[TEST_STRATEGY.md](TEST_STRATEGY.md). Both are standing instructions, not
-background material. The hard guardrails come first because they are the part
-that is not negotiable; the project overview, the commands and the
-architecture summary follow. Read [README.md](README.md) for the feature list
-and [docs/README.md](docs/README.md) for the full documentation set, organised
-by [Diátaxis](https://diataxis.fr).
+## What this project is
 
-## Hard guardrails — never skip these
+**CollectionBuddy** is a photo-first, bilingual (German/English) catalogue app
+for personal collections. Every entry leads with a photo, carries a place and
+tags, and is searchable. Features: [README.md](README.md). Full docs:
+[docs/README.md](docs/README.md).
 
-These are not suggestions. If one of them would block finishing a task, stop
-and say so instead of working around it.
+- **Frontend**: Next.js App Router as a **static export** — no server runtime,
+  no route handlers, no server-side authorization code. `web/`.
+- **Backend**: Supabase (Postgres, Auth, Storage). Google OAuth is the only
+  sign-in; anonymous sign-in exists only for the local demo mode.
+- **Authorization**: Postgres Row Level Security, and nothing else. Sharing is
+  account-based, per category, at role `viewer` or `editor` — an editor
+  creates, edits and deletes entries and photos inside a shared category, so
+  sharing is **not read-only**.
+- **Deploy**: `pages-deploy.yml` migrates the production database, then builds
+  and publishes to GitHub Pages, on every merge to `main`. No staging.
 
-### 1. TEST_STRATEGY.md is mandatory, not advisory
+## Read before you touch
 
-[TEST_STRATEGY.md](TEST_STRATEGY.md) is a **generic, portable testing
-playbook** — deliberately project-agnostic (no CollectionBuddy-specific
-facts), so it stays copy-pasteable into any project of this app's shape:
-static/serverless frontend, Postgres RLS as the only authorization boundary.
-**Read it at the start of every task** and follow its methodology: which
-layer tests a given behavior (§5), what may be mocked vs. must be real
-(§6), the rules authorization tests must follow (§7), and which approaches
-are deliberately not used, and why (throughout).
+| Area | Read first |
+| --- | --- |
+| Schema, RLS, sharing, storage, deletes, search | [architecture.md](docs/reference/architecture.md), then [design-decisions.md](docs/explanation/design-decisions.md) |
+| Tests: which layer, what may be mocked, how RLS is tested | [TEST_STRATEGY.md](TEST_STRATEGY.md) §5–§7, then [developer-guide.md](docs/how-to/developer-guide.md) |
+| Dependencies, `npm audit` findings | design-decisions.md, "npm audit" section |
+| Migrations, squashing, deploying, new environments | developer-guide.md |
+| Local setup, the pre-PR checklist | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
-This repo's **concrete instantiation** — the actual risk table, RLS/sharing
-model, measured thresholds, CI wiring — lives in the pre-PR checklist below
-(guardrail 2), [architecture.md](docs/reference/architecture.md), and
-[design-decisions.md](docs/explanation/design-decisions.md). A task that
-changes an architectural or testing assumption updates *those* files, not
-TEST_STRATEGY.md — a CollectionBuddy fact landing there is a bug.
+## Hard rules
 
-Disagreeing with the playbook is fine; departing from it silently is not.
+Settled decisions and safety rules. If a task seems to need one reversed, stop
+and say so; never work around it quietly. Reasoning lives in
+design-decisions.md, not here.
 
-### 2. Definition of done = the full pre-PR checklist
+- A client-side check is UX, never authorization. Every query is covered by an
+  RLS policy.
+- No public/anonymous share links.
+- Search stays trigram `ILIKE`; no `tsvector`/full-text search.
+- A storage object's path never changes: no `UPDATE` on `storage.objects`, no
+  `move()`, no `upsert`. Restoring it reopens an exploited escalation.
+- Delete storage objects client-side **before** the DB row, never after, and
+  never through a DB trigger.
+- No DDL on `storage.objects` (indexes, columns). Hosted Supabase refuses with
+  `42501`; a local reset will not tell you. Policies on it are fine.
+- Never lower a coverage or mutation threshold (`web/vitest.config.mts`,
+  `web/stryker.config.mjs`) or auto-ratchet one. An unreachable threshold is a
+  design problem: redesign, or raise it with the user.
+- No `/* v8 ignore */` or `// Stryker disable` — `src/` has none. No `.skip`,
+  ESLint or TS suppression without understanding the failure first; the reason
+  goes on the same line. No test gaming.
+- Never commit to `main`, skip hooks (`--no-verify`), force-push over others'
+  commits, or rewrite history on a branch you don't own.
+- Never modify `.github/workflows/**`, repository secrets, branch protection,
+  or `.pre-commit-config.yaml`'s security hooks unless the user explicitly asks.
+- Never run `npm audit fix --force` or a from-scratch `rm -rf node_modules
+  package-lock.json && npm install` in `web/`; use targeted `overrides`.
+- Never write real Google OAuth credentials, service-role keys, or
+  `SUPABASE_DB_URL`/`SUPABASE_ACCESS_TOKEN` values anywhere — code, docs,
+  commits, chat, not even as an example. `NEXT_PUBLIC_SUPABASE_ANON_KEY` is
+  the one credential meant to be public. `service_role` lives only in CI
+  secrets, never in client code.
 
-A task is **not** done — do not say "done", open a PR as ready, or report
-success — until every one of these has been run from `web/` and is green.
-The order is not decoration: the build must run first, because it generates
-`next-env.d.ts`, which `tsc` and ESLint need.
+## Database changes
+
+RLS is the only authorization boundary, and this project's history includes
+several real RLS bugs. Every policy change is security-critical.
+
+- Local stack only: `supabase start`, `supabase db reset`, `supabase migration`.
+  Never `supabase db push` or run SQL against the hosted project; CI's `migrate`
+  job does that on merge.
+- A schema change is a new `supabase/migrations/NNNN_*.sql` file, never an edit
+  to an existing one, plus a regenerated `web/src/app/data/database.types.ts`.
+- A new table ships, in the same migration, with `enable row level security`,
+  its policies, `revoke all ... from anon`, and a grant to `authenticated` of
+  exactly the DML those policies back. A new function pins
+  `set search_path = ''` and revokes `execute` from `public` unless it is a
+  deliberate RPC. Copy the shape of the existing migrations.
+- CI proves a migration applies from scratch; production applies it to a
+  populated database, unattended. If a migration alters an existing table or
+  adds a constraint or index to one: `supabase db reset`, seed (the
+  `e2e/signed-in.setup.ts` seed covers most shapes), apply the new file on top,
+  and say in the PR that you did.
+- A policy, grant, or ownership-trigger change ships a matching case in
+  `web/e2e/signed-in/rls.spec.ts` in the same change — two real identities,
+  real tokens, straight at PostgREST. A pgTAP case in
+  `supabase/tests/database/` is welcome alongside but does not replace it.
+- Call out any change under `supabase/migrations/**` in the commit message and
+  PR description as security-relevant, with one line on what it now allows or
+  denies.
+- `.github/workflows/cleanup-orphaned-photos.yml` counts as a database change:
+  `service_role`, bulk Storage delete, daily cron, irreversible. Its query has
+  three load-bearing invariants — it matches **both `path_full` and
+  `path_thumb`**, casts **no path to `uuid`**, and keeps a **48h grace
+  period**. Never drop, narrow or shorten them; verify any change with the
+  default dry run (`workflow_dispatch`) first. Why: TEST_STRATEGY.md §12.
+
+## How to work here
+
+- **Smallest necessary change.** Preserve existing behavior unless changing it
+  is what was asked. Boy-scout fixes stay inside the function, file, or policy
+  you are already editing; if something outside it breaks a rule, say so rather
+  than widening the diff.
+- **When principles collide:** correctness and security, then KISS/YAGNI, then
+  clean code, then DRY, then SOLID. No abstraction for a requirement nobody has;
+  extract on the third occurrence. SOLID means modules, hooks, and functions —
+  never classes or a DI container. DRY applies to SQL (a shared predicate is a
+  function like `has_category_read_access()`) and workflows (a repeated step is
+  a composite action in `.github/actions/`) too.
+- **Split by responsibility:** fetch in `src/app/data/` (the only place that
+  imports the Supabase client, besides `login/` and the top-level session
+  files), transform in a pure function that takes values as parameters and
+  never reaches for Supabase, `window`, `fetch`, the router or `Date.now()`,
+  render in the component. Hard-to-reach coverage or a stubborn mutant means
+  extract the logic, not force the test. New pure logic goes on
+  `web/mutation-targets.mjs`; rendering stays off it.
+- **Clean code, as applied here:** intent-revealing names, no abbreviations or
+  type prefixes; small functions with guard clauses; zero to two parameters,
+  else a named object, never a boolean flag; command-query separation; no
+  `null`/`undefined` as a signal where a type or empty collection models it;
+  files under ~350 lines; no dead code; no dependency without clear value over
+  what's here, and none that is deprecated or unmaintained.
+- **Comments:** one line, hard cap, only for a non-obvious constraint,
+  workaround, invariant, or external behavior — never to narrate code or record
+  a decision (that goes in the commit or PR). Existing longer comments are not
+  precedent; tighten any you touch.
+- **Fail fast; measure, don't assume.** Surface errors, never swallow them.
+  Performance, coverage, and bundle size are numbers a tool prints. A new
+  filtering/sorting query names its index; bulk operations are set-based.
+- **i18n:** every user-facing string goes through `t('...')` and exists in
+  **both** `web/src/app/i18n/de.json` and `en.json` in the same change. German
+  is the default locale.
+- **Tests:** a UI change gets an E2E case for its journey; a functional change
+  gets a unit test asserting behavior, not implementation; an authorization
+  change gets its `rls.spec.ts` case. E2E specs reach the app only through the
+  page objects in `web/e2e/pages/`, every element by `data-testid`. Disagreeing
+  with the playbook is fine; departing from it silently is not.
+- **Docs sync:** a change to setup, the checklist, architecture, configuration,
+  a design decision, or a testing assumption updates the matching `docs/` file
+  (and `CONTRIBUTING.md`/`README.md`) in the same change. Two things that rotted
+  before: migration filenames after a squash (`grep -rn '00NN_'`), and claims
+  that sharing is "read-only". TEST_STRATEGY.md stays generic: a CollectionBuddy
+  fact landing there is a bug — it goes in `docs/` or here.
+
+## Development commands
+
+```bash
+supabase start && supabase db reset     # repo root, once; needs Docker
+cd web && cp .env.example .env.local && npm install
+npm run dev          # http://localhost:3000; needs Google OAuth env (CONTRIBUTING.md)
+npm run demo         # anonymous local demo user, no OAuth needed
+```
+
+## Definition of done
+
+Not done — no "done", no ready PR, no reported success — until every one of
+these is green, from `web/`, in this order (`build` generates `next-env.d.ts`,
+which `tsc` and ESLint need):
 
 ```bash
 npm run build
 npx tsc --noEmit
 npx prettier --check .
 npm run lint
-npm run depcruise      # architectural boundaries -- see TEST_STRATEGY.md §6
-npm run knip           # dead code / unused dependencies -- see TEST_STRATEGY.md §6
+npm run depcruise         # architectural boundaries
+npm run knip              # dead code / unused dependencies
 npm test -- --coverage
 npm run e2e
-npm run test:mutation     # separate CI job, run it too before calling something done
-npm run e2e:local         # needs `supabase start`; required if you touched
-                           # catalogue, search, map, entry forms, photos,
-                           # sharing, exporting, or RLS
-supabase test db          # pgTAP, from the repo root; needs `supabase start`;
-                           # required alongside e2e:local for changes touching
-                           # RLS policies, grants, ownership triggers, or schema
-opengrep scan --config auto \
-  web/src web/scripts web/e2e supabase   # separate CI job (see CONTRIBUTING.md
-                           # for install); run it too if you touched those paths
-npm run lighthouse        # separate CI job, needs `supabase start`; run it too
-                           # before calling something done
+npm run test:mutation
+npm run e2e:local         # needs `supabase start`; required if you touched catalogue,
+                          # search, map, entry forms, photos, sharing, export, or RLS
+supabase test db          # repo root, needs `supabase start`; required alongside
+                          # e2e:local for RLS policies, grants, ownership triggers, schema
+opengrep scan --config auto web/src web/scripts web/e2e supabase
+                          # if you touched those paths; install: CONTRIBUTING.md
+npm run lighthouse        # needs `supabase start`
 ```
 
-`prek run --all-files` (or `pre-commit run --all-files`) from the repo root
-runs the repo-wide hooks (file hygiene, `typos`, `zizmor`, `markdownlint`,
-`sqlfluff-lint`) plus the same web checks.
-
-Partial runs ("lint passes, I didn't run the rest") are not a stopping point,
-they're a status update.
-
-- Guardrail 1 decides *what* gets tested and at which level; this checklist
-  is *whether you actually ran it*. Both apply — a change that follows the
-  strategy but skips the checklist is not done either.
-- **Never** lower a coverage or mutation-score threshold
-  (`web/vitest.config.mts` `test.coverage.thresholds`,
-  `web/stryker.config.mjs` `thresholds.break`) to make CI pass. If a
-  legitimate change makes a threshold unreachable, that's a design problem —
-  redesign the code/tests, or raise it with the user; don't quietly relax the
-  gate.
-- **Never** add `/* v8 ignore */`, `// Stryker disable`, `.skip`, or an
-  ESLint/TS suppression to make a check pass without first understanding
-  *why* it's failing and confirming the suppression is legitimate. Where one
-  is already in use, it sits next to I/O that cannot be scored and carries
-  the reason in a comment; anything new needs the same.
-- **No test gaming.** Coverage and mutation score must reflect real
-  assertions on real behavior — never write a test just to touch a line, add
-  a meaningless branch to dodge a mutant, or exclude a file to avoid dealing
-  with it. A green metric that doesn't correspond to real confidence is worse
-  than a documented gap.
-
-### 3. Database changes: local-first, RLS is load-bearing
-
-RLS — the policies on the tables, and the ones on the storage bucket — is
-the **only** authorization boundary in this app; there is no server to fall
-back on. This project's history includes several real RLS-correctness bugs,
-so treat every policy change as security-critical, not routine SQL. Find the
-current files by what they define (`grep -rn 'create policy' supabase/migrations/`)
-rather than by a number: a squash renumbers them.
-
-- Write and run migrations against the **local** stack only
-  (`supabase start`, `supabase db reset`, `supabase migration ...`).
-  **Never** run a migration, `supabase db push`, or any destructive SQL
-  against a staging or production project/database — those need
-  `SUPABASE_DB_URL`/`SUPABASE_ACCESS_TOKEN` secrets this session should not
-  have reason to use, and pushing schema changes to `main` is what
-  `pages-deploy.yml`'s `migrate` job does, deliberately, in CI.
-- CI only proves a migration applies **from scratch** (`supabase start` runs
-  `0001`…`N` against an empty database); production applies it with `db
-  push` against a database **full of rows**, on every merge to `main`, with
-  no staging in between. For any migration that alters an existing table, or
-  adds a constraint or index to one, also test it against populated data
-  before opening the PR: `supabase db reset`, seed rows into the affected
-  tables (the `e2e/signed-in.setup.ts` seed covers most shapes), then apply
-  the new migration file on top of that — not through a fresh reset — and
-  say in the PR description that you did. This is a review-enforced practice,
-  not an automated gate: a committed production-shaped seed would just be a
-  second schema to keep in step with the first.
-- Any change to `supabase/migrations/**` — new policy, changed policy, new
-  grant, new trigger touching auth/ownership — **must** be called out
-  explicitly in the commit message and PR description as a security-relevant
-  change, with a one-line explanation of what it now allows or denies.
-- **`.github/workflows/cleanup-orphaned-photos.yml` counts as a database
-  change for that rule.** It's the highest-privilege logic in the repo — a
-  `service_role` key and a bulk Storage delete, on a daily cron, with
-  irreversible deletion of live photographs as its failure mode. Three
-  invariants in its query look like tidy-ups but aren't — never drop, narrow
-  or shorten them: it matches **both `path_full` and `path_thumb`**, it casts
-  **no path to `uuid`**, and it holds a **48h grace period**. Verify any
-  change with a dry run (`workflow_dispatch`, which defaults to it) before
-  letting it delete anything. Why each one matters: [TEST_STRATEGY.md](TEST_STRATEGY.md) §12.
-- Never treat a client-side check ("only show the delete button if...") as
-  authorization. It's UX. The RLS policy is the real check, and any new
-  query needs to be covered by one.
-- A policy, grant, or ownership-trigger change **must** ship a matching case
-  in `web/e2e/signed-in/rls.spec.ts` in the same change — that file is the
-  executable form of the authorization model.
-  [TEST_STRATEGY.md](TEST_STRATEGY.md) §7 has why the rule is absolute and
-  how those cases are written (two real identities, real tokens, straight at
-  PostgREST).
-- Don't touch `storage.objects` DDL — hosted Supabase doesn't grant `postgres`
-  ownership of it; policies are fine, `CREATE INDEX`/schema changes are not
-  and will fail with `42501` (this is expected, not a bug to work around).
-- Squashing migrations again is a deliberate, rare act with a verification
-  procedure (see [developer-guide.md](docs/how-to/developer-guide.md)) —
-  never squash as a side effect of an unrelated change.
-
-### 4. Git, branches, CI
-
-- Never commit directly to `main` (the pre-commit hook `no-commit-to-branch`
-  already blocks this locally — don't bypass it with `--no-verify`).
-- Never skip hooks (`--no-verify`), force-push over someone else's commits,
-  or rewrite history on a branch you don't own.
-- Never modify `.github/workflows/**`, repository secrets, branch protection,
-  or `.pre-commit-config.yaml`'s security hooks (`zizmor`, `detect-private-key`)
-  without the user explicitly asking for that change.
-- Never run `npm audit fix --force` or a from-scratch
-  `rm -rf node_modules package-lock.json && npm install` in `web/` — both
-  have concretely made the dependency tree *worse* on this project (see the
-  advisory section of
-  [design-decisions.md](docs/explanation/design-decisions.md)). Use targeted
-  `overrides` entries instead.
-
-### 5. Secrets and environment
-
-- Never write real Google OAuth credentials, Supabase service-role keys, or
-  `SUPABASE_DB_URL`/`SUPABASE_ACCESS_TOKEN` values into code, commits, docs,
-  or chat output — not even "as an example". `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-  is the one credential that's fine to see in the client bundle and docs by
-  design; nothing else is.
-- `web/.env.local` is local-only and gitignored — never add real secrets to
-  `web/.env.example`, which stays placeholder values.
-- `service_role` must never be used from client code or shipped in the
-  static export; it exists only in CI workflow secrets for specific
-  server-side jobs (`pages-deploy.yml`, `cleanup-orphaned-photos.yml`).
-
-### 6. i18n
-
-Every user-facing string goes through `t('...')` and must exist in **both**
-`web/src/app/i18n/de.json` and `en.json` with the same key. There's an
-executable parity test (`web/src/app/i18n/parity.test.ts`) that fails on a
-missing or mismatched key — but don't rely on it to catch this after the
-fact; add both languages in the same change. German is the default locale.
-
-### 7. Scope-creep guard — settled decisions, don't relitigate silently
-
-[docs/explanation/design-decisions.md](docs/explanation/design-decisions.md)
-documents choices that look like they could be "improved" but were made
-deliberately, for reasons that took real investigation. Read it before
-touching any of the areas below. Do not change these without first flagging
-the tradeoff to the user:
-
-- **No public/anonymous share links** — sharing is account-based only
-  (RLS can't cheaply authorize an anonymous reader; see the doc). Note that
-  "account-based" is not "read-only": a grant carries a `role`, and an
-  `editor` writes item content inside the shared category.
-- **Search is trigram `ILIKE`, not full-text search** — don't reintroduce
-  `tsvector`/FTS columns; they were added once, found unused, and dropped.
-- **A storage object's path never changes** — `authenticated` holds no
-  `UPDATE` on `storage.objects`, so `move()` and `upsert` are refused for
-  owner and grantee alike. Restoring the verb reopens a real, previously
-  exploited escalation (an editor moving the owner's photo into their own
-  namespace, past revocation and past the sweep) — full story in
-  [design-decisions.md](docs/explanation/design-decisions.md#why-a-storage-objects-path-can-never-change).
-- **Storage objects are deleted client-side *before* the DB row**, never
-  the other way around — reversing the order orphans image files with no
-  way to find them again. There is deliberately no DB-side cleanup trigger
-  for `storage.objects` (Supabase forbids deleting from it outside the
-  Storage API).
-- **Mutation testing (Stryker) is scoped by a list**, `web/mutation-targets.mjs`,
-  not applied to the whole `src/app` tree. That one list feeds both Stryker
-  and `vitest.config.mts`'s per-file coverage floors, so it is the only
-  place to change, and everything on it carries a 100% coverage floor.
-  Widening it is welcome where the logic is genuinely reachable from tests;
-  what stays off it is rendering — mutating JSX and class strings produces
-  near-equivalent mutants by the thousand and a score nobody can act on.
-- **The coverage floor is raised by hand** (`autoUpdate: false`) and never
-  auto-ratcheted — that was tried and reverted because it made local-green
-  runs produce red PRs.
-- **`delete_item_if_orphan()` runs `FOR EACH STATEMENT`, not `FOR EACH
-  ROW`** — the row-level version was a real O(n) performance bug at
-  category-deletion scale; don't revert it for "simplicity".
-- Don't recreate a `public.profiles` table — it existed pre-squash, was
-  never populated or queried, and was dropped as dead weight.
-
-If a task seems to require reversing one of these, say so explicitly and
-explain why, rather than quietly doing it.
-
-### 8. Design methods: KISS, DRY, SOLID, Clean Code
-
-These four are **mandatory for every line you write and every line you
-touch** — new code and existing code alike, in TypeScript/React, SQL,
-workflows, scripts and tooling. They are not a style preference to be traded
-against delivery speed: code that breaks one of them is not finished code.
-Almost none of this is tool-enforced — `lint`, `knip` and `depcruise` catch a
-fraction — which is exactly why it sits in the guardrails and not in a style
-guide.
-
-**Existing code** is covered by the boy-scout rule, bounded: when a change
-takes you into a function, file, or policy that breaks a rule below, bring
-*that* unit up to the rule in the same change. Bounded means bounded — this
-never licenses a refactor the task didn't ask for (guardrail 7, and
-"Smallest necessary change" below). If a rule is broken somewhere you are not
-otherwise editing, say so rather than widening the diff.
-
-**When two of them collide, this is the order:** correctness and security,
-then KISS/YAGNI, then Clean Code, then DRY, then SOLID. DRY and SOLID exist
-to remove *present* pain; the moment either argues for an abstraction that
-only pays off for a requirement nobody has, KISS wins and you write the
-obvious version. Call that choice out in the PR description.
-
-#### KISS — the simplest thing that fully solves the actual problem
-
-- Solve the problem that exists, in the most obvious way that works. This is
-  "caveman mode": no cleverness, no indirection layer, no config knob, no
-  generic helper with a single caller.
-- Obvious beats compressed. Nested ternaries, `reduce` used as a loop, and
-  one-liners that need a comment to parse are KISS violations.
-- Complexity is measured, not felt — if a function is hard to name or hard to
-  test, that is the signal, and the answer is to redesign it, not to comment
-  it.
-
-#### DRY — one home per piece of knowledge
-
-- Every rule, constant, query shape, validation, and translation key lives in
-  exactly one place. Copy-pasted logic is a bug report against the design.
-- DRY is about *knowledge*, not about characters. Two blocks that look alike
-  but change for different reasons stay apart; merging them couples things
-  that must move independently.
-- Extract on the third occurrence, not the second — two similar lines are a
-  coincidence, three are a pattern.
-- It applies outside `src/` too: a shared predicate belongs in a SQL function
-  (`has_category_read_access()` is the model), a repeated workflow step in a
-  composite action under `.github/actions/`, and a fact stated in two `docs/`
-  files will rot in one of them.
-
-#### SOLID — as module design, not as class hierarchies
-
-This is functional TypeScript and SQL. SOLID applies to modules, components,
-hooks and functions; it is never a reason to introduce classes, inheritance
-or a DI container here.
-
-- **S — Single responsibility.** One unit, one reason to change. A component
-  that fetches *and* transforms *and* renders is three: the fetch belongs in
-  `src/app/data/`, the transform in a pure function in `src/app/lib/` where
-  it can be unit-tested and mutation-scored, the rendering in the component.
-- **O — Open/closed.** Extend by adding an entry to a list or map, not by
-  reopening a growing `if`/`switch` in the caller. Adding a seam for an
-  extension nobody has asked for is YAGNI — KISS wins.
-- **L — Liskov substitution.** Anything sharing a type must be usable through
-  that type. A union member every caller has to special-case is a modelling
-  error; fix the type, don't guard it at each site.
-- **I — Interface segregation.** Props, parameters and exported types carry
-  what the consumer actually uses — don't pass a whole entity to read two
-  fields.
-- **D — Dependency inversion.** Pure logic never reaches for Supabase,
-  `window`, `fetch`, the router, or `Date.now()`; it takes values as
-  parameters and the edge supplies them. This is what keeps the files on
-  `mutation-targets.mjs` testable without mocks, and what `depcruise`'s
-  `supabase-behind-data-layer` rule enforces at the module level.
-
-#### Clean code — the explicit rules
-
-- **Names reveal intent.** No `data`, `info`, `tmp`, `handleClick2`, no
-  abbreviations, no type prefixes. Functions are verbs, types and components
-  are nouns, booleans read as predicates (`isActive`, `hasWriteAccess`).
-  A name that needs a comment to be understood is the wrong name.
-- **Functions are small and do one thing** — one level of abstraction per
-  function, guard clauses instead of deep nesting (three levels is already a
-  smell), no `else` after a `return`.
-- **Few parameters.** Zero to two; beyond that take a named object. Never a
-  boolean flag parameter — that is two functions wearing one name.
-- **Command-query separation.** A function either changes something or
-  answers something, never both. A `get`/`is`/`has` that mutates is a bug.
-- **No hidden side effects.** Pure by default; where a side effect is the
-  point, the name says so.
-- **No magic numbers or strings.** Name the constant at its one home. Every
-  user-facing string goes through `t('...')` (guardrail 6).
-- **Don't return or pass `null`/`undefined` as a signal** when a narrowed
-  type, an empty collection, or a thrown error models it honestly.
-- **Respect the Law of Demeter.** No `a.b().c().d()` chains reaching through
-  objects the caller has no business knowing about.
-- **Keep files small** — aim for under ~350 lines; split when a file grows
-  past what one concern justifies.
-- **Leave it cleaner than you found it**, within the bound stated above.
-- Rules with a single home elsewhere are not restated here: comments,
-  fail-fast error handling, dead code, and test quality are covered under
-  Engineering Principles and [TEST_STRATEGY.md](TEST_STRATEGY.md).
-
-## Project Overview
-
-**CollectionBuddy** is a photo-first, bilingual (German/English) catalog app
-for personal collections (coins, stamps, records, cameras, ...). Every entry
-leads with a photo, carries a place and tags, and is searchable.
-
-- **Frontend**: Next.js (App Router, **static export**, `output: 'export'`)
-  — no server runtime, no route handlers, no server-side authorization code.
-  The pinned version is `web/package.json`'s, and `web/AGENTS.md` says to
-  read the version's own docs before writing against its APIs.
-- **Backend**: Supabase (Postgres + Auth + Storage). Google is the only
-  sign-in provider.
-- **Authorization**: enforced entirely by Postgres **Row Level Security**.
-  There is nowhere else it could live — see "Hard guardrails" above.
-- **Hosting**: static export deployed to GitHub Pages.
-
-## Repository Structure
-
-```text
-CollectionBuddy/
-├── README.md                      # Feature overview, screenshots
-├── CONTRIBUTING.md               # Local setup, pre-PR checklist
-├── CLAUDE.md                     # This file
-├── TEST_STRATEGY.md              # READ THIS before writing or changing tests
-├── .pre-commit-config.yaml       # File hygiene, spell check, zizmor,
-│                                  # markdownlint, sqlfluff-lint, and web/'s own
-│                                  # checks
-├── .sqlfluff                      # SQLFluff config for supabase/migrations/
-│                                  # and supabase/tests/database/
-├── docs/                         # Diátaxis docs
-│   ├── tutorials/getting-started.md
-│   ├── how-to/user-guide.md, developer-guide.md
-│   ├── reference/architecture.md, configuration.md
-│   └── explanation/design-decisions.md   # READ THIS before touching schema,
-│                                          # RLS, sharing, search, or deletes
-├── .github/
-│   ├── actions/                   # Composite actions the workflows share
-│   └── workflows/                 # CI, Pages deploy, the daily orphan sweep
-├── supabase/
-│   ├── config.toml                # Local stack ports, Google OAuth block
-│   └── migrations/                # Applied in filename order; a squashed
-│                                   # baseline plus whatever has landed since
-└── web/                           # The Next.js app (see web/CLAUDE.md)
-    ├── src/app/                   # components/, data/, i18n/, lib/, login/
-    ├── e2e/                       # Playwright specs (signed-out + signed-in)
-    ├── scripts/                   # Dev/CI tooling: export server, local-stack
-    │                               # runner, icon generation, mutation summary
-    ├── mutation-targets.mjs       # The one list of mutated + 100%-covered files
-    ├── stryker.config.mjs         # Mutation testing, scoped to pure functions
-    └── vitest.config.mts          # Unit tests, coverage thresholds
-```
-
-## Development Commands
-
-Full setup: [CONTRIBUTING.md](CONTRIBUTING.md). Summary:
-
-```bash
-# One-time local backend (from repo root)
-supabase start
-supabase db reset
-
-# Web app (from web/)
-cp .env.example .env.local
-npm install
-npm run dev              # http://localhost:3000
-npm run demo             # no Google OAuth needed, anonymous local demo user
-```
-
-The checks that decide whether a change is finished live in guardrail 2
-above, not here.
-
-## Engineering Principles
-
-Apply these across the codebase — TypeScript/React in `web/`, SQL in
-`supabase/migrations/`, workflows, and docs alike. They sit alongside the
-mandatory design methods in guardrail 8 — KISS, DRY, SOLID and the clean-code
-rules — and add this project's own emphasis on top of them. Three meta-rules
-sit above all the others:
-
-1. **Measure, don't assume.** Performance, coverage, mutation score,
-   complexity, and bundle size are things to run a tool and read a number
-   for — not to estimate from how the code "feels".
-2. **Every line has to earn its place.** Code, dependencies, abstractions,
-   and config all need a concrete, present-tense reason to exist.
-3. **Preserve existing behavior**, unless a change to it is explicitly what
-   was asked for. An unrequested behavior change hidden inside a refactor is
-   a bug, not a bonus.
-
-And the rest:
-
-- **Security by design** — think about RLS/auth/input handling while
-  writing the code, not as a pass afterward.
-- **Performance by design** — pick a reasonable approach up front (e.g. an
-  index-friendly query, a set-based SQL statement) rather than shipping an
-  O(n²)/one-row-at-a-time version and optimizing later.
-- **Maximize test coverage** — and when high coverage is hard to reach,
-  that's usually a sign the design needs to change (extract the pure logic),
-  not that the tests should be forced.
-- **Maximize mutation score** — same principle: a mutant that's hard to kill
-  usually means the code or test needs redesigning, not a Stryker exclusion.
-- **No outdated/unmaintained dependencies** — don't add or keep a
-  dependency that's deprecated, unmaintained, or clearly stale.
-- **Minimal dependencies** — every added dependency needs clear value over
-  the standard library / what's already in the project.
-- **YAGNI / no speculative engineering** — don't build for a requirement
-  that doesn't exist yet. No "for later" abstractions.
-- **Redesign instead of workaround** — when security, performance,
-  testability, maintainability, or complexity is the actual problem,
-  question the design rather than stacking a workaround on it.
-- **Fail fast, no silent failures** — surface errors early and clearly;
-  never swallow them.
-- **Least privilege & secure defaults** — minimal grants/permissions;
-  never make an insecure configuration the default.
-- **No dead code** — remove unused code, imports, config, abstractions, and
-  dependencies as you find them, don't leave them "just in case".
-- **Smallest necessary change** — no unrequested large-scale rewrites; change
-  only what the goal actually requires.
-- **Behavior over implementation in tests** — assert real behavior and
-  meaningful edge cases, not implementation details that just mirror the code.
-- **No test gaming** — don't manipulate coverage or mutation score with
-  meaningless tests, artificial branches, or exclusions; the metrics should
-  reflect real quality.
-- **Comments:**
-  One line, hard cap — never a multi-line or multi-paragraph block. If the
-  reasoning doesn't fit in one line, it belongs in the commit message or PR
-  description, not the code.
-  Add a comment only when it explains something that is not reasonably
-  obvious from the code itself, such as a non-obvious constraint,
-  workaround, invariant, or important external behavior. Do not add
-  comments merely to document implementation decisions, restate what the
-  code does, narrate obvious logic, or explain routine changes.
-  State a piece of reasoning once, at its clearest site. If the same
-  rationale applies to several call sites or lines, don't repeat it at
-  each one — comment the one that explains it best and let the rest be
-  read in light of it.
-  Prefer clear naming and simple code over explanatory comments.
-  Existing comments in this codebase are not a style precedent — several
-  predate this rule and run longer than it allows. Match the rule above
-  for anything you write or touch, not the surrounding file's existing
-  length. Preserve existing comments unless they are incorrect, obsolete,
-  or misleading; when a change already touches a comment that violates
-  this rule, tighten it rather than leaving it as found. Remove comments
-  that no longer provide meaningful context.
-- **Ui changes:** Always need a e2e test
-- **Functional changes:** Always need a unit test
-
-## Quick Architecture Reference
-
-For anything beyond this summary, read
-[docs/reference/architecture.md](docs/reference/architecture.md) and
-[docs/explanation/design-decisions.md](docs/explanation/design-decisions.md)
-first — both explain *why*, not just *what*.
-
-- Tables: `categories`, `items`, `item_categories`, `category_shares`,
-  `images` — see [architecture.md](docs/reference/architecture.md).
-- Every policy starts from `user_id = (select auth.uid())` and is widened
-  by one of two predicates: `has_category_read_access()` (any active
-  `category_shares` grant) or `has_category_write_access()` (category
-  ownership, **or** an active grant at role `editor`). Sharing is *not*
-  read-only — an editor writes items and photographs inside a shared
-  category. Category-level actions (rename, delete, manage shares) stay
-  owner-only at every role.
-- `anon` has both RLS denial *and* explicit revoked grants on **every**
-  table (defense in depth, not redundancy — don't remove either; a real gap
-  here once hid behind a missing function `EXECUTE` grant instead, caught
-  only by the executable assertions — `supabase/tests/database/000_schema_test.sql`).
-  `authenticated` holds exactly the DML each table's policies back, and no
-  `TRUNCATE`/`REFERENCES`/`TRIGGER` — RLS does not filter `TRUNCATE` at all.
-- Photos: one private Storage bucket, with a per-file size cap and an
-  image-only MIME allowlist configured on the bucket itself (`supabase/config.toml`
-  and the storage migration); WebP compression happens in the browser
-  before upload.
-- Daily `cleanup-orphaned-photos.yml` sweeps Storage objects that no
-  `images` row references (48h grace period), which a crashed client-side
-  delete or a failed row insert leaves behind. `workflow_dispatch` runs it as
-  a dry run by default.
-
-## Documentation Sync
-
-If a change affects local setup, the pre-PR checklist, architecture,
-configuration, a design decision, or a testing assumption, update the
-relevant file in `docs/` (and `CONTRIBUTING.md`/`README.md` if applicable) in
-the same change — don't let docs drift from what the code actually does.
-`TEST_STRATEGY.md` is the one exception: per guardrail 1, it stays generic
-and project-agnostic on purpose, so a CollectionBuddy-specific fact belongs
-in `docs/` instead, never added there.
-
-Two things have actually rotted here before, so check them by name:
-
-- **Migration filenames.** A squash folds files away, and every reference to
-  one — in `docs/`, here, and in source comments — then points at a file
-  that no longer exists. Repoint them at the baseline file that now holds
-  the thing, in the same change as the squash. `grep -rn '00NN_'` finds them.
-- **Claims about what sharing allows.** "Read-only" was true of the original
-  grant and stopped being true when the `editor` role landed, while five
-  documents went on saying it. A change to `has_category_read_access()` or
-  `has_category_write_access()` changes what the docs owe the reader.
+CI additionally runs an OWASP ZAP baseline scan against the built export;
+reproduce it per developer-guide.md if you touched headers, CSP, or the login
+page. `prek run --all-files` from the repo root runs the repo-wide hooks
+(`typos`, `zizmor`, `markdownlint`, `sqlfluff-lint`, file hygiene) plus the same
+web checks. A partial run is a status update, not a stopping point. If a gate
+blocks finishing, say so — never relax the gate.

@@ -67,7 +67,7 @@ That migration also brings `authenticated`'s privileges down to what 0006 always
 
 The same file ends with an assert-rather-than-assume guard on `storage.objects`: a `do` block that raises at migration time if row-level security is ever found disabled there, since [`0007_storage.sql`](../../supabase/migrations/0007_storage.sql)'s grants to `authenticated` only narrow down to "your own objects" because RLS is on. It reads `pg_class` rather than running `alter table ... enable row level security`, which needs `supabase_storage_admin` and would fail every migration after it.
 
-`web/e2e/signed-in/rls.spec.ts` is the executable version of this section: it asks the questions the app never would, with a real token, against a local stack. It covers owner-versus-stranger and `viewer` grants — `editor` grants are not covered there yet, see [TEST_STRATEGY.md](../../TEST_STRATEGY.md).
+`web/e2e/signed-in/rls.spec.ts` is the executable version of this section: it asks the questions the app never would, with a real token, against a local stack. It covers owner-versus-stranger, `viewer` grants, and — in its own describe block — the `editor` role, the widest grant the schema can issue. See the [Developer guide](../how-to/developer-guide.md#the-signed-in-suite).
 
 ### Sharing
 
