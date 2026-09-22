@@ -4,9 +4,9 @@ This walks through a first run of CollectionBuddy end to end: sign in, create a 
 
 ## 1. Set up the local stack
 
-Follow [CONTRIBUTING.md](../../CONTRIBUTING.md) to start the local Supabase stack and the web app. You'll need Docker running and a Google OAuth client (both are one-time setup, and CONTRIBUTING.md has the exact steps) — CollectionBuddy has no offline/mock mode, so a working Supabase backend is required even for this first run.
+Follow [CONTRIBUTING.md](../../CONTRIBUTING.md) to start the local Supabase stack and the web app. You'll need Docker running and a Google OAuth client (both are one-time setup, and CONTRIBUTING.md has the exact steps). A working Supabase backend is required even for this first run; to skip the Google setup, run the [local demo](../../CONTRIBUTING.md#try-the-local-demo) instead, which signs you in automatically as an anonymous user, so step 2 doesn't apply.
 
-Once `npm run dev` is up, open `http://localhost:3000`.
+Once `npm run dev` (or `npm run demo`) is up, open `http://localhost:3000`.
 
 ## 2. Sign in
 
