@@ -35,11 +35,7 @@ updates:
       stryker:
         patterns:
           - "@stryker-mutator/*"
-      # Split by dependency-type so a runtime-dependency patch (e.g. next)
-      # never blocks auto-merge.yml from merging a devDependency patch that
-      # happens to land in the same weekly batch: fetch-metadata reports a
-      # mixed group as direct:production, which the workflow always sends
-      # to a human.
+      # Split by dependency-type: a mixed group reports as direct:production, which auto-merge.yml always sends to a human.
       patch-updates-dev:
         dependency-type: "development"
         patterns:
