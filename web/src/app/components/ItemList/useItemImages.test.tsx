@@ -154,9 +154,9 @@ describe('useItemImages', () => {
       expect(listImagesForItems).not.toHaveBeenCalled();
     });
 
-    it('treats a null answer with no error as no images for any of them', async () => {
+    it('treats an empty answer as no images for any of them', async () => {
       vi.mocked(listImagesForItems).mockResolvedValue({
-        data: null,
+        data: [],
         error: null,
       });
       const { result } = renderHook(() => useItemImages(), { wrapper });
@@ -403,9 +403,9 @@ describe('useItemImages', () => {
       expect(result.current.images['item-1']).toEqual([]);
     });
 
-    it('treats a null post-upload listing as no images for this item', async () => {
+    it('treats an empty post-upload listing as no images for this item', async () => {
       vi.mocked(listImagesForItems).mockResolvedValue({
-        data: null,
+        data: [],
         error: null,
       });
       const { result } = renderHook(() => useItemImages(), { wrapper });
@@ -965,9 +965,9 @@ describe('useItemImages', () => {
       ).resolves.toEqual(paths);
     });
 
-    it('treats a null answer with no error as no paths to clean up', async () => {
+    it('treats an empty answer as no paths to clean up', async () => {
       vi.mocked(listImagePathsForItems).mockResolvedValue({
-        data: null,
+        data: [],
         error: null,
       });
       const { result } = renderHook(() => useItemImages(), { wrapper });

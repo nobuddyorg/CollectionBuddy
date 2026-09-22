@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
@@ -86,11 +86,13 @@ export function useTheme() {
     document.documentElement.setAttribute('data-theme', resolved);
   }, [resolved]);
 
-  const setThemePreference = useCallback((next: ThemePreference) => {
+  // Not memoized: it goes straight onto the theme control's onChange in a
+  // component nothing memoizes, and no effect lists it.
+  const setThemePreference = (next: ThemePreference) => {
     if (next === 'system') localStorage.removeItem(THEME_STORAGE_KEY);
     else localStorage.setItem(THEME_STORAGE_KEY, next);
     window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
-  }, []);
+  };
 
   return { preference, resolved, setThemePreference };
 }

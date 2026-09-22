@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { useMenu } from './useMenu';
 
@@ -150,12 +150,35 @@ describe('useMenu', () => {
     const user = userEvent.setup();
     render(<Harness />);
 
-    // With the listener wrongly attached this early, `panelRef.current` is
-    // still null (the panel has never rendered) and the handler crashes on
-    // the first outside click instead of doing nothing.
     await user.click(screen.getByText('elsewhere'));
 
     expect(menu()).toBeNull();
+  });
+
+  // The dismissal rules hang off document/window, where the only evidence
+  // that a closed menu is not still answering every click on the page is
+  // the listener bookkeeping itself.
+  it('hangs no document listener until it is opened, and takes back every one it hangs', async () => {
+    const docAdd = vi.spyOn(document, 'addEventListener');
+    const docRemove = vi.spyOn(document, 'removeEventListener');
+    const user = userEvent.setup();
+    const { unmount } = render(<Harness />);
+
+    expect(docAdd).not.toHaveBeenCalled();
+
+    await user.click(screen.getByText('trigger'));
+    expect(docAdd).toHaveBeenCalledWith('mousedown', expect.any(Function));
+
+    await user.click(screen.getByText('trigger'));
+    unmount();
+
+    // Every listener it hung is taken back under the same name -- a
+    // cleanup that runs but names something else leaves it attached.
+    for (const [event, handler] of docAdd.mock.calls) {
+      expect(docRemove).toHaveBeenCalledWith(event, handler);
+    }
+    docAdd.mockRestore();
+    docRemove.mockRestore();
   });
 
   it('does not attach its Escape listener before the menu has ever been opened', async () => {

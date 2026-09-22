@@ -1,3 +1,5 @@
+import { chunk } from '../lib/chunk';
+import { readAllPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
 
@@ -84,25 +86,23 @@ const ID_FILTER_CHUNK_SIZE = 100;
 async function selectImagesForItems<T>(
   itemIds: string[],
   select: string,
-): Promise<{ data: T[] | null; error: unknown }> {
+): Promise<
+  { data: T[]; error: null } | { data: null; error: NonNullable<unknown> }
+> {
   const rows: T[] = [];
-  for (let i = 0; i < itemIds.length; i += ID_FILTER_CHUNK_SIZE) {
-    const chunk = itemIds.slice(i, i + ID_FILTER_CHUNK_SIZE);
-    for (let page = 0; ; page++) {
-      const from = page * ROW_PAGE_SIZE;
-      const { data, error } = await supabase
+  for (const ids of chunk(itemIds, ID_FILTER_CHUNK_SIZE)) {
+    const paged = await readAllPages<T>(ROW_PAGE_SIZE, (from, to) =>
+      supabase
         .from('images')
         .select(select)
-        .in('item_id', chunk)
+        .in('item_id', ids)
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
-        .range(from, from + ROW_PAGE_SIZE - 1)
-        .overrideTypes<T[], { merge: false }>();
-      if (error) return { data: null, error };
-      if (!data?.length) break;
-      rows.push(...data);
-      if (data.length < ROW_PAGE_SIZE) break;
-    }
+        .range(from, to)
+        .overrideTypes<T[], { merge: false }>(),
+    );
+    if (paged.error !== null) return paged;
+    rows.push(...paged.data);
   }
   return { data: rows, error: null };
 }
@@ -112,7 +112,10 @@ async function selectImagesForItems<T>(
 // (0005_indexes.sql).
 export function listImagesForItems(
   itemIds: string[],
-): Promise<{ data: ImageListRow[] | null; error: unknown }> {
+): Promise<
+  | { data: ImageListRow[]; error: null }
+  | { data: null; error: NonNullable<unknown> }
+> {
   return selectImagesForItems<ImageListRow>(
     itemIds,
     'id, item_id, path_full, path_thumb',
@@ -124,7 +127,10 @@ export function listImagesForItems(
 // Must run before that delete, not after (see 0003_tables.sql).
 export function listImagePathsForItems(
   itemIds: string[],
-): Promise<{ data: ImagePathRow[] | null; error: unknown }> {
+): Promise<
+  | { data: ImagePathRow[]; error: null }
+  | { data: null; error: NonNullable<unknown> }
+> {
   return selectImagesForItems<ImagePathRow>(
     itemIds,
     'item_id, path_full, path_thumb',

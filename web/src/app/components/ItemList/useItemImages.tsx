@@ -89,12 +89,12 @@ export function useItemImages() {
   // other state to settle at the same moment (an upload's placeholder) can
   // apply both in one go instead of rendering in between.
   const fetchItemImages = useCallback(async (itemId: string) => {
-    const { data, error } = await listImagesForItems([itemId]);
-    if (error) {
-      console.error('Failed to list images', error);
+    const listed = await listImagesForItems([itemId]);
+    if (listed.error !== null) {
+      console.error('Failed to list images', listed.error);
       return undefined;
     }
-    const grouped = groupImageRows(data ?? []);
+    const grouped = groupImageRows(listed.data);
     const entryData = grouped.get(itemId) ?? new Map();
     const signed = await signEntries([[itemId, entryData]]);
     lastSignedAtRef.current = Date.now();
@@ -109,11 +109,13 @@ export function useItemImages() {
 
     setLoadingItems((prev) => new Set([...prev, ...itemIds]));
 
-    const { data, error } = await listImagesForItems(itemIds);
-    const grouped = error
-      ? new Map<string, Map<string, ImageEntryData>>()
-      : groupImageRows(data ?? []);
-    if (error) console.error('Failed to list images', error);
+    const listed = await listImagesForItems(itemIds);
+    const grouped =
+      listed.error !== null
+        ? new Map<string, Map<string, ImageEntryData>>()
+        : groupImageRows(listed.data);
+    if (listed.error !== null)
+      console.error('Failed to list images', listed.error);
 
     const perItem = itemIds.map(
       (itemId) => [itemId, grouped.get(itemId) ?? new Map()] as const,
@@ -263,12 +265,12 @@ export function useItemImages() {
   // item's images rows away, and needs the paths first to clean up Storage
   // bytes afterward (images.item_id cascades, 0003_tables.sql).
   const captureItemImagePaths = useCallback(async (itemId: string) => {
-    const { data, error } = await listImagePathsForItems([itemId]);
-    if (error) {
-      console.error('Failed to read image paths before delete', error);
+    const listed = await listImagePathsForItems([itemId]);
+    if (listed.error !== null) {
+      console.error('Failed to read image paths before delete', listed.error);
       return [];
     }
-    return data ?? [];
+    return listed.data;
   }, []);
 
   const removeImageBytes = useCallback(

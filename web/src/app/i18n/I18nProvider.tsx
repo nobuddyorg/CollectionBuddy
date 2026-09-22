@@ -95,16 +95,8 @@ function detectLang(): Language {
   return 'en';
 }
 
-// A no-op on the server: Next still executes this once during the static
-// export's prerender, where useLayoutEffect would otherwise warn.
-const useIsomorphicLayoutEffect =
-  typeof window === 'undefined' ? useEffect : useLayoutEffect;
-
 export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
-  // Must start at 'de' to match the static export's prerendered markup --
-  // seeding from detectLang() directly causes a hydration mismatch on the
-  // first client render. useIsomorphicLayoutEffect below corrects it
-  // before the next paint.
+  // Starts at 'de', matching the prerendered markup -- seeding from detectLang() here is a hydration mismatch, so the layout effect below corrects it before paint.
   const [lang, setLang] = useState<Language>('de');
   // t reads lang through this ref, not directly, so its identity stays
   // stable across a language change -- otherwise every callback/effect
@@ -115,7 +107,7 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   // eslint-disable-next-line react-hooks/refs
   langRef.current = lang;
 
-  useIsomorphicLayoutEffect(() => {
+  useLayoutEffect(() => {
     setLang(detectLang());
   }, []);
 

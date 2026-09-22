@@ -1,3 +1,4 @@
+import { chunk } from '../lib/chunk';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
 
@@ -44,8 +45,6 @@ export interface PlaceGroupRow {
   ids: string[];
 }
 
-/* v8 ignore start -- only used by the ignored query builders below. */
-// Stryker disable all: only used by the ignored query builders below.
 // Coordinates come back with every item read so an item edited without
 // touching its place keeps the pin it already had.
 const ITEM_FIELDS_SELECT = ITEM_FIELD_KEYS.join(',');
@@ -56,8 +55,6 @@ const ITEM_FIELDS_SELECT = ITEM_FIELD_KEYS.join(',');
 // (0013_item_categories_cat_created_idx.sql) instead of scanning every item
 // in the category before sorting (#618, #619).
 const ITEM_CATEGORY_PAGE_SELECT = `items!inner(${ITEM_FIELDS_SELECT})`;
-// Stryker restore all
-/* v8 ignore stop */
 
 // Escapes LIKE metacharacters (and a literal backslash, so it survives as
 // one once ILIKE unescapes it) and wraps the term for a substring match.
@@ -120,10 +117,15 @@ export function likePatternFor(search: string): string | null {
   return search.length >= searchMinLength(search) ? likePattern(search) : null;
 }
 
-/* v8 ignore start -- thin Supabase query builders; buildSearchFilter and
- * searchFilterFor above are what's gated and mutation-tested. */
-// Stryker disable all: what these builders are held to is the shape of the
-// query, not their lines.
+/** `abortSignal` is typed as requiring a signal but only stores what it is
+ * given, so an absent one needs no branch of its own at five call sites. */
+function withSignal<T extends { abortSignal(signal: AbortSignal): T }>(
+  query: T,
+  signal: AbortSignal | undefined,
+): T {
+  return query.abortSignal(signal as AbortSignal);
+}
+
 export function rawListItems({
   categoryId,
   search,
@@ -151,9 +153,8 @@ export function rawListItems({
 
   const filter = searchFilterFor(search);
   if (filter) query = query.or(filter, { referencedTable: 'items' });
-  if (signal) query = query.abortSignal(signal);
 
-  return query
+  return withSignal(query, signal)
     .order('created_at', { ascending: false })
     .range(from, to)
     .overrideTypes<ItemCategoryPageRow[], { merge: false }>();
@@ -178,21 +179,19 @@ export function rawCountItems({
 }) {
   const filter = searchFilterFor(search);
   if (!filter) {
-    let query = supabase
+    const query = supabase
       .from('item_categories')
       .select('item_id', { count: 'exact', head: true })
       .eq('category_id', categoryId);
-    if (signal) query = query.abortSignal(signal);
-    return query;
+    return withSignal(query, signal);
   }
 
-  let query = supabase
+  const query = supabase
     .from('item_categories')
     .select(ITEM_CATEGORY_PAGE_SELECT, { count: 'exact', head: true })
     .eq('category_id', categoryId)
     .or(filter, { referencedTable: 'items' });
-  if (signal) query = query.abortSignal(signal);
-  return query;
+  return withSignal(query, signal);
 }
 
 /**
@@ -218,7 +217,7 @@ export function rawSearchCategoryItems({
   to: number;
   signal?: AbortSignal;
 }) {
-  let query = supabase.rpc(
+  const query = supabase.rpc(
     'search_category_items',
     {
       cat_id: categoryId,
@@ -228,11 +227,11 @@ export function rawSearchCategoryItems({
     },
     { get: true },
   );
-  if (signal) query = query.abortSignal(signal);
-  return query.overrideTypes<SearchItemRow[], { merge: false }>();
+  return withSignal(query, signal).overrideTypes<
+    SearchItemRow[],
+    { merge: false }
+  >();
 }
-/* v8 ignore stop */
-// Stryker restore all
 
 type SearchItemRow = ItemFields & { total_count: number };
 
@@ -298,10 +297,6 @@ export async function listItems(
   return { data: (data ?? []).map((row) => row.items), error: null, count };
 }
 
-/* v8 ignore start -- thin Supabase query builders; buildSearchFilter and
- * searchFilterFor above are what's gated and mutation-tested. */
-// Stryker disable all: what these builders are held to is the shape of the
-// query, not their lines.
 export function createItem(payload: Pick<ItemInsert, ItemEditableFieldKey>) {
   return (
     supabase
@@ -374,13 +369,15 @@ export function rawListCategoryPlaces(
   search: string,
   signal?: AbortSignal,
 ) {
-  let query = supabase.rpc(
+  const query = supabase.rpc(
     'list_category_places',
     { cat_id: categoryId, like_pattern: likePatternFor(search) ?? undefined },
     { get: true },
   );
-  if (signal) query = query.abortSignal(signal);
-  return query.overrideTypes<PlaceGroupRow[], { merge: false }>();
+  return withSignal(query, signal).overrideTypes<
+    PlaceGroupRow[],
+    { merge: false }
+  >();
 }
 
 // Unfiltered by the search box on purpose: an export is of a category, not
@@ -401,13 +398,11 @@ export function listItemsForExport(
       `${ITEM_FIELDS_SELECT},created_at,item_categories!inner(category_id)`,
     )
     .eq('item_categories.category_id', categoryId)
-    .order('created_at', { ascending: true })
-    .order('id', { ascending: true })
+    .order('created_at')
+    .order('id')
     .range(from, to)
     .overrideTypes<ExportItemRow[], { merge: false }>();
 }
-// Stryker restore all
-/* v8 ignore stop */
 
 export type ExportItemRow = ItemFields & { created_at: string };
 
@@ -445,9 +440,8 @@ export async function updateItemsPlace(
   payload: Pick<ItemUpdate, 'place_lat' | 'place_lng'>,
   updatePage: typeof rawUpdateItemsPlace = rawUpdateItemsPlace,
 ): Promise<{ error: unknown }> {
-  for (let i = 0; i < ids.length; i += ID_FILTER_CHUNK_SIZE) {
-    const chunk = ids.slice(i, i + ID_FILTER_CHUNK_SIZE);
-    const { error } = await updatePage(chunk, payload);
+  for (const page of chunk(ids, ID_FILTER_CHUNK_SIZE)) {
+    const { error } = await updatePage(page, payload);
     if (error) return { error };
   }
   return { error: null };
