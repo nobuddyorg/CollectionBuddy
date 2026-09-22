@@ -32,11 +32,32 @@ A web-app catalog for your collected items 🗂️
 
 ## Motivation
 
-Spreadsheets don't have room for a photograph, and social apps don't care about provenance. CollectionBuddy is neither: a quiet, photo-first catalog for the things you collect, whether that's coins, stamps, records, or cameras. Every entry leads with a picture, carries a place and a few tags, and stays searchable once the shelf outgrows memory.
+CollectionBuddy is a photo-first catalog for personal collections. Items can be documented with photos, descriptions, locations, and tags, then searched and browsed as the collection grows.
 
-| Sign in                                                                                                                            | Your collection                                                                                                                              | Every item on a map                                                                            |
-| ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| ![Google sign-in screen for CollectionBuddy, showing the app name and tagline inside a circular seal motif](docs/assets/login.png) | ![A Pokémon collection grid in CollectionBuddy, each entry showing a photo, title, description, place, and tags](docs/assets/collection.png) | ![A world map with pins marking the places a collection's items are from](docs/assets/map.png) |
+Collections can be organized into categories, shared with others, and explored on a map. Data can also be imported and exported, so it is never locked into the application.
+
+It is designed for keeping a structured personal record of collected items rather than building another social network.
+
+<p align="center">
+  <img src="docs/assets/collection.png" width="600" alt="A Pokémon collection grid in CollectionBuddy, each entry showing a photo, title, description, place, and tags">
+  <br>
+  <em>Your collection</em>
+</p>
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/assets/login.png" width="100%" alt="Google sign-in screen for CollectionBuddy, showing the app name and tagline inside a circular seal motif">
+      <br>
+      <em>Sign in</em>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/assets/map.png" width="100%" alt="A world map with pins marking the places a collection's items are from">
+      <br>
+      <em>Every item on a map</em>
+    </td>
+  </tr>
+</table>
 
 ## Features
 
@@ -49,7 +70,11 @@ Spreadsheets don't have room for a photograph, and social apps don't care about 
 - Built to work with a keyboard and a screen reader, not just a mouse.
 - **Local demo mode**: run a local Supabase stack in Docker and try the app with no Google account or sign-in screen — see [CONTRIBUTING.md](CONTRIBUTING.md#try-the-local-demo).
 
-See the [user guide](docs/how-to/user-guide.md) for the full rundown.
+## Using CollectionBuddy
+
+- **First run**: [Getting started](docs/tutorials/getting-started.md) walks through signing in, creating a category, and adding an item with a photo and a place, then finding it again.
+- **Specific tasks**: the [user guide](docs/how-to/user-guide.md) covers categories, sharing, import/export, photos, search, the map, language and theme, and accessibility.
+- **Trying it without Google**: the [local demo](CONTRIBUTING.md#try-the-local-demo) runs against a local Supabase stack with an anonymous user.
 
 ## Documentation
 
