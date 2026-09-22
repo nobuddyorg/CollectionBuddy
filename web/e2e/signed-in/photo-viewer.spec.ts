@@ -1,8 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+import { createClient } from '@supabase/supabase-js';
 
 import { expect, test } from './test';
 
-import { SEED } from './fixtures';
+import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
 // photos.spec.ts proves a photograph is stored and drawn; this is what a
 // collector does with it afterwards -- opening it full size and walking a
 // carousel that only exists once two are attached.
@@ -14,6 +17,38 @@ const ARRIVES = 45_000;
 
 const PHOTO = resolve(process.cwd(), 'public/logo.png');
 const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
+
+const context = () =>
+  JSON.parse(readFileSync(CONTEXT_PATH, 'utf8')) as SeedContext;
+
+function apiAs(token: string) {
+  return createClient(
+    process.env.E2E_SUPABASE_URL!,
+    process.env.E2E_SUPABASE_ANON_KEY!,
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    },
+  );
+}
+
+async function itemIdFor(token: string, title: string) {
+  const { data, error } = await apiAs(token)
+    .from('items')
+    .select('id')
+    .eq('title', title)
+    .single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+async function photoCount(token: string, itemId: string) {
+  const { count } = await apiAs(token)
+    .from('images')
+    .select('id', { count: 'exact', head: true })
+    .eq('item_id', itemId);
+  return count ?? 0;
+}
 
 test.describe('looking at a photograph full size', () => {
   test('opens, walks both ways between two, and closes on Escape', async ({
@@ -55,25 +90,24 @@ test.describe('looking at a photograph full size', () => {
   test('shows a photograph past the card once the carousel reaches it', async ({
     on,
     page,
-  }) => {
+  }, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
     test.setTimeout(240_000);
     const app = on(page);
+    const { token } = context();
     await app.categories.do.open(SEED.viewerCategory);
 
     const title = uniqueTitle('Sechsfach');
     try {
       await app.catalogue.do.addEntry(title);
       // Past five the card shows no more plates, so each upload is awaited
-      // by the photograph row it ends with rather than by the grid.
-      for (let upload = 0; upload < 6; upload++) {
-        const recorded = page.waitForResponse(
-          (response) =>
-            response.url().includes('/rest/v1/images') &&
-            response.request().method() === 'POST',
-          { timeout: ARRIVES },
-        );
+      // by its photograph row, read back the way any client could.
+      const itemId = await itemIdFor(token, title);
+      for (let upload = 1; upload <= 6; upload++) {
         await app.catalogue.card(title).do.uploadPhoto(PHOTO);
-        expect((await recorded).ok()).toBe(true);
+        await expect
+          .poll(() => photoCount(token, itemId), { timeout: ARRIVES })
+          .toBe(upload);
       }
 
       // A fresh page read, so nothing past the card is signed yet.
