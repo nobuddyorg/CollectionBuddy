@@ -37,7 +37,7 @@ function writeGeocodeCache(cache: Record<string, PlaceCoords>) {
 /**
  * Splits the places to draw into ones that already know where they are and
  * names that still need a lookup. `list_category_places`
- * (0014_list_category_places.sql) has already folded every item down to one
+ * (0002_functions.sql) has already folded every item down to one
  * row per distinct place, so there is no deduplication left to do here --
  * only deciding, per place, whether the coordinates it carries are usable.
  */

@@ -1,9 +1,6 @@
 version: 2
 updates:
-  # Grouped into one PR: these move rarely, and reviewing five separate
-  # pinned-action bumps is worse than reviewing one. Actions are pinned by
-  # commit hash, so this is the only thing that can move them -- a tag
-  # repointed at new code silently does not.
+  # Actions are pinned by commit hash, so a repointed tag never moves them; these bumps are the only thing that does.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -15,8 +12,7 @@ updates:
         patterns:
           - "*"
 
-  # The hooks in .pre-commit-config.yaml pin their own revisions, and go
-  # stale the same way, for the same reason.
+  # .pre-commit-config.yaml pins its hook revisions the same way.
   - package-ecosystem: "pre-commit"
     directory: "/"
     schedule:
@@ -35,13 +31,19 @@ updates:
     cooldown:
       default-days: 7
     groups:
-      # stryker-mutator/vitest-runner requires a matching core major version,
-      # so both must land in one PR regardless of update type -- listed
-      # first since dependabot uses the first matching group.
+      # @stryker-mutator/vitest-runner needs a matching core major; listed first because Dependabot uses the first matching group.
       stryker:
         patterns:
           - "@stryker-mutator/*"
-      patch-updates:
+      # Split by dependency-type: a mixed group reports as direct:production, which auto-merge.yml always sends to a human.
+      patch-updates-dev:
+        dependency-type: "development"
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+      patch-updates-prod:
+        dependency-type: "production"
         patterns:
           - "*"
         update-types:
@@ -51,11 +53,7 @@ updates:
           - "*"
         update-types:
           - "minor"
-    # stryker-mutator/core@10.0.0 bundles @babel/generator@8.0.0, which
-    # crashes instrumenting this project's TS function-type annotations
-    # (TypeError: Cannot read properties of undefined (reading 'length')
-    # in Printer._parameters). Re-enable the major-version bump once a
-    # fixed stryker-mutator/core or @babel/generator release is out.
+    # @stryker-mutator/core@10 bundles @babel/generator@8, which crashes on this project's TS function-type annotations (`Printer._parameters`). Re-enable once fixed upstream.
     ignore:
       - dependency-name: "@stryker-mutator/*"
         update-types: ["version-update:semver-major"]

@@ -62,10 +62,15 @@ test.describe('the service worker', () => {
 
     const origin = new URL(page.url()).origin;
     const shell = new URL('./', page.url()).toString();
+    // The manifest is cached with the shell (sw.ts's `isShellRequest`); whether it is there yet is a race the test must not depend on.
     const unexpected = urls.filter(
       (url) =>
         new URL(url).origin !== origin ||
-        !(url.includes('/_next/static/') || url.startsWith(shell)),
+        !(
+          url.includes('/_next/static/') ||
+          url.startsWith(shell) ||
+          url.endsWith('/site.webmanifest')
+        ),
     );
     expect(unexpected, 'cached beyond the static bundle and the shell').toEqual(
       [],

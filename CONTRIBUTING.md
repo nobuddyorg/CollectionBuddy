@@ -69,15 +69,15 @@ npm run depcruise
 npm run knip
 npm test -- --coverage
 npm run e2e
-npm run test:mutation
 ```
 
-These are CI's `build_and_test` and `mutation_test` jobs. The rest of CI needs
-the local stack (`supabase start` from the repository root) and is required
-when your change touches what it covers:
+These are CI's `build_and_test` job. The rest of CI is required when your
+change touches what it covers; the ones below `test:mutation` need the local
+stack (`supabase start` from the repository root):
 
 | Command | Required when you touched | CI job |
 | --- | --- | --- |
+| `npm run test:mutation` | code in a file listed in `web/mutation-targets.mjs` (comments produce no new mutants) | `mutation_test` |
 | `npm run e2e:local` | catalogue, search, map, entry forms, photos, sharing, export/import, or any RLS policy | `e2e_local_stack` |
 | `supabase test db` (repository root) | RLS policies, grants, triggers, functions, or the schema | `e2e_local_stack` |
 | `opengrep scan --config auto web/src web/scripts web/e2e supabase` | anything under those paths | `opengrep` |

@@ -1,0 +1,12 @@
+name: Start the local Supabase stack
+description: "Installs the pinned Supabase CLI and runs `supabase start` from the repo root, applying every migration from scratch. The caller stops it with `supabase stop` under `if: always()`."
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup-supabase-cli
+
+    - name: Start Supabase
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: supabase start

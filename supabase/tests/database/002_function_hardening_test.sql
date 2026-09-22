@@ -32,12 +32,7 @@ select is(
   'every function in schema public pins search_path to the empty string'
 );
 
--- The set of functions that run with their owner's privileges instead of
--- the caller's, stated in full. Eight are trigger functions, which need it
--- to write columns the caller has no business setting; the ninth is
--- search_category_items, which is a deliberate authorization boundary in
--- its own right (0015_search_category_items.sql). A tenth appearing here
--- is a new boundary, and should have to be added to this list on purpose.
+-- Every security-definer function, in full: eight trigger functions plus search_category_items, a deliberate boundary. A tenth must be added here on purpose.
 select is(
   (select array_agg(p.proname::text order by p.proname)
    from pg_catalog.pg_proc p
@@ -73,14 +68,7 @@ select is(
   'every security definer function is owned by postgres, not by a lesser role'
 );
 
--- The two that must stay `security invoker`, named individually because
--- the reasoning is specific to each rather than catalog-wide.
---
--- list_category_places only reshapes rows the caller could already read
--- (0014_list_category_places.sql); making it a definer would turn a
--- presentation helper into a second, unreviewed authorization boundary --
--- and it would be an unsound one, since it applies no read-access check of
--- its own at all.
+-- Two must stay `security invoker`. list_category_places checks nothing itself; as a definer it would be an unsound second boundary.
 select ok(
   not (select prosecdef from pg_catalog.pg_proc where oid = 'public.list_category_places(uuid, text)'::regprocedure),
   'list_category_places runs as its caller, so ordinary RLS still applies to it'

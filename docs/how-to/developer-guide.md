@@ -116,20 +116,19 @@ grep -rn 'getByTestId\|getByRole\|locator(' web/e2e --include=*.spec.ts
 `npm run e2e` and `npm run e2e:local` collect JS/CSS coverage through
 Playwright's own `page.coverage` (Chromium CDP, no instrumentation step);
 `e2e/global-teardown.ts` merges every worker's data into
-`web/coverage-e2e/index.html` and fails the run if it drops below the floor in
-`e2e/coverage.ts` — one floor per suite, since the two reach very different
-amounts of the app. `i18n.spec.ts` (own browser context) and the `firefox`
-project (no CDP) do not contribute.
+`web/coverage-e2e/index.html`. `i18n.spec.ts` (own browser context) and the
+`firefox` project (no CDP) do not contribute. V8 discards a document's counts
+on a full navigation, whatever `resetOnNavigation` says, so the fixture
+flushes them before every `page.goto` and `page.reload`; a navigation the
+app triggers itself (the OAuth redirect) still loses what ran before it.
 
-Measure the way CI does before believing a floor failure: CI and `e2e:local`
-set `E2E_COVERAGE_SOURCEMAPS=true`, so the report maps to `src/app/**` lines;
-a plain `npm run build && npm run e2e` reads the minified bundle instead, a
-different metric with a few dozen "lines". The production deploy never sets
-it — that would ship source maps.
-
-```bash
-E2E_COVERAGE_SOURCEMAPS=true npm run build && E2E_COVERAGE_SOURCEMAPS=true npm run e2e
-```
+Only `npm run e2e:local` collects, and it is gated by the floor in
+`e2e/coverage.ts`: it runs every Chromium-based project (`chromium`, `mobile`,
+`signed-in`) against a source-mapped build, so its report is the one complete
+picture. `npm run e2e` collects nothing: its job is Firefox and the
+production-config bundle, and a build without `E2E_COVERAGE_SOURCEMAPS=true`
+(the deploy the smoke test runs against) has no `src/app/**` paths to map to,
+so its "lines" would be a few dozen minified ones.
 
 ## Run the pgTAP database suite
 
@@ -295,16 +294,23 @@ Three things a from-scratch reset will not tell you:
 
 ### Squashing migrations again
 
-The chain has been squashed twice (most recently #580) into the 0001–0007
-baseline plus whatever landed since. Squashing is a deliberate, occasional act
-that folds the whole current set, never a side effect of another change. Do it
-the way the last one was verified: reset the local stack from the new files,
-introspect old and new databases down to column defaults, constraint
-expressions, index definitions, function bodies, trigger timing, policy
-predicates and grants, and diff them. Afterwards clear
-`supabase_migrations.schema_migrations` on the hosted project so the new files
-are recorded as themselves — that table is the only reason the chain cannot be
-rewritten in place.
+The chain has been squashed three times (most recently on 2026-09-22) into the
+0001–0007 baseline plus whatever landed since. Squashing is a deliberate,
+occasional act that folds the whole current set, never a side effect of
+another change. Do it the way the last one was verified: reset the local stack
+from the old files and introspect, reset from the new files and introspect
+again — column defaults, constraint expressions, index definitions, function
+bodies, trigger timing, policy predicates, grants — and diff the two. Then, in
+the hosted project's SQL editor and right before merging, delete the rows of
+the files that no longer exist so `db push` stops looking for them:
+
+```sql
+delete from supabase_migrations.schema_migrations where version > '0007';
+```
+
+That table is the only reason the chain cannot be rewritten in place. Versions
+0001–0007 stay recorded as applied, so the new files never run on the populated
+database; the diff above is what proves they would have produced it.
 
 ## Set up a new Supabase environment
 

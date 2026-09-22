@@ -31,7 +31,7 @@ type ItemCategoryPageRow = { items: ItemFields & { images: ImageListRow[] } };
 
 /**
  * One distinct place in a category, already folded down from every item
- * catalogued there (`list_category_places`, 0014_list_category_places.sql)
+ * catalogued there (`list_category_places`, 0002_functions.sql)
  * instead of one row per item -- the map used to download the whole
  * category and do this fold on the client (#PERF-H5). `titles` names the
  * entries for the popup; `ids` is every item at this place, so a geocoded
@@ -53,7 +53,7 @@ const ITEM_FIELDS_SELECT = ITEM_FIELD_KEYS.join(',');
 // other way around, so item_categories -- not items -- is the driving,
 // top-level table. That is what lets .order() below sort and .range() page
 // on item_categories' own created_at, walking idx_item_categories_cat_created
-// (0013_item_categories_cat_created_idx.sql) instead of scanning every item
+// (0005_indexes.sql) instead of scanning every item
 // in the category before sorting (#618, #619).
 const ITEM_CATEGORY_PAGE_SELECT = `items!inner(${ITEM_FIELDS_SELECT})`;
 // The page also embeds each item's photograph rows, saving the separate
@@ -203,7 +203,7 @@ export function rawCountItems({
 
 /**
  * The searched page and its exact total in one request, via
- * `search_category_items` (0015_search_category_items.sql) -- a `SECURITY
+ * `search_category_items` (0002_functions.sql) -- a `SECURITY
  * DEFINER` function that applies the read-access check itself and then
  * queries with RLS bypassed, since ILIKE can never use the trigram indexes
  * under RLS (#PERF-H4). Used only once a search term has earned a filter;
@@ -406,7 +406,7 @@ export function deleteItems(ids: string[]) {
 // Narrowed by the same search as the list (via likePatternFor, the same
 // gate and escaping as searchFilterFor), so the map is the same set of
 // entries seen from above. Grouped by place in Postgres itself
-// (list_category_places, 0014_list_category_places.sql) rather than
+// (list_category_places, 0002_functions.sql) rather than
 // downloaded one row per item and folded on the client (#PERF-H5) -- the
 // wire now carries one row per distinct place, bounded by PostgREST's own
 // max_rows the way every other unranged read in this app already is,

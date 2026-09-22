@@ -223,10 +223,7 @@ select ok(
   'a grant cannot expire before it was created'
 );
 
--- category_shares_role_valid: the two predicates in 0006_policies.sql test
--- for the literal 'editor', so an unrecognized role would silently behave
--- as a viewer rather than failing -- the constraint is what makes a typo
--- loud.
+-- category_shares_role_valid: both access predicates test the literal 'editor', so a typo would silently mean viewer.
 select ok(
   pg_temp.raises(format(
     'insert into public.category_shares (category_id, invited_email, role) values (%L, %L, %L)',
@@ -258,7 +255,7 @@ select is(
   'and the photograph records of the removed item cascade away with it'
 );
 
--- Nothing filters tags by array containment, so no GIN index on the array (0016).
+-- Nothing filters tags by array containment, so no GIN index on the array (0008).
 select hasnt_index('public', 'items', 'idx_items_tags_gin', 'items.tags carries no unread GIN index');
 
 select * from finish();

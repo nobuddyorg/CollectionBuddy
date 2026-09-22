@@ -1,17 +1,5 @@
--- What the two read RPCs actually return, once authorization is settled.
---
--- 060_search_category_items_rls_test.sql covers who may search what;
--- 050_functions_triggers_test.sql covers how list_category_places folds
--- rows down to one per place, for an owner. Neither covers the shaping the
--- callers depend on: which columns a search term is matched against, the
--- page window, the total the pager renders, or either function seen
--- through a grant rather than by the owner.
---
--- This matters more than shaping usually would, because
--- search_category_items applies its own access check and then queries with
--- RLS bypassed (0015_search_category_items.sql). An ILIKE branch quietly
--- lost from it is not just a missing result -- it is the one query in the
--- app whose correctness nothing downstream re-checks.
+-- Shaping of the two read RPCs once authorization is settled: matched columns, page window, total, and each seen through a grant.
+-- search_category_items queries with RLS bypassed (0002_functions.sql), so nothing downstream re-checks a lost ILIKE branch.
 begin;
 select no_plan();
 

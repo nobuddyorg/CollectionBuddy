@@ -167,18 +167,34 @@ test.describe('photographs', () => {
     }
   });
 
-  test('a photograph can be taken off again', async ({ on, page }) => {
+  // The delete is deferred to the toast's undo window; closing the toast ends the window, so the row and both objects go now.
+  test('a photograph can be taken off again, and stays off', async ({
+    on,
+    page,
+  }, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const app = on(page);
+    const { token, userId } = context();
+
     const title = uniqueTitle('Wieder weg');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
+      const itemId = await itemIdFor(token, title);
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
 
       await card.locators.buttons.deleteImage.click();
       await app.confirm.do.accept();
       await expect(card.locators.images).toHaveCount(0);
+      await app.toast.do.close();
+
+      await app.categories.do.open(SEED.photoCategory);
+      await expect(app.catalogue.card(title)()).toBeVisible();
+      await expect(app.catalogue.card(title).locators.images).toHaveCount(0);
+      await expect
+        .poll(() => storedObjects(token, userId, itemId), { timeout: 15_000 })
+        .toEqual([]);
     } finally {
       await app.catalogue.do.removeEntry(title);
     }

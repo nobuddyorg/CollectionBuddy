@@ -18,9 +18,11 @@ The `editor` role (#562) widened the grant without touching that argument: shari
 
 ## Why the migrations were squashed
 
-Twice: on 2026-08-06 sixteen migrations became a seven-file baseline, and in #580 those seven plus the seven that had accumulated since were folded back into the current `0001`–`0007`. A third of the original statements existed only to undo an earlier file — a table created and dropped, full-text-search columns added and removed, a trigger written three times. Reading them told you the history but not the schema.
+Three times: on 2026-08-06 sixteen migrations became a seven-file baseline; in #580 those seven plus the seven that had accumulated since were folded back into `0001`–`0007`; on 2026-09-22 the eight that had followed (`0008`–`0015`, three of them security fixes to `0007`) were folded in again, so each file once more holds one concern. A third of the original statements existed only to undo an earlier file — a table created and dropped, full-text-search columns added and removed, a trigger written three times. Reading them told you the history but not the schema.
 
-Both squashes were verified rather than asserted: the local stack was reset from the new files, both databases introspected down to column defaults, constraint expressions, index definitions, function bodies, trigger timing, policy predicates and grants, and diffed. The only differences were local-stack platform defaults no migration sets. Doing it again: [Developer guide](../how-to/developer-guide.md#squashing-migrations-again).
+Every squash was verified rather than asserted: the local stack was reset from the new files, both databases introspected down to column defaults, constraint expressions, index definitions, function bodies, trigger timing, policy predicates and grants, and diffed. The only differences were local-stack platform defaults no migration sets. Doing it again: [Developer guide](../how-to/developer-guide.md#squashing-migrations-again).
+
+Since the third squash every function lives in `0002_functions.sql`. The `language sql` ones that read tables are created with `check_function_bodies` off, as `pg_dump` restores them, because Postgres would otherwise parse their bodies before `0003_tables.sql` exists; the pgTAP suite calls every one of them, so a broken body still fails CI.
 
 ## Why images are deleted client-side before the database row
 
@@ -30,7 +32,7 @@ A `cleanup_item_images()` trigger used to back this up. It was removed because S
 
 ## Why a storage object's path can never change
 
-`authenticated` holds no `UPDATE` on `storage.objects`, and no update policy exists ([`0008_storage_no_update.sql`](../../supabase/migrations/0008_storage_no_update.sql)). `move()`, `copy()`-to-self and `upsert` are refused for owner and grantee alike. It took a working exploit to find out why this matters.
+No update policy exists on `storage.objects` ([`0007_storage.sql`](../../supabase/migrations/0007_storage.sql)), and the grant `postgres` makes there omits `UPDATE`. Storage's own bootstrap grant still carries it and is re-applied on every start, so the missing policy is the control, not the privilege. `move()`, `copy()`-to-self and `upsert` are refused for owner and grantee alike. It took a working exploit to find out why this matters.
 
 The owner-only storage policies key on path segment 1, the uploader's uid. The shared policies cannot — a grantee's uid appears nowhere in `<uid>/<itemId>/<file>` — so they key on segment 2 and join through `item_categories`. The old `"update shared objects"` policy tested segment 2 in both `USING` and `WITH CHECK`, and `UPDATE` is the one verb where those halves describe different rows: an update that rewrote **segment 1** passed both. An editor could move the owner's photo into their own uid prefix. Three controls then failed to reach it — revoking the share (the object now matched the attacker's own-prefix policy), the owner's read (segment 1 was no longer hers, and `has_category_read_access()` excludes ownership), and the sweep (it keyed on segment 2, which the move left intact). The photo was gone, permanently, to an account whose access had been revoked.
 

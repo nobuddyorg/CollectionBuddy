@@ -355,7 +355,7 @@ test.describe('one collection cannot reach another', () => {
   // truthiness: `expect(error ?? {}).toBeTruthy()` would pass either way,
   // since an object is always truthy.
   //
-  // `category_shares` is in this list since 0011_least_privilege_grants.sql.
+  // `category_shares` is in this list since #638.
   // Before it, anon still held full DML there and the select was refused by a
   // different mechanism entirely -- anon lacks EXECUTE on caller_email(), so
   // the policy raised before its predicate resolved. Same visible outcome,
@@ -419,7 +419,7 @@ test.describe('one collection cannot reach another', () => {
   // removed, so item_categories and images deliberately carry no update
   // policy (0006_policies.sql). That made an update a silent no-op: denied,
   // but by the *absence* of a policy while the grant sat there alive.
-  // 0011_least_privilege_grants.sql revoked the grant too, so both are now
+  // #641 revoked the grant too, so both are now
   // refused outright -- the same 42501-versus-empty-result distinction the
   // anon cases above turn on, asserted here on a caller's *own* rows so
   // nothing else could be doing the refusing.
@@ -632,7 +632,7 @@ test.describe('a category shared with another collector', () => {
   // stray spaces they typed. Both sides of the comparison have to agree on
   // what a match is: tg_category_shares_enforce stores `lower(btrim(...))`,
   // and caller_email() reads `lower(btrim(...))` back off the claim
-  // (0009_caller_email_trim.sql -- it only lowercased before, so an address
+  // (it only lowercased before, so an address
   // pasted with a trailing space was stored trimmed and then never matched).
   // Fail-closed either way, which is why nothing here is an escalation: the
   // cost of disagreeing is a grantee silently denied, with nothing to
@@ -919,7 +919,7 @@ test.describe('a category shared at the editor role', () => {
     }
   });
 
-  // The deliberate asymmetry in 0006_policies.sql, asserted so it stays a
+  // The deliberate asymmetry in 0002_functions.sql, asserted so it stays a
   // decision rather than becoming a surprise: has_category_write_access()
   // bundles category ownership in, has_category_read_access() does not. The
   // consequence is that owning the category does *not* grant sight of an
@@ -969,8 +969,8 @@ test.describe('a category shared at the editor role', () => {
     const shareId = await editorShare(token, categoryId);
     // An editor's upload lands under the *editor's own* uid prefix
     // (imagePrefix, data/images.ts), so "upload own objects" is what admits
-    // it -- and since 0010_storage_pin_upload_prefix.sql that is the only
-    // policy that admits an insert at all.
+    // it -- and that is the only policy that admits an insert at all
+    // (0007_storage.sql).
     const path = `${otherUserId}/${itemId}/rls-editor-probe.webp`;
 
     try {
@@ -1218,7 +1218,8 @@ test.describe('a category shared at the editor role', () => {
     }
   });
 
-  // The escalation 0008_storage_no_update.sql closes, asserted through the
+  // The escalation dropping every UPDATE policy on storage.objects closes
+  // (design-decisions.md), asserted through the
   // real Storage API rather than against the policy text. `move()` was the
   // sharpest form of it: "update shared objects" authorized on segment 2 of
   // the path while the owner-only policies authorize on segment 1, so
@@ -1347,7 +1348,7 @@ test.describe('a category shared at the editor role', () => {
   });
 });
 
-// `search_category_items` (0015_search_category_items.sql) is `SECURITY
+// `search_category_items` (0002_functions.sql) is `SECURITY
 // DEFINER`: it queries with RLS bypassed so ILIKE can reach the trigram
 // indexes (#621/PERF-H4), which makes it an authorization boundary in its
 // own right rather than RLS re-expressed for convenience. It is called

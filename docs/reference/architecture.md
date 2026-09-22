@@ -11,19 +11,11 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 
 ## Database schema
 
-[`supabase/migrations/`](../../supabase/migrations/), applied in filename order. The baseline is seven files ordered by dependency, not history — extensions, functions, tables, triggers, indexes, policies, storage — and none of them patches another. Everything after it does:
+[`supabase/migrations/`](../../supabase/migrations/), applied in filename order: seven files ordered by dependency, not history — extensions, functions, tables, triggers, indexes, policies, storage — and none of them patches another. A change to the schema is a new `0008_*.sql`; the chain is folded back into the seven only by a deliberate squash ([why](../explanation/design-decisions.md#why-the-migrations-were-squashed)).
 
 | File | Changes |
 | --- | --- |
-| [`0008_storage_no_update.sql`](../../supabase/migrations/0008_storage_no_update.sql) | Drops `authenticated`'s `UPDATE` on `storage.objects` and the shared update policy. An object's path can no longer change. |
-| [`0009_caller_email_trim.sql`](../../supabase/migrations/0009_caller_email_trim.sql) | `caller_email()` trims as well as lowercases, so both sides of the sharing comparison normalize the same way. |
-| [`0010_storage_pin_upload_prefix.sql`](../../supabase/migrations/0010_storage_pin_upload_prefix.sql) | Drops the shared storage insert policy: an editor's own upload already satisfies the owner-only set, and nothing may write under another uid's prefix. |
-| [`0011_least_privilege_grants.sql`](../../supabase/migrations/0011_least_privilege_grants.sql) | Revokes `anon` on `category_shares` and narrows `authenticated` to the DML its policies back. |
-| [`0012_images_path_matches_item.sql`](../../supabase/migrations/0012_images_path_matches_item.sql) | Check constraint: an `images` row's `path_full` names its own `item_id`. |
-| [`0013_item_categories_cat_created_idx.sql`](../../supabase/migrations/0013_item_categories_cat_created_idx.sql) | `(category_id, created_at desc, item_id)` on `item_categories`, the catalogue page's driving index. |
-| [`0014_list_category_places.sql`](../../supabase/migrations/0014_list_category_places.sql) | `list_category_places()` RPC for the map. |
-| [`0015_search_category_items.sql`](../../supabase/migrations/0015_search_category_items.sql) | `search_category_items()` RPC for the catalogue's search. |
-| [`0016_drop_items_tags_gin.sql`](../../supabase/migrations/0016_drop_items_tags_gin.sql) | Drops the GIN index on `items.tags`, which no query read. |
+| [`0008_drop_items_tags_gin.sql`](../../supabase/migrations/0008_drop_items_tags_gin.sql) | Drops the GIN index on `items.tags`, which no query read. |
 
 ### Tables
 
@@ -55,7 +47,7 @@ Ownership is inside the write predicate and deliberately outside the read one; e
 
 No `update` policy means no row matches, so the omission is the denial. Category-level actions — rename, delete, manage shares — are owner-only at every role.
 
-Grants are the second denial: `anon` has `revoke all` on every table, and `authenticated` holds exactly the DML each table's policies back (`0011`) — no `UPDATE` on `item_categories`/`images`, no `TRUNCATE`/`REFERENCES`/`TRIGGER` anywhere. `TRUNCATE` is the one RLS does not filter. `0011` also raises at migration time if RLS is ever found disabled on `storage.objects`.
+Grants are the second denial: `anon` has `revoke all` on every table, and `authenticated` holds exactly the DML each table's policies back — no `UPDATE` on `item_categories`/`images`, no `TRUNCATE`/`REFERENCES`/`TRIGGER` anywhere. `TRUNCATE` is the one RLS does not filter. `0007` raises at migration time if RLS is ever found disabled on `storage.objects`.
 
 `web/e2e/signed-in/rls.spec.ts` is the executable version of this section, covering owner-versus-stranger, `viewer` and `editor` with real tokens against a local stack; `supabase/tests/database/` covers the same logic directly in pgTAP.
 
@@ -73,7 +65,7 @@ Account-based, one category at a time, `viewer` or `editor`. No public links ([w
 
 ### Triggers and functions
 
-Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql), triggers in [`0004_triggers.sql`](../../supabase/migrations/0004_triggers.sql). The two access predicates live in `0006` because they are `language sql`, which resolves table names at creation time.
+Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql), triggers in [`0004_triggers.sql`](../../supabase/migrations/0004_triggers.sql). The `language sql` functions that read tables — the two access predicates and the two RPCs — are created with `check_function_bodies` off, the way `pg_dump` restores functions, because Postgres would otherwise parse their bodies before `0003` creates the tables.
 
 - `normalize_text()` — trims, collapses whitespace, returns `NULL` for blank.
 - `join_tags()` — backs the `tags_text` generated column.
@@ -96,7 +88,7 @@ Every function pins `set search_path = ''`, and every one revokes `execute` from
 
 - Unique `(user_id, lower(name))` on `categories`.
 - `(user_id, created_at desc)` on `items`.
-- Trigram GIN (`pg_trgm`) on `items.title`, `.description`, `.place`, `.tags_text`. No index on the `items.tags` array: nothing filters by containment (`0016_drop_items_tags_gin.sql`).
+- Trigram GIN (`pg_trgm`) on `items.title`, `.description`, `.place`, `.tags_text`. No index on the `items.tags` array: nothing filters by containment (`0008_drop_items_tags_gin.sql`).
 - `item_id`, `category_id`, `user_id` and `(category_id, created_at desc, item_id)` on `item_categories` — the catalogue page is driven from this table so one index serves ordering and scoping.
 - `(item_id, created_at asc, id)` and `user_id` on `images`.
 
@@ -131,14 +123,14 @@ Session code (`useSession.ts`, `page.tsx`, `login/`) reaches `supabase.ts` direc
 
 ## CI/CD
 
-Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (Node version, npm cache, `npm ci`), `setup-supabase-cli` (the one CLI version, so CI's stack and the production `db push` cannot diverge), `playwright-results` (job summary and artifacts for a Playwright run).
+Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (Node version, npm cache, `npm ci`), `setup-supabase-cli` (the one CLI version, so CI's stack and the production `db push` cannot diverge), `start-local-stack` (that CLI plus `supabase start`), `summary-section` (a tee'd output file into the job summary), `playwright-results` (job summary and artifacts for a Playwright run).
 
 | Workflow (job) | Trigger | Does |
 | --- | --- | --- |
 | `ci.yml` (`prek`) | push/PR to `main` | The repo-wide hooks: file hygiene, `typos`, `markdownlint`, `sqlfluff-lint`, `zizmor`. |
 | `ci.yml` (`changes`) | push/PR to `main` | Path filter: `web` and `sql` outputs the jobs below condition on; always true on a push to `main`. |
 | `ci.yml` (`build_and_test`) | `web` changed | Build, type-check, format, lint, `depcruise`, `knip`, Vitest with coverage, the signed-out Playwright suite on desktop and phone viewports. |
-| `ci.yml` (`e2e_local_stack`) | `web` or `sql` changed | Supabase in Docker: pgTAP, the `database.types.ts` drift check, the signed-in Playwright suite. |
+| `ci.yml` (`e2e_local_stack`) | `web` or `sql` changed | Supabase in Docker: pgTAP, the `database.types.ts` drift check, the full Chromium Playwright suite (signed-out and signed-in) with the one e2e coverage floor. |
 | `ci.yml` (`mutation_test`) | `web` changed | Stryker over `mutation-targets.mjs`. |
 | `ci.yml` (`opengrep`) | `web` or `sql` changed | Opengrep SAST; SARIF to code scanning; fails on ERROR severity. |
 | `ci.yml` (`lighthouse`) | `web` changed | Lighthouse CI against the export, signed out and in demo mode. |
