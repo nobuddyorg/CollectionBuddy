@@ -1,0 +1,40 @@
+name: Add a command's output to the job summary
+description: Appends a heading and the tee'd output file as a code block; a missing file fails the step.
+
+inputs:
+  title:
+    description: Markdown heading for the section.
+    required: true
+  file:
+    description: Path of the tee'd output, relative to the workspace.
+    required: true
+  empty-message:
+    description: Shown instead of an empty code block when the file has no content.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        TITLE: ${{ inputs.title }}
+        FILE: ${{ inputs.file }}
+        EMPTY_MESSAGE: ${{ inputs.empty-message }}
+      run: |
+        if [ ! -f "$FILE" ]; then
+          echo "::error::$FILE is missing, so the step that writes it did not run."
+          exit 1
+        fi
+        {
+          echo "## $TITLE"
+          echo
+          if [ ! -s "$FILE" ] && [ -n "$EMPTY_MESSAGE" ]; then
+            echo "$EMPTY_MESSAGE"
+          else
+            echo '```'
+            cat "$FILE"
+            echo '```'
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"

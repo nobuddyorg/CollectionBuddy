@@ -116,20 +116,16 @@ grep -rn 'getByTestId\|getByRole\|locator(' web/e2e --include=*.spec.ts
 `npm run e2e` and `npm run e2e:local` collect JS/CSS coverage through
 Playwright's own `page.coverage` (Chromium CDP, no instrumentation step);
 `e2e/global-teardown.ts` merges every worker's data into
-`web/coverage-e2e/index.html` and fails the run if it drops below the floor in
-`e2e/coverage.ts` — one floor per suite, since the two reach very different
-amounts of the app. `i18n.spec.ts` (own browser context) and the `firefox`
-project (no CDP) do not contribute.
+`web/coverage-e2e/index.html`. `i18n.spec.ts` (own browser context) and the
+`firefox` project (no CDP) do not contribute.
 
-Measure the way CI does before believing a floor failure: CI and `e2e:local`
-set `E2E_COVERAGE_SOURCEMAPS=true`, so the report maps to `src/app/**` lines;
-a plain `npm run build && npm run e2e` reads the minified bundle instead, a
-different metric with a few dozen "lines". The production deploy never sets
-it — that would ship source maps.
-
-```bash
-E2E_COVERAGE_SOURCEMAPS=true npm run build && E2E_COVERAGE_SOURCEMAPS=true npm run e2e
-```
+Only `npm run e2e:local` is gated, by the floor in `e2e/coverage.ts`: it runs
+every Chromium-based project (`chromium`, `mobile`, `signed-in`) against a
+source-mapped build, so its report is the one complete picture. `npm run e2e`
+reports without a floor. A build without `E2E_COVERAGE_SOURCEMAPS=true`, such
+as the production deploy the smoke test runs against, has no `src/app/**`
+paths to map to, and its "lines" are a few dozen minified ones — a different
+metric, not a regression.
 
 ## Run the pgTAP database suite
 

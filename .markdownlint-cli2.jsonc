@@ -12,6 +12,8 @@
     "!**/node_modules/**",
     "!web/out/**",
     "!web/.next/**",
+    // Written by monocart after every e2e run; gitignored, so CI never sees it but a local `prek run --all-files` did.
+    "!web/coverage-e2e/**",
     // Written verbatim by `next dev`/`next build`, and a one-line `@AGENTS.md` import -- not authored docs.
     "!web/AGENTS.md",
     "!web/CLAUDE.md"

@@ -97,14 +97,10 @@ jobs:
 
       - name: Add architecture check to job summary
         if: always()
-        run: |
-          {
-            echo '## 🏗️ Architectural boundaries (dependency-cruiser)'
-            echo
-            echo '```'
-            cat depcruise-output.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+        uses: ./.github/actions/summary-section
+        with:
+          title: '🏗️ Architectural boundaries (dependency-cruiser)'
+          file: web/depcruise-output.txt
 
       # `--silent` drops npm's own banner: Knip prints nothing when clean, so an empty file means clean.
       - name: Check for dead code and unused dependencies
@@ -113,21 +109,11 @@ jobs:
 
       - name: Add dead-code check to job summary
         if: always()
-        run: |
-          {
-            echo '## 🧹 Dead code and unused dependencies (Knip)'
-            echo
-            if [ -s knip-output.txt ]; then
-              echo '```'
-              cat knip-output.txt
-              echo '```'
-            elif [ -f knip-output.txt ]; then
-              echo '✅ No unused files, exports or dependencies.'
-            else
-              echo 'Knip did not run.' >&2
-              exit 1
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+        uses: ./.github/actions/summary-section
+        with:
+          title: '🧹 Dead code and unused dependencies (Knip)'
+          file: web/knip-output.txt
+          empty-message: '✅ No unused files, exports or dependencies.'
 
       - name: Run tests
         run: npm test -- --coverage
@@ -183,12 +169,8 @@ jobs:
 
       - uses: ./.github/actions/setup-web
 
-      - uses: ./.github/actions/setup-supabase-cli
-
-      # Applies every migration from scratch, so one that cannot apply fails here, not in production.
-      - name: Start Supabase
-        run: supabase start
-        working-directory: .
+      # A migration that cannot apply from scratch fails here, not in production.
+      - uses: ./.github/actions/start-local-stack
 
       # Before the browser install: a schema or RLS regression fails in seconds. Division of labor with rls.spec.ts: TEST_STRATEGY.md §7.
       - name: Run pgTAP database tests
@@ -198,15 +180,10 @@ jobs:
 
       - name: Add pgTAP results to job summary
         if: always()
-        working-directory: .
-        run: |
-          {
-            echo '## 🐘 pgTAP database tests'
-            echo
-            echo '```'
-            cat pgtap-output.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+        uses: ./.github/actions/summary-section
+        with:
+          title: '🐘 pgTAP database tests'
+          file: pgtap-output.txt
 
       # Raw CLI output is unformatted, so it goes through the project's Prettier config before the diff; the checked-in header is carried over.
       - name: Verify database.types.ts matches the schema
@@ -228,8 +205,8 @@ jobs:
         if: always()
         uses: ./.github/actions/playwright-results
         with:
-          title: 'End-to-end tests -- signed-in (local stack)'
-          tag: 'e2e (signed-in, local stack)'
+          title: 'End-to-end tests -- full suite (local stack)'
+          tag: 'e2e (full suite, local stack)'
           artifact-name: playwright-report-signed-in
           coverage-artifact-name: e2e-coverage-signed-in
           job-status: ${{ job.status }}
@@ -254,12 +231,10 @@ jobs:
 
       - uses: ./.github/actions/setup-web
 
-      # Dashboard key only on main, so the published report and badge track one branch; a PR run still breaks on the threshold.
+      # No Supabase env: the unit suite never reads it. Dashboard key only on main, so the published report and badge track one branch.
       - name: Run mutation testing
         run: npx stryker run
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           STRYKER_DASHBOARD_API_KEY: ${{ github.ref == 'refs/heads/main' && secrets.STRYKER_DASHBOARD_API_KEY || '' }}
 
       # Built from reports/mutation/mutation.json (scripts/mutation-summary.mjs); the console log is mostly expected per-mutant failures.
@@ -309,7 +284,20 @@ jobs:
           sarif_file: opengrep-results.sarif
           category: opengrep
 
-      # Opengrep's SARIF leaves a result's `level` unset; severity lives on the rule, so results are joined back to their rule first.
+      # Opengrep's SARIF leaves a result's `level` unset; severity lives on the rule, so results are joined to their rule once here.
+      - name: Join findings to their rule's severity
+        run: |
+          jq '
+            (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
+            | [.runs[].results[] | {
+                level: ($levelById[.ruleId] // "warning"),
+                ruleId,
+                message: .message.text,
+                file: (.locations[0].physicalLocation.artifactLocation.uri // "?"),
+                line: (.locations[0].physicalLocation.region.startLine // 1)
+              }]
+          ' opengrep-results.sarif > opengrep-findings.json
+
       - name: Add scan results to job summary
         if: always()
         run: |
@@ -317,39 +305,28 @@ jobs:
             echo '## 🔍 General-purpose SAST (Opengrep)'
             echo
             jq -r '
-              (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
-              | [.runs[].results[] | . + {level: ($levelById[.ruleId] // "warning")}] as $results
-              | ($results | length) as $total
-              | ($results | map(select(.level == "error")) | length) as $errors
+              length as $total
+              | (map(select(.level == "error")) | length) as $errors
               | "**Total findings:** \($total) (\($errors) at error severity -- blocking; full detail in the Security tab, category `opengrep`)\n"
               + (if $total > 0
                  then "\n| Severity | Rule | Location |\n|---|---|---|\n" + (
-                   $results
-                   | sort_by(.level != "error", .level != "warning")
-                   | map(
-                       "| \(.level) | `\(.ruleId)` | \(.locations[0].physicalLocation.artifactLocation.uri // "?"):\(.locations[0].physicalLocation.region.startLine // "?") |"
-                     )
+                   sort_by(.level != "error", .level != "warning")
+                   | map("| \(.level) | `\(.ruleId)` | \(.file):\(.line) |")
                    | join("\n")
                  )
                  else "" end)
-            ' opengrep-results.sarif
+            ' opengrep-findings.json
           } >> "$GITHUB_STEP_SUMMARY"
 
       # After the upload, so the Security tab stays populated either way. WARNING/INFO stay report-only.
       - name: Fail on error-severity findings
         run: |
-          count=$(jq '
-            (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
-            | [.runs[].results[] | . + {level: ($levelById[.ruleId] // "warning")}]
-            | map(select(.level == "error")) | length
-          ' opengrep-results.sarif)
+          count=$(jq 'map(select(.level == "error")) | length' opengrep-findings.json)
           if [ "$count" -gt 0 ]; then
             jq -r '
-              (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
-              | [.runs[].results[] | . + {level: ($levelById[.ruleId] // "warning")}]
-              | map(select(.level == "error"))[]
-              | "::error file=\(.locations[0].physicalLocation.artifactLocation.uri // "?"),line=\(.locations[0].physicalLocation.region.startLine // 1)::\(.ruleId): \(.message.text)"
-            ' opengrep-results.sarif
+              map(select(.level == "error"))[]
+              | "::error file=\(.file),line=\(.line)::\(.ruleId): \(.message)"
+            ' opengrep-findings.json
             echo "$count error-severity Opengrep finding(s) -- see the annotations above, the job summary, or the Security tab (category opengrep)."
             exit 1
           fi
@@ -370,12 +347,8 @@ jobs:
 
       - uses: ./.github/actions/setup-web
 
-      - uses: ./.github/actions/setup-supabase-cli
-
       # Both builds point at this stack (scripts/lighthouse.mjs) rather than at repo secrets.
-      - name: Start Supabase
-        run: supabase start
-        working-directory: .
+      - uses: ./.github/actions/start-local-stack
 
       - run: npx playwright install --with-deps chromium
 
@@ -413,11 +386,7 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-web
-      - uses: ./.github/actions/setup-supabase-cli
-
-      - name: Start Supabase
-        run: supabase start
-        working-directory: .
+      - uses: ./.github/actions/start-local-stack
 
       - name: Point the build at the local stack
         run: |
