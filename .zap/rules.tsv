@@ -8,5 +8,13 @@
 # HSTS is added at the Pages edge, invisible to a scan of a plain-HTTP local export (#391).
 10035	IGNORE	# Strict-Transport-Security Header Not Set -- hosting concern, not app code
 
+# Response headers a static host never sends; none has a <meta> equivalent.
+10021	IGNORE	# X-Content-Type-Options Header Missing -- header only, no static-host equivalent
+10063	IGNORE	# Permissions Policy Header Not Set -- header only, no static-host equivalent
+90004	IGNORE	# Cross-Origin-{Embedder,Opener,Resource}-Policy Header Missing -- header only, no static-host equivalent
+
+# A static export has no server to issue a per-request nonce, and React's style attributes need style-src 'unsafe-inline'; script origins are still confined to 'self'.
+10055	IGNORE	# CSP: script-src/style-src unsafe-inline -- see layout.tsx CONTENT_SECURITY_POLICY
+
 # Content-based, so a static export can fix it: firing means debug or error output reached shipped HTML.
 90022	FAIL	# Application Error Disclosure

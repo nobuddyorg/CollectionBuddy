@@ -59,7 +59,7 @@ Each job writes its report to its own Actions summary (`$GITHUB_STEP_SUMMARY`); 
 | `opengrep` | Finding count, total and by rule | `jq` over the uploaded SARIF |
 | `lighthouse` | Scores, LCP, CLS against each page's thresholds | `web/scripts/lighthouse-summary.mjs` over each target's `manifest.json` |
 | `build_and_test`, `e2e_local_stack` | Non-blocking accessibility findings | `web/e2e/axe.ts` `reportNonBlockingFindings`, from inside the test, CI only |
-| `zap_baseline` | PASS/WARN/IGNORE/FAIL per rule, per pass | `report_md.md` written by `zaproxy/action-baseline` |
+| `zap_baseline` | Every alert with its verdict, per pass; an alert `.zap/rules.tsv` ignores shows its reason | `web/scripts/zap-summary.mjs` over `report_json.json` from `zaproxy/action-baseline` |
 
 ## End-to-end tests
 

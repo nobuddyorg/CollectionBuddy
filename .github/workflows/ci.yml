@@ -417,16 +417,10 @@ jobs:
           allow_issue_writing: false
           artifact_name: 'zap-baseline-report-signed-out'
 
-      # The action writes report_md.md into the workspace root; captured before the signed-in pass overwrites it.
+      # The action writes report_json.json into the workspace root; rendered before the signed-in pass overwrites it.
       - name: Add the signed-out ZAP results to the job summary
         if: always()
-        working-directory: .
-        run: |
-          {
-            echo '## 🕷️ OWASP ZAP baseline scan -- signed out'
-            echo
-            cat report_md.md
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: npm run zap:summary -- --title '🕷️ OWASP ZAP baseline scan -- signed out' ../report_json.json
 
       # `next build` does not expect the self-referencing symlink, and a lingering `serve` would hold the port.
       - name: Stop the signed-out server
@@ -460,13 +454,7 @@ jobs:
 
       - name: Add the signed-in ZAP results to the job summary
         if: always()
-        working-directory: .
-        run: |
-          {
-            echo '## 🕷️ OWASP ZAP baseline scan -- signed in (demo mode)'
-            echo
-            cat report_md.md
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: npm run zap:summary -- --title '🕷️ OWASP ZAP baseline scan -- signed in (demo mode)' ../report_json.json
 
       - name: Stop the signed-in server
         if: always()

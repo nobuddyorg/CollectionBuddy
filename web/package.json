@@ -18,7 +18,8 @@
     "e2e:local": "node scripts/e2e-local-stack.mjs",
     "demo": "node scripts/demo.mjs",
     "lighthouse": "node scripts/lighthouse.mjs",
-    "lighthouse:summary": "node scripts/lighthouse-summary.mjs"
+    "lighthouse:summary": "node scripts/lighthouse-summary.mjs",
+    "zap:summary": "node scripts/zap-summary.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
