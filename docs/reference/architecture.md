@@ -119,14 +119,14 @@ Session code (`useSession.ts`, `page.tsx`, `login/`) reaches `supabase.ts` direc
 
 ## CI/CD
 
-Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (Node version, npm cache, `npm ci`), `setup-supabase-cli` (the one CLI version, so CI's stack and the production `db push` cannot diverge), `playwright-results` (job summary and artifacts for a Playwright run).
+Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (Node version, npm cache, `npm ci`), `setup-supabase-cli` (the one CLI version, so CI's stack and the production `db push` cannot diverge), `start-local-stack` (that CLI plus `supabase start`), `summary-section` (a tee'd output file into the job summary), `playwright-results` (job summary and artifacts for a Playwright run).
 
 | Workflow (job) | Trigger | Does |
 | --- | --- | --- |
 | `ci.yml` (`prek`) | push/PR to `main` | The repo-wide hooks: file hygiene, `typos`, `markdownlint`, `sqlfluff-lint`, `zizmor`. |
 | `ci.yml` (`changes`) | push/PR to `main` | Path filter: `web` and `sql` outputs the jobs below condition on; always true on a push to `main`. |
 | `ci.yml` (`build_and_test`) | `web` changed | Build, type-check, format, lint, `depcruise`, `knip`, Vitest with coverage, the signed-out Playwright suite on desktop and phone viewports. |
-| `ci.yml` (`e2e_local_stack`) | `web` or `sql` changed | Supabase in Docker: pgTAP, the `database.types.ts` drift check, the signed-in Playwright suite. |
+| `ci.yml` (`e2e_local_stack`) | `web` or `sql` changed | Supabase in Docker: pgTAP, the `database.types.ts` drift check, the full Chromium Playwright suite (signed-out and signed-in) with the one e2e coverage floor. |
 | `ci.yml` (`mutation_test`) | `web` changed | Stryker over `mutation-targets.mjs`. |
 | `ci.yml` (`opengrep`) | `web` or `sql` changed | Opengrep SAST; SARIF to code scanning; fails on ERROR severity. |
 | `ci.yml` (`lighthouse`) | `web` changed | Lighthouse CI against the export, signed out and in demo mode. |

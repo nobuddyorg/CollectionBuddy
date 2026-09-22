@@ -58,11 +58,12 @@ const run = (command, args) =>
 console.log(`Building against ${API_URL}`);
 run('npx', ['next', 'build']);
 
-// `--project=signed-in` pulls in the setup project it depends on, and leaves
-// the signed-out suite to the job that already runs it against the export.
+// Every Chromium-based project, so one coverage report covers the whole app; `signed-in` pulls in its `setup` dependency. Firefox adds no coverage and stays with `npm run e2e`.
 run('npx', [
   'playwright',
   'test',
+  '--project=chromium',
+  '--project=mobile',
   '--project=signed-in',
   ...process.argv.slice(2),
 ]);

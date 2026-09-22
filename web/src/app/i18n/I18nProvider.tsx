@@ -35,34 +35,17 @@ export function resolveTranslationKey(
   dict: TranslationValue,
   key: string,
 ): string | undefined {
-  const keys = key.split('.');
-  let value: TranslationValue = dict;
-  for (const k of keys) {
-    if (
-      typeof value === 'object' &&
-      // `TranslationValue` never includes `null`, so the type checker
-      // considers this unreachable -- kept anyway because `typeof null ===
-      // 'object'` is true, and nothing stops a translation JSON file from
-      // adding a literal `null` value the type just hasn't seen yet.
+  const value = key.split('.').reduce<TranslationValue | undefined>(
+    (current, segment) =>
+      typeof current === 'object' &&
+      // `typeof null === 'object'`, and a translation JSON file can carry a literal `null` the type has not seen.
       // eslint-disable-next-line sonarjs/different-types-comparison
-      value !== null &&
-      Object.hasOwn(value, k)
-    ) {
-      // The rule flags any `obj = obj[dynamicKey]` inside a loop regardless
-      // of the guard in front of it -- the `Object.hasOwn` check above
-      // already closes the actual prototype-pollution path this rule
-      // exists to catch (see TEST_STRATEGY.md §6's SAST guidance: verify a
-      // rewrite actually stops the pattern-matcher from firing before
-      // assuming it does); the shape it's
-      // matching on is inherent to walking a dot-separated key path, so
-      // there's no rewrite left that changes the underlying algorithm
-      // without just restructuring code to dodge a pattern-matcher.
-      // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop
-      value = value[k];
-    } else {
-      return undefined;
-    }
-  }
+      current !== null &&
+      Object.hasOwn(current, segment)
+        ? current[segment]
+        : undefined,
+    dict,
+  );
   return typeof value === 'string' ? value : undefined;
 }
 

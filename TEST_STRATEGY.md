@@ -350,6 +350,15 @@ beyond a dedicated hook and the platform's own tooling.
   assertion.
 - **Fail on an unexpected console or runtime error.** This catches a rejected
   background query hiding behind a passing assertion.
+- **Flush browser coverage before every full navigation.** V8 keeps counts
+  only for the live document; a reload or `goto` discards everything the test
+  did before it, silently, and a "keep across navigations" option does not
+  change that. A spec ending on a reload then reports the journey as
+  unexecuted, and the gap list lies.
+- **Read function coverage, not line coverage, when deciding what a browser
+  suite never reached.** Minified bundles map function starts reliably and
+  block ranges inside async bodies poorly; a function at 0 calls is a real
+  gap, an uncovered line inside an executed function usually is not.
 
 ### Migrations against a populated database
 

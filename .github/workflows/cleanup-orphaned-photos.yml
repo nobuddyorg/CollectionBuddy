@@ -1,19 +1,6 @@
 name: Clean up orphaned photographs
-# Storage objects can outlive the item they belonged to: removeItem/deleteCategory
-# (web/src/app/components/ItemList/useItemMutations.tsx,
-# CategorySelect/useCategories.tsx) delete the database row first and the
-# Storage bytes after, on purpose -- a failure in the second step is treated
-# as a storage leak, not data loss, and never blocks or undoes the deletion
-# the user actually asked for. This is the other half of that trade-off:
-# sweeping up what the leak leaves behind, on a schedule, so it isn't left
-# to accumulate forever or need a human to notice.
-#
-# 48h grace period: an object no `images` row references is only ever
-# orphaned (whatever should have referenced it is really gone) or mid-upload
-# (useItemImages.tsx writes both Storage objects before inserting the row
-# that names them) -- 48h is comfortably past any real upload, so nothing in
-# flight can be mistaken for abandoned. It is the whole idempotency story
-# here; do not shorten it.
+# The client deletes Storage objects before the row, so a failed second step leaks bytes; this sweep is the other half of that trade-off (docs/explanation/design-decisions.md).
+# Three invariants (CLAUDE.md, TEST_STRATEGY.md §12): match both path_full and path_thumb, never cast a path to uuid, keep the 48h grace period.
 on:
   schedule:
     - cron: "30 4 * * *"
@@ -34,27 +21,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          # "No images row references this object" is the actual definition of
-          # orphaned. This used to ask "no item with this id exists", joining
-          # on split_part(o.name, '/', 2) -- a proxy, and one that answered
-          # wrongly in both directions: it kept an object whose path merely
-          # names a live item, and it could only ever find objects whose item
-          # was gone, never one whose row insert failed after the bytes
-          # landed.
-          #
-          # BOTH columns, not just path_full. A photograph is two objects --
-          # `<uuid>.webp` and `<uuid>.thumb.webp` (useItemImages.tsx) -- held
-          # in one row as path_full and path_thumb. Matching path_full alone
-          # would class every thumbnail in the bucket as orphaned and delete
-          # it. Two separate `not exists` rather than one with an `or`, so
-          # each can use its own unique index (0005_indexes.sql).
-          #
-          # Still no cast of the path to uuid anywhere: a malformed path
-          # (never produced by this app, but not something SQL should trust
-          # either) would fail a cast outright and abort the whole query
-          # rather than simply not matching -- see storage_item_id() in
-          # 0002_functions.sql for the same reasoning applied to an RLS
-          # policy. Comparing text to text cannot raise.
+          # 48h: useItemImages.tsx writes both objects before inserting the row that names them, so nothing mid-upload can look orphaned.
+          # Two `not exists` rather than one `or`, so each uses its own unique index (0003_tables.sql, 0005_indexes.sql).
+          # Text compared to text cannot raise; a uuid cast of a malformed path would abort the whole query instead of not matching.
           read -r -d '' QUERY <<'SQL' || true
           select
             json_agg(o.name) as paths,
@@ -81,6 +50,14 @@ jobs:
           count=$(echo "$result" | jq -r '.[0].object_count')
           bytes=$(echo "$result" | jq -r '.[0].total_bytes')
 
+          # An unexpected response shape must not read as "nothing to do" or feed `null` into the delete below.
+          case "$count" in
+            ''|*[!0-9]*)
+              echo "Unexpected query result (object_count='$count'): $result" >&2
+              exit 1
+              ;;
+          esac
+
           if [ "$count" = "0" ]; then
             echo "Nothing orphaned older than 48h. Nothing to do." | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -88,11 +65,7 @@ jobs:
 
           echo "Found $count orphaned object(s), $bytes bytes." | tee -a "$GITHUB_STEP_SUMMARY"
 
-          # Deliberately before the service_role key is fetched, so a dry run
-          # never puts that credential on the runner at all. `workflow_dispatch`
-          # defaults it to true: a human clicking Run workflow gets the
-          # harmless answer unless they ask for the other one. A scheduled run
-          # sends no inputs, so DRY_RUN is empty and the sweep proceeds.
+          # Before the service_role key is fetched, so a dry run never puts that credential on the runner. A scheduled run sends no inputs, so DRY_RUN is empty.
           if [ "${DRY_RUN:-false}" = "true" ]; then
             {
               echo "Dry run -- deleting nothing. Would remove:"
@@ -101,23 +74,13 @@ jobs:
             exit 0
           fi
 
-          # The Storage API is the only way to actually remove object bytes
-          # (SQL cannot: see 0004_triggers.sql's note on storage.objects'
-          # prevent-direct-deletes guard) -- and removing another user's
-          # object needs service_role, since Storage RLS only ever grants a
-          # user their own prefix. Fetched fresh each run rather than stored
-          # as its own secret, so there is one fewer long-lived credential to
-          # rotate if this job is ever removed.
+          # Only the Storage API deletes bytes, and only service_role reaches another user's prefix. Fetched per run rather than stored as a second long-lived secret.
           service_role_key=$(curl -sS --fail-with-body \
             "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             | jq -r '.[] | select(.name == "service_role") | .api_key')
 
-          # A value fetched at run time is not a registered secret, so Actions
-          # does not mask it on its own. Nothing echoes it today; this is about
-          # the next edit, in a public repository, where one `set -x` or a
-          # debugging `echo` would put a credential that bypasses every RLS
-          # policy into a world-readable log.
+          # A value fetched at run time is not a registered secret, so Actions does not mask it on its own.
           echo "::add-mask::$service_role_key"
 
           if [ -z "$service_role_key" ] || [ "$service_role_key" = "null" ]; then

@@ -22,14 +22,8 @@ jobs:
               with:
                   github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-            # Patch-level devDependency bumps only. `--auto` merges once every
-            # *required* status check passes, which must include
-            # e2e_local_stack and prek, not just build_and_test.
-            #
-            # Scoped to `direct:development`: a devDependency never ships in
-            # the built bundle, so a compromised one can act on this repo's
-            # CI runner but not on every signed-in user's browser. Anything
-            # touching a runtime dependency still waits for a human.
+            # `direct:development` only: a devDependency reaches the CI runner, a runtime one reaches every user's browser (TEST_STRATEGY.md §13).
+            # `--auto` waits for every *required* check, so branch protection must require e2e_local_stack and prek, not only build_and_test.
             - name: Merge devDependency patch-level updates only
               if: |
                   steps.metadata.outputs.update-type == 'version-update:semver-patch' &&
