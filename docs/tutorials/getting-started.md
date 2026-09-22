@@ -1,62 +1,77 @@
 # Getting started
 
-This walks through a first run of CollectionBuddy end to end: sign in, create a collection, add an item with a photo and a place, then find it again through search and the map. By the end you'll have touched most of the app's major features.
+A first run of CollectionBuddy end to end: sign in, create a category, add an
+item with a photo and a place, then find it again through search and the map.
 
-## 1. Set up the local stack
+## 1. Start the app
 
-Follow [CONTRIBUTING.md](../../CONTRIBUTING.md) to start the local Supabase stack and the web app. You'll need Docker running and a Google OAuth client (both are one-time setup, and CONTRIBUTING.md has the exact steps). A working Supabase backend is required even for this first run; to skip the Google setup, run the [local demo](../../CONTRIBUTING.md#try-the-local-demo) instead, which signs you in automatically as an anonymous user, so step 2 doesn't apply.
+Follow [Try the local demo](../../CONTRIBUTING.md#try-the-local-demo) — Docker
+and the Supabase CLI, then `npm run demo`. It signs you in automatically as an
+anonymous local user, so there is no sign-in step. Open `http://localhost:3000`.
 
-Once `npm run dev` (or `npm run demo`) is up, open `http://localhost:3000`.
+If you set up [Google sign-in](../../CONTRIBUTING.md#local-development) instead
+and run `npm run dev`, the app sends you to `/login` first: click **Sign in
+with Google** and complete the flow.
 
-## 2. Sign in
+## 2. Create your first category
 
-You're redirected straight to `/login` if you don't have a session yet. Google is the only sign-in provider — click **Sign in with Google** and complete the OAuth flow.
+Items live in categories ("Coins", "Stamps", "Vinyl"), and you browse one at
+a time. On first sign-in you have none, so the category picker is open and
+empty.
 
-## 3. Create your first category
+1. Type a name into the text field.
+2. Click **+**.
 
-CollectionBuddy organises items into categories (e.g. "Coins", "Stamps", "Vinyl") — you always browse one category at a time. On first sign-in you have none, so the category picker is expanded and empty.
+The category is selected, and the picker collapses to its name. Next time,
+the app opens on whichever category you had selected last.
 
-1. Type a name (e.g. `Coins`) into the text field.
-2. Click the **+** button to create it.
+## 3. Add an item
 
-The category becomes selected automatically, and the picker collapses down to just its name. On future visits it opens straight back on whichever category you had selected last, so there's no picking step to repeat.
-
-## 4. Add an item
-
-With a category selected, click the **+** button above the (currently empty) item grid. This opens the item form:
+Click **+** above the empty item grid.
 
 - **Title** — required.
-- **Description** — free text, optional.
-- **Place** — start typing a real place name (3+ characters); a dropdown of matching places appears, sourced from the free [Photon](https://photon.komoot.io/) geocoding API. Pick one.
-- **Tags** — type a word and press Enter (or a comma) to add it as a chip. Add a couple.
+- **Description** — optional.
+- **Place** — type three or more characters of a real place name and pick one
+  of the suggestions. Picking a suggestion is what puts the item on the map.
+- **Tags** — type a word and press Enter or comma to add it as a chip.
 
-Save. The list jumps to page 1 so you can see your new item — items are always sorted newest-first.
+Save. Items sort newest first, and the list jumps to page 1 so you see it.
 
-## 5. Add a photo
+## 4. Add a photo
 
-Hover the new item's card (or tap the **⋯** button on touch devices) to reveal its action row, and click the upload-image icon. Pick any image file. It's compressed client-side to WebP before upload, and a thumbnail is generated alongside the full image — the original never leaves your browser at full size, so there's no file size to think about.
+Hover the card (or tap **⋯** on a touch screen) to show its action row, click
+the upload icon, and pick any image. The browser compresses it to WebP and
+makes a thumbnail before uploading, so a full-size phone photo is fine.
 
-Click the uploaded thumbnail to open it full-size in a lightbox.
+Click the thumbnail to open it full size. A second photo makes a pair; from the
+third on, the first photo gets the large slot and the rest form a strip under
+it. Photos keep the order you added them in.
 
-Add a second photo and the card lays both out as a pair; a third and beyond gives the first photo a large slot with the rest as a strip beneath it. Photos keep the order you added them in, so the first one you upload stays the big one — and while a photo is still uploading, its placeholder holds exactly the slot it will end up in.
+## 5. Find it again
 
-## 6. Find it again
+Add one or two more items with different titles and places, then:
 
-Add one or two more items (different titles/places), then:
+- Type part of a title, description, place, or tag into the search box. Results
+  filter from the third character.
+- With more than nine items, a page control appears under the grid.
+- Click the map icon next to **+** to see every item in the category that has
+  a place, pinned on a map. If you allow location access, your own position
+  shows as a red marker.
 
-- Type part of a title, description, place, or tag into the search box — results filter as you type, after the third character.
-- If you have more than 9 items, a page control appears at the bottom of the grid.
-- Click the map icon (next to **+**) to see every item in the current category that has a place, plotted on an OpenStreetMap map. If your browser grants location access, your own position shows as a red marker too.
+## 6. Housekeeping
 
-## 7. Everyday housekeeping
-
-- **Edit**: pencil icon on a card's action row, same form as creation, pre-filled.
-- **Delete an item**: trash icon, confirm — this also removes its uploaded images.
-- **Delete a category**: expand the category picker, select the category, clear the text field, click delete. Any items that would be left with _no_ category at all are deleted along with it (items that also belong to other categories are kept).
-- **Language / theme**: click your email in the header to open the user menu — German/English and System/Light/Dark are independent toggles there.
+- **Edit**: pencil icon on the action row — the same form, pre-filled.
+- **Delete an item**: trash icon, confirm. Its photos go with it.
+- **Delete a category**: open the picker, select the category, clear the text
+  field, click delete. Items that would be left with no category are deleted
+  too; items that also belong to another category stay.
+- **Language and theme**: click your email in the header. German/English and
+  System/Light/Dark are independent.
 
 ## What's next
 
-- [User guide](../how-to/user-guide.md) covers each of these features as standalone recipes, with the edge cases.
-- [Developer guide](../how-to/developer-guide.md) if you're contributing code rather than just using the app.
-- [Architecture reference](../reference/architecture.md) if you want to understand the data model or how authorization works.
+- [User guide](../how-to/user-guide.md): each feature as a recipe, with the
+  edge cases — sharing, import/export, the map.
+- [Developer guide](../how-to/developer-guide.md) if you are contributing code.
+- [Architecture](../reference/architecture.md) for the data model and how
+  authorization works.
