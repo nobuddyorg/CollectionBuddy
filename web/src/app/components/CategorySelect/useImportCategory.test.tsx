@@ -233,6 +233,27 @@ describe('useImportCategory', () => {
     consoleError.mockRestore();
   });
 
+  it('says the entry limit would be passed when the import is refused for its quota', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    vi.mocked(importCategory).mockRejectedValue(
+      new Error('Could not create items', {
+        cause: { code: 'PT507', message: 'entry quota of 50000 reached' },
+      }),
+    );
+    const { result } = renderHook(() => useImportCategory([]), { wrapper });
+
+    await act(async () => {
+      await result.current.runImport(FILE);
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Importing this archive would pass the limit of 50,000 entries.',
+    );
+    consoleError.mockRestore();
+  });
+
   it('reports any other failure as an import error', async () => {
     const consoleError = vi
       .spyOn(console, 'error')

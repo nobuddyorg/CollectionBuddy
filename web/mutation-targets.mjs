@@ -45,6 +45,7 @@ export const MUTATE_TARGETS = [
   'src/app/data/categories.ts',
   'src/app/data/images.ts',
   'src/app/data/shares.ts',
+  'src/app/data/quota.ts',
   'src/app/components/CategorySelect/selection.ts',
   'src/app/components/CategorySelect/useImportCategory.tsx',
   'src/app/components/ItemList/searchStatus.ts',

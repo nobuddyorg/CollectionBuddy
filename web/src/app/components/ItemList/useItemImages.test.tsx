@@ -452,6 +452,24 @@ describe('useItemImages', () => {
       expect(result.current.pendingUploads['item-1']).toBeUndefined();
     });
 
+    it('says the photograph limit is reached when the row is refused for its quota', async () => {
+      vi.mocked(createImageRow).mockResolvedValue({
+        error: {
+          code: 'PT507',
+          message: 'photo storage quota of 1 GiB reached',
+        },
+      } as never);
+      const { result } = renderHook(() => useItemImages(), { wrapper });
+
+      await act(async () => {
+        await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      });
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'The limit of 1 GiB of photographs is reached. Delete some to add more.',
+      );
+    });
+
     it('reports a photograph whose row cannot be recorded', async () => {
       vi.mocked(createImageRow).mockResolvedValue({
         error: new Error('rls'),

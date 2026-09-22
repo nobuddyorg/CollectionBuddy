@@ -16,6 +16,7 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | File | Changes |
 | --- | --- |
 | [`0008_drop_items_tags_gin.sql`](../../supabase/migrations/0008_drop_items_tags_gin.sql) | Drops the GIN index on `items.tags`, which no query read. |
+| [`0009_user_quotas.sql`](../../supabase/migrations/0009_user_quotas.sql) | Per-owner quotas: 1 GiB of full-size photographs and 50,000 entries, with photograph sizes taken from Storage rather than the client. |
 
 ### Tables
 
@@ -75,6 +76,8 @@ Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql
 - `tg_item_categories_enforce()` — verifies both rows exist, requires write access to the category, sets `user_id` from the item's owner, and rejects the row if that owner is not the caller.
 - `tg_category_shares_enforce()` — see Sharing.
 - `tg_images_enforce()` — derives `images.user_id` from the item's owner; rejects an insert whose item the caller neither owns nor has write access to.
+- `tg_images_size_from_storage()` — sets `images.size_bytes` to the size Storage recorded for `path_full`, or the bucket's 5 MiB cap while nothing is stored there; the client's claim is ignored.
+- `tg_images_quota()`, `tg_items_quota()` — `FOR EACH STATEMENT` after insert: refuse with SQLSTATE `PT507` (HTTP 507) a write that takes an owner past 1 GiB of photographs or 50,000 entries ([why](../explanation/design-decisions.md#why-quotas-are-counted-in-the-database)).
 - `delete_item_if_orphan()` — after `item_categories` rows are deleted, deletes items now in zero categories. `FOR EACH STATEMENT` with a transition table ([why](../explanation/design-decisions.md#why-the-orphan-cleanup-trigger-is-statement-level)).
 - `tg_set_updated_at()` — on `categories` and `items`.
 - `storage_item_id()` — parses the item id out of a storage path, returning `NULL` rather than raising; see Storage.

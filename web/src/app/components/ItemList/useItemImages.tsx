@@ -17,6 +17,7 @@ import {
   uploadImageObject,
   type ImageListRow,
 } from '../../data/images';
+import { isQuotaExceeded } from '../../data/quota';
 import type { ImgEntry } from './types';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
@@ -224,7 +225,13 @@ export function useItemImages() {
         const entries = await fetchItemImages(itemId);
         if (entries) setImages((prev) => ({ ...prev, [itemId]: entries }));
       } catch (err: unknown) {
-        toast.reportError('upload image', err, t('item_list.upload_error'));
+        toast.reportError(
+          'upload image',
+          err,
+          isQuotaExceeded(err)
+            ? t('item_list.photo_quota_error')
+            : t('item_list.upload_error'),
+        );
       } finally {
         setPendingUploads((prev) => {
           const remaining = prev[itemId] - 1;
