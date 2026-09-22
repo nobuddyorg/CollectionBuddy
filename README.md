@@ -39,25 +39,12 @@ Collections can be organized into categories, shared with others, and explored o
 It is designed for keeping a structured personal record of collected items rather than building another social network.
 
 <p align="center">
-  <img src="docs/assets/collection.png" width="600" alt="A Pokémon collection grid in CollectionBuddy, each entry showing a photo, title, description, place, and tags">
-  <br>
-  <em>Your collection</em>
+  <img src="docs/assets/collection.png" width="325" alt="A Pokémon collection grid in CollectionBuddy, each entry showing a photo, title, description, place, and tags">
+  <img src="docs/assets/map.png" width="436" alt="A world map with pins marking the places a collection's items are from">
 </p>
-
-<table>
-  <tr>
-    <td width="50%" align="center">
-      <img src="docs/assets/login.png" width="100%" alt="Google sign-in screen for CollectionBuddy, showing the app name and tagline inside a circular seal motif">
-      <br>
-      <em>Sign in</em>
-    </td>
-    <td width="50%" align="center">
-      <img src="docs/assets/map.png" width="100%" alt="A world map with pins marking the places a collection's items are from">
-      <br>
-      <em>Every item on a map</em>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/assets/login.png" width="397" alt="Google sign-in screen for CollectionBuddy, showing the app name and tagline inside a circular seal motif">
+</p>
 
 ## Features
 
