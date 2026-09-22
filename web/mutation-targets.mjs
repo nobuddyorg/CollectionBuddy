@@ -49,6 +49,7 @@ export const MUTATE_TARGETS = [
   'src/app/components/CategorySelect/useImportCategory.tsx',
   'src/app/components/ItemList/searchStatus.ts',
   'src/app/components/Map/popup.ts',
+  'src/app/components/Map/markerDiff.ts',
   'src/app/lib/useRequestSequence.ts',
   'src/app/lib/useSyncedRef.ts',
   'src/app/lib/useDebouncedValue.ts',

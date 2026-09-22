@@ -6,6 +6,7 @@ import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { popupContent } from './popup';
+import { diffMarkers } from './markerDiff';
 import { useSyncedRef } from '../../lib/useSyncedRef';
 import {
   IconDefaultPrivate,
@@ -46,6 +47,43 @@ const visibleCopyRange = (
 
 const sameRange = (a: [number, number] | null, b: [number, number]): boolean =>
   a !== null && a[0] === b[0] && a[1] === b[1];
+
+/** The longitude shift of each visible world copy, west to east. */
+const copyOffsets = (copyMin: number, copyMax: number): number[] =>
+  Array.from(
+    { length: copyMax - copyMin + 1 },
+    (_, i) => (copyMin + i) * WORLD_WIDTH_DEG,
+  );
+
+/** The pins on the map across effect runs: the copy range they were drawn
+ * for, and each marker's pins (one per copy) under its key. */
+type DrawnMarkers = {
+  range: [number, number] | null;
+  byKey: globalThis.Map<string, import('leaflet').Marker[]>;
+};
+
+/** One pin per world-copy offset for `marker`. The popup is a function, so
+ * its content is only built for the pin a reader actually opens. */
+const drawPins = (
+  L: Leaflet,
+  target: {
+    layer: import('leaflet').LayerGroup;
+    marker: MarkerInput;
+    offsets: number[];
+  },
+): import('leaflet').Marker[] => {
+  const { layer, marker: m, offsets } = target;
+  return offsets.map((offset) =>
+    L.marker([m.lat, m.lng + offset])
+      .addTo(layer)
+      .bindPopup(() => popupContent(m.popupText, m.titles, m.countLabel)),
+  );
+};
+
+const noDrawnMarkers = (): DrawnMarkers => ({
+  range: null,
+  byKey: new globalThis.Map<string, import('leaflet').Marker[]>(),
+});
 
 // A ceiling for every automatic fit. Pins are geocoded from a place *name*,
 // so they are only city-accurate; fitBounds left alone frames a single pin
@@ -119,8 +157,8 @@ const runCommand = (
   }
 };
 
-// Names the component, matching its folder (components/Map); nothing in
-// this scope ever constructs a JS Map.
+// Names the component, matching its folder (components/Map); the JS Map is
+// reached as globalThis.Map in this file.
 // eslint-disable-next-line sonarjs/no-globals-shadowing
 const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -131,6 +169,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     null,
   );
 
+  const drawnMarkersRef = useRef<DrawnMarkers>(noDrawnMarkers());
   const markersRef = useSyncedRef(markers);
   const currentLocRef = useSyncedRef(currentLocation);
 
@@ -186,6 +225,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       mapInstance.current = null;
       layersRef.current = null;
       currentLocationLayerRef.current = null;
+      drawnMarkersRef.current = noDrawnMarkers();
       setReady(false);
     };
   }, []);
@@ -196,31 +236,27 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     const layer = layersRef.current;
     if (!ready || !L || !map || !layer) return;
 
-    const copyRangeRef = { current: null as [number, number] | null };
-
+    const drawn = drawnMarkersRef.current;
     const render = () => {
       const range = visibleCopyRange(map.getBounds());
-      if (sameRange(copyRangeRef.current, range)) return;
-      copyRangeRef.current = range;
-
-      layer.clearLayers();
+      // A new copy range redraws every pin; otherwise only what changed.
+      if (!sameRange(drawn.range, range)) {
+        layer.clearLayers();
+        drawn.byKey.clear();
+        drawn.range = range;
+      }
+      const { add, removeKeys } = diffMarkers(
+        new Set(drawn.byKey.keys()),
+        markers,
+      );
+      for (const key of removeKeys) {
+        drawn.byKey.get(key)!.forEach((pin) => layer.removeLayer(pin));
+        drawn.byKey.delete(key);
+      }
       const [copyMin, copyMax] = range;
-      for (let copy = copyMin; copy <= copyMax; copy++) {
-        markers.forEach((m) => {
-          L.marker([m.lat, m.lng + copy * WORLD_WIDTH_DEG])
-            .addTo(layer)
-            // A function, not a built element: every geocode landing
-            // rebuilds every marker, so building the popup content eagerly
-            // would redo it for every pin on every rebuild instead of only
-            // the one a reader actually opens. The nesting this reads at
-            // (effect -> render -> world-copy loop -> per-marker forEach)
-            // is Leaflet's own re-render shape, not something splitting
-            // this callback out would actually simplify -- it would just
-            // trade the nesting for threading `layer`/`copy` through as
-            // parameters.
-            // eslint-disable-next-line sonarjs/no-nested-functions
-            .bindPopup(() => popupContent(m.popupText, m.titles, m.countLabel));
-        });
+      const offsets = copyOffsets(copyMin, copyMax);
+      for (const [key, marker] of add) {
+        drawn.byKey.set(key, drawPins(L, { layer, marker, offsets }));
       }
     };
 
