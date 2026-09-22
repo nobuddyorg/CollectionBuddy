@@ -36,18 +36,18 @@ function conditions(filter: string): string[] {
 
 /** The value inside `column.ilike."..."`, with PostgREST's escapes undone. */
 function unquote(condition: string): { column: string; value: string } {
-  const match = /^(\w+)\.ilike\."(.*)"$/s.exec(condition);
+  const match = /^(\w+)\.ilike\."([\s\S]*)"$/.exec(condition);
   expect(match).not.toBeNull();
   return {
     column: match![1],
-    value: match![2].replace(/\\(.)/gs, '$1'),
+    value: match![2].replace(/\\([\s\S])/g, '$1'),
   };
 }
 
 /** A LIKE pattern back to the substring it matches literally. */
 function unlike(pattern: string): string {
   expect(pattern.startsWith('%') && pattern.endsWith('%')).toBe(true);
-  return pattern.slice(1, -1).replace(/\\(.)/gs, '$1');
+  return pattern.slice(1, -1).replace(/\\([\s\S])/g, '$1');
 }
 
 describe('buildSearchFilter, for any search term', () => {
