@@ -68,6 +68,21 @@ Where the memoization those lists guard was not load-bearing, it is gone — cal
 
 The other class is the **timeout**, which Stryker counts as a kill. Most were avoidable and the fixes were worth having: counters replaced by iteration over the thing being counted (`chunk()`, `attempts()`, the pool's shared iterator); page fakes backed by a finite table so a walk that asks for one page too many gets nothing instead of spinning; and `timeoutMS` raised to 20 s, since with the 5 s default a mutant covered by a few hundred tests was reported as a timeout after failing seven of them honestly. Three remain, each a mutant whose only effect is non-termination: two in `excludePendingDeletes`, whose job is returning the same reference when nothing changed (break that and the effect reading it re-renders for ever — the bug the line prevents), and `readAllPages`' one unbounded walk, which cannot know how many pages it needs.
 
+## Why four functions have property tests
+
+`buildSearchFilter`, `csvCell`, `dosDateTime` and `clampPage`/`pageRange` take
+input that is adversarial or unbounded (any search term, any user text, any
+date, any page and total), and each has a property that is easy to state: the
+filter is always exactly four quoted conditions that match the term literally;
+a CSV cell always parses back to the text, apostrophe-guarded exactly when it
+would start a formula; a DOS timestamp always decodes to a valid date and
+clamps rather than wraps; a page range always holds an entry when there is
+one. The generic playbook adopts property testing only after a near-miss;
+these were adopted at the maintainer's request (#616) without one. They run
+seeded and deterministic, with one dependency (`fast-check`), beside the
+example tests, in about two seconds. Everything else keeps example tests
+alone: small, enumerable inputs gain nothing from generated ones.
+
 ## Why component tests run in jsdom, and two things that bite
 
 Pure-logic tests could not have caught the hydration mismatch fixed in `008d33b`, so components and hooks are rendering-tested with Testing Library (`web/vitest.setup.ts`). Two things to know when adding more:

@@ -1,4 +1,5 @@
 import { cleanup } from '@testing-library/react';
+import fc from 'fast-check';
 import { afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
@@ -39,3 +40,10 @@ if (dom) {
     configurable: true,
   });
 }
+
+// Property tests run from one fixed seed, so a failure reproduces as-is;
+// FC_SEED replays or explores another. Kept small to hold the unit budget.
+fc.configureGlobal({
+  seed: Number(process.env.FC_SEED ?? 20260911),
+  numRuns: 200,
+});
