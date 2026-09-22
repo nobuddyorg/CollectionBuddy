@@ -35,7 +35,15 @@ updates:
       stryker:
         patterns:
           - "@stryker-mutator/*"
-      patch-updates:
+      # Split by dependency-type: a mixed group reports as direct:production, which auto-merge.yml always sends to a human.
+      patch-updates-dev:
+        dependency-type: "development"
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+      patch-updates-prod:
+        dependency-type: "production"
         patterns:
           - "*"
         update-types:
