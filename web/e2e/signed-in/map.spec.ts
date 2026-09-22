@@ -63,7 +63,7 @@ test.describe('the map', () => {
 const LOOKED_UP: Record<string, [number, number]> = {
   Aachen: [6.0839, 50.7753],
   Bonn: [7.0982, 50.7374],
-  Celle: [10.0807, 52.6226],
+  Dresden: [13.7373, 51.0504],
 };
 
 test.describe('a map whose places are still being looked up', () => {
