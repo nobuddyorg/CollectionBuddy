@@ -25,9 +25,11 @@ vi.mock('../../data/categories', () => ({
   listItemIdsLinkedElsewhere: vi.fn(),
 }));
 
+// Two paths per removal, so IMAGE_ROWS' three paths span two batches.
 vi.mock('../../data/images', () => ({
   listImagePathsForItems: vi.fn(),
   removeImageObjects: vi.fn(),
+  REMOVE_OBJECTS_BATCH_SIZE: 2,
 }));
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -349,11 +351,11 @@ describe('useCategories deleteCategory', () => {
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
     expect(deleteCategoryRow).toHaveBeenCalledWith('cat-1');
-    expect(removeImageObjects).toHaveBeenCalledWith(['u/i1/a.webp']);
     expect(removeImageObjects).toHaveBeenCalledWith([
+      'u/i1/a.webp',
       'u/i2/b.webp',
-      'u/i2/b.thumb.webp',
     ]);
+    expect(removeImageObjects).toHaveBeenCalledWith(['u/i2/b.thumb.webp']);
 
     // The row delete is the first thing to actually mutate anything --
     // every byte removal is ordered strictly after it.
@@ -466,15 +468,15 @@ describe('useCategories deleteCategory', () => {
     });
     await commitDeferredDelete();
 
-    // Both orphaned items were attempted even though the first rejected --
-    // a plain Promise.all would have stopped awaiting after that.
+    // Both batches were attempted even though the first rejected -- a
+    // plain Promise.all would have stopped awaiting after that.
     await waitFor(() =>
-      expect(removeImageObjects).toHaveBeenCalledWith([
-        'u/i2/b.webp',
-        'u/i2/b.thumb.webp',
-      ]),
+      expect(removeImageObjects).toHaveBeenCalledWith(['u/i2/b.thumb.webp']),
     );
-    expect(removeImageObjects).toHaveBeenCalledWith(['u/i1/a.webp']);
+    expect(removeImageObjects).toHaveBeenCalledWith([
+      'u/i1/a.webp',
+      'u/i2/b.webp',
+    ]);
   });
 
   // Every test above sets listItemIdsLinkedElsewhere to return nothing, so
@@ -576,6 +578,8 @@ describe('useCategories deleteCategory', () => {
     await waitFor(() =>
       expect(deleteCategoryRow).toHaveBeenCalledWith('cat-1'),
     );
+    // Settled, so the removal step has run -- and had nothing to remove.
+    await waitFor(() => expect(result.current.isDeleting).toBe(false));
     expect(listItemIdsLinkedElsewhere).not.toHaveBeenCalled();
     expect(listImagePathsForItems).not.toHaveBeenCalled();
     expect(removeImageObjects).not.toHaveBeenCalled();

@@ -1,5 +1,5 @@
 import { chunk } from '../lib/chunk';
-import { readAllPages } from '../lib/pages';
+import { readAllChunks, readAllPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
 import type { ShareRole } from './shares';
@@ -141,14 +141,16 @@ export async function listItemIdsLinkedElsewhere(
   excludingCategoryId: string,
   listPage: typeof rawListItemIdsLinkedElsewhere = rawListItemIdsLinkedElsewhere,
 ): Promise<{ data: string[] | null; error: unknown }> {
-  const linked = new Set<string>();
-  for (const ids of chunk(itemIds, ID_FILTER_CHUNK_SIZE)) {
-    const paged = await readAllPages<{ item_id: string }>(
-      ITEM_LINK_PAGE_SIZE,
-      (from, to) => listPage(ids, excludingCategoryId, from, to),
-    );
-    if (paged.error !== null) return { data: null, error: paged.error };
-    for (const row of paged.data) linked.add(row.item_id);
-  }
-  return { data: Array.from(linked), error: null };
+  const rows = await readAllChunks(
+    chunk(itemIds, ID_FILTER_CHUNK_SIZE),
+    (ids) =>
+      readAllPages<{ item_id: string }>(ITEM_LINK_PAGE_SIZE, (from, to) =>
+        listPage(ids, excludingCategoryId, from, to),
+      ),
+  );
+  if (rows.error !== null) return { data: null, error: rows.error };
+  return {
+    data: Array.from(new Set(rows.data.map((row) => row.item_id))),
+    error: null,
+  };
 }
