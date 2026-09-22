@@ -38,6 +38,13 @@ test.describe('sharing a collection', () => {
     await app.sharing.do.revoke(SEED.other.email);
     await app.confirm.do.accept();
     await expect(app.sharing.locators.texts.empty).toBeVisible();
+
+    // Revoking is deferred to the toast's undo window; closing the toast ends it, so the grant row is really gone on the next visit.
+    await app.toast.do.close();
+    await app.categories.do.open(SEED.shareCategory);
+    await app.categories.do.openPanel();
+    await expect(app.sharing.locators.texts.empty).toBeVisible();
+    await expect(app.sharing.locators.rows).toHaveCount(0);
   });
 
   // The expiry is a real column with a check constraint behind it

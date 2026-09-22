@@ -88,4 +88,36 @@ test.describe('deleting a collection that still holds things', () => {
       .poll(() => storedObjects(token, userId, itemId), { timeout: 15_000 })
       .toEqual([]);
   });
+
+  // The delete waits out the toast's undo window; undo inside it puts the collection back, selected, with nothing lost.
+  test('can be taken back inside the undo window', async ({ on, page }) => {
+    const app = on(page);
+    const name = `E2E Doch behalten ${Date.now()}`;
+    const title = `Inhalt ${Date.now()}`;
+
+    await page.goto('', { waitUntil: 'networkidle' });
+    await expect(app.categories.locators.selected).not.toBeEmpty();
+    await app.categories.do.create(name);
+    await app.catalogue.do.addEntry(title);
+
+    try {
+      await app.categories.do.delete();
+      await app.confirm.do.accept();
+      await expect(app.categories.locators.selected).not.toHaveText(name);
+
+      await app.toast.do.undo();
+      await expect(app.categories.locators.selected).toHaveText(name);
+      await expect(app.catalogue.card(title)()).toBeVisible();
+
+      // Nothing was deleted, so it survives a trip to the database.
+      await app.categories.do.open(name);
+      await expect(app.catalogue.card(title)()).toBeVisible();
+    } finally {
+      await app.categories.do.open(name);
+      await app.categories.do.delete();
+      await app.confirm.do.accept();
+      await app.toast.do.close();
+      await expect(app.categories.locators.selected).not.toHaveText(name);
+    }
+  });
 });

@@ -1,86 +1,83 @@
-import { test as base } from '@playwright/test';
+import { type Page, test as base } from '@playwright/test';
 import MCR from 'monocart-coverage-reports';
 
-/**
- * Playwright's Coverage API only exists on Chromium (it talks to the browser
- * over CDP), which is an instrumentation-free way to get real JS/CSS
- * coverage out of most of the e2e suite -- no Istanbul/babel build step
- * needed. `firefox` (playwright.config.ts) is the one project it can't
- * cover; the fixture below just skips collection there rather than failing.
- */
+// Playwright's Coverage API is Chromium-only (CDP); the fixture skips collection on other engines.
 const mcr = MCR({
   name: 'CollectionBuddy e2e coverage',
   outputDir: 'coverage-e2e',
   reports: ['v8', 'console-summary', 'markdown-summary'],
-  // The static export's own bundle, not e.g. the service worker registered
-  // alongside it.
+  // The export's own bundle, not the service worker registered alongside it.
   entryFilter: '**/_next/**',
-  // Only meaningful once E2E_COVERAGE_SOURCEMAPS unpacks a chunk's original
-  // sources (next.config.ts): without it, every vendor library bundled
-  // alongside app code (Supabase, Leaflet, React) would swamp the report.
+  // Needs E2E_COVERAGE_SOURCEMAPS (next.config.ts); without source maps the bundle has no `src/app` paths.
   sourceFilter: '**/src/app/**',
 });
 
-/**
- * A floor, not a target -- see TEST_STRATEGY.md and CLAUDE.md's coverage
- * guardrail. One per suite, since the two never run together and reach
- * wildly different amounts of the app: `npm run e2e` serves the built
- * export to a signed-out visitor, `npm run e2e:local` points the same
- * report at a real stack. A shared floor would be the signed-out one, and
- * the signed-in suite could then lose most of its coverage unnoticed.
- *
- * Each is a margin below what a real run achieved -- signed-out
- * 16.06/6.92/12.89/43.86 and signed-in 79.38/68.37/82.50/84.82, both in
- * CI, which is the only place the signed-in suite can run. The margin is
- * ~1pp for signed-out and ~3pp for signed-in, against the ~1pp these
- * numbers move between runs of an unchanged suite; a floor tighter than
- * that buys nothing and fails green work. Raise by hand once a real run
- * reports a higher number -- never lower one to make a change fit.
- *
- * `functions` is the one exception, and the reason it now reads 12 rather
- * than 13: its denominator is every function in `src/app`, so extracting a
- * shared helper out of four call sites lowers the ratio without the suite
- * reaching one function less. It last moved that way when `chunk()`,
- * `readAllPages()` and `attempts()` landed -- 559 functions to 582, with
- * the covered count flat at ~75.
- */
-const COVERAGE_THRESHOLDS = process.env.E2E_SUPABASE_URL
-  ? { statements: 76, branches: 65, functions: 79, lines: 81 }
-  : { statements: 15, branches: 6, functions: 12, lines: 42 };
+// Floors ~3pp under a measured `npm run e2e:local` run; raised by hand, never lowered (CLAUDE.md).
+const COVERAGE_THRESHOLDS = {
+  statements: 79,
+  branches: 68,
+  functions: 84,
+  lines: 83,
+};
+
+// Only the local-stack run collects: it is the one run with source maps and every Chromium project. A deployed bundle has no source maps, so its numbers would be minified-line counts.
+const COLLECT = Boolean(process.env.E2E_SUPABASE_URL);
+
+type PageCoverage = Page['coverage'];
+
+function startCollecting(coverage: PageCoverage) {
+  return Promise.all([
+    coverage.startJSCoverage({ resetOnNavigation: false }),
+    coverage.startCSSCoverage({ resetOnNavigation: false }),
+  ]);
+}
+
+async function flushCollected(coverage: PageCoverage) {
+  const [jsCoverage, cssCoverage] = await Promise.all([
+    coverage.stopJSCoverage(),
+    coverage.stopCSSCoverage(),
+  ]);
+  const entries = [...jsCoverage, ...cssCoverage];
+  // Before the first navigation nothing is loaded, and monocart logs an error for an empty list.
+  if (entries.length > 0) await mcr.add(entries);
+}
+
+// V8 discards a document's counts on a full navigation whatever `resetOnNavigation` says, so they are flushed before every `goto`/`reload`.
+function flushBeforeNavigation(page: Page) {
+  const goto = page.goto.bind(page);
+  const reload = page.reload.bind(page);
+  page.goto = async (url, options) => {
+    await flushCollected(page.coverage);
+    await startCollecting(page.coverage);
+    return goto(url, options);
+  };
+  page.reload = async (options) => {
+    await flushCollected(page.coverage);
+    await startCollecting(page.coverage);
+    return reload(options);
+  };
+}
 
 export const test = base.extend<{ autoCoverage: void }>({
   autoCoverage: [
     async ({ page, browserName }, use) => {
-      const collect = browserName === 'chromium';
+      const collect = COLLECT && browserName === 'chromium';
       if (collect) {
-        await Promise.all([
-          page.coverage.startJSCoverage({ resetOnNavigation: false }),
-          page.coverage.startCSSCoverage({ resetOnNavigation: false }),
-        ]);
+        flushBeforeNavigation(page);
+        await startCollecting(page.coverage);
       }
 
       await use();
 
-      if (collect) {
-        const [jsCoverage, cssCoverage] = await Promise.all([
-          page.coverage.stopJSCoverage(),
-          page.coverage.stopCSSCoverage(),
-        ]);
-        await mcr.add([...jsCoverage, ...cssCoverage]);
-      }
+      if (collect) await flushCollected(page.coverage);
     },
     { auto: true },
   ],
 });
 
-/**
- * Merges every worker's coverage (each `add()` above persists to
- * `outputDir`'s cache, not just this process's memory) into one report, then
- * gates on COVERAGE_THRESHOLDS. Called once from globalTeardown, after every
- * project has finished -- throwing here fails the whole Playwright run, the
- * same as a failed test would.
- */
+// Called once from globalTeardown; each worker's `add()` persisted to `outputDir`, and throwing here fails the whole run.
 export async function generateCoverageReport() {
+  if (!COLLECT) return;
   const results = await mcr.generate();
   if (!results) return;
 

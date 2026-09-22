@@ -38,7 +38,7 @@ From `supabase/config.toml`: API `54321`, Postgres `54322`, Studio `54323`, Mail
 | Unit coverage, global | `web/vitest.config.mts` `GLOBAL_COVERAGE_THRESHOLDS` | 99% statements, branches, functions, lines |
 | Unit coverage, per file | same file, `PER_FILE_FLOOR`, over `mutation-targets.mjs` | 100%, except the two `Map/` hooks in `NO_COVERAGE_FLOOR` |
 | Mutation score | `web/stryker.config.mjs` `thresholds.break` | 99 — one below the measured 100, so a single new equivalent mutant cannot block unrelated work |
-| E2E JS/CSS coverage | `web/e2e/coverage.ts` `COVERAGE_THRESHOLDS` | One floor for the signed-out suite, one for signed-in; source-mapped (`E2E_COVERAGE_SOURCEMAPS=true`) |
+| E2E JS/CSS coverage | `web/e2e/coverage.ts` `COVERAGE_THRESHOLDS` | One floor, on `npm run e2e:local` only (every Chromium project, source-mapped); `npm run e2e` and the smoke test collect nothing |
 | Lighthouse | `web/lighthouserc.signed-out.json`, `.signed-in.json` | Performance, best-practices and SEO scores plus LCP, TBT, CLS; set from a measured baseline with margin |
 
 Every floor is raised by hand when a real run reports a higher number, and never lowered to make a change fit. `autoUpdate` is off in Vitest: it wrote the local measurement back into the config after every run, so a green local run produced a red PR.
@@ -53,13 +53,13 @@ Each job writes its report to its own Actions summary (`$GITHUB_STEP_SUMMARY`); 
 | --- | --- | --- |
 | `build_and_test` | Coverage against the thresholds above | `davelosert/vitest-coverage-report-action` over the `json-summary` reporter |
 | `build_and_test` | Signed-out e2e results | `daun/playwright-report-summary` over the `json` reporter |
-| `build_and_test` | `depcruise` and `knip` output | The step's text, `tee`'d into the summary |
+| `build_and_test` | `depcruise` and `knip` output | The step's text, `tee`'d into the summary; Knip prints nothing when clean, so the summary says so |
 | `e2e_local_stack` | pgTAP results; signed-in e2e results | `pg_prove` output; the same Playwright action |
 | `mutation_test` | Mutation score, overall and per file | `web/scripts/mutation-summary.mjs` over Stryker's `json` reporter |
 | `opengrep` | Finding count, total and by rule | `jq` over the uploaded SARIF |
 | `lighthouse` | Scores, LCP, CLS against each page's thresholds | `web/scripts/lighthouse-summary.mjs` over each target's `manifest.json` |
 | `build_and_test`, `e2e_local_stack` | Non-blocking accessibility findings | `web/e2e/axe.ts` `reportNonBlockingFindings`, from inside the test, CI only |
-| `zap_baseline` | PASS/WARN/IGNORE/FAIL per rule, per pass | `report_md.md` written by `zaproxy/action-baseline` |
+| `zap_baseline` | Every alert with its verdict, per pass; an alert `.zap/rules.tsv` ignores shows its reason | `web/scripts/zap-summary.mjs` over `report_json.json` from `zaproxy/action-baseline` |
 
 ## End-to-end tests
 

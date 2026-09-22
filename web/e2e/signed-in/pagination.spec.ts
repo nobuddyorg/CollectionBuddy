@@ -30,6 +30,12 @@ test.describe('a collection larger than one page', () => {
 
     await catalogue.locators.buttons.previousPage.click();
     await expect(catalogue.locators.cards).toHaveCount(9);
+
+    // A numbered page is the other way in.
+    await catalogue.locators.buttons.pageNumbers
+      .filter({ hasText: /^2$/ })
+      .click();
+    await expectTitles(page, ['Schaustück 02', 'Schaustück 01']);
   });
 
   // Paging follows what the search left, not what the collection holds.

@@ -10,15 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  # The repo-wide hooks from .pre-commit-config.yaml. Runs first and gates
-  # every other job -- it's the fastest check, so a failure here (a bad
-  # tsconfig.json, a stray secret, ...) is caught before spending minutes on
-  # a build, two browsers, a Supabase stack and a mutation-testing run.
-  # ESLint/Prettier/TypeScript/depcruise/knip hooks are skipped: build_and_test
-  # already runs those same commands below. Unconditional (unlike the jobs
-  # below): file hygiene and secret scanning need to see every changed file
-  # regardless of which directory it's in, and sqlfluff-lint here is only
-  # ~2s against the fixed migrations/pgTAP set, not worth path-gating.
+  # Unconditional: hygiene and secret scanning must see every changed file. The web hooks are skipped because build_and_test runs the same commands.
   prek:
     runs-on: ubuntu-latest
     steps:
@@ -32,18 +24,7 @@ jobs:
         env:
           SKIP: no-commit-to-branch,prettier,eslint,tsc,depcruise,knip
 
-  # Decides which of the two expensive job groups below actually need to
-  # run. `web` gates the app-code checks (build/tsc/lint/unit tests/mutation
-  # testing/signed-out e2e); `sql` OR `web` gates e2e_local_stack, since that
-  # job validates both the schema/pgTAP side and the signed-in Playwright
-  # journeys together against one running stack, and either changing can
-  # break it. `.github/workflows/ci.yml` is in both filters, so a change to
-  # this file's own logic always exercises what it just changed. Forced to
-  # "true" unconditionally on a push to main: that's the event that
-  # triggers pages-deploy.yml's migrate -> build -> deploy, and PRs get the
-  # path-filtered speedup while the actual pre-deploy gate stays the full,
-  # unconditional run this repo has always had -- a squash-merge combining
-  # unrelated changes must never get a job skipped right before it deploys.
+  # A push to main forces every job: it is the event that deploys, and a squash-merge may combine unrelated changes.
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -62,6 +43,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 2
 
+      # ci.yml is in both filters so a change to this file always exercises what it changed.
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
@@ -95,12 +77,8 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          # This build feeds the e2e run below, not a deploy -- source maps
-          # make its coverage report (e2e/coverage.ts) point at real source.
-          E2E_COVERAGE_SOURCEMAPS: 'true'
 
-      # After the build, not before: `next build` generates next-env.d.ts
-      # (gitignored), which tsc/eslint need on a clean checkout.
+      # After the build: `next build` generates the gitignored next-env.d.ts that tsc and ESLint need.
       - name: Type-check
         run: npx tsc --noEmit
 
@@ -110,54 +88,43 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # `shell: bash` for the pipefail it brings -- the implicit default is
-      # `bash -e`, under which a piped command's status is tee's, so a real
-      # failure here was reported as success.
+      # `shell: bash` adds pipefail; the implicit `bash -e` would report tee's status, not the command's.
       - name: Check architectural boundaries
         shell: bash
         run: npm run depcruise 2>&1 | tee depcruise-output.txt
 
       - name: Add architecture check to job summary
         if: always()
-        run: |
-          {
-            echo '## 🏗️ Architectural boundaries (dependency-cruiser)'
-            echo
-            echo '```'
-            cat depcruise-output.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+        uses: ./.github/actions/summary-section
+        with:
+          title: '🏗️ Architectural boundaries (dependency-cruiser)'
+          file: web/depcruise-output.txt
 
+      # `--silent` drops npm's own banner: Knip prints nothing when clean, so an empty file means clean.
       - name: Check for dead code and unused dependencies
         shell: bash
-        run: npm run knip 2>&1 | tee knip-output.txt
+        run: npm run --silent knip 2>&1 | tee knip-output.txt
 
       - name: Add dead-code check to job summary
         if: always()
-        run: |
-          {
-            echo '## 🧹 Dead code and unused dependencies (Knip)'
-            echo
-            echo '```'
-            cat knip-output.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+        uses: ./.github/actions/summary-section
+        with:
+          title: '🧹 Dead code and unused dependencies (Knip)'
+          file: web/knip-output.txt
+          empty-message: '✅ No unused files, exports or dependencies.'
 
       - name: Run tests
         run: npm test -- --coverage
 
       - name: Upload coverage to Codecov
-        # v5.5.1 fetched Codecov's GPG key from a Keybase account Codecov has
-        # since deleted, failing every upload with "no valid OpenPGP data
-        # found". v7 carries the key instead of fetching it.
+        # v5.5.1 fetched Codecov's GPG key from a Keybase account Codecov has since deleted; v7 carries the key.
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           directory: web/coverage
           fail_ci_if_error: true
 
-      # Job summary only (codecov.yml disables Codecov's own PR comment) --
-      # reads the json-summary reporter vitest.config.mts adds for this.
+      # Reads the json-summary reporter vitest.config.mts adds for this step.
       - name: Add coverage report to job summary
         if: always()
         uses: davelosert/vitest-coverage-report-action@c4bbc33a89b7ace0e63d35f1f7d4bcee31155a73 # v2
@@ -166,18 +133,9 @@ jobs:
           vite-config-path: vitest.config.mts
           file-coverage-mode: none
           comment-on: 'none'
-          # No explicit threshold-icons: the action only draws 🔴/🟢 (not the
-          # ✅/❌ used below) when left to check each category against its own
-          # real threshold automatically. Supplying custom icons forces one
-          # shared cutoff for all four categories *and* makes the action emit
-          # an unavoidable "thresholds and threshold-icons both defined"
-          # warning on every run -- not worth it for a glyph swap on one of
-          # three tables.
+          # No threshold-icons: setting them forces one shared cutoff for all four categories and warns on every run.
 
-      # Drives the built export in a real browser, serving it under the base
-      # path the way Pages does -- serving at the root would make every
-      # asset request a 404 this never caught. Playwright starts and stops
-      # the server itself (playwright.config.ts).
+      # Firefox and the production-config bundle live only here; coverage is e2e_local_stack's job. Playwright serves the export under the base path itself (playwright.config.ts).
       - name: Install browsers for the end-to-end suite
         run: npx playwright install --with-deps chromium firefox
 
@@ -191,21 +149,9 @@ jobs:
           title: 'End-to-end tests -- signed-out (public)'
           tag: 'e2e (signed-out)'
           artifact-name: playwright-report
-          coverage-artifact-name: e2e-coverage
           job-status: ${{ job.status }}
 
-  # The signed-in half of the app, against a real database. Its own job
-  # because it needs Docker and a Supabase stack; everything else in CI
-  # only covers what a signed-out visitor sees. Goes through the same RLS
-  # that is the app's only authorization layer.
-  #
-  # Sign-in can't go through the interface (Google OAuth, no runner can
-  # drive it), so setup mints a session through the auth API into
-  # localStorage -- this path exists for the local stack only.
-  #
-  # Gated on web OR sql changing (see the `changes` job): this is the one
-  # job where the two concerns share a running stack, so either side
-  # changing needs the whole thing to run.
+  # Schema, pgTAP and the signed-in journeys share one running stack, so either `web` or `sql` changing runs the whole job.
   e2e_local_stack:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true' || needs.changes.outputs.sql == 'true'
@@ -220,23 +166,10 @@ jobs:
 
       - uses: ./.github/actions/setup-web
 
-      - uses: ./.github/actions/setup-supabase-cli
+      # A migration that cannot apply from scratch fails here, not in production.
+      - uses: ./.github/actions/start-local-stack
 
-      - name: Start Supabase
-        # From the repo root, where supabase/ lives. Applies every
-        # migration, so one that can't apply fails here, not production --
-        # which is also what makes this the migration-applies-cleanly test
-        # the pgTAP suite below depends on: it never runs against anything
-        # but a database that just came up from a fresh `supabase start`.
-        run: supabase start
-        working-directory: .
-
-      # pg_prove against the local stack (supabase/tests/database/), right
-      # after the stack comes up and before the slower Playwright install +
-      # run below -- a schema/RLS regression fails here in seconds rather
-      # than after paying for browsers too. Complements, not duplicates,
-      # the signed-in suite's rls.spec.ts: see TEST_STRATEGY.md for the
-      # division of labor between the two.
+      # Before the browser install: a schema or RLS regression fails in seconds. Division of labor with rls.spec.ts: TEST_STRATEGY.md §7.
       - name: Run pgTAP database tests
         working-directory: .
         shell: bash
@@ -244,22 +177,12 @@ jobs:
 
       - name: Add pgTAP results to job summary
         if: always()
-        working-directory: .
-        run: |
-          {
-            echo '## 🐘 pgTAP database tests'
-            echo
-            echo '```'
-            cat pgtap-output.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+        uses: ./.github/actions/summary-section
+        with:
+          title: '🐘 pgTAP database tests'
+          file: pgtap-output.txt
 
-      # Regenerates database.types.ts's body against the stack just started
-      # and fails on any difference. Piped through the project's own
-      # Prettier config first -- raw CLI output has neither semicolons nor
-      # single quotes, so an unformatted diff would flag every line
-      # regardless of actual schema drift. The checked-in file's own header
-      # is carried over rather than hardcoded here.
+      # Raw CLI output is unformatted, so it goes through the project's Prettier config before the diff; the checked-in header is carried over.
       - name: Verify database.types.ts matches the schema
         working-directory: .
         run: |
@@ -271,7 +194,7 @@ jobs:
 
       - run: npx playwright install --with-deps chromium
 
-      # Same script a developer runs, so the two can't drift.
+      # Same script a developer runs, so the two cannot drift.
       - name: Run the signed-in end-to-end suite
         run: npm run e2e:local
 
@@ -279,8 +202,8 @@ jobs:
         if: always()
         uses: ./.github/actions/playwright-results
         with:
-          title: 'End-to-end tests -- signed-in (local stack)'
-          tag: 'e2e (signed-in, local stack)'
+          title: 'End-to-end tests -- full suite (local stack)'
+          tag: 'e2e (full suite, local stack)'
           artifact-name: playwright-report-signed-in
           coverage-artifact-name: e2e-coverage-signed-in
           job-status: ${{ job.status }}
@@ -290,12 +213,7 @@ jobs:
         run: supabase stop
         working-directory: .
 
-  # Scoped to the pure, high-risk modules (stryker.config.mjs) -- mutating
-  # the whole app tree would mean mutating JSX and Tailwind class strings,
-  # producing a meaningless score. Runs on every PR that touches web code,
-  # not just main: finding out a test asserts nothing is only useful before
-  # the merge. Gated on web changing (see the `changes` job) -- nothing in
-  # mutation-targets.mjs can be affected by a SQL-only or docs-only change.
+  # Scoped to mutation-targets.mjs (stryker.config.mjs); nothing there is affected by a SQL-only change.
   mutation_test:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true'
@@ -310,19 +228,13 @@ jobs:
 
       - uses: ./.github/actions/setup-web
 
-      # Dashboard key passed only on main, so the published report and badge
-      # track one branch. A PR run still breaks on the same threshold.
+      # No Supabase env: the unit suite never reads it. Dashboard key only on main, so the published report and badge track one branch.
       - name: Run mutation testing
         run: npx stryker run
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           STRYKER_DASHBOARD_API_KEY: ${{ github.ref == 'refs/heads/main' && secrets.STRYKER_DASHBOARD_API_KEY || '' }}
 
-      # A table built from reports/mutation/mutation.json (scripts/mutation-summary.mjs),
-      # not console output -- the console log is mostly expected per-mutant
-      # test "failures" (that's what killing a mutant means), which isn't
-      # useful summary material.
+      # Built from reports/mutation/mutation.json (scripts/mutation-summary.mjs); the console log is mostly expected per-mutant failures.
       - name: Add mutation report to job summary
         if: always()
         run: npm run mutation:summary
@@ -335,26 +247,7 @@ jobs:
           path: web/reports/mutation
           retention-days: 30
 
-  # General-purpose SAST (Opengrep, an LGPL fork of the Semgrep engine),
-  # complementing rather than duplicating ESLint/dependency-cruiser (which
-  # know this app's own conventions) and CodeQL (dataflow analysis, enabled
-  # separately via the repo's default code-scanning setup, not a workflow
-  # file here): Opengrep's community rule pack catches generic
-  # language-level bug/security patterns neither of those is written to
-  # find. A standalone binary with no npm/pip dependency, so its own job
-  # rather than a build_and_test step -- nothing here needs web/node_modules.
-  # Gated on web or sql changing (see the `changes` job): the scanned tree
-  # is exactly web/{src,scripts,e2e} and supabase/, so a docs-only PR has
-  # nothing for it to find.
-  #
-  # `--config auto` resolves to Opengrep's default community pack
-  # (semgrep.dev's public `p/default` registry endpoint) -- no account, API
-  # key, or registry login involved; it's an anonymous, unauthenticated
-  # fetch, the same as CodeQL's own bundled query packs need no credential.
-  # No `--error`, so a finding surfaces in the Security tab without failing
-  # the job -- the same division CodeQL's default setup uses between
-  # findings and job status. No telemetry to disable: Opengrep's source was
-  # checked (see TEST_STRATEGY.md) and ships none.
+  # Opengrep needs no node_modules, so it is its own job. The scanned tree is web/{src,scripts,e2e} and supabase/, hence the `web` or `sql` gate.
   opengrep:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true' || needs.changes.outputs.sql == 'true'
@@ -367,17 +260,14 @@ jobs:
         with:
           persist-credentials: false
 
+      # `shell: bash` adds pipefail, so a failed download cannot pipe an empty script into bash and pass.
       - name: Install Opengrep
+        shell: bash
         run: |
           curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash -s -- -v v1.30.0
           echo "$HOME/.opengrep/cli/latest" >> "$GITHUB_PATH"
 
-      # .semgrepignore (Opengrep's default ignore-file name -- v1.30.0 has no
-      # --semgrepignore-filename to rename it) is this repo's one
-      # suppression file (gitignore syntax) -- see its own comments for
-      # what's excluded and why. Build artifacts need no entry there:
-      # Opengrep only scans git-tracked files, and all of them are already
-      # in web/.gitignore.
+      # `--config auto` fetches the public community pack anonymously. .semgrepignore is the one suppression file; Opengrep scans only git-tracked files.
       - name: Run Opengrep
         run: |
           opengrep scan \
@@ -391,11 +281,20 @@ jobs:
           sarif_file: opengrep-results.sarif
           category: opengrep
 
-      # jq ships on the runner image; no new dependency for a one-off count.
-      # A result's own `level` is unset in Opengrep's SARIF -- severity lives
-      # on the rule definition (`tool.driver.rules[].defaultConfiguration.level`,
-      # ERROR/WARNING/INFO mapped to error/warning/note), so both this and
-      # the enforcement step below join results back to their rule first.
+      # Opengrep's SARIF leaves a result's `level` unset; severity lives on the rule, so results are joined to their rule once here.
+      - name: Join findings to their rule's severity
+        run: |
+          jq '
+            (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
+            | [.runs[].results[] | {
+                level: ($levelById[.ruleId] // "warning"),
+                ruleId,
+                message: .message.text,
+                file: (.locations[0].physicalLocation.artifactLocation.uri // "?"),
+                line: (.locations[0].physicalLocation.region.startLine // 1)
+              }]
+          ' opengrep-results.sarif > opengrep-findings.json
+
       - name: Add scan results to job summary
         if: always()
         run: |
@@ -403,70 +302,34 @@ jobs:
             echo '## 🔍 General-purpose SAST (Opengrep)'
             echo
             jq -r '
-              (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
-              | [.runs[].results[] | . + {level: ($levelById[.ruleId] // "warning")}] as $results
-              | ($results | length) as $total
-              | ($results | map(select(.level == "error")) | length) as $errors
+              length as $total
+              | (map(select(.level == "error")) | length) as $errors
               | "**Total findings:** \($total) (\($errors) at error severity -- blocking; full detail in the Security tab, category `opengrep`)\n"
               + (if $total > 0
                  then "\n| Severity | Rule | Location |\n|---|---|---|\n" + (
-                   $results
-                   | sort_by(.level != "error", .level != "warning")
-                   | map(
-                       "| \(.level) | `\(.ruleId)` | \(.locations[0].physicalLocation.artifactLocation.uri // "?"):\(.locations[0].physicalLocation.region.startLine // "?") |"
-                     )
+                   sort_by(.level != "error", .level != "warning")
+                   | map("| \(.level) | `\(.ruleId)` | \(.file):\(.line) |")
                    | join("\n")
                  )
                  else "" end)
-            ' opengrep-results.sarif
+            ' opengrep-findings.json
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Everything else in this repo already has a real pass/fail gate
-      # (ESLint's --max-warnings 0, depcruise/Knip/SQLFluff's zero-violation
-      # default, Stryker's break threshold, axe-core's serious/critical
-      # split, Lighthouse's per-category budgets) -- this was the one
-      # exception, upload-only regardless of findings. WARNING/INFO stay
-      # report-only (community-pack noise and stylistic suggestions are
-      # mostly there; a handful of ERROR-adjacent false positives have
-      # already been triaged at their `nosemgrep` suppression sites), but
-      # an ERROR-severity finding
-      # (the pack's own bar for "this is a real bug/vulnerability shape")
-      # now fails the job instead of only landing quietly in the Security
-      # tab. Runs after the upload above so the tab stays populated either
-      # way.
+      # After the upload, so the Security tab stays populated either way. WARNING/INFO stay report-only.
       - name: Fail on error-severity findings
         run: |
-          count=$(jq '
-            (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
-            | [.runs[].results[] | . + {level: ($levelById[.ruleId] // "warning")}]
-            | map(select(.level == "error")) | length
-          ' opengrep-results.sarif)
+          count=$(jq 'map(select(.level == "error")) | length' opengrep-findings.json)
           if [ "$count" -gt 0 ]; then
             jq -r '
-              (reduce (.runs[].tool.driver.rules[]) as $rule ({}; .[$rule.id] = ($rule.defaultConfiguration.level // "warning"))) as $levelById
-              | [.runs[].results[] | . + {level: ($levelById[.ruleId] // "warning")}]
-              | map(select(.level == "error"))[]
-              | "::error file=\(.locations[0].physicalLocation.artifactLocation.uri // "?"),line=\(.locations[0].physicalLocation.region.startLine // 1)::\(.ruleId): \(.message.text)"
-            ' opengrep-results.sarif
+              map(select(.level == "error"))[]
+              | "::error file=\(.file),line=\(.line)::\(.ruleId): \(.message)"
+            ' opengrep-findings.json
             echo "$count error-severity Opengrep finding(s) -- see the annotations above, the job summary, or the Security tab (category opengrep)."
             exit 1
           fi
           echo "No error-severity findings."
 
-  # Lighthouse CI against the real production export -- signed-out (the
-  # plain static build) and signed-in (demo mode against the local stack,
-  # scripts/lighthouse.mjs), each served exactly as GitHub Pages serves the
-  # real site (scripts/serve-export.mjs), never `next dev`. Gated on `web`
-  # changing (see the `changes` job): this measures the web bundle/page
-  # performance, the same surface `build_and_test`/`mutation_test` gate on,
-  # not database behaviour.
-  #
-  # Accessibility is deliberately not asserted here even though Lighthouse
-  # computes it (also axe-core-based): #650 already added a dedicated,
-  # more actionable axe-core/Playwright integration
-  # (e2e/{public,signed-in}/accessibility.spec.ts), and `onlyCategories`
-  # below leaves accessibility out of the run entirely rather than
-  # double-gating the same finding through two tools.
+  # Against the production export served as Pages serves it (scripts/serve-export.mjs), never `next dev`. Accessibility is axe-core's gate (e2e/axe.ts), not asserted twice.
   lighthouse:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true'
@@ -481,14 +344,9 @@ jobs:
 
       - uses: ./.github/actions/setup-web
 
-      - uses: ./.github/actions/setup-supabase-cli
+      # Both builds point at this stack (scripts/lighthouse.mjs) rather than at repo secrets.
+      - uses: ./.github/actions/start-local-stack
 
-      - name: Start Supabase
-        run: supabase start
-        working-directory: .
-
-      # Both builds point at this stack rather than needing repo secrets,
-      # same as e2e_local_stack above.
       - run: npx playwright install --with-deps chromium
 
       - name: Run Lighthouse CI
@@ -511,29 +369,7 @@ jobs:
         run: supabase stop
         working-directory: .
 
-  # OWASP ZAP baseline (passive-only) DAST scan against isolated, ephemeral
-  # copies of the built export -- security headers, cookie flags, and
-  # passive injection/error-disclosure probes against real rendered
-  # responses, a different angle from Opengrep (source text) and axe-core
-  # (a static DOM). Complements, never substitutes for, the authorization
-  # testing in e2e_local_stack -- see TEST_STRATEGY.md's §6 "Dynamic
-  # scanning (DAST)" section; a green run here says nothing about RLS.
-  # Gated on web changing (see the `changes` job), same as
-  # build_and_test/mutation_test/lighthouse: this measures the built web
-  # bundle's runtime surface, not database behaviour.
-  #
-  # Two passes, signed-out then signed-in (demo mode) -- matching Lighthouse
-  # and axe-core, which already scan both. A login-page-only scan has almost
-  # nothing rendered to find an injection/disclosure finding in; the app's
-  # actual content (item titles, descriptions, tags, place names) only
-  # exists once signed in, which is exactly where #104 (stored HTML
-  # injection into a map popup) lived. Both builds point at a local
-  # Supabase stack rather than needing repo secrets, mirroring
-  # scripts/lighthouse.mjs exactly. Caveat carried over from Lighthouse's
-  # own notes: a fresh demo-mode account has zero categories, so the
-  # signed-in pass broadens which code paths/bundle get scanned rather than
-  # scanning real seeded content -- seeding a fixture item is a reasonable
-  # future step, not done here.
+  # Passive scan only; a green run says nothing about RLS (TEST_STRATEGY.md §6). The demo-mode pass exists because the login page alone renders almost nothing.
   zap_baseline:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true'
@@ -547,14 +383,8 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-web
-      - uses: ./.github/actions/setup-supabase-cli
+      - uses: ./.github/actions/start-local-stack
 
-      - name: Start Supabase
-        run: supabase start
-        working-directory: .
-
-      # Same local stack backs both builds below -- read once into
-      # GITHUB_ENV rather than re-querying `supabase status` per build.
       - name: Point the build at the local stack
         run: |
           status=$(supabase status -o json)
@@ -565,17 +395,7 @@ jobs:
       - name: Build the signed-out export
         run: npm run build
 
-      # zap-baseline.py always resets its spider to the *host root* of
-      # whatever target URL it's given -- any path component is stripped
-      # before spidering ("backwards compatibility", docker/zap-baseline.py
-      # in zaproxy/zaproxy), so pointing it at .../CollectionBuddy/ directly
-      # would silently scan an empty host root instead. The real export only
-      # renders correctly under EXPORT_BASE_PATH, though -- next.config.ts
-      # bakes it into every asset/navigation URL, the same reason
-      # web/scripts/serve-export.mjs exists for Playwright. A self-
-      # referencing symlink makes the one built export answer identically at
-      # both `/` (what ZAP actually crawls) and `/CollectionBuddy/*` (what
-      # the HTML's own URLs point at) -- no second build, nothing rewritten.
+      # zap-baseline.py strips any path from its target and spiders the host root; the symlink makes one export answer at both `/` and `/CollectionBuddy/`.
       - name: Serve the signed-out export at the site root
         run: |
           ln -s . out/CollectionBuddy
@@ -583,13 +403,7 @@ jobs:
           echo $! > /tmp/zap-serve.pid
           timeout 30 bash -c 'until curl -sf http://127.0.0.1:4173/ >/dev/null; do sleep 1; done'
 
-      # Baseline = passive only (spider + passive scan rules), never an
-      # active scan -- deliberately out of scope per #661. `-I` means only a
-      # rule this repo has explicitly promoted to FAIL in .zap/rules.tsv can
-      # fail this job; everything else still lands in the report/artifact
-      # for human triage, the same graduated-severity split this repo
-      # already uses for Opengrep, axe-core (e2e/axe.ts), and Lighthouse
-      # (scripts/lighthouse.mjs) above.
+      # `-I`: only a rule promoted to FAIL in .zap/rules.tsv fails the job; the rest lands in the report for triage.
       - name: ZAP baseline scan -- signed out
         uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
@@ -600,35 +414,19 @@ jobs:
           allow_issue_writing: false
           artifact_name: 'zap-baseline-report-signed-out'
 
-      # The action writes report_md.md into the workspace root (the `-w`
-      # flag baked into its own zap-baseline.py invocation) in addition to
-      # uploading it as part of the artifact above -- same tee-and-cat
-      # pattern this file already uses for depcruise/knip/pgTAP, just with
-      # the report file written for us instead of by us. Captured now,
-      # before the signed-in pass's build overwrites it.
+      # The action writes report_json.json into the workspace root; rendered before the signed-in pass overwrites it.
       - name: Add the signed-out ZAP results to the job summary
         if: always()
-        working-directory: .
-        run: |
-          {
-            echo '## 🕷️ OWASP ZAP baseline scan -- signed out'
-            echo
-            cat report_md.md 2>/dev/null || echo '_The scan did not complete far enough to produce a report -- see the step above._'
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: npm run zap:summary -- --title '🕷️ OWASP ZAP baseline scan -- signed out' ../report_json.json
 
-      # Tear down before rebuilding in the same out/ directory: next build
-      # doesn't expect the self-referencing symlink still there, and a
-      # lingering `serve` process would otherwise hold the port.
+      # `next build` does not expect the self-referencing symlink, and a lingering `serve` would hold the port.
       - name: Stop the signed-out server
         if: always()
         run: |
           kill "$(cat /tmp/zap-serve.pid)" 2>/dev/null || true
           rm -f out/CollectionBuddy
 
-      # NEXT_PUBLIC_DEMO_MODE signs every visitor in as a fresh anonymous
-      # user instead of showing the Google button -- the same mechanism
-      # scripts/demo.mjs and scripts/lighthouse.mjs already use, since there
-      # is no username/password to script in CI otherwise.
+      # NEXT_PUBLIC_DEMO_MODE signs every visitor in as a fresh anonymous user; there is no password to script otherwise.
       - name: Build the signed-in (demo mode) export
         run: npm run build
         env:
@@ -653,13 +451,7 @@ jobs:
 
       - name: Add the signed-in ZAP results to the job summary
         if: always()
-        working-directory: .
-        run: |
-          {
-            echo '## 🕷️ OWASP ZAP baseline scan -- signed in (demo mode)'
-            echo
-            cat report_md.md 2>/dev/null || echo '_The scan did not complete far enough to produce a report -- see the step above._'
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: npm run zap:summary -- --title '🕷️ OWASP ZAP baseline scan -- signed in (demo mode)' ../report_json.json
 
       - name: Stop the signed-in server
         if: always()

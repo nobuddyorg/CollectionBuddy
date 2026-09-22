@@ -75,10 +75,12 @@ export function initConfirm(page: Page): Confirm {
 
 export function initToast(page: Page): Toast {
   const root = page.getByTestId('toast');
+  // The newest toast that offers an action: a plain success toast may still be on screen beside the undo one.
+  const pending = root.filter({ has: page.getByTestId('toast-action') }).last();
   const locators = {
     buttons: {
-      action: root.getByTestId('toast-action'),
-      close: root.getByTestId('toast-close'),
+      action: pending.getByTestId('toast-action'),
+      close: pending.getByTestId('toast-close'),
     },
   };
   const interactions = {
