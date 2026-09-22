@@ -41,10 +41,7 @@ select is(public.storage_item_id('not-a-uuid/x.webp'), null,
 select is(public.storage_item_id('onesegment'), null,
   'a path with no second segment at all also answers NULL');
 
--- caller_email: lower + trim on both sides of the comparison
--- (0009_caller_email_trim.sql), tested directly here rather than only
--- indirectly through the sharing flow that depends on it
--- (020_category_shares_rls_test.sql).
+-- caller_email: lower + trim, tested directly rather than only through the sharing flow (020_category_shares_rls_test.sql).
 select pg_temp.auth_as(gen_random_uuid(), '  MiXed.Case@Collectionbuddy.TEST  ');
 select is(public.caller_email(), 'mixed.case@collectionbuddy.test',
   'caller_email lowercases and trims the JWT email claim');
@@ -116,11 +113,7 @@ select is(
   'an item still linked elsewhere survives the same batch delete'
 );
 
--- list_category_places (0014_list_category_places.sql): the map's places
--- for a category, one row per distinct place instead of one per item
--- (#PERF-H5). Its own aggregate has to reproduce, in SQL, the "any row can
--- locate the place, ties go to the newest one" rule
--- partitionByStoredCoords (Map/usePlaces.tsx) used to apply on the client.
+-- list_category_places (0002_functions.sql): one row per distinct place; any row can locate the place, ties go to the newest.
 select gen_random_uuid() as places_owner \gset
 select pg_temp.auth_as(:'places_owner'::uuid, 'places-test@collectionbuddy.test');
 insert into public.categories (name) values ('Places test')

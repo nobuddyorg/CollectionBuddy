@@ -621,6 +621,7 @@ time it is inconvenient.
 | Auto-ratcheting coverage | **No.** It makes a green local run produce a red PR. |
 | Mutation score | A break threshold just below the measured score, so one new equivalent mutant can't block unrelated work. Survivors above it remain open questions. |
 | Any threshold | **Never lowered** to pass a build. Redesign, or raise the question. |
+| Gate scope | A gate is required when the diff touches its inputs. Comments, docs and file moves produce no new mutant, bundle or policy, so the gates that read those inputs are not required for such a change; CI's path filter is the executable form of the same rule. |
 | Test pass rate | 100%, `retries: 0` except the deploy-target smoke test. |
 | Authorization | A policy, grant, or trigger change ships its case in the same change (§7). |
 | Schema contract | Generated-types diff clean. |

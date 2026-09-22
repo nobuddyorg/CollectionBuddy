@@ -120,11 +120,7 @@ select is(
   'a grant addressed to someone else does not open the category to a bystander'
 );
 
--- An invitation typed with odd case and stray spaces still matches -- both
--- sides normalize via lower(btrim(...)) (0009_caller_email_trim.sql: a
--- claim carrying stray whitespace used to match no grant, denying a
--- legitimate grantee with no error and nothing to distinguish it from
--- never having been invited).
+-- Odd case and stray spaces still match: both sides normalize via lower(btrim(...)) (caller_email, 0002_functions.sql).
 select pg_temp.auth_as(:'owner_id'::uuid, 'share-owner@collectionbuddy.test');
 insert into public.category_shares (category_id, invited_email)
 values (:'category_id'::uuid, '  SHARE-GRANTEE@COLLECTIONBUDDY.TEST  ')

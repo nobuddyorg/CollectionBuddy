@@ -11,18 +11,7 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 
 ## Database schema
 
-[`supabase/migrations/`](../../supabase/migrations/), applied in filename order. The baseline is seven files ordered by dependency, not history — extensions, functions, tables, triggers, indexes, policies, storage — and none of them patches another. Everything after it does:
-
-| File | Changes |
-| --- | --- |
-| [`0008_storage_no_update.sql`](../../supabase/migrations/0008_storage_no_update.sql) | Drops `authenticated`'s `UPDATE` on `storage.objects` and the shared update policy. An object's path can no longer change. |
-| [`0009_caller_email_trim.sql`](../../supabase/migrations/0009_caller_email_trim.sql) | `caller_email()` trims as well as lowercases, so both sides of the sharing comparison normalize the same way. |
-| [`0010_storage_pin_upload_prefix.sql`](../../supabase/migrations/0010_storage_pin_upload_prefix.sql) | Drops the shared storage insert policy: an editor's own upload already satisfies the owner-only set, and nothing may write under another uid's prefix. |
-| [`0011_least_privilege_grants.sql`](../../supabase/migrations/0011_least_privilege_grants.sql) | Revokes `anon` on `category_shares` and narrows `authenticated` to the DML its policies back. |
-| [`0012_images_path_matches_item.sql`](../../supabase/migrations/0012_images_path_matches_item.sql) | Check constraint: an `images` row's `path_full` names its own `item_id`. |
-| [`0013_item_categories_cat_created_idx.sql`](../../supabase/migrations/0013_item_categories_cat_created_idx.sql) | `(category_id, created_at desc, item_id)` on `item_categories`, the catalogue page's driving index. |
-| [`0014_list_category_places.sql`](../../supabase/migrations/0014_list_category_places.sql) | `list_category_places()` RPC for the map. |
-| [`0015_search_category_items.sql`](../../supabase/migrations/0015_search_category_items.sql) | `search_category_items()` RPC for the catalogue's search. |
+[`supabase/migrations/`](../../supabase/migrations/), applied in filename order: seven files ordered by dependency, not history — extensions, functions, tables, triggers, indexes, policies, storage — and none of them patches another. A change to the schema is a new `0008_*.sql`; the chain is folded back into the seven only by a deliberate squash ([why](../explanation/design-decisions.md#why-the-migrations-were-squashed)).
 
 ### Tables
 
@@ -54,7 +43,7 @@ Ownership is inside the write predicate and deliberately outside the read one; e
 
 No `update` policy means no row matches, so the omission is the denial. Category-level actions — rename, delete, manage shares — are owner-only at every role.
 
-Grants are the second denial: `anon` has `revoke all` on every table, and `authenticated` holds exactly the DML each table's policies back (`0011`) — no `UPDATE` on `item_categories`/`images`, no `TRUNCATE`/`REFERENCES`/`TRIGGER` anywhere. `TRUNCATE` is the one RLS does not filter. `0011` also raises at migration time if RLS is ever found disabled on `storage.objects`.
+Grants are the second denial: `anon` has `revoke all` on every table, and `authenticated` holds exactly the DML each table's policies back — no `UPDATE` on `item_categories`/`images`, no `TRUNCATE`/`REFERENCES`/`TRIGGER` anywhere. `TRUNCATE` is the one RLS does not filter. `0007` raises at migration time if RLS is ever found disabled on `storage.objects`.
 
 `web/e2e/signed-in/rls.spec.ts` is the executable version of this section, covering owner-versus-stranger, `viewer` and `editor` with real tokens against a local stack; `supabase/tests/database/` covers the same logic directly in pgTAP.
 
@@ -72,7 +61,7 @@ Account-based, one category at a time, `viewer` or `editor`. No public links ([w
 
 ### Triggers and functions
 
-Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql), triggers in [`0004_triggers.sql`](../../supabase/migrations/0004_triggers.sql). The two access predicates live in `0006` because they are `language sql`, which resolves table names at creation time.
+Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql), triggers in [`0004_triggers.sql`](../../supabase/migrations/0004_triggers.sql). The `language sql` functions that read tables — the two access predicates and the two RPCs — are created with `check_function_bodies` off, the way `pg_dump` restores functions, because Postgres would otherwise parse their bodies before `0003` creates the tables.
 
 - `normalize_text()` — trims, collapses whitespace, returns `NULL` for blank.
 - `join_tags()` — backs the `tags_text` generated column.
