@@ -24,7 +24,7 @@
     "@supabase/supabase-js": "^2.116.0",
     "browser-image-compression": "^2.0.2",
     "leaflet": "^1.9.4",
-    "next": "16.3.4",
+    "next": "16.3.5",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
@@ -46,7 +46,7 @@
     "axe-core": "^4.13.0",
     "dependency-cruiser": "^18.2.0",
     "eslint": "^10",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.3.5",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-sonarjs": "^4.2.0",
     "jsdom": "^30.0.1",
