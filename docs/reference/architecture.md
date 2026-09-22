@@ -145,5 +145,5 @@ Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (N
 | `ci.yml` (`zap_baseline`) | `web` changed | OWASP ZAP passive scan against the export, signed out and in demo mode, served on the runner. |
 | `pages-deploy.yml` (`migrate` → `build` → `deploy` → `smoke_test`) | push to `main`, manual | Apply pending migrations and reload the PostgREST cache; export; publish to Pages; run the signed-out suite against the live site. |
 | `keep-alive.yml` | daily, manual | Calls `keepalive()` so a free-tier project does not pause. |
-| `cleanup-orphaned-photos.yml` | daily (`30 4 * * *`), manual | Deletes Storage objects no `images` row references as `path_full` or `path_thumb`, older than 48 h. Manual runs are dry runs unless opted out. |
+| `cleanup-orphaned-photos.yml` | daily (`30 4 * * *`), manual | Deletes Storage objects no `images` row references as `path_full` or `path_thumb`, older than 48 h — at most 10,000 per run, in requests of 1,000 (Storage's bulk-delete cap). Manual runs are dry runs unless opted out. |
 | `auto-merge.yml` | PR events | Auto-merges Dependabot patch-level devDependency bumps once checks pass; does not approve. |
