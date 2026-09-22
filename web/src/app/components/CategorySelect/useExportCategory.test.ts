@@ -7,6 +7,7 @@ import { exportProgressMessage } from './useExportCategory';
 // asked for at the same time.
 const strings: Record<string, string> = {
   'category_select.export_reading': 'Reading entries…',
+  'category_select.export_reading_count': 'Entries read: {done}…',
   'category_select.export_photos': 'Photographs {done} of {total}…',
   'category_select.export_packing': 'Packing the archive…',
 };
@@ -23,6 +24,12 @@ describe('exportProgressMessage', () => {
     expect(
       exportProgressMessage({ phase: 'items', done: 0, total: 0 }, t),
     ).toBe('Reading entries…');
+  });
+
+  it('counts the entries read so far once a page has landed', () => {
+    expect(
+      exportProgressMessage({ phase: 'items', done: 500, total: 0 }, t),
+    ).toBe('Entries read: 500…');
   });
 
   it('counts the photographs, which is the part that takes the time', () => {

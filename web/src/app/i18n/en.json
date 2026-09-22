@@ -37,6 +37,7 @@
     "export": "Export",
     "export_hint": "Photos, JSON and CSV.",
     "export_reading": "Reading entries…",
+    "export_reading_count": "Entries read: {done}…",
     "export_photos": "Photographs {done} of {total}…",
     "export_packing": "Packing the archive…",
     "export_cancel": "Cancel export",

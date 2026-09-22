@@ -10,14 +10,13 @@
  */
 
 import { chunk } from '../lib/chunk';
-import { readAllPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import {
   createSignedUrls,
   listExportImagesForItems,
   ITEM_IMAGES_BUCKET,
 } from './images';
-import { listItemsForExport } from './items';
+import { listItemsForExport, type ExportCursor } from './items';
 import {
   archiveName,
   archiveRootFolder,
@@ -57,6 +56,9 @@ export const ITEM_PAGE_SIZE = 500;
 
 /** How many photographs are signed in one call, so a failed batch only takes its own photographs down with it. */
 export const SIGN_BATCH_SIZE = 100;
+
+/** Sign calls in flight at once, bounded like the photo downloads. */
+export const SIGN_CONCURRENCY = 6;
 
 /**
  * Above this, iOS/WebKit risks killing the tab outright with no error: a
@@ -99,20 +101,26 @@ function realGetSession() {
   return supabase.auth.getSession();
 }
 
-/** Walks every page of a category's items, one call per `ITEM_PAGE_SIZE`. */
+/** Walks every page of a category's items, reporting the running count. */
 async function fetchAllItems(
   categoryId: string,
   listItems: typeof listItemsForExport,
+  onProgress?: (progress: ExportProgress) => void,
   signal?: AbortSignal,
 ): Promise<ExportItem[]> {
-  const paged = await readAllPages(ITEM_PAGE_SIZE, (from, to) => {
+  const items: ExportItem[] = [];
+  let after: ExportCursor | null = null;
+  do {
     checkCancelled(signal);
-    return listItems(categoryId, from, to);
-  });
-  if (paged.error !== null) {
-    throw new ExportError('Could not read items', { cause: paged.error });
-  }
-  return paged.data;
+    const page = await listItems(categoryId, { after, size: ITEM_PAGE_SIZE });
+    if (page.error !== null) {
+      throw new ExportError('Could not read items', { cause: page.error });
+    }
+    items.push(...page.data.items);
+    onProgress?.({ phase: 'items', done: items.length, total: 0 });
+    after = page.data.next;
+  } while (after);
+  return items;
 }
 
 function isRetryableStatus(status: number): boolean {
@@ -220,18 +228,22 @@ export async function signAll(
   signal?: AbortSignal,
 ): Promise<Map<string, string>> {
   const signed = new Map<string, string>();
-  for (const batch of chunk(paths, SIGN_BATCH_SIZE)) {
-    checkCancelled(signal);
-    const result = await signUrls(batch, EXPORT_SIGNED_URL_TTL_SECONDS);
-    if (result.error) {
-      throw new ExportError('Could not sign photograph URLs', {
-        cause: result.error,
-      });
-    }
-    for (const row of result.data) {
-      if (row.path && row.signedUrl) signed.set(row.path, row.signedUrl);
-    }
-  }
+  await runPool(
+    chunk(paths, SIGN_BATCH_SIZE),
+    SIGN_CONCURRENCY,
+    async (batch) => {
+      checkCancelled(signal);
+      const result = await signUrls(batch, EXPORT_SIGNED_URL_TTL_SECONDS);
+      if (result.error) {
+        throw new ExportError('Could not sign photograph URLs', {
+          cause: result.error,
+        });
+      }
+      for (const row of result.data) {
+        if (row.path && row.signedUrl) signed.set(row.path, row.signedUrl);
+      }
+    },
+  );
   return signed;
 }
 
@@ -278,7 +290,7 @@ export async function exportCategory({
   if (!sessionData.session?.user.id) throw new ExportError('No user session');
 
   onProgress?.({ phase: 'items', done: 0, total: 0 });
-  const items = await fetchAllItems(category.id, listItems, signal);
+  const items = await fetchAllItems(category.id, listItems, onProgress, signal);
 
   // Paths come fully-qualified from the images table, so nothing here
   // needs the session beyond the guard above.

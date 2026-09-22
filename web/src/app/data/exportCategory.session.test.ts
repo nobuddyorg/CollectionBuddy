@@ -14,7 +14,10 @@ const emptyPage = (async () => ({ data: [], error: null })) as never;
 function runExport() {
   return exportCategory({
     category: { id: 'cat', name: 'Coins' },
-    listItems: emptyPage,
+    listItems: (async () => ({
+      data: { items: [], next: null },
+      error: null,
+    })),
     listImages: emptyPage,
     signUrls: emptyPage,
   });

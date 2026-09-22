@@ -380,28 +380,75 @@ export function rawListCategoryPlaces(
   >();
 }
 
+/** Where the next export page starts: the last page's final link row. */
+export type ExportCursor = { linkedAt: string; itemId: string };
+
+/**
+ * Rows strictly after `cursor` in (created_at, item_id) order, as a PostgREST
+ * or=() filter. Both values come from the database, and are quoted anyway
+ * since a timestamp carries `.` and `:`.
+ */
+export function exportCursorFilter(cursor: ExportCursor): string {
+  const at = `"${cursor.linkedAt}"`;
+  return `created_at.gt.${at},and(created_at.eq.${at},item_id.gt."${cursor.itemId}")`;
+}
+
 // Unfiltered by the search box on purpose: an export is of a category, not
 // of whatever happens to be typed into the field when the button is
-// pressed. Ordered oldest-first, the reverse of the list, so the archive
-// numbers its folders from the collection's first entry and stays stable
-// across re-exports. `created_at` alone isn't unique -- rows from the same
-// transaction can share a timestamp, and Postgres gives ties no stable
-// order across a .range() boundary -- so `id` breaks ties deterministically.
-export function listItemsForExport(
+// pressed. Oldest-first, so the archive numbers its folders from the
+// collection's first entry, `item_id` breaking ties. Driven from
+// item_categories and paged by keyset rather than offset, so every page walks
+// idx_item_categories_cat_created and stops, instead of re-sorting the whole
+// category per page (#625). The `gte` repeats the cursor's lower bound so the
+// index scan can start there; the or=() then drops the ties already read.
+export function rawListItemsForExport(
   categoryId: string,
-  from: number,
-  to: number,
+  page: { after: ExportCursor | null; size: number },
 ) {
-  return supabase
-    .from('items')
-    .select(
-      `${ITEM_FIELDS_SELECT},created_at,item_categories!inner(category_id)`,
-    )
-    .eq('item_categories.category_id', categoryId)
+  let query = supabase
+    .from('item_categories')
+    .select(`created_at,item_id,items!inner(${ITEM_FIELDS_SELECT},created_at)`)
+    .eq('category_id', categoryId);
+  if (page.after) {
+    query = query
+      .gte('created_at', page.after.linkedAt)
+      .or(exportCursorFilter(page.after));
+  }
+  return query
     .order('created_at')
-    .order('id')
-    .range(from, to)
-    .overrideTypes<ExportItemRow[], { merge: false }>();
+    .order('item_id')
+    .limit(page.size)
+    .overrideTypes<ExportLinkRow[], { merge: false }>();
+}
+
+type ExportLinkRow = {
+  created_at: string;
+  item_id: string;
+  items: ExportItemRow;
+};
+
+/**
+ * One export page, flattened to its items, with the cursor for the next page
+ * -- or none once a page comes back short. `rawList` is a parameter for the
+ * test, not for production callers.
+ */
+export async function listItemsForExport(
+  categoryId: string,
+  page: { after: ExportCursor | null; size: number },
+  rawList: typeof rawListItemsForExport = rawListItemsForExport,
+): Promise<
+  | { data: { items: ExportItemRow[]; next: ExportCursor | null }; error: null }
+  | { data: null; error: NonNullable<unknown> }
+> {
+  const { data, error } = await rawList(categoryId, page);
+  if (error) return { data: null, error };
+  const rows = data ?? [];
+  const last = rows.at(-1);
+  const next =
+    last && rows.length === page.size
+      ? { linkedAt: last.created_at, itemId: last.item_id }
+      : null;
+  return { data: { items: rows.map((row) => row.items), next }, error: null };
 }
 
 export type ExportItemRow = ItemFields & { created_at: string };

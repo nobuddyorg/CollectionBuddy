@@ -10,6 +10,7 @@ import {
   PHOTO_DOWNLOAD_CONCURRENCY,
   PHOTO_FETCH_TIMEOUT_MS,
   SIGN_BATCH_SIZE,
+  SIGN_CONCURRENCY,
   type ExportProgress,
   type ExportResult,
 } from './exportCategory';
@@ -44,13 +45,25 @@ function fakeGetSession(uid: string | null): GetSession {
   })) as unknown as GetSession;
 }
 
-// Pages a fixed array the way PostgREST's own `.range(from, to)` would --
-// inclusive of `to`, the boundary a page-size-off-by-one gets wrong.
+// Pages a fixed array by cursor the way listItemsForExport does: a full page
+// points at its last item, a short one ends the walk.
 function paginatedListItems(allItems: ExportItem[]): ListItems {
-  return vi.fn(async (_categoryId: string, from: number, to: number) => ({
-    data: allItems.slice(from, to + 1),
-    error: null,
-  })) as unknown as ListItems;
+  return vi.fn(
+    async (
+      _categoryId: string,
+      page: { after: { itemId: string } | null; size: number },
+    ) => {
+      const start = page.after
+        ? allItems.findIndex((it) => it.id === page.after!.itemId) + 1
+        : 0;
+      const items = allItems.slice(start, start + page.size);
+      const next =
+        items.length === page.size
+          ? { linkedAt: 'at', itemId: items[items.length - 1].id }
+          : null;
+      return { data: { items, next }, error: null };
+    },
+  );
 }
 
 // Keyed by item id, building the same `uid/itemId/name` path shape a real
@@ -192,25 +205,7 @@ describe('exportCategory', () => {
     await expect(failure).rejects.toHaveProperty('cause', listingError);
   });
 
-  it('stops paging rather than crashing when a page comes back with no data and no error', async () => {
-    // Supabase's types allow `data: null, error: null` even though a real
-    // empty page is `[]`.
-    const listItems = (async () => ({
-      data: null,
-      error: null,
-    })) as unknown as ListItems;
-    const result = await exportCategory({
-      category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
-      listItems,
-      listImages: fakeListImages({}),
-      signUrls: fakeSignUrls(),
-    });
-    expect(result.itemCount).toBe(0);
-  });
-
-  // Unlike the two null payloads above and below, this one is not read as
-  // "nothing to do". No rows is `[]`; a null answer to the photographs
+  // A null answer is not read as "nothing to do". No rows is `[]`; a null answer to the photographs
   // query would hand back an archive with no photographs in it and nothing
   // counted as skipped -- indistinguishable from a collection that has
   // none, for an export whose canonical use is "export, then delete the
@@ -370,6 +365,46 @@ describe('exportCategory', () => {
     }
   });
 
+  it('keeps at most SIGN_CONCURRENCY sign calls in flight', async () => {
+    const paths = Array.from(
+      { length: SIGN_BATCH_SIZE * (SIGN_CONCURRENCY + 2) },
+      (_, i) => `p${i}`,
+    );
+    let inFlight = 0;
+    let peak = 0;
+    const signUrls = (async (batch: string[]) => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      inFlight--;
+      return {
+        data: batch.map((path) => ({ path, signedUrl: `signed://${path}` })),
+        error: null,
+      };
+    }) as unknown as SignUrls;
+
+    const signed = await signAll(paths, signUrls);
+
+    expect(signed.size).toBe(paths.length);
+    expect(peak).toBe(SIGN_CONCURRENCY);
+  });
+
+  it('stops asking to sign once a batch has failed', async () => {
+    const paths = Array.from(
+      { length: SIGN_BATCH_SIZE * (SIGN_CONCURRENCY + 4) },
+      (_, i) => `p${i}`,
+    );
+    const signUrls = vi.fn(async () => ({
+      data: null,
+      error: { message: 'signing failed' },
+    }));
+
+    await expect(
+      signAll(paths, signUrls as unknown as SignUrls),
+    ).rejects.toThrow('Could not sign photograph URLs');
+    expect(signUrls.mock.calls.length).toBeLessThan(SIGN_CONCURRENCY + 4);
+  });
+
   describe('item pagination', () => {
     it('reads zero items in one call', async () => {
       const listItems = paginatedListItems([]);
@@ -430,6 +465,55 @@ describe('exportCategory', () => {
       });
       expect(result.itemCount).toBe(ITEM_PAGE_SIZE + 1);
       expect(listItems).toHaveBeenCalledTimes(2);
+    });
+
+    it('starts each page after the last item of the one before', async () => {
+      const items = Array.from({ length: ITEM_PAGE_SIZE + 1 }, (_, i) =>
+        item({ id: `item-${i}` }),
+      );
+      const listItems = paginatedListItems(items);
+      await exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        getSession: fakeGetSession('uid'),
+        listItems,
+        listImages: fakeListImages({}),
+        signUrls: fakeSignUrls(),
+      });
+      expect(vi.mocked(listItems!).mock.calls).toEqual([
+        ['cat', { after: null, size: ITEM_PAGE_SIZE }],
+        [
+          'cat',
+          {
+            after: { linkedAt: 'at', itemId: `item-${ITEM_PAGE_SIZE - 1}` },
+            size: ITEM_PAGE_SIZE,
+          },
+        ],
+      ]);
+    });
+
+    it('reports the running item count after every page', async () => {
+      const onProgress = vi.fn<(progress: ExportProgress) => void>();
+      await exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        onProgress,
+        getSession: fakeGetSession('uid'),
+        listItems: paginatedListItems(
+          Array.from({ length: ITEM_PAGE_SIZE + 1 }, (_, i) =>
+            item({ id: `item-${i}` }),
+          ),
+        ),
+        listImages: fakeListImages({}),
+        signUrls: fakeSignUrls(),
+      });
+      expect(
+        onProgress.mock.calls
+          .map(([p]) => p)
+          .filter((p) => p.phase === 'items'),
+      ).toEqual([
+        { phase: 'items', done: 0, total: 0 },
+        { phase: 'items', done: ITEM_PAGE_SIZE, total: 0 },
+        { phase: 'items', done: ITEM_PAGE_SIZE + 1, total: 0 },
+      ]);
     });
   });
 
@@ -698,6 +782,7 @@ describe('exportCategory', () => {
       // Exact sequence, not just membership: `done` counts up one at a time.
       expect(onProgress.mock.calls.map(([p]) => p)).toEqual([
         { phase: 'items', done: 0, total: 0 },
+        { phase: 'items', done: 2, total: 0 },
         { phase: 'photos', done: 0, total: 2 },
         { phase: 'photos', done: 1, total: 2 },
         { phase: 'photos', done: 2, total: 2 },
