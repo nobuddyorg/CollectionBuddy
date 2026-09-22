@@ -1,7 +1,5 @@
 name: Publish Playwright results
-description: >-
-  The job summary for one Playwright run (plus its e2e coverage numbers, if
-  any), and the HTML reports kept as artifacts.
+description: Job summary for one Playwright run plus its e2e coverage, and the HTML report kept as an artifact on failure.
 
 inputs:
   title:
@@ -14,16 +12,10 @@ inputs:
     description: Name of the report artifact uploaded when the run failed.
     required: true
   job-status:
-    description: >-
-      The calling job's `job.status`. Status functions inside a composite
-      action see only the action's own steps, so whether the run failed has
-      to be passed in rather than asked for with `failure()`.
+    description: The calling job's `job.status`; status functions inside a composite action see only its own steps.
     required: true
   coverage-artifact-name:
-    description: >-
-      Name of the e2e coverage report artifact (web/coverage-e2e), uploaded
-      regardless of job status -- unlike the Playwright report, it's useful
-      to browse on a passing run too, not just to debug a failure.
+    description: Name of the e2e coverage artifact (web/coverage-e2e), uploaded on every run.
     required: true
 
 runs:
@@ -32,15 +24,12 @@ runs:
     - uses: daun/playwright-report-summary@31ed947ec7a623d18a66cfd20ef546dc66ef8063 # v4
       with:
         report-file: web/playwright-results.json
-        # report-tag only identifies a PR comment (unused here); comment-title
-        # is what actually shows as the job summary's heading.
+        # report-tag only identifies a PR comment; comment-title is what shows as the summary heading.
         report-tag: ${{ inputs.tag }}
         comment-title: ${{ inputs.title }}
         job-summary: true
         create-comment: false
-        # Emoji, not the default octicons style -- default renders each icon
-        # as a remote SVG fetched from a third-party host at summary render
-        # time. Emoji also match the coverage/mutation tables.
+        # The default octicons style fetches each icon from a third-party host at render time.
         icon-style: emojis
 
     - name: Keep the report from a failed run
@@ -51,21 +40,23 @@ runs:
         path: web/playwright-report
         retention-days: 7
 
-    # Runs even when the coverage gate (e2e/coverage.ts) is what failed the
-    # job -- mcr.generate() writes the report before that check throws, so
-    # it's the one artifact here worth keeping on every run, not just
-    # failures.
+    # mcr.generate() writes the report before the coverage gate (e2e/coverage.ts) can throw, so it exists on failed runs too. Missing on a passing run means the gate never ran.
     - name: Add e2e coverage report to job summary
       if: always()
       shell: bash
+      env:
+        JOB_STATUS: ${{ inputs.job-status }}
       run: |
-        if [ -f web/coverage-e2e/coverage-summary.md ]; then
-          {
-            echo '## 🎭 e2e JS/CSS coverage'
-            echo
-            cat web/coverage-e2e/coverage-summary.md
-          } >> "$GITHUB_STEP_SUMMARY"
+        if [ ! -f web/coverage-e2e/coverage-summary.md ]; then
+          [ "$JOB_STATUS" = 'success' ] || exit 0
+          echo "::error::web/coverage-e2e/coverage-summary.md is missing on a passing run, so the e2e coverage gate did not execute."
+          exit 1
         fi
+        {
+          echo '## 🎭 e2e JS/CSS coverage'
+          echo
+          cat web/coverage-e2e/coverage-summary.md
+        } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Keep the e2e coverage report
       if: always()

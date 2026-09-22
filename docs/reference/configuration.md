@@ -53,7 +53,7 @@ Each job writes its report to its own Actions summary (`$GITHUB_STEP_SUMMARY`); 
 | --- | --- | --- |
 | `build_and_test` | Coverage against the thresholds above | `davelosert/vitest-coverage-report-action` over the `json-summary` reporter |
 | `build_and_test` | Signed-out e2e results | `daun/playwright-report-summary` over the `json` reporter |
-| `build_and_test` | `depcruise` and `knip` output | The step's text, `tee`'d into the summary |
+| `build_and_test` | `depcruise` and `knip` output | The step's text, `tee`'d into the summary; Knip prints nothing when clean, so the summary says so |
 | `e2e_local_stack` | pgTAP results; signed-in e2e results | `pg_prove` output; the same Playwright action |
 | `mutation_test` | Mutation score, overall and per file | `web/scripts/mutation-summary.mjs` over Stryker's `json` reporter |
 | `opengrep` | Finding count, total and by rule | `jq` over the uploaded SARIF |

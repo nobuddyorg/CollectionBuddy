@@ -1,46 +1,12 @@
-# Rule overrides for the OWASP ZAP baseline scan (ci.yml's zap_baseline job).
-# Applies to both of that job's passes, signed-out and signed-in (demo
-# mode) -- one file, since the reasoning behind each entry below (a header
-# this static export structurally can't send, a content-based check that
-# should never fire) doesn't change with the caller's auth state.
-#
-# Format: <rule id><TAB><threshold><TAB># <comment>
-# Threshold is one of FAIL, WARN, INFO, IGNORE. Anything not listed here
-# defaults to WARN and is reported in the scan artifact/job summary but does
-# not fail the job -- the workflow passes zap-baseline.py's `-I` flag, so
-# only a rule explicitly set to FAIL below can fail this check. See
-# TEST_STRATEGY.md's §6 "Dynamic scanning (DAST)" for what this kind of scan
-# covers and doesn't, and docs/how-to/developer-guide.md for how to run it
-# locally.
-#
-# Deliberately short and conservative on a first rollout, per the rule this
-# file exists to serve: a false positive here is CI noise nobody asked for,
-# so a rule only gets promoted to FAIL once it's both well-established and
-# clearly actionable in a static, server-less export. Tighten over time as
-# real scan history accumulates -- it can't be guessed from a read-through.
+# Rule overrides for both passes of ci.yml's zap_baseline job. Format: <rule id><TAB><threshold><TAB># <comment>; thresholds FAIL, WARN, INFO, IGNORE.
+# Unlisted rules default to WARN and never fail the job (`-I`); only FAIL blocks. What a passive scan proves: TEST_STRATEGY.md §6.
 
-# -- Structurally unfixable on this app's hosting, not just untested --
-#
-# GitHub Pages serves static files only; there is no server to send a
-# custom HTTP response header from. This app's CSP is a <meta> tag
-# (web/src/app/layout.tsx) for exactly that reason, and a <meta> CSP cannot
-# carry `frame-ancestors` or `sandbox` -- browsers only honour those from a
-# real header -- so the app frame-busts with a same-origin check script
-# instead (FRAMEBUST_SCRIPT in layout.tsx). Flagging either rule below would
-# be permanent, unfixable noise for an already-documented tradeoff (#334,
-# docs/explanation/design-decisions.md).
-10020	IGNORE	# X-Frame-Options Header Not Set -- see comment above; mitigated via framebusting script instead
-10038	IGNORE	# Content-Security-Policy Header Not Set -- meta CSP only, see comment above
+# GitHub Pages sends no custom headers, so the CSP is a <meta> tag and frame-ancestors cannot be enforced; layout.tsx frame-busts instead (#334).
+10020	IGNORE	# X-Frame-Options Header Not Set -- static host; mitigated by the framebust script in layout.tsx
+10038	IGNORE	# Content-Security-Policy Header Not Set -- meta CSP only, see above
 
-# HSTS is added by GitHub Pages at the edge for HTTPS-enforced hosting, not
-# by this app, so it's invisible to a scan of a plain-HTTP local export
-# either way. Already tracked as a closed Low-severity finding (#391).
-10035	IGNORE	# Strict-Transport-Security Header Not Set -- edge/hosting concern, not app code
+# HSTS is added at the Pages edge, invisible to a scan of a plain-HTTP local export (#391).
+10035	IGNORE	# Strict-Transport-Security Header Not Set -- hosting concern, not app code
 
-# -- A real, actionable regression gate --
-#
-# Content-based (checks the response body, not a header this static export
-# can't send), well-established, and should never fire against a clean
-# static export -- if it does, something is genuinely leaking debug/error
-# output into shipped HTML.
+# Content-based, so a static export can fix it: firing means debug or error output reached shipped HTML.
 90022	FAIL	# Application Error Disclosure

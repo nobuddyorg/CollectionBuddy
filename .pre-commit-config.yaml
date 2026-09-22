@@ -28,7 +28,6 @@ repos:
             web/package-lock\.json
           )$
 
-  # zizmor: security analysis of the GitHub Actions workflows.
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
     rev: v1.29.0
     hooks:

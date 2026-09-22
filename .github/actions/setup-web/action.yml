@@ -1,8 +1,5 @@
 name: Set up the web toolchain
-description: >-
-  Node.js with an npm cache keyed on web/package-lock.json, then `npm ci` in
-  web/. Every job that runs anything from web/ starts with this, so the Node
-  version and the install step are pinned in one place instead of four.
+description: Node.js with an npm cache keyed on web/package-lock.json, then `npm ci` in web/; the Node version is pinned here once.
 
 runs:
   using: composite
