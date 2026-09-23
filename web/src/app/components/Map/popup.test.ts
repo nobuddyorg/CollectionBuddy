@@ -3,45 +3,41 @@ import { describe, expect, it } from 'vitest';
 
 import { popupContent } from './popup';
 
-// #423: this carries the whole visible output of #404 -- heading, count,
-// scrolling title list -- and its textContent-not-markup XSS guarantee, but
-// was unexported and asserted by nothing. A future edit swapping
-// `textContent` for `innerHTML` would reintroduce XSS via item titles with
-// every other gate green.
+// Pins the textContent-not-markup guarantee: swapping in `innerHTML` would reopen XSS via item titles.
 describe('popupContent', () => {
   it('shows the heading text', () => {
-    const el = popupContent('Cologne');
-    expect(el.querySelector('p')?.textContent).toBe('Cologne');
+    const element = popupContent('Cologne');
+    expect(element.querySelector('p')?.textContent).toBe('Cologne');
   });
 
   it('styles the heading, the count line, and the title list distinctly', () => {
-    const el = popupContent('Cologne', ['Seated Dime'], '1 entry');
-    const paragraphs = el.querySelectorAll('p');
+    const element = popupContent('Cologne', ['Seated Dime'], '1 entry');
+    const paragraphs = element.querySelectorAll('p');
     expect(paragraphs[0].className).toBe('font-display text-sm font-bold');
     expect(paragraphs[1].className).toBe(
       'font-label text-[0.6875rem] text-neutral-500',
     );
-    expect(el.querySelector('ul')?.className).toBe(
+    expect(element.querySelector('ul')?.className).toBe(
       'mt-1.5 max-h-40 overflow-y-auto list-disc pl-4',
     );
   });
 
   it('adds no count node when no count label is given', () => {
-    const el = popupContent('Cologne', ['Seated Dime']);
-    expect(el.querySelectorAll('p')).toHaveLength(1);
+    const element = popupContent('Cologne', ['Seated Dime']);
+    expect(element.querySelectorAll('p')).toHaveLength(1);
   });
 
   it('shows the count label as a second line when given one', () => {
-    const el = popupContent('Cologne', ['A', 'B'], '2 entries');
-    const paragraphs = el.querySelectorAll('p');
+    const element = popupContent('Cologne', ['A', 'B'], '2 entries');
+    const paragraphs = element.querySelectorAll('p');
     expect(paragraphs).toHaveLength(2);
     expect(paragraphs[1].textContent).toBe('2 entries');
   });
 
   it('lists one <li> per title, in the order given', () => {
-    const el = popupContent('Cologne', ['Seated Dime', 'Silver Eagle']);
-    const items = Array.from(el.querySelectorAll('li'));
-    expect(items.map((li) => li.textContent)).toEqual([
+    const element = popupContent('Cologne', ['Seated Dime', 'Silver Eagle']);
+    const items = Array.from(element.querySelectorAll('li'));
+    expect(items.map((item) => item.textContent)).toEqual([
       'Seated Dime',
       'Silver Eagle',
     ]);
@@ -54,10 +50,10 @@ describe('popupContent', () => {
 
   it('renders a hostile title as text, never as markup', () => {
     const hostile = '<img src=x onerror=alert(1)>';
-    const el = popupContent('Cologne', [hostile]);
-    const li = el.querySelector('li');
-    expect(li?.textContent).toBe(hostile);
-    expect(li?.querySelector('img')).toBeNull();
-    expect(el.querySelector('img')).toBeNull();
+    const element = popupContent('Cologne', [hostile]);
+    const item = element.querySelector('li');
+    expect(item?.textContent).toBe(hostile);
+    expect(item?.querySelector('img')).toBeNull();
+    expect(element.querySelector('img')).toBeNull();
   });
 });

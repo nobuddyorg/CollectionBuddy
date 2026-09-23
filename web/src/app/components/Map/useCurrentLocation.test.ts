@@ -22,9 +22,7 @@ describe('classifyLocationError', () => {
     expect(classifyLocationError({})).toBe('unavailable');
   });
 
-  // The callback is documented to hand over an error object, so this is
-  // defensive rather than expected -- but the defence is only worth keeping
-  // if it works, and "unavailable" is the answer that leads somewhere.
+  // Defensive rather than expected, but a defence is only worth keeping if it works.
   it('survives being handed nothing at all', () => {
     const nothing = undefined as unknown as { code?: number };
     expect(classifyLocationError(nothing)).toBe('unavailable');
@@ -67,8 +65,7 @@ describe('isGeolocationGranted', () => {
     await expect(isGeolocationGranted()).resolves.toBe(false);
   });
 
-  // Older Safari has no Permissions API (and rejects the geolocation name
-  // where it does): asking outright is the only thing left to do.
+  // Older Safari has no Permissions API, or rejects the geolocation name: asking outright is all that is left.
   it('falls back to asking when the permission cannot be read', async () => {
     stubPermissions(async () => {
       throw new TypeError('unsupported');
@@ -81,9 +78,7 @@ describe('isGeolocationGranted', () => {
     await expect(isGeolocationGranted()).resolves.toBe(true);
   });
 
-  // The permission name is the whole question. Asked about anything else, the
-  // browser either throws -- and the fallback then reports "granted" for a
-  // permission never checked -- or answers about the wrong capability.
+  // Asked about any other name, the browser throws (and the fallback reports "granted") or answers wrongly.
   it('asks about geolocation and nothing else', async () => {
     const query = vi.fn(async () => ({ state: 'granted' }));
     stubPermissions(query);

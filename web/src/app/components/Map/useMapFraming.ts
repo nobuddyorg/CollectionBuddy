@@ -6,14 +6,12 @@ import type { MapCommand, MapCommandKind } from './types';
 // Counter-based rather than withdrawn and reissued, so a repeat still reads as a change to the map.
 const nextCommand =
   (kind: MapCommandKind) =>
-  (prev: MapCommand | null): MapCommand => ({ kind, id: (prev?.id ?? 0) + 1 });
+  (previous: MapCommand | null): MapCommand => ({
+    kind,
+    id: (previous?.id ?? 0) + 1,
+  });
 
-/**
- * The map's framing commands, arbitrated: the latest tap wins even when an
- * earlier one resolves after it, and the automatic re-frame never overrides
- * a tap that asked for the current location. Opening or closing the map
- * starts over.
- */
+/** Arbitrates framing: the latest tap wins, and the automatic re-frame never overrides a "zoom to me". */
 export function useMapFraming(open: boolean) {
   const [command, setCommand] = useState<MapCommand | null>(null);
   const latestTap = useRef<{ kind: MapCommandKind } | null>(null);
@@ -24,7 +22,7 @@ export function useMapFraming(open: boolean) {
     setCommand(null);
   }, [open]);
 
-  /** Records a tap asking for `kind`; the returned function frames it unless a later tap or a close came first. */
+  /** Records a tap for `kind`; the returned function frames it unless a later tap or a close came first. */
   const tap = useCallback((kind: MapCommandKind) => {
     const thisTap = { kind };
     latestTap.current = thisTap;

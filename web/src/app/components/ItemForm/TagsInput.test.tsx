@@ -137,9 +137,7 @@ describe('TagsInput', () => {
         await vi.advanceTimersByTimeAsync(200);
       });
 
-      // 400ms have passed since "silver" flashed, more than enough for its
-      // own timer to have fired -- but "gold" flashing in between must not
-      // have left it hanging: covered by the flash's normal 350ms clearing.
+      // 400ms after "silver" flashed, "gold" flashing in between must not have left it hanging.
       const silverChip = screen.getByText('silver').closest('span')!;
       const goldChip = screen.getByText('gold').closest('span')!;
       expect(silverChip).not.toHaveClass('tag-flash');

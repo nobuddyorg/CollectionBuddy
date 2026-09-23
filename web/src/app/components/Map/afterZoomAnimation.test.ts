@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { afterZoomAnimation, type ZoomingMap } from './afterZoomAnimation';
 
-/** A map that keeps its listeners per event type, and ends a zoom animation the way Leaflet does: flag first, then zoomend. */
+/** Ends a zoom animation the way Leaflet does: flag first, then zoomend. */
 function fakeMap(animating: boolean) {
   const listeners = new globalThis.Map<string, Set<() => void>>();
   const on = (type: string) => {
@@ -11,14 +11,14 @@ function fakeMap(animating: boolean) {
   };
   const map: ZoomingMap = {
     _animatingZoom: animating,
-    once: (type, fn) => on(type).add(fn),
-    off: (type, fn) => on(type).delete(fn),
+    once: (type, handler) => on(type).add(handler),
+    off: (type, handler) => on(type).delete(handler),
   };
   const endZoom = () => {
     map._animatingZoom = false;
     const waiting = [...on('zoomend')];
     on('zoomend').clear();
-    for (const fn of waiting) fn();
+    for (const handler of waiting) handler();
   };
   return { map, endZoom };
 }

@@ -34,13 +34,7 @@ function writeGeocodeCache(cache: Record<string, PlaceCoords>) {
   }
 }
 
-/**
- * Splits the places to draw into ones that already know where they are and
- * names that still need a lookup. `list_category_places`
- * (0002_functions.sql) has already folded every item down to one
- * row per distinct place, so there is no deduplication left to do here --
- * only deciding, per place, whether the coordinates it carries are usable.
- */
+/** `list_category_places` already yields one row per distinct place, so nothing is deduplicated here. */
 export function partitionByStoredCoords(rows: PlaceGroupRow[]): {
   located: PlaceCoords[];
   unlocated: string[];
@@ -56,10 +50,7 @@ export function partitionByStoredCoords(rows: PlaceGroupRow[]): {
     titles.set(place, row.titles);
     ids.set(place, row.ids);
 
-    // A stored NaN/Infinity/null would draw a pin nowhere and suppress the
-    // geocode that would have found the place properly. `Number.isFinite`
-    // already rejects `null` at runtime; the assertions below only tell the
-    // compiler what this check already guarantees.
+    // A stored NaN/Infinity/null would pin nowhere and suppress the geocode that finds the place.
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
       located.push({ name: place, lat: lat!, lng: lng! });
     } else {
@@ -69,11 +60,7 @@ export function partitionByStoredCoords(rows: PlaceGroupRow[]): {
   return { located, unlocated, titles, ids };
 }
 
-/**
- * Puts a located place back together with the entries catalogued there. A
- * place located without any row behind it gets an empty list rather than a
- * missing one, so the popup still draws its name.
- */
+/** A place without any row behind it gets an empty list, not a missing one, so the popup still draws. */
 export function withTitles(
   coords: PlaceCoords,
   titles: Map<string, string[]>,
@@ -81,10 +68,7 @@ export function withTitles(
   return { ...coords, titles: titles.get(coords.name) ?? [] };
 }
 
-/**
- * Splits the places to draw into the ones the cache already answers and the
- * ones still needing a lookup, preserving input order in both.
- */
+/** Splits places into cache hits and names still needing a lookup, preserving input order in both. */
 export function partitionByCache(
   places: string[],
   cache: Record<string, PlaceCoords>,
@@ -99,10 +83,7 @@ export function partitionByCache(
   return { cached, pending };
 }
 
-/**
- * Reads a Place out of a Photon response, via the same coordinate validator
- * the form's autocomplete uses (`data/photon.ts`).
- */
+/** Reads a Place out of a Photon response via the same coordinate validator the form's autocomplete uses. */
 export function placeFromPhotonResponse(
   name: string,
   data: unknown,
@@ -113,20 +94,20 @@ export function placeFromPhotonResponse(
   return coords ? { name, ...coords } : null;
 }
 
-// Photon is a free public service that sheds load by refusing requests --
-// firing one per place at once got a batch mostly 429'd, with the map
-// silently drawing only the pins that got through. A few at a time,
-// retried on refusal.
+// Photon is a free service that sheds load with 429s, so lookups go a few at a time and retry on refusal.
 const GEOCODE_CONCURRENCY = 3;
 const GEOCODE_ATTEMPTS = 3;
 const RETRY_BASE_MS = 500;
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = (milliseconds: number) =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-// `enabled` gates fetching behind the map actually being open, so geocoding
-// every distinct place isn't paid for far more often than the map is
-// looked at. `search` narrows to the entries the list is showing, not
-// every entry in the category.
+const appendPlace = (place: Place) => (previous: Place[]) => [
+  ...previous,
+  place,
+];
+
+// `enabled` gates fetching behind the map being open; `search` narrows to the entries the list shows.
 export function usePlaces(
   categoryId: string,
   search: string,
@@ -142,9 +123,7 @@ export function usePlaces(
     if (!enabled) return;
 
     let cancelled = false;
-    // Aborts a superseded request's own fetch, not just its effect on
-    // state -- otherwise the response still finishes downloading after a
-    // map that's moved on has already discarded it via `cancelled`.
+    // Aborts a superseded request's own fetch, not just its effect on state.
     const controller = new AbortController();
 
     const fetchPlaces = async () => {
@@ -152,7 +131,7 @@ export function usePlaces(
       setError(false);
       setPlaces([]);
       try {
-        const { data: places, error } = await listCategoryPlaces(
+        const { data: rows, error } = await listCategoryPlaces(
           categoryId,
           search,
           controller.signal,
@@ -161,15 +140,16 @@ export function usePlaces(
         if (error) throw new Error('Could not list places', { cause: error });
 
         const { located, unlocated, titles, ids } = partitionByStoredCoords(
-          places ?? [],
+          rows ?? [],
         );
         const cache = readGeocodeCache();
         let cacheDirty = false;
 
         const { cached, pending } = partitionByCache(unlocated, cache);
-        // Everything already known lands in one batch before any request
-        // goes out, so the map draws those pins immediately.
-        const known = [...located, ...cached].map((c) => withTitles(c, titles));
+        // Everything already known lands in one batch before any request goes out.
+        const known = [...located, ...cached].map((coords) =>
+          withTitles(coords, titles),
+        );
         if (!cancelled && known.length > 0) setPlaces(known);
 
         const placeCount = located.length + unlocated.length;
@@ -180,12 +160,11 @@ export function usePlaces(
             if (cancelled) return null;
             try {
               const url = photonSearchUrl(place, { limit: 1, lang });
-              const res = await fetch(url);
-              // A place the gazetteer doesn't know isn't going to be known
-              // on the third try.
-              if (res.ok)
-                return placeFromPhotonResponse(place, await res.json());
-              if (!isRetryableStatus(res.status)) return null;
+              const response = await fetch(url);
+              // A place the gazetteer does not know will not be known on the third try.
+              if (response.ok)
+                return placeFromPhotonResponse(place, await response.json());
+              if (!isRetryableStatus(response.status)) return null;
             } catch {
               // A network error is worth another go, same as a refusal.
             }
@@ -194,52 +173,29 @@ export function usePlaces(
           return null;
         };
 
-        // Drained by a few workers rather than let loose at once -- pins
-        // still appear as each lookup lands.
+        // Drained by a few workers rather than let loose at once; pins still appear as each lookup lands.
         const queue = [...pending];
         const worker = async () => {
-          // Draining the queue in the loop header, not the body: the walk
-          // ends when the queue does, whatever the body did or did not do.
+          // Drained in the loop header: the walk ends when the queue does, whatever the body did.
           for (
             let place = queue.shift();
             place !== undefined;
             place = queue.shift()
           ) {
-            // No cancellation check of its own: `geocode` fails closed on
-            // `cancelled` before it reaches the network, so a cancelled
-            // worker only walks the rest of the queue doing nothing.
+            // No cancellation check of its own: `geocode` fails closed on `cancelled` before the network.
             const entry = await geocode(place);
             if (!entry) continue;
 
             cache[place] = entry;
             cacheDirty = true;
             resolvedCount += 1;
-            // The nesting here (effect -> fetchPlaces -> worker -> this
-            // callback) is the cancellable-concurrent-queue shape itself;
-            // pulling it out would mean threading `cancelled`/`titles`
-            // through as parameters instead of closing over them.
-            if (!cancelled)
-              // eslint-disable-next-line sonarjs/no-nested-functions
-              setPlaces((prev) => [...prev, withTitles(entry, titles)]);
+            if (!cancelled) setPlaces(appendPlace(withTitles(entry, titles)));
 
-            // Written back to every row from this place, chunked into a
-            // handful of requests instead of one PATCH per item -- a place
-            // shared by thousands of rows used to fire that many concurrent,
-            // un-awaited requests at once, the only fan-out in the app that
-            // could exhaust PostgREST's connections for every user, not just
-            // this one (#PERF-H6). Best effort, not awaited: a failed write
-            // just leaves it unlocated for one more lookup. The builder only
-            // sends once `.then()` is called, so a handler is needed rather
-            // than a plain `void`. `ids` is seeded from the same rows that
-            // produced `unlocated` (and therefore this queue), so every
-            // place reaching this worker already has at least one id keyed
-            // here -- the assertion tells the compiler what the `Map` is
-            // already guaranteed to hold.
+            // Fire-and-forget write-back; `ids` came from the same rows as `unlocated`, so the key exists.
             void updateItemsPlace(ids.get(place)!, {
               place_lat: entry.lat,
               place_lng: entry.lng,
-              // eslint-disable-next-line sonarjs/no-nested-functions
-            }).then(() => {});
+            });
           }
         };
 
@@ -251,14 +207,13 @@ export function usePlaces(
         );
 
         if (cacheDirty) writeGeocodeCache(cache);
-        // Every place failed, not "no places to geocode" -- distinguish
-        // "geocoding is broken" from "nothing to show".
+        // Every place failed, not "nothing to geocode": tells a broken geocoder from nothing to show.
         if (!cancelled && placeCount > 0 && resolvedCount === 0) {
           setError(true);
         }
-      } catch (err) {
+      } catch (error) {
         if (!cancelled) {
-          console.error('Failed to load places:', err);
+          console.error('Failed to load places:', error);
           setPlaces([]);
           setError(true);
         }

@@ -17,8 +17,7 @@ const FIX_OPTIONS: PositionOptions = {
   maximumAge: 0,
 };
 
-// The "where am I" tap accepts a recent fix -- re-arming the GPS to learn
-// the same thing costs seconds.
+// The "where am I" tap accepts a recent fix: re-arming the GPS to learn the same thing costs seconds.
 const REQUEST_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
   timeout: 15000,
@@ -31,8 +30,7 @@ const WATCH_OPTIONS: PositionOptions = {
   maximumAge: 0,
 };
 
-// How long to keep refining the first fix -- the pin stops visibly
-// improving well before a watch left open that long would matter.
+// How long the first fix keeps refining; the pin stops visibly improving well before this.
 const WATCH_MS = 10000;
 
 const coordsOf = (position: GeolocationPosition): Coords => ({
@@ -40,40 +38,26 @@ const coordsOf = (position: GeolocationPosition): Coords => ({
   lng: position.coords.longitude,
 });
 
-/**
- * Separates "you said no" from every other way a fix can fail -- the two
- * need different advice, and only the first is something the user can undo.
- */
+/** "You said no" gets different advice from every other failure, and only it can be undone. */
 export function classifyLocationError(error: {
   code?: number;
 }): LocationFailure {
-  // GeolocationPositionError.PERMISSION_DENIED, spelled out because the
-  // constant lives on an instance that jsdom does not construct.
+  // GeolocationPositionError.PERMISSION_DENIED, spelled out: the constant lives on an instance jsdom lacks.
   return error?.code === 1 ? 'denied' : 'unavailable';
 }
 
-/**
- * Reads whether geolocation may be used *without* prompting. A prompt
- * raised the moment a screen mounts has no visible cause and gets
- * dismissed, and enough dismissals earn a permanent, unreversible block --
- * so only an already-granted permission is spent automatically.
- */
+/** Reads the permission without prompting: an unprompted dialog gets dismissed, and dismissals add up to a block. */
 export async function isGeolocationGranted(): Promise<boolean> {
   try {
     const status = await navigator.permissions.query({ name: 'geolocation' });
     return status.state === 'granted';
   } catch {
-    // No Permissions API, or one refusing the geolocation name (older
-    // Safari): fall back to asking.
+    // No Permissions API, or one refusing the geolocation name (older Safari): fall back to asking.
     return true;
   }
 }
 
-/**
- * The current position for the map, and a way to ask for it on purpose.
- * `request` is a user-gesture-driven fix, the only reliable moment to raise
- * a permission prompt in a standalone PWA.
- */
+/** `request` is a user-gesture fix, the only reliable moment to raise a permission prompt in a PWA. */
 export function useCurrentLocation(active: boolean) {
   const [location, setLocation] = useState<Coords | null>(null);
   const [locating, setLocating] = useState(false);

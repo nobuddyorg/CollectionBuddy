@@ -54,8 +54,7 @@ describe('ItemForm submission', () => {
     expect(title).toHaveAttribute('aria-invalid', 'true');
   });
 
-  // Coordinates come from the place autocomplete, and an entry edited
-  // without touching its place must keep the ones it already had.
+  // An entry edited without touching its place must keep the coordinates it already had.
   it('carries the coordinates of an untouched place through a save', async () => {
     const user = userEvent.setup();
     const { onSubmit } = renderWithSubmit({
@@ -74,9 +73,7 @@ describe('ItemForm submission', () => {
   });
 
   it('drops stale coordinates once the place is hand-edited', async () => {
-    // Typing a long-enough query kicks off PlaceAutocomplete's own
-    // (debounced) search -- stubbed here so the test never reaches the
-    // real network, matching PlaceAutocomplete.test.tsx's own setup.
+    // A long-enough query starts PlaceAutocomplete's debounced search; stubbed so it never hits the network.
     vi.stubGlobal(
       'fetch',
       vi
@@ -122,10 +119,7 @@ describe('ItemForm submission', () => {
     );
   });
 
-  // ItemFormValues types every field as required, but a value assembled from
-  // a partially-loaded record could still hand this a nullish field at
-  // runtime -- each one should fall back the same way an actually-blank
-  // value would, not throw or render "undefined".
+  // A value assembled from a partially-loaded record can hand over a nullish field at runtime.
   it('falls back to blank values for a nullish title, description, place, or tags', () => {
     renderForm({
       ...EMPTY_ITEM_FORM_VALUES,
@@ -142,8 +136,6 @@ describe('ItemForm submission', () => {
   });
 });
 
-// Callers need to know when the form has anything worth losing, so they can
-// confirm before a backdrop tap or Escape discards it.
 // The database's ceilings (0016_bound_row_volume.sql), stopped at the keyboard instead of as a failed save.
 describe('ItemForm text limits', () => {
   it('stops each text field at the length the database accepts', () => {

@@ -27,8 +27,7 @@ describe('useMapFraming', () => {
     expect(result.current.command).toEqual({ kind: 'fitAll', id: 2 });
   });
 
-  // The #694 race: "zoom to me" waits for a fix, "show all" is tapped
-  // meanwhile, and the fix arriving afterwards must not undo the later tap.
+  // "Zoom to me" waits for a fix, "show all" is tapped meanwhile, and the fix must not undo the later tap.
   it('drops a tap that a later one overtook while it was waiting', () => {
     const { result } = renderFraming();
 
@@ -50,8 +49,7 @@ describe('useMapFraming', () => {
     expect(result.current.command).toEqual({ kind: 'fitAll', id: 1 });
   });
 
-  // Geocoding finishing a moment later must not pull the viewer away from
-  // where they asked to look, whether the fix is still coming or arrived.
+  // Geocoding finishing later must not pull the viewer away from where they asked to look.
   it('never re-frames automatically over a request for the current location', () => {
     const { result } = renderFraming();
 

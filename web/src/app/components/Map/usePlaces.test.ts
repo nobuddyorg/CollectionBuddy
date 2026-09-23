@@ -16,9 +16,7 @@ function photon(coordinates: unknown) {
   return { features: [{ geometry: { coordinates } }] };
 }
 
-// `list_category_places` (0002_functions.sql) already folds
-// every item at a place into one row, newest first -- this builds that
-// row directly rather than the per-item rows the SQL now groups.
+// Builds the one-row-per-place shape `list_category_places` returns, not the per-item rows it groups.
 function group(
   place: string,
   place_lat: number | null = null,
@@ -208,20 +206,14 @@ describe('placeFromPhotonResponse', () => {
     );
   });
 
-  // Each coordinate is checked on its own. A pair where only one side is a
-  // number is the dangerous shape: half of it is usable, so a check that
-  // required *both* to be wrong before giving up would pin the place at
-  // NaN -- which Leaflet draws nowhere, silently.
+  // A pair with one usable side is the dangerous shape: a check needing both wrong would pin at NaN.
   it('returns null when only one of the two coordinates is a number', () => {
     expect(placeFromPhotonResponse('Half', photon([6.96, '50.94']))).toBeNull();
     expect(placeFromPhotonResponse('Half', photon(['6.96', 50.94]))).toBeNull();
     expect(placeFromPhotonResponse('Half', photon([6.96, null]))).toBeNull();
   });
 
-  // Photon answers with GeoJSON, and a feature is not obliged to carry a
-  // geometry. Reaching through it is how a missing one becomes a thrown
-  // TypeError inside a geocoding worker, which is swallowed and reported as
-  // "that place could not be found".
+  // A GeoJSON feature need not carry a geometry; reaching through one would throw inside a worker.
   it('returns null for a feature with nothing to read', () => {
     expect(placeFromPhotonResponse('Odd', { features: [null] })).toBeNull();
     expect(placeFromPhotonResponse('Odd', { features: [{}] })).toBeNull();

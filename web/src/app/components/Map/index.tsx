@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import type {
   FitBoundsOptions,
-  LatLngBounds,
   LatLngExpression,
   LayerGroup,
   Map as LeafletMap,
@@ -16,6 +15,13 @@ import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { popupContent } from './popup';
 import { afterZoomAnimation } from './afterZoomAnimation';
 import { diffMarkers } from './markerDiff';
+import {
+  type CopyRange,
+  WORLD_WIDTH_DEG,
+  copyOffsets,
+  sameRange,
+  visibleCopyRange,
+} from './worldCopies';
 import { useSyncedRef } from '../../lib/useSyncedRef';
 import {
   IconDefaultPrivate,
@@ -25,52 +31,22 @@ import {
   MarkerInput,
 } from './types';
 
-const toUrl = (mod: unknown): string => {
-  if (typeof mod === 'string') return mod;
-  const withSrc = mod as { src?: string };
+const toUrl = (imported: unknown): string => {
+  if (typeof imported === 'string') return imported;
+  const withSrc = imported as { src?: string };
   if (withSrc && typeof withSrc.src === 'string') return withSrc.src;
   throw new Error('Unsupported image import format');
 };
 
 const BOUNDS_PAD_RATIO = 0.015;
 
-// worldCopyJump keeps the view within one world-width of the primary copy,
-// but a marker only exists at its one true coordinate, so panning onto a
-// repeated tile copy shows nothing until the jump snaps back. Rendering
-// each marker once per visible world copy, recomputed from the map's own
-// bounds rather than a fixed count, keeps a pin on screen at any pan
-// position without adding copies that aren't actually visible (the e2e
-// suite counts rendered pins per place).
-const WORLD_WIDTH_DEG = 360;
-
-// A copy's longitude span is centred on its multiple of 360 (copy `c`
-// covers [c*360-180, c*360+180]), so classifying by `Math.floor(lng/360)`
-// alone is off by one across half that span. The +180 shift lines the
-// floor up with Leaflet's own copy boundaries.
-const visibleCopyRange = (bounds: LatLngBounds): [number, number] => [
-  Math.floor((bounds.getWest() + 180) / WORLD_WIDTH_DEG),
-  Math.floor((bounds.getEast() + 180) / WORLD_WIDTH_DEG),
-];
-
-const sameRange = (a: [number, number] | null, b: [number, number]): boolean =>
-  a !== null && a[0] === b[0] && a[1] === b[1];
-
-/** The longitude shift of each visible world copy, west to east. */
-const copyOffsets = (copyMin: number, copyMax: number): number[] =>
-  Array.from(
-    { length: copyMax - copyMin + 1 },
-    (_, i) => (copyMin + i) * WORLD_WIDTH_DEG,
-  );
-
-/** The pins on the map across effect runs: the copy range they were drawn
- * for, and each marker's pins (one per copy) under its key. */
+/** The pins on the map across effect runs: their copy range, and each marker's pins under its key. */
 type DrawnMarkers = {
-  range: [number, number] | null;
-  byKey: globalThis.Map<string, Marker[]>;
+  range: CopyRange | null;
+  byKey: Map<string, Marker[]>;
 };
 
-/** One pin per world-copy offset for `marker`. The popup is a function, so
- * its content is only built for the pin a reader actually opens. */
+/** One pin per world-copy offset; the popup is a function, so it is only built for a pin that opens. */
 const drawPins = (
   L: Leaflet,
   target: {
@@ -79,41 +55,33 @@ const drawPins = (
     offsets: number[];
   },
 ): Marker[] => {
-  const { layer, marker: m, offsets } = target;
+  const { layer, marker, offsets } = target;
   return offsets.map((offset) =>
-    L.marker([m.lat, m.lng + offset])
+    L.marker([marker.lat, marker.lng + offset])
       .addTo(layer)
-      .bindPopup(() => popupContent(m.popupText, m.titles, m.countLabel)),
+      .bindPopup(() =>
+        popupContent(marker.popupText, marker.titles, marker.countLabel),
+      ),
   );
 };
 
 const noDrawnMarkers = (): DrawnMarkers => ({
   range: null,
-  byKey: new globalThis.Map<string, Marker[]>(),
+  byKey: new Map<string, Marker[]>(),
 });
 
-// A ceiling for every automatic fit. Pins are geocoded from a place *name*,
-// so they are only city-accurate; fitBounds left alone frames a single pin
-// at the tile layer's max zoom, dropping the viewer onto a rooftop the
-// data never claimed. Zoom 12 shows the city the pin actually means.
+// Pins are geocoded from a place name, so a fit stops at the city rather than a rooftop.
 const FIT_MAX_ZOOM = 12;
 
-// Width of the box "zoom to me" frames around the current position: a
-// regional view, so the surrounding pins stay in the picture.
+// Width of the box "zoom to me" frames: a regional view, so the surrounding pins stay in the picture.
 const CURRENT_LOCATION_SPAN_M = 100000;
 
-// A divIcon rather than a vector circleMarker: Leaflet's zoom animation
-// scales the overlay pane by CSS transform and only re-projects paths at
-// zoomend, so a pixel-radius circle visibly balloons or shrinks mid-zoom.
-// A divIcon is repositioned by translate only, so its size never moves.
+// A divIcon, not a circleMarker: Leaflet's zoom animation scales vector paths mid-zoom, a divIcon not.
 const CURRENT_LOCATION_DIAMETER = 16;
 const CURRENT_LOCATION_STROKE = '#b91c1c';
 const CURRENT_LOCATION_FILL = '#ef4444';
 
-// A marker is a 25x41 icon hanging above the point it marks, so a pin at
-// the edge of the bounds needs asymmetric padding: it rises from its
-// anchor with nothing below it. The top allowance also clears the map's
-// own furniture (the geocoding chip and zoom/locate cluster, both 36px).
+// A 25x41 icon rises above its anchor, and the top must also clear the map's 36px controls.
 const MARKER_ICON_HEIGHT = 41;
 const MARKER_ICON_HALF_WIDTH = 13;
 const CONTROLS_BOTTOM_EDGE = 44;
@@ -137,7 +105,7 @@ const fitToPoints = (
   if (bounds.isValid()) map.fitBounds(bounds, FIT_OPTIONS);
 };
 
-// The only place a view is framed on command; reports whether it framed anything, as a fit with no points is a no-op.
+// Reports whether it framed anything, as a fit with no points is a no-op.
 const runCommand = (
   map: LeafletMap,
   L: Leaflet,
@@ -146,7 +114,10 @@ const runCommand = (
   currentLocation: MapProps['currentLocation'],
 ): boolean => {
   if (command === 'fitAll') {
-    const points: Array<LatLngExpression> = markers.map((m) => [m.lat, m.lng]);
+    const points: Array<LatLngExpression> = markers.map((marker) => [
+      marker.lat,
+      marker.lng,
+    ]);
     if (currentLocation)
       points.push([currentLocation.lat, currentLocation.lng]);
     fitToPoints(map, L, points);
@@ -161,19 +132,16 @@ const runCommand = (
   return true;
 };
 
-// Names the component, matching its folder (components/Map); the JS Map is
-// reached as globalThis.Map in this file.
-// eslint-disable-next-line sonarjs/no-globals-shadowing
-const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
+const MapView: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const LRef = useRef<Leaflet | null>(null);
+  const leafletRef = useRef<Leaflet | null>(null);
   const mapInstance = useRef<LeafletMap | null>(null);
   const layersRef = useRef<LayerGroup | null>(null);
   const currentLocationLayerRef = useRef<LayerGroup | null>(null);
 
   const drawnMarkersRef = useRef<DrawnMarkers>(noDrawnMarkers());
   const markersRef = useSyncedRef(markers);
-  const currentLocRef = useSyncedRef(currentLocation);
+  const currentLocationRef = useSyncedRef(currentLocation);
 
   const [ready, setReady] = useState(false);
   const hasInitialFit = useRef(false);
@@ -186,7 +154,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
 
       const L = (await import('leaflet')).default;
       if (cancelled) return;
-      LRef.current = L;
+      leafletRef.current = L;
 
       delete (L.Icon.Default.prototype as IconDefaultPrivate)._getIconUrl;
       L.Icon.Default.mergeOptions({
@@ -195,11 +163,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
         shadowUrl: toUrl(shadowUrl),
       });
 
-      // Opens on a world view since pins aren't geocoded yet: a zoomed-in
-      // default would fetch a screenful of tiles nobody asked about, then
-      // discard them on the fit. worldCopyJump snaps back to the primary
-      // world copy on pan, since pins only exist there and would otherwise
-      // vanish once the view drifted onto a repeat.
+      // A world view fetches no tiles the fit would discard; worldCopyJump keeps pins on the primary copy.
       const map = L.map(mapRef.current, { worldCopyJump: true }).setView(
         [20, 0],
         2,
@@ -233,7 +197,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
   }, []);
 
   useEffect(() => {
-    const L = LRef.current;
+    const L = leafletRef.current;
     const map = mapInstance.current;
     const layer = layersRef.current;
     if (!ready || !L || !map || !layer) return;
@@ -270,12 +234,12 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
   }, [markers, ready]);
 
   useEffect(() => {
-    const L = LRef.current;
+    const L = leafletRef.current;
     const map = mapInstance.current;
     const layer = currentLocationLayerRef.current;
     if (!ready || !L || !map || !layer) return;
 
-    const copyRangeRef = { current: null as [number, number] | null };
+    const copyRangeRef = { current: null as CopyRange | null };
 
     const render = () => {
       const range = visibleCopyRange(map.getBounds());
@@ -289,8 +253,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       const [copyMin, copyMax] = range;
       for (let copy = copyMin; copy <= copyMax; copy++) {
         const here = L.marker([lat, lng + copy * WORLD_WIDTH_DEG], {
-          // className: '' strips Leaflet's default divIcon box (a white
-          // square with its own border) so only the dot below is drawn.
+          // className: '' strips Leaflet's default divIcon box so only the dot below is drawn.
           icon: L.divIcon({
             className: '',
             html: `<div style="width:100%;height:100%;box-sizing:border-box;border-radius:9999px;background:${CURRENT_LOCATION_FILL};border:2px solid ${CURRENT_LOCATION_STROKE};"></div>`,
@@ -302,8 +265,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
           }),
           pane: 'currentLocation',
         }).addTo(layer);
-        // Narrowed to a local const: TS can't carry the `if` guard's
-        // narrowing of `currentLocation.popupText` through the closure below.
+        // A local const: TS cannot carry the guard's narrowing of `popupText` into the closure.
         if (popupText) here.bindPopup(() => popupContent(popupText));
       }
     };
@@ -315,17 +277,16 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     };
   }, [currentLocation, ready]);
 
-  // Waits for a pin before framing: the location dot alone isn't a
-  // collection, and framing just it puts the viewer on their own doorstep
-  // at max zoom. `hasInitialFit` guards against the geolocation fix (held
-  // by the parent, so already available on a second open) latching a frame
-  // before any pin has come back.
+  // Waits for a pin: framing the location dot alone drops the viewer on their own doorstep.
   useEffect(() => {
-    const L = LRef.current;
+    const L = leafletRef.current;
     if (!ready || !L || !mapInstance.current || hasInitialFit.current) return;
     if (markers.length === 0) return;
 
-    const points: Array<LatLngExpression> = markers.map((m) => [m.lat, m.lng]);
+    const points: Array<LatLngExpression> = markers.map((marker) => [
+      marker.lat,
+      marker.lng,
+    ]);
     if (currentLocation)
       points.push([currentLocation.lat, currentLocation.lng]);
 
@@ -333,23 +294,21 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     hasInitialFit.current = true;
   }, [markers, currentLocation, ready]);
 
-  // Runs on the command *or* on becoming ready, so an instruction issued
-  // before Leaflet loaded still gets carried out. Re-measures first: a fit
-  // computed against a container Leaflet hasn't sized yet frames the wrong
-  // box.
+  // Also runs on becoming ready, so a command issued before Leaflet loaded is still carried out.
   useEffect(() => {
-    const L = LRef.current;
+    const L = leafletRef.current;
     const map = mapInstance.current;
     if (!ready || !L || !map || !command) return;
 
     const framing = () => {
+      // A fit against a container Leaflet has not sized yet frames the wrong box.
       map.invalidateSize();
       const framed = runCommand(
         map,
         L,
         command.kind,
         markersRef.current,
-        currentLocRef.current,
+        currentLocationRef.current,
       );
       // A command that framed the view outranks the one-shot fit on the first pin.
       if (framed) hasInitialFit.current = true;
@@ -362,23 +321,21 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       cancelAnimationFrame(frame);
       cancelWait();
     };
-  }, [command, ready, markersRef, currentLocRef]);
+  }, [command, ready, markersRef, currentLocationRef]);
 
-  // Leaflet caches the container size, so a box that changes while mounted
-  // (rotation, the mobile URL bar collapsing) renders into stale
-  // dimensions and leaves grey tiles until told to re-measure.
+  // Leaflet caches the container size, so a resize while mounted leaves grey tiles until re-measured.
   useEffect(() => {
     if (!ready) return;
-    const el = mapRef.current;
+    const element = mapRef.current;
     const map = mapInstance.current;
-    if (!el || !map) return;
+    if (!element || !map) return;
 
     const observer = new ResizeObserver(() => map.invalidateSize());
-    observer.observe(el);
+    observer.observe(element);
     return () => observer.disconnect();
   }, [ready]);
 
   return <div ref={mapRef} style={{ height: '100%', width: '100%' }} />;
 };
 
-export default Map;
+export default MapView;
