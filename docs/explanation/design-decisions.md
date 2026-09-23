@@ -127,8 +127,6 @@ A grantee's read used to call `has_category_read_access(category_id)` on every r
 
 Postgres 17 plans a SQL function's body without its argument values, so `category_id = cat_id` was costed on an average category. In the load test's `peak` run a 1,000-entry shared category was read by scanning all 26,000 links, 10,936 times. `0018` makes both RPCs plpgsql with `plan_cache_mode = force_custom_plan`: each call is planned with the category it names, as the SQL functions were already re-planned on every call, so planning costs nothing extra. The query text is unchanged, and `075_query_plans_test.sql` plans that same text with literal arguments, which is now also what runs.
 
-Both also set `jit = off`. Supabase leaves JIT on, and a large category's map passes `jit_above_cost`, so every call compiled its plan first: in the `catalogue` `peak` run the owner's map averaged 373 ms at 25,000 entries against 37 ms at 10,000, and on a scratch database at 40,000 it took 604 ms with JIT and 173 ms without. JIT pays off for long analytical queries, never for an interactive call answered in milliseconds.
-
 ## Why load testing is manual and local by default
 
 Collections are personal-scale, one owner each, with no throughput SLA, and a load number measured against a Free-tier project or a CI runner measures the hosting tier (TEST_STRATEGY.md §12). So the k6 scripts (#662) are a measurement a person asks for, never a gate. The default target is a Supabase stack started inside the workflow run, because there is no staging and the only other backend is production, shared with real collectors. The hosted target exists behind two switches and currently cannot sign in ([Load testing](../how-to/load-testing.md#the-hosted-target-and-why-not)).

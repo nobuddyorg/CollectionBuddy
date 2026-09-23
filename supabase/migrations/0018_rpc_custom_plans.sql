@@ -1,4 +1,4 @@
--- The map and search RPCs plan each call for the category it names, and skip JIT: a large category's plan passes jit_above_cost, and compiling costs more than running.
+-- The map and search RPCs plan each call for the category it names: Postgres 17 gives a SQL function's body a generic plan, costed on an average category.
 begin;
 
 set local lock_timeout = '5s';
@@ -21,7 +21,6 @@ stable
 security invoker
 set search_path = ''
 set plan_cache_mode = force_custom_plan
-set jit = off
 as $$
 begin
   return query
@@ -72,7 +71,6 @@ stable
 security definer
 set search_path = ''
 set plan_cache_mode = force_custom_plan
-set jit = off
 as $$
 begin
   return query
