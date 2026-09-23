@@ -43,8 +43,10 @@ design-decisions.md, not here.
   RLS policy.
 - No public/anonymous share links.
 - Search stays trigram `ILIKE`; no `tsvector`/full-text search.
-- A storage object's path never changes: no `UPDATE` on `storage.objects`, no
-  `move()`, no `upsert`. Restoring it reopens an exploited escalation.
+- A storage object's path never changes: no `UPDATE` policy on
+  `storage.objects`, no `move()`, no `upsert`. The missing policy is the only
+  denial — Storage re-grants `UPDATE` on every start — so re-adding one reopens
+  an exploited escalation.
 - Delete storage objects client-side **before** the DB row, never after, and
   never through a DB trigger.
 - No DDL on `storage.objects` (indexes, columns). Hosted Supabase refuses with

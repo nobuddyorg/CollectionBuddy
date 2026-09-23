@@ -104,7 +104,7 @@ One private bucket, `item-images` ([`0007_storage.sql`](../../supabase/migration
 - **Owner-only policies** on `select`, `insert`, `delete`: `split_part(name, '/', 1) = auth.uid()::text`.
 - **Shared policies** on `select` and `delete`: extract the item id with `storage_item_id()` and join through `item_categories` to the same read/write predicates the tables use. `storage_item_id()` returns `NULL` on a path that does not parse, because a raised error inside `USING` aborts the statement instead of failing to match the row.
 - **No shared `insert`**: an editor's upload lands under the editor's own prefix and satisfies the owner-only set.
-- **No `update`** for anyone, and no `UPDATE` privilege: a path is fixed when written; `move()` and `upsert` are refused ([why](../explanation/design-decisions.md#why-a-storage-objects-path-can-never-change)).
+- **No `update` policy** for anyone, and that absence is the only denial — Storage's bootstrap re-grants the `UPDATE` privilege on every start. A path is fixed when written; `move()` and `upsert` are refused ([why](../explanation/design-decisions.md#why-a-storage-objects-path-can-never-change)).
 
 Because `has_category_read_access()` excludes ownership and an owner cannot share with herself, **the owner cannot read or sign an object an editor uploaded** — same asymmetry as an editor-filed item being invisible to the category's owner. Deliberate.
 
