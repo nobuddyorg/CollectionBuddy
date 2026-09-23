@@ -103,10 +103,7 @@ describe('useItemImages when an entry is deleted', () => {
     expect(listImagePathsForItems).toHaveBeenCalledWith(['item-1']);
   });
 
-  it('answers with nothing when those paths cannot be read', async () => {
-    const consoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
+  it('refuses to answer when those paths cannot be read, so no delete proceeds blind', async () => {
     const pathsError = new Error('nope');
     vi.mocked(listImagePathsForItems).mockResolvedValue({
       data: null,
@@ -116,14 +113,11 @@ describe('useItemImages when an entry is deleted', () => {
 
     await expect(
       result.current.captureItemImagePaths('item-1'),
-    ).resolves.toEqual([]);
-    expect(consoleError).toHaveBeenCalledWith(
-      'Failed to read image paths before delete',
-      pathsError,
-    );
-    consoleError.mockRestore();
+    ).rejects.toMatchObject({
+      message: 'Could not read image paths before delete',
+      cause: pathsError,
+    });
   });
-
   it('removes every object of every photograph and forgets the item', async () => {
     vi.mocked(removeImageObjects).mockResolvedValue({ error: null } as never);
     vi.mocked(listImagesForItems).mockResolvedValue({

@@ -94,12 +94,13 @@ export function useItemMutations({
       toast.success(t('item_list.entry_deleted'), {
         action: { label: t('common.undo'), onClick: restore },
         onExpire: async () => {
-          // Before deleteItem: the item row's cascade takes the images rows, and their paths, with it.
-          const imagePaths = await captureItemImagePaths(id);
-
-          // The row before the objects: if this fails nothing happened yet, so the restore is honest.
-          const { error } = await deleteItem(id);
-          if (error) {
+          try {
+            // Objects before the row: the row's cascade takes the images rows, and their paths, with it.
+            const imagePaths = await captureItemImagePaths(id);
+            await removeImageBytes(id, imagePaths);
+            const { error } = await deleteItem(id);
+            if (error) throw error;
+          } catch (error) {
             toast.reportError(
               'delete item',
               error,
@@ -107,17 +108,6 @@ export function useItemMutations({
             );
             restore();
             return;
-          }
-
-          try {
-            // Row already gone: a failure here is a storage leak, not data loss.
-            await removeImageBytes(id, imagePaths);
-          } catch (cleanupError) {
-            toast.reportError(
-              'delete item images',
-              cleanupError,
-              t('item_list.delete_images_cleanup_error'),
-            );
           }
           void reload({ silent: true });
         },

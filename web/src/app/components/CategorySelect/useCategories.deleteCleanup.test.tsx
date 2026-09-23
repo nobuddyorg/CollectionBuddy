@@ -86,7 +86,7 @@ describe('useCategories deleteCategory image cleanup', () => {
     });
   });
 
-  it('logs but continues when reading orphaned images fails', async () => {
+  it('aborts and restores the collection when reading orphaned images fails', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     vi.mocked(listImagePathsForItems).mockResolvedValue({
       data: null,
@@ -105,17 +105,20 @@ describe('useCategories deleteCategory image cleanup', () => {
     });
     await commitDeferredDelete();
 
-    await waitFor(() =>
-      expect(consoleError).toHaveBeenCalledWith(
-        'Could not read images for orphaned items:',
-        expect.any(Error),
-      ),
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not delete collection. Please try again.',
     );
-    expect(deleteCategoryRow).toHaveBeenCalledWith('cat-1');
     expect(removeImageObjects).not.toHaveBeenCalled();
+    expect(deleteCategoryRow).not.toHaveBeenCalled();
+    expect(result.current.categories).toEqual([CAT_1]);
+    expect(consoleError).toHaveBeenCalledWith(
+      'delete category',
+      expect.objectContaining({
+        message: 'Could not read images for orphaned items',
+      }),
+    );
     consoleError.mockRestore();
   });
-
   it('treats an empty image-paths answer as no photographs to remove', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     vi.mocked(listImagePathsForItems).mockResolvedValue({
@@ -158,15 +161,13 @@ describe('useCategories deleteCategory image cleanup', () => {
     expect(removeImageObjects).toHaveBeenCalledWith(['u/i1/a.webp']);
   });
 
-  it('reports a resolved storage error the same as a rejection', async () => {
+  it('reports a resolved storage error the same as a rejection, and keeps the row', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     vi.mocked(removeImageObjects).mockResolvedValue({
       data: null,
       error: new Error('storage down'),
     } as never);
-    const consoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     const { result } = renderHook(() => useCategories(), { wrapper });
     await act(async () => {
       await result.current.reload();
@@ -178,12 +179,12 @@ describe('useCategories deleteCategory image cleanup', () => {
     await commitDeferredDelete();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'This collection was deleted, but some of its photographs could not be removed and may still count against your storage.',
+      'Could not delete collection. Please try again.',
     );
-    consoleError.mockRestore();
+    expect(deleteCategoryRow).not.toHaveBeenCalled();
+    expect(result.current.categories).toEqual([CAT_1]);
   });
-
-  it('deletes the category row before touching any photograph, and cleans up on success', async () => {
+  it('removes every photograph before the category row, and reports nothing on success', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     const consoleError = vi
       .spyOn(console, 'error')
@@ -202,29 +203,30 @@ describe('useCategories deleteCategory image cleanup', () => {
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
     await commitDeferredDelete();
 
-    await waitFor(() => expect(removeImageObjects).toHaveBeenCalledTimes(2));
-    // No image-read error to report on the happy path.
+    await waitFor(() =>
+      expect(deleteCategoryRow).toHaveBeenCalledWith('cat-1'),
+    );
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
-    expect(deleteCategoryRow).toHaveBeenCalledWith('cat-1');
+    expect(removeImageObjects).toHaveBeenCalledTimes(2);
     expect(removeImageObjects).toHaveBeenCalledWith([
       'u/i1/a.webp',
       'u/i2/b.webp',
     ]);
     expect(removeImageObjects).toHaveBeenCalledWith(['u/i2/b.thumb.webp']);
 
-    // Every byte removal is ordered strictly after the row delete, the first real mutation.
+    // The read, then every byte removal, strictly before the row delete.
     const readOrder = vi.mocked(listImagePathsForItems).mock
       .invocationCallOrder[0];
     const rowOrder = vi.mocked(deleteCategoryRow).mock.invocationCallOrder[0];
     expect(readOrder).toBeLessThan(rowOrder);
     for (const call of vi.mocked(removeImageObjects).mock.invocationCallOrder) {
-      expect(call).toBeGreaterThan(rowOrder);
+      expect(call).toBeGreaterThan(readOrder);
+      expect(call).toBeLessThan(rowOrder);
     }
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
-
   it("reads every orphaned item's image paths in one batched query, not once per item", async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     const { result } = renderHook(() => useCategories(), { wrapper });
@@ -243,7 +245,7 @@ describe('useCategories deleteCategory image cleanup', () => {
     expect(listImagePathsForItems).toHaveBeenCalledTimes(1);
   });
 
-  it('leaves every photograph untouched when the row delete fails, and reports the error', async () => {
+  it('restores the collection and reports the error when the row delete fails after the photographs went', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({
       error: new Error('offline'),
     } as never);
@@ -263,10 +265,8 @@ describe('useCategories deleteCategory image cleanup', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not delete collection. Please try again.',
     );
-    // The read still happened (harmless), but nothing that acts on it did.
-    expect(listImagePathsForItems).toHaveBeenCalledWith(['i1', 'i2']);
-    expect(removeImageObjects).not.toHaveBeenCalled();
-    // Failure restores the row rather than leaving it hidden.
+    expect(removeImageObjects).toHaveBeenCalledTimes(2);
+    // The row is still there, so restoring shows what the database has.
     expect(result.current.categories).toEqual([CAT_1]);
     expect(consoleError).toHaveBeenCalledWith(
       'delete category',
@@ -274,8 +274,7 @@ describe('useCategories deleteCategory image cleanup', () => {
     );
     consoleError.mockRestore();
   });
-
-  it('reports a cleanup failure without undoing the already-successful row delete', async () => {
+  it('stops at a failed removal batch, keeps the row, and restores the collection', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     vi.mocked(removeImageObjects)
       .mockResolvedValueOnce({ data: [], error: null })
@@ -293,19 +292,19 @@ describe('useCategories deleteCategory image cleanup', () => {
     });
     await commitDeferredDelete();
 
-    // The row is already gone, irreversibly: a cleanup failure is a leak, so the row stays deleted.
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'This collection was deleted, but some of its photographs could not be removed and may still count against your storage.',
+      'Could not delete collection. Please try again.',
     );
     expect(removeImageObjects).toHaveBeenCalledTimes(2);
+    expect(deleteCategoryRow).not.toHaveBeenCalled();
+    expect(result.current.categories).toEqual([CAT_1]);
     expect(consoleError).toHaveBeenCalledWith(
-      'Failed to clean up category images:',
+      'delete category',
       expect.objectContaining({ message: 'storage down' }),
     );
     consoleError.mockRestore();
   });
-
-  it('does not let one failed image removal stop the rest from being attempted', async () => {
+  it('attempts no further batch once one has failed', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     vi.mocked(removeImageObjects)
       .mockRejectedValueOnce(new Error('storage down'))
@@ -321,13 +320,12 @@ describe('useCategories deleteCategory image cleanup', () => {
     });
     await commitDeferredDelete();
 
-    // Both batches were attempted though the first rejected; Promise.all would have stopped.
-    await waitFor(() =>
-      expect(removeImageObjects).toHaveBeenCalledWith(['u/i2/b.thumb.webp']),
-    );
+    await screen.findByRole('alert');
+    expect(removeImageObjects).toHaveBeenCalledTimes(1);
     expect(removeImageObjects).toHaveBeenCalledWith([
       'u/i1/a.webp',
       'u/i2/b.webp',
     ]);
+    expect(deleteCategoryRow).not.toHaveBeenCalled();
   });
 });

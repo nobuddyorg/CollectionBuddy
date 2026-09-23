@@ -279,8 +279,9 @@ export function useItemImages() {
   const captureItemImagePaths = useCallback(async (itemId: string) => {
     const listed = await listImagePathsForItems([itemId]);
     if (listed.error !== null) {
-      console.error('Failed to read image paths before delete', listed.error);
-      return [];
+      throw new Error('Could not read image paths before delete', {
+        cause: listed.error,
+      });
     }
     return listed.data;
   }, []);

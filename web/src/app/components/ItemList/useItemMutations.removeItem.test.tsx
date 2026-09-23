@@ -106,7 +106,7 @@ describe('useItemMutations removeItem', () => {
     } as never);
     const collaborators = {
       captureItemImagePaths: vi.fn().mockResolvedValue([]),
-      removeImageBytes: vi.fn(),
+      removeImageBytes: vi.fn().mockResolvedValue(undefined),
       reload: vi.fn(),
     };
     const consoleError = vi
@@ -137,16 +137,14 @@ describe('useItemMutations removeItem', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Could not delete this entry. Please try again.',
     );
-    // The paths were read (harmless), but nothing acting on them may run: the row was never deleted.
+    // The objects went first; the row is still there, so the restore shows what the database has.
     expect(collaborators.captureItemImagePaths).toHaveBeenCalledWith('b');
-    expect(collaborators.removeImageBytes).not.toHaveBeenCalled();
+    expect(collaborators.removeImageBytes).toHaveBeenCalledWith('b', []);
     expect(collaborators.reload).not.toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalledWith('delete item', expect.anything());
     consoleError.mockRestore();
   });
-
-  // deleteItem succeeding is the point of no return: restoring would resurrect a card the DB no longer has.
-  it('does not restore the item when deleteItem succeeds but image cleanup fails', async () => {
+  it('removes the photographs before the row, and restores the entry without deleting the row when that fails', async () => {
     vi.mocked(deleteItem).mockResolvedValue({ error: null } as never);
     const capturedPaths = [{ path_full: 'b/a.webp', path_thumb: null }];
     const collaborators = {
@@ -174,22 +172,56 @@ describe('useItemMutations removeItem', () => {
     await commitDeferredDelete();
 
     await screen.findByRole('alert');
-    expect(result.current.items.map((entry) => entry.id)).toEqual(['a', 'c']);
+    expect(result.current.items.map((entry) => entry.id)).toEqual([
+      'a',
+      'b',
+      'c',
+    ]);
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'This entry was deleted, but its photographs could not be removed and may still count against your storage.',
+      'Could not delete this entry. Please try again.',
     );
     expect(collaborators.removeImageBytes).toHaveBeenCalledWith(
       'b',
       capturedPaths,
     );
-    expect(collaborators.reload).toHaveBeenCalledWith({ silent: true });
-    expect(consoleError).toHaveBeenCalledWith(
-      'delete item images',
-      expect.anything(),
-    );
+    expect(deleteItem).not.toHaveBeenCalled();
+    expect(collaborators.reload).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith('delete item', expect.anything());
     consoleError.mockRestore();
   });
 
+  it('deletes the row only after every photograph object is gone', async () => {
+    vi.mocked(deleteItem).mockResolvedValue({ error: null } as never);
+    const capturedPaths = [{ path_full: 'b/a.webp', path_thumb: null }];
+    const collaborators = {
+      captureItemImagePaths: vi.fn().mockResolvedValue(capturedPaths),
+      removeImageBytes: vi.fn().mockResolvedValue(undefined),
+      reload: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const { result } = renderHook(
+      () =>
+        useHarness({
+          initial: [item('a'), item('b'), item('c')],
+          ...collaborators,
+        }),
+      { wrapper },
+    );
+
+    act(() => {
+      void result.current.removeItem('b');
+    });
+    await acceptDeleteConfirmation();
+    await commitDeferredDelete();
+
+    await waitFor(() => expect(deleteItem).toHaveBeenCalledWith('b'));
+    expect(result.current.items.map((entry) => entry.id)).toEqual(['a', 'c']);
+    const removeOrder =
+      collaborators.removeImageBytes.mock.invocationCallOrder[0];
+    const rowOrder = vi.mocked(deleteItem).mock.invocationCallOrder[0];
+    expect(removeOrder).toBeLessThan(rowOrder);
+    expect(collaborators.reload).toHaveBeenCalledWith({ silent: true });
+  });
   it('calls whichever reload function is current after a re-render, not a stale one', async () => {
     vi.mocked(deleteItem).mockResolvedValue({ error: null } as never);
     const staleReload = vi.fn();

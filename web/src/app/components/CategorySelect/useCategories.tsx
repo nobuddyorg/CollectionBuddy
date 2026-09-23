@@ -180,52 +180,33 @@ export function useCategories() {
               orphanedItemIds = itemIds.filter((itemId) => !keep.has(itemId));
             }
 
-            // Read before the row delete (the cascade drops these rows); failing only leaks storage, so not fatal.
+            // Read before the row delete: the cascade would drop these rows and the paths with them.
             let orphanedPaths: string[] = [];
             if (orphanedItemIds.length) {
-              const { data: imageRows, error: imagesError } =
-                await listImagePathsForItems(orphanedItemIds);
-              if (imagesError) {
-                console.error(
-                  'Could not read images for orphaned items:',
-                  imagesError,
-                );
+              const listed = await listImagePathsForItems(orphanedItemIds);
+              if (listed.error !== null) {
+                throw new Error('Could not read images for orphaned items', {
+                  cause: listed.error,
+                });
               }
               const orphaned = new Set(orphanedItemIds);
-              orphanedPaths =
-                imageRows
-                  ?.filter((row) => orphaned.has(row.item_id))
-                  .flatMap(storagePathsOf) ?? [];
+              orphanedPaths = listed.data
+                .filter((row) => orphaned.has(row.item_id))
+                .flatMap(storagePathsOf);
             }
 
-            // Row before bytes: a failure here still means nothing happened, no photograph destroyed.
+            // Objects before the row: only Storage can delete bytes, and a row that is gone cannot name them.
+            for (const paths of chunk(
+              orphanedPaths,
+              REMOVE_OBJECTS_BATCH_SIZE,
+            )) {
+              const { error: removeError } = await removeImageObjects(paths);
+              if (removeError) throw removeError;
+            }
+
             const { error } = await deleteCategoryRow(id);
             if (error) throw error;
             await reload();
-
-            // allSettled: the row is already gone, so a failed batch is a leak, not a reason to stop the rest.
-            const results = await Promise.allSettled(
-              chunk(orphanedPaths, REMOVE_OBJECTS_BATCH_SIZE).map(
-                async (paths) => {
-                  const { error: removeError } =
-                    await removeImageObjects(paths);
-                  if (removeError) throw removeError;
-                },
-              ),
-            );
-            const failures = results.filter(
-              (result): result is PromiseRejectedResult =>
-                result.status === 'rejected',
-            );
-            if (failures.length) {
-              failures.forEach((failure) =>
-                console.error(
-                  'Failed to clean up category images:',
-                  failure.reason,
-                ),
-              );
-              toast.error(t('category_select.delete_images_cleanup_error'));
-            }
           } catch (error) {
             toast.reportError(
               'delete category',
