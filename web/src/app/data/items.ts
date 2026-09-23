@@ -75,7 +75,7 @@ export function rawListItems({
     withSignal(query, signal)
       .order('created_at', { ascending: false })
       // The item id breaks ties, so entries linked in one statement page stably.
-      .order('item_id', { ascending: true })
+      .order('item_id')
       // Photographs oldest-first per item, as listImagesForItems orders them.
       .order('created_at', { referencedTable: 'items.images', ascending: true })
       .order('id', { referencedTable: 'items.images', ascending: true })
