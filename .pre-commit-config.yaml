@@ -63,6 +63,15 @@ repos:
   # The same commands CI runs, from web/ where their config lives.
   - repo: local
     hooks:
+      # Its own pinned install, not a web/ devDependency: CI's prek job runs without node_modules.
+      - id: lockfile-lint
+        name: lockfile-lint (web)
+        entry: lockfile-lint --path web/package-lock.json --type npm --allowed-hosts npm --validate-https --validate-integrity --validate-package-names
+        language: node
+        additional_dependencies: ["lockfile-lint@5.0.1"]
+        pass_filenames: false
+        files: ^web/package-lock\.json$
+
       - id: prettier
         name: Prettier (web)
         entry: bash -c 'cd web && npx prettier --check .'

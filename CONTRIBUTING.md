@@ -49,7 +49,9 @@ Google OAuth is the only real sign-in, and it needs credentials even locally
 on every commit: file hygiene, gitleaks over the staged changes (service-role
 keys and database URLs block the commit; anon keys pass, [`.gitleaks.toml`](.gitleaks.toml)), `typos`, `zizmor`, `markdownlint`, `sqlfluff-lint`
 over `supabase/`, Squawk over new migrations (lock and rewrite hazards,
-[`.squawk.toml`](.squawk.toml)), and the same format/lint/type/architecture/dead-code checks
+[`.squawk.toml`](.squawk.toml)), lockfile-lint on `web/package-lock.json`
+(every package from `registry.npmjs.org`, over HTTPS, with an integrity
+hash), and the same format/lint/type/architecture/dead-code checks
 CI runs in `web/`. `pre-commit` reads the same file.
 
 ```bash
