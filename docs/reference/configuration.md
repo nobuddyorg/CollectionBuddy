@@ -24,8 +24,8 @@ From `supabase/config.toml`: API `54321`, Postgres `54322`, Studio `54323`, Mail
 
 | Secret | Used by | Notes |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml` | Required |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml` | Required |
+| `NEXT_PUBLIC_SUPABASE_URL` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml`; `k6-load-test.yml` with `target=hosted` only | Required |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`; `k6-load-test.yml` with `target=hosted` only | Required |
 | `SUPABASE_DB_URL` | `pages-deploy.yml` (`migrate`) | Required. The **session pooler** string (`aws-0-<region>.pooler.supabase.com`), password percent-encoded. The direct `db.<ref>.supabase.co` host is IPv6-only and unreachable from GitHub runners; `supabase link` reports success anyway and the push fails. |
 | `SUPABASE_ACCESS_TOKEN` | `pages-deploy.yml` (`migrate`), `cleanup-orphaned-photos.yml` | Required. Management-API token: reloads the PostgREST schema cache after a migration; in the cleanup job, runs the orphan query and fetches a fresh `service_role` key. Without it `migrate` returns 401 and the deploy stops. |
 | `SUPABASE_PROJECT_REF` | same two | Required |
@@ -51,6 +51,8 @@ protection is the server-side check.
 
 Every floor is raised by hand when a real run reports a higher number, and never lowered to make a change fit. `autoUpdate` is off in Vitest: it wrote the local measurement back into the config after every run, so a green local run produced a red PR.
 
+Stryker runs incrementally (`incremental: true`, reusing `web/reports/stryker-incremental.json`); CI caches that file keyed on `package-lock.json` and the Stryker and Vitest config, and `main` passes `--force` for a full run. k6's thresholds (`web/load/lib/options.js`) are initial proposals, not calibrated floors ([Load testing](../how-to/load-testing.md#read-the-results)).
+
 Stryker runs Vitest through `web/vitest.mutation.config.mts`, which only changes `test.reporters`: Vitest adds a `github-actions` annotation reporter under `GITHUB_ACTIONS`, and a killed mutant is an expected test failure that would otherwise become a workflow annotation.
 
 ## CI job summaries
@@ -68,6 +70,7 @@ Each job writes its report to its own Actions summary (`$GITHUB_STEP_SUMMARY`); 
 | `lighthouse` | Scores, LCP, CLS against each page's thresholds | `web/scripts/lighthouse-summary.mjs` over each target's `manifest.json` |
 | `build_and_test`, `e2e_local_stack` | Non-blocking accessibility findings | `web/e2e/axe.ts` `reportNonBlockingFindings`, from inside the test, CI only |
 | `zap_baseline` | Every alert with its verdict, per pass; an alert `.zap/rules.tsv` ignores shows its reason | `web/scripts/zap-summary.mjs` over `report_json.json` from `zaproxy/action-baseline` |
+| `load_test` (`k6-load-test.yml`, manual) | Per scenario: requests, rate, failures, p50/p95/p99; every threshold | `handleSummary` in `web/load/lib/summary.js` |
 
 ## End-to-end tests
 

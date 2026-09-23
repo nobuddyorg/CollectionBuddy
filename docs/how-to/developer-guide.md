@@ -223,6 +223,14 @@ Only `main` publishes to the
 [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main);
 locally, the report is `web/reports/mutation/index.html`.
 
+## Run a load test
+
+k6 scripts in `web/load/`, run by hand against your own `supabase start`
+stack (`npm run load -- smoke`) or from the manual `k6-load-test.yml`
+workflow. Never a gate. Everything else — the scripts, the seed, the
+workflow inputs, how to read a report, and why the hosted target stays off —
+is in [Load testing](load-testing.md).
+
 ## Replay a property-test failure
 
 Four functions with adversarial input carry fast-check properties beside their

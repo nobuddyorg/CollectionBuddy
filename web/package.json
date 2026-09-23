@@ -16,6 +16,7 @@
     "icons": "node scripts/make-icons.mjs",
     "e2e": "playwright test",
     "e2e:local": "node scripts/e2e-local-stack.mjs",
+    "load": "node scripts/load-test.mjs",
     "demo": "node scripts/demo.mjs",
     "lighthouse": "node scripts/lighthouse.mjs",
     "lighthouse:summary": "node scripts/lighthouse-summary.mjs",

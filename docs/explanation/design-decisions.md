@@ -106,6 +106,12 @@ Pure-logic tests could not have caught the hydration mismatch fixed in `008d33b`
 
 [`.sqlfluff`](../../.sqlfluff) uses the `core` bundle and excludes nine rules, for one reason: a migration is applied history and a pgTAP suite is reviewed SQL, so a finding that only reformats one is churn on security-critical files, not a caught defect. `aliasing.table` and five `layout.*` rules would rewrite every file; `references.special_chars` objects to the quoted policy names, and renaming a policy is DDL against the authorization boundary; `references.keywords` objects to the documented `category_shares.role` column; `references.consistent` would qualify every column reference across applied migrations. What is left — `ambiguous.*`, most of `structure.*`, `capitalisation.*` pinned to `lower` — was clean when adopted and still earns its place on new SQL. Only `sqlfluff-lint` runs as a hook, never `sqlfluff-fix`.
 
+## Why load testing is manual and local by default
+
+Collections are personal-scale, one owner each, with no throughput SLA, and a load number measured against a Free-tier project or a CI runner measures the hosting tier (TEST_STRATEGY.md §12). So the k6 scripts (#662) are a measurement a person asks for, never a gate. The default target is a Supabase stack started inside the workflow run, because there is no staging and the only other backend is production, shared with real collectors. The hosted target exists behind two switches and currently cannot sign in ([Load testing](../how-to/load-testing.md#the-hosted-target-and-why-not)).
+
+What would regress under load is gated deterministically instead: `075_query_plans_test.sql` (#704) asserts that each index-backed query can reach its index and, at a realistic row count, picks it. A plan assertion costs milliseconds and fails the PR that broke it; a load test would only show a slower number later.
+
 ## npm audit: what's overridden and what's accepted risk
 
 `web/package.json`'s `overrides` pin transitive dependencies that `npm audit` flagged and that have a same-major patched version:

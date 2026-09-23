@@ -1,0 +1,94 @@
+name: Load test (k6)
+
+# Manual only: a measurement, never a gate (TEST_STRATEGY.md §12). How to run and read it: docs/how-to/load-testing.md.
+on:
+  workflow_dispatch:
+    inputs:
+      flow:
+        description: Script under web/load/ to run
+        type: choice
+        options: [smoke, catalogue, shared-viewer, write]
+        default: smoke
+      target:
+        description: "local-stack: a Supabase stack started inside this run. hosted: the production project."
+        type: choice
+        options: [local-stack, hosted]
+        default: local-stack
+      confirm_production:
+        description: Required for target=hosted -- the run writes to and loads the production Free-tier project
+        type: boolean
+        default: false
+
+run-name: k6 ${{ inputs.flow }} against ${{ inputs.target }}
+
+permissions:
+  contents: read
+
+jobs:
+  load_test:
+    name: k6 ${{ inputs.flow }} against ${{ inputs.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # One run per target at a time: two against the hosted project would add up on its Free-tier limits.
+    concurrency:
+      group: k6-${{ inputs.target }}
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      # Before checkout, before any secret is read.
+      - name: Refuse the hosted target without confirmation
+        if: inputs.target == 'hosted' && !inputs.confirm_production
+        working-directory: .
+        run: |
+          echo "::error::target=hosted loads the production project; run again with confirm_production ticked."
+          exit 1
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-web
+
+      - if: inputs.target == 'local-stack'
+        uses: ./.github/actions/start-local-stack
+
+      - uses: grafana/setup-k6-action@43b9fc21641a76002687994433dd586f56e791b1 # v1.2.2
+        with:
+          k6-version: '2.3.0'
+
+      # Same script a developer runs; the hosted URL and anon key are read only for a hosted run.
+      - name: Run k6
+        id: k6
+        run: npm run load -- "$FLOW" --target "$TARGET" ${CONFIRM:+--confirm-production}
+        env:
+          FLOW: ${{ inputs.flow }}
+          TARGET: ${{ inputs.target }}
+          CONFIRM: ${{ inputs.confirm_production && 'true' || '' }}
+          LOAD_SUPABASE_URL: ${{ inputs.target == 'hosted' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
+          LOAD_SUPABASE_ANON_KEY: ${{ inputs.target == 'hosted' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
+
+      # handleSummary writes it already formatted (web/load/lib/summary.js).
+      - name: Add the k6 report to the job summary
+        if: always() && steps.k6.outcome != 'skipped'
+        env:
+          FLOW: ${{ inputs.flow }}
+        run: |
+          if [ ! -f "load-results/$FLOW.md" ]; then
+            echo "::error::load-results/$FLOW.md is missing, so k6 never reached its summary."
+            exit 1
+          fi
+          cat "load-results/$FLOW.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the k6 results
+        if: always() && steps.k6.outcome != 'skipped'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: k6-${{ inputs.flow }}-${{ inputs.target }}
+          path: web/load-results
+          retention-days: 30
+
+      - name: Stop Supabase
+        if: always() && inputs.target == 'local-stack'
+        run: supabase stop
+        working-directory: .

@@ -134,12 +134,13 @@ Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (N
 | `ci.yml` (`prek`) | push/PR to `main` | The repo-wide hooks: file hygiene, `typos`, `markdownlint`, `sqlfluff-lint`, `zizmor`. |
 | `ci.yml` (`changes`) | push/PR to `main` | Path filter: `web` and `sql` outputs the jobs below condition on; always true on a push to `main`. |
 | `ci.yml` (`build_and_test`) | `web` changed | Build, type-check, format, lint, `depcruise`, `knip`, Vitest with coverage, the signed-out Playwright suite on desktop and phone viewports. |
-| `ci.yml` (`e2e_local_stack`) | `web` or `sql` changed | Supabase in Docker: pgTAP, the `database.types.ts` drift check, the full Chromium Playwright suite (signed-out and signed-in) with the one e2e coverage floor. |
-| `ci.yml` (`mutation_test`) | `web` changed | Stryker over `mutation-targets.mjs`. |
+| `ci.yml` (`e2e_local_stack`) | `web` or `sql` changed | Supabase in Docker: pgTAP (query plans included), the `database.types.ts` drift check, the full Chromium Playwright suite (signed-out and signed-in) with the one e2e coverage floor. |
+| `ci.yml` (`mutation_test`) | `web` changed | Stryker over `mutation-targets.mjs`: incremental on a PR from `main`'s cached results, every mutant on `main`. |
 | `ci.yml` (`opengrep`) | `web` or `sql` changed | Opengrep SAST; SARIF to code scanning; fails on ERROR severity. |
 | `ci.yml` (`lighthouse`) | `web` changed | Lighthouse CI against the export, signed out and in demo mode. |
 | `ci.yml` (`zap_baseline`) | `web` changed | OWASP ZAP passive scan against the export, signed out and in demo mode, served on the runner. |
 | `pages-deploy.yml` (`migrate` → `build` → `deploy` → `smoke_test`) | push to `main`, manual | Apply pending migrations and reload the PostgREST cache; export; publish to Pages; run the signed-out suite against the live site. |
 | `keep-alive.yml` | daily, manual | Calls `keepalive()` so a free-tier project does not pause. |
 | `cleanup-orphaned-photos.yml` | daily (`30 4 * * *`), manual | Deletes Storage objects no `images` row references as `path_full` or `path_thumb`, older than 48 h — at most 10,000 per run, in requests of 1,000 (Storage's bulk-delete cap). Manual runs are dry runs unless opted out. |
+| `k6-load-test.yml` | manual only | k6 against a Supabase stack started in the run, or the hosted project behind an explicit opt-in; reports, never gates ([Load testing](../how-to/load-testing.md)). |
 | `auto-merge.yml` | PR events | Auto-merges Dependabot patch-level devDependency bumps once checks pass; does not approve. |
