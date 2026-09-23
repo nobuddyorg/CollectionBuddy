@@ -14,15 +14,16 @@ runs:
         username: ${{ github.actor }}
         password: ${{ github.token }}
 
-    # ghcr.io throttles the burst of parallel layer pulls; pulled layers stay cached, so a retry needs fewer.
+    # Only db, auth, rest, storage, kong and pg-meta serve a test; the rest is pull volume ghcr.io throttles.
+    # Pulled layers stay cached, so each retry needs fewer requests; the pause lets the throttle window pass.
     - name: Start Supabase
       shell: bash
       working-directory: ${{ github.workspace }}
       run: |
-        for attempt in 1 2 3; do
-          if supabase start; then exit 0; fi
-          echo "supabase start failed (attempt $attempt of 3); retrying in 30s"
+        for pause in 30 60 0; do
+          if supabase start -x studio,logflare,vector,edge-runtime,mailpit,realtime,imgproxy; then exit 0; fi
+          [ "$pause" -eq 0 ] && exit 1
+          echo "supabase start failed; retrying in ${pause}s"
           supabase stop --no-backup || true
-          sleep 30
+          sleep "$pause"
         done
-        exit 1
