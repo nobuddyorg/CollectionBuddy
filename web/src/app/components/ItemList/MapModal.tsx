@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 
 import { useI18n } from '../../i18n/useI18n';
@@ -11,7 +11,7 @@ import Icon, { IconType } from '../Icon';
 import { Spinner } from '../ui/Spinner';
 import { usePlaces } from '../Map/usePlaces';
 import { useCurrentLocation } from '../Map/useCurrentLocation';
-import type { MapCommand, MapCommandKind } from '../Map/types';
+import { useMapFraming } from '../Map/useMapFraming';
 
 // Names the component it dynamically imports, not the JS Map builtin;
 // nothing in this scope ever constructs one.
@@ -38,16 +38,12 @@ export function MapModal({
     error: placesError,
   } = usePlaces(categoryId, search, open, lang);
 
-  // Starts empty; the map frames pins as they stream in on its own. This
-  // state exists for the re-frame below, once the last place is geocoded.
-  const [mapCommand, setMapCommand] = useState<MapCommand | null>(null);
-
-  // Counter-based rather than withdrawn and reissued: clearing each command
-  // after 0ms so repeats registered as a change made every command a
-  // single-tick pulse a still-loading map could miss.
-  const issueMapCommand = useCallback((kind: MapCommandKind) => {
-    setMapCommand((prev) => ({ kind, id: (prev?.id ?? 0) + 1 }));
-  }, []);
+  // Starts empty; the map frames pins as they stream in on its own.
+  const {
+    command: mapCommand,
+    tap,
+    frameAllAutomatically,
+  } = useMapFraming(open);
 
   const mapMarkers = useMemo(
     () =>
@@ -76,9 +72,8 @@ export function MapModal({
   // to frame an empty collection.
   useEffect(() => {
     if (!open || loadingPlaces || places.length === 0) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    issueMapCommand('fitAll');
-  }, [open, loadingPlaces, places.length, issueMapCommand]);
+    frameAllAutomatically();
+  }, [open, loadingPlaces, places.length, frameAllAutomatically]);
 
   const {
     location: currentLocation,
@@ -90,6 +85,7 @@ export function MapModal({
   // tap is the gesture the permission prompt hangs off, and the only place
   // a refusal can be explained.
   const showCurrentLocation = useCallback(async () => {
+    const frame = tap('fitCurrent');
     const result = await requestLocation();
     if (!result.ok) {
       toast.error(
@@ -101,8 +97,8 @@ export function MapModal({
       );
       return;
     }
-    issueMapCommand('fitCurrent');
-  }, [requestLocation, toast, t, issueMapCommand]);
+    frame();
+  }, [requestLocation, toast, t, tap]);
 
   return (
     <CenteredModal
@@ -187,7 +183,7 @@ export function MapModal({
             <button
               type="button"
               data-testid="frame-all-pins"
-              onClick={() => issueMapCommand('fitAll')}
+              onClick={() => tap('fitAll')()}
               className="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-neutral-300 text-neutral-900 shadow-sm hover:opacity-90"
               aria-label={t('item_list.frame_all_pins')}
               title={t('item_list.frame_all_pins')}

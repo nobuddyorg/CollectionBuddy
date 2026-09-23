@@ -130,16 +130,14 @@ const fitToPoints = (
   if (bounds.isValid()) map.fitBounds(bounds, FIT_OPTIONS);
 };
 
-// The only place a view is ever framed on command; a command that's never
-// withdrawn stays readable once the map is ready, so a command issued
-// before the map finished initialising is naturally still covered.
+// The only place a view is framed on command; reports whether it framed anything, as a fit with no points is a no-op.
 const runCommand = (
   map: import('leaflet').Map,
   L: Leaflet,
   command: MapCommandKind,
   markers: MarkerInput[],
   currentLocation: MapProps['currentLocation'],
-): void => {
+): boolean => {
   if (command === 'fitAll') {
     const points: Array<import('leaflet').LatLngExpression> = markers.map(
       (m) => [m.lat, m.lng],
@@ -147,14 +145,15 @@ const runCommand = (
     if (currentLocation)
       points.push([currentLocation.lat, currentLocation.lng]);
     fitToPoints(map, L, points);
-  } else if (command === 'fitCurrent') {
-    if (!currentLocation) return;
-    const { lat, lng } = currentLocation;
-    map.fitBounds(
-      L.latLng(lat, lng).toBounds(CURRENT_LOCATION_SPAN_M),
-      FIT_OPTIONS,
-    );
+    return points.length > 0;
   }
+  if (!currentLocation) return false;
+  const { lat, lng } = currentLocation;
+  map.fitBounds(
+    L.latLng(lat, lng).toBounds(CURRENT_LOCATION_SPAN_M),
+    FIT_OPTIONS,
+  );
+  return true;
 };
 
 // Names the component, matching its folder (components/Map); the JS Map is
@@ -344,13 +343,15 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
 
     const frame = requestAnimationFrame(() => {
       map.invalidateSize();
-      runCommand(
+      const framed = runCommand(
         map,
         L,
         command.kind,
         markersRef.current,
         currentLocRef.current,
       );
+      // A command that framed the view outranks the one-shot fit on the first pin.
+      if (framed) hasInitialFit.current = true;
     });
     return () => cancelAnimationFrame(frame);
   }, [command, ready, markersRef, currentLocRef]);

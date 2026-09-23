@@ -72,4 +72,17 @@ test.describe('the map, with a location to show', () => {
     await app.map.locators.pins.last().click();
     await expect(app.map.locators.popup).toContainText('You are here');
   });
+
+  // #694: the fix may land after the second tap; MapModal.test.tsx forces that order, real geolocation cannot.
+  test('keeps the later of two quick framing taps', async ({ on, page }) => {
+    const app = on(page);
+    await openMap(app);
+    await expect(app.map.locators.pins).toHaveCount(3);
+
+    await app.map.do.zoomToLocation();
+    await app.map.do.frameAllPins();
+    await expect(app.map.locators.buttons.zoomToLocation).toBeEnabled();
+
+    await expect(app.map.locators.pins.first()).toBeInViewport();
+  });
 });
