@@ -205,6 +205,19 @@ select is(
   '3f2504e0-4f89-11d3-9a0c-0305e82c3301'::uuid,
   'an upper-case uuid parses the same as a lower-case one'
 );
+-- Every spelling the uuid type accepts still parses; 0011 tests the segment instead of catching the cast (#720).
+select is(
+  public.storage_item_id('uid/{3f2504e0-4f89-11d3-9a0c-0305e82c3301}/file.webp'),
+  '3f2504e0-4f89-11d3-9a0c-0305e82c3301'::uuid,
+  'a braced uuid parses'
+);
+select is(
+  public.storage_item_id('uid/3f2504e04f8911d39a0c0305e82c3301/file.webp'),
+  '3f2504e0-4f89-11d3-9a0c-0305e82c3301'::uuid,
+  'so does one without hyphens'
+);
+select is(public.storage_item_id('uid/3f2504e0-4f89-11d3-9a0c-0305e82c330g/file.webp'), null,
+  'a uuid-shaped segment with a non-hex digit answers NULL');
 
 -- join_tags on the empty array, the shape every entry with no tags
 -- actually has -- the NULL case (050_functions_triggers_test.sql) is the

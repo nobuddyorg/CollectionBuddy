@@ -93,5 +93,18 @@ select is(
   'none of the superseded storage policies has come back'
 );
 
+-- Splinter's auth_rls_initplan skips the storage schema, so this is its check here: auth.uid() only ever inside a scalar subquery (0012, #719).
+select is(
+  (select array_agg(policyname::text order by policyname)
+   from pg_catalog.pg_policies
+   where schemaname = 'storage' and tablename = 'objects'
+     and (
+       replace(coalesce(qual, ''), '( SELECT auth.uid() AS uid)', '') like '%auth.uid()%'
+       or replace(coalesce(with_check, ''), '( SELECT auth.uid() AS uid)', '') like '%auth.uid()%'
+     )),
+  null,
+  'no policy on storage.objects calls auth.uid() once per row'
+);
+
 select * from finish();
 rollback;

@@ -64,6 +64,22 @@ begin
 end;
 $$;
 
+create or replace function pg_temp.plan_uses_index_only(p_sql text, p_index text, p_description text)
+returns text
+language plpgsql
+as $$
+begin
+  if jsonb_path_exists(
+    pg_temp.plan_json(p_sql),
+    '$.** ? (@."Node Type" == "Index Only Scan" && @."Index Name" == $index)',
+    jsonb_build_object('index', p_index)
+  ) then
+    return ok(true, p_description);
+  end if;
+  return ok(false, p_description) || e'\n' || diag(pg_temp.plan_text(p_sql));
+end;
+$$;
+
 select gen_random_uuid() as owner_id \gset
 
 select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
@@ -184,6 +200,37 @@ select pg_temp.plan_uses_index(
 );
 select pg_temp.plan_has_no_seq_scan_on(
   :'catalogue_sql', 'item_categories', 'preferred: the catalogue page does not scan item_categories sequentially'
+);
+
+-- The FK cascades' own queries, planned as the owner that runs them: item_categories keeps no index on item_id or category_id alone (#717).
+reset role;
+select pg_temp.plan_uses_index(
+  format('delete from only public.item_categories where item_id = %L::uuid',
+    (select ic.item_id from public.item_categories ic limit 1)),
+  'item_categories_pkey',
+  'preferred: deleting an item cascades to its links through the primary key'
+);
+select pg_temp.plan_uses_index(
+  format('delete from only public.item_categories where category_id = %L::uuid', gen_random_uuid()),
+  'idx_item_categories_cat_created',
+  'preferred: deleting a category cascades to its links through idx_item_categories_cat_created'
+);
+
+-- tg_images_quota()'s per-owner sum reads size_bytes from the index alone, never the owner's heap rows (#718).
+select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
+insert into public.images (item_id, path_full)
+select i.id, :'owner_id'::text || '/' || i.id::text || '/plan.webp'
+from public.items i
+where i.title like 'Plan filler %'
+limit 100;
+reset role;
+analyze public.images;
+set local enable_seqscan = off;
+set local enable_bitmapscan = off;
+select pg_temp.plan_uses_index_only(
+  format('select coalesce(sum(im.size_bytes), 0) from public.images im where im.user_id = %L::uuid', :'owner_id'),
+  'idx_images_user_size',
+  'reachable: the photo quota sum is an index-only scan on idx_images_user_size'
 );
 
 select * from finish();

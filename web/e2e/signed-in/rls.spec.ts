@@ -248,6 +248,48 @@ test.describe('one collection cannot reach another', () => {
     expect(error).not.toBeNull();
   });
 
+  // The three owner-only storage policies (0012): their owner does all of it, anyone else none of it. No item row, so no shared policy can match.
+  test('only the owner lists, signs and removes an object under their prefix', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const folder = `${userId}/${crypto.randomUUID()}`;
+    const path = `${folder}/rls-owner-only-probe.webp`;
+    const owner = apiAs(token).storage.from('item-images');
+    const other = apiAs(otherToken).storage.from('item-images');
+
+    try {
+      const { error: uploadError } = await owner.upload(
+        path,
+        new Blob(['probe'], { type: 'image/webp' }),
+      );
+      expect(uploadError).toBeNull();
+
+      const { data: ownList } = await owner.list(folder);
+      expect(ownList?.map((o) => o.name)).toEqual([
+        'rls-owner-only-probe.webp',
+      ]);
+      const { error: ownSignError } = await owner.createSignedUrl(path, 60);
+      expect(ownSignError).toBeNull();
+
+      const { data: theirList } = await other.list(folder);
+      expect(theirList ?? []).toEqual([]);
+      const { error: theirSignError } = await other.createSignedUrl(path, 60);
+      expect(theirSignError).not.toBeNull();
+      const { data: theirRemoved } = await other.remove([path]);
+      expect(theirRemoved ?? []).toEqual([]);
+      const { error: theirUploadError } = await other.upload(
+        `${folder}/planted.webp`,
+        new Blob(['x'], { type: 'image/webp' }),
+      );
+      expect(theirUploadError).not.toBeNull();
+
+      const { data: ownRemoved } = await owner.remove([path]);
+      expect(ownRemoved?.map((o) => o.name)).toEqual([path]);
+    } finally {
+      await owner.remove([path]);
+    }
+  });
+
   // The images table is a separate authorization surface from storage.objects
   // (a row naming an object vs. the object's bytes), so it needs its own
   // check. No seed fixture plants an images row, so this inserts and tears

@@ -136,6 +136,32 @@ select is(
   'the only non-trigger function anon may execute is keepalive'
 );
 
+-- Direct grants too, not only PUBLIC's: hosted default privileges once gave every new function one to both API roles (0015, #715).
+select is(
+  (select array_agg(p.proname::text || ' to ' || r.rolname order by p.proname, r.rolname)
+   from pg_catalog.pg_proc p
+   join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+   cross join (values ('anon'), ('authenticated')) as r(rolname)
+   where n.nspname = 'public'
+     and p.prorettype = 'pg_catalog.trigger'::regtype
+     and has_function_privilege(r.rolname, p.oid, 'EXECUTE')),
+  null,
+  'neither API role holds EXECUTE on any trigger function'
+);
+
+select is(
+  (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
+   from pg_catalog.pg_default_acl d
+   cross join lateral pg_catalog.aclexplode(d.defaclacl) a
+   where d.defaclrole = 'postgres'::regrole
+     and d.defaclnamespace = 'public'::regnamespace
+     and d.defaclobjtype = 'f'
+     and a.privilege_type = 'EXECUTE'
+     and a.grantee in ('anon'::regrole, 'authenticated'::regrole)),
+  null,
+  'a function the next migration creates is granted to neither API role by default'
+);
+
 -- Row level security on every table in the schema, derived rather than
 -- listed: a sixth table added without it would be readable by every signed-
 -- in user, and a policy file that simply forgot the `alter table ... enable`
