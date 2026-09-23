@@ -2,26 +2,15 @@ import { expect, test } from './test';
 
 import { expectNoSeriousA11yViolations } from '../axe';
 import type { PageTree } from '../pages';
-// Runs against real, signed-in pages -- the same rendered DOM a collector
-// actually sees, not a mock. See #650: this complements (doesn't replace)
-// eslint-plugin-jsx-a11y's static check, which can't see computed contrast,
-// focus order, or the real accessible-name/ARIA-state computation.
 test.use({ locale: 'en-GB' });
 
-// Cards mount with `.fade-up` (globals.css), a 500ms opacity/transform
-// animation. axe's color-contrast check samples whatever is on screen the
-// instant it runs, so scanning mid-fade reads a blended, lower-contrast
-// colour than the settled one globals.contrast.test.ts actually verifies --
-// a false positive in the check's timing, not a real design defect. Same
-// wait login.spec.ts already uses for the same animation.
+// Cards fade in (.fade-up, 500ms); axe samples contrast mid-fade as a false positive unless settled.
 async function waitForCardsSettled(app: PageTree) {
   await expect(app.catalogue.locators.cards.first()).toHaveCSS('opacity', '1');
 }
 
 test.describe('accessibility -- signed in', () => {
-  // Covers the catalogue grid *and* an entry's detail (title, description,
-  // place, tags are all rendered inline on the card -- this app has no
-  // separate detail page, see docs/reference/architecture.md).
+  // Also covers an entry's detail: everything is rendered inline on the card, there is no detail page.
   test('the catalogue grid has no serious or critical violations', async ({
     on,
     page,
@@ -54,9 +43,7 @@ test.describe('accessibility -- signed in', () => {
     await expectNoSeriousA11yViolations(page, testInfo);
   });
 
-  // The empty-results state: distinct markup from a populated grid (a
-  // message instead of cards), and a real non-happy-path a collector hits
-  // on every search that doesn't match.
+  // Distinct markup from a populated grid: a message instead of cards.
   test('the no-results search state has no serious or critical violations', async ({
     on,
     page,
@@ -81,8 +68,7 @@ test.describe('accessibility -- signed in', () => {
     await app.form.do.close();
   });
 
-  // The sharing panel lives inside the same expanded strip categories.spec.ts
-  // drives (SharingSection, rendered for an owned, unshared category).
+  // The sharing panel lives inside the expanded strip, rendered for an owned category.
   test('the sharing panel has no serious or critical violations', async ({
     on,
     page,

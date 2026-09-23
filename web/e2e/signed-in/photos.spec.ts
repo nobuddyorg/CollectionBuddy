@@ -5,21 +5,15 @@ import { expect, test } from './test';
 import { createClient } from '@supabase/supabase-js';
 
 import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
-// Decode, resize (twice), upload (twice), list, and sign -- all in the
-// browser, so a `next build` can't verify any of it. What the storage
-// policies allow is checked separately in rls.spec.ts; this checks that an
-// ordinary upload still works.
+// Decode, resize, upload, list and sign all happen in the browser; rls/ covers what the policies allow.
 test.use({ locale: 'en-GB' });
 
-// Playwright's default 30s test timeout doesn't reliably cover two real
-// browser-side uploads under parallel load.
+// The default 30s does not reliably cover two real uploads under parallel load.
 test.describe.configure({ timeout: 120_000 });
-// Kept below the test timeout so a slow upload fails with its own assertion
-// message instead of a bare "test timed out".
+// Below the test timeout, so a slow upload fails with its own message instead of a bare timeout.
 const ARRIVES = 45_000;
 
-// A real photograph, not fabricated bytes: the compressor decodes what it's
-// given, and a canvas can't draw something that only claims to be a PNG.
+// A real photograph: the compressor decodes what it is given, and a canvas cannot draw a fake PNG.
 const PHOTO = resolve(process.cwd(), 'public/logo.png');
 
 const context = () =>
@@ -51,15 +45,15 @@ async function itemIdFor(token: string, title: string) {
   return data.id as string;
 }
 
-/**
- * Every stored object under one item's own prefix.
- *
- * Scoped to the item, not the whole account: other signed-in specs write
- * under this same owner concurrently (`workers: 2` in CI), so listing the
- * whole account here would pick up their objects too (#664).
- */
-async function storedObjects(token: string, userId: string, itemId: string) {
-  const { data } = await storageAs(token).list(`${userId}/${itemId}`);
+/** Scoped to the item, not the account: other specs write under the same owner concurrently. */
+async function storedObjects(item: {
+  token: string;
+  userId: string;
+  itemId: string;
+}) {
+  const { data } = await storageAs(item.token).list(
+    `${item.userId}/${item.itemId}`,
+  );
   return (data ?? []).map((object) => object.name);
 }
 
@@ -86,8 +80,7 @@ test.describe('photographs', () => {
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
       await expect(card.locators.images).toHaveAttribute('src', /token=/);
     } finally {
-      // In `finally`: reseed() only deletes database rows, never storage
-      // objects, so a leaked entry here orphans an upload permanently.
+      // In finally: reseed() deletes rows, never storage objects, so a leaked entry orphans an upload.
       await app.catalogue.do.removeEntry(title);
     }
   });
@@ -114,13 +107,8 @@ test.describe('photographs', () => {
     }
   });
 
-  // Both files live under the owner's prefix, the segment storage policies
-  // key on; a wrong path locks the photo away from its own owner.
-  test('it is stored as a pair, under the owner', async ({
-    on,
-    page,
-  }, testInfo) => {
-    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+  // Both files live under the owner's prefix, the segment the storage policies key on.
+  test('it is stored as a pair, under the owner', async ({ on, page }) => {
     const app = on(page);
     const { token, userId } = context();
 
@@ -132,7 +120,7 @@ test.describe('photographs', () => {
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
 
-      const stored = await storedObjects(token, userId, itemId);
+      const stored = await storedObjects({ token, userId, itemId });
       expect(stored).toHaveLength(2);
       expect(
         stored.filter((name) => name.endsWith('.thumb.webp')),
@@ -167,12 +155,11 @@ test.describe('photographs', () => {
     }
   });
 
-  // The delete is deferred to the toast's undo window; closing the toast ends the window, so the row and both objects go now.
+  // The delete is deferred to the undo window; closing the toast ends it, so the row and both objects go now.
   test('a photograph can be taken off again, and stays off', async ({
     on,
     page,
-  }, testInfo) => {
-    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+  }) => {
     const app = on(page);
     const { token, userId } = context();
 
@@ -193,20 +180,20 @@ test.describe('photographs', () => {
       await expect(app.catalogue.card(title)()).toBeVisible();
       await expect(app.catalogue.card(title).locators.images).toHaveCount(0);
       await expect
-        .poll(() => storedObjects(token, userId, itemId), { timeout: 15_000 })
+        .poll(() => storedObjects({ token, userId, itemId }), {
+          timeout: 15_000,
+        })
         .toEqual([]);
     } finally {
       await app.catalogue.do.removeEntry(title);
     }
   });
 
-  // SQL cannot reach object storage, so the app must delete photographs
-  // itself or they become unreachable, paid-for orphans.
+  // SQL cannot reach object storage, so the app must delete photographs itself.
   test('deleting the entry takes its photographs with it', async ({
     on,
     page,
-  }, testInfo) => {
-    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+  }) => {
     const app = on(page);
     const { token, userId } = context();
 
@@ -219,14 +206,16 @@ test.describe('photographs', () => {
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
 
-      const during = await storedObjects(token, userId, itemId);
+      const during = await storedObjects({ token, userId, itemId });
       expect(during.length).toBeGreaterThan(0);
     } finally {
       await app.catalogue.do.removeEntry(title);
     }
 
     await expect
-      .poll(() => storedObjects(token, userId, itemId!), { timeout: 15_000 })
+      .poll(() => storedObjects({ token, userId, itemId: itemId! }), {
+        timeout: 15_000,
+      })
       .toEqual([]);
   });
 });

@@ -1,22 +1,13 @@
 import { type Locator, type Page } from '@playwright/test';
 
 interface AccountMenu {
-  /**
-   * Points to self.
-   */
   (): Locator;
-  /**
-   * High-level interactions.
-   */
   do: {
-    chooseLanguage(lang: 'de' | 'en'): Promise<void>;
+    chooseLanguage(language: 'de' | 'en'): Promise<void>;
     chooseTheme(theme: 'system' | 'light' | 'dark'): Promise<void>;
     open(): Promise<void>;
     signOut(): Promise<void>;
   };
-  /**
-   * Raw locators.
-   */
   locators: {
     buttons: {
       open: Locator;
@@ -45,8 +36,8 @@ export function initAccountMenu(page: Page): AccountMenu {
     },
   };
   const interactions = {
-    chooseLanguage: async (lang: 'de' | 'en') => {
-      await locators.languages[lang].click();
+    chooseLanguage: async (language: 'de' | 'en') => {
+      await locators.languages[language].click();
     },
     chooseTheme: async (theme: 'system' | 'light' | 'dark') => {
       await locators.themes[theme].click();

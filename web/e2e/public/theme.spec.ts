@@ -2,29 +2,27 @@ import type { Page } from '@playwright/test';
 
 import { expect, test } from '../fixture';
 
-import { cssVar } from '../helpers';
+import { cssVariable } from '../helpers';
 
 const PAPER = 'rgb(244, 243, 239)';
 const CHARCOAL = 'rgb(25, 24, 21)';
 
-const themeAttr = (page: Page) =>
+const themeAttribute = (page: Page) =>
   page.evaluate(() => document.documentElement.getAttribute('data-theme'));
 
-// Covers only the pre-React half: an inline script sets the theme from OS/storage
-// before hydration, since nothing else runs early enough. Its failure mode is a
-// flash of the wrong theme, invisible to unit tests.
+// The pre-React half: an inline script sets the theme before hydration, or the wrong one flashes.
 test.describe('the theme a page arrives in', () => {
   test('follows a dark OS when nothing has been chosen', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.goto('login/');
-    expect(await themeAttr(page)).toBe('dark');
+    expect(await themeAttribute(page)).toBe('dark');
     await expect(page.locator('body')).toHaveCSS('background-color', CHARCOAL);
   });
 
   test('follows a light OS when nothing has been chosen', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light' });
     await page.goto('login/');
-    expect(await themeAttr(page)).toBe('light');
+    expect(await themeAttribute(page)).toBe('light');
     await expect(page.locator('body')).toHaveCSS('background-color', PAPER);
   });
 
@@ -32,7 +30,7 @@ test.describe('the theme a page arrives in', () => {
     await page.emulateMedia({ colorScheme: 'light' });
     await page.addInitScript(() => localStorage.setItem('theme', 'dark'));
     await page.goto('login/');
-    expect(await themeAttr(page)).toBe('dark');
+    expect(await themeAttribute(page)).toBe('dark');
     await expect(page.locator('body')).toHaveCSS('background-color', CHARCOAL);
   });
 
@@ -40,7 +38,7 @@ test.describe('the theme a page arrives in', () => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.addInitScript(() => localStorage.setItem('theme', 'light'));
     await page.goto('login/');
-    expect(await themeAttr(page)).toBe('light');
+    expect(await themeAttribute(page)).toBe('light');
   });
 
   // Storage is not a trusted input; an invalid value must fall back to the OS.
@@ -50,17 +48,16 @@ test.describe('the theme a page arrives in', () => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.addInitScript(() => localStorage.setItem('theme', 'sepia'));
     await page.goto('login/');
-    expect(await themeAttr(page)).toBe('dark');
+    expect(await themeAttribute(page)).toBe('dark');
   });
 
-  // `domcontentloaded` fires before hydration, so this fails if the theme
-  // attribute is only ever set by React.
+  // domcontentloaded fires before hydration, so this fails if only React ever sets the attribute.
   test('is decided before the page is interactive, not after', async ({
     page,
   }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.goto('login/', { waitUntil: 'domcontentloaded' });
-    expect(await themeAttr(page)).toBe('dark');
+    expect(await themeAttribute(page)).toBe('dark');
     await expect(page.locator('body')).toHaveCSS('background-color', CHARCOAL);
   });
 
@@ -68,7 +65,7 @@ test.describe('the theme a page arrives in', () => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.goto('login/');
     // Drives the scrollbars and any native control the app does not style.
-    expect(await cssVar(page, 'color-scheme')).toBe('dark');
+    expect(await cssVariable(page, 'color-scheme')).toBe('dark');
   });
 
   // Browser chrome around an installed app is the one surface CSS can't reach.

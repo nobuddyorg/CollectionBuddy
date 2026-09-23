@@ -11,22 +11,12 @@ import {
   SEED,
 } from './signed-in/fixtures';
 
-// Sign-in cannot go through the UI (Google OAuth, undrivable in CI), so a
-// session is minted via the auth API and written to localStorage before the
-// app boots; everything after that runs against the real Postgres with real
-// row-level security.
-//
-// Local only: URL and service key both come from `supabase status`. The
-// public suite is what runs against production.
+// Google OAuth cannot be driven in CI, so the session is minted via the auth API into storage state.
 const SUPABASE_URL = process.env.E2E_SUPABASE_URL!;
 const ANON_KEY = process.env.E2E_SUPABASE_ANON_KEY!;
 const SERVICE_KEY = process.env.E2E_SUPABASE_SERVICE_KEY!;
 
-// The service key only creates the user (a GoTrue admin call); `service_role`
-// has no grant on the tables themselves, since row-level security is this
-// app's only authorization layer. Seed rows are written through the signed-in
-// user's own session below, so a policy that stopped permitting an ordinary
-// insert would fail here rather than in production.
+// The service key only creates users; seed rows go through the user's own session, so RLS has to permit them.
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
@@ -40,9 +30,7 @@ async function ensureUser(email: string, password: string): Promise<string> {
   });
   if (!error && data.user) return data.user.id;
 
-  // Already there from a previous run -- find it rather than fail. `perPage`
-  // must be raised: a long-lived stack can hold more than the default 50
-  // users, and the default page would miss this one.
+  // Already there from a previous run; perPage raised, since a long-lived stack holds more than 50 users.
   const { data: list, error: listError } = await admin.auth.admin.listUsers({
     perPage: 1000,
   });
@@ -52,14 +40,7 @@ async function ensureUser(email: string, password: string): Promise<string> {
   return existing.id;
 }
 
-/**
- * Removes every stored object under this user's prefix, across every item.
- *
- * SQL cannot reach object storage, so a failed test between uploading and
- * deleting an entry can leave orphaned objects that reseed()'s row deletes
- * won't catch. Run once per suite start to sweep those up; anything still
- * wanted is re-uploaded by the test that wants it.
- */
+/** SQL cannot reach object storage, so a test that failed mid-upload leaves objects reseed() would miss. */
 async function sweepStorage(as: SupabaseClient, userId: string) {
   const { data: itemPrefixes } = await as.storage
     .from('item-images')
@@ -76,12 +57,7 @@ async function sweepStorage(as: SupabaseClient, userId: string) {
   if (paths.length) await as.storage.from('item-images').remove(paths);
 }
 
-/**
- * Puts the collection into a known state.
- *
- * Deleted and rebuilt rather than added to, so a second run sees exactly what
- * the first did.
- */
+/** Deleted and rebuilt rather than added to, so a second run sees exactly what the first did. */
 async function reseed(as: SupabaseClient, userId: string) {
   await sweepStorage(as, userId);
   await as.from('items').delete().eq('user_id', userId);
@@ -99,8 +75,7 @@ async function reseed(as: SupabaseClient, userId: string) {
     return found.id;
   };
 
-  // Inserted one at a time, oldest first, so `created_at` reflects insertion
-  // order; a batch insert can share a timestamp and leave order to chance.
+  // One at a time, oldest first: a batch insert can share a timestamp and leave the order to chance.
   for (const item of SEED.items) {
     const { category, ...fields } = item;
     const { data: inserted, error: itemError } = await as
@@ -147,12 +122,7 @@ async function reseedOther(as: SupabaseClient, userId: string) {
   if (linkError) throw linkError;
 }
 
-/**
- * Signs in and returns the localStorage entry the browser build would hold.
- *
- * The key is not hardcoded: supabase-js derives it from the project URL, so
- * this captures whatever it actually writes rather than guessing the format.
- */
+/** supabase-js derives the storage key from the project URL, so this captures whatever it writes. */
 async function mintSession(
   email: string,
   password: string,

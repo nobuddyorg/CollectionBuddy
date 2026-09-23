@@ -110,7 +110,7 @@ whose paths did not change; the local list above is not conditional.
   CI only proves it applies from scratch, production applies it to live rows
   with no staging in between. Recipe: [Change the database schema](docs/how-to/developer-guide.md#change-the-database-schema).
 - **A policy, grant, or ownership-trigger change** ships its case in
-  `web/e2e/signed-in/rls.spec.ts` in the same PR.
+  `web/e2e/signed-in/rls/` in the same PR.
 - **A UI change** ships an end-to-end case for its journey; **a functional
   change** ships a unit test. Which layer proves what:
   [TEST_STRATEGY.md](TEST_STRATEGY.md).

@@ -1,11 +1,7 @@
 import { expect, test } from './test';
 
 import { SEED } from './fixtures';
-// Everything on an entry besides its title: the tag chips and the place
-// autocomplete, filled in through the real form. The geocoder is a third
-// party and is always faked (TEST_STRATEGY.md §6); what is real here is
-// that the coordinates it hands back survive the round trip to Postgres,
-// which the map at the end is what proves.
+// The geocoder is always faked; what is real is that its coordinates survive the round trip to Postgres.
 test.use({ locale: 'en-GB' });
 
 type Page = import('@playwright/test').Page;
@@ -70,8 +66,7 @@ test.describe('an entry with a place and tags', () => {
       await expect(card.locators.place).toHaveText('Bremen, Germany');
       await expect(card.locators.tags).toHaveText(['hansestadt']);
 
-      // The one assertion only a real database can make: the coordinates
-      // the geocoder returned were stored, not just the name beside them.
+      // Only a real database can show the coordinates were stored, not just the name beside them.
       await app.map.do.open();
       await expect(app.map.locators.pins).toHaveCount(1);
     } finally {
@@ -103,8 +98,7 @@ test.describe('an entry with a place and tags', () => {
     }
   });
 
-  // Every dismissal of the form routes through one guard, so a stray tap
-  // cannot lose an edit more easily than pressing Cancel would.
+  // Every dismissal of the form routes through one guard, so a stray tap cannot lose an edit.
   test('asks before throwing away a half-written entry', async ({
     on,
     page,
@@ -126,8 +120,7 @@ test.describe('an entry with a place and tags', () => {
     await expect(app.form.locators.inputs.title).toHaveCount(0);
   });
 
-  // The edit modal is the one caller that gives the form a Cancel button,
-  // and it goes through the same guard a stray dismissal would.
+  // The edit modal is the one caller with a Cancel button, and it goes through the same guard.
   test('leaves an entry alone when an edit is cancelled', async ({
     on,
     page,

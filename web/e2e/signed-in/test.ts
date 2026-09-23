@@ -1,10 +1,6 @@
 import { test as base, expect } from '../fixture';
 
-/**
- * The signed-in suite's `test`, which additionally fails when the page throws
- * or logs an error -- catching session-only failures like a rejected query or
- * a failed upload that a passing assertion could otherwise mask.
- */
+/** Fails when the page throws or logs an error, which a passing assertion could otherwise mask. */
 export const test = base.extend<{ quietConsole: void }>({
   quietConsole: [
     async ({ page }, use) => {

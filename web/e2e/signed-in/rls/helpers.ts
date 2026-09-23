@@ -1,0 +1,100 @@
+import { readFileSync } from 'node:fs';
+
+import { createClient } from '@supabase/supabase-js';
+
+import { CONTEXT_PATH, SEED, type SeedContext } from '../fixtures';
+
+export const context = () =>
+  JSON.parse(readFileSync(CONTEXT_PATH, 'utf8')) as SeedContext;
+
+/** A PostgREST client carrying one user's access token, and nothing more. */
+export function apiAs(token: string) {
+  return createClient(
+    process.env.E2E_SUPABASE_URL!,
+    process.env.E2E_SUPABASE_ANON_KEY!,
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    },
+  );
+}
+
+/** Issues a grant as the category's owner; `role` left out is the column default, `viewer`. */
+export async function share(grant: {
+  token: string;
+  categoryId: string;
+  invitedEmail: string;
+  role?: 'viewer' | 'editor';
+  window?: { createdAt: string; expiresAt: string };
+}) {
+  const { data, error } = await apiAs(grant.token)
+    .from('category_shares')
+    .insert({
+      category_id: grant.categoryId,
+      invited_email: grant.invitedEmail,
+      ...(grant.role && { role: grant.role }),
+      ...(grant.window && {
+        created_at: grant.window.createdAt,
+        expires_at: grant.window.expiresAt,
+      }),
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+export async function unshare(token: string, shareId: string) {
+  await apiAs(token).from('category_shares').delete().eq('id', shareId);
+}
+
+export async function ownedCategoryId(owner: {
+  token: string;
+  userId: string;
+  name: string;
+}) {
+  const { data, error } = await apiAs(owner.token)
+    .from('categories')
+    .select('id')
+    .eq('user_id', owner.userId)
+    .eq('name', owner.name)
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+/** SEED.editorCategory, plus a throwaway entry of the owner's inside it. */
+export async function ownerEntryIn(entry: {
+  token: string;
+  userId: string;
+  title: string;
+}): Promise<{ categoryId: string; itemId: string }> {
+  const { token, userId, title } = entry;
+  const categoryId = await ownedCategoryId({
+    token,
+    userId,
+    name: SEED.editorCategory,
+  });
+  const { data: item, error: itemError } = await apiAs(token)
+    .from('items')
+    .insert({ user_id: userId, title })
+    .select('id')
+    .single();
+  if (itemError) throw itemError;
+
+  const { error: linkError } = await apiAs(token)
+    .from('item_categories')
+    .insert({ item_id: item!.id, category_id: categoryId });
+  if (linkError) throw linkError;
+
+  return { categoryId, itemId: item!.id };
+}
+
+export async function editorShare(token: string, categoryId: string) {
+  return share({
+    token,
+    categoryId,
+    invitedEmail: SEED.other.email,
+    role: 'editor',
+  });
+}

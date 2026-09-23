@@ -6,9 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { expect, test } from './test';
 
 import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
-// photos.spec.ts proves a photograph is stored and drawn; this is what a
-// collector does with it afterwards -- opening it full size and walking a
-// carousel that only exists once two are attached.
+// photos.spec.ts proves a photograph is stored; this opens it full size and walks the carousel.
 test.use({ locale: 'en-GB' });
 
 // Two real uploads before the first assertion, same as photos.spec.ts.
@@ -87,13 +85,11 @@ test.describe('looking at a photograph full size', () => {
     }
   });
 
-  // A card signs only the photographs it can show (hero and a strip of four);
-  // the rest are signed once the carousel opens (#630).
+  // A card signs only the five photographs it shows; the rest are signed once the carousel opens.
   test('shows a photograph past the card once the carousel reaches it', async ({
     on,
     page,
-  }, testInfo) => {
-    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+  }) => {
     test.setTimeout(240_000);
     const app = on(page);
     const { token } = context();
@@ -102,8 +98,7 @@ test.describe('looking at a photograph full size', () => {
     const title = uniqueTitle('Sechsfach');
     try {
       await app.catalogue.do.addEntry(title);
-      // Past five the card shows no more plates, so each upload is awaited
-      // by its photograph row, read back the way any client could.
+      // Past five the card shows no more plates, so each upload is awaited by its photograph row instead.
       const itemId = await itemIdFor(token, title);
       for (let upload = 1; upload <= 6; upload++) {
         // The control stays disabled until the card has shown the last one.

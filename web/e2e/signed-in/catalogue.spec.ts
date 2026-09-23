@@ -45,8 +45,7 @@ test.describe('the catalogue', () => {
     await expect(card.locators.tags).toHaveText([...denarius.tags]);
   });
 
-  // An unphotographed entry gets an empty mount rather than no image area,
-  // so every card in the stack keeps the same silhouette.
+  // An unphotographed entry keeps an empty image area, so every card has the same silhouette.
   test('gives an unphotographed entry the same shape as the rest', async ({
     on,
     page,

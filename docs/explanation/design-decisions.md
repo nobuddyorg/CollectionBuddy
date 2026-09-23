@@ -57,7 +57,7 @@ No update policy exists on `storage.objects` ([`0007_storage.sql`](../../supabas
 
 The owner-only storage policies key on path segment 1, the uploader's uid. The shared policies cannot — a grantee's uid appears nowhere in `<uid>/<itemId>/<file>` — so they key on segment 2 and join through `item_categories`. The old `"update shared objects"` policy tested segment 2 in both `USING` and `WITH CHECK`, and `UPDATE` is the one verb where those halves describe different rows: an update that rewrote **segment 1** passed both. An editor could move the owner's photo into their own uid prefix. Three controls then failed to reach it — revoking the share (the object now matched the attacker's own-prefix policy), the owner's read (segment 1 was no longer hers, and `has_category_read_access()` excludes ownership), and the sweep (it keyed on segment 2, which the move left intact). The photo was gone, permanently, to an account whose access had been revoked.
 
-Pinning segment 1 would have closed the hole and left a strict subset of `"update own objects"` — a capability nothing uses. `data/images.ts` only ever calls `upload` (never with `upsert`), `remove` and `createSignedUrls`, so dropping the verb costs nothing. `rls.spec.ts` asserts it from both sides.
+Pinning segment 1 would have closed the hole and left a strict subset of `"update own objects"` — a capability nothing uses. `data/images.ts` only ever calls `upload` (never with `upsert`), `remove` and `createSignedUrls`, so dropping the verb costs nothing. `e2e/signed-in/rls/editor-share-photographs.spec.ts` asserts it from both sides.
 
 ## Why the orphan-cleanup trigger is statement-level
 

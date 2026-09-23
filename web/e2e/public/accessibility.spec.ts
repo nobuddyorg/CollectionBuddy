@@ -2,8 +2,7 @@ import { test } from '../fixture';
 
 import { expectNoSeriousA11yViolations } from '../axe';
 
-// Pinned so this doesn't accidentally double-count a locale switch as a
-// second, unrelated accessibility state.
+// Pinned, so a locale switch is not scanned as a second accessibility state.
 test.use({ locale: 'en-GB' });
 
 test.describe('accessibility -- signed out', () => {
@@ -14,8 +13,7 @@ test.describe('accessibility -- signed out', () => {
     await expectNoSeriousA11yViolations(page, testInfo);
   });
 
-  // Opened directly: the local harness answers an unmatched path with a
-  // generic error template of its own, which no deployed visitor ever sees.
+  // Opened directly: the local harness answers an unmatched path with an error template of its own.
   test('the not-found page has no serious or critical violations', async ({
     page,
   }, testInfo) => {

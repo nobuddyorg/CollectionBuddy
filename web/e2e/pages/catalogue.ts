@@ -1,13 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
 interface Catalogue {
-  /**
-   * Points to self.
-   */
   (): Locator;
-  /**
-   * High-level interactions.
-   */
   do: {
     addEntry(title: string, description?: string): Promise<void>;
     clearSearch(): Promise<void>;
@@ -16,9 +10,6 @@ interface Catalogue {
     openMap(): Promise<void>;
     search(term: string): Promise<void>;
   };
-  /**
-   * Raw locators.
-   */
   locators: {
     buttons: {
       newEntry: Locator;
@@ -138,8 +129,7 @@ export function initCatalogue(page: Page): Catalogue {
     clearSearch: async () => {
       await locators.buttons.clearSearch.click();
     },
-    // Reaches the confirmation the delete raises, since that dialog is the
-    // second half of this one action rather than a screen of its own.
+    // Answers the confirmation too: that dialog is the second half of this action, not a screen of its own.
     removeEntry: async (title: string) => {
       const card = locators.cards.filter({ hasText: title });
       await card.getByTestId('delete-entry').click();

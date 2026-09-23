@@ -1,20 +1,11 @@
 import { type Locator, type Page } from '@playwright/test';
 
 interface Confirm {
-  /**
-   * Points to self.
-   */
   (): Locator;
-  /**
-   * High-level interactions.
-   */
   do: {
     accept(): Promise<void>;
     cancel(): Promise<void>;
   };
-  /**
-   * Raw locators.
-   */
   locators: {
     buttons: {
       accept: Locator;

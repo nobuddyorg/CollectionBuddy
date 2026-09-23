@@ -7,8 +7,7 @@ const SHELL_CACHE = 'collectionbuddy-shell-v1';
 
 type Page = import('@playwright/test').Page;
 
-/** Controlling the page, not merely registered -- an uncontrolled page's
- *  requests never reach the fetch handler at all. */
+/** Controlling, not merely registered: an uncontrolled page's requests never reach the fetch handler. */
 async function waitForController(page: Page) {
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
 }
@@ -30,8 +29,8 @@ test.describe('the service worker', () => {
     await waitForController(page);
 
     const registration = await page.evaluate(async () => {
-      const reg = await navigator.serviceWorker.ready;
-      return { scope: reg.scope, scriptURL: reg.active!.scriptURL };
+      const ready = await navigator.serviceWorker.ready;
+      return { scope: ready.scope, scriptURL: ready.active!.scriptURL };
     });
 
     // A scope at the origin root is refused on a subdirectory host.
@@ -62,7 +61,7 @@ test.describe('the service worker', () => {
 
     const origin = new URL(page.url()).origin;
     const shell = new URL('./', page.url()).toString();
-    // The manifest is cached with the shell (sw.ts's `isShellRequest`); whether it is there yet is a race the test must not depend on.
+    // Whether the manifest (cached with the shell) is there yet is a race the test must not depend on.
     const unexpected = urls.filter(
       (url) =>
         new URL(url).origin !== origin ||

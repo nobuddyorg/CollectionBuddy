@@ -61,7 +61,7 @@ No `update` policy means no row matches, so the omission is the denial. Category
 
 Grants are the second denial: `anon` has `revoke all` on every table, and `authenticated` holds exactly the DML each table's policies back — no `UPDATE` on `item_categories`/`images`, no `TRUNCATE`/`REFERENCES`/`TRIGGER` anywhere. `TRUNCATE` is the one RLS does not filter. `0007` raises at migration time if RLS is ever found disabled on `storage.objects`.
 
-`web/e2e/signed-in/rls.spec.ts` is the executable version of this section, covering owner-versus-stranger, `viewer` and `editor` with real tokens against a local stack; `supabase/tests/database/` covers the same logic directly in pgTAP.
+[`web/e2e/signed-in/rls/`](../../web/e2e/signed-in/rls/) is the executable version of this section, one spec per boundary (`isolation`, `viewer-share`, `editor-share`, each with a `-photographs` half for Storage, plus `search-rpc` and `quotas`), with real tokens against a local stack; `supabase/tests/database/` covers the same logic directly in pgTAP.
 
 ### Sharing
 
@@ -94,7 +94,7 @@ Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql
 - `storage_item_id()` — parses the item id out of a storage path, returning `NULL` rather than raising; it tests the segment with `pg_input_is_valid()` rather than catching the cast's error, so no call opens a subtransaction. See Storage.
 - `keepalive()` — no-op RPC, callable by `anon`, hit daily by `keep-alive.yml`.
 - `list_category_places()` — the map's distinct places for a category, `SECURITY INVOKER`.
-- `search_category_items()` — the searched catalogue page, `SECURITY DEFINER`: re-implements the read-access check (owns the item, or holds an active read grant on the category) and then queries with RLS bypassed so the trigram indexes are usable ([why](../explanation/design-decisions.md#why-search-uses-trigram-ilike-instead-of-full-text-search)). An authorization boundary in its own right, with its own `rls.spec.ts` case.
+- `search_category_items()` — the searched catalogue page, `SECURITY DEFINER`: re-implements the read-access check (owns the item, or holds an active read grant on the category) and then queries with RLS bypassed so the trigram indexes are usable ([why](../explanation/design-decisions.md#why-search-uses-trigram-ilike-instead-of-full-text-search)). An authorization boundary in its own right, with its own spec (`rls/search-rpc.spec.ts`).
 
 Every function pins `set search_path = ''`, and every one revokes `execute` from `public` and `anon` (trigger functions from `authenticated` too) before granting it to `authenticated` — except `keepalive()`, the one function `anon` may call. The revokes name `anon` and `authenticated` because hosted default privileges can give a new function a direct grant to each, which a revoke from `public` leaves in place (`0015`); `postgres`'s own default privileges no longer grant either.
 

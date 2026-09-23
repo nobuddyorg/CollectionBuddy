@@ -2,17 +2,9 @@ import { test as base } from './coverage';
 
 import { createPageTree } from './pages';
 
-/**
- * Adds `on`, the one handle every spec reaches the interface through:
- * `on(page).catalogue.do.search('...')` for an interaction,
- * `on(page).catalogue.locators.cards` for the element behind it.
- *
- * A function of `page` rather than a ready-made tree, so a spec that opens
- * a second browser context can point it at that context's page too.
- */
+/** A function of `page`, not a tree, so a spec with a second browser context can point it there. */
 export const test = base.extend<{ on: typeof createPageTree }>({
-  // `provide`, not Playwright's usual `use`: named `use` inside a property
-  // called `on`, it reads to react-hooks/rules-of-hooks as a hook call.
+  // Named provide, not use: inside a property called on, `use` reads to react-hooks/rules-of-hooks as a hook.
   on: async ({}, provide) => {
     await provide((page) => createPageTree(page));
   },

@@ -5,7 +5,7 @@ test.use({ locale: 'en-GB' });
 
 type Page = import('@playwright/test').Page;
 
-const themeAttr = (page: Page) =>
+const themeAttribute = (page: Page) =>
   page.evaluate(() => document.documentElement.getAttribute('data-theme'));
 
 test.describe('the account menu', () => {
@@ -19,14 +19,14 @@ test.describe('the account menu', () => {
     on,
     page,
   }) => {
-    expect(await themeAttr(page)).not.toBe('dark');
+    expect(await themeAttribute(page)).not.toBe('dark');
 
     await on(page).account.do.chooseTheme('dark');
-    await expect.poll(() => themeAttr(page)).toBe('dark');
+    await expect.poll(() => themeAttribute(page)).toBe('dark');
 
     // Before hydration: the head script found it, with no flash to fix up.
     await page.reload({ waitUntil: 'domcontentloaded' });
-    expect(await themeAttr(page)).toBe('dark');
+    expect(await themeAttribute(page)).toBe('dark');
   });
 
   test('changes the language, and the next visit arrives in it', async ({

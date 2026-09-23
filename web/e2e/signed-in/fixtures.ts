@@ -59,26 +59,12 @@ const PAGING_ITEMS: SeedItem[] = Array.from({ length: 11 }, (_, index) => ({
   tags: [],
 }));
 
-/**
- * The collection every signed-in test looks at.
- *
- * Small enough to assert on exactly. Search terms are chosen so each matches
- * exactly one entry through a different column (title, description, place,
- * tag), so the search test notices a broken column rather than just one match.
- */
+/** Each search term below matches exactly one entry through a different column, so a broken column shows. */
 export const SEED = {
   email: 'e2e@collectionbuddy.test',
   password: 'e2e-password-not-a-secret',
 
-  /**
-   * A second collector, with a collection of their own.
-   *
-   * Row-level security is this app's whole authorization boundary (no server
-   * exists to check anything else). A single-user suite can't notice a broken
-   * policy, since every query it makes is one policies are supposed to allow
-   * anyway; another user's rows have to exist before "cannot see them" means
-   * anything.
-   */
+  /** A second collector: another user's rows have to exist before "cannot see them" means anything. */
   other: {
     email: 'e2e-other@collectionbuddy.test',
     password: 'other-password-not-a-secret',
@@ -86,10 +72,7 @@ export const SEED = {
     item: 'Fremdes Fundstück',
   },
 
-  // One scratch collection per writing spec, kept separate from the read
-  // collections and from each other: specs run in parallel against one
-  // database, so a test creating an entry while another counts them fails at
-  // random if they share a collection.
+  // One scratch collection per writing spec: specs run in parallel against one database.
   categories: [
     'Münzen',
     'Briefmarken',
@@ -112,14 +95,7 @@ export const SEED = {
   photoCategory: 'Fotostudio',
   /** For export.spec.ts, which also creates, photographs and deletes an entry. */
   exportCategory: 'Exportarchiv',
-  /**
-   * For rls.spec.ts's `editor`-grant cases.
-   *
-   * Those write as the *grantee* -- editing and deleting the owner's entries,
-   * and adding entries of their own. Münzen, which the viewer-grant cases
-   * share, is a read-only fixture for the rest of the suite, so the editor
-   * cases need a collection of their own to take apart.
-   */
+  /** For rls/editor-share.spec.ts, whose grantee edits and deletes the owner's entries here. */
   editorCategory: 'Leihgabe',
   /** For sharing.spec.ts, which issues and revokes a grant through the panel. */
   shareCategory: 'Vitrine',
@@ -135,11 +111,10 @@ export const SEED = {
   viewerCategory: 'Bildergalerie',
   /** For undo.spec.ts, which deletes an entry and takes it back. */
   undoCategory: 'Rückgängig',
-  /** For upload-failure.spec.ts, whose uploads are made to fail. */
+  /** For failures.spec.ts, whose uploads are made to fail. */
   failureCategory: 'Pannenwerkstatt',
 
-  // Oldest first. The list sorts newest-first, so the last one here is the
-  // first card on the page.
+  // Oldest first; the list sorts newest first, so the last one here is the first card on the page.
   items: [
     {
       category: 'Münzen',
@@ -207,8 +182,7 @@ export const SEED = {
       tags: [],
     },
     {
-      // The editor-grant cases edit and delete this one, so they reseed it
-      // themselves rather than counting on it surviving.
+      // The editor-grant cases edit and delete this one, so they reseed it themselves.
       category: 'Leihgabe',
       title: 'Leihstück',
       description: 'Bleibt liegen, damit die Leihgabe nie leer bleibt.',

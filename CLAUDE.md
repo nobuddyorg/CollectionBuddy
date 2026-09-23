@@ -90,7 +90,7 @@ several real RLS bugs. Every policy change is security-critical.
   `e2e/signed-in.setup.ts` seed covers most shapes), apply the new file on top,
   and say in the PR that you did.
 - A policy, grant, or ownership-trigger change ships a matching case in
-  `web/e2e/signed-in/rls.spec.ts` in the same change — two real identities,
+  `web/e2e/signed-in/rls/` in the same change — two real identities,
   real tokens, straight at PostgREST. A pgTAP case in
   `supabase/tests/database/` is welcome alongside but does not replace it.
 - Call out any change under `supabase/migrations/**` in the commit message and
@@ -140,7 +140,7 @@ several real RLS bugs. Every policy change is security-critical.
   is the default locale.
 - **Tests:** a UI change gets an E2E case for its journey; a functional change
   gets a unit test asserting behavior, not implementation; an authorization
-  change gets its `rls.spec.ts` case. E2E specs reach the app only through the
+  change gets its `e2e/signed-in/rls/` case. E2E specs reach the app only through the
   page objects in `web/e2e/pages/`, every element by `data-testid`. Disagreeing
   with the playbook is fine; departing from it silently is not.
 - **Docs sync:** a change to setup, the checklist, architecture, configuration,

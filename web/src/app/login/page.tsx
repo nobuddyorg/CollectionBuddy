@@ -57,10 +57,15 @@ export default function LoginPage() {
         data-testid="wordmark"
         className="font-display text-4xl sm:text-5xl mb-3 text-center"
       >
-        <span className="border-b-[3px] border-foreground pb-0.5">
+        <span
+          data-testid="wordmark-part"
+          className="border-b-[3px] border-foreground pb-0.5"
+        >
           {t('brand.collection')}
         </span>
-        <span className="text-accent">{t('brand.buddy')}</span>
+        <span data-testid="wordmark-part" className="text-accent">
+          {t('brand.buddy')}
+        </span>
       </h1>
 
       <p

@@ -3,37 +3,27 @@ import { defineConfig, devices } from '@playwright/test';
 import { EXPORT_BASE_PATH } from './next.config';
 import { AUTH_STATE_PATH } from './e2e/signed-in/fixtures';
 
-// One suite, two targets. Unset, it serves the local export; with
-// E2E_BASE_URL it runs against a deployed site. Everything in e2e/ has to
-// hold for a *signed-out* visitor, so a production run stays read-only.
+// Unset, the suite serves the local export; with E2E_BASE_URL it runs read-only against a deployed site.
 const PORT = Number(process.env.E2E_PORT ?? 4173);
 
-// Trailing slash: Playwright resolves a relative goto() against this, and
-// without it the last segment (the base path) is dropped.
+// Trailing slash: a relative goto() resolves against this, and without it the base path segment is dropped.
 const localURL = `http://127.0.0.1:${PORT}${EXPORT_BASE_PATH}/`;
 const baseURL = process.env.E2E_BASE_URL ?? localURL;
 const isRemote = Boolean(process.env.E2E_BASE_URL);
 
-// Signed-in tests run only when a database is pointed at (a local
-// `supabase start`), so `npm run e2e` alone stays runnable with nothing
-// installed.
+// Signed-in projects exist only with a local stack, so `npm run e2e` alone needs nothing installed.
 const localStack = Boolean(process.env.E2E_SUPABASE_URL);
 
 export default defineConfig({
   testDir: './e2e',
-  // Merges every worker's JS/CSS coverage (e2e/coverage.ts's autoCoverage
-  // fixture) into one report once every project has finished.
+  // Merges every worker's coverage (e2e/coverage.ts) into one report once every project has finished.
   globalTeardown: './e2e/global-teardown.ts',
-  // Retries would hide the flake worth knowing about. The remote target is
-  // the exception: there, a retry distinguishes a broken deploy from a
-  // dropped connection.
+  // No retries locally, they hide flakes; remotely one distinguishes a broken deploy from a dropped connection.
   retries: isRemote ? 2 : 0,
   forbidOnly: !!process.env.CI,
   workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI
-    ? // `html` is kept as an artifact since a browser failure reads better
-      // as a trace than a stack. `json` feeds the job-summary step in
-      // ci.yml (daun/playwright-report-summary) -- nothing else reads it.
+    ? // html is kept as an artifact for the trace; json feeds ci.yml's job-summary step and nothing else.
       [
         ['github'],
         ['list'],
@@ -52,16 +42,13 @@ export default defineConfig({
       testDir: './e2e/public',
       use: { ...devices['Desktop Chrome'] },
     },
-    // The app is mobile-first and most layout bugs have been phone-only, so
-    // this is a target, not a variation.
+    // Mobile-first app, and most layout bugs have been phone-only: a target, not a variation.
     {
       name: 'mobile',
       testDir: './e2e/public',
       use: { ...devices['Pixel 7'] },
     },
-    // The only non-Chromium engine in the matrix. Coverage collection skips
-    // it (e2e/coverage.ts -- Playwright's Coverage API is Chromium-only via
-    // CDP) but every other assertion in e2e/public runs here too.
+    // The only non-Chromium engine; coverage collection skips it, every other assertion runs here too.
     {
       name: 'firefox',
       testDir: './e2e/public',
@@ -80,8 +67,7 @@ export default defineConfig({
             dependencies: ['setup'],
             use: {
               ...devices['Desktop Chrome'],
-              // The session the setup project minted, loaded per test so
-              // no test can leave another signed out.
+              // The session the setup project minted, loaded per test so no test can leave another signed out.
               storageState: AUTH_STATE_PATH,
             },
           },

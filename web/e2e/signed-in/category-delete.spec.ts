@@ -6,11 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { expect, test } from './test';
 import { CONTEXT_PATH, type SeedContext } from './fixtures';
 
-// categories.spec.ts deletes an empty collection, which is the harmless
-// half. This is the other one: a collection with an entry and a photograph
-// in it, where the confirmation has to count what is about to go, and the
-// files have to be swept client-side -- SQL cannot reach object storage, so
-// nothing else ever would.
+// The other half of categories.spec.ts: a collection with contents, whose photographs only the client sweeps.
 test.use({ locale: 'en-GB' });
 
 // A real upload before the delete even starts.
@@ -44,10 +40,14 @@ async function itemIdFor(token: string, title: string) {
 }
 
 /** Every stored object under one item's own prefix, not the whole account. */
-async function storedObjects(token: string, userId: string, itemId: string) {
-  const { data } = await apiAs(token)
+async function storedObjects(item: {
+  token: string;
+  userId: string;
+  itemId: string;
+}) {
+  const { data } = await apiAs(item.token)
     .storage.from('item-images')
-    .list(`${userId}/${itemId}`);
+    .list(`${item.userId}/${item.itemId}`);
   return (data ?? []).map((object) => object.name);
 }
 
@@ -55,13 +55,11 @@ test.describe('deleting a collection that still holds things', () => {
   test('counts what it is about to destroy, and takes the photographs too', async ({
     on,
     page,
-  }, testInfo) => {
-    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+  }) => {
     const app = on(page);
     const { token, userId } = context();
 
-    // Its own throwaway collection, created here and destroyed by the test
-    // itself -- nothing seeded is safe to delete out from under the suite.
+    // Its own throwaway collection: nothing seeded is safe to delete out from under the suite.
     const name = `E2E Vollgepackt ${Date.now()}`;
     const title = `Inhalt ${Date.now()}`;
 
@@ -74,7 +72,7 @@ test.describe('deleting a collection that still holds things', () => {
     const itemId = await itemIdFor(token, title);
     await card.do.uploadPhoto(PHOTO);
     await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
-    expect(await storedObjects(token, userId, itemId)).not.toEqual([]);
+    expect(await storedObjects({ token, userId, itemId })).not.toEqual([]);
 
     await app.categories.do.delete();
     // Named and counted, not a bare "are you sure".
@@ -85,11 +83,11 @@ test.describe('deleting a collection that still holds things', () => {
 
     await expect(app.categories.locators.selected).not.toHaveText(name);
     await expect
-      .poll(() => storedObjects(token, userId, itemId), { timeout: 15_000 })
+      .poll(() => storedObjects({ token, userId, itemId }), { timeout: 15_000 })
       .toEqual([]);
   });
 
-  // The delete waits out the toast's undo window; undo inside it puts the collection back, selected, with nothing lost.
+  // The delete waits out the undo window; undo inside it puts the collection back, selected, with nothing lost.
   test('can be taken back inside the undo window', async ({ on, page }) => {
     const app = on(page);
     const name = `E2E Doch behalten ${Date.now()}`;

@@ -10,7 +10,7 @@ import {
   type SeedContext,
 } from './fixtures';
 
-// The grantee's side, in their own session; rls.spec.ts has what it reaches.
+// The grantee's side, in their own session; rls/viewer-share.spec.ts has what it reaches.
 test.use({ storageState: OTHER_AUTH_STATE_PATH, locale: 'en-GB' });
 
 const context = () =>
@@ -28,12 +28,16 @@ function apiAs(token: string) {
   );
 }
 
-async function ownedCategoryId(token: string, userId: string, name: string) {
-  const { data, error } = await apiAs(token)
+async function ownedCategoryId(owner: {
+  token: string;
+  userId: string;
+  name: string;
+}) {
+  const { data, error } = await apiAs(owner.token)
     .from('categories')
     .select('id')
-    .eq('user_id', userId)
-    .eq('name', name)
+    .eq('user_id', owner.userId)
+    .eq('name', owner.name)
     .single();
   if (error) throw error;
   return data.id as string;
@@ -43,17 +47,16 @@ test.describe('a collection shared with you', () => {
   test('is marked as someone else, refuses the owner controls, and can be left', async ({
     on,
     page,
-  }, testInfo) => {
-    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+  }) => {
     const app = on(page);
     const { token, userId } = context();
 
     // Issued by the owner, as sharing.spec.ts does through the panel.
-    const categoryId = await ownedCategoryId(
+    const categoryId = await ownedCategoryId({
       token,
       userId,
-      SEED.grantedCategory,
-    );
+      name: SEED.grantedCategory,
+    });
     const { data: grant, error } = await apiAs(token)
       .from('category_shares')
       .insert({ category_id: categoryId, invited_email: SEED.other.email })
