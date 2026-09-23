@@ -180,6 +180,8 @@ npm run e2e:local         # needs `supabase start`; required if you touched cata
                           # search, map, entry forms, photos, sharing, export, or RLS
 supabase test db          # repo root, needs `supabase start`; required alongside
                           # e2e:local for RLS policies, grants, ownership triggers, schema
+supabase/splinter.sh      # repo root, needs `supabase start` and `psql`; same trigger as
+                          # `supabase test db` -- the hosted dashboard's Advisors lints
 opengrep scan --config auto web/src web/scripts web/e2e supabase
                           # if you touched those paths; install: CONTRIBUTING.md
 npm run lighthouse        # needs `supabase start`

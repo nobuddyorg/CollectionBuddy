@@ -161,6 +161,22 @@ the Storage API and the bytes behind a `storage.objects` row are exercised. A
 policy, grant, or ownership-trigger change needs its `rls.spec.ts` case
 regardless of pgTAP coverage.
 
+### Splinter (Supabase Advisors lints)
+
+```bash
+supabase/splinter.sh   # repository root, after supabase start; needs psql
+```
+
+Runs [Splinter](https://github.com/supabase/splinter), the lint set behind the
+hosted dashboard's Advisors, against the local stack, and fails on any `WARN`
+or `ERROR`: RLS disabled, a mutable `search_path`, an unindexed foreign key, a
+`SECURITY DEFINER` function the API roles can execute. CI runs it right after
+pgTAP. The script pins Splinter by commit and checksum and lists what it
+excuses, each with its reason: `unused_index`, which reads runtime statistics
+a freshly reset database does not have, and `search_category_items`, the one
+deliberate `SECURITY DEFINER` RPC. A new excuse is a design decision and goes
+into that list with its reason, never into a broader filter.
+
 ## Run mutation testing
 
 ```bash

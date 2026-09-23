@@ -80,6 +80,7 @@ stack (`supabase start` from the repository root):
 | `npm run test:mutation` | code in a file listed in `web/mutation-targets.mjs` (comments produce no new mutants) | `mutation_test` |
 | `npm run e2e:local` | catalogue, search, map, entry forms, photos, sharing, export/import, or any RLS policy | `e2e_local_stack` |
 | `supabase test db` (repository root) | RLS policies, grants, triggers, functions, or the schema | `e2e_local_stack` |
+| `supabase/splinter.sh` (repository root, needs `psql`) | RLS policies, grants, triggers, functions, or the schema | `e2e_local_stack` |
 | `opengrep scan --config auto web/src web/scripts web/e2e supabase` | anything under those paths | `opengrep` |
 | `npm run lighthouse` | anything that ships in the bundle | `lighthouse` |
 | OWASP ZAP baseline | response headers, CSP, the login page | `zap_baseline` |

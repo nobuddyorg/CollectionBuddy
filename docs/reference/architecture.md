@@ -17,7 +17,7 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | --- | --- |
 | [`0008_drop_items_tags_gin.sql`](../../supabase/migrations/0008_drop_items_tags_gin.sql) | Drops the GIN index on `items.tags`, which no query read. |
 | [`0009_user_quotas.sql`](../../supabase/migrations/0009_user_quotas.sql) | Per-owner quotas: 1 GiB of full-size photographs and 50,000 entries, with photograph sizes taken from Storage rather than the client. |
-| [`0010_revoke_public_execute.sql`](../../supabase/migrations/0010_revoke_public_execute.sql) | Revokes PUBLIC's default `EXECUTE` on `storage_item_id()`, so only `authenticated` may call it. |
+| [`0010_revoke_public_execute.sql`](../../supabase/migrations/0010_revoke_public_execute.sql) | Revokes PUBLIC's default `EXECUTE` on `storage_item_id()` and on the `SECURITY DEFINER` trigger functions of `0002`; triggers still fire, direct calls are refused. |
 
 ### Tables
 

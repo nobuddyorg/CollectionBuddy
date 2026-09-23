@@ -70,6 +70,19 @@ select is(
   'every security definer function is owned by postgres, not by a lesser role'
 );
 
+-- A trigger fires without EXECUTE, so the API roles hold it on one definer only: the deliberate RPC (0010, Splinter 0028/0029).
+select is(
+  (select array_agg(p.proname::text || ' to ' || r.rolname order by p.proname, r.rolname)
+   from pg_catalog.pg_proc p
+   join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+   cross join (values ('anon'), ('authenticated')) as r(rolname)
+   where n.nspname = 'public'
+     and p.prosecdef
+     and has_function_privilege(r.rolname, p.oid, 'EXECUTE')),
+  array['search_category_items to authenticated'],
+  'the API roles can execute exactly one security definer function: search_category_items, signed in'
+);
+
 -- Two must stay `security invoker`. list_category_places checks nothing itself; as a definer it would be an unsound second boundary.
 select ok(
   not (select prosecdef from pg_catalog.pg_proc where oid = 'public.list_category_places(uuid, text)'::regprocedure),
