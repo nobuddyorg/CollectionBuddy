@@ -15,21 +15,23 @@ function fail(message) {
   process.exit(1);
 }
 
-function localStack() {
+function supabaseStatus() {
   try {
-    const { API_URL, ANON_KEY } = JSON.parse(
-      execFileSync('supabase', ['status', '-o', 'json'], {
-        cwd: repoRoot,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }),
-    );
-    return { url: API_URL, anonKey: ANON_KEY };
+    return execFileSync('supabase', ['status', '-o', 'json'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
   } catch {
-    return fail(
+    fail(
       'Could not read the local Supabase stack. Start it first:\n\n  supabase start\n',
     );
   }
+}
+
+function localStack() {
+  const { API_URL, ANON_KEY } = JSON.parse(supabaseStatus());
+  return { url: API_URL, anonKey: ANON_KEY };
 }
 
 function hosted(confirmed) {
@@ -62,10 +64,10 @@ if (!PROFILES.includes(values.profile)) {
 
 const confirmed = values['confirm-production'];
 const targets = { 'local-stack': localStack, hosted: () => hosted(confirmed) };
-const resolveProject =
-  targets[values.target] ??
+if (!Object.hasOwn(targets, values.target)) {
   fail(`--target must be local-stack or hosted, not ${values.target}`);
-const project = resolveProject();
+}
+const project = targets[values.target]();
 
 // k6 writes the summary files handleSummary names but will not create their directory.
 mkdirSync(resolve(webDir, 'load-results'), { recursive: true });
