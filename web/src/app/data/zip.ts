@@ -1,14 +1,4 @@
-/**
- * A minimal ZIP writer, store-only (no deflate).
- *
- * Written by hand rather than pulled in as a dependency: the bytes going
- * into the archive are already WebP-compressed photographs, so deflate
- * would run over every megabyte to produce roughly the same megabyte.
- *
- * Deliberately does NOT support Zip64, which caps an archive at 4 GiB and
- * 65535 entries -- see MAX_ZIP_BYTES/MAX_ZIP_ENTRIES below, enforced rather
- * than silently rolling over into a corrupt file.
- */
+// Store-only and no Zip64: the 4 GiB / 65535-entry ceilings are refused, never rolled over.
 
 const LOCAL_HEADER_SIGNATURE = 0x04034b50;
 const CENTRAL_HEADER_SIGNATURE = 0x02014b50;
@@ -27,26 +17,20 @@ const FLAG_UTF8 = 0x0800;
 /** Compression method 0 -- the bytes are stored verbatim. */
 const METHOD_STORE = 0;
 
-/**
- * The point past which the 32-bit header fields stop being able to
- * describe the archive; beyond either of these a writer must move to
- * Zip64, so this one refuses instead.
- */
+/** Past these the 32-bit header fields cannot describe the archive without Zip64. */
 export const MAX_ZIP_BYTES = 0xffffffff;
 export const MAX_ZIP_ENTRIES = 0xffff;
 
 const CRC32_POLYNOMIAL = 0xedb88320;
 
-// Built once on first use rather than at module load: a module that is
-// imported for its type alone should not spend 256 iterations proving it.
+// Built on first use, not at module load: importing this module for a type costs no table.
 let crcTable: Uint32Array | null = null;
 
-function crc32Step(c: number): number {
-  return c & 1 ? CRC32_POLYNOMIAL ^ (c >>> 1) : c >>> 1;
+function crc32Step(crc: number): number {
+  return crc & 1 ? CRC32_POLYNOMIAL ^ (crc >>> 1) : crc >>> 1;
 }
 
 function crc32TableEntry(byte: number): number {
-  // One step per bit of the byte, folded rather than counted.
   return Array.from({ length: 8 }).reduce<number>(crc32Step, byte) >>> 0;
 }
 
@@ -68,11 +52,7 @@ export function crc32(bytes: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-/**
- * A timestamp in the packed MS-DOS form the headers use: seconds at
- * two-second resolution, and a year counted from 1980. Anything the format
- * cannot express is clamped to 1980-01-01 rather than allowed to wrap.
- */
+/** Packed MS-DOS time and date; a year outside 1980-2107 clamps to 1980-01-01 instead of wrapping. */
 export function dosDateTime(date: Date): { time: number; date: number } {
   const year = date.getFullYear();
   if (year < 1980 || year > 2107) return { time: 0, date: (1 << 5) | 1 };
@@ -103,40 +83,38 @@ export type ZipEntry = {
   date: number;
 };
 
-function view(length: number): {
+/** A zero-filled header buffer with little-endian field writers, as every ZIP field is. */
+function headerBuffer(length: number): {
   bytes: Uint8Array<ArrayBuffer>;
-  dv: DataView;
+  uint16: (offset: number, value: number) => void;
+  uint32: (offset: number, value: number) => void;
 } {
   const bytes = new Uint8Array(length);
-  return { bytes, dv: new DataView(bytes.buffer) };
-}
-
-// Every multi-byte field in a ZIP header is little-endian, stated here once
-// rather than at each of the writes below.
-function u16(dv: DataView, offset: number, value: number): void {
-  dv.setUint16(offset, value, true);
-}
-
-function u32(dv: DataView, offset: number, value: number): void {
-  dv.setUint32(offset, value, true);
+  const dataView = new DataView(bytes.buffer);
+  return {
+    bytes,
+    uint16: (offset, value) => dataView.setUint16(offset, value, true),
+    uint32: (offset, value) => dataView.setUint32(offset, value, true),
+  };
 }
 
 /** The 30-byte header (plus name) that precedes an entry's bytes. */
 export function localFileHeader(entry: ZipEntry): Uint8Array<ArrayBuffer> {
   const name = encodePath(entry.path);
-  const { bytes, dv } = view(LOCAL_HEADER_BYTES + name.length);
-  u32(dv, 0, LOCAL_HEADER_SIGNATURE);
-  u16(dv, 4, VERSION);
-  u16(dv, 6, FLAG_UTF8);
-  u16(dv, 8, METHOD_STORE);
-  u16(dv, 10, entry.time);
-  u16(dv, 12, entry.date);
-  u32(dv, 14, entry.crc);
+  const { bytes, uint16, uint32 } = headerBuffer(
+    LOCAL_HEADER_BYTES + name.length,
+  );
+  uint32(0, LOCAL_HEADER_SIGNATURE);
+  uint16(4, VERSION);
+  uint16(6, FLAG_UTF8);
+  uint16(8, METHOD_STORE);
+  uint16(10, entry.time);
+  uint16(12, entry.date);
+  uint32(14, entry.crc);
   // Stored, so the compressed and uncompressed sizes are the same number.
-  u32(dv, 18, entry.size);
-  u32(dv, 22, entry.size);
-  u16(dv, 26, name.length);
-  // Extra-field length is zero, which the zero-filled buffer already says.
+  uint32(18, entry.size);
+  uint32(22, entry.size);
+  uint16(26, name.length);
   bytes.set(name, LOCAL_HEADER_BYTES);
   return bytes;
 }
@@ -146,22 +124,22 @@ export function centralDirectoryEntry(
   entry: ZipEntry,
 ): Uint8Array<ArrayBuffer> {
   const name = encodePath(entry.path);
-  const { bytes, dv } = view(CENTRAL_HEADER_BYTES + name.length);
-  u32(dv, 0, CENTRAL_HEADER_SIGNATURE);
-  u16(dv, 4, VERSION);
-  u16(dv, 6, VERSION);
-  u16(dv, 8, FLAG_UTF8);
-  u16(dv, 10, METHOD_STORE);
-  u16(dv, 12, entry.time);
-  u16(dv, 14, entry.date);
-  u32(dv, 16, entry.crc);
-  u32(dv, 20, entry.size);
-  u32(dv, 24, entry.size);
-  u16(dv, 28, name.length);
-  // Extra, comment, disk number, internal attributes, external attributes:
-  // all zero. The zeroed array already says so; they are named here only
-  // because their absence is otherwise indistinguishable from an omission.
-  u32(dv, 42, entry.offset);
+  const { bytes, uint16, uint32 } = headerBuffer(
+    CENTRAL_HEADER_BYTES + name.length,
+  );
+  uint32(0, CENTRAL_HEADER_SIGNATURE);
+  uint16(4, VERSION);
+  uint16(6, VERSION);
+  uint16(8, FLAG_UTF8);
+  uint16(10, METHOD_STORE);
+  uint16(12, entry.time);
+  uint16(14, entry.date);
+  uint32(16, entry.crc);
+  uint32(20, entry.size);
+  uint32(24, entry.size);
+  uint16(28, name.length);
+  // Bytes 30-41 (extra, comment, disk, attributes) stay zero.
+  uint32(42, entry.offset);
   bytes.set(name, CENTRAL_HEADER_BYTES);
   return bytes;
 }
@@ -176,15 +154,13 @@ export function endOfCentralDirectory({
   size: number;
   offset: number;
 }): Uint8Array<ArrayBuffer> {
-  const { bytes, dv } = view(END_OF_CENTRAL_DIR_BYTES);
-  u32(dv, 0, END_OF_CENTRAL_DIR_SIGNATURE);
-  // This disk's number, and the disk the directory starts on: both zero in
-  // a single-disk archive, and the zero-filled buffer already says so.
-  u16(dv, 8, entries);
-  u16(dv, 10, entries);
-  u32(dv, 12, size);
-  u32(dv, 16, offset);
-  // Archive comment length: zero, already in the buffer.
+  const { bytes, uint16, uint32 } = headerBuffer(END_OF_CENTRAL_DIR_BYTES);
+  uint32(0, END_OF_CENTRAL_DIR_SIGNATURE);
+  // Bytes 4-7 (this disk, the directory's disk) and 20-21 (comment length) stay zero.
+  uint16(8, entries);
+  uint16(10, entries);
+  uint32(12, size);
+  uint32(16, offset);
   return bytes;
 }
 
@@ -195,12 +171,7 @@ export class ZipReadError extends Error {
   }
 }
 
-/**
- * Reads an archive `createZipWriter` produced back into its entries, keyed
- * by path. Walks the central directory rather than the local headers --
- * the same place a real extractor trusts, and where every entry's size and
- * offset are recorded without summing the local entries first.
- */
+/** Reads an archive `createZipWriter` produced back into entries by path, via the central directory. */
 export async function readZipEntries(
   blob: Blob,
 ): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
@@ -208,19 +179,21 @@ export async function readZipEntries(
   if (bytes.length < END_OF_CENTRAL_DIR_BYTES) {
     throw new ZipReadError('Not a ZIP archive: file is too small');
   }
-  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const eocd = bytes.length - END_OF_CENTRAL_DIR_BYTES;
-  if (dv.getUint32(eocd, true) !== END_OF_CENTRAL_DIR_SIGNATURE) {
-    // A real extractor scans backward to allow for an archive comment after
-    // this signature; `createZipWriter` never writes one, so requiring it
-    // at the very end is exact for anything this app produced.
+  const dataView = new DataView(
+    bytes.buffer,
+    bytes.byteOffset,
+    bytes.byteLength,
+  );
+  const trailerAt = bytes.length - END_OF_CENTRAL_DIR_BYTES;
+  if (dataView.getUint32(trailerAt, true) !== END_OF_CENTRAL_DIR_SIGNATURE) {
+    // No backward scan for an archive comment: `createZipWriter` never writes one.
     throw new ZipReadError(
       'Not a ZIP archive: no end-of-central-directory record',
     );
   }
 
-  const entryCount = dv.getUint16(eocd + 8, true);
-  let directoryAt = dv.getUint32(eocd + 16, true);
+  const entryCount = dataView.getUint16(trailerAt + 8, true);
+  let directoryAt = dataView.getUint32(trailerAt + 16, true);
 
   const entries = new Map<string, Uint8Array<ArrayBuffer>>();
   const decoder = new TextDecoder();
@@ -230,14 +203,14 @@ export async function readZipEntries(
         'Corrupt archive: central directory runs past the file',
       );
     }
-    if (dv.getUint32(directoryAt, true) !== CENTRAL_HEADER_SIGNATURE) {
+    if (dataView.getUint32(directoryAt, true) !== CENTRAL_HEADER_SIGNATURE) {
       throw new ZipReadError(
         'Corrupt archive: malformed central directory entry',
       );
     }
-    const size = dv.getUint32(directoryAt + 24, true);
-    const nameLength = dv.getUint16(directoryAt + 28, true);
-    const localOffset = dv.getUint32(directoryAt + 42, true);
+    const size = dataView.getUint32(directoryAt + 24, true);
+    const nameLength = dataView.getUint16(directoryAt + 28, true);
+    const localOffset = dataView.getUint32(directoryAt + 42, true);
     const name = decoder.decode(
       bytes.slice(
         directoryAt + CENTRAL_HEADER_BYTES,
@@ -245,7 +218,7 @@ export async function readZipEntries(
       ),
     );
 
-    const localNameLength = dv.getUint16(localOffset + 26, true);
+    const localNameLength = dataView.getUint16(localOffset + 26, true);
     const dataStart = localOffset + LOCAL_HEADER_BYTES + localNameLength;
     if (dataStart + size > bytes.length) {
       throw new ZipReadError(`Corrupt archive: "${name}" runs past the file`);
@@ -264,18 +237,18 @@ export class ZipLimitError extends Error {
   }
 }
 
-/**
- * Keeps the writer inside what its 32-bit headers can describe. Lifted out
- * of the writer so a test can lower `maxBytes`/`maxEntries` to reach a
- * boundary cheaply instead of allocating gigabytes or tens of thousands of
- * entries.
- */
-export function assertZipRoom(
-  totalBytes: number,
-  entryCount: number,
+/** Refuses what the 32-bit headers cannot describe; a test lowers the limits to reach them cheaply. */
+export function assertZipRoom({
+  totalBytes,
+  entryCount,
   maxBytes = MAX_ZIP_BYTES,
   maxEntries = MAX_ZIP_ENTRIES,
-): void {
+}: {
+  totalBytes: number;
+  entryCount: number;
+  maxBytes?: number;
+  maxEntries?: number;
+}): void {
   if (totalBytes > maxBytes) {
     throw new ZipLimitError('Archive would exceed the 4 GiB ZIP limit');
   }
@@ -285,20 +258,17 @@ export function assertZipRoom(
 }
 
 export type ZipWriter = {
-  add: (path: string, bytes: Uint8Array<ArrayBuffer>, modified?: Date) => void;
+  add: (entry: {
+    path: string;
+    bytes: Uint8Array<ArrayBuffer>;
+    modified?: Date;
+  }) => void;
   /** Bytes written so far, which is what the archive would weigh today. */
   size: () => number;
   finish: () => Blob;
 };
 
-/**
- * Accumulates entries and hands back the finished archive as one Blob.
- *
- * Each entry becomes its own Blob the moment it's added, and the caller's
- * `Uint8Array` is not retained -- a Blob is something the browser may keep
- * on disk, so a hundred photographs cost one photograph of live heap, not
- * a hundred.
- */
+/** Each entry becomes its own Blob as it is added, so a hundred photographs cost one in heap. */
 export function createZipWriter({
   maxBytes = MAX_ZIP_BYTES,
   maxEntries = MAX_ZIP_ENTRIES,
@@ -308,17 +278,15 @@ export function createZipWriter({
   let offset = 0;
 
   return {
-    add(path, bytes, modified = new Date()) {
-      // Checked before the CRC rather than after: hashing is a pass over
-      // every byte, and there's no reason to spend one on an entry that's
-      // about to be refused.
+    add({ path, bytes, modified = new Date() }) {
+      // Checked before the CRC: hashing is a pass over every byte of an entry about to be refused.
       const headerLength = LOCAL_HEADER_BYTES + encodePath(path).length;
-      assertZipRoom(
-        offset + headerLength + bytes.length,
-        entries.length + 1,
+      assertZipRoom({
+        totalBytes: offset + headerLength + bytes.length,
+        entryCount: entries.length + 1,
         maxBytes,
         maxEntries,
-      );
+      });
 
       const { time, date } = dosDateTime(modified);
       const entry: ZipEntry = {
@@ -338,9 +306,17 @@ export function createZipWriter({
 
     finish() {
       const directory = entries.map(centralDirectoryEntry);
-      const directorySize = directory.reduce((sum, d) => sum + d.length, 0);
+      const directorySize = directory.reduce(
+        (sum, record) => sum + record.length,
+        0,
+      );
       const total = offset + directorySize + END_OF_CENTRAL_DIR_BYTES;
-      assertZipRoom(total, entries.length, maxBytes, maxEntries);
+      assertZipRoom({
+        totalBytes: total,
+        entryCount: entries.length,
+        maxBytes,
+        maxEntries,
+      });
       return new Blob([
         ...parts,
         ...directory,

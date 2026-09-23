@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { importCategory, type ImportProgress } from './importCategory';
-import { ImportFormatError } from './importFormat';
+import {
+  ImportCancelledError,
+  importCategory,
+  ITEM_INSERT_BATCH_SIZE,
+} from './importCategory';
 import {
   buildManifest,
   exportEntries,
@@ -141,107 +144,70 @@ function baseFakes() {
   };
 }
 
-describe('importCategory', () => {
-  it('throws a named ImportError rather than importing when there is no session', async () => {
+describe('importCategory, cancelled', () => {
+  it('rejects immediately with ImportCancelledError when the signal is already aborted', async () => {
     const archive = await buildArchive();
-    const failure = importCategory({
-      file: archive,
-      categoryName: 'Coins',
-      ...baseFakes(),
-      getUid: fakeGetUid(null),
-    });
-    await expect(failure).rejects.toThrow('No user session');
-    await expect(failure).rejects.toHaveProperty('name', 'ImportError');
-  });
-
-  it('rejects a file that is not a ZIP archive at all', async () => {
-    const failure = importCategory({
-      file: new Blob(['not a zip']),
-      categoryName: 'Coins',
-      ...baseFakes(),
-    });
-    await expect(failure).rejects.toHaveProperty('name', 'ImportError');
-    await expect(failure).rejects.toHaveProperty(
-      'message',
-      'Could not read this file as a ZIP archive',
-    );
-    await expect(failure).rejects.toHaveProperty('cause');
-  });
-
-  it('rejects an archive with no collection.json', async () => {
-    const writer = createZipWriter();
-    writer.add({ path: 'root/photos/1.webp', bytes: new Uint8Array([1]) });
-    const failure = importCategory({
-      file: writer.finish(),
-      categoryName: 'Coins',
-      ...baseFakes(),
-    });
-    await expect(failure).rejects.toBeInstanceOf(ImportFormatError);
-    await expect(failure).rejects.toHaveProperty(
-      'message',
-      'Not a CollectionBuddy export archive',
-    );
-  });
-
-  it("rejects an archive whose manifest is not this app's format", async () => {
-    const writer = createZipWriter();
-    const encoder = new TextEncoder();
-    writer.add({
-      path: 'root/collection.json',
-      bytes: encoder.encode(JSON.stringify({ format: 'something-else' })),
-    });
-    const failure = importCategory({
-      file: writer.finish(),
-      categoryName: 'Coins',
-      ...baseFakes(),
-    });
-    await expect(failure).rejects.toBeInstanceOf(ImportFormatError);
-    // Rethrown as-is: the generic "could not read collection.json" would mean the catch-all branch.
-    await expect(failure).rejects.toHaveProperty(
-      'message',
-      'Not a CollectionBuddy export archive',
-    );
-  });
-
-  it('rejects an archive whose collection.json is not valid JSON', async () => {
-    const writer = createZipWriter();
-    const encoder = new TextEncoder();
-    writer.add({
-      path: 'root/collection.json',
-      bytes: encoder.encode('{not json'),
-    });
-    const failure = importCategory({
-      file: writer.finish(),
-      categoryName: 'Coins',
-      ...baseFakes(),
-    });
-    await expect(failure).rejects.toBeInstanceOf(ImportFormatError);
-    await expect(failure).rejects.toHaveProperty(
-      'message',
-      'Could not read collection.json in this archive',
-    );
-  });
-
-  it("creates a new category with the given name, not the archive's original name", async () => {
-    const archive = await buildArchive();
+    const controller = new AbortController();
+    controller.abort();
     const createCategoryRow = fakeCreateCategory();
-    await importCategory({
+
+    const failure = importCategory({
       file: archive,
-      categoryName: 'Coins (2)',
+      categoryName: 'Coins',
       ...baseFakes(),
       createCategoryRow,
+      signal: controller.signal,
     });
-    expect(createCategoryRow).toHaveBeenCalledWith('Coins (2)');
+
+    await expect(failure).rejects.toBeInstanceOf(ImportCancelledError);
+    await expect(failure).rejects.toHaveProperty('message', 'Import cancelled');
+    await expect(failure).rejects.toHaveProperty(
+      'name',
+      'ImportCancelledError',
+    );
+    expect(createCategoryRow).not.toHaveBeenCalled();
   });
 
-  it('does not touch the category at all when creating it fails -- nothing to clean up', async () => {
-    const archive = await buildArchive();
-    const categoryError = new Error('duplicate name');
-    const createCategoryRow = vi.fn(async () => ({
-      data: null,
-      error: categoryError,
-    })) as unknown as CreateCategoryRow;
+  it('cleans up the new category when cancelled between item batches', async () => {
+    const archive = await buildArchive({
+      items: Array.from({ length: ITEM_INSERT_BATCH_SIZE + 1 }, (_, i) =>
+        item({ id: `o${i}` }),
+      ),
+      photosByItemId: {},
+    });
+    const controller = new AbortController();
+    // Aborted during the first batch and noticed at the next checkpoint, as a real mid-await signal is.
+    const createItemRows = vi.fn(async () => {
+      controller.abort();
+      return { error: null };
+    }) as unknown as CreateItemRows;
     const deleteCategoryRow = fakeDeleteCategory();
+    const createCategoryRow = fakeCreateCategory('new-cat-1');
+
+    const failure = importCategory({
+      file: archive,
+      categoryName: 'Coins',
+      ...baseFakes(),
+      createCategoryRow,
+      createItemRows,
+      deleteCategoryRow,
+      signal: controller.signal,
+    });
+
+    await expect(failure).rejects.toBeInstanceOf(ImportCancelledError);
+    expect(createItemRows).toHaveBeenCalledOnce();
+    expect(deleteCategoryRow).toHaveBeenCalledWith('new-cat-1');
+  });
+
+  it('stops the whole photo pool and cleans up when cancelled mid-upload, rather than skipping just one photo', async () => {
+    const archive = await buildArchive();
+    const controller = new AbortController();
+    const compressThumb = vi.fn(async (bytes: Uint8Array<ArrayBuffer>) => {
+      controller.abort();
+      return new Blob([bytes]);
+    }) as unknown as CompressThumb;
+    const deleteCategoryRow = fakeDeleteCategory();
+    const createCategoryRow = fakeCreateCategory('new-cat-1');
 
     const failure = importCategory({
       file: archive,
@@ -249,51 +215,11 @@ describe('importCategory', () => {
       ...baseFakes(),
       createCategoryRow,
       deleteCategoryRow,
+      compressThumb,
+      signal: controller.signal,
     });
 
-    await expect(failure).rejects.toHaveProperty('name', 'ImportError');
-    await expect(failure).rejects.toHaveProperty(
-      'message',
-      'Could not create category',
-    );
-    await expect(failure).rejects.toHaveProperty('cause', categoryError);
-    expect(deleteCategoryRow).not.toHaveBeenCalled();
-  });
-
-  it('treats a missing category row as a failure even without an explicit error', async () => {
-    const archive = await buildArchive();
-    const createCategoryRow = vi.fn(async () => ({
-      data: null,
-      error: null,
-    })) as unknown as CreateCategoryRow;
-
-    const failure = importCategory({
-      file: archive,
-      categoryName: 'Coins',
-      ...baseFakes(),
-      createCategoryRow,
-    });
-
-    await expect(failure).rejects.toThrow('Could not create category');
-  });
-
-  it('reports progress through reading, items and photos', async () => {
-    const archive = await buildArchive();
-    const progress: ImportProgress[] = [];
-    await importCategory({
-      file: archive,
-      categoryName: 'Coins',
-      ...baseFakes(),
-      onProgress: (step) => progress.push(step),
-    });
-
-    // One item, one photo: deterministic, so the whole sequence is pinned, `done`/`total` included.
-    expect(progress).toEqual([
-      { phase: 'reading', done: 0, total: 0 },
-      { phase: 'items', done: 0, total: 1 },
-      { phase: 'items', done: 1, total: 1 },
-      { phase: 'photos', done: 0, total: 1 },
-      { phase: 'photos', done: 1, total: 1 },
-    ]);
+    await expect(failure).rejects.toBeInstanceOf(ImportCancelledError);
+    expect(deleteCategoryRow).toHaveBeenCalledWith('new-cat-1');
   });
 });

@@ -10,9 +10,7 @@ import {
 } from './exportFormat';
 import { createZipWriter } from './zip';
 
-// Every other test in importCategory.test.ts injects its own thumbnailer,
-// which leaves the default -- the one real browser call this module makes --
-// never executed. This file exercises that default and nothing else.
+// Every other importCategory test injects a thumbnailer; this file exercises the real default alone.
 const compress = vi.fn(async () => new Blob(['thumb']));
 vi.mock('browser-image-compression', () => ({
   default: (...args: unknown[]) => compress(...(args as [])),
@@ -45,11 +43,14 @@ async function archiveWithOnePhoto(): Promise<Blob> {
   });
   const writer = createZipWriter();
   const root = 'CollectionBuddy-coins-2026-08-06';
-  writer.add(
-    `${root}/${MANIFEST_NAME}`,
-    new TextEncoder().encode(JSON.stringify(manifest)),
-  );
-  writer.add(`${root}/${entries[0].photos[0].archivePath}`, PHOTO);
+  writer.add({
+    path: `${root}/${MANIFEST_NAME}`,
+    bytes: new TextEncoder().encode(JSON.stringify(manifest)),
+  });
+  writer.add({
+    path: `${root}/${entries[0].photos[0].archivePath}`,
+    bytes: PHOTO,
+  });
   return writer.finish();
 }
 
@@ -81,8 +82,7 @@ describe('importCategory with no thumbnailer injected', () => {
         ...WEBP_COMPRESSION_OPTIONS,
       }),
     );
-    // The archive only ever carries the full-size image, so the thumbnail
-    // is made from the bytes that are actually in it.
+    // The archive only carries the full size, so the thumbnail comes from the bytes in it.
     const [file] = compress.mock.calls[0] as unknown as [File];
     expect(file.type).toBe('image/webp');
     expect(file.name).toBe('photo.webp');

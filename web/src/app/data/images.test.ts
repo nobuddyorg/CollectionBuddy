@@ -36,20 +36,20 @@ function mockStorageFrom() {
 
 describe('createSignedUrls', () => {
   it('signs against the item-images bucket, defaulting to a one hour expiry', () => {
-    const { from, createSignedUrls: signFn } = mockStorageFrom();
+    const { from, createSignedUrls: signUrls } = mockStorageFrom();
     void createSignedUrls(['uid/item/1.webp', 'uid/item/2.webp']);
     expect(ITEM_IMAGES_BUCKET).toBe('item-images');
     expect(from).toHaveBeenCalledWith('item-images');
-    expect(signFn).toHaveBeenCalledWith(
+    expect(signUrls).toHaveBeenCalledWith(
       ['uid/item/1.webp', 'uid/item/2.webp'],
       3600,
     );
   });
 
   it('carries a custom expiry through unchanged', () => {
-    const { createSignedUrls: signFn } = mockStorageFrom();
+    const { createSignedUrls: signUrls } = mockStorageFrom();
     void createSignedUrls(['uid/item/1.webp'], 120);
-    expect(signFn).toHaveBeenCalledWith(['uid/item/1.webp'], 120);
+    expect(signUrls).toHaveBeenCalledWith(['uid/item/1.webp'], 120);
   });
 });
 
@@ -126,10 +126,7 @@ describe('deleteImageRow', () => {
 
 type Row = { item_id: string; n: number };
 
-// Records the `.in()` chunk and `.range()` window for every page of every
-// chunk fetched, and lets the test script what each call resolves to --
-// this is what exercises selectImagesForItems' chunk-then-page loop, which
-// isn't exposed directly.
+// Records each page's `.in()` chunk and `.range()` window, and scripts what each call resolves to.
 function mockImagesQuery(
   resolve: (
     chunk: string[],
@@ -174,9 +171,7 @@ function mockImagesQuery(
 
 describe('listImagesForItems', () => {
   it('selects the listing columns for a single page, single chunk', async () => {
-    // Range-aware, like every other page fake here: a reader that asks for
-    // a second page has to run off the end rather than be handed the first
-    // one again for ever.
+    // Range-aware: a reader asking for a second page runs off the end instead of looping for ever.
     const { from, calls, columns } = mockImagesQuery((chunk, rangeFrom) => ({
       data:
         rangeFrom === 0 ? chunk.map((id, i) => ({ item_id: id, n: i })) : [],
@@ -190,9 +185,7 @@ describe('listImagesForItems', () => {
     expect(columns()).toBe('id, item_id, path_full, path_thumb');
   });
 
-  // Oldest first, with the row id breaking a tie between two photographs
-  // uploaded in the same instant: this order is what puts an item's first
-  // photograph in its hero slot, and it matches the index that serves it.
+  // Oldest first, id breaking a same-instant tie: this puts an item's first photograph in its hero slot.
   it('asks for the rows in the order the grid hangs them', async () => {
     const { orders } = mockImagesQuery(() => ({ data: [], error: null }));
     await listImagesForItems(['item-1']);
@@ -211,8 +204,7 @@ describe('listImagesForItems', () => {
     expect(calls).toHaveLength(1);
   });
 
-  // No rows is `[]`, but a page that answers with neither rows nor an error
-  // still has to end the walk rather than being read for a length.
+  // A page with neither rows nor an error still ends the walk rather than being read for a length.
   it('stops on a page that answers with nothing at all', async () => {
     const { calls } = mockImagesQuery(() => ({ data: null, error: null }));
     const { data, error } = await listImagesForItems(['item-1']);
@@ -240,8 +232,7 @@ describe('listImagesForItems', () => {
     const ids = Array.from({ length: 150 }, (_, i) => `item-${i}`);
     const { calls } = mockImagesQuery(() => ({ data: [], error: null }));
     await listImagesForItems(ids);
-    // Exactly two, not a third empty one: the chunk walk stops at the last
-    // id rather than one past it.
+    // Exactly two, not a third empty one: the chunk walk stops at the last id, not one past it.
     expect(calls).toHaveLength(2);
     expect(calls[0].chunk).toHaveLength(100);
     expect(calls[1].chunk).toHaveLength(50);
@@ -249,9 +240,7 @@ describe('listImagesForItems', () => {
     expect(calls[1].chunk[0]).toBe('item-100');
   });
 
-  // Paged out of a fixed table rather than scripted per call, so a walk
-  // that asks for one page too many runs off the end instead of being
-  // handed the same rows again for ever.
+  // Paged out of a fixed table, so a walk asking for one page too many runs off the end.
   it('keeps paging a chunk while a page comes back full', async () => {
     const all = Array.from({ length: 1001 }, (_, i) => ({
       item_id: 'item-1',
@@ -264,7 +253,7 @@ describe('listImagesForItems', () => {
     const { data, error } = await listImagesForItems(['item-1']);
     expect(error).toBeNull();
     expect(data).toHaveLength(1001);
-    expect(calls.map((c) => [c.from, c.to])).toEqual([
+    expect(calls.map((call) => [call.from, call.to])).toEqual([
       [0, 999],
       [1000, 1999],
     ]);

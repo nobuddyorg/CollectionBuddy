@@ -28,29 +28,25 @@ export function removeImageObjects(paths: string[]) {
 
 export type ImageRow = Database['public']['Tables']['images']['Row'];
 
-// `id` is the row's own primary key, carried through so a single photograph
-// can be deleted by id.
+/** Carries the row's own `id`, so a single photograph can be deleted by it. */
 export type ImageListRow = Pick<
   ImageRow,
   'id' | 'item_id' | 'path_full' | 'path_thumb'
 >;
 
-// No `id`: capture-before-cascade readers (removeItem, deleteCategory) act
-// on a whole item's photographs via the item's own id, never one photo's.
+/** No `id`: capture-before-cascade readers act on a whole item's photographs, never one photo. */
 export type ImagePathRow = Pick<
   ImageRow,
   'item_id' | 'path_full' | 'path_thumb'
 >;
 
-// No `path_thumb`: an export's manifest is only ever built from full-size
-// paths.
+/** No `path_thumb`: an export's manifest is only ever built from full-size paths. */
 export type ExportImageRow = Pick<
   ImageRow,
   'item_id' | 'path_full' | 'size_bytes'
 >;
 
-// user_id is never sent: tg_images_enforce (0002_functions.sql) derives it from
-// the item's own owner and rejects anything else.
+// user_id is never sent: tg_images_enforce derives it from the item's owner and rejects the rest.
 export function createImageRow(row: {
   item_id: string;
   path_full: string;
@@ -64,9 +60,7 @@ export function createImageRow(row: {
     .single<ImageListRow>();
 }
 
-// The row IS what's being removed here, not a side effect of another row's
-// cascade, so delete-and-capture in one call is safe (contrast the
-// capture-before-cascade readers below).
+// The row itself is removed, not a cascade's side effect, so delete-and-capture in one call is safe.
 export function deleteImageRow(id: string) {
   return supabase
     .from('images')
@@ -76,16 +70,13 @@ export function deleteImageRow(id: string) {
     .single<Pick<ImageRow, 'path_full' | 'path_thumb'>>();
 }
 
-// PostgREST caps an unranged request at max_rows (supabase/config.toml,
-// 1000) and truncates silently, so this pages instead of asking once.
+// PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.
 const ROW_PAGE_SIZE = 1000;
 
-// How many ids ride in one `.in()` filter's query string -- a few thousand
-// UUIDs would hit a URL length limit long before the row cap did.
+// Ids per `.in()` filter; a few thousand UUIDs would hit a URL length limit before the row cap.
 const ID_FILTER_CHUNK_SIZE = 100;
 
-// Chunks an id list (URL-length concern), pages each chunk (row-cap concern)
-// and reads a few chunks at once, generalized over which columns the caller wants.
+// Chunks the id list (URL length), pages each chunk (row cap), and reads a few chunks at once.
 function selectImagesForItems<T>(
   itemIds: string[],
   select: string,
@@ -106,9 +97,7 @@ function selectImagesForItems<T>(
   );
 }
 
-// Ordered oldest-first, `id` breaking a tie between two photographs
-// uploaded in the same instant, matching idx_images_item_created_at
-// (0005_indexes.sql).
+// Oldest-first, `id` breaking a same-instant tie, matching idx_images_item_created_at.
 export function listImagesForItems(
   itemIds: string[],
 ): Promise<
@@ -121,9 +110,7 @@ export function listImagesForItems(
   );
 }
 
-// Read-only: captures photo paths before a delete that will cascade the
-// images rows away, so the Storage bytes can still be removed afterward.
-// Must run before that delete, not after (see 0003_tables.sql).
+// Captures photo paths before a delete cascades the rows away; runs before that delete, never after.
 export function listImagePathsForItems(
   itemIds: string[],
 ): Promise<

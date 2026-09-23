@@ -1,20 +1,4 @@
-// The single list of modules that carry both mutation testing
-// (stryker.config.mjs) and the stricter per-file coverage floor
-// (vitest.config.mts) -- shared so the two lists can't drift apart.
-//
-// A file belongs here once its logic is reachable from tests without
-// faking the world into a shape nobody would recognise: pure functions,
-// the data layer's query construction, and the hooks whose state machines
-// are drivable through their own fakes. What stays out is rendering --
-// mutating JSX and class strings produces near-equivalent mutants by the
-// thousand and a score nobody can act on.
-//
-// Nothing in these files is suppressed: no `Stryker disable`, no
-// `/* v8 ignore */`. A raw call is reached through an injected parameter so
-// a test can drive it, and a query builder is asserted by the request it
-// composed. A mutant that survives is a missing assertion or dead code --
-// the only class no test can reach is a React dependency list, which
-// Stryker fills with a constant React reads as unchanged on every render.
+// Modules under both mutation testing (stryker.config.mjs) and the per-file coverage floor (vitest.config.mts).
 export const MUTATE_TARGETS = [
   'src/app/data/items.ts',
   'src/app/data/zip.ts',
@@ -46,6 +30,10 @@ export const MUTATE_TARGETS = [
   'src/app/data/images.ts',
   'src/app/data/shares.ts',
   'src/app/data/quota.ts',
+  'src/app/data/itemSearch.ts',
+  'src/app/data/exportItemPages.ts',
+  'src/app/data/importPhoto.ts',
+  'src/app/data/importCancellation.ts',
   'src/app/components/CategorySelect/selection.ts',
   'src/app/components/CategorySelect/useImportCategory.tsx',
   'src/app/components/ItemList/searchStatus.ts',
@@ -71,10 +59,10 @@ export const MUTATE_TARGETS = [
   'src/app/components/CenteredModal/useFocusTrap.tsx',
   'src/app/components/CenteredModal/useInertBackground.tsx',
   'src/app/components/CenteredModal/useLockBodyScroll.tsx',
+  'src/app/components/Map/worldCopies.ts',
 ];
 
-// Mutation-tested but deliberately without a per-file coverage floor -- see
-// Configuration's "Coverage and mutation thresholds" for why.
+// Mutation-tested but deliberately without a per-file coverage floor.
 export const NO_COVERAGE_FLOOR = [
   'src/app/components/Map/usePlaces.tsx',
   'src/app/components/Map/useCurrentLocation.ts',

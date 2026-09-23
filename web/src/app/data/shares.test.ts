@@ -8,9 +8,7 @@ import {
   updateShareRole,
 } from './shares';
 
-// Each function here only builds a query and hands it back for the caller
-// to await, so what's worth asserting is the shape of the query it built,
-// not a resolved value that would just echo the mock back at itself.
+// Each function only builds a query, so the query's shape is what is asserted, not an echoed mock.
 
 type Call = { method: string; args: unknown[] };
 
