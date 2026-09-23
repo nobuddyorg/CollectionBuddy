@@ -202,6 +202,7 @@ export type Database = {
     };
     Functions: {
       caller_email: { Args: never; Returns: string };
+      granted_category_ids: { Args: never; Returns: string[] };
       has_category_read_access: { Args: { cat_id: string }; Returns: boolean };
       has_category_write_access: { Args: { cat_id: string }; Returns: boolean };
       join_tags: { Args: { tags: string[] }; Returns: string };

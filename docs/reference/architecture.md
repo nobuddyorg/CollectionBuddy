@@ -24,6 +24,7 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | [`0014_drop_redundant_item_categories_indexes.sql`](../../supabase/migrations/0014_drop_redundant_item_categories_indexes.sql) | Drops `item_categories (item_id)` and `(category_id)`, prefixes of the primary key and of `(category_id, created_at desc, item_id)`. |
 | [`0015_revoke_api_role_execute.sql`](../../supabase/migrations/0015_revoke_api_role_execute.sql) | Revokes direct `EXECUTE` grants to `anon` (and, on trigger functions, `authenticated`) that hosted default privileges add, and stops `postgres`'s default privileges granting new functions to either. |
 | [`0016_bound_row_volume.sql`](../../supabase/migrations/0016_bound_row_volume.sql) | Per-owner ceilings on categories and shares, a per-entry ceiling on category links, and length checks on every text column. |
+| [`0017_shared_read_once_per_statement.sql`](../../supabase/migrations/0017_shared_read_once_per_statement.sql) | Adds `granted_category_ids()`; the read policies (tables and shared `storage.objects`) and `has_category_read_access()` ask it once per statement, and `search_category_items()` checks access once per call. Same rows allowed and denied ([why](../explanation/design-decisions.md#why-read-policies-take-the-callers-grants-as-one-set)). |
 
 ### Tables
 
@@ -37,10 +38,10 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 
 ### Row Level Security
 
-All policies are in [`0006_policies.sql`](../../supabase/migrations/0006_policies.sql), built from an owner check and two `security invoker` predicates:
+All policies are in [`0006_policies.sql`](../../supabase/migrations/0006_policies.sql), with the read policies rewritten by `0017`, built from an owner check and `security invoker` predicates:
 
 - `user_id = (select auth.uid())` — the scalar subquery makes the planner evaluate it once per query, not per row.
-- `has_category_read_access(cat_id)` — an active `category_shares` grant to the caller's email, at either role.
+- `category_id in (select granted_category_ids())` — the categories an active `category_shares` grant to the caller's email opens, at either role, read once per statement. `has_category_read_access(cat_id)` asks the same set for one category.
 - `has_category_write_access(cat_id)` — category ownership, **or** an active grant at role `editor`.
 
 Ownership is inside the write predicate and deliberately outside the read one; every read policy adds its own owner branch instead. Folding ownership into the read predicate would let a category's owner see every item linked into it, including ones an editor added that the owner was never granted.
@@ -109,7 +110,7 @@ Nothing indexes `storage.objects`; hosted Supabase owns it and refuses DDL with 
 One private bucket, `item-images` ([`0007_storage.sql`](../../supabase/migrations/0007_storage.sql)), restricted to `image/webp`, `image/jpeg`, `image/png` at 5 MiB per file. Paths are `<uid>/<itemId>/<file>`, where the uid is the **uploader's**. The client reads through signed URLs.
 
 - **Owner-only policies** on `select`, `insert`, `delete`: `split_part(name, '/', 1) = (select auth.uid())::text`. Splinter skips the `storage` schema, so `040_storage_policy_surface_test.sql` checks that no policy here calls `auth.uid()` once per row.
-- **Shared policies** on `select` and `delete`: extract the item id with `storage_item_id()` and join through `item_categories` to the same read/write predicates the tables use. `storage_item_id()` returns `NULL` on a path that does not parse, because a raised error inside `USING` aborts the statement instead of failing to match the row.
+- **Shared policies** on `select` and `delete`: extract the item id with `storage_item_id()` and join through `item_categories` to the same read/write predicates the tables use (`granted_category_ids()` for reading). `storage_item_id()` returns `NULL` on a path that does not parse, because a raised error inside `USING` aborts the statement instead of failing to match the row.
 - **No shared `insert`**: an editor's upload lands under the editor's own prefix and satisfies the owner-only set.
 - **No `update` policy** for anyone, and that absence is the only denial — Storage's bootstrap re-grants the `UPDATE` privilege on every start. A path is fixed when written; `move()` and `upsert` are refused ([why](../explanation/design-decisions.md#why-a-storage-objects-path-can-never-change)).
 

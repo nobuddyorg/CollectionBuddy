@@ -671,6 +671,92 @@ test.describe('a category shared with another collector', () => {
     }
   });
 
+  // The read policies ask for the caller's grants as one set per statement
+  // (0017), so the category, not just the grantee, is what each one must
+  // still match on: expiry and scope are checked on every table they cover.
+  test('an expired grant opens no entry, link or map place either', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const shareId = await share(token, categoryId, SEED.other.email, {
+      window: { createdAt, expiresAt },
+    });
+
+    try {
+      const other = apiAs(otherToken);
+      const { data: items } = await other
+        .from('items')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('title', itemsIn('Münzen')[0].title);
+      expect(items).toEqual([]);
+
+      const { data: links } = await other
+        .from('item_categories')
+        .select('item_id')
+        .eq('category_id', categoryId);
+      expect(links).toEqual([]);
+
+      const { data: places, error } = await other.rpc('list_category_places', {
+        cat_id: categoryId,
+      });
+      expect(error).toBeNull();
+      expect(places).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
+  test('a grant opens nothing filed only in the owner’s other category', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const siblingId = await mineCategoryId(token, userId, 'Briefmarken');
+    const [sibling] = itemsIn('Briefmarken');
+    const shareId = await share(token, categoryId, SEED.other.email);
+
+    try {
+      const other = apiAs(otherToken);
+      // The grant itself is live: the shared category's map opens.
+      const { data: sharedPlaces } = await other.rpc('list_category_places', {
+        cat_id: categoryId,
+      });
+      expect(
+        sharedPlaces!.map((row: { place: string }) => row.place),
+      ).toContain(itemsIn('Münzen').find((item) => item.place)!.place);
+
+      const { data: items } = await other
+        .from('items')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('title', sibling.title);
+      expect(items).toEqual([]);
+
+      const { data: links } = await other
+        .from('item_categories')
+        .select('item_id')
+        .eq('category_id', siblingId);
+      expect(links).toEqual([]);
+
+      const { data: places } = await other.rpc('list_category_places', {
+        cat_id: siblingId,
+      });
+      expect(places).toEqual([]);
+
+      const { data: found } = await other.rpc('search_category_items', {
+        cat_id: siblingId,
+        like_pattern: `%${sibling.title}%`,
+        page_from: 0,
+        page_to: 9,
+      });
+      expect(found).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
   test('a grant addressed to someone else does not open the category to a bystander', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, userId, otherToken } = context();

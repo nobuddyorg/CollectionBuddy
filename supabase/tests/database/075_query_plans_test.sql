@@ -80,6 +80,30 @@ begin
 end;
 $$;
 
+create or replace function pg_temp.plan_mentions(p_sql text, p_fragment text, p_description text)
+returns text
+language plpgsql
+as $$
+begin
+  if strpos(pg_temp.plan_text(p_sql), p_fragment) > 0 then
+    return ok(true, p_description);
+  end if;
+  return ok(false, p_description) || e'\n' || diag(pg_temp.plan_text(p_sql));
+end;
+$$;
+
+create or replace function pg_temp.plan_never_mentions(p_sql text, p_fragment text, p_description text)
+returns text
+language plpgsql
+as $$
+begin
+  if strpos(pg_temp.plan_text(p_sql), p_fragment) = 0 then
+    return ok(true, p_description);
+  end if;
+  return ok(false, p_description) || e'\n' || diag(pg_temp.plan_text(p_sql));
+end;
+$$;
+
 select gen_random_uuid() as owner_id \gset
 
 select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
@@ -231,6 +255,36 @@ select pg_temp.plan_uses_index_only(
   format('select coalesce(sum(im.size_bytes), 0) from public.images im where im.user_id = %L::uuid', :'owner_id'),
   'idx_images_user_size',
   'reachable: the photo quota sum is an index-only scan on idx_images_user_size'
+);
+
+-- A grantee's reads ask for its grants once per statement (0017): no plan calls has_category_read_access() on a row.
+reset enable_seqscan;
+reset enable_bitmapscan;
+select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
+insert into public.category_shares (category_id, invited_email)
+values (:'category_id'::uuid, 'plans-viewer@collectionbuddy.test');
+select pg_temp.auth_as(gen_random_uuid(), 'plans-viewer@collectionbuddy.test');
+
+select pg_temp.plan_never_mentions(
+  format('select * from %s', relation), 'has_category_read_access',
+  'a grantee''s read of ' || relation || ' checks no grant per row'
+)
+from unnest(array[
+  'public.categories', 'public.items', 'public.item_categories', 'public.images', 'storage.objects'
+]) as relation;
+select pg_temp.plan_mentions(
+  :'catalogue_sql', 'Function Scan on granted_category_ids',
+  'a grantee''s catalogue page reads its grants as one set'
+);
+select pg_temp.plan_uses_index(
+  :'catalogue_sql', 'idx_item_categories_cat_created',
+  'preferred: a grantee''s catalogue page uses idx_item_categories_cat_created under RLS'
+);
+
+select set_config('role', :'search_role', true);
+select pg_temp.plan_never_mentions(
+  :'search_sql', 'has_category_read_access',
+  'search_category_items checks the grant once per call, not per row'
 );
 
 select * from finish();
