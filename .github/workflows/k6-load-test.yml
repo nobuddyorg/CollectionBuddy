@@ -9,6 +9,11 @@ on:
         type: choice
         options: [smoke, catalogue, shared-viewer, write]
         default: smoke
+      profile:
+        description: "Load shape and seed size: normal (everyday), peak (5x users), stress (steps to 20x, 40,000 entries)"
+        type: choice
+        options: [normal, peak, stress]
+        default: normal
       target:
         description: "local-stack: a Supabase stack started inside this run. hosted: the production project."
         type: choice
@@ -19,16 +24,17 @@ on:
         type: boolean
         default: false
 
-run-name: k6 ${{ inputs.flow }} against ${{ inputs.target }}
+run-name: k6 ${{ inputs.flow }} (${{ inputs.profile }}) against ${{ inputs.target }}
 
 permissions:
   contents: read
 
 jobs:
   load_test:
-    name: k6 ${{ inputs.flow }} against ${{ inputs.target }}
+    name: k6 ${{ inputs.flow }} (${{ inputs.profile }}) against ${{ inputs.target }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # stress runs nine minutes after a 42,000-row setup, on a runner that also hosts the stack.
+    timeout-minutes: 45
     # One run per target at a time: two against the hosted project would add up on its Free-tier limits.
     concurrency:
       group: k6-${{ inputs.target }}
@@ -60,15 +66,16 @@ jobs:
       # Same script a developer runs; the hosted URL and anon key are read only for a hosted run.
       - name: Run k6
         id: k6
-        run: npm run load -- "$FLOW" --target "$TARGET" ${CONFIRM:+--confirm-production}
+        run: npm run load -- "$FLOW" --profile "$PROFILE" --target "$TARGET" ${CONFIRM:+--confirm-production}
         env:
           FLOW: ${{ inputs.flow }}
+          PROFILE: ${{ inputs.profile }}
           TARGET: ${{ inputs.target }}
           CONFIRM: ${{ inputs.confirm_production && 'true' || '' }}
           LOAD_SUPABASE_URL: ${{ inputs.target == 'hosted' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
           LOAD_SUPABASE_ANON_KEY: ${{ inputs.target == 'hosted' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
 
-      # handleSummary writes it already formatted (web/load/lib/summary.js).
+      # handleSummary writes it already formatted (web/load/lib/summary.js); the HTML charts ride in the artifact.
       - name: Add the k6 report to the job summary
         if: always() && steps.k6.outcome != 'skipped'
         env:
@@ -84,7 +91,7 @@ jobs:
         if: always() && steps.k6.outcome != 'skipped'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: k6-${{ inputs.flow }}-${{ inputs.target }}
+          name: k6-${{ inputs.flow }}-${{ inputs.profile }}-${{ inputs.target }}
           path: web/load-results
           retention-days: 30
 

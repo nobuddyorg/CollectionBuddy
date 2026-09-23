@@ -1,4 +1,5 @@
 // The end-of-test report: per scenario, the rate, error rate and p50/p95/p99 the issue asks for (#662).
+import { PROFILE, PROFILE_NAME } from './profile.js';
 import { SEARCHED_ITEMS, SHARED_ITEMS } from './seed.js';
 import { SUPABASE_URL, TARGET } from './target.js';
 
@@ -33,9 +34,9 @@ function summaryMarkdown(flow, data) {
     .sort();
   const all = metrics.http_req_duration.values;
   return [
-    `## k6 load test: \`${flow}\` against ${TARGET}`,
+    `## k6 load test: \`${flow}\`, \`${PROFILE_NAME}\` profile, against ${TARGET}`,
     '',
-    `Target \`${SUPABASE_URL}\`. Seeded ${SEARCHED_ITEMS} entries in the searched category and ${SHARED_ITEMS} in the shared one. Rates are over the whole run, setup included.`,
+    `Target \`${SUPABASE_URL}\`; virtual users ×${PROFILE.vusScale} of normal. Seeded ${SEARCHED_ITEMS} entries in the searched category and ${SHARED_ITEMS} in the shared one. Rates are over the whole run, setup included. Charts over time, for runs past 30 s: \`${flow}.html\` in the run's artifact.`,
     '',
     '| Scenario | Requests | Req/s | Failed | p50 | p95 | p99 |',
     '| --- | --- | --- | --- | --- | --- | --- |',

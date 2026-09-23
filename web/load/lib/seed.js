@@ -1,4 +1,4 @@
-// Every script's setup() and teardown(): two fresh identities and a production-shaped collection, all written through RLS.
+// Every script's setup() and teardown(): three fresh identities and a production-shaped collection, all written through RLS.
 import {
   deleteOwnRows,
   insertReturning,
@@ -7,10 +7,13 @@ import {
   removeObjects,
   signUp,
 } from './api.js';
+import { PROFILE } from './profile.js';
 
 // Below a few thousand rows every plan is a sequential scan and the numbers say nothing (#662).
-export const SEARCHED_ITEMS = 10000;
-export const SHARED_ITEMS = 300;
+export const SEARCHED_ITEMS = PROFILE.searchedItems;
+export const SHARED_ITEMS = PROFILE.sharedItems;
+// One INSERT per request, set-based, at a body size no proxy in front of PostgREST refuses.
+const SEED_BATCH = 10000;
 
 const NOUNS = ['Denar', 'Sesterz', 'Taler', 'Groschen', 'Dukat', 'Obol'];
 const PLACES = ['Rom', 'Wien', 'Prag', 'Athen', 'Trier', 'Köln'];
@@ -44,8 +47,10 @@ function itemRows(count, categoryId, now) {
 
 function fillCategory(session, categoryId, count) {
   const { items, links } = itemRows(count, categoryId, Date.now());
-  insertRows(session, 'items', items);
-  insertRows(session, 'item_categories', links);
+  for (let i = 0; i < count; i += SEED_BATCH) {
+    insertRows(session, 'items', items.slice(i, i + SEED_BATCH));
+    insertRows(session, 'item_categories', links.slice(i, i + SEED_BATCH));
+  }
 }
 
 export function setup() {
@@ -58,15 +63,16 @@ export function setup() {
     `load-viewer-${run}@collectionbuddy.test`,
     crypto.randomUUID(),
   );
+  // Writes land in their own account, so a stress run's new entries never meet the seeded owner's quota.
+  const writer = signUp(
+    `load-writer-${run}@collectionbuddy.test`,
+    crypto.randomUUID(),
+  );
 
   const categories = insertReturning(
     owner,
     'categories',
-    [
-      { name: 'Load: searched' },
-      { name: 'Load: shared' },
-      { name: 'Load: written' },
-    ],
+    [{ name: 'Load: searched' }, { name: 'Load: shared' }],
     'id,name',
   );
   const idOf = (name) => categories.find((c) => c.name === name).id;
@@ -83,27 +89,40 @@ export function setup() {
     },
   ]);
 
+  const [written] = insertReturning(
+    writer,
+    'categories',
+    [{ name: 'Load: written' }],
+    'id',
+  );
+
   return {
     owner,
     viewer,
+    writer,
     searchedCategoryId,
     sharedCategoryId,
-    writtenCategoryId: idOf('Load: written'),
+    writtenCategoryId: written.id,
   };
 }
 
 // Storage objects before rows, never after (CLAUDE.md); items cascade their photographs and links, categories their shares.
-export function teardown({ owner }) {
+function clearAccount(session) {
   for (let offset = 0; ; offset += PHOTO_PAGE) {
-    const rows = listImagePaths(owner, offset, PHOTO_PAGE);
+    const rows = listImagePaths(session, offset, PHOTO_PAGE);
     if (rows.length === 0) break;
     removeObjects(
-      owner,
+      session,
       rows.flatMap((row) =>
         row.path_thumb ? [row.path_full, row.path_thumb] : [row.path_full],
       ),
     );
   }
-  deleteOwnRows(owner, 'items');
-  deleteOwnRows(owner, 'categories');
+  deleteOwnRows(session, 'items');
+  deleteOwnRows(session, 'categories');
+}
+
+export function teardown({ owner, writer }) {
+  clearAccount(owner);
+  clearAccount(writer);
 }

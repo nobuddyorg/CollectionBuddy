@@ -1,7 +1,9 @@
 // Options every script shares: trend stats the report reads, lifecycle timeouts, load shape and thresholds.
+import { PROFILE } from './profile.js';
+
 export const SUMMARY_TREND_STATS = ['avg', 'med', 'p(95)', 'p(99)', 'max'];
 
-// Setup writes 10,000 rows through PostgREST; k6's 60s default is not enough on a cold stack.
+// Setup writes up to 42,000 rows through PostgREST; k6's 60s default is not enough on a cold stack.
 export const LIFECYCLE_TIMEOUTS = { setupTimeout: '5m', teardownTimeout: '5m' };
 
 // Initial proposals, not validated limits: calibrate from a baseline first (docs/how-to/load-testing.md). Per-scenario sub-metrics feed the report.
@@ -19,11 +21,10 @@ export function thresholdsFor(p95MsByScenario) {
   return thresholds;
 }
 
-/** Ramp up to `vus`, hold for two minutes, ramp down. */
+/** The profile's stages for a scenario whose normal load is `vus`. */
 export function rampTo(vus) {
-  return [
-    { duration: '30s', target: vus },
-    { duration: '2m', target: vus },
-    { duration: '15s', target: 0 },
-  ];
+  return PROFILE.stages.map(([duration, fraction]) => ({
+    duration,
+    target: Math.ceil(vus * PROFILE.vusScale * fraction),
+  }));
 }

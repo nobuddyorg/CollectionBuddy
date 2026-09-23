@@ -24,7 +24,7 @@ export const options = {
 };
 
 export function writeEntry(data) {
-  write(data.owner, data.writtenCategoryId);
+  write(data.writer, data.writtenCategoryId);
 }
 
 export function handleSummary(data) {
