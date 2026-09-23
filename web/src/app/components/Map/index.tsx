@@ -6,6 +6,7 @@ import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { popupContent } from './popup';
+import { afterZoomAnimation } from './afterZoomAnimation';
 import { diffMarkers } from './markerDiff';
 import { useSyncedRef } from '../../lib/useSyncedRef';
 import {
@@ -341,7 +342,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     const map = mapInstance.current;
     if (!ready || !L || !map || !command) return;
 
-    const frame = requestAnimationFrame(() => {
+    const framing = () => {
       map.invalidateSize();
       const framed = runCommand(
         map,
@@ -352,8 +353,15 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       );
       // A command that framed the view outranks the one-shot fit on the first pin.
       if (framed) hasInitialFit.current = true;
+    };
+    let cancelWait = () => {};
+    const frame = requestAnimationFrame(() => {
+      cancelWait = afterZoomAnimation(map, framing);
     });
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      cancelWait();
+    };
   }, [command, ready, markersRef, currentLocRef]);
 
   // Leaflet caches the container size, so a box that changes while mounted
