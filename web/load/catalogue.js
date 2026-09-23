@@ -17,7 +17,7 @@ export const options = {
     browse: { executor: 'ramping-vus', exec: 'browseOwn', stages: rampTo(10) },
     search: { executor: 'ramping-vus', exec: 'searchOwn', stages: rampTo(5) },
   },
-  thresholds: thresholdsFor({ browse: 500, search: 800 }),
+  thresholds: thresholdsFor(['browse', 'search']),
 };
 
 export function browseOwn(data) {

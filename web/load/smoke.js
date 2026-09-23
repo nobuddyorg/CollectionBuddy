@@ -21,13 +21,13 @@ export const options = {
     shared_search: { ...ONCE, exec: 'searchShared' },
     write: { ...ONCE, exec: 'writeEntry' },
   },
-  thresholds: thresholdsFor({
-    browse: 500,
-    search: 800,
-    shared_browse: 500,
-    shared_search: 800,
-    write: 1500,
-  }),
+  thresholds: thresholdsFor([
+    'browse',
+    'search',
+    'shared_browse',
+    'shared_search',
+    'write',
+  ]),
 };
 
 export function browseOwn(data) {

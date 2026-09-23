@@ -125,13 +125,27 @@ together with the timeout count (a request that hit k6's own timeout, error
 code 1050). Requests per second is over the whole run, setup included, so it
 understates a scenario's rate a little.
 
-The thresholds (`web/load/lib/options.js`) are **initial proposals, not
-validated limits**: under 1% failed requests, no timeouts, over 99% of checks
-passing, and a p95 of 500 ms for browsing, 800 ms for searching and 1,500 ms
-for a write. Calibrate them the way TEST_STRATEGY.md §12 says for any
-performance threshold: run the same script a few times on the same runner,
-take the measured p95, and set the threshold above it with margin. A red
-threshold before that is a question, not a regression.
+The thresholds (`web/load/lib/options.js`) are under 1% failed requests, no
+timeouts, over 99% of checks passing, and a p95 per scenario calibrated the
+way TEST_STRATEGY.md §12 says: two `normal` runs of every script on a GitHub
+runner, three times the worse p95, at least 100 ms, rounded up to 50.
+
+| Scenario | Measured p95 (two runs) | Threshold |
+| --- | --- | --- |
+| `browse` | 27.4, 34.4 ms | 150 ms |
+| `search` | 46.1, 62.2 ms | 200 ms |
+| `shared_browse` | 5.6, 5.0 ms | 100 ms |
+| `shared_search` | 35.2, 33.6 ms | 150 ms |
+| `write` | 9.9, 12.9 ms (`population`: 12.3, 15.0 ms) | 100 ms |
+| `own_browse`, `lent_browse`, `own_search` | at most 7.8 ms | 100 ms |
+
+The margin is wide on purpose: the same script on the same runner type has
+varied by 2× between runs, and the floor keeps a 5 ms scenario from turning
+red on a noisy neighbour. They hold for `normal`; `peak` and `stress` are
+meant to find where they break. The owner's map on a 25,000-entry category
+does at `peak`: it returns every title of every place in one call, which is
+kept on purpose so a popup opens without a second request.
+Recalibrate the same way when a change moves a scenario's baseline.
 
 A stack on a GitHub runner measures the runner as much as the app. Compare a
 run with an earlier run of the same script on the same runner type, not with

@@ -47,7 +47,7 @@ function summaryMarkdown(flow, data, seeded) {
     '',
     `All requests, setup and teardown included: ${metrics.http_reqs.values.count}, ${metrics.http_req_failed.values.passes} failed, ${metrics.http_req_timeouts.values.count} timed out; p50 ${ms(all.med)}, p95 ${ms(all['p(95)'])}, p99 ${ms(all['p(99)'])}.`,
     '',
-    'Thresholds are initial proposals, not validated limits.',
+    'Thresholds are calibrated at the normal profile; peak and stress are meant to find where they break.',
     '',
     '| Metric | Threshold | Result |',
     '| --- | --- | --- |',

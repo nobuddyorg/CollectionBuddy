@@ -20,7 +20,7 @@ export const options = {
       stages: rampTo(5),
     },
   },
-  thresholds: thresholdsFor({ write: 1500 }),
+  thresholds: thresholdsFor(['write']),
 };
 
 export function writeEntry(data) {

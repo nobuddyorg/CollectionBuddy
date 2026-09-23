@@ -51,7 +51,7 @@ protection is the server-side check.
 
 Every floor is raised by hand when a real run reports a higher number, and never lowered to make a change fit. `autoUpdate` is off in Vitest: it wrote the local measurement back into the config after every run, so a green local run produced a red PR.
 
-Stryker runs incrementally (`incremental: true`, reusing `web/reports/stryker-incremental.json`); CI caches that file keyed on `package-lock.json` and the Stryker and Vitest config, and `main` passes `--force` for a full run. k6's thresholds (`web/load/lib/options.js`) are initial proposals, not calibrated floors ([Load testing](../how-to/load-testing.md#read-the-results)).
+Stryker runs incrementally (`incremental: true`, reusing `web/reports/stryker-incremental.json`); CI caches that file keyed on `package-lock.json` and the Stryker and Vitest config, and `main` passes `--force` for a full run. k6's p95 thresholds (`web/load/lib/options.js`) are calibrated from two `normal` runs per script with a 3× margin ([Load testing](../how-to/load-testing.md#read-the-results)).
 
 Stryker runs Vitest through `web/vitest.mutation.config.mts`, which only changes `test.reporters`: Vitest adds a `github-actions` annotation reporter under `GITHUB_ACTIONS`, and a killed mutant is an expected test failure that would otherwise become a workflow annotation.
 

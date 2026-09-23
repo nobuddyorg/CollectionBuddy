@@ -32,12 +32,12 @@ export const options = {
     },
     write: { executor: 'ramping-vus', exec: 'writeOwn', stages: rampTo(3) },
   },
-  thresholds: thresholdsFor({
-    own_browse: 500,
-    own_search: 800,
-    lent_browse: 500,
-    write: 1500,
-  }),
+  thresholds: thresholdsFor([
+    'own_browse',
+    'own_search',
+    'lent_browse',
+    'write',
+  ]),
 };
 
 // k6 numbers VUs from 1 across every scenario, so neighbouring VUs are different collectors.
