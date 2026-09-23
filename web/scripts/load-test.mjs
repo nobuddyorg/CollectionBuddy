@@ -121,12 +121,11 @@ try {
 const status = runK6();
 await setTimeout(STATS_FLUSH_MS);
 const dbReport = `load-results/${flow}.db.md`;
-writeFileSync(
-  resolve(webDir, dbReport),
-  dbReportMarkdown(
-    `\`${flow}\`, \`${values.profile}\` profile`,
-    finishDbCapture(project.dbUrl, before),
-  ),
+const dbMarkdown = dbReportMarkdown(
+  `\`${flow}\`, \`${values.profile}\` profile`,
+  finishDbCapture(project.dbUrl, before),
 );
-console.log(`Postgres report: ${dbReport}`);
+writeFileSync(resolve(webDir, dbReport), dbMarkdown);
+// Printed like k6's own table, so the job log carries it for whoever cannot open the artifact.
+console.log(`${dbMarkdown}\nPostgres report: ${dbReport}`);
 process.exit(status);

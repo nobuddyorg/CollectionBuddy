@@ -78,7 +78,7 @@ the same way `npm run e2e:local` does, and runs
 | `<flow>.md` | The table below, also printed to stdout |
 | `<flow>.json` | k6's full end-of-test summary object |
 | `<flow>.html` | k6's self-contained HTML report: request rate, latency percentiles, VUs and errors as charts over time. Skipped, with a warning, for a run under three 10 s periods, so never for `smoke` |
-| `<flow>.db.md` | What Postgres did during the run: see [the Postgres side](#the-postgres-side). Local stack only |
+| `<flow>.db.md` | What Postgres did during the run: see [the Postgres side](#the-postgres-side). Also printed to stdout. Local stack only |
 
 It also sets `K6_NO_USAGE_REPORT`, so k6 does not phone home, and disables the
 live dashboard's port, so k6 exits when the run does.
