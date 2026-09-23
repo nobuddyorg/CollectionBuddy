@@ -139,7 +139,7 @@ Session code (`useSession.ts`, `page.tsx`, `login/`) reaches `supabase.ts` direc
 
 ## CI/CD
 
-Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (Node version, npm cache, `npm ci`), `setup-supabase-cli` (the one CLI version, so CI's stack and the production `db push` cannot diverge), `start-local-stack` (that CLI plus `supabase start`), `summary-section` (a tee'd output file into the job summary), `playwright-results` (job summary and artifacts for a Playwright run).
+Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (Node version, npm cache, `npm ci`), `setup-supabase-cli` (the one CLI version, so CI's stack and the production `db push` cannot diverge), `start-local-stack` (that CLI, a ghcr.io login with the job token so the image pulls are not rate-limited as anonymous, then `supabase start`), `summary-section` (a tee'd output file into the job summary), `playwright-results` (job summary and artifacts for a Playwright run).
 
 | Workflow (job) | Trigger | Does |
 | --- | --- | --- |

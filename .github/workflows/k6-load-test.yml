@@ -28,6 +28,8 @@ run-name: k6 ${{ inputs.flow }} (${{ inputs.profile }}) against ${{ inputs.targe
 
 permissions:
   contents: read
+  # start-local-stack logs in to ghcr.io for the Supabase images.
+  packages: read
 
 jobs:
   load_test:

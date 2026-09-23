@@ -157,6 +157,10 @@ jobs:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true' || needs.changes.outputs.sql == 'true'
     runs-on: ubuntu-latest
+    # packages: read lets start-local-stack log in to ghcr.io for the Supabase images.
+    permissions:
+      contents: read
+      packages: read
     defaults:
       run:
         working-directory: ./web
@@ -170,7 +174,7 @@ jobs:
       # A migration that cannot apply from scratch fails here, not in production.
       - uses: ./.github/actions/start-local-stack
 
-      # Before the browser install: a schema or RLS regression fails in seconds. Division of labor with rls.spec.ts: TEST_STRATEGY.md §7.
+      # Before the browser install: a schema or RLS regression fails in seconds. Division of labor with e2e/signed-in/rls/: TEST_STRATEGY.md §7.
       - name: Run pgTAP database tests
         working-directory: .
         shell: bash
@@ -376,6 +380,10 @@ jobs:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
+    # packages: read lets start-local-stack log in to ghcr.io for the Supabase images.
+    permissions:
+      contents: read
+      packages: read
     defaults:
       run:
         working-directory: ./web
@@ -416,6 +424,10 @@ jobs:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
+    # packages: read lets start-local-stack log in to ghcr.io for the Supabase images.
+    permissions:
+      contents: read
+      packages: read
     defaults:
       run:
         working-directory: ./web
