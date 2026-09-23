@@ -320,5 +320,16 @@ select is(
   'the map and search RPCs plan each call for the category it names'
 );
 
+-- JIT compiles any plan past jit_above_cost, which a large category's map reaches; compiling cost more than the query ran (0018).
+select is(
+  (select array_agg(p.proname::text order by p.proname)
+   from pg_catalog.pg_proc p
+   join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and coalesce(p.proconfig, '{}') @> array['jit=off']),
+  array['list_category_places', 'search_category_items'],
+  'the map and search RPCs never JIT-compile'
+);
+
 select * from finish();
 rollback;
