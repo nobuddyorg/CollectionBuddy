@@ -127,7 +127,9 @@ Because `has_category_read_access()` excludes ownership and an owner cannot shar
 
 [`web/src/app/data/`](../../web/src/app/data/) holds every table and storage query, and the two other external boundaries:
 
-- `items.ts` — `listItems()` (paginated; a search goes through `search_category_items`), `createItem()`, `updateItem()`, `deleteItem()`, `linkItemToCategory()`, `listCategoryPlaces()`.
+- `items.ts` — `listItems()` (paginated; a search goes through `search_category_items`), `createItem()`, `updateItem()`, `deleteItem()`, `linkItemToCategory()`, `listCategoryPlaces()`. `itemSearch.ts` builds the `ILIKE` filter and decides the minimum search length; `exportItemPages.ts` pages a whole category oldest-first for an export, keyed on `(linked_at, item_id)` rather than an offset.
+- `exportCategory.ts`, `exportFormat.ts`, `zip.ts` — the export: a store-only ZIP assembled in the tab, laid out as `CollectionBuddy-<slug>-<date>/` with `collection.json` (every field, full fidelity: tags as a list, coordinates as numbers, ids kept as a future merge identity), `collection.csv` (the same rows flattened to text for a spreadsheet, RFC 4180-quoted, user text formula-guarded) and `photos/NNN-<slug>/N.webp`. `zip.ts` is hand-written because the bytes are already WebP-compressed, so deflate would cost a pass per megabyte for nothing; it has no Zip64, so 4 GiB and 65 535 entries are hard caps.
+- `importCategory.ts`, `importFormat.ts`, `importPhoto.ts`, `importCancellation.ts` — the import: always a new category, never a merge into an existing one (importing the same archive twice makes two categories); photos re-upload through a bounded pool with retries, and a cancel aborts between items.
 - `categories.ts` — list/create/rename/delete, plus the counts the deletion warning needs.
 - `images.ts` — the `images` table plus `createSignedUrls()` (1 h), `uploadImageObject()`, `removeImageObjects()`, and `imagePrefix()`, the one place the path scheme is written down.
 - `auth.ts` — `verifiedUserId()`, a round trip to the auth server for a caller about to write under a user-derived path.

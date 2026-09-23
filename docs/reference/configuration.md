@@ -49,7 +49,7 @@ protection is the server-side check.
 | E2E JS/CSS coverage | `web/e2e/coverage.ts` `COVERAGE_THRESHOLDS` | One floor, on `npm run e2e:local` only (every Chromium project, source-mapped); `npm run e2e` and the smoke test collect nothing |
 | Lighthouse | `web/lighthouserc.signed-out.json`, `.signed-in.json` | Performance, best-practices and SEO scores plus LCP, TBT, CLS, set from a measured baseline with margin; accessibility at exactly 1.0 |
 
-Every floor is raised by hand when a real run reports a higher number, and never lowered to make a change fit. `autoUpdate` is off in Vitest: it wrote the local measurement back into the config after every run, so a green local run produced a red PR.
+Every floor is raised by hand when a real run reports a higher number, and never lowered to make a change fit. The global unit floor sits one point under the measured 100% because CI's pinned Node measures about 0.1 pp lower than a local run. `autoUpdate` is off in Vitest: it wrote the local measurement back into the config after every run, so a green local run produced a red PR.
 
 Stryker runs incrementally (`incremental: true`, reusing `web/reports/stryker-incremental.json`); CI caches that file keyed on `package-lock.json` and the Stryker and Vitest config, and `main` passes `--force` for a full run. k6's p95 thresholds (`web/load/lib/options.js`) are calibrated from two `normal` runs per script with a 3× margin ([Load testing](../how-to/load-testing.md#read-the-results)).
 
