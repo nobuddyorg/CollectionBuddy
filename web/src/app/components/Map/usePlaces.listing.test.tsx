@@ -34,7 +34,9 @@ describe('usePlaces listing', () => {
   });
 
   it('does nothing while disabled, leaving the initial loading/error state untouched', async () => {
-    const { result } = renderHook(() => usePlaces('cat-1', '', false));
+    const { result } = renderHook(() =>
+      usePlaces({ categoryId: 'cat-1', search: '', enabled: false }),
+    );
     await act(async () => {
       await Promise.resolve();
     });
@@ -53,7 +55,9 @@ describe('usePlaces listing', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
-    const { result } = renderHook(() => usePlaces('cat-1', '', true));
+    const { result } = renderHook(() =>
+      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
+    );
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -73,7 +77,9 @@ describe('usePlaces listing', () => {
       error: new Error('offline'),
     });
 
-    const { result } = renderHook(() => usePlaces('cat-1', '', true));
+    const { result } = renderHook(() =>
+      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
+    );
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -92,7 +98,9 @@ describe('usePlaces listing', () => {
       error: listingError,
     });
 
-    renderHook(() => usePlaces('cat-1', '', true));
+    renderHook(() =>
+      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
+    );
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -116,7 +124,7 @@ describe('usePlaces listing', () => {
 
     const { rerender } = renderHook(
       ({ categoryId, search }: { categoryId: string; search: string }) =>
-        usePlaces(categoryId, search, true),
+        usePlaces({ categoryId, search, enabled: true }),
       { initialProps: { categoryId: 'cat-1', search: '' } },
     );
     await act(async () => {
@@ -133,10 +141,11 @@ describe('usePlaces listing', () => {
 
     expect(listCategoryPlaces).toHaveBeenCalledTimes(2);
     expect(listCategoryPlaces).toHaveBeenLastCalledWith(
-      'cat-1',
-      'Col',
-      expect.anything(),
+      expect.objectContaining({ categoryId: 'cat-1', search: 'Col' }),
     );
+    expect(
+      vi.mocked(listCategoryPlaces).mock.lastCall?.[0].signal,
+    ).toBeInstanceOf(AbortSignal);
   });
 
   it('sets loading back to true for a later fetch, not only the first one', async () => {
@@ -147,7 +156,7 @@ describe('usePlaces listing', () => {
 
     const { result, rerender } = renderHook(
       ({ categoryId }: { categoryId: string }) =>
-        usePlaces(categoryId, '', true),
+        usePlaces({ categoryId, search: '', enabled: true }),
       { initialProps: { categoryId: 'cat-1' } },
     );
     await act(async () => {
@@ -167,7 +176,9 @@ describe('usePlaces listing', () => {
   it('reports no error when there is nothing at all to plot', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({ data: [], error: null });
 
-    const { result } = renderHook(() => usePlaces('cat-1', '', true));
+    const { result } = renderHook(() =>
+      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
+    );
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -183,7 +194,9 @@ describe('usePlaces listing', () => {
       error: null,
     });
 
-    const { result } = renderHook(() => usePlaces('cat-1', '', true));
+    const { result } = renderHook(() =>
+      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
+    );
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -207,7 +220,7 @@ describe('usePlaces listing', () => {
     let renderCount = 0;
     renderHook(() => {
       renderCount += 1;
-      return usePlaces('cat-1', '', true);
+      return usePlaces({ categoryId: 'cat-1', search: '', enabled: true });
     });
     const countAfterMount = renderCount;
 

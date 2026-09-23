@@ -21,7 +21,11 @@ function Harness({
 }) {
   const container = useRef<HTMLDivElement>(null);
   const second = useRef<HTMLButtonElement>(null);
-  useFocusTrap(open, container, useInitialFocus ? second : undefined);
+  useFocusTrap({
+    open,
+    containerRef: container,
+    initialFocusRef: useInitialFocus ? second : undefined,
+  });
 
   return (
     <div>
@@ -52,7 +56,7 @@ const button = (name: string) => screen.getByRole('button', { name });
 // Keeps the container mounted while closed: `open` alone must gate the hook, not callers' unmounts.
 function AlwaysMountedHarness({ open }: { open: boolean }) {
   const container = useRef<HTMLDivElement>(null);
-  useFocusTrap(open, container);
+  useFocusTrap({ open, containerRef: container });
   return (
     <div>
       <button>outside</button>

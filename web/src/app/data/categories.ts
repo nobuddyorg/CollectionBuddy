@@ -121,8 +121,10 @@ function rawListItemIdsLinkedElsewhere({
 
 /** Which items would NOT be orphaned; on `error` abort the deletion rather than act on a partial set. */
 export async function listItemIdsLinkedElsewhere(
-  itemIds: string[],
-  excludingCategoryId: string,
+  {
+    itemIds,
+    excludingCategoryId,
+  }: { itemIds: string[]; excludingCategoryId: string },
   listPage: typeof rawListItemIdsLinkedElsewhere = rawListItemIdsLinkedElsewhere,
 ): Promise<{ data: string[] | null; error: unknown }> {
   const rows = await readAllChunks(

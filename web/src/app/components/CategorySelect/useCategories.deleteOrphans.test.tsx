@@ -188,10 +188,10 @@ describe('useCategories deleteCategory orphan detection', () => {
         'u/i2/b.thumb.webp',
       ]),
     );
-    expect(listItemIdsLinkedElsewhere).toHaveBeenCalledWith(
-      ['i1', 'i2'],
-      'cat-1',
-    );
+    expect(listItemIdsLinkedElsewhere).toHaveBeenCalledWith({
+      itemIds: ['i1', 'i2'],
+      excludingCategoryId: 'cat-1',
+    });
     expect(listImagePathsForItems).toHaveBeenCalledWith(['i2']);
     expect(removeImageObjects).toHaveBeenCalledTimes(1);
   });

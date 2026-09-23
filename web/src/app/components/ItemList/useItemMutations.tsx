@@ -86,7 +86,9 @@ export function useItemMutations({
       const restore = () => {
         pendingDeleteIds.current.delete(id);
         if (!snapshot) return;
-        setItems((previous) => restoreAt(previous, index, snapshot));
+        setItems((previous) =>
+          restoreAt({ list: previous, index, item: snapshot }),
+        );
       };
 
       toast.success(t('item_list.entry_deleted'), {

@@ -48,7 +48,7 @@ export default function Menu({
   onClose,
   labelSignOut,
 }: MenuProps) {
-  const { t, lang, setLang } = useI18n();
+  const { t, language, setLanguage } = useI18n();
   const { preference, setThemePreference } = useTheme();
   if (!open) return null;
   const menuId = 'user-menu';
@@ -65,10 +65,10 @@ export default function Menu({
       <div className="px-3 py-2 space-y-1.5">
         <span className="block text-sm">{t('header.language')}</span>
         <SegmentedControl
-          value={lang}
+          value={language}
           options={['de', 'en']}
           labels={{ de: 'Deutsch', en: 'English' }}
-          onChange={setLang}
+          onChange={setLanguage}
           testIdPrefix="lang"
         />
       </div>

@@ -16,9 +16,7 @@ describe('listCategoryPlaces', () => {
     const rawList = vi.fn().mockResolvedValue({ data: rows, error: null });
 
     const { data, error } = await listCategoryPlaces(
-      'cat-1',
-      '',
-      undefined,
+      { categoryId: 'cat-1', search: '' },
       rawList,
     );
 
@@ -37,9 +35,7 @@ describe('listCategoryPlaces', () => {
       .mockResolvedValue({ data: null, error: new Error('rls') });
 
     const { data, error } = await listCategoryPlaces(
-      'cat-1',
-      '',
-      undefined,
+      { categoryId: 'cat-1', search: '' },
       rawList,
     );
 
@@ -51,9 +47,7 @@ describe('listCategoryPlaces', () => {
     const rawList = vi.fn().mockResolvedValue({ data: null, error: null });
 
     const { data, error } = await listCategoryPlaces(
-      'cat-1',
-      '',
-      undefined,
+      { categoryId: 'cat-1', search: '' },
       rawList,
     );
 
@@ -67,8 +61,7 @@ describe('updateItemsPlace', () => {
     const updatePage = vi.fn().mockResolvedValue({ error: null });
 
     const { error } = await updateItemsPlace(
-      ['a', 'b'],
-      { place_lat: 50.7, place_lng: 7.1 },
+      { ids: ['a', 'b'], payload: { place_lat: 50.7, place_lng: 7.1 } },
       updatePage,
     );
 
@@ -86,7 +79,7 @@ describe('updateItemsPlace', () => {
     const updatePage = vi.fn().mockResolvedValue({ error: null });
     const payload = { place_lat: 50.7, place_lng: 7.1 };
 
-    const { error } = await updateItemsPlace(ids, payload, updatePage);
+    const { error } = await updateItemsPlace({ ids, payload }, updatePage);
 
     expect(error).toBeNull();
     expect(updatePage).toHaveBeenCalledTimes(3);
@@ -99,7 +92,10 @@ describe('updateItemsPlace', () => {
     const ids = Array.from({ length: 200 }, (_, i) => `id-${i}`);
     const updatePage = vi.fn().mockResolvedValue({ error: null });
 
-    await updateItemsPlace(ids, { place_lat: 0, place_lng: 0 }, updatePage);
+    await updateItemsPlace(
+      { ids, payload: { place_lat: 0, place_lng: 0 } },
+      updatePage,
+    );
 
     expect(updatePage).toHaveBeenCalledTimes(2);
   });
@@ -111,8 +107,7 @@ describe('updateItemsPlace', () => {
       .mockResolvedValueOnce({ error: new Error('boom') });
 
     const { error } = await updateItemsPlace(
-      ids,
-      { place_lat: 0, place_lng: 0 },
+      { ids, payload: { place_lat: 0, place_lng: 0 } },
       updatePage,
     );
 

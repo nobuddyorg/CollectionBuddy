@@ -7,10 +7,10 @@ import { useI18n } from './useI18n';
 import realEn from './en.json';
 
 function Probe() {
-  const { lang, setLang, t, tCount } = useI18n();
+  const { language, setLanguage, t, tCount } = useI18n();
   return (
     <div>
-      <span data-testid="lang">{lang}</span>
+      <span data-testid="lang">{language}</span>
       <span data-testid="close">{t('common.close')}</span>
       <span data-testid="missing">
         {t('nope.not.a.real.key' as TranslationKey)}
@@ -22,10 +22,10 @@ function Probe() {
       <span data-testid="no-key-at-all">
         {tCount('nope.not.real' as TranslationKey, 1)}
       </span>
-      <button type="button" onClick={() => setLang('en')}>
+      <button type="button" onClick={() => setLanguage('en')}>
         English
       </button>
-      <button type="button" onClick={() => setLang('de')}>
+      <button type="button" onClick={() => setLanguage('de')}>
         Deutsch
       </button>
     </div>
@@ -158,8 +158,8 @@ describe('I18nProvider', () => {
     const { I18nProvider: FreshProvider } = await import('./I18nProvider');
     const { useI18n: freshUseI18n } = await import('./useI18n');
     function FreshProbe() {
-      const { lang } = freshUseI18n();
-      return <span data-testid="lang">{lang}</span>;
+      const { language } = freshUseI18n();
+      return <span data-testid="lang">{language}</span>;
     }
     localStorage.setItem('lang', 'en');
 
@@ -214,7 +214,7 @@ describe('I18nProvider', () => {
     const tBeforeSwitch = result.current.t;
 
     await act(async () => {
-      result.current.setLang('de');
+      result.current.setLanguage('de');
     });
 
     // Same function identity throughout, yet it must answer for German now, not the English it was made under.

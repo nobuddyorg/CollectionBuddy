@@ -49,11 +49,11 @@ export default function ItemList({
 
   const closeCreate = useCallback(() => setCreateOpen(false), []);
   const discardCreate = useCallback(() => setCreateDirty(false), []);
-  const guardedCloseCreate = useGuardedModalClose(
-    isCreateDirty,
-    closeCreate,
-    discardCreate,
-  );
+  const guardedCloseCreate = useGuardedModalClose({
+    isDirty: isCreateDirty,
+    onClose: closeCreate,
+    onDiscard: discardCreate,
+  });
 
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query, 200).trim();

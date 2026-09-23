@@ -47,8 +47,8 @@ export function resolveTranslationKey(
 }
 
 type I18nContextType = {
-  lang: Language;
-  setLang: (lang: Language) => void;
+  language: Language;
+  setLanguage: (language: Language) => void;
   t: (key: TranslationKey) => string;
   /** Picks `${baseKey}_one` by the locale's plural rule (German and English disagree), else `baseKey`. */
   tCount: (baseKey: TranslationKey, count: number) => string;
@@ -74,31 +74,31 @@ function detectLanguage(): Language {
 
 export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   // Starts at 'de' to match the prerendered markup; the layout effect corrects it before paint.
-  const [lang, setLang] = useState<Language>('de');
-  // t reads lang through this ref so its identity survives a language change.
-  const languageRef = useRef(lang);
-  // eslint-disable-next-line react-hooks/refs -- written during render so t never reads a stale lang in this render
-  languageRef.current = lang;
+  const [language, setLanguage] = useState<Language>('de');
+  // t reads language through this ref so its identity survives a language change.
+  const languageRef = useRef(language);
+  // eslint-disable-next-line react-hooks/refs -- written during render so t never reads a stale language in this render
+  languageRef.current = language;
 
   useLayoutEffect(() => {
-    setLang(detectLanguage());
+    setLanguage(detectLanguage());
   }, []);
 
-  const setLangAndPersist = useCallback((next: Language) => {
-    setLang(next);
+  const setLanguageAndPersist = useCallback((next: Language) => {
+    setLanguage(next);
     localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
   }, []);
 
   // Keeps <html lang> and the meta description with the language, or screen readers use the wrong phonetics.
   useEffect(() => {
-    document.documentElement.lang = lang;
+    document.documentElement.lang = language;
     document
       .querySelector('meta[name="description"]')
       ?.setAttribute(
         'content',
-        resolveTranslationKey(translations[lang], 'page.footer') ?? '',
+        resolveTranslationKey(translations[language], 'page.footer') ?? '',
       );
-  }, [lang]);
+  }, [language]);
 
   const t = useCallback(
     (key: TranslationKey) =>
@@ -119,8 +119,8 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const value = useMemo(
-    () => ({ lang, setLang: setLangAndPersist, t, tCount }),
-    [lang, setLangAndPersist, t, tCount],
+    () => ({ language, setLanguage: setLanguageAndPersist, t, tCount }),
+    [language, setLanguageAndPersist, t, tCount],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

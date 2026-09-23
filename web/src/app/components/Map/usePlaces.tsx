@@ -108,12 +108,17 @@ const appendPlace = (place: Place) => (previous: Place[]) => [
 ];
 
 // `enabled` gates fetching behind the map being open; `search` narrows to the entries the list shows.
-export function usePlaces(
-  categoryId: string,
-  search: string,
-  enabled: boolean,
-  locale?: string,
-) {
+export function usePlaces({
+  categoryId,
+  search,
+  enabled,
+  locale,
+}: {
+  categoryId: string;
+  search: string;
+  enabled: boolean;
+  locale?: string;
+}) {
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -131,11 +136,11 @@ export function usePlaces(
       setError(false);
       setPlaces([]);
       try {
-        const { data: rows, error } = await listCategoryPlaces(
+        const { data: rows, error } = await listCategoryPlaces({
           categoryId,
           search,
-          controller.signal,
-        );
+          signal: controller.signal,
+        });
 
         if (error) throw new Error('Could not list places', { cause: error });
 
@@ -192,9 +197,9 @@ export function usePlaces(
             if (!cancelled) setPlaces(appendPlace(withTitles(entry, titles)));
 
             // Fire-and-forget write-back; `ids` came from the same rows as `unlocated`, so the key exists.
-            void updateItemsPlace(ids.get(place)!, {
-              place_lat: entry.lat,
-              place_lng: entry.lng,
+            void updateItemsPlace({
+              ids: ids.get(place)!,
+              payload: { place_lat: entry.lat, place_lng: entry.lng },
             });
           }
         };

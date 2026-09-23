@@ -20,12 +20,17 @@ export function listSharesForCategory(categoryId: string) {
 }
 
 // tg_category_shares_enforce fills owner_user_id and re-normalizes the email: use the returned row.
-export function createShare(
-  categoryId: string,
-  invitedEmail: string,
-  expiresAt: string | null,
-  role: ShareRole = 'viewer',
-) {
+export function createShare({
+  categoryId,
+  invitedEmail,
+  expiresAt,
+  role = 'viewer',
+}: {
+  categoryId: string;
+  invitedEmail: string;
+  expiresAt: string | null;
+  role?: ShareRole;
+}) {
   return supabase
     .from('category_shares')
     .insert({

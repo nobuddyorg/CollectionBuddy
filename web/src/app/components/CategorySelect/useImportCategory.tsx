@@ -5,11 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TranslationKey } from '../../i18n/I18nProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
-import {
-  ImportCancelledError,
-  importCategory,
-  type ImportProgress,
-} from '../../data/importCategory';
+import { ImportCancelledError } from '../../data/importCancellation';
+import { importCategory, type ImportProgress } from '../../data/importCategory';
 import {
   findManifestPath,
   ImportFormatError,

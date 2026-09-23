@@ -4,10 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
-import {
-  ImportCancelledError,
-  importCategory,
-} from '../../data/importCategory';
+import { ImportCancelledError } from '../../data/importCancellation';
+import { importCategory } from '../../data/importCategory';
 import { readZipEntries } from '../../data/zip';
 import { useImportCategory } from './useImportCategory';
 

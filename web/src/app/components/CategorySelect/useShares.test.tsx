@@ -178,11 +178,11 @@ describe('useShares', () => {
       });
 
       expect(ok).toBe(true);
-      expect(createShareRow).toHaveBeenCalledWith(
-        'cat-1',
-        'grantee@example.com',
-        null,
-      );
+      expect(createShareRow).toHaveBeenCalledWith({
+        categoryId: 'cat-1',
+        invitedEmail: 'grantee@example.com',
+        expiresAt: null,
+      });
       expect(result.current.shares).toEqual([grant]);
     });
 

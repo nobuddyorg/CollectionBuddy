@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { searchMinLength } from '../../data/items';
+import { searchMinLength } from '../../data/itemSearch';
 import {
   coordsFromFeature,
   photonLang,

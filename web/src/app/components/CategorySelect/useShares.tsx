@@ -56,11 +56,11 @@ export function useShares(categoryId: string | null) {
       if (!categoryId || isSharing) return false;
       setIsSharing(true);
       try {
-        const { data, error } = await createShareRow(
+        const { data, error } = await createShareRow({
           categoryId,
           invitedEmail,
           expiresAt,
-        );
+        });
         if (error) throw error;
         if (data) setShares((previous) => [...previous, data]);
         toast.success(t('category_select.share_success'));
@@ -126,7 +126,9 @@ export function useShares(categoryId: string | null) {
       setShares((previous) => previous.filter((share) => share.id !== shareId));
 
       const restoreAndNotify = () => {
-        setShares((previous) => restoreAt(previous, index, snapshot));
+        setShares((previous) =>
+          restoreAt({ list: previous, index, item: snapshot }),
+        );
         options.onRestore?.();
       };
 

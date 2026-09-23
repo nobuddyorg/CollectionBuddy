@@ -238,7 +238,7 @@ export function useItemImages() {
       const restore = () => {
         setImages((previous) => ({
           ...previous,
-          [itemId]: restoreAt(previous[itemId], index, image),
+          [itemId]: restoreAt({ list: previous[itemId], index, item: image }),
         }));
       };
 

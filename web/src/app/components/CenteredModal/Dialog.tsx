@@ -31,7 +31,7 @@ export function Dialog({
   const titleId = useId();
   const descriptionId = useId();
 
-  useFocusTrap(open, panelRef, initialFocusRef);
+  useFocusTrap({ open, containerRef: panelRef, initialFocusRef });
 
   return (
     <div

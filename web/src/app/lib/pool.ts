@@ -5,11 +5,15 @@ function throwAsError(error: unknown): never {
 }
 
 /** First rejection stops every runner picking up more; in-flight work settles, then it is rethrown. */
-export async function runPool<T>(
-  items: T[],
-  concurrency: number,
-  worker: (item: T) => Promise<void>,
-): Promise<void> {
+export async function runPool<T>({
+  items,
+  concurrency,
+  worker,
+}: {
+  items: T[];
+  concurrency: number;
+  worker: (item: T) => Promise<void>;
+}): Promise<void> {
   // One shared iterator is the hand-off: each pull claims the next item exactly once.
   const remaining = items[Symbol.iterator]();
   let poolError: unknown;

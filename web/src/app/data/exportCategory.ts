@@ -197,10 +197,10 @@ export async function signAll({
   signal?: AbortSignal;
 }): Promise<Map<string, string>> {
   const signed = new Map<string, string>();
-  await runPool(
-    chunk(paths, SIGN_BATCH_SIZE),
-    SIGN_CONCURRENCY,
-    async (batch) => {
+  await runPool({
+    items: chunk(paths, SIGN_BATCH_SIZE),
+    concurrency: SIGN_CONCURRENCY,
+    worker: async (batch) => {
       checkCancelled(signal);
       const result = await signUrls(batch, EXPORT_SIGNED_URL_TTL_SECONDS);
       if (result.error) {
@@ -212,7 +212,7 @@ export async function signAll({
         if (row.path && row.signedUrl) signed.set(row.path, row.signedUrl);
       }
     },
-  );
+  });
   return signed;
 }
 
@@ -281,28 +281,32 @@ export async function exportCategory({
   onProgress?.({ phase: 'photos', done, total });
 
   // A ZipLimitError or a cancellation fails the whole export, not one more skipped photograph.
-  await runPool(tasks, PHOTO_DOWNLOAD_CONCURRENCY, async (task) => {
-    checkCancelled(signal);
-    const url = signed.get(task.storagePath);
-    try {
-      if (!url) throw new Error(`Unsigned path in ${ITEM_IMAGES_BUCKET}`);
-      const bytes = await fetchPhotoBytes(url, signal);
-      writer.add({
-        path: `${archiveRoot}/${task.archivePath}`,
-        bytes,
-        modified: exportedAt,
-      });
-    } catch (error) {
-      if (
-        error instanceof ZipLimitError ||
-        error instanceof ExportCancelledError
-      ) {
-        throw error;
+  await runPool({
+    items: tasks,
+    concurrency: PHOTO_DOWNLOAD_CONCURRENCY,
+    worker: async (task) => {
+      checkCancelled(signal);
+      const url = signed.get(task.storagePath);
+      try {
+        if (!url) throw new Error(`Unsigned path in ${ITEM_IMAGES_BUCKET}`);
+        const bytes = await fetchPhotoBytes(url, signal);
+        writer.add({
+          path: `${archiveRoot}/${task.archivePath}`,
+          bytes,
+          modified: exportedAt,
+        });
+      } catch (error) {
+        if (
+          error instanceof ZipLimitError ||
+          error instanceof ExportCancelledError
+        ) {
+          throw error;
+        }
+        console.error('Skipping photograph', task.storagePath, error);
+        skipped++;
       }
-      console.error('Skipping photograph', task.storagePath, error);
-      skipped++;
-    }
-    onProgress?.({ phase: 'photos', done: ++done, total });
+      onProgress?.({ phase: 'photos', done: ++done, total });
+    },
   });
 
   onProgress?.({ phase: 'packing', done: total, total });

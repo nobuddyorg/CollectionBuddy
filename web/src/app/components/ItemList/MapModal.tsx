@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
-import { searchMinLength } from '../../data/items';
+import { searchMinLength } from '../../data/itemSearch';
 import CenteredModal from '../CenteredModal';
 import Icon, { IconType } from '../Icon';
 import { Spinner } from '../ui/Spinner';
@@ -26,14 +26,14 @@ export function MapModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { t, lang } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
 
   const {
     places,
     loading: loadingPlaces,
     error: placesError,
-  } = usePlaces(categoryId, search, open, lang);
+  } = usePlaces({ categoryId, search, enabled: open, locale: language });
 
   // Starts empty; the map frames pins as they stream in on its own.
   const {

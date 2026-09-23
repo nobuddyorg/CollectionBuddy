@@ -53,7 +53,9 @@ describe('usePlaces geocode cache', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
-    const { result } = renderHook(() => usePlaces('cat-1', '', true));
+    const { result } = renderHook(() =>
+      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
+    );
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -74,7 +76,9 @@ describe('usePlaces geocode cache', () => {
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(photonOk([6.96, 50.94])));
 
-    const { result } = renderHook(() => usePlaces('cat-1', '', true));
+    const { result } = renderHook(() =>
+      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
+    );
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -99,7 +103,9 @@ describe('usePlaces geocode cache', () => {
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(photonOk([6.96, 50.94])));
 
-    const { result } = renderHook(() => usePlaces('cat-1', '', true));
+    const { result } = renderHook(() =>
+      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
+    );
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -120,7 +126,9 @@ describe('usePlaces geocode cache', () => {
       error: null,
     });
 
-    renderHook(() => usePlaces('cat-1', '', true));
+    renderHook(() =>
+      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
+    );
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();

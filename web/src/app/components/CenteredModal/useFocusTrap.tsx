@@ -4,11 +4,15 @@ import { useEffect } from 'react';
 
 import { getFocusable } from './getFocusable';
 
-export function useFocusTrap(
-  open: boolean,
-  containerRef: React.RefObject<HTMLElement | null>,
-  initialFocusRef?: React.RefObject<HTMLElement | null>,
-) {
+export function useFocusTrap({
+  open,
+  containerRef,
+  initialFocusRef,
+}: {
+  open: boolean;
+  containerRef: React.RefObject<HTMLElement | null>;
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
+}) {
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;

@@ -1,4 +1,4 @@
-import { searchMinLength } from '../../data/items';
+import { searchMinLength } from '../../data/itemSearch';
 
 /** Nothing typed; too short to filter (total is the whole category); or filtered, with a match count. */
 export type SearchStatus =

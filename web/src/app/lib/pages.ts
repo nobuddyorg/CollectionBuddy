@@ -35,10 +35,10 @@ export async function readAllChunks<C, T>(
   const results: T[][] = [];
   let firstError: NonNullable<unknown> | undefined;
   try {
-    await runPool(
-      chunks.map((chunk, index) => ({ chunk, index })),
-      CHUNK_READ_CONCURRENCY,
-      async ({ chunk, index }) => {
+    await runPool({
+      items: chunks.map((chunk, index) => ({ chunk, index })),
+      concurrency: CHUNK_READ_CONCURRENCY,
+      worker: async ({ chunk, index }) => {
         const result = await readChunk(chunk);
         if (result.error !== null) {
           firstError ??= result.error;
@@ -47,7 +47,7 @@ export async function readAllChunks<C, T>(
         }
         results[index] = result.data;
       },
-    );
+    });
   } catch (error) {
     return { data: null, error: firstError ?? (error as NonNullable<unknown>) };
   }

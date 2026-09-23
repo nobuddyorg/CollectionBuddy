@@ -43,7 +43,11 @@ export function EditItemModal({
 
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
   const discard = useCallback(() => setIsDirty(false), []);
-  const guardedClose = useGuardedModalClose(isDirty, close, discard);
+  const guardedClose = useGuardedModalClose({
+    isDirty,
+    onClose: close,
+    onDiscard: discard,
+  });
 
   return (
     <CenteredModal

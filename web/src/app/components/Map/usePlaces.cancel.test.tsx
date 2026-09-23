@@ -40,7 +40,8 @@ const berlin = {
 
 function renderByCategory() {
   return renderHook(
-    ({ categoryId }: { categoryId: string }) => usePlaces(categoryId, '', true),
+    ({ categoryId }: { categoryId: string }) =>
+      usePlaces({ categoryId, search: '', enabled: true }),
     { initialProps: { categoryId: 'cat-1' } },
   );
 }
@@ -60,13 +61,15 @@ describe('usePlaces cancellation', () => {
   it('aborts the listing fetch on unmount, before it has a chance to resolve', async () => {
     let capturedSignal: AbortSignal | undefined;
     vi.mocked(listCategoryPlaces).mockImplementation(
-      (_categoryId, _search, signal) =>
+      ({ signal }) =>
         new Promise(() => {
           capturedSignal = signal;
         }),
     );
 
-    const { unmount } = renderHook(() => usePlaces('cat-1', '', true));
+    const { unmount } = renderHook(() =>
+      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
+    );
     await act(async () => {
       await Promise.resolve();
     });
@@ -91,7 +94,9 @@ describe('usePlaces cancellation', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    const { unmount } = renderHook(() => usePlaces('cat-1', '', true));
+    const { unmount } = renderHook(() =>
+      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
+    );
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -106,9 +111,9 @@ describe('usePlaces cancellation', () => {
       await Promise.resolve();
     });
 
-    expect(updateItemsPlace).toHaveBeenCalledWith(['row-id'], {
-      place_lat: 50.94,
-      place_lng: 6.96,
+    expect(updateItemsPlace).toHaveBeenCalledWith({
+      ids: ['row-id'],
+      payload: { place_lat: 50.94, place_lng: 6.96 },
     });
   });
 

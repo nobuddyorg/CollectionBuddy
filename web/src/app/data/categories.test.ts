@@ -168,7 +168,10 @@ describe('countItemsForCategory', () => {
 describe('listItemIdsLinkedElsewhere', () => {
   it('filters to the given item ids, excluding the category being deleted', async () => {
     const { from, calls } = mockFrom();
-    await listItemIdsLinkedElsewhere(['item-1', 'item-2'], 'cat-1');
+    await listItemIdsLinkedElsewhere({
+      itemIds: ['item-1', 'item-2'],
+      excludingCategoryId: 'cat-1',
+    });
     expect(from).toHaveBeenCalledWith('item_categories');
     expect(calls[0]).toEqual({ method: 'select', args: ['item_id'] });
     expect(calls[1]).toEqual({
@@ -185,7 +188,10 @@ describe('listItemIdsLinkedElsewhere', () => {
   it('carries the exact candidate values through to .in() when under the chunk size', async () => {
     const { calls } = mockFrom();
     const ids = ['a', 'b', 'c'];
-    await listItemIdsLinkedElsewhere(ids, 'cat-1');
+    await listItemIdsLinkedElsewhere({
+      itemIds: ids,
+      excludingCategoryId: 'cat-1',
+    });
     const inCall = calls.find((call) => call.method === 'in')!;
     // A chunked slice, not the original reference: even a short list passes through `.slice()`.
     expect(inCall.args[1]).toEqual(ids);
@@ -196,7 +202,10 @@ describe('listItemIdsLinkedElsewhere', () => {
     const ids = Array.from({ length: 200 }, (_, i) => `id-${i}`);
     const listPage = vi.fn().mockResolvedValue({ data: [], error: null });
 
-    await listItemIdsLinkedElsewhere(ids, 'cat-1', listPage);
+    await listItemIdsLinkedElsewhere(
+      { itemIds: ids, excludingCategoryId: 'cat-1' },
+      listPage,
+    );
 
     expect(listPage).toHaveBeenCalledTimes(2);
   });
@@ -213,8 +222,7 @@ describe('listItemIdsLinkedElsewhere', () => {
       .mockResolvedValueOnce({ data: page3, error: null });
 
     const { data, error } = await listItemIdsLinkedElsewhere(
-      ids,
-      'cat-1',
+      { itemIds: ids, excludingCategoryId: 'cat-1' },
       listPage,
     );
 
@@ -252,8 +260,7 @@ describe('listItemIdsLinkedElsewhere', () => {
       .mockResolvedValueOnce({ data: shortPage, error: null });
 
     const { data } = await listItemIdsLinkedElsewhere(
-      ['item-1'],
-      'cat-1',
+      { itemIds: ['item-1'], excludingCategoryId: 'cat-1' },
       listPage,
     );
 
@@ -279,8 +286,7 @@ describe('listItemIdsLinkedElsewhere', () => {
       .mockResolvedValue({ data: null, error: new Error('boom') });
 
     const { data, error } = await listItemIdsLinkedElsewhere(
-      ['item-1'],
-      'cat-1',
+      { itemIds: ['item-1'], excludingCategoryId: 'cat-1' },
       listPage,
     );
 

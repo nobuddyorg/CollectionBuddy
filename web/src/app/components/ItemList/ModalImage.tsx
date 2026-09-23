@@ -91,7 +91,7 @@ export function ModalImage({
 
   useLockBodyScroll(open);
   useEscapeToClose(open, onClose);
-  useFocusTrap(open, panelRef);
+  useFocusTrap({ open, containerRef: panelRef });
   useInertBackground(open);
 
   useEffect(() => {

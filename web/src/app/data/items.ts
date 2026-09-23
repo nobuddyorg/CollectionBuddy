@@ -4,8 +4,6 @@ import type { Database } from './database.types';
 import type { ImageListRow } from './images';
 import { likePatternFor, searchFilterFor } from './itemSearch';
 
-export { searchMinLength } from './itemSearch';
-
 type ItemRow = Database['public']['Tables']['items']['Row'];
 export type ItemInsert = Database['public']['Tables']['items']['Insert'];
 export type ItemUpdate = Database['public']['Tables']['items']['Update'];
@@ -319,9 +317,11 @@ export function rawListCategoryPlaces({
 
 /** A plain, mockable await over `rawListCategoryPlaces`; `rawList` exists for its test. */
 export async function listCategoryPlaces(
-  categoryId: string,
-  search: string,
-  signal?: AbortSignal,
+  {
+    categoryId,
+    search,
+    signal,
+  }: { categoryId: string; search: string; signal?: AbortSignal },
   rawList: typeof rawListCategoryPlaces = rawListCategoryPlaces,
 ): Promise<{ data: PlaceGroupRow[] | null; error: unknown }> {
   const { data, error } = await rawList({ categoryId, search, signal });
@@ -333,8 +333,10 @@ const ID_FILTER_CHUNK_SIZE = 100;
 
 /** Writes a geocoded place onto every item at it, one request per chunk; `updatePage` is for the test. */
 export async function updateItemsPlace(
-  ids: string[],
-  payload: Pick<ItemUpdate, 'place_lat' | 'place_lng'>,
+  {
+    ids,
+    payload,
+  }: { ids: string[]; payload: Pick<ItemUpdate, 'place_lat' | 'place_lng'> },
   updatePage: typeof rawUpdateItemsPlace = rawUpdateItemsPlace,
 ): Promise<{ error: unknown }> {
   for (const page of chunk(ids, ID_FILTER_CHUNK_SIZE)) {

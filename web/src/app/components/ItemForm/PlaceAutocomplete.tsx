@@ -16,7 +16,7 @@ export function PlaceAutocomplete({
   value: string;
   onChange: (value: string, coords: PlaceCoords | null) => void;
 }) {
-  const { t, lang } = useI18n();
+  const { t, language } = useI18n();
   const {
     setQuery,
     focus,
@@ -32,7 +32,7 @@ export function PlaceAutocomplete({
     choose,
     onKeyDown,
     formatDisplay,
-  } = usePhotonSearch(lang);
+  } = usePhotonSearch(language);
   const listId = useId();
 
   useEffect(() => {

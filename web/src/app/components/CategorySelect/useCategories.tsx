@@ -131,7 +131,9 @@ export function useCategories() {
         previous.filter((category) => category.id !== id),
       );
       return () =>
-        setCategories((previous) => restoreAt(previous, index, snapshot));
+        setCategories((previous) =>
+          restoreAt({ list: previous, index, item: snapshot }),
+        );
     },
     [categories],
   );
@@ -164,7 +166,10 @@ export function useCategories() {
             let orphanedItemIds = itemIds;
             if (itemIds.length) {
               const { data: stillLinked, error: linkedError } =
-                await listItemIdsLinkedElsewhere(itemIds, id);
+                await listItemIdsLinkedElsewhere({
+                  itemIds,
+                  excludingCategoryId: id,
+                });
               if (linkedError) {
                 // An incomplete answer must abort the whole delete, not read as "nothing else links these".
                 throw new Error('Could not check items linked elsewhere', {

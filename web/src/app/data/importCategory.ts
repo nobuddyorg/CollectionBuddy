@@ -24,8 +24,6 @@ import { readZipEntries } from './zip';
 import { chunk } from '../lib/chunk';
 import { runPool } from '../lib/pool';
 
-export { ImportCancelledError } from './importCancellation';
-
 export type ImportProgress = {
   phase: 'reading' | 'items' | 'photos';
   done: number;
@@ -226,17 +224,21 @@ export async function importCategory({
     let skippedPhotoCount = 0;
     onProgress?.({ phase: 'photos', done, total });
 
-    await runPool(photoTasks, PHOTO_UPLOAD_CONCURRENCY, async (task) => {
-      checkCancelled(signal);
-      const imported = await importPhoto({
-        task,
-        bytes: entries.get(`${root}/${task.archivePath}`),
-        uid,
-        calls: { uploadImage, createImage, compressThumb, signal },
-      });
-      if (imported) photoCount++;
-      else skippedPhotoCount++;
-      onProgress?.({ phase: 'photos', done: ++done, total });
+    await runPool({
+      items: photoTasks,
+      concurrency: PHOTO_UPLOAD_CONCURRENCY,
+      worker: async (task) => {
+        checkCancelled(signal);
+        const imported = await importPhoto({
+          task,
+          bytes: entries.get(`${root}/${task.archivePath}`),
+          uid,
+          calls: { uploadImage, createImage, compressThumb, signal },
+        });
+        if (imported) photoCount++;
+        else skippedPhotoCount++;
+        onProgress?.({ phase: 'photos', done: ++done, total });
+      },
     });
 
     return {
