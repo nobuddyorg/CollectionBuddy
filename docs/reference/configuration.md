@@ -31,6 +31,14 @@ From `supabase/config.toml`: API `54321`, Postgres `54322`, Studio `54323`, Mail
 | `SUPABASE_PROJECT_REF` | same two | Required |
 | `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test`) | Optional; without it Stryker writes a local HTML report only |
 
+None of these may appear in the repository. The gitleaks hook
+([`.gitleaks.toml`](../../.gitleaks.toml)) blocks a commit that stages a JWT or
+a password-bearing `*.supabase.co` / `*.pooler.supabase.com` connection
+string. JWTs whose payload carries `"role":"anon"` are allowlisted, because
+the anon key is public by design; a `service_role` key still fails. The hook
+sees only staged changes, so in CI it has nothing to scan; GitHub push
+protection is the server-side check.
+
 ## Coverage and mutation thresholds
 
 | Gate | Where | Value |

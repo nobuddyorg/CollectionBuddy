@@ -1,0 +1,16 @@
+# gitleaks' default rules (their `jwt` catches service_role keys) plus a Supabase database URL rule; the anon key, the one public credential, is allowlisted by its claim.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "supabase-postgres-url"
+description = "Postgres connection string with a password for a hosted Supabase database"
+regex = '''postgres(?:ql)?://[^\s:@/]+:([^\s@/]+)@[^\s/:]*\.(?:supabase\.co|pooler\.supabase\.com)\b'''
+secretGroup = 1
+keywords = ["supabase.co", "pooler.supabase.com"]
+
+# "role":"anon" in the payload, as base64url at each of its three byte alignments; every other JWT still matches `jwt`.
+[[allowlists]]
+description = "Supabase anon keys: public by design"
+targetRules = ["jwt"]
+regexes = ['''\.[A-Za-z0-9_-]*(?:InJvbGUiOiJhbm9u|Jyb2xlIjoiYW5v|icm9sZSI6ImFub24i)[A-Za-z0-9_-]*\.''']

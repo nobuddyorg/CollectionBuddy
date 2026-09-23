@@ -46,7 +46,8 @@ Google OAuth is the only real sign-in, and it needs credentials even locally
 ## Commit hooks
 
 [prek](https://github.com/j178/prek) runs [`.pre-commit-config.yaml`](.pre-commit-config.yaml)
-on every commit: file hygiene, `typos`, `zizmor`, `markdownlint`, `sqlfluff-lint`
+on every commit: file hygiene, gitleaks over the staged changes (service-role
+keys and database URLs block the commit; anon keys pass, [`.gitleaks.toml`](.gitleaks.toml)), `typos`, `zizmor`, `markdownlint`, `sqlfluff-lint`
 over `supabase/`, Squawk over new migrations (lock and rewrite hazards,
 [`.squawk.toml`](.squawk.toml)), and the same format/lint/type/architecture/dead-code checks
 CI runs in `web/`. `pre-commit` reads the same file.
