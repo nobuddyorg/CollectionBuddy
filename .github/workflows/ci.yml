@@ -243,10 +243,20 @@ jobs:
 
       - uses: ./.github/actions/setup-web
 
+      # Stryker's incremental file (#714); a PR restores main's latest. Keyed on what incremental mode cannot see: dependencies and test config.
+      - name: Restore the incremental mutation report
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: web/reports/stryker-incremental.json
+          key: stryker-incremental-${{ hashFiles('web/package-lock.json', 'web/stryker.config.mjs', 'web/vitest.config.mts', 'web/vitest.mutation.config.mts', 'web/vitest.setup.ts') }}-${{ github.run_id }}
+          restore-keys: stryker-incremental-${{ hashFiles('web/package-lock.json', 'web/stryker.config.mjs', 'web/vitest.config.mts', 'web/vitest.mutation.config.mts', 'web/vitest.setup.ts') }}-
+
       # No Supabase env: the unit suite never reads it. Dashboard key only on main, so the published report and badge track one branch.
+      # main reruns every mutant (--force): incremental is blind to modules a target imports, and main's run seeds every PR's cache.
       - name: Run mutation testing
-        run: npx stryker run
+        run: npx stryker run ${FULL_RUN:+--force}
         env:
+          FULL_RUN: ${{ github.ref == 'refs/heads/main' && 'true' || '' }}
           STRYKER_DASHBOARD_API_KEY: ${{ github.ref == 'refs/heads/main' && secrets.STRYKER_DASHBOARD_API_KEY || '' }}
 
       # Built from reports/mutation/mutation.json (scripts/mutation-summary.mjs); the console log is mostly expected per-mutant failures.

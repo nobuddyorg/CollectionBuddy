@@ -207,7 +207,19 @@ assert the request it composed. There is no `Stryker disable` or
 delete, except the React dependency-list class explained in
 [Design decisions](../explanation/design-decisions.md#what-still-survives-and-why-no-test-can-kill-it).
 
-CI runs this on every PR. Only `main` publishes to the
+Runs are incremental: Stryker keeps every mutant's result in
+`web/reports/stryker-incremental.json` and reruns only mutants whose code or
+covering tests changed since. It cannot see a change anywhere else — a module
+a target imports, a test helper, a dependency — so after one of those, or to
+reproduce `main`, rerun everything:
+
+```bash
+npm run test:mutation -- --force
+```
+
+CI runs this on every PR, restoring `main`'s incremental file; `main` itself
+always runs with `--force` ([Design decisions](../explanation/design-decisions.md#incremental-on-pull-requests-full-on-main)).
+Only `main` publishes to the
 [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main);
 locally, the report is `web/reports/mutation/index.html`.
 
