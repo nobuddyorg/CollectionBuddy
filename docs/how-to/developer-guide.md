@@ -239,9 +239,11 @@ cd web && npm run lighthouse
 ```
 
 Thresholds and the baseline they were measured against are in
-`web/lighthouserc.signed-out.json` and `.signed-in.json`. The performance
-category is the gate; accessibility findings belong to `@axe-core/playwright`
-in the e2e suite, so they are not double-asserted here. A fresh demo account
+`web/lighthouserc.signed-out.json` and `.signed-in.json`. Performance is gated
+against a measured baseline; accessibility must score exactly 1.0 on both
+flows, a second, weighted lens on the pages `@axe-core/playwright` already
+checks in the e2e suite. A finding fixed for Lighthouse gets an axe or
+Playwright case too, so it cannot regress between runs. A fresh demo account
 has no categories, so the signed-in pass measures a different code path than a
 populated catalogue.
 
