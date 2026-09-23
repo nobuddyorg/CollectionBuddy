@@ -93,7 +93,9 @@ function diffBy(key, before, after) {
 }
 
 const ms = (value) => value.toFixed(1);
-const cell = (text) => text.replace(/\|/g, '\\|');
+// Backslashes first, so the pipe escape added next cannot be undone by one already in the text; a backtick would close the code span.
+const cell = (text) =>
+  text.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/`/g, "'");
 
 function statementRows(statements, total) {
   return statements.map((s) => {
