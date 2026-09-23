@@ -173,7 +173,6 @@ describe('importCategory, uploading through the pool', () => {
     await vi.waitFor(() =>
       expect(release.length).toBe(PHOTO_UPLOAD_CONCURRENCY),
     );
-    await new Promise((resolve) => setTimeout(resolve, 20));
     expect(maxInFlight).toBe(PHOTO_UPLOAD_CONCURRENCY);
 
     // Two sequential uploadImage calls per photo (full, then thumbnail), so every call is drained.

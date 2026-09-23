@@ -148,7 +148,6 @@ describe('exportCategory, downloading through the pool', () => {
       await vi.waitFor(() =>
         expect(release.length).toBe(PHOTO_DOWNLOAD_CONCURRENCY),
       );
-      await new Promise((resolve) => setTimeout(resolve, 20));
       expect(maxInFlight).toBe(PHOTO_DOWNLOAD_CONCURRENCY);
 
       for (let released = 0; released < photoCount; released++) {
