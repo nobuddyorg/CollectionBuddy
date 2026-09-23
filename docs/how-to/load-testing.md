@@ -27,9 +27,9 @@ users and sets the seed size, so a heavier run needs no new script:
 
 | Profile | Virtual users | Shape | Seed: searched + shared entries | `population`: collectors × entries |
 | --- | --- | --- | --- | --- |
-| `normal` (default) | ×1: 15 on `catalogue` | 30 s ramp, 2 min hold, 15 s down | 10,000 + 300 | 20 × 500 |
-| `peak` | ×5: 75 on `catalogue` | 1 min ramp, 5 min hold, 30 s down | 25,000 + 1,000 | 28 × 1,000 |
-| `stress` | steps to ×20: 300 on `catalogue` | a quarter, half, then all of it for 2 min each, held 2 min more, 1 min down | 40,000 + 2,000 | 28 × 1,500 |
+| `normal` (default) | ×1: 15 on `catalogue` | 30 s ramp, 2 min hold, 15 s down | 10,000 + 300 | 50 × 200 |
+| `peak` | ×5: 75 on `catalogue` | 1 min ramp, 5 min hold, 30 s down | 25,000 + 1,000 | 100 × 250 |
+| `stress` | steps to ×20: 300 on `catalogue` | a quarter, half, then all of it for 2 min each, held 2 min more, 1 min down | 40,000 + 2,000 | 200 × 200 |
 
 `stress` is meant to cross the thresholds: the question it answers is where
 latency bends and errors start, which the HTML report's charts show step by
@@ -58,9 +58,10 @@ suggestion stores them, so the map returns the shape real collections get.
 `population.js` has its own `setup()` (`web/load/lib/population.js`): the
 profile's number of collectors, each with a collection titled with one word
 of their own and a fifth as many entries lent, at `viewer`, to the next
-collector in a ring. It stops at 28 collectors because the local stack
-allows 30 sign-ups per 5 minutes, and sign-up is the only way in without
-`service_role`.
+collector in a ring: the same totals as the other seeds, spread over many
+people. Sign-up is the only way in without `service_role`, so
+`supabase/config.toml` raises the local stack's sign-up limit from 30 to 500
+per 5 minutes; production never reads that file.
 
 `teardown()` deletes each account's photographs from Storage **before** any
 row (CLAUDE.md), then its entries and categories. The users stay in the
