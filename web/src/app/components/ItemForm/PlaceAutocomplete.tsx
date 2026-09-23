@@ -4,6 +4,7 @@ import { useI18n } from '../../i18n/useI18n';
 import { isQueryLongEnough, usePhotonSearch } from './usePhoton';
 import type { PlaceCoords } from './types';
 import { fieldClasses } from '../ui/fieldClasses';
+import { MAX_PLACE_LENGTH } from '../../lib/textLimits';
 
 // `onChange` reports null coords for hand-typed edits, so stale coordinates
 // never outlive the name they were looked up for.
@@ -76,6 +77,7 @@ export function PlaceAutocomplete({
         }
         aria-label={t('item_create.place_placeholder')}
         value={value}
+        maxLength={MAX_PLACE_LENGTH}
         onChange={(e) => {
           const v = e.target.value;
           onChange(v, null);

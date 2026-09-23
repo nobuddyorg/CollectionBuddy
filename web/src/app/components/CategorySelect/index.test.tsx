@@ -196,6 +196,14 @@ describe('CategorySelect', () => {
     expect(screen.getByLabelText('New collection')).toBeVisible();
   });
 
+  it('stops a rename at the 200 characters a category name may have', async () => {
+    renderSelect();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Open collection' }),
+    );
+    expect(screen.getByLabelText('Rename')).toHaveAttribute('maxlength', '200');
+  });
+
   it('shows nothing selected when selectedCat names a category not in the list', () => {
     renderSelect({ selectedCat: 'not-a-real-id' });
     expect(screen.queryByText('None selected')).toBeInTheDocument();

@@ -1,5 +1,6 @@
 -- Per-owner quotas (0009_user_quotas.sql, #637): photograph bytes as Storage
 -- recorded them, never as the client claimed, and a ceiling on entries.
+-- 0016_bound_row_volume.sql (#716): categories, shares, links per entry, text lengths.
 -- web/e2e/signed-in/rls.spec.ts proves the same refusal through PostgREST.
 begin;
 select no_plan();
@@ -96,6 +97,103 @@ select pg_temp.auth_as(:'editor_id'::uuid, 'quota-editor@collectionbuddy.test');
 select ok(
   not pg_temp.raises('insert into public.items (title) values (''unaffected'')'),
   'one collector''s ceiling is not another''s'
+);
+
+-- Categories: 1,000 per owner, checked once per statement like entries.
+select gen_random_uuid() as curator_id \gset
+select pg_temp.auth_as(:'curator_id'::uuid, 'quota-curator@collectionbuddy.test');
+select ok(
+  not pg_temp.raises('insert into public.categories (name) select ''Category '' || g from generate_series(1, 1000) g'),
+  'a collector may hold 1,000 categories'
+);
+select throws_ok(
+  'insert into public.categories (name) values (''one too many'')',
+  'PT507',
+  'category quota of 1000 reached',
+  'the 1,001st category is refused'
+);
+
+-- Shares: 1,000 per owner, however many categories they are spread over.
+select id as shared_category_id from public.categories where name = 'Category 1' \gset
+select ok(
+  not pg_temp.raises(format(
+    'insert into public.category_shares (category_id, invited_email) select %L, ''guest'' || g || ''@collectionbuddy.test'' from generate_series(1, 1000) g',
+    :'shared_category_id'::uuid
+  )),
+  'an owner may hold 1,000 shares'
+);
+select throws_ok(
+  format(
+    'insert into public.category_shares (category_id, invited_email) values (%L, ''one-too-many@collectionbuddy.test'')',
+    (select id from public.categories where name = 'Category 2')
+  ),
+  'PT507',
+  'share quota of 1000 reached',
+  'the 1,001st share is refused, in another category too'
+);
+
+-- Links: 10 categories per entry.
+insert into public.items (title) values ('Linked entry')
+returning id as linked_item_id \gset
+select ok(
+  not pg_temp.raises(format(
+    'insert into public.item_categories (item_id, category_id) select %L, c.id from public.categories c where c.name in (%s)',
+    :'linked_item_id'::uuid,
+    (select string_agg(quote_literal('Category ' || g), ', ') from generate_series(1, 10) g)
+  )),
+  'an entry may sit in 10 categories'
+);
+select throws_ok(
+  format(
+    'insert into public.item_categories (item_id, category_id) select %L, c.id from public.categories c where c.name = ''Category 11''',
+    :'linked_item_id'::uuid
+  ),
+  'PT507',
+  'category link quota of 10 per entry reached',
+  'an 11th category for the same entry is refused'
+);
+
+-- Text: each column's ceiling holds, and the value one past it is refused.
+select ok(
+  not pg_temp.raises(format(
+    'insert into public.items (title, description, place, tags) values (%L, %L, %L, %L)',
+    repeat('t', 300), repeat('d', 10000), repeat('p', 500),
+    (select array_agg(lpad(g::text, 100, 'x')) from generate_series(1, 50) g)
+  )),
+  'an entry at every text ceiling is accepted'
+);
+select throws_ok(
+  format('insert into public.items (title) values (%L)', repeat('t', 301)),
+  '23514', null, 'a title past 300 characters is refused'
+);
+select throws_ok(
+  format('insert into public.items (title, description) values (''d'', %L)', repeat('d', 10001)),
+  '23514', null, 'a description past 10,000 characters is refused'
+);
+select throws_ok(
+  format('insert into public.items (title, place) values (''p'', %L)', repeat('p', 501)),
+  '23514', null, 'a place past 500 characters is refused'
+);
+select throws_ok(
+  format('insert into public.items (title, tags) values (''n'', %L)',
+    (select array_agg('tag' || g) from generate_series(1, 51) g)),
+  '23514', null, 'a 51st tag is refused'
+);
+select throws_ok(
+  format('insert into public.items (title, tags) values (''l'', %L)',
+    array[repeat('a', 5050)]),
+  '23514', null, 'tags longer together than 50 tags of 100 characters are refused'
+);
+select throws_ok(
+  format('update public.categories set name = %L where name = ''Category 3''', repeat('n', 201)),
+  '23514', null, 'a category name past 200 characters is refused, on rename too'
+);
+select throws_ok(
+  format(
+    'insert into public.category_shares (category_id, invited_email) values (%L, %L)',
+    :'shared_category_id'::uuid, repeat('e', 309) || '@example.org'
+  ),
+  '23514', null, 'an invited email past 320 characters is refused'
 );
 
 select * from finish();

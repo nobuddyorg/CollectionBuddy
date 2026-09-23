@@ -24,6 +24,7 @@ import { useImportCategory } from './useImportCategory';
 import { useShares } from './useShares';
 import { fieldClasses } from '../ui/fieldClasses';
 import { labelClasses } from '../ui/labelClasses';
+import { MAX_CATEGORY_NAME_LENGTH } from '../../lib/textLimits';
 
 type Props = {
   selectedCat: string | null;
@@ -218,6 +219,7 @@ export default function CategorySelect({
                   id="rename-category"
                   data-testid="rename-category-input"
                   value={renameValue}
+                  maxLength={MAX_CATEGORY_NAME_LENGTH}
                   // Shared categories keep this field in the same slot,
                   // disabled rather than hidden or readOnly: RLS's "update
                   // own categories" policy would reject the write anyway,

@@ -187,6 +187,45 @@ describe('TagsInput', () => {
     expect(setTags).toHaveBeenCalledWith(['silver']);
   });
 
+  // The database refuses a 51st tag (0016_bound_row_volume.sql); the field stops taking one first.
+  it('takes no more typing at 50 tags, and says why', async () => {
+    const user = userEvent.setup();
+    const fifty = Array.from({ length: 50 }, (_, i) => `tag${i}`);
+    const { setTags, field } = renderTags(fifty);
+
+    expect(field).toHaveAttribute('readonly');
+    expect(field).toHaveAttribute(
+      'placeholder',
+      '50 tags at most – remove one to add another',
+    );
+    await user.type(field, 'more{Enter}');
+    expect(setTags).not.toHaveBeenCalled();
+  });
+
+  it('still removes the last tag with Backspace at the limit', async () => {
+    const user = userEvent.setup();
+    const fifty = Array.from({ length: 50 }, (_, i) => `tag${i}`);
+    const { setTags, field } = renderTags(fifty);
+
+    await user.type(field, '{Backspace}');
+    expect(setTags).toHaveBeenCalledWith(fifty.slice(0, 49));
+  });
+
+  it('keeps taking tags one below the limit', async () => {
+    const user = userEvent.setup();
+    const fortyNine = Array.from({ length: 49 }, (_, i) => `tag${i}`);
+    const { setTags, field } = renderTags(fortyNine);
+
+    expect(field).not.toHaveAttribute('readonly');
+    await user.type(field, 'last{Enter}');
+    expect(setTags).toHaveBeenCalledWith([...fortyNine, 'last']);
+  });
+
+  it('caps a single tag at 100 characters', () => {
+    const { field } = renderTags();
+    expect(field).toHaveAttribute('maxlength', '100');
+  });
+
   it('announces how many tags there are', async () => {
     renderTags(['gold', 'silver']);
     expect(screen.getByRole('status')).toHaveTextContent('2');

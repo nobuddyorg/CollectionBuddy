@@ -144,6 +144,25 @@ describe('ItemForm submission', () => {
 
 // Callers need to know when the form has anything worth losing, so they can
 // confirm before a backdrop tap or Escape discards it.
+// The database's ceilings (0016_bound_row_volume.sql), stopped at the keyboard instead of as a failed save.
+describe('ItemForm text limits', () => {
+  it('stops each text field at the length the database accepts', () => {
+    renderForm();
+    expect(screen.getByTestId('item-title')).toHaveAttribute(
+      'maxlength',
+      '300',
+    );
+    expect(screen.getByTestId('item-description')).toHaveAttribute(
+      'maxlength',
+      '10000',
+    );
+    expect(screen.getByTestId('item-place')).toHaveAttribute(
+      'maxlength',
+      '500',
+    );
+  });
+});
+
 describe('ItemForm dirty tracking', () => {
   it('reports not dirty on mount, for a blank form', () => {
     const { onDirtyChange } = renderForm();

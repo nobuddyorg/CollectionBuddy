@@ -248,6 +248,48 @@ test.describe('one collection cannot reach another', () => {
     expect(error).not.toBeNull();
   });
 
+  // The three owner-only storage policies (0012): their owner does all of it, anyone else none of it. No item row, so no shared policy can match.
+  test('only the owner lists, signs and removes an object under their prefix', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const folder = `${userId}/${crypto.randomUUID()}`;
+    const path = `${folder}/rls-owner-only-probe.webp`;
+    const owner = apiAs(token).storage.from('item-images');
+    const other = apiAs(otherToken).storage.from('item-images');
+
+    try {
+      const { error: uploadError } = await owner.upload(
+        path,
+        new Blob(['probe'], { type: 'image/webp' }),
+      );
+      expect(uploadError).toBeNull();
+
+      const { data: ownList } = await owner.list(folder);
+      expect(ownList?.map((o) => o.name)).toEqual([
+        'rls-owner-only-probe.webp',
+      ]);
+      const { error: ownSignError } = await owner.createSignedUrl(path, 60);
+      expect(ownSignError).toBeNull();
+
+      const { data: theirList } = await other.list(folder);
+      expect(theirList ?? []).toEqual([]);
+      const { error: theirSignError } = await other.createSignedUrl(path, 60);
+      expect(theirSignError).not.toBeNull();
+      const { data: theirRemoved } = await other.remove([path]);
+      expect(theirRemoved ?? []).toEqual([]);
+      const { error: theirUploadError } = await other.upload(
+        `${folder}/planted.webp`,
+        new Blob(['x'], { type: 'image/webp' }),
+      );
+      expect(theirUploadError).not.toBeNull();
+
+      const { data: ownRemoved } = await owner.remove([path]);
+      expect(ownRemoved?.map((o) => o.name)).toEqual([path]);
+    } finally {
+      await owner.remove([path]);
+    }
+  });
+
   // The images table is a separate authorization surface from storage.objects
   // (a row naming an object vs. the object's bytes), so it needs its own
   // check. No seed fixture plants an images row, so this inserts and tears
@@ -1656,5 +1698,93 @@ test.describe('per-owner quotas', () => {
       await apiAs(token).storage.from('item-images').remove([path]);
       await apiAs(token).from('items').delete().eq('id', item!.id);
     }
+  });
+
+  // 0016_bound_row_volume.sql: the tables and text columns #637 left unbounded.
+  test('a write that would pass 1,000 categories is refused, with the quota code', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { otherToken } = context();
+
+    const { error } = await apiAs(otherToken)
+      .from('categories')
+      .insert(
+        Array.from({ length: 1001 }, (_, i) => ({ name: `quota-probe-${i}` })),
+      );
+
+    expect(error?.code).toBe('PT507');
+    expect(error?.message).toBe('category quota of 1000 reached');
+  });
+
+  test('a write that would pass 1,000 shares is refused, with the quota code', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { otherToken, otherUserId } = context();
+    const categoryId = await mineCategoryId(
+      otherToken,
+      otherUserId,
+      SEED.other.category,
+    );
+
+    const { error } = await apiAs(otherToken)
+      .from('category_shares')
+      .insert(
+        Array.from({ length: 1001 }, (_, i) => ({
+          category_id: categoryId,
+          invited_email: `quota-probe-${i}@collectionbuddy.test`,
+        })),
+      );
+
+    expect(error?.code).toBe('PT507');
+    expect(error?.message).toBe('share quota of 1000 reached');
+  });
+
+  test('an entry cannot be filed into more than 10 categories', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { otherToken } = context();
+    const api = apiAs(otherToken);
+    const { data: categories, error: categoriesError } = await api
+      .from('categories')
+      .insert(
+        Array.from({ length: 11 }, (_, i) => ({ name: `link-probe-${i}` })),
+      )
+      .select('id');
+    expect(categoriesError).toBeNull();
+    const { data: item } = await api
+      .from('items')
+      .insert({ title: 'Link quota probe' })
+      .select('id')
+      .single();
+
+    try {
+      const { error } = await api
+        .from('item_categories')
+        .insert(
+          categories!.map((c) => ({ item_id: item!.id, category_id: c.id })),
+        );
+
+      expect(error?.code).toBe('PT507');
+      expect(error?.message).toBe(
+        'category link quota of 10 per entry reached',
+      );
+    } finally {
+      await api
+        .from('categories')
+        .delete()
+        .in(
+          'id',
+          categories!.map((c) => c.id),
+        );
+      await api.from('items').delete().eq('id', item!.id);
+    }
+  });
+
+  test('text past its ceiling is refused, whatever the form would have allowed', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token } = context();
+
+    const { error } = await apiAs(token)
+      .from('items')
+      .insert({ title: 'Text probe', description: 'd'.repeat(10_001) });
+
+    expect(error?.code).toBe('23514');
   });
 });

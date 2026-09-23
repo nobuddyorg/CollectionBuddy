@@ -18,15 +18,21 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | [`0008_drop_items_tags_gin.sql`](../../supabase/migrations/0008_drop_items_tags_gin.sql) | Drops the GIN index on `items.tags`, which no query read. |
 | [`0009_user_quotas.sql`](../../supabase/migrations/0009_user_quotas.sql) | Per-owner quotas: 1 GiB of full-size photographs and 50,000 entries, with photograph sizes taken from Storage rather than the client. |
 | [`0010_revoke_public_execute.sql`](../../supabase/migrations/0010_revoke_public_execute.sql) | Revokes PUBLIC's default `EXECUTE` on `storage_item_id()` and on the `SECURITY DEFINER` trigger functions of `0002`; triggers still fire, direct calls are refused. |
+| [`0011_storage_item_id_no_subtransaction.sql`](../../supabase/migrations/0011_storage_item_id_no_subtransaction.sql) | `storage_item_id()` tests the segment with `pg_input_is_valid()` instead of catching the cast's error, so no call opens a subtransaction. Same results. |
+| [`0012_storage_owner_policies_initplan.sql`](../../supabase/migrations/0012_storage_owner_policies_initplan.sql) | The owner-only `storage.objects` policies call `(select auth.uid())`, once per statement, like `0006`. Same rows allowed and denied. |
+| [`0013_images_user_covers_size.sql`](../../supabase/migrations/0013_images_user_covers_size.sql) | Replaces `images (user_id)` with `(user_id) include (size_bytes)`, so the photo quota sum is an index-only scan. |
+| [`0014_drop_redundant_item_categories_indexes.sql`](../../supabase/migrations/0014_drop_redundant_item_categories_indexes.sql) | Drops `item_categories (item_id)` and `(category_id)`, prefixes of the primary key and of `(category_id, created_at desc, item_id)`. |
+| [`0015_revoke_api_role_execute.sql`](../../supabase/migrations/0015_revoke_api_role_execute.sql) | Revokes direct `EXECUTE` grants to `anon` (and, on trigger functions, `authenticated`) that hosted default privileges add, and stops `postgres`'s default privileges granting new functions to either. |
+| [`0016_bound_row_volume.sql`](../../supabase/migrations/0016_bound_row_volume.sql) | Per-owner ceilings on categories and shares, a per-entry ceiling on category links, and length checks on every text column. |
 
 ### Tables
 
 | Table | Columns | Notes |
 | --- | --- | --- |
-| `categories` | `id`, `user_id`, `name`, `created_at`, `updated_at` | Name non-blank after normalization; unique per user, case-insensitively. |
-| `items` | `id`, `user_id`, `title`, `description`, `place`, `place_lat`, `place_lng`, `tags text[]`, `tags_text` (generated), `created_at`, `updated_at` | Title non-blank. `tags_text` is a space-joined copy of `tags` so tag search shares the `ILIKE` filter. `place_lat`/`place_lng` are set when the user picks a suggestion; null for hand-typed places, which the map geocodes on demand. |
-| `item_categories` | `item_id`, `category_id`, `user_id`, `created_at` | Primary key `(item_id, category_id)`. An item may belong to several categories; the UI browses one at a time. |
-| `category_shares` | `id`, `category_id`, `owner_user_id`, `invited_email`, `role`, `expires_at`, `created_at` | One row per `(category, invited email)`. `role` is `viewer` (default) or `editor`. |
+| `categories` | `id`, `user_id`, `name`, `created_at`, `updated_at` | Name non-blank after normalization, at most 200 characters; unique per user, case-insensitively. |
+| `items` | `id`, `user_id`, `title`, `description`, `place`, `place_lat`, `place_lng`, `tags text[]`, `tags_text` (generated), `created_at`, `updated_at` | Title non-blank. At most 300 characters of title, 10,000 of description, 500 of place, and 50 tags of up to 100 characters. `tags_text` is a space-joined copy of `tags` so tag search shares the `ILIKE` filter. `place_lat`/`place_lng` are set when the user picks a suggestion; null for hand-typed places, which the map geocodes on demand. |
+| `item_categories` | `item_id`, `category_id`, `user_id`, `created_at` | Primary key `(item_id, category_id)`. An item may belong to up to 10 categories; the UI files it in one and browses one at a time. |
+| `category_shares` | `id`, `category_id`, `owner_user_id`, `invited_email`, `role`, `expires_at`, `created_at` | One row per `(category, invited email)`, email at most 320 characters. `role` is `viewer` (default) or `editor`. |
 | `images` | `id`, `item_id`, `user_id`, `path_full`, `path_thumb`, `size_bytes`, `created_at` | One row per photo; paths are complete Storage paths. Cascades away with its item. |
 
 ### Row Level Security
@@ -78,23 +84,23 @@ Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql
 - `tg_category_shares_enforce()` — see Sharing.
 - `tg_images_enforce()` — derives `images.user_id` from the item's owner; rejects an insert whose item the caller neither owns nor has write access to.
 - `tg_images_size_from_storage()` — sets `images.size_bytes` to the size Storage recorded for `path_full`, or the bucket's 5 MiB cap while nothing is stored there; the client's claim is ignored.
-- `tg_images_quota()`, `tg_items_quota()` — `FOR EACH STATEMENT` after insert: refuse with SQLSTATE `PT507` (HTTP 507) a write that takes an owner past 1 GiB of photographs or 50,000 entries ([why](../explanation/design-decisions.md#why-quotas-are-counted-in-the-database)).
+- `tg_images_quota()`, `tg_items_quota()`, `tg_categories_quota()`, `tg_category_shares_quota()`, `tg_item_categories_quota()` — `FOR EACH STATEMENT` after insert: refuse with SQLSTATE `PT507` (HTTP 507) a write that takes an owner past 1 GiB of photographs, 50,000 entries, 1,000 categories or 1,000 shares, or an entry past 10 categories ([why](../explanation/design-decisions.md#why-quotas-are-counted-in-the-database)).
 - `delete_item_if_orphan()` — after `item_categories` rows are deleted, deletes items now in zero categories. `FOR EACH STATEMENT` with a transition table ([why](../explanation/design-decisions.md#why-the-orphan-cleanup-trigger-is-statement-level)).
 - `tg_set_updated_at()` — on `categories` and `items`.
-- `storage_item_id()` — parses the item id out of a storage path, returning `NULL` rather than raising; see Storage.
+- `storage_item_id()` — parses the item id out of a storage path, returning `NULL` rather than raising; it tests the segment with `pg_input_is_valid()` rather than catching the cast's error, so no call opens a subtransaction. See Storage.
 - `keepalive()` — no-op RPC, callable by `anon`, hit daily by `keep-alive.yml`.
 - `list_category_places()` — the map's distinct places for a category, `SECURITY INVOKER`.
 - `search_category_items()` — the searched catalogue page, `SECURITY DEFINER`: re-implements the read-access check (owns the item, or holds an active read grant on the category) and then queries with RLS bypassed so the trigram indexes are usable ([why](../explanation/design-decisions.md#why-search-uses-trigram-ilike-instead-of-full-text-search)). An authorization boundary in its own right, with its own `rls.spec.ts` case.
 
-Every function pins `set search_path = ''`, and every one revokes `execute` from `public` before granting it to `authenticated` — except `keepalive()`, the one function `anon` may call.
+Every function pins `set search_path = ''`, and every one revokes `execute` from `public` and `anon` (trigger functions from `authenticated` too) before granting it to `authenticated` — except `keepalive()`, the one function `anon` may call. The revokes name `anon` and `authenticated` because hosted default privileges can give a new function a direct grant to each, which a revoke from `public` leaves in place (`0015`); `postgres`'s own default privileges no longer grant either.
 
 ### Indexes
 
 - Unique `(user_id, lower(name))` on `categories`.
 - `(user_id, created_at desc)` on `items`.
 - Trigram GIN (`pg_trgm`) on `items.title`, `.description`, `.place`, `.tags_text`. No index on the `items.tags` array: nothing filters by containment (`0008_drop_items_tags_gin.sql`).
-- `item_id`, `category_id`, `user_id` and `(category_id, created_at desc, item_id)` on `item_categories` — the catalogue page is driven from this table so one index serves ordering and scoping.
-- `(item_id, created_at asc, id)` and `user_id` on `images`.
+- `user_id` and `(category_id, created_at desc, item_id)` on `item_categories` — the catalogue page is driven from this table so one index serves ordering and scoping. It also serves the cascade from `categories`, and the primary key serves the one from `items`; neither needs an index of its own (`0014`).
+- `(item_id, created_at asc, id)` and `(user_id) include (size_bytes)` on `images` — the second makes the photo quota's per-owner sum index-only (`0013`).
 
 Nothing indexes `storage.objects`; hosted Supabase owns it and refuses DDL with `42501`.
 
@@ -102,7 +108,7 @@ Nothing indexes `storage.objects`; hosted Supabase owns it and refuses DDL with 
 
 One private bucket, `item-images` ([`0007_storage.sql`](../../supabase/migrations/0007_storage.sql)), restricted to `image/webp`, `image/jpeg`, `image/png` at 5 MiB per file. Paths are `<uid>/<itemId>/<file>`, where the uid is the **uploader's**. The client reads through signed URLs.
 
-- **Owner-only policies** on `select`, `insert`, `delete`: `split_part(name, '/', 1) = auth.uid()::text`.
+- **Owner-only policies** on `select`, `insert`, `delete`: `split_part(name, '/', 1) = (select auth.uid())::text`. Splinter skips the `storage` schema, so `040_storage_policy_surface_test.sql` checks that no policy here calls `auth.uid()` once per row.
 - **Shared policies** on `select` and `delete`: extract the item id with `storage_item_id()` and join through `item_categories` to the same read/write predicates the tables use. `storage_item_id()` returns `NULL` on a path that does not parse, because a raised error inside `USING` aborts the statement instead of failing to match the row.
 - **No shared `insert`**: an editor's upload lands under the editor's own prefix and satisfies the owner-only set.
 - **No `update` policy** for anyone, and that absence is the only denial — Storage's bootstrap re-grants the `UPDATE` privilege on every start. A path is fixed when written; `move()` and `upsert` are refused ([why](../explanation/design-decisions.md#why-a-storage-objects-path-can-never-change)).

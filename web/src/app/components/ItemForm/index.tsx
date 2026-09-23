@@ -7,6 +7,7 @@ import { Submit } from './Submit';
 import { TagsInput } from './TagsInput';
 import type { ItemFormProps, PlaceCoords } from './types';
 import { fieldClasses } from '../ui/fieldClasses';
+import { MAX_DESCRIPTION_LENGTH, MAX_TITLE_LENGTH } from '../../lib/textLimits';
 import { buttonClasses } from '../ui/buttonClasses';
 
 export type { ItemFormValues } from './types';
@@ -113,6 +114,7 @@ export default function ItemForm({
             data-testid="item-title"
             ref={titleRef}
             value={title}
+            maxLength={MAX_TITLE_LENGTH}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={() => setTitleTouched(true)}
             required
@@ -139,6 +141,7 @@ export default function ItemForm({
             id={descriptionId}
             data-testid="item-description"
             value={description}
+            maxLength={MAX_DESCRIPTION_LENGTH}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
             className={fieldClasses(

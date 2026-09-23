@@ -32,7 +32,7 @@ select is(
   'every function in schema public pins search_path to the empty string'
 );
 
--- Every security-definer function, in full: eleven trigger functions plus search_category_items, a deliberate boundary. A thirteenth must be added here on purpose.
+-- Every security-definer function, in full: fourteen trigger functions plus search_category_items, a deliberate boundary. A sixteenth must be added here on purpose.
 select is(
   (select array_agg(p.proname::text order by p.proname)
    from pg_catalog.pg_proc p
@@ -45,12 +45,13 @@ select is(
      )),
   array[
     'delete_item_if_orphan', 'enforce_user_id', 'search_category_items',
-    'tg_categories_normalize', 'tg_category_shares_enforce', 'tg_images_enforce',
+    'tg_categories_normalize', 'tg_categories_quota', 'tg_category_shares_enforce',
+    'tg_category_shares_quota', 'tg_images_enforce',
     'tg_images_quota', 'tg_images_size_from_storage',
-    'tg_item_categories_enforce', 'tg_items_normalize', 'tg_items_quota',
-    'tg_set_updated_at'
+    'tg_item_categories_enforce', 'tg_item_categories_quota',
+    'tg_items_normalize', 'tg_items_quota', 'tg_set_updated_at'
   ],
-  'exactly twelve functions run as their owner, and search_category_items is the only non-trigger one'
+  'exactly fifteen functions run as their owner, and search_category_items is the only non-trigger one'
 );
 
 -- A `security definer` function runs as whoever owns it, so the owner is

@@ -26,7 +26,18 @@ Since the third squash every function lives in `0002_functions.sql`. The `langua
 
 ## Why quotas are counted in the database
 
-Any signed-in collector could otherwise create rows and upload 5 MiB objects without end, and on a free-tier project that is the likeliest way to take the app down (#637). There is no server to rate-limit at, so the ceilings are triggers: 1 GiB of full-size photographs and 50,000 entries per owner. A photograph added by an editor lands on the owner's row, so it counts against the owner's quota.
+Any signed-in collector could otherwise create rows and upload 5 MiB objects without end, and on a free-tier project that is the likeliest way to take the app down (#637). There is no server to rate-limit at, so the ceilings live in the database:
+
+| Ceiling | Enforced by |
+| --- | --- |
+| 1 GiB of full-size photographs per owner | `tg_images_quota()` (`0009`) |
+| 50,000 entries per owner | `tg_items_quota()` (`0009`) |
+| 1,000 categories per owner | `tg_categories_quota()` (`0016`) |
+| 1,000 shares per owner, across all their categories | `tg_category_shares_quota()` (`0016`) |
+| 10 categories per entry | `tg_item_categories_quota()` (`0016`) |
+| Text: category name 200, title 300, description 10,000, place 500, invited email 320 characters; 50 tags of up to 100 characters | `check` constraints (`0016`) |
+
+A photograph added by an editor lands on the owner's row, so it counts against the owner's quota. The link ceiling is per entry rather than per owner because the entry ceiling already bounds the entries; together they bound the links. The UI files an entry in one category, so no message covers the link ceiling; the form's `maxLength`s mirror the text ceilings, so typing stops before the database would refuse. The text checks are `not valid`: every write since `0016` is checked, but a row already past a limit was left in place rather than failing the unattended deploy, and editing such a row fails until the long field is shortened. Once production holds no row past a limit, a later migration can `validate constraint` each one.
 
 The byte count cannot trust the client, which sends `size_bytes` itself. `tg_images_size_from_storage()` replaces it with the size Storage recorded for the object, which Storage writes before the upload request returns. A row inserted before its object exists counts the bucket's 5 MiB cap, so under-reporting a size buys nothing. The counts are statement-level, so a batch insert is checked once per owner. A refusal carries SQLSTATE `PT507`, which PostgREST turns into HTTP 507, and the app shows a message naming the limit rather than a generic failure.
 
@@ -120,6 +131,8 @@ What would regress under load is gated deterministically instead: `075_query_pla
 - `@babel/core` → `7.29.7` (GHSA-4x5r-pxfx-6jf8). Stryker's toolchain, never shipped.
 - `minimatch` → `10.2.6`, which brings a patched `brace-expansion`. Three `minimatch` majors used to be installed across `eslint`, `typescript-eslint` and Stryker, two with vulnerable `brace-expansion` ranges. Overriding `brace-expansion` directly broke `npm audit`'s own advisory correlation into a bogus 20-vulnerability cascade; overriding `minimatch` sidesteps that and dedupes the install.
 - `sharp` → `0.35.4` (GHSA-rgj7-g3m4-5g8c), in range of `next`'s own `optionalDependencies`. It was accepted risk while the only fix was a 7-major `next` downgrade; a same-range patch shipped later. Check for that before assuming a downgrade is the only option.
+- `eslint` → `$eslint` (the direct ESLint 10) under `eslint-plugin-import`, `eslint-plugin-react`, `eslint-plugin-react-hooks` and `eslint-plugin-jsx-a11y` (#722). The installed releases declare peer ranges that stop at ESLint 9, and `eslint-config-next` pulls in the first three. Without the override, every `npm ci` prints `ERESOLVE overriding peer dependency`. The accepted risk: a rule that silently stops reporting under ESLint 10 would look like a clean lint run. Revisit when a plugin widens its `eslint` peer range, and drop that entry. `eslint-plugin-react-hooks` already has: `7.1.1`, inside `eslint-config-next`'s range, supports ESLint 10, but its `set-state-in-effect` rule reports three existing hooks (`usePhoton`, `useItems`, `I18nProvider`), so moving to it is its own change.
+- No `typescript-eslint` entry. It once repeated the direct dependency's literal range, which npm refuses as soon as Dependabot bumps the direct one (#721). `eslint-config-next`'s range dedupes to the one copy without it.
 - `tmp` → `0.2.7` and `uuid` → `^14.0.2`, from `@lhci/cli` (#651). Both dev-only, reached only by `lhci open`, which this project never runs; the calls each package makes stayed source-compatible, checked against the installed packages.
 
 Accepted risk: `extract-zip` (GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3), unresolved upstream, four levels under `@lhci/cli`. Only `@puppeteer/browsers`' Chrome-download path calls it, and this project's Lighthouse config points at the runner's or Playwright's existing Chrome, so that path never executes. Revisit if `@lhci/cli` moves past `lighthouse@13.3.0` / `puppeteer-core@24.43.1`.

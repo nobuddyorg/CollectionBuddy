@@ -1,3 +1,5 @@
+import type { Page } from '@playwright/test';
+
 import { expect, test } from '../fixture';
 
 import { cssVar } from '../helpers';
@@ -5,7 +7,7 @@ import { cssVar } from '../helpers';
 const PAPER = 'rgb(244, 243, 239)';
 const CHARCOAL = 'rgb(25, 24, 21)';
 
-const themeAttr = (page: import('@playwright/test').Page) =>
+const themeAttr = (page: Page) =>
   page.evaluate(() => document.documentElement.getAttribute('data-theme'));
 
 // Covers only the pre-React half: an inline script sets the theme from OS/storage

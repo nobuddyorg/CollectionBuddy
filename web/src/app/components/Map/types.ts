@@ -1,6 +1,8 @@
+import type { Icon } from 'leaflet';
+
 export type Leaflet = typeof import('leaflet');
 
-export type IconDefaultPrivate = import('leaflet').Icon.Default & {
+export type IconDefaultPrivate = Icon.Default & {
   _getIconUrl?: () => string;
 };
 

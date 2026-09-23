@@ -204,8 +204,28 @@ describe('useCategories', () => {
         ).resolves.toBeNull();
       });
 
-      expect(await screen.findByRole('alert')).toBeVisible();
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Could not create collection. Please try again.',
+      );
       expect(result.current.isCreating).toBe(false);
+    });
+
+    it('says the collection limit is reached when the database refuses it for its quota', async () => {
+      vi.mocked(createCategory).mockResolvedValue({
+        data: null,
+        error: { code: 'PT507', message: 'category quota of 1000 reached' },
+      } as never);
+      const { result } = await loaded();
+
+      await act(async () => {
+        await expect(
+          result.current.createCategory('Coins'),
+        ).resolves.toBeNull();
+      });
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'You have reached the limit of 1,000 collections.',
+      );
     });
   });
 

@@ -231,6 +231,29 @@ describe('useShares', () => {
       consoleError.mockRestore();
     });
 
+    it('says the share limit is reached when the database refuses it for its quota', async () => {
+      vi.mocked(createShareRow).mockResolvedValue({
+        data: null,
+        error: { code: 'PT507', message: 'share quota of 1000 reached' },
+      } as never);
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const { result } = renderHook(() => useShares('cat-1'), { wrapper });
+
+      let ok: boolean | undefined;
+      await act(async () => {
+        ok = await result.current.createShare('guest@example.com', null);
+      });
+
+      expect(ok).toBe(false);
+      expect(result.current.shares).toEqual([]);
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'You have reached the limit of 1,000 shares. Remove one to invite someone else.',
+      );
+      consoleError.mockRestore();
+    });
+
     it('announces success with the expected text', async () => {
       vi.mocked(createShareRow).mockResolvedValue({
         data: grant,
