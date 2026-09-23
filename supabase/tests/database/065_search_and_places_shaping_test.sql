@@ -153,7 +153,7 @@ select is(
 -- Expiry is deliberately not re-tested through search here.
 -- 020_category_shares_rls_test.sql proves an expired grant opens nothing,
 -- and 060_search_category_items_rls_test.sql proves a closed grant closes
--- search -- both go through the same has_category_read_access, so a third
+-- search -- both go through the same granted_category_ids(), so a third
 -- assertion of the composition would cost a fixture and catch nothing the
 -- other two miss (TEST_STRATEGY.md §3.9).
 

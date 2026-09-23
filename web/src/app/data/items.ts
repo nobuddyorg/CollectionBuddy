@@ -34,9 +34,10 @@ type ItemCategoryPageRow = { items: ItemFields & { images: ImageListRow[] } };
  * catalogued there (`list_category_places`, 0002_functions.sql)
  * instead of one row per item -- the map used to download the whole
  * category and do this fold on the client (#PERF-H5). `titles` names the
- * entries for the popup; `ids` is every item at this place, so a geocoded
- * result can be written back onto them instead of repeating the lookup on
- * the next map open. Both are newest-first, the same order the list uses.
+ * entries for the popup; `ids` is every item at a place without finite
+ * coordinates (empty otherwise), so a geocoded result can be written back
+ * onto them instead of repeating the lookup on the next map open. Both are
+ * newest-first, the same order the list uses.
  */
 export interface PlaceGroupRow {
   place: string;
@@ -158,13 +159,17 @@ export function rawListItems({
   const filter = searchFilterFor(search);
   if (filter) query = query.or(filter, { referencedTable: 'items' });
 
-  // Photographs oldest-first per item, as listImagesForItems orders them.
-  return withSignal(query, signal)
-    .order('created_at', { ascending: false })
-    .order('created_at', { referencedTable: 'items.images', ascending: true })
-    .order('id', { referencedTable: 'items.images', ascending: true })
-    .range(from, to)
-    .overrideTypes<ItemCategoryPageRow[], { merge: false }>();
+  return (
+    withSignal(query, signal)
+      .order('created_at', { ascending: false })
+      // The item id breaks ties, so entries linked in one statement page stably.
+      .order('item_id', { ascending: true })
+      // Photographs oldest-first per item, as listImagesForItems orders them.
+      .order('created_at', { referencedTable: 'items.images', ascending: true })
+      .order('id', { referencedTable: 'items.images', ascending: true })
+      .range(from, to)
+      .overrideTypes<ItemCategoryPageRow[], { merge: false }>()
+  );
 }
 
 /**

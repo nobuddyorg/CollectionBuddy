@@ -6,17 +6,40 @@ export const SUMMARY_TREND_STATS = ['avg', 'med', 'p(95)', 'p(99)', 'max'];
 // Setup writes up to 42,000 rows through PostgREST; k6's 60s default is not enough on a cold stack.
 export const LIFECYCLE_TIMEOUTS = { setupTimeout: '5m', teardownTimeout: '5m' };
 
-// Initial proposals, not validated limits: calibrate from a baseline first (docs/how-to/load-testing.md). Per-scenario sub-metrics feed the report.
-export function thresholdsFor(p95MsByScenario) {
+// p95 per scenario: 3x the worst of two normal-profile runs on a GitHub runner, at least 100 ms, rounded up to 50 (docs/how-to/load-testing.md).
+const P95_MS = {
+  browse: 150,
+  search: 200,
+  shared_browse: 100,
+  shared_search: 150,
+  write: 100,
+  own_browse: 100,
+  lent_browse: 100,
+  own_search: 100,
+};
+
+/** Failures, timeouts and checks per named scenario, with no latency limit; per-scenario sub-metrics also feed the report. */
+export function correctnessThresholds(scenarios) {
   const thresholds = {
     http_req_failed: ['rate<0.01'],
     http_req_timeouts: ['count<1'],
     checks: ['rate>0.99'],
   };
-  for (const [scenario, p95Ms] of Object.entries(p95MsByScenario)) {
-    thresholds[`http_req_duration{scenario:${scenario}}`] = [`p(95)<${p95Ms}`];
+  for (const scenario of scenarios) {
+    thresholds[`http_req_duration{scenario:${scenario}}`] = [];
     thresholds[`http_req_failed{scenario:${scenario}}`] = ['rate<0.01'];
     thresholds[`http_reqs{scenario:${scenario}}`] = ['count>0'];
+  }
+  return thresholds;
+}
+
+/** Correctness thresholds plus each scenario's p95 limit. */
+export function thresholdsFor(scenarios) {
+  const thresholds = correctnessThresholds(scenarios);
+  for (const scenario of scenarios) {
+    thresholds[`http_req_duration{scenario:${scenario}}`] = [
+      `p(95)<${P95_MS[scenario]}`,
+    ];
   }
   return thresholds;
 }

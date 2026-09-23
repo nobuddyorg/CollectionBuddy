@@ -24,6 +24,14 @@ values (:'item_id'::uuid, :'category_id'::uuid);
 insert into public.images (item_id, path_full)
 values (:'item_id'::uuid, :'owner_id'::text || '/' || :'item_id'::text || '/shared.webp')
 returning id as image_id \gset
+-- Filed only into the unshared sibling, so a grant that stopped matching on category would surface it.
+insert into public.items (title) values ('Sibling item')
+returning id as sibling_item_id \gset
+insert into public.item_categories (item_id, category_id)
+values (:'sibling_item_id'::uuid, :'other_category_id'::uuid);
+insert into public.images (item_id, path_full)
+values (:'sibling_item_id'::uuid, :'owner_id'::text || '/' || :'sibling_item_id'::text || '/sibling.webp')
+returning id as sibling_image_id \gset
 
 -- An active grant.
 insert into public.category_shares (category_id, invited_email)
@@ -62,6 +70,14 @@ select is(
   'the grant is scoped to this one category, not to the owner as a whole'
 );
 
+select is(
+  (select count(*) from public.items where id = :'sibling_item_id'::uuid)
+  + (select count(*) from public.item_categories where category_id = :'other_category_id'::uuid)
+  + (select count(*) from public.images where id = :'sibling_image_id'::uuid),
+  0::bigint,
+  'nor to an entry, link or photograph record filed only in the owner''s unshared category'
+);
+
 -- A viewer grant does not extend to writing.
 with attempt as (
   update public.categories set name = 'taken over' where id = :'category_id'::uuid returning id
@@ -87,6 +103,14 @@ select is(
   'revocation closes the category again, with it still present'
 );
 
+select is(
+  (select count(*) from public.items where id = :'item_id'::uuid)
+  + (select count(*) from public.item_categories where category_id = :'category_id'::uuid)
+  + (select count(*) from public.images where id = :'image_id'::uuid),
+  0::bigint,
+  'and its entry, link and photograph record with it'
+);
+
 -- An expired grant is refused exactly like no grant at all -- the check
 -- constraint only demands expires_at > created_at, not that either sits
 -- in the future, so this is a legal row and the question is whether the
@@ -104,6 +128,14 @@ select is(
   (select count(*) from public.categories where id = :'category_id'::uuid),
   0::bigint,
   'an already-expired grant opens nothing'
+);
+
+select is(
+  (select count(*) from public.items where id = :'item_id'::uuid)
+  + (select count(*) from public.item_categories where category_id = :'category_id'::uuid)
+  + (select count(*) from public.images where id = :'image_id'::uuid),
+  0::bigint,
+  'not the entry, link or photograph record either'
 );
 
 -- A grant addressed to someone else does not open the category to a

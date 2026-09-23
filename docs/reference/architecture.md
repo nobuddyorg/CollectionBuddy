@@ -24,6 +24,10 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | [`0014_drop_redundant_item_categories_indexes.sql`](../../supabase/migrations/0014_drop_redundant_item_categories_indexes.sql) | Drops `item_categories (item_id)` and `(category_id)`, prefixes of the primary key and of `(category_id, created_at desc, item_id)`. |
 | [`0015_revoke_api_role_execute.sql`](../../supabase/migrations/0015_revoke_api_role_execute.sql) | Revokes direct `EXECUTE` grants to `anon` (and, on trigger functions, `authenticated`) that hosted default privileges add, and stops `postgres`'s default privileges granting new functions to either. |
 | [`0016_bound_row_volume.sql`](../../supabase/migrations/0016_bound_row_volume.sql) | Per-owner ceilings on categories and shares, a per-entry ceiling on category links, and length checks on every text column. |
+| [`0017_shared_read_once_per_statement.sql`](../../supabase/migrations/0017_shared_read_once_per_statement.sql) | Adds `granted_category_ids()`; the read policies (tables and shared `storage.objects`) and `has_category_read_access()` ask it once per statement. Same rows allowed and denied ([why](../explanation/design-decisions.md#why-read-policies-take-the-callers-grants-as-one-set)). |
+| [`0018_rpc_custom_plans.sql`](../../supabase/migrations/0018_rpc_custom_plans.sql) | `list_category_places()` and `search_category_items()` become plpgsql with `plan_cache_mode = force_custom_plan`, so each call is planned for the category it names; search checks access once per call, and both order ties by id so pages and a place's titles, ids and coordinates stay consistent. The map sends `ids` only for a place without finite coordinates, the only one the client writes a geocode back to: 1,283 KB to 331 KB for 25,000 entries. Same rows, same security mode ([why](../explanation/design-decisions.md#why-the-map-and-search-rpcs-are-plpgsql)). |
+| [`0019_images_path_thumb_matches_item.sql`](../../supabase/migrations/0019_images_path_thumb_matches_item.sql) | `images.path_thumb` must name its own entry, as `path_full` must: the owner's client deletes both paths, so a planted thumbnail took another entry's photo with it. `not valid`: checked on every write from now on. |
+| [`0020_one_collection_per_entry.sql`](../../supabase/migrations/0020_one_collection_per_entry.sql) | `tg_item_categories_quota()` refuses an entry's second category link (was: an 11th), with `PT507`. Existing rows untouched. |
 
 ### Tables
 
@@ -31,16 +35,16 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | --- | --- | --- |
 | `categories` | `id`, `user_id`, `name`, `created_at`, `updated_at` | Name non-blank after normalization, at most 200 characters; unique per user, case-insensitively. |
 | `items` | `id`, `user_id`, `title`, `description`, `place`, `place_lat`, `place_lng`, `tags text[]`, `tags_text` (generated), `created_at`, `updated_at` | Title non-blank. At most 300 characters of title, 10,000 of description, 500 of place, and 50 tags of up to 100 characters. `tags_text` is a space-joined copy of `tags` so tag search shares the `ILIKE` filter. `place_lat`/`place_lng` are set when the user picks a suggestion; null for hand-typed places, which the map geocodes on demand. |
-| `item_categories` | `item_id`, `category_id`, `user_id`, `created_at` | Primary key `(item_id, category_id)`. An item may belong to up to 10 categories; the UI files it in one and browses one at a time. |
+| `item_categories` | `item_id`, `category_id`, `user_id`, `created_at` | Primary key `(item_id, category_id)`. An item belongs to exactly one category: the UI files it in one, and `0020` refuses a second link. Rows filed twice before `0020` are left as they are, and deleting one of their categories keeps the item. |
 | `category_shares` | `id`, `category_id`, `owner_user_id`, `invited_email`, `role`, `expires_at`, `created_at` | One row per `(category, invited email)`, email at most 320 characters. `role` is `viewer` (default) or `editor`. |
-| `images` | `id`, `item_id`, `user_id`, `path_full`, `path_thumb`, `size_bytes`, `created_at` | One row per photo; paths are complete Storage paths. Cascades away with its item. |
+| `images` | `id`, `item_id`, `user_id`, `path_full`, `path_thumb`, `size_bytes`, `created_at` | One row per photo; paths are complete Storage paths whose second segment is the row's own item, for both sizes. Cascades away with its item. |
 
 ### Row Level Security
 
-All policies are in [`0006_policies.sql`](../../supabase/migrations/0006_policies.sql), built from an owner check and two `security invoker` predicates:
+All policies are in [`0006_policies.sql`](../../supabase/migrations/0006_policies.sql), with the read policies rewritten by `0017`, built from an owner check and `security invoker` predicates:
 
 - `user_id = (select auth.uid())` — the scalar subquery makes the planner evaluate it once per query, not per row.
-- `has_category_read_access(cat_id)` — an active `category_shares` grant to the caller's email, at either role.
+- `category_id = any(array(select granted_category_ids()))` — the categories an active `category_shares` grant to the caller's email opens, at either role, read once per statement as an initPlan. `has_category_read_access(cat_id)` asks the same set for one category.
 - `has_category_write_access(cat_id)` — category ownership, **or** an active grant at role `editor`.
 
 Ownership is inside the write predicate and deliberately outside the read one; every read policy adds its own owner branch instead. Folding ownership into the read predicate would let a category's owner see every item linked into it, including ones an editor added that the owner was never granted.
@@ -84,7 +88,7 @@ Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql
 - `tg_category_shares_enforce()` — see Sharing.
 - `tg_images_enforce()` — derives `images.user_id` from the item's owner; rejects an insert whose item the caller neither owns nor has write access to.
 - `tg_images_size_from_storage()` — sets `images.size_bytes` to the size Storage recorded for `path_full`, or the bucket's 5 MiB cap while nothing is stored there; the client's claim is ignored.
-- `tg_images_quota()`, `tg_items_quota()`, `tg_categories_quota()`, `tg_category_shares_quota()`, `tg_item_categories_quota()` — `FOR EACH STATEMENT` after insert: refuse with SQLSTATE `PT507` (HTTP 507) a write that takes an owner past 1 GiB of photographs, 50,000 entries, 1,000 categories or 1,000 shares, or an entry past 10 categories ([why](../explanation/design-decisions.md#why-quotas-are-counted-in-the-database)).
+- `tg_images_quota()`, `tg_items_quota()`, `tg_categories_quota()`, `tg_category_shares_quota()`, `tg_item_categories_quota()` — `FOR EACH STATEMENT` after insert: refuse with SQLSTATE `PT507` (HTTP 507) a write that takes an owner past 1 GiB of photographs, 50,000 entries, 1,000 categories or 1,000 shares, or an entry into a second category ([why](../explanation/design-decisions.md#why-quotas-are-counted-in-the-database)).
 - `delete_item_if_orphan()` — after `item_categories` rows are deleted, deletes items now in zero categories. `FOR EACH STATEMENT` with a transition table ([why](../explanation/design-decisions.md#why-the-orphan-cleanup-trigger-is-statement-level)).
 - `tg_set_updated_at()` — on `categories` and `items`.
 - `storage_item_id()` — parses the item id out of a storage path, returning `NULL` rather than raising; it tests the segment with `pg_input_is_valid()` rather than catching the cast's error, so no call opens a subtransaction. See Storage.
@@ -109,7 +113,7 @@ Nothing indexes `storage.objects`; hosted Supabase owns it and refuses DDL with 
 One private bucket, `item-images` ([`0007_storage.sql`](../../supabase/migrations/0007_storage.sql)), restricted to `image/webp`, `image/jpeg`, `image/png` at 5 MiB per file. Paths are `<uid>/<itemId>/<file>`, where the uid is the **uploader's**. The client reads through signed URLs.
 
 - **Owner-only policies** on `select`, `insert`, `delete`: `split_part(name, '/', 1) = (select auth.uid())::text`. Splinter skips the `storage` schema, so `040_storage_policy_surface_test.sql` checks that no policy here calls `auth.uid()` once per row.
-- **Shared policies** on `select` and `delete`: extract the item id with `storage_item_id()` and join through `item_categories` to the same read/write predicates the tables use. `storage_item_id()` returns `NULL` on a path that does not parse, because a raised error inside `USING` aborts the statement instead of failing to match the row.
+- **Shared policies** on `select` and `delete`: extract the item id with `storage_item_id()` and join through `item_categories` to the same read/write predicates the tables use (`granted_category_ids()` for reading). `storage_item_id()` returns `NULL` on a path that does not parse, because a raised error inside `USING` aborts the statement instead of failing to match the row.
 - **No shared `insert`**: an editor's upload lands under the editor's own prefix and satisfies the owner-only set.
 - **No `update` policy** for anyone, and that absence is the only denial — Storage's bootstrap re-grants the `UPDATE` privilege on every start. A path is fixed when written; `move()` and `upsert` are refused ([why](../explanation/design-decisions.md#why-a-storage-objects-path-can-never-change)).
 

@@ -18,17 +18,18 @@ supabase-js. Change one, change the other.
 | `catalogue.js` | `browse`, `search` | 10 + 5 VUs | The owner paging the catalogue (list, exact count, map) and searching it through `search_category_items` |
 | `shared-viewer.js` | `shared_browse`, `shared_search` | 10 + 5 VUs | A second identity reading a category it holds a `viewer` grant on: the `has_category_read_access()` path (#619) |
 | `write.js` | `write` | 5 VUs | Creating an entry, filing it, uploading a photograph and its thumbnail, writing its `images` row |
+| `population.js` | `own_browse`, `own_search`, `lent_browse`, `write` | 10 + 5 + 5 + 3 VUs | Many collectors at once, each VU one of them: tables and trigram indexes shared by everyone, a grant per collector, quota triggers per owner. Searches are mostly another collector's word, common across the table and absent from the searcher's own collection |
 
 ### Profiles
 
 A profile (`web/load/lib/profile.js`) scales every ramped scenario's virtual
 users and sets the seed size, so a heavier run needs no new script:
 
-| Profile | Virtual users | Shape | Seed: searched + shared entries |
-| --- | --- | --- | --- |
-| `normal` (default) | ×1: 15 on `catalogue` | 30 s ramp, 2 min hold, 15 s down | 10,000 + 300 |
-| `peak` | ×5: 75 on `catalogue` | 1 min ramp, 5 min hold, 30 s down | 25,000 + 1,000 |
-| `stress` | steps to ×20: 300 on `catalogue` | a quarter, half, then all of it for 2 min each, held 2 min more, 1 min down | 40,000 + 2,000 |
+| Profile | Virtual users | Shape | Seed: searched + shared entries | `population`: collectors × entries |
+| --- | --- | --- | --- | --- |
+| `normal` (default) | ×1: 15 on `catalogue` | 30 s ramp, 2 min hold, 15 s down | 10,000 + 300 | 50 × 200 |
+| `peak` | ×5: 75 on `catalogue` | 1 min ramp, 5 min hold, 30 s down | 25,000 + 1,000 | 100 × 250 |
+| `stress` | steps to ×20: 300 on `catalogue` | a quarter, half, then all of it for 2 min each, held 2 min more, 1 min down | 40,000 + 2,000 | 200 × 200 |
 
 `stress` is meant to cross the thresholds: the question it answers is where
 latency bends and errors start, which the HTML report's charts show step by
@@ -51,6 +52,17 @@ Every script shares one `setup()` (`web/load/lib/seed.js`):
 3. As the writer, one empty category that `write` files its new entries into,
    so a `stress` run's writes never meet the owner's quota.
 
+Nine seeded entries in ten carry their place's coordinates, as picking a
+suggestion stores them, so the map returns the shape real collections get.
+
+`population.js` has its own `setup()` (`web/load/lib/population.js`): the
+profile's number of collectors, each with a collection titled with one word
+of their own and a fifth as many entries lent, at `viewer`, to the next
+collector in a ring: the same totals as the other seeds, spread over many
+people. Sign-up is the only way in without `service_role`, so
+`supabase/config.toml` raises the local stack's sign-up limit from 30 to 500
+per 5 minutes; production never reads that file.
+
 `teardown()` deletes each account's photographs from Storage **before** any
 row (CLAUDE.md), then its entries and categories. The users stay in the
 stack's `auth.users`; on the ephemeral CI stack that is moot, and locally
@@ -64,7 +76,7 @@ Install [k6](https://grafana.com/docs/k6/latest/set-up/install-k6/) (CI pins
 ```bash
 supabase start
 cd web
-npm run load -- smoke          # then: catalogue, shared-viewer, write
+npm run load -- smoke          # then: catalogue, shared-viewer, write, population
 npm run load -- catalogue --profile peak
 ```
 
@@ -78,7 +90,7 @@ the same way `npm run e2e:local` does, and runs
 | `<flow>.md` | The table below, also printed to stdout |
 | `<flow>.json` | k6's full end-of-test summary object |
 | `<flow>.html` | k6's self-contained HTML report: request rate, latency percentiles, VUs and errors as charts over time. Skipped, with a warning, for a run under three 10 s periods, so never for `smoke` |
-| `<flow>.db.md` | What Postgres did during the run: see [the Postgres side](#the-postgres-side). Local stack only |
+| `<flow>.db.md` | What Postgres did during the run: see [the Postgres side](#the-postgres-side). Also printed to stdout. Local stack only |
 
 It also sets `K6_NO_USAGE_REPORT`, so k6 does not phone home, and disables the
 live dashboard's port, so k6 exits when the run does.
@@ -113,13 +125,29 @@ together with the timeout count (a request that hit k6's own timeout, error
 code 1050). Requests per second is over the whole run, setup included, so it
 understates a scenario's rate a little.
 
-The thresholds (`web/load/lib/options.js`) are **initial proposals, not
-validated limits**: under 1% failed requests, no timeouts, over 99% of checks
-passing, and a p95 of 500 ms for browsing, 800 ms for searching and 1,500 ms
-for a write. Calibrate them the way TEST_STRATEGY.md §12 says for any
-performance threshold: run the same script a few times on the same runner,
-take the measured p95, and set the threshold above it with margin. A red
-threshold before that is a question, not a regression.
+The thresholds (`web/load/lib/options.js`) are under 1% failed requests, no
+timeouts, over 99% of checks passing, and a p95 per scenario calibrated the
+way TEST_STRATEGY.md §12 says: two `normal` runs of every script on a GitHub
+runner, three times the worse p95, at least 100 ms, rounded up to 50.
+
+| Scenario | Measured p95 (two runs) | Threshold |
+| --- | --- | --- |
+| `browse` | 27.4, 34.4 ms | 150 ms |
+| `search` | 46.1, 62.2 ms | 200 ms |
+| `shared_browse` | 5.6, 5.0 ms | 100 ms |
+| `shared_search` | 35.2, 33.6 ms | 150 ms |
+| `write` | 9.9, 12.9 ms (`population`: 12.3, 15.0 ms) | 100 ms |
+| `own_browse`, `lent_browse`, `own_search` | at most 7.8 ms | 100 ms |
+
+The margin is wide on purpose: the same script on the same runner type has
+varied by 2× between runs, and the floor keeps a 5 ms scenario from turning
+red on a noisy neighbour. They hold for `normal`; `peak` and `stress` are
+meant to find where they break. The owner's map on a 25,000-entry category
+does at `peak`: it returns every title of every place in one call, which is
+kept on purpose so a popup opens without a second request.
+Recalibrate the same way when a change moves a scenario's baseline.
+`smoke` keeps every threshold but the p95s: one cold iteration measures the
+first request after setup, not a baseline.
 
 A stack on a GitHub runner measures the runner as much as the app. Compare a
 run with an earlier run of the same script on the same runner type, not with

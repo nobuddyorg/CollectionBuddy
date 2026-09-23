@@ -152,7 +152,7 @@ select is(
 
 -- The sweep is a no-op when nothing is actually orphaned, which is what
 -- makes it safe to fire on every mapping delete: an entry filed in two
--- collections survives losing one of them.
+-- collections, which only predates 0020, survives losing one of them.
 select pg_temp.auth_as(:'owner_id'::uuid, 'edge-owner@collectionbuddy.test');
 insert into public.categories (name) values ('Kept A')
 returning id as kept_a \gset
@@ -160,8 +160,14 @@ insert into public.categories (name) values ('Kept B')
 returning id as kept_b \gset
 insert into public.items (title) values ('Filed twice')
 returning id as kept_item \gset
+reset role;
+alter table public.item_categories disable trigger trg_item_categories_quota;
+select pg_temp.auth_as(:'owner_id'::uuid, 'edge-owner@collectionbuddy.test');
 insert into public.item_categories (item_id, category_id)
 values (:'kept_item'::uuid, :'kept_a'::uuid), (:'kept_item'::uuid, :'kept_b'::uuid);
+reset role;
+alter table public.item_categories enable trigger trg_item_categories_quota;
+select pg_temp.auth_as(:'owner_id'::uuid, 'edge-owner@collectionbuddy.test');
 
 delete from public.item_categories
 where item_id = :'kept_item'::uuid and category_id = :'kept_a'::uuid;

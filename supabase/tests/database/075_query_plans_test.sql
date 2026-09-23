@@ -80,6 +80,18 @@ begin
 end;
 $$;
 
+create or replace function pg_temp.plan_never_mentions(p_sql text, p_fragment text, p_description text)
+returns text
+language plpgsql
+as $$
+begin
+  if strpos(pg_temp.plan_text(p_sql), p_fragment) = 0 then
+    return ok(true, p_description);
+  end if;
+  return ok(false, p_description) || e'\n' || diag(pg_temp.plan_text(p_sql));
+end;
+$$;
+
 select gen_random_uuid() as owner_id \gset
 
 select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
@@ -90,12 +102,15 @@ values ('Plan Probe Silberdenar', 'A silver coin', 'Rome', array['coin']);
 insert into public.item_categories (item_id, category_id)
 select i.id, :'category_id'::uuid from public.items i where i.title = 'Plan Probe Silberdenar';
 
--- The searched page's body, read from the live function rather than pasted, with its arguments inlined as the app sends them.
+-- The searched page's query, read from the live function rather than pasted, with its arguments inlined as the app sends them.
 select
   regexp_replace(
     regexp_replace(
       regexp_replace(
-        regexp_replace(p.prosrc, '\mcat_id\M', quote_literal(:'category_id') || '::uuid', 'g'),
+        regexp_replace(
+          substring(p.prosrc from 'return query(.*);\s*end'),
+          '\mcat_id\M', quote_literal(:'category_id') || '::uuid', 'g'
+        ),
         '\mlike_pattern\M', quote_literal('%silberdenar%'), 'g'
       ),
       '\mpage_from\M', '0', 'g'
@@ -114,7 +129,7 @@ select format(
     from public.item_categories ic
     join public.items i on i.id = ic.item_id
     where ic.category_id = %L::uuid
-    order by ic.created_at desc
+    order by ic.created_at desc, ic.item_id
     limit 50 offset 0
   $sql$,
   :'category_id'
@@ -231,6 +246,80 @@ select pg_temp.plan_uses_index_only(
   format('select coalesce(sum(im.size_bytes), 0) from public.images im where im.user_id = %L::uuid', :'owner_id'),
   'idx_images_user_size',
   'reachable: the photo quota sum is an index-only scan on idx_images_user_size'
+);
+
+-- The map's query for a small category beside a large one, planned for the category it names as 0018 makes every call.
+select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
+insert into public.categories (name) values ('Plans small (pgTAP)')
+returning id as small_category_id \gset
+insert into public.items (title, place) values ('Plan Probe Small', 'Rome')
+returning id as small_item_id \gset
+insert into public.item_categories (item_id, category_id)
+values (:'small_item_id'::uuid, :'small_category_id'::uuid);
+reset role;
+analyze public.item_categories;
+
+select
+  regexp_replace(
+    regexp_replace(
+      substring(p.prosrc from 'return query(.*);\s*end'),
+      '\mcat_id\M', quote_literal(:'small_category_id') || '::uuid', 'g'
+    ),
+    '\mlike_pattern\M', 'null::text', 'g'
+  ) as places_sql
+from pg_catalog.pg_proc p
+where p.oid = 'public.list_category_places(uuid, text)'::regprocedure \gset
+
+select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
+select pg_temp.plan_uses_index(
+  :'places_sql', 'idx_item_categories_cat_created',
+  'preferred: a small category''s map reads its links through idx_item_categories_cat_created'
+);
+select pg_temp.plan_has_no_seq_scan_on(
+  :'places_sql', 'item_categories', 'preferred: a small category''s map does not scan every link'
+);
+
+-- A grantee's reads ask for its grants once per statement (0017): no plan calls has_category_read_access() on a row.
+reset enable_seqscan;
+reset enable_bitmapscan;
+select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
+insert into public.category_shares (category_id, invited_email)
+values (:'category_id'::uuid, 'plans-viewer@collectionbuddy.test');
+select pg_temp.auth_as(gen_random_uuid(), 'plans-viewer@collectionbuddy.test');
+
+select pg_temp.plan_never_mentions(
+  format('select * from %s', relation), 'has_category_read_access',
+  'a grantee''s read of ' || relation || ' checks no grant per row'
+)
+from unnest(array[
+  'public.categories', 'public.items', 'public.item_categories', 'public.images', 'storage.objects'
+]) as relation;
+select pg_temp.plan_never_mentions(
+  format('select * from %s', relation), 'SubPlan',
+  'a grantee''s read of ' || relation || ' takes its grants once, as an initPlan'
+)
+from unnest(array['public.categories', 'public.item_categories']) as relation;
+select pg_temp.plan_uses_index(
+  :'catalogue_sql', 'idx_item_categories_cat_created',
+  'preferred: a grantee''s catalogue page uses idx_item_categories_cat_created under RLS'
+);
+
+select set_config('role', :'search_role', true);
+select pg_temp.plan_never_mentions(
+  :'search_sql', 'has_category_read_access',
+  'search_category_items checks the grant once per call, not per row'
+);
+
+-- A SQL function's body gets a generic plan in Postgres 17, costed on an average category rather than the one named (0018).
+reset role;
+select is(
+  (select array_agg(p.proname::text order by p.proname)
+   from pg_catalog.pg_proc p
+   join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and coalesce(p.proconfig, '{}') @> array['plan_cache_mode=force_custom_plan']),
+  array['list_category_places', 'search_category_items'],
+  'the map and search RPCs plan each call for the category it names'
 );
 
 select * from finish();

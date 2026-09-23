@@ -7,7 +7,7 @@ on:
       flow:
         description: Script under web/load/ to run
         type: choice
-        options: [smoke, catalogue, shared-viewer, write]
+        options: [smoke, catalogue, shared-viewer, write, population]
         default: smoke
       profile:
         description: "Load shape and seed size: normal (everyday), peak (5x users), stress (steps to 20x, 40,000 entries)"

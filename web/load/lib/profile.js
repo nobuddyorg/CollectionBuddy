@@ -1,4 +1,4 @@
-// Load shape and seed size per LOAD_PROFILE; seeds stay under the 50,000-entry quota per owner (0009_user_quotas.sql).
+// Load shape and seed size per LOAD_PROFILE; seeds stay under the 50,000-entry quota per owner (0009_user_quotas.sql), and population's collectors under the 500 sign-ups per 5 minutes supabase/config.toml allows the local stack.
 const PROFILES = {
   normal: {
     vusScale: 1,
@@ -9,6 +9,7 @@ const PROFILES = {
     ],
     searchedItems: 10000,
     sharedItems: 300,
+    population: { collectors: 50, entriesEach: 200 },
   },
   peak: {
     vusScale: 5,
@@ -19,6 +20,7 @@ const PROFILES = {
     ],
     searchedItems: 25000,
     sharedItems: 1000,
+    population: { collectors: 100, entriesEach: 250 },
   },
   stress: {
     vusScale: 20,
@@ -31,6 +33,7 @@ const PROFILES = {
     ],
     searchedItems: 40000,
     sharedItems: 2000,
+    population: { collectors: 200, entriesEach: 200 },
   },
 };
 

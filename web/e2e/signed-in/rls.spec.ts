@@ -353,12 +353,11 @@ test.describe('one collection cannot reach another', () => {
     expect(error).not.toBeNull();
   });
 
-  // Not an authorization boundary -- claiming a path conveys no access, since
-  // the storage policies parse an object's own name and never consult this
-  // table. It keeps the mirror self-consistent by construction
-  // (images_path_full_matches_item, 0012): a row may only name a path whose
-  // item-id segment is the item it belongs to, so it cannot point at a path
-  // its own owner is unable to read.
+  // Claiming a path conveys no read access -- the storage policies parse an
+  // object's own name and never consult this table -- but it does steer
+  // deletes: the owner's client removes every path a record names. So a row
+  // may only name paths whose item-id segment is its own item
+  // (images_path_full_matches_item, images_path_thumb_matches_item).
   for (const [shape, path] of [
     [
       'naming another item',
@@ -383,6 +382,29 @@ test.describe('one collection cannot reach another', () => {
         .insert({
           item_id: mine!.id,
           path_full: path.replace('{uid}', userId),
+        })
+        .select('id');
+      expect(data).toBeNull();
+      expect(error).not.toBeNull();
+    });
+
+    test(`a photograph record cannot claim a thumbnail ${shape}`, async ({}, testInfo) => {
+      testInfo.skip(!process.env.E2E_SUPABASE_URL);
+      const { token, userId } = context();
+
+      const { data: mine } = await apiAs(token)
+        .from('items')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('title', itemsIn('Münzen')[0].title)
+        .single();
+
+      const { data, error } = await apiAs(token)
+        .from('images')
+        .insert({
+          item_id: mine!.id,
+          path_full: `${userId}/${mine!.id}/rls-thumb-probe.webp`,
+          path_thumb: path.replace('{uid}', userId),
         })
         .select('id');
       expect(data).toBeNull();
@@ -671,6 +693,92 @@ test.describe('a category shared with another collector', () => {
     }
   });
 
+  // The read policies ask for the caller's grants as one set per statement
+  // (0017), so the category, not just the grantee, is what each one must
+  // still match on: expiry and scope are checked on every table they cover.
+  test('an expired grant opens no entry, link or map place either', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const shareId = await share(token, categoryId, SEED.other.email, {
+      window: { createdAt, expiresAt },
+    });
+
+    try {
+      const other = apiAs(otherToken);
+      const { data: items } = await other
+        .from('items')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('title', itemsIn('Münzen')[0].title);
+      expect(items).toEqual([]);
+
+      const { data: links } = await other
+        .from('item_categories')
+        .select('item_id')
+        .eq('category_id', categoryId);
+      expect(links).toEqual([]);
+
+      const { data: places, error } = await other.rpc('list_category_places', {
+        cat_id: categoryId,
+      });
+      expect(error).toBeNull();
+      expect(places).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
+  test('a grant opens nothing filed only in the owner’s other category', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const siblingId = await mineCategoryId(token, userId, 'Briefmarken');
+    const [sibling] = itemsIn('Briefmarken');
+    const shareId = await share(token, categoryId, SEED.other.email);
+
+    try {
+      const other = apiAs(otherToken);
+      // The grant itself is live: the shared category's map opens.
+      const { data: sharedPlaces } = await other.rpc('list_category_places', {
+        cat_id: categoryId,
+      });
+      expect(
+        sharedPlaces!.map((row: { place: string }) => row.place),
+      ).toContain(itemsIn('Münzen').find((item) => item.place)!.place);
+
+      const { data: items } = await other
+        .from('items')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('title', sibling.title);
+      expect(items).toEqual([]);
+
+      const { data: links } = await other
+        .from('item_categories')
+        .select('item_id')
+        .eq('category_id', siblingId);
+      expect(links).toEqual([]);
+
+      const { data: places } = await other.rpc('list_category_places', {
+        cat_id: siblingId,
+      });
+      expect(places).toEqual([]);
+
+      const { data: found } = await other.rpc('search_category_items', {
+        cat_id: siblingId,
+        like_pattern: `%${sibling.title}%`,
+        page_from: 0,
+        page_to: 9,
+      });
+      expect(found).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+    }
+  });
+
   test('a grant addressed to someone else does not open the category to a bystander', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { token, userId, otherToken } = context();
@@ -816,6 +924,62 @@ test.describe('a category shared with another collector', () => {
       expect(afterError).not.toBeNull();
     } finally {
       await apiAs(token).storage.from('item-images').remove([path]);
+    }
+  });
+
+  test('a photograph cannot be signed through an expired grant, nor from the owner’s unshared category', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const idOf = async (title: string) => {
+      const { data } = await apiAs(token)
+        .from('items')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('title', title)
+        .single();
+      return data!.id;
+    };
+    const shared = `${userId}/${await idOf(itemsIn('Münzen')[0].title)}/rls-expiry-probe.webp`;
+    const sibling = `${userId}/${await idOf(itemsIn('Briefmarken')[0].title)}/rls-sibling-probe.webp`;
+    const storage = apiAs(token).storage.from('item-images');
+    for (const path of [shared, sibling]) {
+      const { error } = await storage.upload(
+        path,
+        new Blob(['probe'], { type: 'image/webp' }),
+      );
+      expect(error).toBeNull();
+    }
+    const sign = (path: string) =>
+      apiAs(otherToken).storage.from('item-images').createSignedUrl(path, 60);
+
+    try {
+      const expiredId = await share(token, categoryId, SEED.other.email, {
+        window: {
+          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          expiresAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        },
+      });
+      try {
+        const { data, error } = await sign(shared);
+        expect(data).toBeNull();
+        expect(error).not.toBeNull();
+      } finally {
+        await unshare(token, expiredId);
+      }
+
+      const activeId = await share(token, categoryId, SEED.other.email);
+      try {
+        // The grant is live, so the refusal below is its scope, not its absence.
+        expect((await sign(shared)).error).toBeNull();
+        const { data, error } = await sign(sibling);
+        expect(data).toBeNull();
+        expect(error).not.toBeNull();
+      } finally {
+        await unshare(token, activeId);
+      }
+    } finally {
+      await storage.remove([shared, sibling]);
     }
   });
 
@@ -1000,6 +1164,7 @@ test.describe('a category shared at the editor role', () => {
       .insert({ user_id: otherUserId, title: 'rls-editor-invisible-entry' })
       .select('id')
       .single();
+    const photo = `${otherUserId}/${mine!.id}/rls-editor-invisible.webp`;
 
     try {
       await apiAs(otherToken)
@@ -1013,9 +1178,73 @@ test.describe('a category shared at the editor role', () => {
         .select('id')
         .eq('id', mine!.id);
       expect(seen).toEqual([]);
+
+      // Nor its link, its photograph record, or the photograph's bytes.
+      const { data: link } = await apiAs(token)
+        .from('item_categories')
+        .select('item_id')
+        .eq('item_id', mine!.id);
+      expect(link).toEqual([]);
+
+      const { error: uploadError } = await apiAs(otherToken)
+        .storage.from('item-images')
+        .upload(photo, new Blob(['probe'], { type: 'image/webp' }));
+      expect(uploadError).toBeNull();
+      const { error: rowError } = await apiAs(otherToken)
+        .from('images')
+        .insert({ item_id: mine!.id, path_full: photo });
+      expect(rowError).toBeNull();
+
+      const { data: record } = await apiAs(token)
+        .from('images')
+        .select('id')
+        .eq('item_id', mine!.id);
+      expect(record).toEqual([]);
+      const { data: signed, error: signError } = await apiAs(token)
+        .storage.from('item-images')
+        .createSignedUrl(photo, 60);
+      expect(signed).toBeNull();
+      expect(signError).not.toBeNull();
     } finally {
+      await apiAs(otherToken).storage.from('item-images').remove([photo]);
       await unshare(token, shareId);
       await apiAs(otherToken).from('items').delete().eq('id', mine!.id);
+    }
+  });
+
+  // The exploit images_path_thumb_matches_item closes: a thumbnail naming the
+  // owner's photograph in a collection the editor was never granted, which the
+  // owner's own client would remove on deleting this entry.
+  test('an editor cannot plant a thumbnail naming the owner’s photograph elsewhere', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken, otherUserId } = context();
+    const { categoryId, itemId } = await ownerEntryIn(
+      token,
+      userId,
+      'rls-editor-thumb-probe',
+    );
+    const shareId = await editorShare(token, categoryId);
+    const { data: elsewhere } = await apiAs(token)
+      .from('items')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('title', itemsIn('Münzen')[0].title)
+      .single();
+
+    try {
+      const { data, error } = await apiAs(otherToken)
+        .from('images')
+        .insert({
+          item_id: itemId,
+          path_full: `${otherUserId}/${itemId}/rls-thumb-plant.webp`,
+          path_thumb: `${userId}/${elsewhere!.id}/victim.webp`,
+        })
+        .select('id');
+      expect(data).toBeNull();
+      expect(error).not.toBeNull();
+    } finally {
+      await unshare(token, shareId);
+      await apiAs(token).from('items').delete().eq('id', itemId);
     }
   });
 
@@ -1737,15 +1966,13 @@ test.describe('per-owner quotas', () => {
     expect(error?.message).toBe('share quota of 1000 reached');
   });
 
-  test('an entry cannot be filed into more than 10 categories', async ({}, testInfo) => {
+  test('an entry belongs to one collection: a second one is refused', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { otherToken } = context();
     const api = apiAs(otherToken);
     const { data: categories, error: categoriesError } = await api
       .from('categories')
-      .insert(
-        Array.from({ length: 11 }, (_, i) => ({ name: `link-probe-${i}` })),
-      )
+      .insert([{ name: 'link-probe-home' }, { name: 'link-probe-second' }])
       .select('id');
     expect(categoriesError).toBeNull();
     const { data: item } = await api
@@ -1755,16 +1982,17 @@ test.describe('per-owner quotas', () => {
       .single();
 
     try {
+      const [home, second] = categories!;
+      const { error: homeError } = await api
+        .from('item_categories')
+        .insert({ item_id: item!.id, category_id: home.id });
+      expect(homeError).toBeNull();
+
       const { error } = await api
         .from('item_categories')
-        .insert(
-          categories!.map((c) => ({ item_id: item!.id, category_id: c.id })),
-        );
-
+        .insert({ item_id: item!.id, category_id: second.id });
       expect(error?.code).toBe('PT507');
-      expect(error?.message).toBe(
-        'category link quota of 10 per entry reached',
-      );
+      expect(error?.message).toBe('an entry belongs to one collection');
     } finally {
       await api
         .from('categories')

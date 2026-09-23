@@ -25,7 +25,7 @@ export const options = {
       stages: rampTo(5),
     },
   },
-  thresholds: thresholdsFor({ shared_browse: 500, shared_search: 800 }),
+  thresholds: thresholdsFor(['shared_browse', 'shared_search']),
 };
 
 export function browseShared(data) {

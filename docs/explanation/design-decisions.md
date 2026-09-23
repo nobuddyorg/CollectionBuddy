@@ -34,7 +34,7 @@ Any signed-in collector could otherwise create rows and upload 5 MiB objects wit
 | 50,000 entries per owner | `tg_items_quota()` (`0009`) |
 | 1,000 categories per owner | `tg_categories_quota()` (`0016`) |
 | 1,000 shares per owner, across all their categories | `tg_category_shares_quota()` (`0016`) |
-| 10 categories per entry | `tg_item_categories_quota()` (`0016`) |
+| One category per entry | `tg_item_categories_quota()` (`0016`, lowered from 10 by `0020`) |
 | Text: category name 200, title 300, description 10,000, place 500, invited email 320 characters; 50 tags of up to 100 characters | `check` constraints (`0016`) |
 
 A photograph added by an editor lands on the owner's row, so it counts against the owner's quota. The link ceiling is per entry rather than per owner because the entry ceiling already bounds the entries; together they bound the links. The UI files an entry in one category, so no message covers the link ceiling; the form's `maxLength`s mirror the text ceilings, so typing stops before the database would refuse. The text checks are `not valid`: every write since `0016` is checked, but a row already past a limit was left in place rather than failing the unattended deploy, and editing such a row fails until the long field is shortened. Once production holds no row past a limit, a later migration can `validate constraint` each one.
@@ -48,6 +48,8 @@ What this does not bound: bytes uploaded to Storage that never get an `images` r
 Only the Storage API can delete file bytes; SQL reaches the `storage.objects` metadata row and nothing more. So the client removes the objects _first_, then deletes the item or category row. Reversing the order orphans the files with no way to find them again.
 
 A `cleanup_item_images()` trigger used to back this up. It was removed because Supabase's `prevent-direct-deletes` migration guards `storage.objects` with a `BEFORE DELETE ... FOR EACH STATEMENT` trigger that raises `42501` for any session outside the Storage API — statement-level, so it fires even when the delete matches nothing, which is the normal case once the client has already removed the objects. Every item deletion failed. There is no SQL-side backstop available; [`cleanup-orphaned-photos.yml`](../../.github/workflows/cleanup-orphaned-photos.yml) sweeps unreferenced objects daily through the Storage API instead, past a 48 h grace period so nothing still uploading is mistaken for orphaned.
+
+The client deletes whatever paths a row names, with the deleting user's token, so a row may only name paths under its own entry: `images_path_full_matches_item`, and since `0019` `images_path_thumb_matches_item`. Before `0019` an editor could file a record whose thumbnail named the owner's photograph in a collection the editor was never granted, and the owner's own delete of that entry removed it.
 
 ## Why a storage object's path can never change
 
@@ -66,6 +68,8 @@ Pinning segment 1 would have closed the hole and left a strict subset of `"updat
 Early migrations added `tsvector` columns and GIN indexes. They were dropped because search is a substring match (`ILIKE '%query%'`) across title, description, place and tags, and full-text search was never used — extra storage and write cost for a feature that was not there. `pg_trgm` GIN indexes on each searched column are what `ILIKE '%…%'` needs to avoid a sequential scan.
 
 On their own those indexes only work under `BYPASSRLS`. `texticlike` is not leakproof, and Postgres refuses to evaluate a non-leakproof qual before a relation's RLS qual, so for `authenticated` the planner never chooses them: a rare-term search over a 100,000-item category measured 415.8 ms as a sequential scan, and `enable_seqscan = off` did not change the plan (#621). The catalogue's search therefore goes through `search_category_items()`, a `SECURITY DEFINER` function that re-implements the read-access check itself and queries with RLS bypassed — 24.3 ms on the same term. The map's `list_category_places()` stays `SECURITY INVOKER` and still cannot use them.
+
+The planner picks between three paths per call (0018 plans each call with its real arguments): the trigram indexes for a term rare across the whole table, the category's own links for a small collection, or a sequential scan of `items` when the term is common across everyone. Postgres costs an `ILIKE` evaluation far below what it takes, so that last path wins until `items` is several times larger than the collection searched. The `population` load test measured it at 33,600 entries over 28 collectors: 8.7 ms by sequential scan against 3.6 ms from the collection's links. That grows with every user's entries, not just the searcher's, and stays in the tens of milliseconds at this app's scale. Forcing the collection-first path would give up the trigram path, which answers a rare term in a 40,000-entry collection in 1.5 ms instead of about 200, so the choice stays with the planner.
 
 The 3-character minimum before a search fires is not about the index: a one- or two-character query matches nearly every row, so firing one per keystroke would cost a full scan for no narrowing. The debounce does the same job for typing speed.
 
@@ -116,6 +120,14 @@ Pure-logic tests could not have caught the hydration mismatch fixed in `008d33b`
 ## Why SQL linting runs `core` minus nine rules, and never autofixes
 
 [`.sqlfluff`](../../.sqlfluff) uses the `core` bundle and excludes nine rules, for one reason: a migration is applied history and a pgTAP suite is reviewed SQL, so a finding that only reformats one is churn on security-critical files, not a caught defect. `aliasing.table` and five `layout.*` rules would rewrite every file; `references.special_chars` objects to the quoted policy names, and renaming a policy is DDL against the authorization boundary; `references.keywords` objects to the documented `category_shares.role` column; `references.consistent` would qualify every column reference across applied migrations. What is left — `ambiguous.*`, most of `structure.*`, `capitalisation.*` pinned to `lower` — was clean when adopted and still earns its place on new SQL. Only `sqlfluff-lint` runs as a hook, never `sqlfluff-fix`.
+
+## Why read policies take the caller's grants as one set
+
+A grantee's read used to call `has_category_read_access(category_id)` on every row, and twice per entry, since the `items` policy reads `item_categories` under that table's own policy. The function pins `search_path`, and PostgreSQL never inlines a function with a `SET` clause, so each row paid a full call and an index probe into `category_shares`. The k6 `shared-viewer` run measured it: 300 shared entries browsed slower than the owner's 10,000, and at the `peak` profile p95 passed 9 s with 3.6% of requests failing. `0017` has every read policy ask `category_id = any(array(select granted_category_ids()))` instead: an initPlan, evaluated once per statement and only when the owner branch has not already decided, which inside the `EXISTS` becomes part of one primary-key probe. `granted_category_ids()` is plpgsql so its query is planned once per connection, and `has_category_read_access()` is defined on the same set, so what a grant is (email, expiry) is written once. Ownership stays outside the set for the same reason it stays outside the read predicate. `075_query_plans_test.sql` fails if a read plan calls `has_category_read_access()` again.
+
+## Why the map and search RPCs are plpgsql
+
+Postgres 17 plans a SQL function's body without its argument values, so `category_id = cat_id` was costed on an average category. In the load test's `peak` run a 1,000-entry shared category was read by scanning all 26,000 links, 10,936 times. `0018` makes both RPCs plpgsql with `plan_cache_mode = force_custom_plan`: each call is planned with the category it names, as the SQL functions were already re-planned on every call, so planning costs nothing extra. The query text is unchanged, and `075_query_plans_test.sql` plans that same text with literal arguments, which is now also what runs.
 
 ## Why load testing is manual and local by default
 

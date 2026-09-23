@@ -94,8 +94,16 @@ returning id as item_c \gset
 insert into public.item_categories (item_id, category_id) values
   (:'item_a'::uuid, :'category_a'::uuid),
   (:'item_b'::uuid, :'category_b'::uuid),
-  (:'item_c'::uuid, :'category_a'::uuid),
-  (:'item_c'::uuid, :'category_c'::uuid);
+  (:'item_c'::uuid, :'category_a'::uuid);
+
+-- A second collection can only predate 0020 now; seeded past its trigger, which the rollback restores.
+reset role;
+alter table public.item_categories disable trigger trg_item_categories_quota;
+select pg_temp.auth_as(:'owner_id'::uuid, 'functions-test@collectionbuddy.test');
+insert into public.item_categories (item_id, category_id) values (:'item_c'::uuid, :'category_c'::uuid);
+reset role;
+alter table public.item_categories enable trigger trg_item_categories_quota;
+select pg_temp.auth_as(:'owner_id'::uuid, 'functions-test@collectionbuddy.test');
 
 -- One statement, deleting mappings across both category_a and category_b
 -- at once.
@@ -123,7 +131,8 @@ insert into public.items (title, place, place_lat, place_lng, created_at) values
   ('Oldest at Cologne', 'Cologne', 1, 2, now() - interval '3 hours'),
   ('Middle at Cologne, no coords', 'Cologne', null, null, now() - interval '2 hours'),
   ('Newest at Cologne', 'Cologne', 50.94, 6.96, now() - interval '1 hour'),
-  ('Only entry, unlocated', 'Nowhere Yet', null, null, now());
+  ('Only entry, unlocated', 'Nowhere Yet', null, null, now()),
+  ('Stored NaN', 'Broken Coordinates', 'NaN', 6.96, now());
 
 -- Fetched back by title, one \gset per row, rather than off the INSERT's
 -- own RETURNING: \gset accepts exactly one row, and the insert above wrote
@@ -132,12 +141,14 @@ select id as oldest_id from public.items where title = 'Oldest at Cologne' \gset
 select id as middle_id from public.items where title = 'Middle at Cologne, no coords' \gset
 select id as newest_id from public.items where title = 'Newest at Cologne' \gset
 select id as unlocated_id from public.items where title = 'Only entry, unlocated' \gset
+select id as nan_id from public.items where title = 'Stored NaN' \gset
 
 insert into public.item_categories (item_id, category_id) values
   (:'oldest_id'::uuid, :'places_category'::uuid),
   (:'middle_id'::uuid, :'places_category'::uuid),
   (:'newest_id'::uuid, :'places_category'::uuid),
-  (:'unlocated_id'::uuid, :'places_category'::uuid);
+  (:'unlocated_id'::uuid, :'places_category'::uuid),
+  (:'nan_id'::uuid, :'places_category'::uuid);
 
 select is(
   (select place_lat from public.list_category_places(:'places_category'::uuid, null)
@@ -157,11 +168,24 @@ select is(
   array['Newest at Cologne', 'Middle at Cologne, no coords', 'Oldest at Cologne'],
   'every title at the place is collected, newest first, including a row with no coordinates of its own'
 );
+-- ids only feed the geocode write-back (0018): a located place sends none, an unlocated one every entry, newest first.
 select is(
   (select ids from public.list_category_places(:'places_category'::uuid, null)
     where place = 'Cologne'),
-  array[:'newest_id'::uuid, :'middle_id'::uuid, :'oldest_id'::uuid],
-  'ids are collected in the same newest-first order, for the geocode write-back'
+  '{}'::uuid[],
+  'a located place sends no ids, since nothing there needs writing back'
+);
+select is(
+  (select ids from public.list_category_places(:'places_category'::uuid, null)
+    where place = 'Nowhere Yet'),
+  array[:'unlocated_id'::uuid],
+  'an unlocated place sends its ids, for the geocode write-back'
+);
+select is(
+  (select ids from public.list_category_places(:'places_category'::uuid, null)
+    where place = 'Broken Coordinates'),
+  array[:'nan_id'::uuid],
+  'a place whose coordinates are not finite sends its ids too, as the client geocodes it'
 );
 select is(
   (select place_lat from public.list_category_places(:'places_category'::uuid, null)

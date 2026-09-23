@@ -90,10 +90,11 @@ select ok(
   'list_category_places runs as its caller, so ordinary RLS still applies to it'
 );
 
--- has_category_read_access and has_category_write_access are called from
--- inside policy predicates; as definers they would evaluate auth.uid()
--- just the same, but they would also stop being filtered by the RLS on
--- category_shares that currently scopes what they can see.
+-- has_category_read_access, has_category_write_access and
+-- granted_category_ids are called from inside policy predicates; as
+-- definers they would evaluate auth.uid() just the same, but they would
+-- also stop being filtered by the RLS on category_shares that currently
+-- scopes what they can see.
 select ok(
   not (select prosecdef from pg_catalog.pg_proc where oid = 'public.has_category_read_access(uuid)'::regprocedure),
   'has_category_read_access runs as its caller'
@@ -101,6 +102,10 @@ select ok(
 select ok(
   not (select prosecdef from pg_catalog.pg_proc where oid = 'public.has_category_write_access(uuid)'::regprocedure),
   'has_category_write_access runs as its caller'
+);
+select ok(
+  not (select prosecdef from pg_catalog.pg_proc where oid = 'public.granted_category_ids()'::regprocedure),
+  'granted_category_ids runs as its caller'
 );
 
 -- 001_grants_test.sql leaves the trigger functions out of anon's reachable

@@ -77,7 +77,7 @@ export function listPage(session, categoryId, page) {
   const params = query({
     select: PAGE_SELECT,
     category_id: `eq.${categoryId}`,
-    order: 'created_at.desc',
+    order: 'created_at.desc,item_id.asc',
     'items.images.order': 'created_at.asc,id.asc',
     offset: (page - 1) * PAGE_SIZE,
     limit: PAGE_SIZE,

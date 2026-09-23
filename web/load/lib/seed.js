@@ -15,8 +15,16 @@ export const SHARED_ITEMS = PROFILE.sharedItems;
 // One INSERT per request, set-based, at a body size no proxy in front of PostgREST refuses.
 const SEED_BATCH = 10000;
 
-const NOUNS = ['Denar', 'Sesterz', 'Taler', 'Groschen', 'Dukat', 'Obol'];
+export const NOUNS = ['Denar', 'Sesterz', 'Taler', 'Groschen', 'Dukat', 'Obol'];
 const PLACES = ['Rom', 'Wien', 'Prag', 'Athen', 'Trier', 'Köln'];
+const COORDS = {
+  Rom: [41.9, 12.5],
+  Wien: [48.21, 16.37],
+  Prag: [50.08, 14.43],
+  Athen: [37.98, 23.73],
+  Trier: [49.75, 6.64],
+  Köln: [50.94, 6.96],
+};
 const TAGS = ['silber', 'bronze', 'gold', 'antik', 'mittelalter'];
 // Terms the search flows pick from: common, rare, and one that matches nothing.
 export const SEARCH_TERMS = ['Denar', 'Wien', 'silber', 'Dukat 42', 'zzqx'];
@@ -24,19 +32,22 @@ export const SEARCH_TERMS = ['Denar', 'Wien', 'silber', 'Dukat 42', 'zzqx'];
 // Two paths per row, so one page stays within Storage's 1,000 prefixes per delete.
 const PHOTO_PAGE = 500;
 
-/** `count` items newest-first, a minute apart, with the links that file them into one category. */
-function itemRows(count, categoryId, now) {
+/** `count` items newest-first, a minute apart, with the links that file them into one category; nine in ten carry their place's coordinates, as a picked suggestion does. */
+function itemRows(count, categoryId, now, nouns) {
   const items = [];
   const links = [];
   for (let n = 0; n < count; n++) {
     const id = crypto.randomUUID();
     const createdAt = new Date(now - n * 60000).toISOString();
     const place = PLACES[n % PLACES.length];
+    const [lat, lng] = n % 10 === 9 ? [null, null] : COORDS[place];
     items.push({
       id,
-      title: `${NOUNS[n % NOUNS.length]} ${n}`,
+      title: `${nouns[n % nouns.length]} ${n}`,
       description: `Probe ${n} aus ${place}`,
       place,
+      place_lat: lat,
+      place_lng: lng,
       tags: [TAGS[n % TAGS.length], TAGS[(n + 2) % TAGS.length]],
       created_at: createdAt,
     });
@@ -45,8 +56,9 @@ function itemRows(count, categoryId, now) {
   return { items, links };
 }
 
-function fillCategory(session, categoryId, count) {
-  const { items, links } = itemRows(count, categoryId, Date.now());
+/** Titles cycle through `nouns`, so one collector's word can be made rare in their own collection and common in everyone else's. */
+export function fillCategory(session, categoryId, count, nouns = NOUNS) {
+  const { items, links } = itemRows(count, categoryId, Date.now(), nouns);
   for (let i = 0; i < count; i += SEED_BATCH) {
     insertRows(session, 'items', items.slice(i, i + SEED_BATCH));
     insertRows(session, 'item_categories', links.slice(i, i + SEED_BATCH));
@@ -107,7 +119,7 @@ export function setup() {
 }
 
 // Storage objects before rows, never after (CLAUDE.md); items cascade their photographs and links, categories their shares.
-function clearAccount(session) {
+export function clearAccount(session) {
   for (let offset = 0; ; offset += PHOTO_PAGE) {
     const rows = listImagePaths(session, offset, PHOTO_PAGE);
     if (rows.length === 0) break;

@@ -132,25 +132,35 @@ select throws_ok(
   'the 1,001st share is refused, in another category too'
 );
 
--- Links: 10 categories per entry.
+-- Links: an entry belongs to one collection (0020).
 insert into public.items (title) values ('Linked entry')
 returning id as linked_item_id \gset
 select ok(
   not pg_temp.raises(format(
-    'insert into public.item_categories (item_id, category_id) select %L, c.id from public.categories c where c.name in (%s)',
-    :'linked_item_id'::uuid,
-    (select string_agg(quote_literal('Category ' || g), ', ') from generate_series(1, 10) g)
+    'insert into public.item_categories (item_id, category_id) select %L, c.id from public.categories c where c.name = ''Category 1''',
+    :'linked_item_id'::uuid
   )),
-  'an entry may sit in 10 categories'
+  'an entry may sit in one collection'
 );
 select throws_ok(
   format(
-    'insert into public.item_categories (item_id, category_id) select %L, c.id from public.categories c where c.name = ''Category 11''',
+    'insert into public.item_categories (item_id, category_id) select %L, c.id from public.categories c where c.name = ''Category 2''',
     :'linked_item_id'::uuid
   ),
   'PT507',
-  'category link quota of 10 per entry reached',
-  'an 11th category for the same entry is refused'
+  'an entry belongs to one collection',
+  'a second collection for the same entry is refused'
+);
+insert into public.items (title) values ('Linked twice at once')
+returning id as twice_item_id \gset
+select throws_ok(
+  format(
+    'insert into public.item_categories (item_id, category_id) select %L, c.id from public.categories c where c.name in (''Category 3'', ''Category 4'')',
+    :'twice_item_id'::uuid
+  ),
+  'PT507',
+  'an entry belongs to one collection',
+  'so is filing a new entry into two collections in one statement'
 );
 
 -- Text: each column's ceiling holds, and the value one past it is refused.
