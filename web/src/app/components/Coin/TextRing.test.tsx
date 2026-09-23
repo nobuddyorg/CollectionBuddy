@@ -1,12 +1,21 @@
 // @vitest-environment jsdom
 import { render } from '@testing-library/react';
+import type React from 'react';
 import { describe, expect, it } from 'vitest';
 
 import { TextRing } from './TextRing';
 
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+
+// A bare <text> at the document root is created in the HTML namespace, not SVG.
+function renderInSvg(ui: React.ReactElement) {
+  const svg = document.createElementNS(SVG_NAMESPACE, 'svg');
+  return render(ui, { container: document.body.appendChild(svg) });
+}
+
 describe('TextRing', () => {
   it('renders the text along a textPath referencing the given rim id', () => {
-    const { container } = render(
+    const { container } = renderInSvg(
       <TextRing
         rimId="rim-1"
         text="Hello"
@@ -20,10 +29,11 @@ describe('TextRing', () => {
     expect(textPath).toHaveAttribute('href', '#rim-1');
     expect(textPath).toHaveTextContent('Hello');
     expect(container.querySelector('text')).toHaveAttribute('opacity', '0.5');
+    expect(textPath?.namespaceURI).toBe(SVG_NAMESPACE);
   });
 
   it('fits the text to exactly one turn of the rim', () => {
-    const { container } = render(
+    const { container } = renderInSvg(
       <TextRing
         rimId="rim-1"
         text="Hello"
@@ -44,7 +54,7 @@ describe('TextRing', () => {
   });
 
   it('defaults to the rim radius the coin actually draws', () => {
-    const { container } = render(
+    const { container } = renderInSvg(
       <TextRing
         rimId="rim-1"
         text="Hello"
