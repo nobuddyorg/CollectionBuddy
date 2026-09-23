@@ -27,7 +27,7 @@ import { labelClasses } from '../ui/labelClasses';
 import { MAX_CATEGORY_NAME_LENGTH } from '../../lib/textLimits';
 
 type Props = {
-  selectedCat: string | null;
+  selectedCategoryId: string | null;
   onSelect: (id: string | null) => void;
   categories: UseCategories;
   userId: string | null;
@@ -36,7 +36,7 @@ type Props = {
 };
 
 export default function CategorySelect({
-  selectedCat: selectedCategoryId,
+  selectedCategoryId,
   onSelect,
   categories,
   userId,
@@ -44,7 +44,7 @@ export default function CategorySelect({
 }: Props) {
   const { t } = useI18n();
   const {
-    cats: categoryList,
+    categories: categoryList,
     isLoading,
     isCreating,
     isDeleting,

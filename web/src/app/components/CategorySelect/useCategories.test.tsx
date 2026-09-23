@@ -241,7 +241,7 @@ describe('useCategories renameCategory', () => {
     });
 
     expect(renamed).toBe(true);
-    expect(result.current.cats).toEqual([
+    expect(result.current.categories).toEqual([
       { id: 'cat-a', name: 'Renamed A', user_id: 'owner-1' },
       CAT_B,
     ]);

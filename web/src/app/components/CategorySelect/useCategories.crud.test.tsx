@@ -69,7 +69,7 @@ describe('useCategories', () => {
       });
 
       expect(result.current.isLoading).toBe(false);
-      expect(result.current.cats).toEqual([COINS, STAMPS]);
+      expect(result.current.categories).toEqual([COINS, STAMPS]);
     });
 
     it('falls back to an empty list when the server returns no rows', async () => {
@@ -83,7 +83,7 @@ describe('useCategories', () => {
         await expect(result.current.reload()).resolves.toEqual([]);
       });
 
-      expect(result.current.cats).toEqual([]);
+      expect(result.current.categories).toEqual([]);
     });
 
     it('reports a failed listing and leaves the strip empty', async () => {
@@ -101,7 +101,7 @@ describe('useCategories', () => {
       });
 
       expect(await screen.findByRole('alert')).toBeVisible();
-      expect(result.current.cats).toEqual([]);
+      expect(result.current.categories).toEqual([]);
       expect(result.current.isLoading).toBe(false);
       consoleError.mockRestore();
     });
@@ -128,7 +128,7 @@ describe('useCategories', () => {
         releaseFirst({ data: [COINS], error: null });
       });
 
-      expect(result.current.cats).toEqual([STAMPS]);
+      expect(result.current.categories).toEqual([STAMPS]);
     });
 
     it('logs but does not toast a superseded request that errors', async () => {
@@ -157,7 +157,7 @@ describe('useCategories', () => {
 
       expect(consoleError).toHaveBeenCalledWith(expect.any(Error));
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-      expect(result.current.cats).toEqual([STAMPS]);
+      expect(result.current.categories).toEqual([STAMPS]);
       consoleError.mockRestore();
     });
   });
@@ -244,7 +244,7 @@ describe('useCategories', () => {
       });
 
       expect(renameCategory).toHaveBeenCalledWith('cat-1', 'coins & medals');
-      expect(result.current.cats[0]?.name).toBe('Coins & Medals');
+      expect(result.current.categories[0]?.name).toBe('Coins & Medals');
       expect(await screen.findByRole('status')).toBeVisible();
     });
 
@@ -274,7 +274,7 @@ describe('useCategories', () => {
       });
 
       expect(await screen.findByRole('alert')).toBeVisible();
-      expect(result.current.cats[0]?.name).toBe('Coins');
+      expect(result.current.categories[0]?.name).toBe('Coins');
     });
 
     it('leaves the strip alone when the rename answers with no row', async () => {
@@ -290,7 +290,7 @@ describe('useCategories', () => {
         ).resolves.toBe(true);
       });
 
-      expect(result.current.cats).toEqual([COINS, STAMPS]);
+      expect(result.current.categories).toEqual([COINS, STAMPS]);
     });
   });
 
@@ -302,10 +302,12 @@ describe('useCategories', () => {
       act(() => {
         restore = result.current.optimisticRemove('cat-1');
       });
-      expect(result.current.cats).toEqual([STAMPS]);
+      expect(result.current.categories).toEqual([STAMPS]);
 
       act(() => restore?.());
-      await waitFor(() => expect(result.current.cats).toEqual([COINS, STAMPS]));
+      await waitFor(() =>
+        expect(result.current.categories).toEqual([COINS, STAMPS]),
+      );
     });
 
     it('answers with nothing for a category that is already gone', async () => {
@@ -315,7 +317,7 @@ describe('useCategories', () => {
         expect(result.current.optimisticRemove('cat-nope')).toBeNull();
       });
 
-      expect(result.current.cats).toEqual([COINS, STAMPS]);
+      expect(result.current.categories).toEqual([COINS, STAMPS]);
     });
   });
 });

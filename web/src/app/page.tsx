@@ -43,8 +43,9 @@ export default function Page() {
   const headerUser = { ...user, email: user.email ?? '' };
 
   const selectedCategory =
-    categories.cats.find((category) => category.id === selectedCategoryId) ??
-    null;
+    categories.categories.find(
+      (category) => category.id === selectedCategoryId,
+    ) ?? null;
   // UX only, RLS decides: owner or an editor grant; a viewer grant or none falls through to false.
   const canEditSelected =
     !!selectedCategory &&
@@ -72,7 +73,7 @@ export default function Page() {
         className="mx-auto max-w-6xl px-4 py-5 sm:py-8 space-y-5 sm:space-y-7"
       >
         <CategorySelect
-          selectedCat={selectedCategoryId}
+          selectedCategoryId={selectedCategoryId}
           onSelect={selectCategory}
           categories={categories}
           userId={userId ?? null}

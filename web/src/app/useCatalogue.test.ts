@@ -25,7 +25,7 @@ function categoriesState(
   overrides: Partial<UseCategories> = {},
 ): UseCategories {
   return {
-    cats: categories,
+    categories: categories,
     isLoading: false,
     isCreating: false,
     isDeleting: false,

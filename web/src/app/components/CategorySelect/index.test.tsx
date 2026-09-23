@@ -80,7 +80,7 @@ const CATEGORIES = [
 
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   return {
-    cats: CATEGORIES,
+    categories: CATEGORIES,
     isLoading: false,
     isCreating: false,
     isDeleting: false,
@@ -103,7 +103,7 @@ function renderSelect(
       <ToastProvider>
         <ConfirmProvider>
           <CategorySelect
-            selectedCat="a"
+            selectedCategoryId="a"
             onSelect={onSelect}
             categories={categories()}
             userId="owner-1"
@@ -191,8 +191,8 @@ describe('CategorySelect', () => {
     expect(screen.getByLabelText('Rename')).toHaveAttribute('maxlength', '200');
   });
 
-  it('shows nothing selected when selectedCat names a category not in the list', () => {
-    renderSelect({ selectedCat: 'not-a-real-id' });
+  it('shows nothing selected when selectedCategoryId names a category not in the list', () => {
+    renderSelect({ selectedCategoryId: 'not-a-real-id' });
     expect(screen.queryByText('None selected')).toBeInTheDocument();
   });
 
@@ -265,7 +265,7 @@ describe('CategorySelect', () => {
   });
 
   it('holds the header when nothing is selected', () => {
-    renderSelect({ selectedCat: null });
+    renderSelect({ selectedCategoryId: null });
     expect(heading()).toBeVisible();
     expect(headerName()).toHaveTextContent('None selected');
     expect(

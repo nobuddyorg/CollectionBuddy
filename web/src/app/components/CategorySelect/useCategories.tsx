@@ -238,7 +238,7 @@ export function useCategories() {
   );
 
   return {
-    cats: categories,
+    categories,
     isLoading,
     isCreating,
     isDeleting,

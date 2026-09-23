@@ -81,7 +81,7 @@ const CATEGORIES = [
 
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   return {
-    cats: CATEGORIES,
+    categories: CATEGORIES,
     isLoading: false,
     isCreating: false,
     isDeleting: false,
@@ -104,7 +104,7 @@ function renderSelect(
       <ToastProvider>
         <ConfirmProvider>
           <CategorySelect
-            selectedCat="a"
+            selectedCategoryId="a"
             onSelect={onSelect}
             categories={categories()}
             userId="owner-1"
@@ -132,7 +132,7 @@ describe('CategorySelect with a shared category', () => {
   ];
 
   it('marks the shared tab, but not one the viewer owns', async () => {
-    renderSelect({ categories: categories({ cats: sharedCategories }) });
+    renderSelect({ categories: categories({ categories: sharedCategories }) });
     await userEvent.click(
       screen.getByRole('button', { name: 'Open collection' }),
     );
@@ -149,7 +149,7 @@ describe('CategorySelect with a shared category', () => {
   });
 
   it('shows the name disabled rather than offering to rename it', async () => {
-    renderSelect({ categories: categories({ cats: sharedCategories }) });
+    renderSelect({ categories: categories({ categories: sharedCategories }) });
     await userEvent.click(
       screen.getByRole('button', { name: 'Open collection' }),
     );
@@ -161,7 +161,7 @@ describe('CategorySelect with a shared category', () => {
   });
 
   it('does not offer sharing controls for a category the viewer does not own', async () => {
-    renderSelect({ categories: categories({ cats: sharedCategories }) });
+    renderSelect({ categories: categories({ categories: sharedCategories }) });
     await userEvent.click(
       screen.getByRole('button', { name: 'Open collection' }),
     );
@@ -172,7 +172,7 @@ describe('CategorySelect with a shared category', () => {
 
   // exportCategory() builds storage paths from the caller's uid, which is wrong for a grantee.
   it('disables export rather than offering a broken one', async () => {
-    renderSelect({ categories: categories({ cats: sharedCategories }) });
+    renderSelect({ categories: categories({ categories: sharedCategories }) });
     await userEvent.click(
       screen.getByRole('button', { name: 'Open collection' }),
     );
@@ -198,7 +198,7 @@ describe('CategorySelect with a shared category', () => {
       }),
     );
     const { onSelect } = renderSelect({
-      categories: categories({ cats: sharedCategories, deleteCategory }),
+      categories: categories({ categories: sharedCategories, deleteCategory }),
     });
     await userEvent.click(
       screen.getByRole('button', { name: 'Open collection' }),

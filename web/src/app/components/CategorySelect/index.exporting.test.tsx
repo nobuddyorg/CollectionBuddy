@@ -80,7 +80,7 @@ const CATEGORIES = [
 
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   return {
-    cats: CATEGORIES,
+    categories: CATEGORIES,
     isLoading: false,
     isCreating: false,
     isDeleting: false,
@@ -103,7 +103,7 @@ function renderSelect(
       <ToastProvider>
         <ConfirmProvider>
           <CategorySelect
-            selectedCat="a"
+            selectedCategoryId="a"
             onSelect={onSelect}
             categories={categories()}
             userId="owner-1"
@@ -195,7 +195,7 @@ describe('CategorySelect export', () => {
   });
 
   it('offers no export when no category is selected', async () => {
-    renderSelect({ selectedCat: null });
+    renderSelect({ selectedCategoryId: null });
     expect(
       screen.queryByRole('button', { name: 'Export' }),
     ).not.toBeInTheDocument();

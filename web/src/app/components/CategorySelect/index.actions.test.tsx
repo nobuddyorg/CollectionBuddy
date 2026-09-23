@@ -33,7 +33,7 @@ const CATEGORIES = [
 
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   return {
-    cats: CATEGORIES,
+    categories: CATEGORIES,
     isLoading: false,
     isCreating: false,
     isDeleting: false,
@@ -56,7 +56,7 @@ function renderSelect(
       <ToastProvider>
         <ConfirmProvider>
           <CategorySelect
-            selectedCat="a"
+            selectedCategoryId="a"
             onSelect={onSelect}
             categories={categories()}
             userId="owner-1"
@@ -241,7 +241,7 @@ describe('the category panel', () => {
   });
 
   it('follows a selection that changes underneath it', async () => {
-    const { view } = renderSelect({ selectedCat: null });
+    const { view } = renderSelect({ selectedCategoryId: null });
     expect(screen.getByLabelText('New collection')).toBeVisible();
 
     view.rerender(
@@ -249,7 +249,7 @@ describe('the category panel', () => {
         <ToastProvider>
           <ConfirmProvider>
             <CategorySelect
-              selectedCat="a"
+              selectedCategoryId="a"
               onSelect={vi.fn()}
               categories={categories()}
               userId="owner-1"

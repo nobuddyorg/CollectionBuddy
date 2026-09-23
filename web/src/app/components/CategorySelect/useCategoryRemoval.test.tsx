@@ -23,7 +23,7 @@ const CATEGORIES: Category[] = [
 
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   return {
-    cats: CATEGORIES,
+    categories: CATEGORIES,
     isLoading: false,
     isCreating: false,
     isDeleting: false,

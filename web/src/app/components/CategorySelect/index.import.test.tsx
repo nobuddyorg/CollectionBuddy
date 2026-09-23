@@ -80,7 +80,7 @@ const CATEGORIES = [
 
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   return {
-    cats: CATEGORIES,
+    categories: CATEGORIES,
     isLoading: false,
     isCreating: false,
     isDeleting: false,
@@ -103,7 +103,7 @@ function renderSelect(
       <ToastProvider>
         <ConfirmProvider>
           <CategorySelect
-            selectedCat="a"
+            selectedCategoryId="a"
             onSelect={onSelect}
             categories={categories()}
             userId="owner-1"
@@ -126,7 +126,7 @@ describe('CategorySelect import', () => {
 
   it('offers import independently of a category being selected', async () => {
     // The panel starts expanded when nothing is selected, so there is no toggle to click.
-    renderSelect({ selectedCat: null });
+    renderSelect({ selectedCategoryId: null });
 
     const importButton = screen.getByRole('button', { name: 'Import' });
     expect(importButton).toBeVisible();

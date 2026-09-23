@@ -267,7 +267,7 @@ describe('useCategories deleteCategory image cleanup', () => {
     expect(listImagePathsForItems).toHaveBeenCalledWith(['i1', 'i2']);
     expect(removeImageObjects).not.toHaveBeenCalled();
     // Failure restores the row rather than leaving it hidden.
-    expect(result.current.cats).toEqual([CAT_1]);
+    expect(result.current.categories).toEqual([CAT_1]);
     expect(consoleError).toHaveBeenCalledWith(
       'delete category',
       expect.objectContaining({ message: 'offline' }),

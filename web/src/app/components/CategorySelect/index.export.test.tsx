@@ -25,7 +25,7 @@ vi.mock('./useShares', () => ({
 // The real hook: with no session, exportCategory rejects before any Supabase call.
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   return {
-    cats: [{ id: 'a', name: 'Coins', user_id: 'owner-1' }],
+    categories: [{ id: 'a', name: 'Coins', user_id: 'owner-1' }],
     isLoading: false,
     isCreating: false,
     isDeleting: false,
@@ -45,7 +45,7 @@ function renderSelect() {
       <ToastProvider>
         <ConfirmProvider>
           <CategorySelect
-            selectedCat="a"
+            selectedCategoryId="a"
             onSelect={() => {}}
             categories={categories()}
             userId="owner-1"

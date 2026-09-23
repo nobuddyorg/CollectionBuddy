@@ -107,7 +107,7 @@ describe('useCategories deleteCategory orphan detection', () => {
 
     await screen.findByRole('alert');
     expect(deleteCategoryRow).not.toHaveBeenCalled();
-    expect(result.current.cats).toEqual([CAT_1]);
+    expect(result.current.categories).toEqual([CAT_1]);
     expect(consoleError).toHaveBeenCalledWith(
       'delete category',
       expect.objectContaining({
@@ -220,7 +220,7 @@ describe('useCategories deleteCategory orphan detection', () => {
     expect(deleteCategoryRow).not.toHaveBeenCalled();
     expect(listImagePathsForItems).not.toHaveBeenCalled();
     expect(removeImageObjects).not.toHaveBeenCalled();
-    expect(result.current.cats).toEqual([CAT_1]);
+    expect(result.current.categories).toEqual([CAT_1]);
     expect(consoleError).toHaveBeenCalledWith(
       'delete category',
       expect.objectContaining({

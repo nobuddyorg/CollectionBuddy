@@ -97,7 +97,7 @@ describe('useCategories deleteCategory', () => {
     });
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(result.current.cats).toEqual([CAT_1]);
+    expect(result.current.categories).toEqual([CAT_1]);
   });
 
   it('does nothing for a category that is no longer in the list', async () => {
@@ -111,7 +111,7 @@ describe('useCategories deleteCategory', () => {
     });
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(result.current.cats).toEqual([CAT_1]);
+    expect(result.current.categories).toEqual([CAT_1]);
   });
 
   it('ignores a second delete of a different category while one is still deferred', async () => {
@@ -141,7 +141,7 @@ describe('useCategories deleteCategory', () => {
       result.current.deleteCategory('cat-2');
     });
 
-    expect(result.current.cats).toEqual([CAT_2]);
+    expect(result.current.categories).toEqual([CAT_2]);
     expect(deleteCategoryRow).toHaveBeenCalledTimes(1);
     await act(async () => {
       release?.();
@@ -162,7 +162,7 @@ describe('useCategories deleteCategory', () => {
     await screen.findByRole('status');
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
 
-    expect(result.current.cats).toEqual([CAT_1]);
+    expect(result.current.categories).toEqual([CAT_1]);
     expect(deleteCategoryRow).not.toHaveBeenCalled();
   });
 
@@ -181,7 +181,7 @@ describe('useCategories deleteCategory', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
 
     expect(onRestore).toHaveBeenCalledTimes(1);
-    expect(result.current.cats).toEqual([CAT_1]);
+    expect(result.current.categories).toEqual([CAT_1]);
   });
 
   it('clears isDeleting once a delete settles, letting the next one proceed', async () => {
