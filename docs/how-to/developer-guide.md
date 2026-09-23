@@ -297,7 +297,15 @@ names exists at the size it claims.
 ## Change the database schema
 
 1. Add `supabase/migrations/NNNN_description.sql`, numbered after the highest
-   existing file. Never edit an existing migration.
+   existing file. Never edit an existing migration. A file that takes a lock
+   starts with `set local lock_timeout` and `set local statement_timeout`
+   after its `begin;`, so it fails fast instead of queueing every read behind
+   it; the Squawk hook enforces that and the other lock and rewrite hazards.
+   [`.squawk.toml`](../../.squawk.toml) turns off three rules:
+   `require-concurrent-index-creation` and `-deletion`, since `CONCURRENTLY`
+   cannot run inside the transaction every file is, and `prefer-robust-stmts`,
+   since `IF NOT EXISTS` hides typos in files CI applies from scratch. The
+   hook skips `0001`–`0009`, applied before it existed.
 2. Apply it: `supabase db reset` (re-runs every migration from scratch).
 3. Regenerate `web/src/app/data/database.types.ts`:
    `supabase gen types typescript --local`. CI fails if it drifts.
