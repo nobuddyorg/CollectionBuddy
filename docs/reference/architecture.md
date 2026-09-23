@@ -43,7 +43,7 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 All policies are in [`0006_policies.sql`](../../supabase/migrations/0006_policies.sql), with the read policies rewritten by `0017`, built from an owner check and `security invoker` predicates:
 
 - `user_id = (select auth.uid())` — the scalar subquery makes the planner evaluate it once per query, not per row.
-- `category_id in (select granted_category_ids())` — the categories an active `category_shares` grant to the caller's email opens, at either role, read once per statement. `has_category_read_access(cat_id)` asks the same set for one category.
+- `category_id = any(array(select granted_category_ids()))` — the categories an active `category_shares` grant to the caller's email opens, at either role, read once per statement as an initPlan. `has_category_read_access(cat_id)` asks the same set for one category.
 - `has_category_write_access(cat_id)` — category ownership, **or** an active grant at role `editor`.
 
 Ownership is inside the write predicate and deliberately outside the read one; every read policy adds its own owner branch instead. Folding ownership into the read predicate would let a category's owner see every item linked into it, including ones an editor added that the owner was never granted.

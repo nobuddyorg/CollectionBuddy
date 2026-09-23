@@ -80,18 +80,6 @@ begin
 end;
 $$;
 
-create or replace function pg_temp.plan_mentions(p_sql text, p_fragment text, p_description text)
-returns text
-language plpgsql
-as $$
-begin
-  if strpos(pg_temp.plan_text(p_sql), p_fragment) > 0 then
-    return ok(true, p_description);
-  end if;
-  return ok(false, p_description) || e'\n' || diag(pg_temp.plan_text(p_sql));
-end;
-$$;
-
 create or replace function pg_temp.plan_never_mentions(p_sql text, p_fragment text, p_description text)
 returns text
 language plpgsql
@@ -304,9 +292,9 @@ select pg_temp.plan_never_mentions(
 from unnest(array[
   'public.categories', 'public.items', 'public.item_categories', 'public.images', 'storage.objects'
 ]) as relation;
-select pg_temp.plan_mentions(
-  format('select * from %s', relation), 'hashed SubPlan',
-  'a grantee''s read of ' || relation || ' takes its grants once, as a hashed set'
+select pg_temp.plan_never_mentions(
+  format('select * from %s', relation), 'SubPlan',
+  'a grantee''s read of ' || relation || ' takes its grants once, as an initPlan'
 )
 from unnest(array['public.categories', 'public.item_categories']) as relation;
 select pg_temp.plan_uses_index(
