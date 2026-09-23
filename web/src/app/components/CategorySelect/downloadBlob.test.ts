@@ -5,7 +5,7 @@ import type { Mock } from 'vitest';
 import { downloadBlob } from './downloadBlob';
 
 describe('downloadBlob', () => {
-  let createObjectURL: Mock<(obj: Blob) => string>;
+  let createObjectURL: Mock<(blob: Blob) => string>;
   let revokeObjectURL: Mock<(url: string) => void>;
 
   beforeEach(() => {

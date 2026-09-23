@@ -131,8 +131,7 @@ describe('ExportButton', () => {
       />,
     );
     const button = screen.getByRole('button', { name: 'Export' });
-    // Label stays visible while exporting rather than being replaced by a
-    // spinner -- a run that can take minutes shouldn't lose its name.
+    // The label stays while exporting: a run that can take minutes must not lose its name.
     expect(button).toHaveTextContent('Export');
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button).toBeDisabled();

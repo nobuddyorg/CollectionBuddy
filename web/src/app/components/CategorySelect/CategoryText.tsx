@@ -1,8 +1,7 @@
 'use client';
 
 import { labelClasses } from '../ui/labelClasses';
-// Rendered in both panel states so the heading doesn't move when the panel
-// toggles open or closed.
+
 export function CategoryText({
   title,
   name,
@@ -13,8 +12,7 @@ export function CategoryText({
   name: string;
   /** Nothing is selected yet: the line stands in for a name it hasn't got. */
   placeholder?: boolean;
-  /** The catalogue hasn't resolved yet, so a neutral bar stands in until the
-   *  real name (or "none") is known. */
+  /** The catalogue hasn't resolved yet: a neutral bar stands in for the name. */
   loading?: boolean;
 }) {
   return (
@@ -29,8 +27,6 @@ export function CategoryText({
         />
       ) : (
         <div
-          // data-testid for the e2e suite: the only element still showing
-          // the collection name once the strip has collapsed.
           data-testid="selected-category"
           className={`font-display text-2xl sm:text-3xl truncate ${
             placeholder ? 'text-muted-foreground' : 'text-foreground'

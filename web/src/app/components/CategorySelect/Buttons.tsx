@@ -17,9 +17,7 @@ export function AddButton({
   label: string;
   className?: string;
 }) {
-  // Icon-only: a spelled-out label on both the rename and add rows crowded
-  // the field down to a sliver on a phone-width panel. The name is still
-  // said, via aria-label/title.
+  // Icon-only: a text label crowded the field to a sliver at phone width; aria-label says the name.
   return (
     <IconButton
       variant="primary"
@@ -78,8 +76,7 @@ export function DeleteButtonWithLabel({
   return (
     <IconButton
       variant="destructive"
-      // Drawn to the same height as the field and rename button it stands
-      // beside.
+      // Same height as the field and rename button beside it.
       size="xl"
       data-testid="delete-category"
       onClick={onClick}
@@ -93,9 +90,6 @@ export function DeleteButtonWithLabel({
   );
 }
 
-// Shared shape for every circular, icon-only, muted-until-hover button below
-// (collapse/expand the panel, cancel a running export/import). Each wrapper
-// keeps its own name and testid so call sites read the same as before.
 function RoundIconButton({
   testId,
   onClick,
@@ -126,22 +120,17 @@ function RoundIconButton({
         icon={icon}
         className={iconClassName}
         aria-hidden="true"
-        // Only spread when set: Icon's `{...props}` sits after each icon's
-        // own default `strokeLinecap="round"`, so an *explicit* `undefined`
-        // here would override that default to unset rather than leaving it
-        // alone the way simply not passing the prop does.
+        // Spread only when set: an explicit undefined would override Icon's own strokeLinecap default.
         {...(strokeLinecap ? { strokeLinecap } : {})}
       />
     </button>
   );
 }
 
-// Both size down at `sm`, unlike the cancel buttons below: this pair sits in
-// the panel's header, at home beside the larger touch targets around it.
+// Sizes down at sm, unlike CANCEL_BOX: the header's neighbours do too.
 const HEADER_TOGGLE_BOX = 'w-11 h-11 sm:w-9 sm:h-9';
 
-// Pairs with ExpandButton: drawn to the same box so the toggle's position
-// doesn't move between open and closed.
+// Same box as ExpandButton, so the toggle does not move between open and closed.
 export function CollapseButton({
   onClick,
   label,
@@ -151,15 +140,13 @@ export function CollapseButton({
 }) {
   return (
     <RoundIconButton
-      // Named for the end-to-end suite: an icon button whose only label is
-      // translated.
       testId="collapse-categories"
       onClick={onClick}
       label={label}
       icon={IconType.Close}
       iconClassName="w-5 h-5"
       boxClassName={HEADER_TOGGLE_BOX}
-      // Trailing override: Close's own default draws a square cap.
+      // Close's own default draws a square cap.
       strokeLinecap="round"
     />
   );
@@ -184,13 +171,9 @@ export function ExpandButton({
   );
 }
 
-// Fixed size, not responsive like the header toggle above: these sit inline
-// with an in-progress row's status text, which never gets the header's own
-// room to grow at `sm`.
+// Fixed, unlike HEADER_TOGGLE_BOX: sits inline with a status line that has no room to grow at sm.
 const CANCEL_BOX = 'w-9 h-9';
 
-// Shown only while an export is running -- the one action available for a
-// run that can take minutes.
 export function CancelExportButton({
   onClick,
   label,
@@ -231,8 +214,6 @@ export function CancelImportButton({
   );
 }
 
-// Shared shape for ExportButton/ImportButton: a full-width, labeled button
-// with an icon that swaps for a spinner while busy.
 function LabeledActionButton({
   testId,
   onClick,
@@ -268,8 +249,6 @@ function LabeledActionButton({
   );
 }
 
-// Full width, under its own rule, away from Delete: a thumb slip between
-// Export and Delete would be destructive, not just inconvenient.
 export function ExportButton({
   onClick,
   disabled,

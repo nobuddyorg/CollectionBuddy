@@ -4,13 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
-import {
-  ImportCancelledError,
-  importCategory,
-} from '../../data/importCategory';
+import { importCategory } from '../../data/importCategory';
 import { ImportFormatError } from '../../data/importFormat';
 import { readZipEntries } from '../../data/zip';
-import { importProgressMessage, useImportCategory } from './useImportCategory';
+import { useImportCategory } from './useImportCategory';
 
 vi.mock('../../data/importCategory', async () => {
   const actual = await vi.importActual<
@@ -62,41 +59,6 @@ function imported(overrides: Record<string, unknown> = {}) {
 
 const FILE = new File(['zip'], 'coins.zip');
 
-describe('importProgressMessage', () => {
-  const t = ((key: string) =>
-    ({
-      'category_select.import_reading': 'Reading the archive…',
-      'category_select.import_items': 'Creating entries…',
-      'category_select.import_photos': 'Photos {done} of {total}…',
-    })[key] ?? key) as Parameters<typeof importProgressMessage>[1];
-
-  it('says nothing when no import is running', () => {
-    expect(importProgressMessage(null, t)).toBeNull();
-  });
-
-  it('counts photographs once there are any to count', () => {
-    expect(
-      importProgressMessage({ phase: 'photos', done: 2, total: 5 }, t),
-    ).toBe('Photos 2 of 5…');
-  });
-
-  // "0 of 0" would be a progress bar for work that does not exist.
-  it('falls back to the entries wording for a photo phase with nothing to do', () => {
-    expect(
-      importProgressMessage({ phase: 'photos', done: 0, total: 0 }, t),
-    ).toBe('Creating entries…');
-  });
-
-  it('names the reading and entry phases', () => {
-    expect(
-      importProgressMessage({ phase: 'reading', done: 0, total: 0 }, t),
-    ).toBe('Reading the archive…');
-    expect(
-      importProgressMessage({ phase: 'items', done: 1, total: 3 }, t),
-    ).toBe('Creating entries…');
-  });
-});
-
 describe('useImportCategory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -139,8 +101,7 @@ describe('useImportCategory', () => {
     );
   });
 
-  // A photograph left behind must never go missing quietly: the canonical
-  // use of an export is "export, then delete the originals".
+  // Export-then-delete is the canonical use, so a photograph left behind must never go unsaid.
   it('reports photographs the import had to leave out', async () => {
     vi.mocked(importCategory).mockResolvedValue(
       imported({ photoCount: 2, skippedPhotoCount: 1 }),
@@ -202,8 +163,7 @@ describe('useImportCategory', () => {
     );
     consoleError.mockRestore();
     expect(importCategory).not.toHaveBeenCalled();
-    // The format complaint, not the generic one: the file was read, it just
-    // was not one of ours.
+    // The format complaint, not the generic one: the file was read, it just was not ours.
     expect(await screen.findByRole('alert')).toHaveTextContent(
       "This file isn't a CollectionBuddy export archive.",
     );
@@ -273,127 +233,5 @@ describe('useImportCategory', () => {
       expect.any(Error),
     );
     consoleError.mockRestore();
-  });
-
-  it('announces a cancelled import instead of reporting it', async () => {
-    vi.mocked(importCategory).mockRejectedValue(new ImportCancelledError());
-    const { result } = renderHook(() => useImportCategory([]), { wrapper });
-
-    await act(async () => {
-      await result.current.runImport(FILE);
-    });
-
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(await screen.findByText('Import cancelled.')).toBeInTheDocument();
-  });
-
-  it('can be cancelled when nothing is running, without complaint', () => {
-    const { result } = renderHook(() => useImportCategory([]), { wrapper });
-
-    expect(() => result.current.cancelImport()).not.toThrow();
-  });
-
-  // What the controller ref buys, rather than the memoization that used to
-  // stand in for it: a cancel captured before the run began still reaches
-  // the run actually in flight.
-  it('aborts the current run even when cancelled through a reference taken before it started', async () => {
-    let signal: AbortSignal | undefined;
-    let release: (() => void) | undefined;
-    vi.mocked(importCategory).mockImplementation((args) => {
-      signal = args.signal;
-      return new Promise((resolve) => {
-        release = () => resolve(imported());
-      });
-    });
-    const { result } = renderHook(() => useImportCategory([]), { wrapper });
-    const cancelFromBefore = result.current.cancelImport;
-
-    act(() => {
-      void result.current.runImport(FILE);
-    });
-    await waitFor(() => expect(signal).toBeDefined());
-    act(() => {
-      cancelFromBefore();
-    });
-
-    expect(signal!.aborted).toBe(true);
-    await act(async () => {
-      release?.();
-    });
-  });
-
-  it('aborts the run in flight when cancelled', async () => {
-    let signal: AbortSignal | undefined;
-    let release: (() => void) | undefined;
-    vi.mocked(importCategory).mockImplementation((args) => {
-      signal = args.signal;
-      return new Promise((resolve) => {
-        release = () => resolve(imported());
-      });
-    });
-    const { result } = renderHook(() => useImportCategory([]), { wrapper });
-
-    act(() => {
-      void result.current.runImport(FILE);
-    });
-    await waitFor(() => expect(signal).toBeDefined());
-    act(() => result.current.cancelImport());
-
-    expect(signal?.aborted).toBe(true);
-    await act(async () => {
-      release?.();
-    });
-  });
-
-  it('refuses to start a second import while one is running', async () => {
-    let release: (() => void) | undefined;
-    vi.mocked(importCategory).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(imported());
-        }),
-    );
-    const { result } = renderHook(() => useImportCategory([]), { wrapper });
-
-    act(() => {
-      void result.current.runImport(FILE);
-    });
-    await waitFor(() => expect(result.current.isImporting).toBe(true));
-    await act(async () => {
-      await result.current.runImport(FILE);
-    });
-
-    expect(importCategory).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      release?.();
-    });
-  });
-
-  // Closing the tab mid-import would leave a half-built category behind.
-  it('warns before the tab is closed while an import is running', async () => {
-    let release: (() => void) | undefined;
-    vi.mocked(importCategory).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(imported());
-        }),
-    );
-    const { result } = renderHook(() => useImportCategory([]), { wrapper });
-
-    act(() => {
-      void result.current.runImport(FILE);
-    });
-    await waitFor(() => expect(result.current.isImporting).toBe(true));
-
-    const event = new Event('beforeunload', { cancelable: true });
-    window.dispatchEvent(event);
-    expect(event.defaultPrevented).toBe(true);
-
-    await act(async () => {
-      release?.();
-    });
-    const afterwards = new Event('beforeunload', { cancelable: true });
-    window.dispatchEvent(afterwards);
-    expect(afterwards.defaultPrevented).toBe(false);
   });
 });

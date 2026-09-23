@@ -5,9 +5,9 @@ import { MAX_CATEGORY_NAME_LENGTH } from '../../lib/textLimits';
 
 type Props = {
   name: string;
-  setName: (v: string) => void;
+  setName: (value: string) => void;
   createCategory: () => void;
-  setExpanded: (v: boolean) => void;
+  setExpanded: (value: boolean) => void;
 };
 export function CategoryInput({
   name,
@@ -22,14 +22,12 @@ export function CategoryInput({
       data-testid="new-category-input"
       value={name}
       maxLength={MAX_CATEGORY_NAME_LENGTH}
-      onChange={(e) => setName(e.target.value)}
+      onChange={(event) => setName(event.target.value)}
       placeholder={t('category_select.new_category')}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') createCategory();
-        if (e.key === 'Escape') {
-          // Matches the rename field above: first Escape clears the typed
-          // name; only a second Escape (nothing left to clear) collapses
-          // the panel.
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') createCategory();
+        if (event.key === 'Escape') {
+          // First Escape clears the name; a second one (nothing left to clear) collapses the panel.
           if (name !== '') {
             setName('');
           } else {
@@ -37,8 +35,6 @@ export function CategoryInput({
           }
         }
       }}
-      // Sized by its grid column, which it shares with the rename field
-      // above so the two come out the same width.
       className={fieldClasses('min-w-0')}
     />
   );

@@ -9,8 +9,7 @@ import { ToastProvider } from '../Toast/ToastProvider';
 import CategorySelect from './index';
 import type { UseCategories } from './useCategories';
 
-// Mocked to keep the panel's expand-on-open from firing a real, unmocked
-// Supabase call, the same way index.test.tsx does.
+// Mocked so the panel's expand-on-open never fires a real Supabase call.
 vi.mock('./useShares', () => ({
   useShares: vi.fn().mockReturnValue({
     shares: [],
@@ -23,12 +22,7 @@ vi.mock('./useShares', () => ({
   }),
 }));
 
-// index.test.tsx mocks useExportCategory away entirely, so the catch ->
-// toast.error -> reset path was never exercised. This is the one test that
-// runs the real hook: with no signed-in session, exportCategory rejects
-// before any Supabase/storage call, which is enough to cover that path
-// with zero new mocks.
-
+// The real hook: with no session, exportCategory rejects before any Supabase call.
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   return {
     cats: [{ id: 'a', name: 'Coins', user_id: 'owner-1' }],
@@ -64,8 +58,7 @@ function renderSelect() {
 
 describe('exporting with no session', () => {
   beforeEach(() => {
-    // Cleared, not assumed empty: `getSession()` resolves with no session
-    // (and the export fails) only if nothing is persisted under it.
+    // Cleared, not assumed empty: getSession() finds no session only if nothing is persisted.
     window.localStorage.clear();
     window.localStorage.setItem('lang', 'en');
   });

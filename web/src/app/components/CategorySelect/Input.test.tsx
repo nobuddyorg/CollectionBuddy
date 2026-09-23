@@ -47,8 +47,7 @@ describe('CategoryInput', () => {
     expect(props.setExpanded).not.toHaveBeenCalled();
   });
 
-  // Escape here matches the rename field above: first press clears the
-  // field, nothing more.
+  // Matches the rename field: the first Escape clears the field, nothing more.
   it('clears what was typed on the first Escape, without collapsing', async () => {
     const props = renderInput({ name: 'Stamps' });
     await userEvent.type(screen.getByRole('textbox'), '{Escape}');

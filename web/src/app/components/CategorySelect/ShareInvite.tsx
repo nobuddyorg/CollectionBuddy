@@ -11,20 +11,15 @@ import { labelClasses } from '../ui/labelClasses';
 import { MAX_EMAIL_LENGTH } from '../../lib/textLimits';
 import type { UseShares } from './useShares';
 
-// Local midnight would already be behind `now()` for most of the day
-// picked, tripping the category_shares_expiry_in_future check constraint on
-// a perfectly reasonable choice. End of day gives the whole picked date, as
-// "expires August 11" would suggest.
-function endOfDayIso(dateStr: string): string {
-  return new Date(`${dateStr}T23:59:59`).toISOString();
+// End of day, not midnight: midnight would trip category_shares_expiry_in_future for most of the day.
+function endOfDayIso(dateString: string): string {
+  return new Date(`${dateString}T23:59:59`).toISOString();
 }
 
-function todayDateStr(): string {
+function todayDateString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// A grant is always issued at the `viewer` role; promoting one to `editor`
-// happens from the list beside this, on a row that already exists.
 export function ShareInvite({ shares }: { shares: UseShares }) {
   const { t } = useI18n();
   const { isSharing, createShare } = shares;
@@ -32,17 +27,13 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
   const [expiryDate, setExpiryDate] = useState('');
   const expiryInputRef = useRef<HTMLInputElement>(null);
 
-  // Delegates to the native date picker rather than reimplementing one.
-  // `typeof el.showPicker === 'function'` guards against older Safari/
-  // Firefox and jsdom (which stubs the property, so an `in` check would
-  // still pass); falling back to focus() is what a click on the field
-  // would do anyway on those.
+  // typeof, not in: jsdom stubs showPicker as a non-function, and older Safari/Firefox lack it.
   const openDatePicker = useCallback(() => {
-    const el = expiryInputRef.current!;
-    if (typeof el.showPicker === 'function') {
-      el.showPicker();
+    const element = expiryInputRef.current!;
+    if (typeof element.showPicker === 'function') {
+      element.showPicker();
     } else {
-      el.focus();
+      element.focus();
     }
   }, []);
 
@@ -62,16 +53,7 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
       <label htmlFor="share-email" className={labelClasses()}>
         {t('category_select.share_invite_label')}
       </label>
-      {/* `<input type="date">` renders its text-and-icon cluster
-            completely differently per engine -- flush-right in Blink,
-            left-aligned and clipped in Gecko -- in ways CSS can't reach.
-            The real `<input>` is `sr-only`, driven by a button that opens
-            its picker via `showPicker()`, so the "Expires {date}" chip is
-            ours to size once and have it hold in every engine (`w-56` is
-            sized against German's longer phrasing). The date group and
-            Share button are `shrink-0`, so email's `sm:flex-1` only
-            claims what's left after them, uncapped so it isn't cramped on
-            wider containers. */}
+      {/* The date input is sr-only: engines render it too differently, so a button drives showPicker(). */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <input
           id="share-email"
@@ -79,9 +61,9 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
           type="email"
           value={email}
           maxLength={MAX_EMAIL_LENGTH}
-          onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void onShare();
+          onChange={(event) => setEmail(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') void onShare();
           }}
           placeholder={t('category_select.share_invite_placeholder')}
           className={fieldClasses('min-w-0 sm:flex-1')}
@@ -134,8 +116,8 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
             data-testid="share-expiry-input"
             type="date"
             value={expiryDate}
-            min={todayDateStr()}
-            onChange={(e) => setExpiryDate(e.target.value)}
+            min={todayDateString()}
+            onChange={(event) => setExpiryDate(event.target.value)}
             aria-label={t('category_select.share_expiry_label')}
             className="sr-only"
             tabIndex={-1}

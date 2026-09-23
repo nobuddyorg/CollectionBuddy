@@ -1,5 +1,4 @@
-/** Hands a finished archive to the browser as a download -- DOM plumbing
- * kept separate from `data/exportCategory.ts`. */
+/** Hands a finished archive to the browser as a download; DOM plumbing kept out of data/. */
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -8,7 +7,6 @@ export function downloadBlob(blob: Blob, filename: string): void {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  // Revoked next turn, not immediately: Safari has cancelled downloads
-  // whose object URL is released in the same tick as the triggering click.
+  // Revoked next tick: Safari cancels a download whose object URL is released in the click's tick.
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }

@@ -37,9 +37,9 @@ function wrapper({ children }: { children: React.ReactNode }) {
 const COINS = { id: 'cat-1', name: 'Coins', user_id: 'owner-1' };
 const STAMPS = { id: 'cat-2', name: 'Stamps', user_id: 'owner-1' };
 
-function lists(cats: (typeof COINS)[]) {
+function lists(categories: (typeof COINS)[]) {
   vi.mocked(listCategories).mockResolvedValue({
-    data: cats,
+    data: categories,
     error: null,
   } as never);
 }
@@ -106,8 +106,7 @@ describe('useCategories', () => {
       consoleError.mockRestore();
     });
 
-    // Every auth event reloads, with no guarantee the answers come back in
-    // the order they were asked for.
+    // Every auth event reloads, with no guarantee the answers come back in order.
     it('lets a newer listing win over one that resolves later', async () => {
       let releaseFirst: (value: unknown) => void = () => {};
       vi.mocked(listCategories)
@@ -230,8 +229,7 @@ describe('useCategories', () => {
   });
 
   describe('renameCategory', () => {
-    // The trigger normalises the name, so what lands in the strip is the
-    // row the database answered with, not the text that was typed.
+    // The trigger normalises the name, so the strip shows the row the database answered with.
     it('keeps the name the database returned, not the one sent', async () => {
       vi.mocked(renameCategory).mockResolvedValue({
         data: { id: 'cat-1', name: 'Coins & Medals', user_id: 'owner-1' },

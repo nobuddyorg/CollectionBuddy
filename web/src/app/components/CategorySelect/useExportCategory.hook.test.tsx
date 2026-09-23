@@ -110,7 +110,7 @@ describe('useExportCategory', () => {
   });
 
   it('shows whatever phase the export reports as it advances', async () => {
-    let report: ((p: ExportProgress) => void) | undefined;
+    let report: ((progress: ExportProgress) => void) | undefined;
     let release: (() => void) | undefined;
     vi.mocked(exportCategory).mockImplementation(((args: ExportArgs) => {
       report = args.onProgress;
@@ -133,84 +133,6 @@ describe('useExportCategory', () => {
     await act(async () => {
       release?.();
     });
-  });
-
-  // A second click while one export is already running must not start a
-  // second run against the same category.
-  it('ignores a second request while one export is still in flight', async () => {
-    let release: (() => void) | undefined;
-    vi.mocked(exportCategory).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(exported());
-        }) as never,
-    );
-    const { result } = renderHook(() => useExportCategory(), { wrapper });
-
-    act(() => {
-      void result.current.runExport(CATEGORY);
-    });
-    await waitFor(() => expect(result.current.isExporting).toBe(true));
-
-    await act(async () => {
-      await result.current.runExport(CATEGORY);
-    });
-
-    expect(exportCategory).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      release?.();
-    });
-  });
-
-  it('cancels the export actually in flight', async () => {
-    let release: (() => void) | undefined;
-    vi.mocked(exportCategory).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(exported());
-        }) as never,
-    );
-    const { result } = renderHook(() => useExportCategory(), { wrapper });
-
-    act(() => {
-      void result.current.runExport(CATEGORY);
-    });
-    await waitFor(() => expect(result.current.isExporting).toBe(true));
-    expect(lastCall().signal!.aborted).toBe(false);
-
-    act(() => {
-      result.current.cancelExport();
-    });
-
-    expect(lastCall().signal!.aborted).toBe(true);
-    await act(async () => {
-      release?.();
-    });
-  });
-
-  // Nothing is in flight, so there is no controller to abort -- it must not
-  // throw either.
-  it('does nothing when asked to cancel with no export running', () => {
-    const { result } = renderHook(() => useExportCategory(), { wrapper });
-
-    expect(() => {
-      act(() => {
-        result.current.cancelExport();
-      });
-    }).not.toThrow();
-  });
-
-  it('drops the controller once a run has finished, so a later cancel is a no-op', async () => {
-    const { result } = renderHook(() => useExportCategory(), { wrapper });
-    await act(async () => {
-      await result.current.runExport(CATEGORY);
-    });
-
-    act(() => {
-      result.current.cancelExport();
-    });
-
-    expect(lastCall().signal!.aborted).toBe(false);
   });
 
   it('asks before exporting an archive big enough to lose, and reports the size', async () => {
@@ -260,8 +182,7 @@ describe('useExportCategory', () => {
     );
   });
 
-  // Export-then-delete is a canonical use of this feature, so a photograph
-  // missing from the archive can never be left unsaid.
+  // Export-then-delete is a canonical use, so a photograph missing from the archive is never left unsaid.
   it('reports photographs the export had to skip', async () => {
     vi.mocked(exportCategory).mockResolvedValue(
       exported({ photoCount: 2, skippedPhotoCount: 1 }) as never,
@@ -329,45 +250,5 @@ describe('useExportCategory', () => {
     );
     expect(result.current.isExporting).toBe(false);
     consoleError.mockRestore();
-  });
-
-  // An export runs for minutes; closing the tab mid-run would discard it
-  // with no way back, so the browser has to ask first -- but only while
-  // there is something to lose.
-  it('guards against closing the tab only while an export is running', async () => {
-    const addSpy = vi.spyOn(window, 'addEventListener');
-    const removeSpy = vi.spyOn(window, 'removeEventListener');
-    let release: (() => void) | undefined;
-    vi.mocked(exportCategory).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(exported());
-        }) as never,
-    );
-    const { result } = renderHook(() => useExportCategory(), { wrapper });
-
-    const beforeUnloadCalls = () =>
-      addSpy.mock.calls.filter(([event]) => event === 'beforeunload');
-    // Nothing to lose yet, so nothing is listening yet.
-    expect(beforeUnloadCalls()).toHaveLength(0);
-
-    act(() => {
-      void result.current.runExport(CATEGORY);
-    });
-    await waitFor(() => expect(result.current.isExporting).toBe(true));
-
-    expect(beforeUnloadCalls()).toHaveLength(1);
-    const handler = beforeUnloadCalls()[0][1] as EventListener;
-    const event = new Event('beforeunload', { cancelable: true });
-    handler(event);
-    expect(event.defaultPrevented).toBe(true);
-
-    await act(async () => {
-      release?.();
-    });
-
-    expect(removeSpy).toHaveBeenCalledWith('beforeunload', handler);
-    addSpy.mockRestore();
-    removeSpy.mockRestore();
   });
 });

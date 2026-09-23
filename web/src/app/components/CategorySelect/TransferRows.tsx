@@ -52,9 +52,9 @@ export function ImportRow({
         data-testid="import-file-input"
         className="sr-only"
         aria-label={t('category_select.import')}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = '';
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
           if (file) onFile(file);
         }}
       />
@@ -74,9 +74,7 @@ export function ImportRow({
   );
 }
 
-/** Disabled, not absent, for a shared category: exportCategory() resolves
- *  the *caller's own* uid to build each item's storage prefix, which for a
- *  grantee is the wrong prefix entirely, not the owner's. */
+/** Disabled for a shared category: exportCategory() builds storage paths from the caller's uid, not the owner's. */
 export function ExportRow({
   isExporting,
   isShared,

@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
+import { countItemsForCategory } from '../../data/categories';
 import CategorySelect from './index';
 import type { UseCategories } from './useCategories';
 
@@ -25,19 +26,19 @@ vi.mock('./useShares', () => ({
 
 vi.mock('../../data/categories', () => ({ countItemsForCategory: vi.fn() }));
 
-const CATS = [
+const CATEGORIES = [
   { id: 'a', name: 'Coins', user_id: 'owner-1' },
   { id: 'b', name: 'Stamps', user_id: 'owner-1' },
 ];
 
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   return {
-    cats: CATS,
+    cats: CATEGORIES,
     isLoading: false,
     isCreating: false,
     isDeleting: false,
     isRenaming: false,
-    reload: vi.fn().mockResolvedValue(CATS),
+    reload: vi.fn().mockResolvedValue(CATEGORIES),
     createCategory: vi.fn().mockResolvedValue(null),
     renameCategory: vi.fn(),
     deleteCategory: vi.fn(),
@@ -115,8 +116,7 @@ describe('the category panel', () => {
       expect(renameCategory).toHaveBeenCalledWith('a', 'Münzen');
     });
 
-    // First Escape discards the edit; only a second one, with nothing left
-    // to discard, closes the panel.
+    // First Escape discards the edit; only a second one, with nothing left to discard, closes.
     it('discards an edit on Escape before closing the panel', async () => {
       renderSelect();
       await openPanel();
@@ -179,6 +179,52 @@ describe('the category panel', () => {
       );
 
       expect(createCategory).toHaveBeenCalledWith('Cameras');
+    });
+  });
+
+  describe('deleting', () => {
+    it('names the category and states the entry count when it holds entries', async () => {
+      vi.mocked(countItemsForCategory).mockResolvedValue({
+        count: 40,
+        error: null,
+      } as never);
+      renderSelect();
+      await openPanel();
+      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+      expect(
+        await screen.findByText(
+          'Delete "Coins"? Its 40 entries and all their photographs will be permanently deleted.',
+        ),
+      ).toBeVisible();
+    });
+
+    it('does not claim entries or photographs will be lost when the category is empty', async () => {
+      vi.mocked(countItemsForCategory).mockResolvedValue({
+        count: 0,
+        error: null,
+      } as never);
+      renderSelect();
+      await openPanel();
+      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+      expect(await screen.findByText('Delete "Coins"?')).toBeVisible();
+    });
+
+    it('falls back to a generic warning rather than claiming zero entries when the count is unknown', async () => {
+      vi.mocked(countItemsForCategory).mockResolvedValue({
+        count: null,
+        error: new Error('network error'),
+      } as never);
+      renderSelect();
+      await openPanel();
+      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+      expect(
+        await screen.findByText(
+          'Delete "Coins"? Its entries and all their photographs will be permanently deleted.',
+        ),
+      ).toBeVisible();
     });
   });
 
