@@ -22,8 +22,7 @@ You always browse one category at a time.
 - **Rename**: select the category, edit the name in the text field, confirm.
   Same rules as creation. Whitespace is trimmed and collapsed on save.
 - **Delete**: select the category, clear the text field, click delete, confirm.
-  Items that would be left with no category are deleted too; items that also
-  belong to another category stay.
+  Its items are deleted with it: every item belongs to exactly one category.
 
 The picker opens collapsed on the category you had selected last.
 

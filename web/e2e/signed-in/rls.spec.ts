@@ -1966,15 +1966,13 @@ test.describe('per-owner quotas', () => {
     expect(error?.message).toBe('share quota of 1000 reached');
   });
 
-  test('an entry cannot be filed into more than 10 categories', async ({}, testInfo) => {
+  test('an entry belongs to one collection: a second one is refused', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { otherToken } = context();
     const api = apiAs(otherToken);
     const { data: categories, error: categoriesError } = await api
       .from('categories')
-      .insert(
-        Array.from({ length: 11 }, (_, i) => ({ name: `link-probe-${i}` })),
-      )
+      .insert([{ name: 'link-probe-home' }, { name: 'link-probe-second' }])
       .select('id');
     expect(categoriesError).toBeNull();
     const { data: item } = await api
@@ -1984,16 +1982,17 @@ test.describe('per-owner quotas', () => {
       .single();
 
     try {
+      const [home, second] = categories!;
+      const { error: homeError } = await api
+        .from('item_categories')
+        .insert({ item_id: item!.id, category_id: home.id });
+      expect(homeError).toBeNull();
+
       const { error } = await api
         .from('item_categories')
-        .insert(
-          categories!.map((c) => ({ item_id: item!.id, category_id: c.id })),
-        );
-
+        .insert({ item_id: item!.id, category_id: second.id });
       expect(error?.code).toBe('PT507');
-      expect(error?.message).toBe(
-        'category link quota of 10 per entry reached',
-      );
+      expect(error?.message).toBe('an entry belongs to one collection');
     } finally {
       await api
         .from('categories')

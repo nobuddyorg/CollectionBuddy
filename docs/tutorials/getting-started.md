@@ -63,8 +63,8 @@ Add one or two more items with different titles and places, then:
 - **Edit**: pencil icon on the action row — the same form, pre-filled.
 - **Delete an item**: trash icon, confirm. Its photos go with it.
 - **Delete a category**: open the picker, select the category, clear the text
-  field, click delete. Items that would be left with no category are deleted
-  too; items that also belong to another category stay.
+  field, click delete. Its items are deleted with it: every item belongs to
+  exactly one category.
 - **Language and theme**: click your email in the header. German/English and
   System/Light/Dark are independent.
 

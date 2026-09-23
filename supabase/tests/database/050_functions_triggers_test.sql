@@ -94,8 +94,16 @@ returning id as item_c \gset
 insert into public.item_categories (item_id, category_id) values
   (:'item_a'::uuid, :'category_a'::uuid),
   (:'item_b'::uuid, :'category_b'::uuid),
-  (:'item_c'::uuid, :'category_a'::uuid),
-  (:'item_c'::uuid, :'category_c'::uuid);
+  (:'item_c'::uuid, :'category_a'::uuid);
+
+-- A second collection can only predate 0020 now; seeded past its trigger, which the rollback restores.
+reset role;
+alter table public.item_categories disable trigger trg_item_categories_quota;
+select pg_temp.auth_as(:'owner_id'::uuid, 'functions-test@collectionbuddy.test');
+insert into public.item_categories (item_id, category_id) values (:'item_c'::uuid, :'category_c'::uuid);
+reset role;
+alter table public.item_categories enable trigger trg_item_categories_quota;
+select pg_temp.auth_as(:'owner_id'::uuid, 'functions-test@collectionbuddy.test');
 
 -- One statement, deleting mappings across both category_a and category_b
 -- at once.

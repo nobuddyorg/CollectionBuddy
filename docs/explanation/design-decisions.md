@@ -34,7 +34,7 @@ Any signed-in collector could otherwise create rows and upload 5 MiB objects wit
 | 50,000 entries per owner | `tg_items_quota()` (`0009`) |
 | 1,000 categories per owner | `tg_categories_quota()` (`0016`) |
 | 1,000 shares per owner, across all their categories | `tg_category_shares_quota()` (`0016`) |
-| 10 categories per entry | `tg_item_categories_quota()` (`0016`) |
+| One category per entry | `tg_item_categories_quota()` (`0016`, lowered from 10 by `0020`) |
 | Text: category name 200, title 300, description 10,000, place 500, invited email 320 characters; 50 tags of up to 100 characters | `check` constraints (`0016`) |
 
 A photograph added by an editor lands on the owner's row, so it counts against the owner's quota. The link ceiling is per entry rather than per owner because the entry ceiling already bounds the entries; together they bound the links. The UI files an entry in one category, so no message covers the link ceiling; the form's `maxLength`s mirror the text ceilings, so typing stops before the database would refuse. The text checks are `not valid`: every write since `0016` is checked, but a row already past a limit was left in place rather than failing the unattended deploy, and editing such a row fails until the long field is shortened. Once production holds no row past a limit, a later migration can `validate constraint` each one.

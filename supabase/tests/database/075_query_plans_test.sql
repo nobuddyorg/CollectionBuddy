@@ -252,8 +252,10 @@ select pg_temp.plan_uses_index_only(
 select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
 insert into public.categories (name) values ('Plans small (pgTAP)')
 returning id as small_category_id \gset
+insert into public.items (title, place) values ('Plan Probe Small', 'Rome')
+returning id as small_item_id \gset
 insert into public.item_categories (item_id, category_id)
-select i.id, :'small_category_id'::uuid from public.items i where i.title = 'Plan Probe Silberdenar';
+values (:'small_item_id'::uuid, :'small_category_id'::uuid);
 reset role;
 analyze public.item_categories;
 
