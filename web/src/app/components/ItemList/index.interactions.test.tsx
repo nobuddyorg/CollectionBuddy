@@ -7,7 +7,7 @@ import { I18nProvider } from '../../i18n/I18nProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import ItemList from './index';
-import type { ItemLite, ImgEntry } from './types';
+import type { ItemLite, ImageEntry } from './types';
 import type { useItems } from './useItems';
 import type { useItemImages } from './useItemImages';
 import type { useItemMutations } from './useItemMutations';
@@ -44,7 +44,7 @@ const ITEM: ItemLite = {
   tags: [],
 };
 
-const PHOTO: ImgEntry = {
+const PHOTO: ImageEntry = {
   id: 'img-1',
   pathFull: 'uid/item-1/a.webp',
   urlFull: 'https://signed/a',
@@ -54,7 +54,7 @@ const PHOTO: ImgEntry = {
 
 function imagesState(overrides: Record<string, unknown> = {}) {
   return {
-    images: { 'item-1': [PHOTO] } as Record<string, ImgEntry[]>,
+    images: { 'item-1': [PHOTO] } as Record<string, ImageEntry[]>,
     loadingItems: new Set<string>(),
     refreshAllImages: vi.fn(),
     showImages: vi.fn(),
@@ -68,8 +68,7 @@ function imagesState(overrides: Record<string, unknown> = {}) {
   };
 }
 
-// A card only shows its caption and actions once its hero photograph has
-// loaded, which in jsdom only ever happens on request.
+// A card shows its caption and actions only once its hero has loaded, which jsdom does only on request.
 async function heroLoads() {
   fireEvent.load(await screen.findByRole('img'));
 }

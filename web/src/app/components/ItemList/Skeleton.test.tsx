@@ -45,8 +45,7 @@ describe('ItemListSkeleton', () => {
       </I18nProvider>,
     );
     const status = screen.getByRole('status');
-    // The grid is the status region; the toolbar sits outside it, so the
-    // row that lands above the cards is not part of the placeholder grid.
+    // The toolbar sits outside the status region, so its row is not part of the placeholder grid.
     expect(status.previousElementSibling).not.toBeNull();
     expect(cardCount(container)).toBe(6);
   });

@@ -18,37 +18,28 @@ import { useGuardedModalClose } from '../../lib/useGuardedModalClose';
 import { EditItemModal } from './EditItemModal';
 import { MapModal } from './MapModal';
 import CenteredModal from '../CenteredModal';
+import Icon, { IconType } from '../Icon';
 import type { ItemFormValues } from '../ItemForm';
-import type { ImgEntry, ItemLite } from './types';
+import type { ImageEntry, ItemLite } from './types';
 
-// Warms the map modal's dynamic() chunk on intent (hover/focus/press-down)
-// rather than page load, so leaving the map alone costs nothing.
+// Warmed on intent, not page load; a failed prefetch is retried by dynamic() on the actual open.
 const prefetchMap = () => {
-  // A failed prefetch isn't reported: dynamic() retries on actual open.
   void import('../Map').catch(() => {});
 };
 
-// Same reasoning, for the create form's dynamic() import.
 const prefetchItemForm = () => {
   void import('../ItemForm').catch(() => {});
 };
-import Icon, { IconType } from '../Icon';
 
-// Stable identity for entries with no photographs yet, so an unrelated
-// re-render doesn't hand ItemCard a fresh `[]` and force it to re-render too
-// (it's memoized against reference equality here).
-const EMPTY_IMAGES: ImgEntry[] = [];
+// Stable identity: a fresh [] per render would defeat ItemCard's reference-equality memo.
+const EMPTY_IMAGES: ImageEntry[] = [];
 
 export default function ItemList({
   categoryId,
   canEdit,
 }: {
   categoryId: string;
-  /** False for a category shared read-only (viewer role). Every write
-   * control but "New entry" is hidden, not just disabled -- RLS already
-   * refuses the writes, so this is UX, not the security boundary. "New
-   * entry" stays mounted and disabled so the toolbar doesn't shrink to
-   * just the Map button. */
+  /** Viewer-role share: write controls hide (UX only; RLS authorizes), "New entry" stays disabled. */
   canEdit: boolean;
 }) {
   const { t, tCount } = useI18n();
@@ -64,10 +55,8 @@ export default function ItemList({
     discardCreate,
   );
 
-  // Declared up here, ahead of the map, because the map is filtered by the
-  // same term the list is: they are one filtered set drawn two ways.
-  const [q, setQ] = useState('');
-  const qDebounced = useDebouncedValue(q, 200).trim();
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query, 200).trim();
 
   const [mapOpen, setMapOpen] = useState(false);
 
@@ -81,13 +70,12 @@ export default function ItemList({
     totalPages,
     reload,
     setItems,
-  } = useItems(categoryId, qDebounced);
-  const searchStatus = searchStatusFor(qDebounced, total);
+  } = useItems(categoryId, debouncedQuery);
+  const searchStatus = searchStatusFor(debouncedQuery, total);
 
   const handleCreated = useCallback(() => {
     setCreateOpen(false);
-    // New items sort to page 1. If we're already there, reload() to reveal
-    // it; otherwise setPage(1) and let useItems' own effect fetch it.
+    // New entries sort to page 1: setPage(1) fetches on its own; already there, only a reload does.
     if (page !== 1) {
       setPage(1);
     } else {
@@ -110,7 +98,7 @@ export default function ItemList({
 
   // Read through a ref so a reload that keeps the same items re-signs nothing.
   const pageImagesRef = useSyncedRef(pageImages);
-  const itemIdsKey = items.map((i) => i.id).join(',');
+  const itemIdsKey = items.map((item) => item.id).join(',');
   useEffect(() => {
     if (!itemIdsKey) return;
     const itemIds = itemIdsKey.split(',');
@@ -129,21 +117,19 @@ export default function ItemList({
 
   const [editOpen, setEditOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ItemLite | null>(null);
-  // Which entry's carousel is open, and where in its `imgs` it's showing --
-  // not a URL, so the modal can navigate to every photograph an entry has,
-  // including ones a strip cell never had room for (#304).
+  // An index into the entry's images, not a URL: the carousel reaches photographs the strip never showed.
   const [modalState, setModalState] = useState<{
     itemId: string;
     index: number;
   } | null>(null);
-  const modalImgs = modalState ? images[modalState.itemId] : [];
+  const modalImages = modalState ? images[modalState.itemId] : [];
   const modalItemId = modalState?.itemId;
-  const modalNeedsSigning = modalImgs.some((img) => !img.urlFull);
+  const modalNeedsSigning = modalImages.some((image) => !image.urlFull);
   useEffect(() => {
     if (modalItemId && modalNeedsSigning) void signAllFor(modalItemId);
   }, [modalItemId, modalNeedsSigning, signAllFor]);
   const modalItemTitle = modalState
-    ? (items.find((i) => i.id === modalState.itemId)?.title ?? '')
+    ? (items.find((item) => item.id === modalState.itemId)?.title ?? '')
     : '';
 
   const openEdit = (item: ItemLite) => {
@@ -162,10 +148,7 @@ export default function ItemList({
     [editingItem, saveEdit, setEditOpen, setEditingItem],
   );
 
-  // `total > 0` with empty `items` isn't "no entries" -- it's the gap
-  // between a page-no-longer-existing refetch landing and the corrected
-  // page's fetch resolving. Painting the empty state here would flash it
-  // over entries that still exist.
+  // Empty `items` with `total > 0` is a page correction in flight, not an empty collection.
   const isEmpty = items.length === 0;
   const showSkeleton = isEmpty && (loading || total > 0);
   const showEmptyState = isEmpty && !showSkeleton;
@@ -184,11 +167,9 @@ export default function ItemList({
 
   return (
     <div className="space-y-4">
-      {/* Mobile-first toolbar: search takes the full first row where it is
-          actually usable, actions sit beside it from `sm` up. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex-1">
-          <SearchInput value={q} onChange={setQ} />
+          <SearchInput value={query} onChange={setQuery} />
         </div>
 
         <div className="flex gap-2 sm:shrink-0">
@@ -225,9 +206,7 @@ export default function ItemList({
         </div>
       </div>
 
-      {/* searchStatus, not raw qDebounced: a too-short term earns no filter
-          from listItems, so announcing a count here would pass off the
-          unfiltered total as a search result. */}
+      {/* A too-short term earns no filter, so its count would pass off the whole category as results. */}
       <span data-testid="search-status" className="sr-only" aria-live="polite">
         {searchAnnouncement}
       </span>
@@ -238,7 +217,7 @@ export default function ItemList({
         <section className="py-16 grid place-items-center text-center">
           <div className="flex flex-col items-center gap-4 max-w-xs">
             <div className="h-16 w-16 bg-card ring-1 ring-border grid place-items-center text-3xl">
-              {qDebounced ? '🔍' : '🧺'}
+              {debouncedQuery ? '🔍' : '🧺'}
             </div>
             <div className="space-y-1.5">
               <h3
@@ -246,7 +225,10 @@ export default function ItemList({
                 className="font-display text-lg text-foreground"
               >
                 {searchStatus.kind === 'active'
-                  ? t('item_list.no_results_title').replace('{q}', qDebounced)
+                  ? t('item_list.no_results_title').replace(
+                      '{q}',
+                      debouncedQuery,
+                    )
                   : t('item_list.no_items_title')}
               </h3>
               <p className="text-sm text-muted-foreground">
@@ -255,11 +237,11 @@ export default function ItemList({
                   : t('item_list.no_items_hint')}
               </p>
             </div>
-            {qDebounced && (
+            {debouncedQuery && (
               <button
                 type="button"
                 data-testid="empty-clear-search"
-                onClick={() => setQ('')}
+                onClick={() => setQuery('')}
                 className="min-h-11 px-3 font-label text-xs text-foreground underline underline-offset-4"
               >
                 {t('item_list.search_clear')}
@@ -273,26 +255,24 @@ export default function ItemList({
         <ul
           aria-busy={loading}
           aria-labelledby="entries-heading"
-          // Cards keep the page's side margin even on mobile, not full-bleed
-          // -- edge-to-edge cards left only a thin band separating entries,
-          // not enough to visually bind a caption to its photograph.
           className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-4 transition-opacity ${loading ? 'opacity-60' : ''}`}
         >
-          {items.map((item, idx) => (
+          {items.map((item, index) => (
             <ItemCard
               key={item.id}
               item={item}
-              imgs={images[item.id] ?? EMPTY_IMAGES}
+              images={images[item.id] ?? EMPTY_IMAGES}
               pendingUploads={pendingUploads[item.id] ?? 0}
               imagesLoading={loadingItems.has(item.id)}
-              onUpload={(f) => void uploadImage(item.id, f)}
+              onUpload={(file) => void uploadImage(item.id, file)}
               onEditItem={() => openEdit(item)}
               onDeleteItem={() => void removeItem(item.id)}
-              onDeleteImage={(img) => void deleteImage(item.id, img)}
-              onOpenModal={(index) => setModalState({ itemId: item.id, index })}
-              // The grid is up to 3 columns wide, so the LCP candidate is
-              // always among the first three regardless of viewport.
-              priority={idx < 3}
+              onDeleteImage={(image) => void deleteImage(item.id, image)}
+              onOpenModal={(imageIndex) =>
+                setModalState({ itemId: item.id, index: imageIndex })
+              }
+              // The grid is at most 3 wide, so the LCP candidate is always among the first three.
+              priority={index < 3}
               readOnly={!canEdit}
             />
           ))}
@@ -302,14 +282,14 @@ export default function ItemList({
       <Pagination page={page} setPage={setPage} totalPages={totalPages} />
 
       <ModalImage
-        imgs={modalImgs}
+        images={modalImages}
         index={modalState ? modalState.index : null}
         itemTitle={modalItemTitle}
         onIndexChange={(index) =>
-          setModalState((prev) => ({ ...prev!, index }))
+          setModalState((previous) => ({ ...previous!, index }))
         }
         onClose={() => setModalState(null)}
-        onDelete={(img) => void deleteImage(modalState!.itemId, img)}
+        onDelete={(image) => void deleteImage(modalState!.itemId, image)}
         busy={modalState ? (pendingUploads[modalState.itemId] ?? 0) > 0 : false}
         readOnly={!canEdit}
       />
@@ -327,7 +307,7 @@ export default function ItemList({
 
       <MapModal
         categoryId={categoryId}
-        search={qDebounced}
+        search={debouncedQuery}
         open={mapOpen}
         onOpenChange={setMapOpen}
       />

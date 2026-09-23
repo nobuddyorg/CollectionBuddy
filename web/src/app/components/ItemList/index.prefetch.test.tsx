@@ -11,10 +11,7 @@ import type { useItems } from './useItems';
 import type { useItemImages } from './useItemImages';
 import type { useItemMutations } from './useItemMutations';
 
-// Both the map modal and the edit form are lazy chunks warmed on intent
-// (hover/focus/press-down); a failed prefetch isn't reported since the real
-// dynamic() import just retries on the actual open, so it must be swallowed
-// rather than surfacing as an unhandled rejection.
+// A failed prefetch of a lazy chunk must be swallowed, not surfaced as an unhandled rejection.
 vi.mock('../Map', () => {
   throw new Error('chunk load failed');
 });

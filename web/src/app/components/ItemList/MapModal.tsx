@@ -13,10 +13,7 @@ import { usePlaces } from '../Map/usePlaces';
 import { useCurrentLocation } from '../Map/useCurrentLocation';
 import { useMapFraming } from '../Map/useMapFraming';
 
-// Names the component it dynamically imports, not the JS Map builtin;
-// nothing in this scope ever constructs one.
-// eslint-disable-next-line sonarjs/no-globals-shadowing
-const Map = dynamic(() => import('../Map'), { ssr: false });
+const MapView = dynamic(() => import('../Map'), { ssr: false });
 
 export function MapModal({
   categoryId,
@@ -47,29 +44,24 @@ export function MapModal({
 
   const mapMarkers = useMemo(
     () =>
-      places.map((p) => ({
-        lat: p.lat,
-        lng: p.lng,
-        popupText: p.name,
-        titles: p.titles,
-        // Only shown when count > 1: a lone entry is already described by
-        // the place name line, and this avoids "1 entries" wording.
+      places.map((place) => ({
+        lat: place.lat,
+        lng: place.lng,
+        popupText: place.name,
+        titles: place.titles,
+        // Only when count > 1: a lone entry is already named by the place line, and "1 entries" is avoided.
         countLabel:
-          p.titles.length > 1
+          place.titles.length > 1
             ? t('item_list.map_entries_count').replace(
                 '{count}',
-                String(p.titles.length),
+                String(place.titles.length),
               )
             : undefined,
       })),
     [places, t],
   );
 
-  // Re-frames once the last pin lands so the view covers the whole
-  // collection, not just the quickest lookups. Also waits for a pin, not
-  // just for loading to finish: `loadingPlaces` is still false on the
-  // render that opens the map, so without this the map would first be told
-  // to frame an empty collection.
+  // Waits for a pin, not just for loading: `loadingPlaces` is still false on the render that opens the map.
   useEffect(() => {
     if (!open || loadingPlaces || places.length === 0) return;
     frameAllAutomatically();
@@ -81,9 +73,7 @@ export function MapModal({
     request: requestLocation,
   } = useCurrentLocation(open);
 
-  // Asks for the fix rather than reusing one: in an installed PWA, this
-  // tap is the gesture the permission prompt hangs off, and the only place
-  // a refusal can be explained.
+  // Asks for a fresh fix: in an installed PWA this tap is the gesture the permission prompt hangs off.
   const showCurrentLocation = useCallback(async () => {
     const frame = tap('fitCurrent');
     const result = await requestLocation();
@@ -115,9 +105,7 @@ export function MapModal({
       )}
 
       {!placesError && !loadingPlaces && places.length === 0 && (
-        // A generic empty message would read as "you have no places" when
-        // a search is what emptied the map, sending the reader to the
-        // wrong place.
+        // A generic empty message would read as "no places" when a search is what emptied the map.
         <p
           data-testid="map-empty"
           className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70"
@@ -131,14 +119,10 @@ export function MapModal({
       )}
 
       {!placesError && (loadingPlaces || places.length > 0) && (
-        // Mounts immediately rather than behind the geocoding spinner, so
-        // Leaflet's chunk and first tiles load while places still resolve.
+        // Mounted before the places resolve, so Leaflet's chunk and first tiles load meanwhile.
         <div className="relative h-full">
-          {/* `relative` on this wrapper makes the overlay chips their own
-              stacking context, so `z-[1000]` only has to clear Leaflet's
-              own control layer (default z-index 1000), not the app's
-              z-index scale. */}
-          <Map
+          {/* `relative` here: `z-[1000]` then only has to clear Leaflet's own control layer. */}
+          <MapView
             command={mapCommand}
             markers={mapMarkers}
             currentLocation={
@@ -152,9 +136,7 @@ export function MapModal({
             }
           />
           {loadingPlaces && (
-            // Fixed light colours and a solid plate: at 80% theme opacity
-            // this was a pale chip on pale tiles in light mode, exactly
-            // the "barely there" look the theme swap was meant to avoid.
+            // Fixed light colours and a solid plate: at 80% theme opacity this vanished on pale tiles.
             <div
               role="status"
               aria-label={t('common.loading')}
@@ -164,9 +146,7 @@ export function MapModal({
               {t('common.loading')}
             </div>
           )}
-          {/* Fixed light colours, not theme tokens: the map tiles beneath
-              never go dark, so a chip that did would be the only thing on
-              the map switching with the rest of the app. */}
+          {/* Fixed light colours, not theme tokens: the map tiles beneath never go dark. */}
           <div className="absolute top-2 right-2 z-[1000] bg-white/80 backdrop-blur rounded-lg flex gap-1 p-1">
             <button
               type="button"

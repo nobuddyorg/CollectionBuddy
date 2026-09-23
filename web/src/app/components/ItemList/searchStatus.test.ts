@@ -7,9 +7,7 @@ describe('searchStatusFor', () => {
     expect(searchStatusFor('', 40)).toEqual({ kind: 'inactive' });
   });
 
-  // Below the minimum, listItems applies no filter at all -- `total` here is
-  // the whole category's count, not a match count, so it must not surface as
-  // one (#307).
+  // Below the minimum, listItems applies no filter, so `total` is the whole category, not a match count.
   it('is tooShort below the minimum length, regardless of total', () => {
     expect(searchStatusFor('ab', 40)).toEqual({ kind: 'tooShort' });
   });

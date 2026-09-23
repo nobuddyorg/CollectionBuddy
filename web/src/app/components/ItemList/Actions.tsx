@@ -5,14 +5,11 @@ import Icon, { IconType } from '../Icon';
 import { IconButton, iconButtonClasses } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
 
-// Warms the edit modal's dynamic() import of ItemForm before the click
-// that opens it (same as ItemList/index.tsx's prefetchItemForm).
+// Warms the edit modal's lazy ItemForm chunk before the click that opens it.
 const prefetchItemForm = () => {
   void import('../ItemForm').catch(() => {});
 };
 
-// Shared so both the row control and the empty plate hand a chosen file
-// straight to onUpload.
 function UploadInput({
   onUpload,
   busy,
@@ -30,18 +27,15 @@ function UploadInput({
       className="peer sr-only"
       aria-label={label}
       disabled={busy}
-      onChange={(e) => {
-        const f = e.target.files?.[0];
-        if (f) onUpload(f);
+      onChange={(event) => {
+        const file = event.target.files?.[0];
+        if (file) onUpload(file);
       }}
     />
   );
 }
 
-// Holds the same 4:3 frame a photo would occupy, so entries without one
-// still fit the grid's repeating shape.
-// `--mount` sits a step below `--muted`, so the plate reads as a hollow cut
-// into the card rather than another pale panel floating on it.
+// Holds the same 4:3 frame a photo would, so unphotographed entries fit the grid's repeating shape.
 export function AddPhotoPlate({
   onUpload,
   busy,
@@ -49,8 +43,7 @@ export function AddPhotoPlate({
 }: {
   onUpload: (file: File) => void;
   busy: boolean;
-  /** Read-only (e.g. a shared category) renders a `div`, not the
-   * interactive `label` below, so it doesn't read as clickable. */
+  /** Read-only renders a `div`, not the interactive `label`, so it doesn't read as clickable. */
   readOnly?: boolean;
 }) {
   const { t } = useI18n();
@@ -67,17 +60,13 @@ export function AddPhotoPlate({
     >
       {!readOnly && <UploadInput onUpload={onUpload} busy={busy} />}
 
-      {/* border-foreground/60: below this, the border falls under the 3:1
-          WCAG floor against `--mount` in one or both themes. */}
+      {/* border-foreground/60: any less falls under the 3:1 WCAG floor against `--mount`. */}
       <span
         aria-hidden="true"
         className="pointer-events-none absolute inset-3 rounded-sm border border-dashed border-foreground/60"
       />
 
-      {/* Read-only omits the CTA chip entirely rather than rendering a
-          disabled copy of it. */}
-      {/* text-foreground/80, not text-muted-foreground: the latter falls
-          below the 4.5:1 AA floor on `--mount` in the light theme. */}
+      {/* text-foreground/80: text-muted-foreground falls under the 4.5:1 AA floor on `--mount` in light mode. */}
       <span className="relative flex flex-col items-center gap-2.5 text-foreground/80 transition-colors group-hover/plate:text-foreground">
         {busy && !readOnly ? (
           <span role="status" aria-label={t('common.loading')}>
@@ -106,10 +95,7 @@ export function AddPhotoPlate({
   );
 }
 
-// Icons rather than spelled-out labels: German translations overflowed the
-// card by up to 45px. Safe as icon-only because each has a title/aria-label,
-// and the trash icon no longer collides with the per-photo ✕ control on the
-// photograph itself.
+// Icon-only: spelled-out German labels overflowed the card by up to 45px; each has a title/aria-label.
 export function Actions({
   onEdit,
   onDelete,
@@ -125,8 +111,7 @@ export function Actions({
 
   return (
     <div className="mt-auto flex items-center gap-2 border-t border-border pt-3">
-      {/* A file input needs a label, not a button, so it borrows the icon
-          button's own classes rather than approximating them. */}
+      {/* A file input needs a label, not a button, so it borrows the icon button's own classes. */}
       <label
         className={`${iconButtonClasses({ variant: 'outline' })} peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-foreground cursor-pointer ${
           busy ? 'pointer-events-none opacity-60' : ''

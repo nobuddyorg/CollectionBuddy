@@ -6,10 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { Actions, AddPhotoPlate } from './Actions';
 
-// The edit button's own prefetch warms the lazy ItemForm chunk on intent;
-// a failure there isn't reported (the real dynamic() import retries on the
-// actual click), so it must be swallowed, not surfaced as an unhandled
-// rejection.
+// A failed prefetch of the lazy ItemForm chunk must be swallowed, not surfaced as an unhandled rejection.
 vi.mock('../ItemForm', () => {
   throw new Error('chunk load failed');
 });
@@ -52,8 +49,7 @@ describe('Actions', () => {
     expect(screen.getAllByRole('button')).toHaveLength(2);
   });
 
-  // Regression: spelled-out labels overflowed the card in German and were
-  // clipped.
+  // Regression: spelled-out labels overflowed the card in German and were clipped.
   it('gives each control a title so the icon is not the only cue', () => {
     renderActions();
     expect(screen.getByTitle('Add image')).toBeInTheDocument();

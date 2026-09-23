@@ -16,8 +16,7 @@ import type { MapCommand } from '../Map/types';
 vi.mock('../Map/usePlaces', () => ({ usePlaces: vi.fn() }));
 vi.mock('../Map/useCurrentLocation', () => ({ useCurrentLocation: vi.fn() }));
 
-// Leaflet needs a real layout engine, so the map itself is a stand-in that
-// records what it was told to draw and which command it last received.
+// Leaflet needs a real layout engine; this stand-in records the markers and the last command.
 const drawn: { markers: unknown[]; command: MapCommand | null }[] = [];
 vi.mock('../Map', () => ({
   default: (props: { markers: unknown[]; command: MapCommand | null }) => {
@@ -85,8 +84,7 @@ describe('MapModal', () => {
     expect(screen.queryByTestId('map')).not.toBeInTheDocument();
   });
 
-  // "No places yet" would read as "you have never placed anything" when a
-  // search is what emptied the map.
+  // "No places yet" would read as "never placed anything" when a search is what emptied the map.
   it('says the search emptied the map, not the collection', () => {
     renderModal({ search: 'zzz' });
 
@@ -105,17 +103,13 @@ describe('MapModal', () => {
     });
     renderModal();
 
-    // The map itself arrives as a dynamic import, so nothing is drawn on
-    // the render that mounts it. The label is matched by its count rather
-    // than its wording: `t` keeps one identity across a language change,
-    // so which of the two languages this memo was built in depends on
-    // render order, and neither is the point of the case.
+    // Matched by count, not wording: which language the memo was built in depends on render order.
     await waitFor(() => expect(drawn.length).toBeGreaterThan(0));
     const markers = drawn.at(-1)?.markers as {
       popupText: string;
       countLabel?: string;
     }[];
-    expect(markers.map((m) => m.popupText)).toEqual(['Bonn', 'Köln']);
+    expect(markers.map((marker) => marker.popupText)).toEqual(['Bonn', 'Köln']);
     expect(markers[0]?.countLabel).toMatch(/^2 /);
     expect(markers[1]?.countLabel).toBeUndefined();
   });
@@ -172,7 +166,7 @@ describe('MapModal', () => {
     expect(marker).toBeDefined();
   });
 
-  // #694: the fix resolving after a later "show all" tap must not undo it.
+  // The fix resolving after a later "show all" tap must not undo it.
   it('keeps the later tap when the location fix arrives after it', async () => {
     placesState({ places: [place('Bonn', ['a'])] });
     let resolveFix: (result: LocationResult) => void = () => {};

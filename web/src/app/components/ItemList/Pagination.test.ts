@@ -23,9 +23,7 @@ describe('getPaginationItems', () => {
   });
 
   it('handles the page=5/page=totalPages-4 boundary without gaps or overlap', () => {
-    // page < 5 is false at page 5, and page > totalPages - 4 (6) is also
-    // false, so this must fall into the centered-window branch, not
-    // silently skip straight from the leading run to the trailing one.
+    // page < 5 and page > totalPages - 4 are both false at page 5, so it must be the centered window.
     expect(getPaginationItems(5, 10)).toEqual([1, '...', 4, 5, 6, '...', 10]);
     expect(getPaginationItems(6, 10)).toEqual([1, '...', 5, 6, 7, '...', 10]);
   });
