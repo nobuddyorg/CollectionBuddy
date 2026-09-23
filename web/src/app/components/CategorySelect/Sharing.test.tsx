@@ -46,6 +46,14 @@ describe('SharingSection', () => {
     expect(screen.getByText('Not shared with anyone yet.')).toBeVisible();
   });
 
+  it('stops the email at 320 characters, as the database does', () => {
+    renderSection(sharesState());
+    expect(screen.getByLabelText('Share with (email)')).toHaveAttribute(
+      'maxlength',
+      '320',
+    );
+  });
+
   it('shares with the trimmed email and no expiry when none is picked', async () => {
     const createShare = vi.fn().mockResolvedValue(true);
     renderSection(sharesState({ createShare }));

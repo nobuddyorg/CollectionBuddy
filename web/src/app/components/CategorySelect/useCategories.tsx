@@ -7,6 +7,7 @@ import { chunk } from '../../lib/chunk';
 import { restoreAt } from '../../lib/optimistic';
 import { useRequestSequence } from '../../lib/useRequestSequence';
 import { useToast } from '../Toast/ToastProvider';
+import { isQuotaExceeded } from '../../data/quota';
 import {
   createCategory as createCategoryRow,
   deleteCategory as deleteCategoryRow,
@@ -85,7 +86,9 @@ export function useCategories() {
         toast.reportError(
           'create category',
           e,
-          t('category_select.create_error'),
+          isQuotaExceeded(e)
+            ? t('category_select.create_quota_error')
+            : t('category_select.create_error'),
         );
         return null;
       } finally {

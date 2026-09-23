@@ -29,6 +29,11 @@ describe('CategoryInput', () => {
     window.localStorage.setItem('lang', 'en');
   });
 
+  it('stops at the 200 characters a category name may have', () => {
+    renderInput();
+    expect(screen.getByRole('textbox')).toHaveAttribute('maxlength', '200');
+  });
+
   it('reports what the user types', async () => {
     const props = renderInput();
     await userEvent.type(screen.getByRole('textbox'), 'S');

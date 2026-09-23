@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
+import { MAX_TAG_LENGTH, MAX_TAGS } from '../../lib/textLimits';
 
 // Matches .tag-flash's animation-duration in globals.css. A timer, not
 // onAnimationEnd, so the flash always clears even if the animation is
@@ -48,6 +49,11 @@ export function TagsInput({
     [tags, setTags],
   );
 
+  // Read-only rather than disabled at the limit, so Backspace still removes the last tag.
+  const atLimit = tags.length >= MAX_TAGS;
+  const emptyPlaceholder =
+    tags.length === 0 ? t('item_create.tags_placeholder') : '';
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
@@ -87,10 +93,12 @@ export function TagsInput({
         id={id}
         data-testid="item-tags"
         value={tagInput}
+        maxLength={MAX_TAG_LENGTH}
+        readOnly={atLimit}
         onChange={(e) => setTagInput(e.target.value)}
         onKeyDown={onKeyDown}
         aria-label={t('item_create.tags_placeholder')}
-        placeholder={tags.length === 0 ? t('item_create.tags_placeholder') : ''}
+        placeholder={atLimit ? t('item_create.tags_limit') : emptyPlaceholder}
         enterKeyHint="done"
         className="flex-1 min-w-[100px] bg-transparent py-1 text-sm"
       />

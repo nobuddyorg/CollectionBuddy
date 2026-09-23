@@ -1699,4 +1699,92 @@ test.describe('per-owner quotas', () => {
       await apiAs(token).from('items').delete().eq('id', item!.id);
     }
   });
+
+  // 0016_bound_row_volume.sql: the tables and text columns #637 left unbounded.
+  test('a write that would pass 1,000 categories is refused, with the quota code', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { otherToken } = context();
+
+    const { error } = await apiAs(otherToken)
+      .from('categories')
+      .insert(
+        Array.from({ length: 1001 }, (_, i) => ({ name: `quota-probe-${i}` })),
+      );
+
+    expect(error?.code).toBe('PT507');
+    expect(error?.message).toBe('category quota of 1000 reached');
+  });
+
+  test('a write that would pass 1,000 shares is refused, with the quota code', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { otherToken, otherUserId } = context();
+    const categoryId = await mineCategoryId(
+      otherToken,
+      otherUserId,
+      SEED.other.category,
+    );
+
+    const { error } = await apiAs(otherToken)
+      .from('category_shares')
+      .insert(
+        Array.from({ length: 1001 }, (_, i) => ({
+          category_id: categoryId,
+          invited_email: `quota-probe-${i}@collectionbuddy.test`,
+        })),
+      );
+
+    expect(error?.code).toBe('PT507');
+    expect(error?.message).toBe('share quota of 1000 reached');
+  });
+
+  test('an entry cannot be filed into more than 10 categories', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { otherToken } = context();
+    const api = apiAs(otherToken);
+    const { data: categories, error: categoriesError } = await api
+      .from('categories')
+      .insert(
+        Array.from({ length: 11 }, (_, i) => ({ name: `link-probe-${i}` })),
+      )
+      .select('id');
+    expect(categoriesError).toBeNull();
+    const { data: item } = await api
+      .from('items')
+      .insert({ title: 'Link quota probe' })
+      .select('id')
+      .single();
+
+    try {
+      const { error } = await api
+        .from('item_categories')
+        .insert(
+          categories!.map((c) => ({ item_id: item!.id, category_id: c.id })),
+        );
+
+      expect(error?.code).toBe('PT507');
+      expect(error?.message).toBe(
+        'category link quota of 10 per entry reached',
+      );
+    } finally {
+      await api
+        .from('categories')
+        .delete()
+        .in(
+          'id',
+          categories!.map((c) => c.id),
+        );
+      await api.from('items').delete().eq('id', item!.id);
+    }
+  });
+
+  test('text past its ceiling is refused, whatever the form would have allowed', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token } = context();
+
+    const { error } = await apiAs(token)
+      .from('items')
+      .insert({ title: 'Text probe', description: 'd'.repeat(10_001) });
+
+    expect(error?.code).toBe('23514');
+  });
 });

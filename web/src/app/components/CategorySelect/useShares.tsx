@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import { restoreAt } from '../../lib/optimistic';
 import { useToast } from '../Toast/ToastProvider';
+import { isQuotaExceeded } from '../../data/quota';
 import {
   createShare as createShareRow,
   deleteShare as deleteShareRow,
@@ -70,7 +71,13 @@ export function useShares(categoryId: string | null) {
         toast.success(t('category_select.share_success'));
         return true;
       } catch (e) {
-        toast.reportError('create share', e, t('category_select.share_error'));
+        toast.reportError(
+          'create share',
+          e,
+          isQuotaExceeded(e)
+            ? t('category_select.share_quota_error')
+            : t('category_select.share_error'),
+        );
         return false;
       } finally {
         setIsSharing(false);

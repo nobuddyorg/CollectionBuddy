@@ -8,6 +8,7 @@ import { IconButton } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
 import { fieldClasses } from '../ui/fieldClasses';
 import { labelClasses } from '../ui/labelClasses';
+import { MAX_EMAIL_LENGTH } from '../../lib/textLimits';
 import type { UseShares } from './useShares';
 
 // Local midnight would already be behind `now()` for most of the day
@@ -77,6 +78,7 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
           data-testid="share-email"
           type="email"
           value={email}
+          maxLength={MAX_EMAIL_LENGTH}
           onChange={(e) => setEmail(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void onShare();

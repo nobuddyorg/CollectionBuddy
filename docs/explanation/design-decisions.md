@@ -26,7 +26,18 @@ Since the third squash every function lives in `0002_functions.sql`. The `langua
 
 ## Why quotas are counted in the database
 
-Any signed-in collector could otherwise create rows and upload 5 MiB objects without end, and on a free-tier project that is the likeliest way to take the app down (#637). There is no server to rate-limit at, so the ceilings are triggers: 1 GiB of full-size photographs and 50,000 entries per owner. A photograph added by an editor lands on the owner's row, so it counts against the owner's quota.
+Any signed-in collector could otherwise create rows and upload 5 MiB objects without end, and on a free-tier project that is the likeliest way to take the app down (#637). There is no server to rate-limit at, so the ceilings live in the database:
+
+| Ceiling | Enforced by |
+| --- | --- |
+| 1 GiB of full-size photographs per owner | `tg_images_quota()` (`0009`) |
+| 50,000 entries per owner | `tg_items_quota()` (`0009`) |
+| 1,000 categories per owner | `tg_categories_quota()` (`0016`) |
+| 1,000 shares per owner, across all their categories | `tg_category_shares_quota()` (`0016`) |
+| 10 categories per entry | `tg_item_categories_quota()` (`0016`) |
+| Text: category name 200, title 300, description 10,000, place 500, invited email 320 characters; 50 tags of up to 100 characters | `check` constraints (`0016`) |
+
+A photograph added by an editor lands on the owner's row, so it counts against the owner's quota. The link ceiling is per entry rather than per owner because the entry ceiling already bounds the entries; together they bound the links. The UI files an entry in one category, so no message covers the link ceiling; the form's `maxLength`s mirror the text ceilings, so typing stops before the database would refuse. The text checks are `not valid`: every write since `0016` is checked, but a row already past a limit was left in place rather than failing the unattended deploy, and editing such a row fails until the long field is shortened. Once production holds no row past a limit, a later migration can `validate constraint` each one.
 
 The byte count cannot trust the client, which sends `size_bytes` itself. `tg_images_size_from_storage()` replaces it with the size Storage recorded for the object, which Storage writes before the upload request returns. A row inserted before its object exists counts the bucket's 5 MiB cap, so under-reporting a size buys nothing. The counts are statement-level, so a batch insert is checked once per owner. A refusal carries SQLSTATE `PT507`, which PostgREST turns into HTTP 507, and the app shows a message naming the limit rather than a generic failure.
 
