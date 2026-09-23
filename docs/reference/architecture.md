@@ -11,12 +11,13 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 
 ## Database schema
 
-[`supabase/migrations/`](../../supabase/migrations/), applied in filename order: seven files ordered by dependency, not history — extensions, functions, tables, triggers, indexes, policies, storage — and none of them patches another. A change to the schema is a new `0008_*.sql`; the chain is folded back into the seven only by a deliberate squash ([why](../explanation/design-decisions.md#why-the-migrations-were-squashed)).
+[`supabase/migrations/`](../../supabase/migrations/), applied in filename order: seven files ordered by dependency, not history — extensions, functions, tables, triggers, indexes, policies, storage — and none of them patches another. A change to the schema is a new numbered file after them; the chain is folded back into the seven only by a deliberate squash ([why](../explanation/design-decisions.md#why-the-migrations-were-squashed)).
 
 | File | Changes |
 | --- | --- |
 | [`0008_drop_items_tags_gin.sql`](../../supabase/migrations/0008_drop_items_tags_gin.sql) | Drops the GIN index on `items.tags`, which no query read. |
 | [`0009_user_quotas.sql`](../../supabase/migrations/0009_user_quotas.sql) | Per-owner quotas: 1 GiB of full-size photographs and 50,000 entries, with photograph sizes taken from Storage rather than the client. |
+| [`0010_revoke_public_execute.sql`](../../supabase/migrations/0010_revoke_public_execute.sql) | Revokes PUBLIC's default `EXECUTE` on `storage_item_id()`, so only `authenticated` may call it. |
 
 ### Tables
 
