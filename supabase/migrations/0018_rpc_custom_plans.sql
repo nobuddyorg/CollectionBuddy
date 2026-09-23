@@ -4,7 +4,7 @@ begin;
 set local lock_timeout = '5s';
 set local statement_timeout = '60s';
 
--- Same rows as 0002; plpgsql so plan_cache_mode applies, `security invoker` so the caller's RLS still shapes them.
+-- Same rows as 0002; plpgsql so plan_cache_mode applies, `security invoker` so the caller's RLS still shapes them. The id tiebreak keeps titles, ids and coordinates from one entry.
 create or replace function public.list_category_places(
   cat_id uuid,
   like_pattern text default null
@@ -27,12 +27,12 @@ begin
   select
     i.place,
     -- The newest item's coordinates, if any row has them.
-    (array_agg(i.place_lat order by i.created_at desc)
+    (array_agg(i.place_lat order by i.created_at desc, i.id desc)
       filter (where i.place_lat is not null and i.place_lng is not null))[1],
-    (array_agg(i.place_lng order by i.created_at desc)
+    (array_agg(i.place_lng order by i.created_at desc, i.id desc)
       filter (where i.place_lat is not null and i.place_lng is not null))[1],
-    array_agg(i.title order by i.created_at desc),
-    array_agg(i.id order by i.created_at desc)
+    array_agg(i.title order by i.created_at desc, i.id desc),
+    array_agg(i.id order by i.created_at desc, i.id desc)
   from public.items i
   join public.item_categories ic on ic.item_id = i.id
   where ic.category_id = cat_id
@@ -49,7 +49,7 @@ begin
 end
 $$;
 
--- Same rows as 0002; both access checks are scalar subqueries, so each runs once per call instead of once per row.
+-- Same rows as 0002; both access checks run once per call, and the id tiebreak keeps pages stable when a plan changes between them.
 create or replace function public.search_category_items(
   cat_id uuid,
   like_pattern text,
@@ -96,7 +96,7 @@ begin
       or i.place ilike like_pattern
       or i.tags_text ilike like_pattern
     )
-  order by i.created_at desc
+  order by i.created_at desc, i.id desc
   offset page_from
   limit (page_to - page_from + 1);
 end

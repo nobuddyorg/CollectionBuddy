@@ -63,6 +63,28 @@ select ok(
   'a photograph record naming its own item is accepted'
 );
 
+-- images_path_thumb_matches_item (0019): the thumbnail path too, since the
+-- owner's client removes both paths when the record goes.
+select ok(
+  pg_temp.raises(format(
+    'insert into public.images (item_id, path_full, path_thumb) values (%L, %L, %L)',
+    :'item_id'::uuid,
+    :'owner_id'::text || '/' || :'item_id'::text || '/planted-full.webp',
+    :'owner_id'::text || '/' || gen_random_uuid()::text || '/victim.webp'
+  )),
+  'a photograph record cannot claim a thumbnail naming a different item'
+);
+
+select ok(
+  not pg_temp.raises(format(
+    'insert into public.images (item_id, path_full, path_thumb) values (%L, %L, %L)',
+    :'item_id'::uuid,
+    :'owner_id'::text || '/' || :'item_id'::text || '/pair.webp',
+    :'owner_id'::text || '/' || :'item_id'::text || '/pair.thumb.webp'
+  )),
+  'a photograph record whose thumbnail names its own item is accepted'
+);
+
 -- category_shares_category_email_unique: re-sharing the same (category,
 -- email) pair is refused outright, not a second grant with its own expiry
 -- (TEST_STRATEGY.md §8's idempotency table, "creating a grant/share that

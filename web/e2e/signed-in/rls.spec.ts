@@ -353,12 +353,11 @@ test.describe('one collection cannot reach another', () => {
     expect(error).not.toBeNull();
   });
 
-  // Not an authorization boundary -- claiming a path conveys no access, since
-  // the storage policies parse an object's own name and never consult this
-  // table. It keeps the mirror self-consistent by construction
-  // (images_path_full_matches_item, 0012): a row may only name a path whose
-  // item-id segment is the item it belongs to, so it cannot point at a path
-  // its own owner is unable to read.
+  // Claiming a path conveys no read access -- the storage policies parse an
+  // object's own name and never consult this table -- but it does steer
+  // deletes: the owner's client removes every path a record names. So a row
+  // may only name paths whose item-id segment is its own item
+  // (images_path_full_matches_item, images_path_thumb_matches_item).
   for (const [shape, path] of [
     [
       'naming another item',
@@ -383,6 +382,29 @@ test.describe('one collection cannot reach another', () => {
         .insert({
           item_id: mine!.id,
           path_full: path.replace('{uid}', userId),
+        })
+        .select('id');
+      expect(data).toBeNull();
+      expect(error).not.toBeNull();
+    });
+
+    test(`a photograph record cannot claim a thumbnail ${shape}`, async ({}, testInfo) => {
+      testInfo.skip(!process.env.E2E_SUPABASE_URL);
+      const { token, userId } = context();
+
+      const { data: mine } = await apiAs(token)
+        .from('items')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('title', itemsIn('Münzen')[0].title)
+        .single();
+
+      const { data, error } = await apiAs(token)
+        .from('images')
+        .insert({
+          item_id: mine!.id,
+          path_full: `${userId}/${mine!.id}/rls-thumb-probe.webp`,
+          path_thumb: path.replace('{uid}', userId),
         })
         .select('id');
       expect(data).toBeNull();
@@ -905,6 +927,62 @@ test.describe('a category shared with another collector', () => {
     }
   });
 
+  test('a photograph cannot be signed through an expired grant, nor from the owner’s unshared category', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken } = context();
+    const categoryId = await mineCategoryId(token, userId, 'Münzen');
+    const idOf = async (title: string) => {
+      const { data } = await apiAs(token)
+        .from('items')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('title', title)
+        .single();
+      return data!.id;
+    };
+    const shared = `${userId}/${await idOf(itemsIn('Münzen')[0].title)}/rls-expiry-probe.webp`;
+    const sibling = `${userId}/${await idOf(itemsIn('Briefmarken')[0].title)}/rls-sibling-probe.webp`;
+    const storage = apiAs(token).storage.from('item-images');
+    for (const path of [shared, sibling]) {
+      const { error } = await storage.upload(
+        path,
+        new Blob(['probe'], { type: 'image/webp' }),
+      );
+      expect(error).toBeNull();
+    }
+    const sign = (path: string) =>
+      apiAs(otherToken).storage.from('item-images').createSignedUrl(path, 60);
+
+    try {
+      const expiredId = await share(token, categoryId, SEED.other.email, {
+        window: {
+          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          expiresAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        },
+      });
+      try {
+        const { data, error } = await sign(shared);
+        expect(data).toBeNull();
+        expect(error).not.toBeNull();
+      } finally {
+        await unshare(token, expiredId);
+      }
+
+      const activeId = await share(token, categoryId, SEED.other.email);
+      try {
+        // The grant is live, so the refusal below is its scope, not its absence.
+        expect((await sign(shared)).error).toBeNull();
+        const { data, error } = await sign(sibling);
+        expect(data).toBeNull();
+        expect(error).not.toBeNull();
+      } finally {
+        await unshare(token, activeId);
+      }
+    } finally {
+      await storage.remove([shared, sibling]);
+    }
+  });
+
   // The images table's select policy joins through item_categories directly
   // via its own item_id column, rather than parsing one back out of a path
   // the way storage.objects has to. Same grant and revocation, checked
@@ -1086,6 +1164,7 @@ test.describe('a category shared at the editor role', () => {
       .insert({ user_id: otherUserId, title: 'rls-editor-invisible-entry' })
       .select('id')
       .single();
+    const photo = `${otherUserId}/${mine!.id}/rls-editor-invisible.webp`;
 
     try {
       await apiAs(otherToken)
@@ -1099,9 +1178,73 @@ test.describe('a category shared at the editor role', () => {
         .select('id')
         .eq('id', mine!.id);
       expect(seen).toEqual([]);
+
+      // Nor its link, its photograph record, or the photograph's bytes.
+      const { data: link } = await apiAs(token)
+        .from('item_categories')
+        .select('item_id')
+        .eq('item_id', mine!.id);
+      expect(link).toEqual([]);
+
+      const { error: uploadError } = await apiAs(otherToken)
+        .storage.from('item-images')
+        .upload(photo, new Blob(['probe'], { type: 'image/webp' }));
+      expect(uploadError).toBeNull();
+      const { error: rowError } = await apiAs(otherToken)
+        .from('images')
+        .insert({ item_id: mine!.id, path_full: photo });
+      expect(rowError).toBeNull();
+
+      const { data: record } = await apiAs(token)
+        .from('images')
+        .select('id')
+        .eq('item_id', mine!.id);
+      expect(record).toEqual([]);
+      const { data: signed, error: signError } = await apiAs(token)
+        .storage.from('item-images')
+        .createSignedUrl(photo, 60);
+      expect(signed).toBeNull();
+      expect(signError).not.toBeNull();
     } finally {
+      await apiAs(otherToken).storage.from('item-images').remove([photo]);
       await unshare(token, shareId);
       await apiAs(otherToken).from('items').delete().eq('id', mine!.id);
+    }
+  });
+
+  // The exploit images_path_thumb_matches_item closes: a thumbnail naming the
+  // owner's photograph in a collection the editor was never granted, which the
+  // owner's own client would remove on deleting this entry.
+  test('an editor cannot plant a thumbnail naming the owner’s photograph elsewhere', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token, userId, otherToken, otherUserId } = context();
+    const { categoryId, itemId } = await ownerEntryIn(
+      token,
+      userId,
+      'rls-editor-thumb-probe',
+    );
+    const shareId = await editorShare(token, categoryId);
+    const { data: elsewhere } = await apiAs(token)
+      .from('items')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('title', itemsIn('Münzen')[0].title)
+      .single();
+
+    try {
+      const { data, error } = await apiAs(otherToken)
+        .from('images')
+        .insert({
+          item_id: itemId,
+          path_full: `${otherUserId}/${itemId}/rls-thumb-plant.webp`,
+          path_thumb: `${userId}/${elsewhere!.id}/victim.webp`,
+        })
+        .select('id');
+      expect(data).toBeNull();
+      expect(error).not.toBeNull();
+    } finally {
+      await unshare(token, shareId);
+      await apiAs(token).from('items').delete().eq('id', itemId);
     }
   });
 

@@ -49,6 +49,8 @@ Only the Storage API can delete file bytes; SQL reaches the `storage.objects` me
 
 A `cleanup_item_images()` trigger used to back this up. It was removed because Supabase's `prevent-direct-deletes` migration guards `storage.objects` with a `BEFORE DELETE ... FOR EACH STATEMENT` trigger that raises `42501` for any session outside the Storage API — statement-level, so it fires even when the delete matches nothing, which is the normal case once the client has already removed the objects. Every item deletion failed. There is no SQL-side backstop available; [`cleanup-orphaned-photos.yml`](../../.github/workflows/cleanup-orphaned-photos.yml) sweeps unreferenced objects daily through the Storage API instead, past a 48 h grace period so nothing still uploading is mistaken for orphaned.
 
+The client deletes whatever paths a row names, with the deleting user's token, so a row may only name paths under its own entry: `images_path_full_matches_item`, and since `0019` `images_path_thumb_matches_item`. Before `0019` an editor could file a record whose thumbnail named the owner's photograph in a collection the editor was never granted, and the owner's own delete of that entry removed it.
+
 ## Why a storage object's path can never change
 
 No update policy exists on `storage.objects` ([`0007_storage.sql`](../../supabase/migrations/0007_storage.sql)), and the grant `postgres` makes there omits `UPDATE`. Storage's own bootstrap grant still carries it and is re-applied on every start, so the missing policy is the control, not the privilege. `move()`, `copy()`-to-self and `upsert` are refused for owner and grantee alike. It took a working exploit to find out why this matters.

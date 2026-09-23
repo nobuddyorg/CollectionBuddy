@@ -4,7 +4,7 @@ begin;
 set local lock_timeout = '5s';
 set local statement_timeout = '60s';
 
--- The categories an active grant opens to the caller, at either role; ownership excluded, as in has_category_read_access().
+-- The categories an active grant to the caller's email opens, at either role; ownership excluded. The where clause is the guard: search runs it as its owner, past RLS.
 create function public.granted_category_ids()
 returns setof uuid
 language sql
@@ -28,7 +28,7 @@ stable
 security invoker
 set search_path = ''
 as $$
-  select cat_id in (select public.granted_category_ids())
+  select coalesce(cat_id in (select public.granted_category_ids()), false)
 $$;
 
 alter policy "select categories with read access"

@@ -25,7 +25,8 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | [`0015_revoke_api_role_execute.sql`](../../supabase/migrations/0015_revoke_api_role_execute.sql) | Revokes direct `EXECUTE` grants to `anon` (and, on trigger functions, `authenticated`) that hosted default privileges add, and stops `postgres`'s default privileges granting new functions to either. |
 | [`0016_bound_row_volume.sql`](../../supabase/migrations/0016_bound_row_volume.sql) | Per-owner ceilings on categories and shares, a per-entry ceiling on category links, and length checks on every text column. |
 | [`0017_shared_read_once_per_statement.sql`](../../supabase/migrations/0017_shared_read_once_per_statement.sql) | Adds `granted_category_ids()`; the read policies (tables and shared `storage.objects`) and `has_category_read_access()` ask it once per statement. Same rows allowed and denied ([why](../explanation/design-decisions.md#why-read-policies-take-the-callers-grants-as-one-set)). |
-| [`0018_rpc_custom_plans.sql`](../../supabase/migrations/0018_rpc_custom_plans.sql) | `list_category_places()` and `search_category_items()` become plpgsql with `plan_cache_mode = force_custom_plan`, so each call is planned for the category it names; search checks access once per call. Same rows, same security mode ([why](../explanation/design-decisions.md#why-the-map-and-search-rpcs-are-plpgsql)). |
+| [`0018_rpc_custom_plans.sql`](../../supabase/migrations/0018_rpc_custom_plans.sql) | `list_category_places()` and `search_category_items()` become plpgsql with `plan_cache_mode = force_custom_plan`, so each call is planned for the category it names; search checks access once per call, and both order ties by id so pages and a place's titles, ids and coordinates stay consistent. Same rows, same security mode ([why](../explanation/design-decisions.md#why-the-map-and-search-rpcs-are-plpgsql)). |
+| [`0019_images_path_thumb_matches_item.sql`](../../supabase/migrations/0019_images_path_thumb_matches_item.sql) | `images.path_thumb` must name its own entry, as `path_full` must: the owner's client deletes both paths, so a planted thumbnail took another entry's photo with it. `not valid`: checked on every write from now on. |
 
 ### Tables
 
@@ -35,7 +36,7 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | `items` | `id`, `user_id`, `title`, `description`, `place`, `place_lat`, `place_lng`, `tags text[]`, `tags_text` (generated), `created_at`, `updated_at` | Title non-blank. At most 300 characters of title, 10,000 of description, 500 of place, and 50 tags of up to 100 characters. `tags_text` is a space-joined copy of `tags` so tag search shares the `ILIKE` filter. `place_lat`/`place_lng` are set when the user picks a suggestion; null for hand-typed places, which the map geocodes on demand. |
 | `item_categories` | `item_id`, `category_id`, `user_id`, `created_at` | Primary key `(item_id, category_id)`. An item may belong to up to 10 categories; the UI files it in one and browses one at a time. |
 | `category_shares` | `id`, `category_id`, `owner_user_id`, `invited_email`, `role`, `expires_at`, `created_at` | One row per `(category, invited email)`, email at most 320 characters. `role` is `viewer` (default) or `editor`. |
-| `images` | `id`, `item_id`, `user_id`, `path_full`, `path_thumb`, `size_bytes`, `created_at` | One row per photo; paths are complete Storage paths. Cascades away with its item. |
+| `images` | `id`, `item_id`, `user_id`, `path_full`, `path_thumb`, `size_bytes`, `created_at` | One row per photo; paths are complete Storage paths whose second segment is the row's own item, for both sizes. Cascades away with its item. |
 
 ### Row Level Security
 
