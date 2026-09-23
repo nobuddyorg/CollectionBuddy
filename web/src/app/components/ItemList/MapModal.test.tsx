@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
 import { usePlaces } from '../Map/usePlaces';
-import { useCurrentLocation } from '../Map/useCurrentLocation';
+import {
+  useCurrentLocation,
+  type LocationResult,
+} from '../Map/useCurrentLocation';
 import { MapModal } from './MapModal';
 import type { MapCommand } from '../Map/types';
 
@@ -167,6 +170,32 @@ describe('MapModal', () => {
       markers: unknown[];
     };
     expect(marker).toBeDefined();
+  });
+
+  // #694: the fix resolving after a later "show all" tap must not undo it.
+  it('keeps the later tap when the location fix arrives after it', async () => {
+    placesState({ places: [place('Bonn', ['a'])] });
+    let resolveFix: (result: LocationResult) => void = () => {};
+    const request = vi.fn(
+      () => new Promise<LocationResult>((resolve) => (resolveFix = resolve)),
+    );
+    locationState({ request, location: { lat: 1, lng: 2 } });
+    renderModal();
+    await waitFor(() => expect(drawn.at(-1)?.command).not.toBeNull());
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Zoom to current location' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Show all locations' }),
+    );
+    const afterShowAll = drawn.at(-1)?.command;
+    await act(async () =>
+      resolveFix({ ok: true, location: { lat: 1, lng: 2 } }),
+    );
+
+    expect(afterShowAll).toMatchObject({ kind: 'fitAll' });
+    expect(drawn.at(-1)?.command).toEqual(afterShowAll);
   });
 
   it('explains a refused location rather than failing silently', async () => {

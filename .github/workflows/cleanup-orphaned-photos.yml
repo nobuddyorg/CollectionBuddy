@@ -47,6 +47,7 @@ jobs:
 
           # Bounds the query's response and this run's deletes; the next daily run takes the rest.
           MAX_OBJECTS_PER_RUN=10000
+          # shellcheck disable=SC2016 # the single-quoted pattern is the heredoc's literal placeholder, meant not to expand
           QUERY=${QUERY//'$MAX_OBJECTS_PER_RUN'/$MAX_OBJECTS_PER_RUN}
 
           payload=$(jq -n --arg q "$QUERY" '{query: $q}')

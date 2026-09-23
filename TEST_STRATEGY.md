@@ -551,10 +551,10 @@ not leakproof.
 
 **The frontend side benefits from a numeric gate** (Lighthouse CI): against the
 production build, never a dev server; a few representative states (signed out,
-and signed in via an anonymous or demo session); gate on performance only,
-leaving accessibility to §9's tooling; median of several runs; **thresholds
-from a measured baseline with margin**, never the tool's defaults or the exact
-measured value. When a measurement reveals something worth understanding (a
+and signed in via an anonymous or demo session); gate on performance, and
+assert accessibility at a perfect score as a second lens on §9's tooling;
+median of several runs; **thresholds from a measured baseline with margin**,
+never the tool's defaults or the exact measured value. When a measurement reveals something worth understanding (a
 first-run layout shift a real session never sees), write down why the threshold
 sits where it does.
 

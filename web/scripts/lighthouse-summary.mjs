@@ -29,6 +29,9 @@ const TARGETS = [
   },
 ];
 
+// Both targets assert a perfect accessibility score.
+const MIN_ACCESSIBILITY = 1;
+
 // `atLeast`/`atMost` each return an emoji, or ➖ when there's nothing to
 // compare (a report that failed to produce the metric at all).
 function atLeast(value, threshold) {
@@ -50,15 +53,16 @@ async function summarizeTarget({ label, manifest, minPerformance, maxCls }) {
   try {
     entries = JSON.parse(await readFile(manifest, 'utf8'));
   } catch {
-    return `| ${label} | _no report found_ | | | | | |`;
+    return `| ${label} | _no report found_ | | | | | | |`;
   }
   // lhci marks exactly one run representative per URL once numberOfRuns > 1;
   // falls back to the last run so a single-run local override still reports.
   const run = entries.find((e) => e.isRepresentativeRun) ?? entries.at(-1);
-  if (!run) return `| ${label} | _no run recorded_ | | | | | |`;
+  if (!run) return `| ${label} | _no run recorded_ | | | | | | |`;
 
   const report = JSON.parse(await readFile(run.jsonPath, 'utf8'));
   const performance = run.summary.performance;
+  const accessibility = run.summary.accessibility;
   const cls = report.audits['cumulative-layout-shift']?.numericValue;
   const lcpMs = report.audits['largest-contentful-paint']?.numericValue;
   const lcp = Number.isFinite(lcpMs) ? `${(lcpMs / 1000).toFixed(1)}s` : 'n/a';
@@ -68,6 +72,7 @@ async function summarizeTarget({ label, manifest, minPerformance, maxCls }) {
       label,
       atLeast(performance, minPerformance),
       pct(performance),
+      `${atLeast(accessibility, MIN_ACCESSIBILITY)} ${pct(accessibility)}`,
       pct(run.summary['best-practices']),
       pct(run.summary.seo),
       lcp,
@@ -85,8 +90,8 @@ async function buildSummary() {
     '',
     'Scores are 0-100. Full HTML reports: download the `lighthouse-reports` workflow artifact.',
     '',
-    '| Page | | Performance | Best practices | SEO | LCP | CLS |',
-    '|---|---|---|---|---|---|---|',
+    '| Page | | Performance | Accessibility | Best practices | SEO | LCP | CLS |',
+    '|---|---|---|---|---|---|---|---|',
     ...rows,
     '',
   ].join('\n');

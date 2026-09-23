@@ -31,6 +31,14 @@ From `supabase/config.toml`: API `54321`, Postgres `54322`, Studio `54323`, Mail
 | `SUPABASE_PROJECT_REF` | same two | Required |
 | `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test`) | Optional; without it Stryker writes a local HTML report only |
 
+None of these may appear in the repository. The gitleaks hook
+([`.gitleaks.toml`](../../.gitleaks.toml)) blocks a commit that stages a JWT or
+a password-bearing `*.supabase.co` / `*.pooler.supabase.com` connection
+string. JWTs whose payload carries `"role":"anon"` are allowlisted, because
+the anon key is public by design; a `service_role` key still fails. The hook
+sees only staged changes, so in CI it has nothing to scan; GitHub push
+protection is the server-side check.
+
 ## Coverage and mutation thresholds
 
 | Gate | Where | Value |
@@ -39,7 +47,7 @@ From `supabase/config.toml`: API `54321`, Postgres `54322`, Studio `54323`, Mail
 | Unit coverage, per file | same file, `PER_FILE_FLOOR`, over `mutation-targets.mjs` | 100%, except the two `Map/` hooks in `NO_COVERAGE_FLOOR` |
 | Mutation score | `web/stryker.config.mjs` `thresholds.break` | 99 — one below the measured 100, so a single new equivalent mutant cannot block unrelated work |
 | E2E JS/CSS coverage | `web/e2e/coverage.ts` `COVERAGE_THRESHOLDS` | One floor, on `npm run e2e:local` only (every Chromium project, source-mapped); `npm run e2e` and the smoke test collect nothing |
-| Lighthouse | `web/lighthouserc.signed-out.json`, `.signed-in.json` | Performance, best-practices and SEO scores plus LCP, TBT, CLS; set from a measured baseline with margin |
+| Lighthouse | `web/lighthouserc.signed-out.json`, `.signed-in.json` | Performance, best-practices and SEO scores plus LCP, TBT, CLS, set from a measured baseline with margin; accessibility at exactly 1.0 |
 
 Every floor is raised by hand when a real run reports a higher number, and never lowered to make a change fit. `autoUpdate` is off in Vitest: it wrote the local measurement back into the config after every run, so a green local run produced a red PR.
 

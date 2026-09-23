@@ -90,6 +90,8 @@ select function_privs_are('public', 'normalize_text', array['text'],
   'anon', array[]::text[], 'anon cannot execute normalize_text');
 select function_privs_are('public', 'join_tags', array['text[]'],
   'anon', array[]::text[], 'anon cannot execute join_tags');
+select function_privs_are('public', 'storage_item_id', array['text'],
+  'anon', array[]::text[], 'anon cannot execute storage_item_id');
 
 -- ...and the same set from the other side: the application's own role can
 -- reach every function it actually calls. An EXECUTE quietly lost here is
@@ -115,14 +117,10 @@ from (values
 -- pg_depend entry rather than by name, so where pgTAP itself is installed
 -- makes no difference to this.
 --
--- Two ordinary functions are deliberately in the list. keepalive() is the
--- one thing anon is meant to do (.github/workflows/keep-alive.yml).
--- storage_item_id() takes no authorization decision and reads nothing --
--- it parses a uuid out of the second segment of a string -- so reaching it
--- with no session discloses nothing; it is here to be noticed if that ever
--- stops being true. Everything else is a trigger function, which cannot be
--- called directly at all (002_function_hardening_test.sql asserts that
--- rather than assuming it).
+-- keepalive() is the one ordinary function anon is meant to reach
+-- (.github/workflows/keep-alive.yml). Everything else is a trigger function,
+-- which cannot be called directly at all (002_function_hardening_test.sql
+-- asserts that rather than assuming it).
 select is(
   (select array_agg(p.proname::text order by p.proname)
    from pg_catalog.pg_proc p
@@ -134,8 +132,8 @@ select is(
        select 1 from pg_catalog.pg_depend d
        where d.objid = p.oid and d.deptype = 'e'
      )),
-  array['keepalive', 'storage_item_id'],
-  'the only non-trigger functions anon may execute are keepalive and storage_item_id'
+  array['keepalive'],
+  'the only non-trigger function anon may execute is keepalive'
 );
 
 -- Row level security on every table in the schema, derived rather than

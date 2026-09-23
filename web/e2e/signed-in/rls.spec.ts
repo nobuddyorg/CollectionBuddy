@@ -378,6 +378,28 @@ test.describe('one collection cannot reach another', () => {
     });
   }
 
+  // PUBLIC's default EXECUTE is revoked (0010), so anon is refused before the body runs; signed in, it still parses.
+  test('a visitor with no session cannot call storage_item_id', async ({}, testInfo) => {
+    testInfo.skip(!process.env.E2E_SUPABASE_URL);
+    const { token } = context();
+    const anon = createClient(
+      process.env.E2E_SUPABASE_URL!,
+      process.env.E2E_SUPABASE_ANON_KEY!,
+      { auth: { persistSession: false } },
+    );
+    const itemId = '00000000-0000-4000-8000-000000000000';
+    const path = `owner/${itemId}/photo.webp`;
+
+    const { data, error, status } = await anon.rpc('storage_item_id', { path });
+    expect(data).toBeNull();
+    expect(error!.code).toBe('42501');
+    expect(status).toBe(401);
+
+    const signedIn = await apiAs(token).rpc('storage_item_id', { path });
+    expect(signedIn.error).toBeNull();
+    expect(signedIn.data).toBe(itemId);
+  });
+
   test('a visitor with no session can list no photographs', async ({}, testInfo) => {
     testInfo.skip(!process.env.E2E_SUPABASE_URL);
     const { otherUserId } = context();

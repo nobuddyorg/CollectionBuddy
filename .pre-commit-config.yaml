@@ -28,10 +28,25 @@ repos:
             web/package-lock\.json
           )$
 
+  # Staged changes on commit; rules and the anon-key allowlist in .gitleaks.toml.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
     rev: v1.29.0
     hooks:
       - id: zizmor
+
+  # zizmor covers security; actionlint covers syntax, expression types, job references and ShellCheck on run: blocks.
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+        # Every workflow at once, so an edited composite action re-checks the workflows that call it.
+        files: ^\.github/(workflows|actions)/
+        pass_filenames: false
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.23.2
@@ -44,9 +59,28 @@ repos:
     hooks:
       - id: sqlfluff-lint
 
+  # Lock and rewrite hazards sqlfluff cannot see; rules in .squawk.toml.
+  - repo: https://github.com/sbdchd/squawk
+    rev: v2.65.0
+    hooks:
+      - id: squawk
+        files: ^supabase/migrations/.*\.sql$
+        # 0001-0009 are applied history and predate the lock/statement timeout rules; never edited to satisfy them.
+        exclude: ^supabase/migrations/000[1-9]_
+        additional_dependencies: ["squawk-cli@2.65.0"]
+
   # The same commands CI runs, from web/ where their config lives.
   - repo: local
     hooks:
+      # Its own pinned install, not a web/ devDependency: CI's prek job runs without node_modules.
+      - id: lockfile-lint
+        name: lockfile-lint (web)
+        entry: lockfile-lint --path web/package-lock.json --type npm --allowed-hosts npm --validate-https --validate-integrity --validate-package-names
+        language: node
+        additional_dependencies: ["lockfile-lint@5.0.1"]
+        pass_filenames: false
+        files: ^web/package-lock\.json$
+
       - id: prettier
         name: Prettier (web)
         entry: bash -c 'cd web && npx prettier --check .'

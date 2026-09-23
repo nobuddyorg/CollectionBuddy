@@ -161,6 +161,22 @@ the Storage API and the bytes behind a `storage.objects` row are exercised. A
 policy, grant, or ownership-trigger change needs its `rls.spec.ts` case
 regardless of pgTAP coverage.
 
+### Splinter (Supabase Advisors lints)
+
+```bash
+supabase/splinter.sh   # repository root, after supabase start; needs psql
+```
+
+Runs [Splinter](https://github.com/supabase/splinter), the lint set behind the
+hosted dashboard's Advisors, against the local stack, and fails on any `WARN`
+or `ERROR`: RLS disabled, a mutable `search_path`, an unindexed foreign key, a
+`SECURITY DEFINER` function the API roles can execute. CI runs it right after
+pgTAP. The script pins Splinter by commit and checksum and lists what it
+excuses, each with its reason: `unused_index`, which reads runtime statistics
+a freshly reset database does not have, and `search_category_items`, the one
+deliberate `SECURITY DEFINER` RPC. A new excuse is a design decision and goes
+into that list with its reason, never into a broader filter.
+
 ## Run mutation testing
 
 ```bash
@@ -223,9 +239,11 @@ cd web && npm run lighthouse
 ```
 
 Thresholds and the baseline they were measured against are in
-`web/lighthouserc.signed-out.json` and `.signed-in.json`. The performance
-category is the gate; accessibility findings belong to `@axe-core/playwright`
-in the e2e suite, so they are not double-asserted here. A fresh demo account
+`web/lighthouserc.signed-out.json` and `.signed-in.json`. Performance is gated
+against a measured baseline; accessibility must score exactly 1.0 on both
+flows, a second, weighted lens on the pages `@axe-core/playwright` already
+checks in the e2e suite. A finding fixed for Lighthouse gets an axe or
+Playwright case too, so it cannot regress between runs. A fresh demo account
 has no categories, so the signed-in pass measures a different code path than a
 populated catalogue.
 
@@ -281,7 +299,15 @@ names exists at the size it claims.
 ## Change the database schema
 
 1. Add `supabase/migrations/NNNN_description.sql`, numbered after the highest
-   existing file. Never edit an existing migration.
+   existing file. Never edit an existing migration. A file that takes a lock
+   starts with `set local lock_timeout` and `set local statement_timeout`
+   after its `begin;`, so it fails fast instead of queueing every read behind
+   it; the Squawk hook enforces that and the other lock and rewrite hazards.
+   [`.squawk.toml`](../../.squawk.toml) turns off three rules:
+   `require-concurrent-index-creation` and `-deletion`, since `CONCURRENTLY`
+   cannot run inside the transaction every file is, and `prefer-robust-stmts`,
+   since `IF NOT EXISTS` hides typos in files CI applies from scratch. The
+   hook skips `0001`–`0009`, applied before it existed.
 2. Apply it: `supabase db reset` (re-runs every migration from scratch).
 3. Regenerate `web/src/app/data/database.types.ts`:
    `supabase gen types typescript --local`. CI fails if it drifts.

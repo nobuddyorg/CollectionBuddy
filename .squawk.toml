@@ -1,0 +1,9 @@
+# Squawk over supabase/migrations/ (hook in .pre-commit-config.yaml); every other default rule stays on.
+pg_version = "17.0"
+excluded_rules = [
+  # Each migration is one transaction (its own begin/commit), and CONCURRENTLY cannot run inside one.
+  "require-concurrent-index-creation",
+  "require-concurrent-index-deletion",
+  # IF NOT EXISTS everywhere hides typos in files CI already proves apply from scratch.
+  "prefer-robust-stmts",
+]

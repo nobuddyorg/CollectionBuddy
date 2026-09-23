@@ -11,12 +11,13 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 
 ## Database schema
 
-[`supabase/migrations/`](../../supabase/migrations/), applied in filename order: seven files ordered by dependency, not history — extensions, functions, tables, triggers, indexes, policies, storage — and none of them patches another. A change to the schema is a new `0008_*.sql`; the chain is folded back into the seven only by a deliberate squash ([why](../explanation/design-decisions.md#why-the-migrations-were-squashed)).
+[`supabase/migrations/`](../../supabase/migrations/), applied in filename order: seven files ordered by dependency, not history — extensions, functions, tables, triggers, indexes, policies, storage — and none of them patches another. A change to the schema is a new numbered file after them; the chain is folded back into the seven only by a deliberate squash ([why](../explanation/design-decisions.md#why-the-migrations-were-squashed)).
 
 | File | Changes |
 | --- | --- |
 | [`0008_drop_items_tags_gin.sql`](../../supabase/migrations/0008_drop_items_tags_gin.sql) | Drops the GIN index on `items.tags`, which no query read. |
 | [`0009_user_quotas.sql`](../../supabase/migrations/0009_user_quotas.sql) | Per-owner quotas: 1 GiB of full-size photographs and 50,000 entries, with photograph sizes taken from Storage rather than the client. |
+| [`0010_revoke_public_execute.sql`](../../supabase/migrations/0010_revoke_public_execute.sql) | Revokes PUBLIC's default `EXECUTE` on `storage_item_id()` and on the `SECURITY DEFINER` trigger functions of `0002`; triggers still fire, direct calls are refused. |
 
 ### Tables
 
@@ -104,7 +105,7 @@ One private bucket, `item-images` ([`0007_storage.sql`](../../supabase/migration
 - **Owner-only policies** on `select`, `insert`, `delete`: `split_part(name, '/', 1) = auth.uid()::text`.
 - **Shared policies** on `select` and `delete`: extract the item id with `storage_item_id()` and join through `item_categories` to the same read/write predicates the tables use. `storage_item_id()` returns `NULL` on a path that does not parse, because a raised error inside `USING` aborts the statement instead of failing to match the row.
 - **No shared `insert`**: an editor's upload lands under the editor's own prefix and satisfies the owner-only set.
-- **No `update`** for anyone, and no `UPDATE` privilege: a path is fixed when written; `move()` and `upsert` are refused ([why](../explanation/design-decisions.md#why-a-storage-objects-path-can-never-change)).
+- **No `update` policy** for anyone, and that absence is the only denial — Storage's bootstrap re-grants the `UPDATE` privilege on every start. A path is fixed when written; `move()` and `upsert` are refused ([why](../explanation/design-decisions.md#why-a-storage-objects-path-can-never-change)).
 
 Because `has_category_read_access()` excludes ownership and an owner cannot share with herself, **the owner cannot read or sign an object an editor uploaded** — same asymmetry as an editor-filed item being invisible to the category's owner. Deliberate.
 

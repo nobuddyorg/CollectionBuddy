@@ -55,6 +55,7 @@ jobs:
             sql:
               - 'supabase/migrations/**'
               - 'supabase/tests/database/**'
+              - 'supabase/splinter.sh'
               - '.sqlfluff'
               - '.github/workflows/ci.yml'
 
@@ -181,6 +182,20 @@ jobs:
         with:
           title: '🐘 pgTAP database tests'
           file: pgtap-output.txt
+
+      # The hosted dashboard's Advisors, on the same stack; what the script excuses, and why, is listed in it.
+      - name: Run Splinter (Supabase Advisors lints)
+        id: splinter
+        working-directory: .
+        shell: bash
+        run: supabase/splinter.sh 2>&1 | tee splinter-output.txt
+
+      - name: Add Splinter results to job summary
+        if: always() && steps.splinter.outcome != 'skipped'
+        uses: ./.github/actions/summary-section
+        with:
+          title: '🩺 Splinter (Supabase Advisors lints)'
+          file: splinter-output.txt
 
       # Raw CLI output is unformatted, so it goes through the project's Prettier config before the diff; the checked-in header is carried over.
       - name: Verify database.types.ts matches the schema
