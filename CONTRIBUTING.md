@@ -46,13 +46,20 @@ Google OAuth is the only real sign-in, and it needs credentials even locally
 ## Commit hooks
 
 [prek](https://github.com/j178/prek) runs [`.pre-commit-config.yaml`](.pre-commit-config.yaml)
-on every commit: file hygiene, gitleaks over the staged changes (service-role
-keys and database URLs block the commit; anon keys pass, [`.gitleaks.toml`](.gitleaks.toml)), `typos`, `zizmor`, `markdownlint`, `sqlfluff-lint`
-over `supabase/`, Squawk over new migrations (lock and rewrite hazards,
-[`.squawk.toml`](.squawk.toml)), lockfile-lint on `web/package-lock.json`
-(every package from `registry.npmjs.org`, over HTTPS, with an integrity
-hash), and the same format/lint/type/architecture/dead-code checks
-CI runs in `web/`. `pre-commit` reads the same file.
+on every commit; `pre-commit` reads the same file:
+
+- file hygiene, `typos`, `markdownlint`;
+- gitleaks over the staged changes: service-role keys and database URLs
+  block the commit, anon keys pass ([`.gitleaks.toml`](.gitleaks.toml));
+- `zizmor` and `actionlint` over `.github/` — security, then syntax,
+  expression types, job references, and ShellCheck on workflow `run:` blocks
+  when `shellcheck` is on your `PATH` (CI's runner has it; composite actions'
+  own scripts are not checked);
+- `sqlfluff-lint` over `supabase/`, and Squawk over new migrations for lock
+  and rewrite hazards ([`.squawk.toml`](.squawk.toml));
+- lockfile-lint on `web/package-lock.json`: every package from
+  `registry.npmjs.org`, over HTTPS, with an integrity hash;
+- the same format/lint/type/architecture/dead-code checks CI runs in `web/`.
 
 ```bash
 prek install           # once

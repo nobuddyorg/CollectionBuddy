@@ -39,6 +39,15 @@ repos:
     hooks:
       - id: zizmor
 
+  # zizmor covers security; actionlint covers syntax, expression types, job references and ShellCheck on run: blocks.
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+        # Every workflow at once, so an edited composite action re-checks the workflows that call it.
+        files: ^\.github/(workflows|actions)/
+        pass_filenames: false
+
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.23.2
     hooks:
