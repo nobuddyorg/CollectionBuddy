@@ -23,35 +23,31 @@ type ToastEntry = {
   action?: ToastAction;
   onExpire?: () => void | Promise<void>;
 };
-type SuccessOpts = {
-  /** Renders a second button that cancels `onExpire` and runs its own
-   * `onClick` instead -- the toast's undo. */
+type SuccessOptions = {
+  /** A second button that cancels `onExpire` and runs its own `onClick`: the toast's undo. */
   action?: ToastAction;
-  /** Runs once, when the toast is dismissed any way other than its action
-   * button: auto-dismiss or the close button. This is where a deferred
-   * destructive operation actually happens, so it never fires twice. */
+  /** Runs once, on auto-dismiss or the close button; the deferred destructive step goes here. */
   onExpire?: () => void | Promise<void>;
 };
 
 type ToastApi = {
   error: (message: string) => void;
-  /** Visible, self-dismissing confirmation for actions whose only other
-   * signal is structural (a card disappearing, a button re-enabling). */
-  success: (message: string, opts?: SuccessOpts) => void;
-  /** Posts an outcome to the app-level polite live region, for anyone not
-   * looking at whatever just changed. */
+  /** Visible, self-dismissing confirmation for actions whose only other signal is structural. */
+  success: (message: string, options?: SuccessOptions) => void;
+  /** Posts an outcome to the app-level polite live region. */
   announce: (message: string) => void;
-  /** console.error + toast.error together: `scope` is a short console
-   * label, `err` is logged in full, `message` is shown to the user. */
-  reportError: (scope: string, err: unknown, message: string) => void;
+  /** console.error(scope, error) plus toast.error(message). */
+  reportError: (scope: string, error: unknown, message: string) => void;
 };
 
 const ToastContext = createContext<ToastApi | undefined>(undefined);
 
 export function useToast(): ToastApi {
-  const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error('useToast must be used within a ToastProvider');
-  return ctx;
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error('useToast must be used within a ToastProvider');
+  }
+  return context;
 }
 
 const AUTO_DISMISS_MS = 6000;
@@ -62,24 +58,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [announcement, setAnnouncement] = useState('');
   const nextId = useRef(0);
 
-  // Gated on a post-mount flag, not a bare `typeof document` check, so the
-  // client's first render pass matches the server's (which never renders
-  // the portal at all) for hydration.
   const [mounted, setMounted] = useState(false);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- a post-mount flag keeps the client's first render identical to the server's (no portal) for hydration
   useEffect(() => setMounted(true), []);
 
-  // Mirrors `toasts` by id so `expire` can reach a toast's onExpire without
-  // reading it out of a setState updater, which Strict Mode double-invokes.
+  // Kept by id so expire() reads onExpire outside a setState updater, which Strict Mode runs twice.
   const entriesRef = useRef<Map<number, ToastEntry>>(new Map());
 
   const remove = useCallback((id: number) => {
     entriesRef.current.delete(id);
-    setToasts((prev) => prev.filter((entry) => entry.id !== id));
+    setToasts((previous) => previous.filter((entry) => entry.id !== id));
   }, []);
 
-  // Auto-dismiss and the close button both commit whatever the toast
-  // represents; only its action button (the undo) skips onExpire.
+  // Auto-dismiss and the close button both commit; only the action button (undo) skips onExpire.
   const expire = useCallback(
     (id: number) => {
       void entriesRef.current.get(id)?.onExpire?.();
@@ -89,17 +80,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 
   const post = useCallback(
-    (kind: ToastKind, message: string, opts?: SuccessOpts) => {
+    (kind: ToastKind, message: string, options?: SuccessOptions) => {
       const id = ++nextId.current;
       const entry: ToastEntry = {
         id,
         message,
         kind,
-        action: opts?.action,
-        onExpire: opts?.onExpire,
+        action: options?.action,
+        onExpire: options?.onExpire,
       };
       entriesRef.current.set(id, entry);
-      setToasts((prev) => [...prev, entry]);
+      setToasts((previous) => [...previous, entry]);
       setTimeout(() => expire(id), AUTO_DISMISS_MS);
     },
     [expire],
@@ -110,7 +101,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [post],
   );
   const success = useCallback(
-    (message: string, opts?: SuccessOpts) => post('success', message, opts),
+    (message: string, options?: SuccessOptions) =>
+      post('success', message, options),
     [post],
   );
 
@@ -119,8 +111,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const reportError = useCallback(
-    (scope: string, err: unknown, message: string) => {
-      console.error(scope, err);
+    (scope: string, error: unknown, message: string) => {
+      console.error(scope, error);
       post('error', message);
     },
     [post],
@@ -134,8 +126,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      {/* The one polite live region for the whole app -- unlike the toasts
-          below, this never needs to be seen. */}
+      {/* The one polite live region for the whole app; unlike the toasts, never meant to be seen */}
       <span className="sr-only" aria-live="polite">
         {announcement}
       </span>

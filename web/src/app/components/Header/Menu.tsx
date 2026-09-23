@@ -15,12 +15,11 @@ function SegmentedControl<T extends string>({
   value: T;
   options: readonly T[];
   labels: Record<T, string>;
-  onChange: (v: T) => void;
+  onChange: (value: T) => void;
   testIdPrefix: string;
 }) {
   return (
-    // Full width with equal segments: labels are language names, never
-    // translated, so their width can't be budgeted for.
+    // Equal segments: language names are never translated, so their width cannot be budgeted.
     <div className="flex w-full rounded-lg border overflow-hidden">
       {options.map((option) => (
         <button
@@ -62,8 +61,7 @@ export default function Menu({
     >
       <div className={labelClasses('px-3 py-2 truncate')}>{user.email}</div>
 
-      {/* Caption above, not beside, so the layout doesn't depend on how
-          long the translation of "Language" happens to be. */}
+      {/* Caption above, not beside: the layout must not depend on a translation's length. */}
       <div className="px-3 py-2 space-y-1.5">
         <span className="block text-sm">{t('header.language')}</span>
         <SegmentedControl
@@ -75,7 +73,6 @@ export default function Menu({
         />
       </div>
 
-      {/* Same shape as the language control above. */}
       <div className="px-3 py-2 space-y-1.5">
         <span className="block text-sm">{t('header.theme')}</span>
         <SegmentedControl

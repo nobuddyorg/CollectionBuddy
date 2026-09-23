@@ -1,26 +1,15 @@
-// Serves the static export the way GitHub Pages does: under the base path,
-// not at the root.
-//
-// `next build` bakes the base path into every asset URL and the manifest,
-// so an export served at `/` 404s on nearly everything -- a suite pointed
-// at it would test a site that never existed. The directory built below
-// puts `out/` one level down, at the name the base path expects.
-//
-// Usage: node scripts/serve-export.mjs <port> [basePath]
-//
-// Started by playwright.config.ts, which passes the base path it read from
-// next.config.ts -- this script deliberately does not know the name itself.
+// Serves out/ under the base path playwright.config.ts passes (`<port> [basePath]`), as GitHub Pages does; at `/` it 404s.
 import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync, symlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const webDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const webDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const port = process.argv[2] ?? '4173';
 const basePath = (process.argv[3] ?? '').replace(/^\//, '');
 
-const scratch = resolve(webDir, '.e2e-serve');
-const out = resolve(webDir, 'out');
+const scratch = resolve(webDirectory, '.e2e-serve');
+const out = resolve(webDirectory, 'out');
 
 let root = out;
 if (basePath) {
@@ -33,7 +22,7 @@ if (basePath) {
 const cleanUp = () => rmSync(scratch, { recursive: true, force: true });
 
 const child = spawn('npx', ['serve', root, '-l', port], {
-  cwd: webDir,
+  cwd: webDirectory,
   stdio: 'inherit',
 });
 

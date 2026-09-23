@@ -6,9 +6,7 @@ import { useI18n } from '../../i18n/useI18n';
 
 type LoadingOverlayProps = {
   label: string;
-  // 'dark' is a black scrim for overlays over real page content. 'auto'
-  // follows the app's own tokens, for overlays that are the only thing on
-  // screen.
+  /** 'dark' scrims real page content; 'auto' follows the app tokens when alone on screen. */
   theme?: 'dark' | 'auto';
 };
 
@@ -22,10 +20,8 @@ export default function LoadingOverlay({
   const { t } = useI18n();
   const [slow, setSlow] = useState(false);
 
-  // Resets synchronously so a new wait starting while already slow (label
-  // changed, overlay didn't unmount) doesn't stay stuck in "slow" state.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset synchronously so a new wait that starts while already slow does not stay slow
     setSlow(false);
     const id = setTimeout(() => setSlow(true), SLOW_THRESHOLD_MS);
     return () => clearTimeout(id);

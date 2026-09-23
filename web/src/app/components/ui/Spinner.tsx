@@ -7,8 +7,7 @@ const SIZE_CLASSES = {
 
 export type SpinnerSize = keyof typeof SIZE_CLASSES;
 
-// Inherits currentColor rather than a fixed white, so a caller on a dark
-// surface sets its own text colour the same way it sets every other icon's.
+// currentColor, not a fixed white: a fixed white was invisible on every pale surface.
 export function Spinner({ size = 'md' }: { size?: SpinnerSize }) {
   return (
     <div

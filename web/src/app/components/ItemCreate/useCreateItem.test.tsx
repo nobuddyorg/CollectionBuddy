@@ -167,8 +167,7 @@ describe('useCreateItem', () => {
     consoleError.mockRestore();
   });
 
-  // The rollback this guards: a row that exists but belongs to no category
-  // is invisible to every view the app has, and permanently unreachable.
+  // A row that belongs to no category is invisible to every view and permanently unreachable.
   it('deletes the created item when linking it to the category fails', async () => {
     vi.mocked(createItem).mockResolvedValue({
       data: { id: 'item-1' },

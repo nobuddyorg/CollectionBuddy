@@ -1,10 +1,4 @@
-// Turns Stryker's JSON report into a markdown table for the mutation_test
-// job's Actions summary. Uses the mutation-testing-report-schema data via
-// mutation-testing-metrics (the same package Stryker's own HTML/dashboard
-// reporters use to compute scores) rather than scraping console output, so
-// it can't drift out of sync with what those reporters show.
-//
-// Usage: npm run mutation:summary   (after `npx stryker run`)
+// Stryker's JSON report as a markdown table, scored by mutation-testing-metrics as Stryker's own reporters are.
 import { readFile, appendFile } from 'node:fs/promises';
 
 import { calculateMutationTestMetrics } from 'mutation-testing-metrics';
@@ -18,7 +12,7 @@ function formatScore(score) {
 }
 
 function statusIcon(score) {
-  if (!Number.isFinite(score)) return '➖'; // heavy minus sign -- no mutants to score
+  if (!Number.isFinite(score)) return '➖'; // no mutants to score
   return score >= BREAK_THRESHOLD ? '✅' : '❌';
 }
 
@@ -40,7 +34,7 @@ async function buildSummary() {
 
   const fileRows = [];
   collectFileRows(root, fileRows);
-  // Worst score first -- that's the part worth a reviewer's attention.
+  // Worst score first.
   fileRows.sort((a, b) => {
     const scoreA = Number.isFinite(a.metrics.mutationScore)
       ? a.metrics.mutationScore

@@ -26,10 +26,7 @@ describe('Spinner', () => {
     );
   });
 
-  // Regression: a hardcoded white spinner used to be invisible on every pale
-  // surface (the outline buttons, the light-themed primary button, ...),
-  // which is why three call sites rolled their own currentColor spinner
-  // instead of using this one.
+  // A hardcoded white spinner was invisible on every pale surface (outline buttons, light primary).
   it('inherits currentColor rather than a fixed white', () => {
     const { container } = render(<Spinner />);
     expect(container.firstChild).toHaveClass(

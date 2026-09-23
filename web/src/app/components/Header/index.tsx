@@ -5,8 +5,6 @@ import { HeaderProps } from './types';
 import { useMenu } from './useMenu';
 import Menu from './Menu';
 
-// The one caller below always passes a leading slash -- no normalization
-// needed for a path this function never receives any other way.
 const withBasePath = (path: `/${string}`): string => {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
   return `${basePath}${path}`;
@@ -26,8 +24,7 @@ export default function Header({ user, onSignOut }: HeaderProps) {
     >
       <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          {/* eslint-disable-next-line @next/next/no-img-element -- next/image
-              earns nothing on this static export (images.unoptimized). */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- next/image earns nothing on a static export with images.unoptimized */}
           <img
             src={withBasePath('/logo-header.png')}
             alt=""
@@ -37,10 +34,7 @@ export default function Header({ user, onSignOut }: HeaderProps) {
             fetchPriority="high"
             className="object-contain shrink-0"
           />
-          {/* The login page's wordmark at header scale. 2px rule, not the
-              login page's 3px -- under 16px type that weight reads as a
-              highlighter stroke. `pb-0.5` on the outer span keeps the rule
-              visible past `truncate`'s clip. */}
+          {/* pb-0.5 on the outer span keeps the rule visible past truncate's clip. */}
           <span className="font-display text-base sm:text-lg text-foreground truncate pb-0.5">
             <span className="border-b-2 border-foreground pb-px">
               {t('brand.collection')}

@@ -2,18 +2,10 @@
 
 import { useEffect } from 'react';
 
-// Keyed by element rather than a single counter: in real use there is only
-// ever one #app-root, but keying by identity means independent renders (as
-// in tests, where each one mounts its own root) never share a count.
+// Keyed by element so independent roots (each test mounts its own) never share a count.
 const openCounts = new WeakMap<HTMLElement, number>();
 
-// `aria-modal` on the dialog isn't honoured by every reader/browser pairing:
-// VoiceOver and NVDA's virtual cursor (browse mode) can walk straight past
-// it into the rest of the page. `inert` on the app root removes that
-// background from both the accessibility tree and the tab order.
-//
-// Counted rather than a plain on/off, so a confirm dialog opening on top of
-// an already-open modal keeps the root hidden until the last of them closes.
+// aria-modal alone is not honoured by VoiceOver or NVDA browse mode; inert on the root is.
 export function useInertBackground(active: boolean) {
   useEffect(() => {
     if (!active) return;
@@ -21,6 +13,7 @@ export function useInertBackground(active: boolean) {
     const root = document.getElementById('app-root');
     if (!root) return;
 
+    // Counted, not on/off: a confirm over an open modal keeps the root inert until both close.
     const count = (openCounts.get(root) ?? 0) + 1;
     openCounts.set(root, count);
     if (count === 1) root.inert = true;

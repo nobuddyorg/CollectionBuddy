@@ -11,17 +11,14 @@ export function useFocusTrap(
 ) {
   useEffect(() => {
     if (!open) return;
-    const prev = document.activeElement as HTMLElement | null;
+    const previous = document.activeElement as HTMLElement | null;
     (
       initialFocusRef?.current ?? getFocusable(containerRef.current)[0]
     )?.focus();
     return () => {
-      // A confirmed delete can remove the control that opened the dialog
-      // (e.g. a card's trash button) from the DOM first, making
-      // `prev.focus()` a silent no-op; fall back to the stable main
-      // landmark instead of dropping focus on the floor.
-      if (prev!.isConnected) {
-        prev!.focus();
+      // A confirmed delete may have removed the opener from the DOM, making focus() a silent no-op.
+      if (previous!.isConnected) {
+        previous!.focus();
       } else {
         document.getElementById('main-content')?.focus();
       }
@@ -30,17 +27,17 @@ export function useFocusTrap(
 
   useEffect(() => {
     if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const f = getFocusable(containerRef.current);
-      const first = f[0];
-      const last = f[f.length - 1];
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const focusable = getFocusable(containerRef.current);
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
       const active = document.activeElement as HTMLElement | null;
-      if (e.shiftKey && active === first) {
-        e.preventDefault();
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
         last.focus();
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
         first.focus();
       }
     };

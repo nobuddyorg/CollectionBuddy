@@ -5,14 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { useMenu } from './useMenu';
 
-// A menu is mostly its dismissal rules, and those live in document-level
-// listeners rather than in anything the markup shows -- so they are invisible
-// to a rendering test that only looks at the panel, and invisible to the
-// end-to-end suite too, which has no way to ask where focus went.
-// "elsewhere" deliberately has no handler of its own. Giving it one is the
-// mistake this harness started with: clicking it closed the menu because of
-// the handler, so the test passed with the document listener removed
-// entirely, and said nothing about the behaviour it was named after.
+// "elsewhere" has no handler of its own: with one, tests passed without the document listener.
 function Harness() {
   const { open, toggle, close, anchorRef, panelRef } = useMenu();
   return (
@@ -96,10 +89,7 @@ describe('useMenu', () => {
     expect(menu()).toBeNull();
   });
 
-  // Dismissing with the keyboard is the one case where focus has nowhere
-  // sensible to land, so it goes back to the trigger. Clicking the trigger
-  // already focuses it, so that alone can't prove restoration happens --
-  // focus has to actually move away first.
+  // Clicking the trigger already focuses it, so focus must move away first to prove restoration.
   it('returns focus to the trigger after Escape', async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -110,10 +100,7 @@ describe('useMenu', () => {
     expect(screen.getByText('trigger')).toHaveFocus();
   });
 
-  // The other half of that rule, and the reason it is a rule. Refocusing
-  // whenever the menu is shut -- including after a click elsewhere -- gave
-  // the trigger a keyboard-style focus ring it had not earned, because a
-  // programmatic focus() matches :focus-visible.
+  // A programmatic focus() matches :focus-visible: refocusing after a click earns an unwanted ring.
   it('leaves focus alone when it is dismissed by a click', async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -123,14 +110,7 @@ describe('useMenu', () => {
     expect(screen.getByText('trigger')).not.toHaveFocus();
   });
 
-  // A click that closes the menu is deliberately routed through "sign out"
-  // rather than "elsewhere" here: clicking outside focuses whatever was
-  // clicked as a native side effect of the same mousedown that closes the
-  // menu, and that native refocus wins the race against any focus() this
-  // hook might call, masking the very thing these tests check. Closing via
-  // a button inside the menu removes that button from the DOM on close
-  // instead, so any leftover focus() call is the only thing left to explain
-  // where focus ends up.
+  // Closed via "sign out": a click on "elsewhere" natively refocuses it, masking a stray focus().
   it('actually stops listening for Escape once closed, not just stops restoring focus in principle', async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -155,30 +135,27 @@ describe('useMenu', () => {
     expect(menu()).toBeNull();
   });
 
-  // The dismissal rules hang off document/window, where the only evidence
-  // that a closed menu is not still answering every click on the page is
-  // the listener bookkeeping itself.
+  // The listener bookkeeping is the only evidence that a closed menu is not still answering clicks.
   it('hangs no document listener until it is opened, and takes back every one it hangs', async () => {
-    const docAdd = vi.spyOn(document, 'addEventListener');
-    const docRemove = vi.spyOn(document, 'removeEventListener');
+    const addListener = vi.spyOn(document, 'addEventListener');
+    const removeListener = vi.spyOn(document, 'removeEventListener');
     const user = userEvent.setup();
     const { unmount } = render(<Harness />);
 
-    expect(docAdd).not.toHaveBeenCalled();
+    expect(addListener).not.toHaveBeenCalled();
 
     await user.click(screen.getByText('trigger'));
-    expect(docAdd).toHaveBeenCalledWith('mousedown', expect.any(Function));
+    expect(addListener).toHaveBeenCalledWith('mousedown', expect.any(Function));
 
     await user.click(screen.getByText('trigger'));
     unmount();
 
-    // Every listener it hung is taken back under the same name -- a
-    // cleanup that runs but names something else leaves it attached.
-    for (const [event, handler] of docAdd.mock.calls) {
-      expect(docRemove).toHaveBeenCalledWith(event, handler);
+    // A cleanup that runs but names a different handler leaves the listener attached.
+    for (const [event, handler] of addListener.mock.calls) {
+      expect(removeListener).toHaveBeenCalledWith(event, handler);
     }
-    docAdd.mockRestore();
-    docRemove.mockRestore();
+    addListener.mockRestore();
+    removeListener.mockRestore();
   });
 
   it('does not attach its Escape listener before the menu has ever been opened', async () => {
@@ -212,8 +189,7 @@ describe('useMenu', () => {
     expect(screen.getByText('trigger')).not.toHaveFocus();
   });
 
-  // The listeners are hung only while it is open, so a closed menu is not
-  // still answering every keystroke on the page.
+  // Listeners hang only while open, so a closed menu is not answering every keystroke on the page.
   it('ignores Escape once it is already closed', async () => {
     const user = userEvent.setup();
     render(<Harness />);

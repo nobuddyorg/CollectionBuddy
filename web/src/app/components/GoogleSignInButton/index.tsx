@@ -8,8 +8,8 @@ import LoadingOverlay from '../LoadingOverlay';
 import { Spinner } from '../ui/Spinner';
 import type { GoogleSignInButtonProps } from './types';
 
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(' ');
+function joinClasses(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(' ');
 }
 
 export default function GoogleSignInButton({
@@ -21,13 +21,10 @@ export default function GoogleSignInButton({
 
   const label = t('google_sign_in_button.sign_in_with_google');
 
-  // `loading` is never cleared on success -- the redirect unmounts this
-  // page. A bfcache restore (Back from Google's consent screen) resurrects
-  // that stale `loading: true` with no redirect coming, so `pageshow`'s
-  // `persisted` flag is what clears the stuck overlay.
+  // Success never clears `loading` (the redirect unmounts); a bfcache restore revives it stuck.
   useEffect(() => {
-    const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) setLoading(false);
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setLoading(false);
     };
     window.addEventListener('pageshow', onPageShow);
     return () => window.removeEventListener('pageshow', onPageShow);
@@ -37,9 +34,9 @@ export default function GoogleSignInButton({
     setLoading(true);
     try {
       await onClick();
-    } catch (err) {
+    } catch (error) {
       setLoading(false);
-      onError?.(err);
+      onError?.(error);
     }
   }, [onClick, onError]);
 
@@ -52,7 +49,7 @@ export default function GoogleSignInButton({
         disabled={loading}
         aria-label={label}
         aria-busy={loading ? 'true' : 'false'}
-        className={cx(
+        className={joinClasses(
           'relative flex items-center justify-center h-12 px-4 rounded-md',
           'border border-[#747775] dark:border-[#8e918f]',
           'bg-white hover:bg-[#f8f9fa] active:bg-[#f1f3f4]',

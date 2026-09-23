@@ -14,7 +14,7 @@ type Props = {
   radius?: number;
 };
 
-// The rim path in Icon's Coin case is a circle of r=160.
+// The rim path in Icon's CoinIcon is a circle of r=160.
 const DEFAULT_RADIUS = 160;
 
 export function TextRing({
@@ -27,10 +27,7 @@ export function TextRing({
   className,
   radius = DEFAULT_RADIUS,
 }: Props) {
-  // Fit the string to exactly one full turn, or it flows past the end of
-  // the path and wraps over its own start, clipping mid-glyph. `textLength`
-  // + `lengthAdjust="spacing"` distributes the slack between characters
-  // instead, so the engraving closes cleanly.
+  // textLength + lengthAdjust fit the text to one full turn, or it wraps over its own start.
   const circumference = 2 * Math.PI * radius;
 
   return (

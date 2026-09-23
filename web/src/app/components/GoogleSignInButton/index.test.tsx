@@ -47,10 +47,7 @@ describe('GoogleSignInButton', () => {
     expect(screen.getByRole('button')).not.toBeDisabled();
   });
 
-  // Regression (#350): `mode: 'oauth'` never clears `loading` itself, relying
-  // on the redirect to unmount the page. A bfcache restore resurrects that
-  // stale `loading: true` with no redirect coming -- the full-screen overlay
-  // would otherwise be stuck with no way to dismiss it.
+  // Nothing clears `loading` on success, so a bfcache restore would leave the overlay stuck.
   it('drops a stuck overlay once the page is restored from bfcache', async () => {
     renderButton();
     fireEvent.click(screen.getByRole('button'));

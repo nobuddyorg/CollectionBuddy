@@ -8,9 +8,9 @@ import { TextRing } from './TextRing';
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 
 // A bare <text> at the document root is created in the HTML namespace, not SVG.
-function renderInSvg(ui: React.ReactElement) {
+function renderInSvg(element: React.ReactElement) {
   const svg = document.createElementNS(SVG_NAMESPACE, 'svg');
-  return render(ui, { container: document.body.appendChild(svg) });
+  return render(element, { container: document.body.appendChild(svg) });
 }
 
 describe('TextRing', () => {

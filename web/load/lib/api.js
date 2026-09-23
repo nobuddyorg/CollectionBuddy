@@ -22,7 +22,7 @@ function query(params) {
     .join('&');
 }
 
-function send(method, path, { session, body, headers = {}, name }) {
+function send({ method, path, session, body, headers = {}, name }) {
   const response = http.request(method, `${SUPABASE_URL}${path}`, body, {
     headers: {
       apikey: ANON_KEY,
@@ -33,13 +33,16 @@ function send(method, path, { session, body, headers = {}, name }) {
   });
   if (response.error_code === REQUEST_TIMEOUT) timeouts.add(1, { name });
   check(response, {
-    [`${name} succeeded`]: (r) => r.status >= 200 && r.status < 300,
+    [`${name} succeeded`]: (checked) =>
+      checked.status >= 200 && checked.status < 300,
   });
   return response;
 }
 
-function sendJson(method, path, { session, payload, prefer, name }) {
-  return send(method, path, {
+function sendJson({ method, path, session, payload, prefer, name }) {
+  return send({
+    method,
+    path,
     session,
     name,
     body: JSON.stringify(payload),
@@ -58,10 +61,12 @@ function expectOk(response, what) {
   return response;
 }
 
-// Local stacks confirm email sign-ups instantly; the hosted project has no password sign-in to call (docs/how-to/load-testing.md).
+// Local stacks confirm email sign-ups instantly; the hosted project has no password sign-in to call.
 export function signUp(email, password) {
   const response = expectOk(
-    sendJson('POST', '/auth/v1/signup', {
+    sendJson({
+      method: 'POST',
+      path: '/auth/v1/signup',
       payload: { email, password },
       name: 'auth signup',
     }),
@@ -73,7 +78,7 @@ export function signUp(email, password) {
 }
 
 /** data/items.ts rawListItems, unfiltered: one catalogue page with its photographs. */
-export function listPage(session, categoryId, page) {
+export function listPage({ session, categoryId, page }) {
   const params = query({
     select: PAGE_SELECT,
     category_id: `eq.${categoryId}`,
@@ -82,7 +87,9 @@ export function listPage(session, categoryId, page) {
     offset: (page - 1) * PAGE_SIZE,
     limit: PAGE_SIZE,
   });
-  return send('GET', `/rest/v1/item_categories?${params}`, {
+  return send({
+    method: 'GET',
+    path: `/rest/v1/item_categories?${params}`,
     session,
     name: 'catalogue page',
   });
@@ -94,7 +101,9 @@ export function countItems(session, categoryId) {
     select: 'item_id',
     category_id: `eq.${categoryId}`,
   });
-  return send('HEAD', `/rest/v1/item_categories?${params}`, {
+  return send({
+    method: 'HEAD',
+    path: `/rest/v1/item_categories?${params}`,
     session,
     headers: { Prefer: 'count=exact' },
     name: 'catalogue count',
@@ -102,27 +111,31 @@ export function countItems(session, categoryId) {
 }
 
 /** data/items.ts rawSearchCategoryItems: a searched page and its total. */
-export function searchPage(session, categoryId, term, page) {
+export function searchPage({ session, categoryId, term, page }) {
   const params = query({
     cat_id: categoryId,
     like_pattern: `%${term}%`,
     page_from: (page - 1) * PAGE_SIZE,
     page_to: page * PAGE_SIZE - 1,
   });
-  return send('GET', `/rest/v1/rpc/search_category_items?${params}`, {
+  return send({
+    method: 'GET',
+    path: `/rest/v1/rpc/search_category_items?${params}`,
     session,
     name: 'search page',
   });
 }
 
 /** data/items.ts rawListCategoryPlaces: the map's places, narrowed like the list. */
-export function listPlaces(session, categoryId, term) {
+export function listPlaces({ session, categoryId, term }) {
   const params = query(
     term
       ? { cat_id: categoryId, like_pattern: `%${term}%` }
       : { cat_id: categoryId },
   );
-  return send('GET', `/rest/v1/rpc/list_category_places?${params}`, {
+  return send({
+    method: 'GET',
+    path: `/rest/v1/rpc/list_category_places?${params}`,
     session,
     name: 'map places',
   });
@@ -130,7 +143,9 @@ export function listPlaces(session, categoryId, term) {
 
 /** data/items.ts createItem; user_id is the trigger's to fill in. */
 export function createItem(session, fields) {
-  const response = sendJson('POST', '/rest/v1/items?select=id', {
+  const response = sendJson({
+    method: 'POST',
+    path: '/rest/v1/items?select=id',
     session,
     payload: fields,
     prefer: 'return=representation',
@@ -139,8 +154,10 @@ export function createItem(session, fields) {
   return response.status === 201 ? response.json()[0].id : null;
 }
 
-export function linkItem(session, itemId, categoryId) {
-  return sendJson('POST', '/rest/v1/item_categories', {
+export function linkItem({ session, itemId, categoryId }) {
+  return sendJson({
+    method: 'POST',
+    path: '/rest/v1/item_categories',
     session,
     payload: { item_id: itemId, category_id: categoryId },
     name: 'link item',
@@ -148,8 +165,10 @@ export function linkItem(session, itemId, categoryId) {
 }
 
 /** data/images.ts uploadImageObject: never an upsert, a path is written once. */
-export function uploadObject(session, path, bytes) {
-  return send('POST', `/storage/v1/object/${BUCKET}/${path}`, {
+export function uploadObject({ session, path, bytes }) {
+  return send({
+    method: 'POST',
+    path: `/storage/v1/object/${BUCKET}/${path}`,
     session,
     body: bytes,
     headers: { 'Content-Type': 'image/webp' },
@@ -158,7 +177,9 @@ export function uploadObject(session, path, bytes) {
 }
 
 export function createImageRow(session, row) {
-  return sendJson('POST', '/rest/v1/images', {
+  return sendJson({
+    method: 'POST',
+    path: '/rest/v1/images',
     session,
     payload: row,
     name: 'create image row',
@@ -166,9 +187,11 @@ export function createImageRow(session, row) {
 }
 
 /** Bulk writes for setup: one request, so one INSERT statement, per call. */
-export function insertRows(session, table, rows) {
+export function insertRows({ session, table, rows }) {
   return expectOk(
-    sendJson('POST', `/rest/v1/${table}`, {
+    sendJson({
+      method: 'POST',
+      path: `/rest/v1/${table}`,
       session,
       payload: rows,
       name: `seed ${table}`,
@@ -177,9 +200,11 @@ export function insertRows(session, table, rows) {
   );
 }
 
-export function insertReturning(session, table, rows, select) {
+export function insertReturning({ session, table, rows, select }) {
   return expectOk(
-    sendJson('POST', `/rest/v1/${table}?${query({ select })}`, {
+    sendJson({
+      method: 'POST',
+      path: `/rest/v1/${table}?${query({ select })}`,
       session,
       payload: rows,
       prefer: 'return=representation',
@@ -190,7 +215,7 @@ export function insertReturning(session, table, rows, select) {
 }
 
 /** One page of the caller's photograph paths, for teardown's Storage-first delete. */
-export function listImagePaths(session, offset, limit) {
+export function listImagePaths({ session, offset, limit }) {
   const params = query({
     select: 'path_full,path_thumb',
     user_id: `eq.${session.userId}`,
@@ -199,7 +224,9 @@ export function listImagePaths(session, offset, limit) {
     limit,
   });
   return expectOk(
-    send('GET', `/rest/v1/images?${params}`, {
+    send({
+      method: 'GET',
+      path: `/rest/v1/images?${params}`,
       session,
       name: 'teardown images',
     }),
@@ -209,7 +236,9 @@ export function listImagePaths(session, offset, limit) {
 
 export function removeObjects(session, paths) {
   return expectOk(
-    sendJson('DELETE', `/storage/v1/object/${BUCKET}`, {
+    sendJson({
+      method: 'DELETE',
+      path: `/storage/v1/object/${BUCKET}`,
       session,
       payload: { prefixes: paths },
       name: 'teardown storage',
@@ -220,7 +249,9 @@ export function removeObjects(session, paths) {
 
 export function deleteOwnRows(session, table) {
   return expectOk(
-    send('DELETE', `/rest/v1/${table}?user_id=eq.${session.userId}`, {
+    send({
+      method: 'DELETE',
+      path: `/rest/v1/${table}?user_id=eq.${session.userId}`,
       session,
       name: `teardown ${table}`,
     }),

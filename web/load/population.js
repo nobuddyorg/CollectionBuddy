@@ -51,7 +51,11 @@ export function browseOwn(data) {
 
 // Mostly another collector's word: common across the table, absent from this collection.
 export function searchOwn(data) {
-  search(me(data).session, me(data).ownCategoryId, NOUNS_SEARCHED);
+  search({
+    session: me(data).session,
+    categoryId: me(data).ownCategoryId,
+    terms: NOUNS_SEARCHED,
+  });
 }
 
 export function browseLent(data) {
@@ -63,9 +67,9 @@ export function writeOwn(data) {
 }
 
 export function handleSummary(data) {
-  return summarize(
-    'population',
+  return summarize({
+    flow: 'population',
     data,
-    `${COLLECTORS} collectors, each with ${ENTRIES_EACH} entries of their own and a fifth as many lent to the next`,
-  );
+    seeded: `${COLLECTORS} collectors, each with ${ENTRIES_EACH} entries of their own and a fifth as many lent to the next`,
+  });
 }

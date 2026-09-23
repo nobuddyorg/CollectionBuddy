@@ -12,14 +12,16 @@ import { useI18n } from '../../i18n/useI18n';
 import CenteredModal from '../CenteredModal';
 import { buttonClasses } from '../ui/buttonClasses';
 
-type ConfirmFn = (message: string) => Promise<boolean>;
+type ConfirmFunction = (message: string) => Promise<boolean>;
 
-const ConfirmContext = createContext<ConfirmFn | undefined>(undefined);
+const ConfirmContext = createContext<ConfirmFunction | undefined>(undefined);
 
-export function useConfirm(): ConfirmFn {
-  const ctx = useContext(ConfirmContext);
-  if (!ctx) throw new Error('useConfirm must be used within a ConfirmProvider');
-  return ctx;
+export function useConfirm(): ConfirmFunction {
+  const context = useContext(ConfirmContext);
+  if (!context) {
+    throw new Error('useConfirm must be used within a ConfirmProvider');
+  }
+  return context;
 }
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
@@ -28,10 +30,10 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const resolveRef = useRef<((value: boolean) => void) | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
 
-  const confirm = useCallback<ConfirmFn>((msg) => {
+  const confirm = useCallback<ConfirmFunction>((question) => {
     return new Promise((resolve) => {
       resolveRef.current = resolve;
-      setMessage(msg);
+      setMessage(question);
     });
   }, []);
 

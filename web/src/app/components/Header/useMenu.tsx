@@ -8,35 +8,30 @@ export function useMenu() {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef(false);
 
-  // Not memoized: both go straight onto elements in a component nothing
-  // memoizes, and no effect lists them, so a stable identity buys nothing.
+  // Not memoized: nothing downstream memoizes them or lists them in an effect.
   const close = () => setOpen(false);
-  const toggle = () => setOpen((v) => !v);
+  const toggle = () => setOpen((value) => !value);
 
   useEffect(() => {
     if (!open) return;
-    // The trigger is captured here rather than read per click: it is the
-    // one element that is always rendered, so holding it keeps this handler
-    // from reaching through a ref that a later unmount has already cleared.
+    // Captured once: the anchor is always rendered, so a later unmount cannot clear it mid-handler.
     const anchor = anchorRef.current!;
-    const onDocClick = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (anchor.contains(t)) return;
-      // The panel only exists while the menu is open, so it stays a ref
-      // read with its own guard.
-      if (panelRef.current && panelRef.current.contains(t)) return;
+    const onDocumentClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (anchor.contains(target)) return;
+      // The panel exists only while open, so it stays a guarded ref read.
+      if (panelRef.current && panelRef.current.contains(target)) return;
       setOpen(false);
     };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
+    document.addEventListener('mousedown', onDocumentClick);
+    return () => document.removeEventListener('mousedown', onDocumentClick);
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        // Dismissed by keyboard: focus has nowhere sensible to land, so
-        // send it back to the trigger.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        // Dismissed by keyboard, focus has nowhere sensible to land but the trigger.
         restoreFocusRef.current = true;
         setOpen(false);
       }
@@ -45,9 +40,7 @@ export function useMenu() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  // Only ever refocus after an Escape: a programmatic focus() matches
-  // :focus-visible, so refocusing on every close (including a click
-  // outside) gave the trigger a keyboard-style outline it hadn't earned.
+  // Only after Escape: programmatic focus() matches :focus-visible, so a click would earn an outline.
   useEffect(() => {
     if (open || !restoreFocusRef.current) return;
     restoreFocusRef.current = false;

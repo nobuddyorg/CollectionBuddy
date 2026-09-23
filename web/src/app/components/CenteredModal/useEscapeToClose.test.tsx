@@ -74,8 +74,8 @@ describe('useEscapeToClose', () => {
       return (
         <input
           aria-label="inner"
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') e.preventDefault();
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') event.preventDefault();
           }}
         />
       );

@@ -1,4 +1,4 @@
-// A second identity reading a category it holds a viewer grant on: the has_category_read_access() path (#619).
+// A second identity reading a category it holds a viewer grant on: the has_category_read_access() path.
 import { browse, search } from './lib/flows.js';
 import {
   LIFECYCLE_TIMEOUTS,
@@ -33,9 +33,9 @@ export function browseShared(data) {
 }
 
 export function searchShared(data) {
-  search(data.viewer, data.sharedCategoryId);
+  search({ session: data.viewer, categoryId: data.sharedCategoryId });
 }
 
 export function handleSummary(data) {
-  return summarize('shared-viewer', data);
+  return summarize({ flow: 'shared-viewer', data });
 }

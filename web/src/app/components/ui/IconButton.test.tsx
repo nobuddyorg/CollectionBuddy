@@ -29,9 +29,7 @@ describe('IconButton', () => {
     expect(button.className).toContain('bg-primary');
   });
 
-  // The outline frame is hover-revealed, which on a touch device means
-  // never revealed. It has to be there unconditionally first, and only
-  // then be hidden again for pointers -- not the other way round.
+  // The frame must exist unconditionally and only then hide for pointers; touch never hovers.
   it.each(['outline', 'outlineDestructive'] as const)(
     'keeps %s framed where there is no hover to reveal it',
     (variant) => {
@@ -42,11 +40,7 @@ describe('IconButton', () => {
     },
   );
 
-  // A disabled button still receives its hover:* classes -- :hover doesn't
-  // consult the disabled attribute -- so a merely-dimmed disabled control
-  // looked interactive under the cursor (reported live, on the shared
-  // category rename button (#483 follow-up) once it was disabled rather
-  // than absent). pointer-events-none is what actually stops that.
+  // :hover ignores the disabled attribute, so a dimmed disabled control still looked interactive.
   it('kills pointer events -- and therefore hover -- when disabled', () => {
     const classes = iconButtonClasses();
     expect(classes).toContain('disabled:pointer-events-none');

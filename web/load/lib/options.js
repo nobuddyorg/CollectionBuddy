@@ -6,7 +6,7 @@ export const SUMMARY_TREND_STATS = ['avg', 'med', 'p(95)', 'p(99)', 'max'];
 // Setup writes up to 42,000 rows through PostgREST; k6's 60s default is not enough on a cold stack.
 export const LIFECYCLE_TIMEOUTS = { setupTimeout: '5m', teardownTimeout: '5m' };
 
-// p95 per scenario: 3x the worst of two normal-profile runs on a GitHub runner, at least 100 ms, rounded up to 50 (docs/how-to/load-testing.md).
+// p95 per scenario: 3x the worst of two normal-profile runs on a GitHub runner, at least 100 ms, rounded up to 50.
 const P95_MS = {
   browse: 150,
   search: 200,

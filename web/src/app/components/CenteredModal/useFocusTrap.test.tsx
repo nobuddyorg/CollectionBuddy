@@ -14,8 +14,7 @@ function Harness({
 }: {
   open: boolean;
   useInitialFocus?: boolean;
-  /** Mimics an optimistic delete: the button that opened the dialog is
-   * gone from the DOM by the time the dialog closes. */
+  /** Mimics an optimistic delete: the opener is gone from the DOM by the time the dialog closes. */
   removeTrigger?: boolean;
   /** No focusable controls at all inside the trapped container. */
   empty?: boolean;
@@ -50,11 +49,7 @@ function Harness({
 
 const button = (name: string) => screen.getByRole('button', { name });
 
-// Every real caller happens to unmount the trapped container in the same
-// render that `open` goes false, but the hook's own contract is that `open`
-// alone gates it -- this harness keeps the container mounted regardless, to
-// prove the hook honours that contract itself rather than merely getting
-// away with it because callers also unmount.
+// Keeps the container mounted while closed: `open` alone must gate the hook, not callers' unmounts.
 function AlwaysMountedHarness({ open }: { open: boolean }) {
   const container = useRef<HTMLDivElement>(null);
   useFocusTrap(open, container);
@@ -76,8 +71,7 @@ describe('useFocusTrap', () => {
     expect(button('first')).toHaveFocus();
   });
 
-  // Destructive dialogs point focus at Cancel rather than at the action, so
-  // the first thing a keyboard confirms is the safe one.
+  // Destructive dialogs start focus on Cancel, so the first thing a keyboard confirms is safe.
   it('honours a requested starting point over the first control', () => {
     const { rerender } = render(<Harness open={false} useInitialFocus />);
     rerender(<Harness open useInitialFocus />);

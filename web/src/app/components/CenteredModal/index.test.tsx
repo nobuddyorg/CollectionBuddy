@@ -38,9 +38,7 @@ describe('CenteredModal', () => {
     expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal', 'true');
   });
 
-  // aria-modal alone isn't honoured by every reader/browser pairing, and
-  // the Tab trap doesn't constrain a screen reader's virtual cursor; the
-  // rest of the page has to come out of the accessibility tree.
+  // Neither aria-modal nor the Tab trap constrains a screen reader's virtual cursor; inert does.
   it('makes the app root inert while open', () => {
     render(
       <CenteredModal open onOpenChange={vi.fn()} title="Edit entry">

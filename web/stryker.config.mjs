@@ -1,9 +1,6 @@
 import { MUTATE_TARGETS } from './mutation-targets.mjs';
 
-// Publish to the Stryker dashboard only when the API key is available (CI on
-// nobuddyorg/CollectionBuddy). Local runs and key-less CI keep the offline reporters.
-// `json` always runs -- scripts/mutation-summary.mjs reads reports/mutation/mutation.json
-// to build the mutation_test job's Actions summary table.
+// The dashboard reporter needs CI's API key; `json` feeds scripts/mutation-summary.mjs.
 const reporters = ['html', 'clear-text', 'progress', 'json'];
 if (process.env.STRYKER_DASHBOARD_API_KEY) reporters.push('dashboard');
 
@@ -13,21 +10,18 @@ const config = {
   testRunner: 'vitest',
   coverageAnalysis: 'perTest',
   reporters,
-  // Points Stryker's internal test runs at a vitest config with the noisy
-  // `github-actions` reporter turned off -- see vitest.mutation.config.mts.
+  // A vitest config without the `github-actions` reporter: a killed mutant is not a real test failure.
   vitest: {
     configFile: 'vitest.mutation.config.mts',
   },
   htmlReporter: {
     fileName: 'reports/mutation/index.html',
   },
-  // project/version are auto-detected from the CI git context (badge tracks main).
+  // project/version come from the CI git context.
   dashboard: {
     reportType: 'full',
   },
-  // Stryker copies the project into a sandbox before mutating it, and can't
-  // copy a symlink -- the e2e server's out/ symlink has to be excluded or a
-  // run started while that server is up dies on ENOTSUP.
+  // The sandbox copy cannot copy a symlink; the e2e server's out/ symlink dies on ENOTSUP.
   ignorePatterns: [
     '.e2e-serve',
     'out',
@@ -37,17 +31,13 @@ const config = {
     'test-results',
     'playwright-report',
   ],
-  // Raised from the 5s default: a mutant covered by a few hundred tests
-  // runs the whole suite, and a run that fails seven tests honestly was
-  // being reported as a timeout on a loaded machine. A real infinite loop
-  // still hits this ceiling; a slow-but-finite run no longer does.
+  // A mutant covered by hundreds of tests runs the whole suite; the 5s default reported honest failures as timeouts.
   timeoutMS: 20_000,
-  // See mutation-targets.mjs for what's in this list and why -- shared with
-  // vitest.config.mts's per-file coverage floors so the two can't drift.
+  // Shared with vitest.config.mts's per-file coverage floors so the two lists cannot drift.
   mutate: MUTATE_TARGETS,
-  // Reuses reports/stryker-incremental.json; blind to non-mutated, non-test files, so main forces a full run (#714).
+  // Blind to non-mutated, non-test files, so main forces a full run.
   incremental: true,
-  // A floor under the measured 100%, kept below it so one new equivalent mutant can't block unrelated work (TEST_STRATEGY.md §14).
+  // One below the measured 100, so a single new equivalent mutant cannot block unrelated work.
   thresholds: {
     high: 100,
     low: 99,

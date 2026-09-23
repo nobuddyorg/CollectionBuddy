@@ -1,19 +1,7 @@
-// Turns lhci autorun's manifest.json (one per target, written by
-// scripts/lighthouse.mjs) into a markdown table for the lighthouse job's
-// Actions summary. Reads each representative run's own report for the
-// metrics lighthouserc.*.json actually asserts on, rather than re-deriving
-// them, so this can't drift out of sync with what failed or passed.
-//
-// Usage: node scripts/lighthouse-summary.mjs   (after `npm run lighthouse`)
+// lhci's manifest.json per target, as a markdown table reading the metrics lighthouserc.*.json asserts on.
 import { readFile, appendFile } from 'node:fs/promises';
 
-// Must match the `assert` blocks in lighthouserc.signed-out.json /
-// .signed-in.json. The two targets differ because a brand-new signed-in
-// demo account has zero categories, so its first render goes through a
-// large, deterministic skeleton-to-empty-state layout shift that a
-// signed-out page never hits -- see TEST_STRATEGY.md §12 for the general
-// principle (set thresholds from a measured baseline with real margin, and
-// write down why a threshold is loose rather than silently widening it).
+// Must match the `assert` blocks in lighthouserc.signed-out.json / .signed-in.json.
 const TARGETS = [
   {
     label: 'Signed out (`/login/`)',
@@ -25,15 +13,14 @@ const TARGETS = [
     label: 'Signed in (`/`, demo mode)',
     manifest: 'lighthouse-reports/signed-in/manifest.json',
     minPerformance: 0.65,
+    // Loose on purpose: a new demo account's first render shifts from skeleton to empty state.
     maxCls: 0.4,
   },
 ];
 
-// Both targets assert a perfect accessibility score.
 const MIN_ACCESSIBILITY = 1;
 
-// `atLeast`/`atMost` each return an emoji, or ➖ when there's nothing to
-// compare (a report that failed to produce the metric at all).
+// ➖ when the report produced no metric to compare.
 function atLeast(value, threshold) {
   if (!Number.isFinite(value)) return '➖';
   return value >= threshold ? '✅' : '❌';
@@ -44,7 +31,7 @@ function atMost(value, threshold) {
   return value <= threshold ? '✅' : '❌';
 }
 
-function pct(score) {
+function percentage(score) {
   return Number.isFinite(score) ? `${Math.round(score * 100)}` : 'n/a';
 }
 
@@ -55,26 +42,29 @@ async function summarizeTarget({ label, manifest, minPerformance, maxCls }) {
   } catch {
     return `| ${label} | _no report found_ | | | | | | |`;
   }
-  // lhci marks exactly one run representative per URL once numberOfRuns > 1;
-  // falls back to the last run so a single-run local override still reports.
-  const run = entries.find((e) => e.isRepresentativeRun) ?? entries.at(-1);
+  // lhci marks one representative run per URL once numberOfRuns > 1; a single-run override has none.
+  const run =
+    entries.find((entry) => entry.isRepresentativeRun) ?? entries.at(-1);
   if (!run) return `| ${label} | _no run recorded_ | | | | | | |`;
 
   const report = JSON.parse(await readFile(run.jsonPath, 'utf8'));
   const performance = run.summary.performance;
   const accessibility = run.summary.accessibility;
   const cls = report.audits['cumulative-layout-shift']?.numericValue;
-  const lcpMs = report.audits['largest-contentful-paint']?.numericValue;
-  const lcp = Number.isFinite(lcpMs) ? `${(lcpMs / 1000).toFixed(1)}s` : 'n/a';
+  const lcpMilliseconds =
+    report.audits['largest-contentful-paint']?.numericValue;
+  const lcp = Number.isFinite(lcpMilliseconds)
+    ? `${(lcpMilliseconds / 1000).toFixed(1)}s`
+    : 'n/a';
 
   return (
     [
       label,
       atLeast(performance, minPerformance),
-      pct(performance),
-      `${atLeast(accessibility, MIN_ACCESSIBILITY)} ${pct(accessibility)}`,
-      pct(run.summary['best-practices']),
-      pct(run.summary.seo),
+      percentage(performance),
+      `${atLeast(accessibility, MIN_ACCESSIBILITY)} ${percentage(accessibility)}`,
+      percentage(run.summary['best-practices']),
+      percentage(run.summary.seo),
       lcp,
       `${atMost(cls, maxCls)} ${Number.isFinite(cls) ? cls.toFixed(3) : 'n/a'}`,
     ]
