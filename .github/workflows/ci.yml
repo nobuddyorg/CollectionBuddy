@@ -298,6 +298,7 @@ jobs:
           opengrep scan \
             --config auto \
             --sarif-output=opengrep-results.sarif \
+            --json-output=opengrep-results.json \
             web/src web/scripts web/e2e supabase
 
       - name: Upload SARIF to code scanning
@@ -338,6 +339,22 @@ jobs:
                  )
                  else "" end)
             ' opengrep-findings.json
+            # SARIF carries a parse error as free text only; the JSON output names its file.
+            jq -r '
+              [.errors[] | select(.path) | {
+                path,
+                line: (.spans[0].start.line // "?"),
+                kind: (.type | if type == "array" then .[0] else . end)
+              }]
+              | sort_by(.line)
+              | unique_by(.path)
+              | length as $count
+              | "\n**Partially analyzed files:** \($count) (no finding in their unparsed lines is reported; see the developer guide, Run Opengrep)\n"
+              + (if $count > 0
+                 then "\n| File | First error at line | Error |\n|---|---|---|\n"
+                   + (map("| \(.path) | \(.line) | \(.kind) |") | join("\n"))
+                 else "" end)
+            ' opengrep-results.json
           } >> "$GITHUB_STEP_SUMMARY"
 
       # After the upload, so the Security tab stays populated either way. WARNING/INFO stay report-only.

@@ -66,7 +66,7 @@ Each job writes its report to its own Actions summary (`$GITHUB_STEP_SUMMARY`); 
 | `build_and_test` | `depcruise` and `knip` output | The step's text, `tee`'d into the summary; Knip prints nothing when clean, so the summary says so |
 | `e2e_local_stack` | pgTAP results; signed-in e2e results | `pg_prove` output; the same Playwright action |
 | `mutation_test` | Mutation score, overall and per file | `web/scripts/mutation-summary.mjs` over Stryker's `json` reporter |
-| `opengrep` | Finding count, total and by rule | `jq` over the uploaded SARIF |
+| `opengrep` | Finding count, total and by rule; every partially analyzed file | `jq` over the uploaded SARIF; `jq` over the same scan's `--json-output` `errors[]` |
 | `lighthouse` | Scores, LCP, CLS against each page's thresholds | `web/scripts/lighthouse-summary.mjs` over each target's `manifest.json` |
 | `build_and_test`, `e2e_local_stack` | Non-blocking accessibility findings | `web/e2e/axe.ts` `reportNonBlockingFindings`, from inside the test, CI only |
 | `zap_baseline` | Every alert with its verdict, per pass; an alert `.zap/rules.tsv` ignores shows its reason | `web/scripts/zap-summary.mjs` over `report_json.json` from `zaproxy/action-baseline` |
