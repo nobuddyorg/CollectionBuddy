@@ -1,6 +1,14 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
+import type {
+  FitBoundsOptions,
+  LatLngBounds,
+  LatLngExpression,
+  LayerGroup,
+  Map as LeafletMap,
+  Marker,
+} from 'leaflet';
 
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
@@ -39,9 +47,7 @@ const WORLD_WIDTH_DEG = 360;
 // covers [c*360-180, c*360+180]), so classifying by `Math.floor(lng/360)`
 // alone is off by one across half that span. The +180 shift lines the
 // floor up with Leaflet's own copy boundaries.
-const visibleCopyRange = (
-  bounds: import('leaflet').LatLngBounds,
-): [number, number] => [
+const visibleCopyRange = (bounds: LatLngBounds): [number, number] => [
   Math.floor((bounds.getWest() + 180) / WORLD_WIDTH_DEG),
   Math.floor((bounds.getEast() + 180) / WORLD_WIDTH_DEG),
 ];
@@ -60,7 +66,7 @@ const copyOffsets = (copyMin: number, copyMax: number): number[] =>
  * for, and each marker's pins (one per copy) under its key. */
 type DrawnMarkers = {
   range: [number, number] | null;
-  byKey: globalThis.Map<string, import('leaflet').Marker[]>;
+  byKey: globalThis.Map<string, Marker[]>;
 };
 
 /** One pin per world-copy offset for `marker`. The popup is a function, so
@@ -68,11 +74,11 @@ type DrawnMarkers = {
 const drawPins = (
   L: Leaflet,
   target: {
-    layer: import('leaflet').LayerGroup;
+    layer: LayerGroup;
     marker: MarkerInput;
     offsets: number[];
   },
-): import('leaflet').Marker[] => {
+): Marker[] => {
   const { layer, marker: m, offsets } = target;
   return offsets.map((offset) =>
     L.marker([m.lat, m.lng + offset])
@@ -83,7 +89,7 @@ const drawPins = (
 
 const noDrawnMarkers = (): DrawnMarkers => ({
   range: null,
-  byKey: new globalThis.Map<string, import('leaflet').Marker[]>(),
+  byKey: new globalThis.Map<string, Marker[]>(),
 });
 
 // A ceiling for every automatic fit. Pins are geocoded from a place *name*,
@@ -112,7 +118,7 @@ const MARKER_ICON_HEIGHT = 41;
 const MARKER_ICON_HALF_WIDTH = 13;
 const CONTROLS_BOTTOM_EDGE = 44;
 
-const FIT_OPTIONS: import('leaflet').FitBoundsOptions = {
+const FIT_OPTIONS: FitBoundsOptions = {
   paddingTopLeft: [
     MARKER_ICON_HALF_WIDTH,
     Math.max(MARKER_ICON_HEIGHT, CONTROLS_BOTTOM_EDGE),
@@ -122,9 +128,9 @@ const FIT_OPTIONS: import('leaflet').FitBoundsOptions = {
 };
 
 const fitToPoints = (
-  map: import('leaflet').Map,
+  map: LeafletMap,
   L: Leaflet,
-  points: Array<import('leaflet').LatLngExpression>,
+  points: Array<LatLngExpression>,
 ): void => {
   if (points.length === 0) return;
   const bounds = L.latLngBounds(points).pad(BOUNDS_PAD_RATIO);
@@ -133,16 +139,14 @@ const fitToPoints = (
 
 // The only place a view is framed on command; reports whether it framed anything, as a fit with no points is a no-op.
 const runCommand = (
-  map: import('leaflet').Map,
+  map: LeafletMap,
   L: Leaflet,
   command: MapCommandKind,
   markers: MarkerInput[],
   currentLocation: MapProps['currentLocation'],
 ): boolean => {
   if (command === 'fitAll') {
-    const points: Array<import('leaflet').LatLngExpression> = markers.map(
-      (m) => [m.lat, m.lng],
-    );
+    const points: Array<LatLngExpression> = markers.map((m) => [m.lat, m.lng]);
     if (currentLocation)
       points.push([currentLocation.lat, currentLocation.lng]);
     fitToPoints(map, L, points);
@@ -163,11 +167,9 @@ const runCommand = (
 const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const LRef = useRef<Leaflet | null>(null);
-  const mapInstance = useRef<import('leaflet').Map | null>(null);
-  const layersRef = useRef<import('leaflet').LayerGroup | null>(null);
-  const currentLocationLayerRef = useRef<import('leaflet').LayerGroup | null>(
-    null,
-  );
+  const mapInstance = useRef<LeafletMap | null>(null);
+  const layersRef = useRef<LayerGroup | null>(null);
+  const currentLocationLayerRef = useRef<LayerGroup | null>(null);
 
   const drawnMarkersRef = useRef<DrawnMarkers>(noDrawnMarkers());
   const markersRef = useSyncedRef(markers);
@@ -323,9 +325,7 @@ const Map: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     if (!ready || !L || !mapInstance.current || hasInitialFit.current) return;
     if (markers.length === 0) return;
 
-    const points: Array<import('leaflet').LatLngExpression> = markers.map(
-      (m) => [m.lat, m.lng],
-    );
+    const points: Array<LatLngExpression> = markers.map((m) => [m.lat, m.lng]);
     if (currentLocation)
       points.push([currentLocation.lat, currentLocation.lng]);
 

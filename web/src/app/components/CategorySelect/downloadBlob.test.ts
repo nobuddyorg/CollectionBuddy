@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Mock } from 'vitest';
 
 import { downloadBlob } from './downloadBlob';
 
 describe('downloadBlob', () => {
-  let createObjectURL: ReturnType<typeof vi.fn<(obj: Blob) => string>>;
-  let revokeObjectURL: ReturnType<typeof vi.fn<(url: string) => void>>;
+  let createObjectURL: Mock<(obj: Blob) => string>;
+  let revokeObjectURL: Mock<(url: string) => void>;
 
   beforeEach(() => {
     vi.useFakeTimers();

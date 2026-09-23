@@ -263,6 +263,16 @@ curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh |
 **ERROR** finding fails the job; WARNING and INFO are surfaced for triage. It
 runs in CI rather than as a commit hook because of that network fetch.
 
+A file Opengrep cannot parse is only partially analyzed, and no finding in its
+unparsed lines is ever reported. The scan summary counts such files; add
+`--verbose` to name them. None is expected: keep the count at zero rather than
+adding the file to `.semgrepignore`. Two TypeScript constructs are known to
+trip the parser (#724), so write the equivalent instead:
+
+- an `import('module').Name` type: use `import type { Name } from 'module'`;
+- an instantiation expression such as `ReturnType<typeof vi.fn<F>>`: use
+  `Mock<F>` from `vitest`.
+
 ## Run Lighthouse
 
 CI's `lighthouse` job runs [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci)
