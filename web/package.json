@@ -68,11 +68,19 @@
     "qs": "6.16.0",
     "@babel/core": "7.29.7",
     "minimatch": "10.2.6",
-    "typescript-eslint": "^8.65.0",
     "tmp": "0.2.7",
     "uuid": "^14.0.2",
     "sharp": "0.35.4",
     "eslint-plugin-jsx-a11y": {
+      "eslint": "$eslint"
+    },
+    "eslint-plugin-import": {
+      "eslint": "$eslint"
+    },
+    "eslint-plugin-react": {
+      "eslint": "$eslint"
+    },
+    "eslint-plugin-react-hooks": {
       "eslint": "$eslint"
     }
   }
