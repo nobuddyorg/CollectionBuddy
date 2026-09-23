@@ -152,6 +152,8 @@ supabase test db
 | `040_storage_policy_surface_test.sql` | Bucket configuration; the storage verbs two security fixes removed |
 | `050`, `055` | The SQL functions and every branch of the write-path triggers |
 | `060`, `065` | The two read RPCs: who may call them, what they return |
+| `070_quotas_test.sql` | The per-owner photo-storage and entry quotas |
+| `075_query_plans_test.sql` | That every index-backed query can reach its index, and picks it at a realistic size |
 
 `_helpers.psql` holds the shared fixtures; it is `.psql` because
 `supabase test db` collects every `.sql` file as a test. pgTAP proves the
@@ -160,6 +162,18 @@ properties through the real PostgREST-and-JWT pipeline and is the only place
 the Storage API and the bytes behind a `storage.objects` row are exercised. A
 policy, grant, or ownership-trigger change needs its `rls.spec.ts` case
 regardless of pgTAP coverage.
+
+A new query that names its index (CLAUDE.md, "measure, don't assume") also gets
+a plan case in `075_query_plans_test.sql`, at both levels the file runs.
+**Reachability** plans the query on fixture rows with every cheaper path
+switched off (`enable_seqscan`, and whichever of `enable_indexscan`,
+`enable_nestloop`, `enable_sort` leave another route), so it fails only when
+the planner *cannot* use the index; that is what broke under RLS in #621.
+**Preference** plans it again on generated rows after `analyze`, with default
+settings, and fails when the planner would rather not. Plan the text the app
+actually sends: read a function body from `pg_proc` rather than pasting it,
+and run it as the role it runs as — the owner for `SECURITY DEFINER`,
+`authenticated` with claims otherwise.
 
 ### Splinter (Supabase Advisors lints)
 
