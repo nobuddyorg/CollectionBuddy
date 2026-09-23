@@ -151,7 +151,7 @@ incidents happen.
 | Mutation | **Required, scoped** | §11. |
 | E2E | **Required, small** | §9. |
 | API fuzzing | **Not justified** | Fuzzes the vendor's product; hostile-input unit tests cover what is yours. |
-| Load testing | **Not justified** | Until an actual throughput SLA exists. |
+| Load testing | **Manual only, never a gate** | Until an actual throughput SLA exists: a measurement someone asks for, against an ephemeral stack by default (§12). |
 | Concurrency | **Unit level** | In-client races are common; same-row multi-writer conflicts are rare in single-owner data. |
 | Failure injection | **Unit level** | Retry, backoff, skip, cancel through injected fakes; the real stack adds cost without signal. |
 | Deployment | **Required** | Every migration applied from scratch in CI; the built artifact served under its real base path. |
@@ -515,6 +515,10 @@ a real near-miss, not speculatively.
   thousand. A file that can't split into logic and rendering is the problem.
 - Run on every change touching scoped files. A scoped run is fast; learning
   after the merge that a test asserts nothing is too late.
+- Incremental reuse of earlier results is fine on a change, provided the
+  branch that deploys reruns everything: the tool's diff sees mutated code and
+  tests, not what the mutated code imports, nor a dependency bump. Key the
+  saved results on what it cannot see.
 
 A surviving mutant has two honest endings: **a missing assertion** (kill it
 with a real behavioral test, usually an unpinned boundary or error path), or
@@ -548,6 +552,22 @@ operations are set-based; large reads page around PostgREST's row cap. Inspect
 the plan for any new hot query **as the role the app uses** — an index the
 planner chooses as `postgres` may be unreachable under RLS when the operator is
 not leakproof.
+Then assert it in the database suite so it cannot silently regress, at two
+levels: **reachable** on fixture rows with the cheaper paths switched off
+(fails only when the index cannot be used at all), and **preferred** on a few
+thousand generated, analyzed rows with default settings.
+
+**Load testing is a measurement, not a gate.** Run by hand, against an
+ephemeral stack started for the run by default; production only behind an
+explicit, separate opt-in, since without staging it is the only other backend
+and real users share it. Script realistic journeys, including a second identity
+reading through a grant, and seed to production shape first — at test-fixture
+row counts every plan is a sequential scan and every number is fast. Capture
+the database's own statistics over the same run (statement timings and call
+counts, scans per table and index): the latency says something is slow, the
+statistics say which statement and why.
+Thresholds start as proposals, calibrated from a baseline like any other
+(below).
 
 **The frontend side benefits from a numeric gate** (Lighthouse CI): against the
 production build, never a dev server; a few representative states (signed out,

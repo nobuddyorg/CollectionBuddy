@@ -51,6 +51,7 @@ export const MUTATE_TARGETS = [
   'src/app/components/ItemList/searchStatus.ts',
   'src/app/components/Map/popup.ts',
   'src/app/components/Map/markerDiff.ts',
+  'src/app/components/Map/afterZoomAnimation.ts',
   'src/app/components/Map/useMapFraming.ts',
   'src/app/lib/useRequestSequence.ts',
   'src/app/lib/useSyncedRef.ts',

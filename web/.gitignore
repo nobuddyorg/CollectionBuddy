@@ -56,3 +56,6 @@ out/
 # scratch directory.
 /lighthouse-reports
 /.lighthouseci
+
+# k6 end-of-test summaries (npm run load).
+/load-results

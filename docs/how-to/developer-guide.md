@@ -152,6 +152,8 @@ supabase test db
 | `040_storage_policy_surface_test.sql` | Bucket configuration; the storage verbs two security fixes removed |
 | `050`, `055` | The SQL functions and every branch of the write-path triggers |
 | `060`, `065` | The two read RPCs: who may call them, what they return |
+| `070_quotas_test.sql` | The per-owner photo-storage and entry quotas |
+| `075_query_plans_test.sql` | That every index-backed query can reach its index, and picks it at a realistic size |
 
 `_helpers.psql` holds the shared fixtures; it is `.psql` because
 `supabase test db` collects every `.sql` file as a test. pgTAP proves the
@@ -160,6 +162,18 @@ properties through the real PostgREST-and-JWT pipeline and is the only place
 the Storage API and the bytes behind a `storage.objects` row are exercised. A
 policy, grant, or ownership-trigger change needs its `rls.spec.ts` case
 regardless of pgTAP coverage.
+
+A new query that names its index (CLAUDE.md, "measure, don't assume") also gets
+a plan case in `075_query_plans_test.sql`, at both levels the file runs.
+**Reachability** plans the query on fixture rows with every cheaper path
+switched off (`enable_seqscan`, and whichever of `enable_indexscan`,
+`enable_nestloop`, `enable_sort` leave another route), so it fails only when
+the planner *cannot* use the index; that is what broke under RLS in #621.
+**Preference** plans it again on generated rows after `analyze`, with default
+settings, and fails when the planner would rather not. Plan the text the app
+actually sends: read a function body from `pg_proc` rather than pasting it,
+and run it as the role it runs as — the owner for `SECURITY DEFINER`,
+`authenticated` with claims otherwise.
 
 ### Splinter (Supabase Advisors lints)
 
@@ -193,9 +207,31 @@ assert the request it composed. There is no `Stryker disable` or
 delete, except the React dependency-list class explained in
 [Design decisions](../explanation/design-decisions.md#what-still-survives-and-why-no-test-can-kill-it).
 
-CI runs this on every PR. Only `main` publishes to the
+Runs are incremental: Stryker keeps every mutant's result in
+`web/reports/stryker-incremental.json` and reruns only mutants whose code or
+covering tests changed since. It cannot see a change anywhere else — a module
+a target imports, a test helper, a dependency — so after one of those, or to
+reproduce `main`, rerun everything:
+
+```bash
+npm run test:mutation -- --force
+```
+
+CI runs this on every PR, restoring `main`'s incremental file; `main` itself
+always runs with `--force` ([Design decisions](../explanation/design-decisions.md#incremental-on-pull-requests-full-on-main)).
+Only `main` publishes to the
 [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main);
 locally, the report is `web/reports/mutation/index.html`.
+
+## Run a load test
+
+k6 scripts in `web/load/`, run by hand against your own `supabase start`
+stack (`npm run load -- smoke`) or from the manual `k6-load-test.yml`
+workflow. Never a gate. A local run also reports what Postgres did meanwhile
+(slowest and most-called statements, scans per table and index). Everything
+else — the scripts, the seed, the profiles, the workflow inputs, how to read
+both reports, and why the hosted target stays off — is in
+[Load testing](load-testing.md).
 
 ## Replay a property-test failure
 

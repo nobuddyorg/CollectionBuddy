@@ -45,6 +45,8 @@ const config = {
   // See mutation-targets.mjs for what's in this list and why -- shared with
   // vitest.config.mts's per-file coverage floors so the two can't drift.
   mutate: MUTATE_TARGETS,
+  // Reuses reports/stryker-incremental.json; blind to non-mutated, non-test files, so main forces a full run (#714).
+  incremental: true,
   // A floor under the measured 100%, kept below it so one new equivalent mutant can't block unrelated work (TEST_STRATEGY.md §14).
   thresholds: {
     high: 100,
