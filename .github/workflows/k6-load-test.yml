@@ -75,17 +75,22 @@ jobs:
           LOAD_SUPABASE_URL: ${{ inputs.target == 'hosted' && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
           LOAD_SUPABASE_ANON_KEY: ${{ inputs.target == 'hosted' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
 
-      # handleSummary writes it already formatted (web/load/lib/summary.js); the HTML charts ride in the artifact.
-      - name: Add the k6 report to the job summary
+      # Both arrive formatted: k6's from handleSummary, Postgres's from scripts/load-db-report.mjs (local stack only). The HTML charts ride in the artifact.
+      - name: Add the k6 and Postgres reports to the job summary
         if: always() && steps.k6.outcome != 'skipped'
         env:
           FLOW: ${{ inputs.flow }}
+          TARGET: ${{ inputs.target }}
         run: |
-          if [ ! -f "load-results/$FLOW.md" ]; then
-            echo "::error::load-results/$FLOW.md is missing, so k6 never reached its summary."
-            exit 1
-          fi
-          cat "load-results/$FLOW.md" >> "$GITHUB_STEP_SUMMARY"
+          reports=("load-results/$FLOW.md")
+          if [ "$TARGET" = local-stack ]; then reports+=("load-results/$FLOW.db.md"); fi
+          for report in "${reports[@]}"; do
+            if [ ! -f "$report" ]; then
+              echo "::error::$report is missing, so the run never reached it."
+              exit 1
+            fi
+            cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          done
 
       - name: Upload the k6 results
         if: always() && steps.k6.outcome != 'skipped'

@@ -227,9 +227,11 @@ locally, the report is `web/reports/mutation/index.html`.
 
 k6 scripts in `web/load/`, run by hand against your own `supabase start`
 stack (`npm run load -- smoke`) or from the manual `k6-load-test.yml`
-workflow. Never a gate. Everything else — the scripts, the seed, the
-workflow inputs, how to read a report, and why the hosted target stays off —
-is in [Load testing](load-testing.md).
+workflow. Never a gate. A local run also reports what Postgres did meanwhile
+(slowest and most-called statements, scans per table and index). Everything
+else — the scripts, the seed, the profiles, the workflow inputs, how to read
+both reports, and why the hosted target stays off — is in
+[Load testing](load-testing.md).
 
 ## Replay a property-test failure
 

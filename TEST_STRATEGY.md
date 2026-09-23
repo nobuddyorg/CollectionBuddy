@@ -562,7 +562,10 @@ ephemeral stack started for the run by default; production only behind an
 explicit, separate opt-in, since without staging it is the only other backend
 and real users share it. Script realistic journeys, including a second identity
 reading through a grant, and seed to production shape first — at test-fixture
-row counts every plan is a sequential scan and every number is fast.
+row counts every plan is a sequential scan and every number is fast. Capture
+the database's own statistics over the same run (statement timings and call
+counts, scans per table and index): the latency says something is slow, the
+statistics say which statement and why.
 Thresholds start as proposals, calibrated from a baseline like any other
 (below).
 

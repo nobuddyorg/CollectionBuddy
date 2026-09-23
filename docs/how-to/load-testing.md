@@ -78,6 +78,7 @@ the same way `npm run e2e:local` does, and runs
 | `<flow>.md` | The table below, also printed to stdout |
 | `<flow>.json` | k6's full end-of-test summary object |
 | `<flow>.html` | k6's self-contained HTML report: request rate, latency percentiles, VUs and errors as charts over time. Skipped, with a warning, for a run under three 10 s periods, so never for `smoke` |
+| `<flow>.db.md` | What Postgres did during the run: see [the Postgres side](#the-postgres-side). Local stack only |
 
 It also sets `K6_NO_USAGE_REPORT`, so k6 does not phone home, and disables the
 live dashboard's port, so k6 exits when the run does.
@@ -126,6 +127,36 @@ production. When a number moves, check
 [`075_query_plans_test.sql`](../../supabase/tests/database/075_query_plans_test.sql)
 first: it is the deterministic gate for the same queries, and a plan change
 shows up there before it shows up here.
+
+## The Postgres side
+
+k6 says a request was slow; Postgres says which statement made it slow, how
+often it ran, and what it scanned. For a local-stack run,
+`scripts/load-db-report.mjs` resets `pg_stat_statements` (enabled by
+`0001_extensions.sql`) and snapshots the table and index counters just before
+k6 starts, snapshots again after it ends, and writes `<flow>.db.md`, which the
+workflow appends to the job summary under the k6 table:
+
+| Section | Read it for |
+| --- | --- |
+| Most time in total | Where the database's time went: statement, calls, mean and max ms, rows, share of the total, buffer cache hit rate, and the role that ran it (`authenticated` for PostgREST, `supabase_storage_admin` for Storage, `supabase_auth_admin` for sign-up) |
+| Most calls | Something called far more often than the journeys explain: a per-row trigger lookup, an N+1 from the client |
+| Table access | Sequential scans and the rows they read against index scans, per table. A table the app filters that shows sequential scans reading many rows is the first thing to check against [`075_query_plans_test.sql`](../../supabase/tests/database/075_query_plans_test.sql) |
+| Index use | Scans per index, and the indexes this run never touched. An index no journey uses is a candidate to drop (as #629 did), or a sign that its query plans around it |
+
+Three things to keep in mind:
+
+- It covers the whole run, setup and teardown included, so the seed's bulk
+  `INSERT`s and their per-row trigger lookups show up. They are recognisable
+  by their shape: a few calls, many rows each.
+- `pg_stat_statements` tracks top-level statements only, so the statements
+  inside `search_category_items` count toward the call that ran it.
+- The wrapper waits 11 s after k6 before the second snapshot, because an idle
+  backend can hold its table counters for up to 10 s before flushing them.
+
+It needs `psql` on `PATH`, as `supabase/splinter.sh` does, and reads the local
+stack's `DB_URL` from `supabase status`. A hosted run gets no Postgres report:
+nothing here holds a connection string for the hosted database, by design.
 
 ## The hosted target, and why not
 

@@ -35,6 +35,8 @@ const config: KnipConfig = {
     'supabase',
     // k6: a standalone binary too, installed by grafana/setup-k6-action or locally.
     'k6',
+    // psql: the Postgres client scripts/load-db-report.mjs reads statistics with, as supabase/splinter.sh does.
+    'psql',
   ],
   ignoreDependencies: [
     // scripts/lighthouse.mjs invokes it as `npx lhci autorun` -- Knip's
