@@ -146,6 +146,8 @@ meant to find where they break. The owner's map on a 25,000-entry category
 does at `peak`: it returns every title of every place in one call, which is
 kept on purpose so a popup opens without a second request.
 Recalibrate the same way when a change moves a scenario's baseline.
+`smoke` keeps every threshold but the p95s: one cold iteration measures the
+first request after setup, not a baseline.
 
 A stack on a GitHub runner measures the runner as much as the app. Compare a
 run with an earlier run of the same script on the same runner type, not with

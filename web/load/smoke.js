@@ -3,7 +3,7 @@ import { browse, search, write } from './lib/flows.js';
 import {
   LIFECYCLE_TIMEOUTS,
   SUMMARY_TREND_STATS,
-  thresholdsFor,
+  correctnessThresholds,
 } from './lib/options.js';
 import { summarize } from './lib/summary.js';
 
@@ -21,7 +21,7 @@ export const options = {
     shared_search: { ...ONCE, exec: 'searchShared' },
     write: { ...ONCE, exec: 'writeEntry' },
   },
-  thresholds: thresholdsFor([
+  thresholds: correctnessThresholds([
     'browse',
     'search',
     'shared_browse',

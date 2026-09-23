@@ -18,19 +18,28 @@ const P95_MS = {
   own_search: 100,
 };
 
-/** Thresholds for the named scenarios; per-scenario sub-metrics also feed the report. */
-export function thresholdsFor(scenarios) {
+/** Failures, timeouts and checks per named scenario, with no latency limit; per-scenario sub-metrics also feed the report. */
+export function correctnessThresholds(scenarios) {
   const thresholds = {
     http_req_failed: ['rate<0.01'],
     http_req_timeouts: ['count<1'],
     checks: ['rate>0.99'],
   };
   for (const scenario of scenarios) {
+    thresholds[`http_req_duration{scenario:${scenario}}`] = [];
+    thresholds[`http_req_failed{scenario:${scenario}}`] = ['rate<0.01'];
+    thresholds[`http_reqs{scenario:${scenario}}`] = ['count>0'];
+  }
+  return thresholds;
+}
+
+/** Correctness thresholds plus each scenario's p95 limit. */
+export function thresholdsFor(scenarios) {
+  const thresholds = correctnessThresholds(scenarios);
+  for (const scenario of scenarios) {
     thresholds[`http_req_duration{scenario:${scenario}}`] = [
       `p(95)<${P95_MS[scenario]}`,
     ];
-    thresholds[`http_req_failed{scenario:${scenario}}`] = ['rate<0.01'];
-    thresholds[`http_reqs{scenario:${scenario}}`] = ['count>0'];
   }
   return thresholds;
 }
