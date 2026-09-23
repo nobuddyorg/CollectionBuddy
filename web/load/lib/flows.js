@@ -40,8 +40,8 @@ export function browse(session, categoryId) {
 }
 
 /** Type a term, read two pages of matches, then see them on the map. */
-export function search(session, categoryId) {
-  const term = pick(SEARCH_TERMS);
+export function search(session, categoryId, terms = SEARCH_TERMS) {
+  const term = pick(terms);
   searchPage(session, categoryId, term, 1);
   sleep(THINK_SECONDS);
   searchPage(session, categoryId, term, 2);

@@ -129,7 +129,7 @@ select format(
     from public.item_categories ic
     join public.items i on i.id = ic.item_id
     where ic.category_id = %L::uuid
-    order by ic.created_at desc
+    order by ic.created_at desc, ic.item_id
     limit 50 offset 0
   $sql$,
   :'category_id'

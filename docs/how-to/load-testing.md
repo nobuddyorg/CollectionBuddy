@@ -18,17 +18,18 @@ supabase-js. Change one, change the other.
 | `catalogue.js` | `browse`, `search` | 10 + 5 VUs | The owner paging the catalogue (list, exact count, map) and searching it through `search_category_items` |
 | `shared-viewer.js` | `shared_browse`, `shared_search` | 10 + 5 VUs | A second identity reading a category it holds a `viewer` grant on: the `has_category_read_access()` path (#619) |
 | `write.js` | `write` | 5 VUs | Creating an entry, filing it, uploading a photograph and its thumbnail, writing its `images` row |
+| `population.js` | `own_browse`, `own_search`, `lent_browse`, `write` | 10 + 5 + 5 + 3 VUs | Many collectors at once, each VU one of them: tables and trigram indexes shared by everyone, a grant per collector, quota triggers per owner. Searches are mostly another collector's word, common across the table and absent from the searcher's own collection |
 
 ### Profiles
 
 A profile (`web/load/lib/profile.js`) scales every ramped scenario's virtual
 users and sets the seed size, so a heavier run needs no new script:
 
-| Profile | Virtual users | Shape | Seed: searched + shared entries |
-| --- | --- | --- | --- |
-| `normal` (default) | ×1: 15 on `catalogue` | 30 s ramp, 2 min hold, 15 s down | 10,000 + 300 |
-| `peak` | ×5: 75 on `catalogue` | 1 min ramp, 5 min hold, 30 s down | 25,000 + 1,000 |
-| `stress` | steps to ×20: 300 on `catalogue` | a quarter, half, then all of it for 2 min each, held 2 min more, 1 min down | 40,000 + 2,000 |
+| Profile | Virtual users | Shape | Seed: searched + shared entries | `population`: collectors × entries |
+| --- | --- | --- | --- | --- |
+| `normal` (default) | ×1: 15 on `catalogue` | 30 s ramp, 2 min hold, 15 s down | 10,000 + 300 | 20 × 500 |
+| `peak` | ×5: 75 on `catalogue` | 1 min ramp, 5 min hold, 30 s down | 25,000 + 1,000 | 28 × 1,000 |
+| `stress` | steps to ×20: 300 on `catalogue` | a quarter, half, then all of it for 2 min each, held 2 min more, 1 min down | 40,000 + 2,000 | 28 × 1,500 |
 
 `stress` is meant to cross the thresholds: the question it answers is where
 latency bends and errors start, which the HTML report's charts show step by
@@ -51,6 +52,16 @@ Every script shares one `setup()` (`web/load/lib/seed.js`):
 3. As the writer, one empty category that `write` files its new entries into,
    so a `stress` run's writes never meet the owner's quota.
 
+Nine seeded entries in ten carry their place's coordinates, as picking a
+suggestion stores them, so the map returns the shape real collections get.
+
+`population.js` has its own `setup()` (`web/load/lib/population.js`): the
+profile's number of collectors, each with a collection titled with one word
+of their own and a fifth as many entries lent, at `viewer`, to the next
+collector in a ring. It stops at 28 collectors because the local stack
+allows 30 sign-ups per 5 minutes, and sign-up is the only way in without
+`service_role`.
+
 `teardown()` deletes each account's photographs from Storage **before** any
 row (CLAUDE.md), then its entries and categories. The users stay in the
 stack's `auth.users`; on the ephemeral CI stack that is moot, and locally
@@ -64,7 +75,7 @@ Install [k6](https://grafana.com/docs/k6/latest/set-up/install-k6/) (CI pins
 ```bash
 supabase start
 cd web
-npm run load -- smoke          # then: catalogue, shared-viewer, write
+npm run load -- smoke          # then: catalogue, shared-viewer, write, population
 npm run load -- catalogue --profile peak
 ```
 

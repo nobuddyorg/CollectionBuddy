@@ -13,7 +13,7 @@ import {
   startDbCapture,
 } from './load-db-report.mjs';
 
-const FLOWS = ['smoke', 'catalogue', 'shared-viewer', 'write'];
+const FLOWS = ['smoke', 'catalogue', 'shared-viewer', 'write', 'population'];
 const PROFILES = ['normal', 'peak', 'stress'];
 const webDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(webDir, '..');

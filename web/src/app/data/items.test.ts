@@ -363,8 +363,8 @@ describe('the queries behind the list and the map', () => {
   const exportQuery = (after: typeof cursor | null = null) =>
     paramsOf(rawListItemsForExport('cat-1', { after, size: 500 }));
 
-  it('orders the list newest-first', () => {
-    expect(listQuery('coin').get('order')).toBe('created_at.desc');
+  it('orders the list newest-first, the item id breaking ties', () => {
+    expect(listQuery('coin').get('order')).toBe('created_at.desc,item_id.asc');
   });
 
   it('orders the export oldest-first with the item id as a tiebreaker', () => {

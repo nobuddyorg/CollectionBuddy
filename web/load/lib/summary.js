@@ -24,8 +24,11 @@ function thresholdRows(metrics) {
     );
 }
 
+const seedSize = () =>
+  `${SEARCHED_ITEMS} entries in the searched category and ${SHARED_ITEMS} in the shared one`;
+
 /** The report as Markdown, for stdout and the Actions job summary alike. */
-function summaryMarkdown(flow, data) {
+function summaryMarkdown(flow, data, seeded) {
   const { metrics } = data;
   const scenarios = Object.keys(metrics)
     .map((name) => /^http_reqs\{scenario:(.+)\}$/.exec(name))
@@ -36,7 +39,7 @@ function summaryMarkdown(flow, data) {
   return [
     `## k6 load test: \`${flow}\`, \`${PROFILE_NAME}\` profile, against ${TARGET}`,
     '',
-    `Target \`${SUPABASE_URL}\`; virtual users ×${PROFILE.vusScale} of normal. Seeded ${SEARCHED_ITEMS} entries in the searched category and ${SHARED_ITEMS} in the shared one. Rates are over the whole run, setup included. Charts over time, for runs past 30 s: \`${flow}.html\` in the run's artifact.`,
+    `Target \`${SUPABASE_URL}\`; virtual users ×${PROFILE.vusScale} of normal. Seeded ${seeded}. Rates are over the whole run, setup included. Charts over time, for runs past 30 s: \`${flow}.html\` in the run's artifact.`,
     '',
     '| Scenario | Requests | Req/s | Failed | p50 | p95 | p99 |',
     '| --- | --- | --- | --- | --- | --- | --- |',
@@ -53,8 +56,8 @@ function summaryMarkdown(flow, data) {
   ].join('\n');
 }
 
-export function summarize(flow, data) {
-  const markdown = summaryMarkdown(flow, data);
+export function summarize(flow, data, seeded = seedSize()) {
+  const markdown = summaryMarkdown(flow, data, seeded);
   return {
     stdout: markdown,
     [`load-results/${flow}.md`]: markdown,
