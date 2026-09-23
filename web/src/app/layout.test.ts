@@ -1,8 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-// Runs from a <script> tag before React exists to import from, so it's
-// asserted on as raw source text rather than executed.
+// Runs from a <script> tag before React exists, so it is asserted as raw source text, not executed.
 const layout = readFileSync(new URL('layout.tsx', import.meta.url), 'utf8');
 
 describe('the framebusting script in layout.tsx', () => {
@@ -57,8 +56,7 @@ describe('the Content-Security-Policy meta tag in layout.tsx', () => {
     expect(layout).toContain("object-src 'none'");
   });
 
-  // Guards against someone adding frame-ancestors later believing it does
-  // something in a <meta> tag; the framebusting script carries that job.
+  // frame-ancestors does nothing in a meta tag; the framebusting script carries that job.
   it('does not declare frame-ancestors, which a meta tag cannot enforce', () => {
     expect(policy).not.toContain('frame-ancestors');
   });

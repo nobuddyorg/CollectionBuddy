@@ -36,11 +36,11 @@ describe('runPool', () => {
     let caught: unknown;
     try {
       await runPool([1], 1, async () => {
-        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- a non-Error throw is the behavior under test
         throw 'plain string failure';
       });
-    } catch (err) {
-      caught = err;
+    } catch (error) {
+      caught = error;
     }
     expect(caught).toBeInstanceOf(Error);
     expect((caught as Error).message).toBe('plain string failure');
@@ -56,15 +56,13 @@ describe('runPool', () => {
         if (item === 1) {
           throw new Error('first item fails immediately');
         }
-        // item 2 is the other runner's in-flight work when item 1 fails --
-        // it must still be allowed to finish.
+        // Item 2 is the other runner's in-flight work when item 1 fails; it must still finish.
         await Promise.resolve();
         finished.push(item);
       }),
     ).rejects.toThrow('first item fails immediately');
 
-    // Only the two initial runners' items ever started -- 3 and 4 were
-    // never picked up once the pool recorded a failure.
+    // 3 and 4 were never picked up once the pool recorded a failure.
     expect(started.sort()).toEqual([1, 2]);
     expect(finished).toEqual([2]);
   });

@@ -3,20 +3,10 @@ import { runPool } from './pool';
 type ReadResult<T> =
   { data: T[]; error: null } | { data: null; error: NonNullable<unknown> };
 
-/**
- * Every row a ranged reader will give, one page at a time until a page comes
- * back short -- how a read gets past the API's row cap without silently
- * truncating, written once rather than at each of the four readers that
- * need it.
- *
- * A page that comes back empty and one that comes back short both end the
- * walk; only a full page earns another request, so an exact multiple of
- * `pageSize` costs one extra, empty round trip rather than dropping rows.
- */
+/** All rows, walked page by page until a page comes back short; a full last page costs one empty read. */
 export async function readAllPages<T>(
   pageSize: number,
-  // PromiseLike, not Promise: a PostgREST builder is a thenable that only
-  // issues its request when awaited, which is exactly what a caller hands in.
+  // PromiseLike: a PostgREST builder is a thenable that only issues its request when awaited.
   readPage: (
     from: number,
     to: number,
@@ -37,11 +27,7 @@ export async function readAllPages<T>(
 // Bounded like the photo pools in exportCategory.ts and importCategory.ts.
 const CHUNK_READ_CONCURRENCY = 6;
 
-/**
- * Every row from a set of independent chunked reads, a few in flight at a
- * time, joined in chunk order. The first failed chunk stops new ones starting
- * and is returned as the error, with no partial data.
- */
+/** Chunked reads a few at a time, joined in chunk order; the first failure ends it with no partial data. */
 export async function readAllChunks<C, T>(
   chunks: readonly C[],
   readChunk: (chunk: C) => PromiseLike<ReadResult<T>>,
@@ -62,8 +48,8 @@ export async function readAllChunks<C, T>(
         results[index] = result.data;
       },
     );
-  } catch (err) {
-    return { data: null, error: firstError ?? (err as NonNullable<unknown>) };
+  } catch (error) {
+    return { data: null, error: firstError ?? (error as NonNullable<unknown>) };
   }
   return { data: results.flat(), error: null };
 }

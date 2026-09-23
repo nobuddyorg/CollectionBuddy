@@ -15,14 +15,14 @@ export function useAuthRedirect(redirectTo: string) {
     const handler = (_: AuthChangeEvent, session: Session | null) => {
       if (session) router.replace(redirectTo);
     };
-    const { data } = supabase.auth.onAuthStateChange(handler);
+    const { data: authListener } = supabase.auth.onAuthStateChange(handler);
 
-    void supabase.auth.getSession().then(({ data: d }) => {
-      if (d.session) router.replace(redirectTo);
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data.session) router.replace(redirectTo);
       else setChecking(false);
     });
 
-    return () => data.subscription.unsubscribe();
+    return () => authListener.subscription.unsubscribe();
   }, [router, redirectTo]);
 
   return checking;

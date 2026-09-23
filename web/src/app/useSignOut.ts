@@ -13,18 +13,16 @@ export function useSignOut() {
 
   return useCallback(async () => {
     try {
-      // Global scope revokes the refresh token server-side; fall back to a
-      // local clear on failure so a network error can't leave the user
-      // signed in on this device.
+      // Global sign-out revokes the refresh token server-side; on failure a local clear still ends it here.
       const { error } = await supabase.auth.signOut();
       if (error) {
         toast.reportError('sign out failed', error, t('header.sign_out_error'));
         await supabase.auth.signOut({ scope: 'local' });
       }
-    } catch (err) {
+    } catch (error) {
       toast.reportError(
         'sign out unexpected error',
-        err,
+        error,
         t('header.sign_out_error'),
       );
       await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);

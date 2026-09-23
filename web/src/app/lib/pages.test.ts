@@ -42,8 +42,7 @@ describe('readAllPages', () => {
     ]);
   });
 
-  // The boundary a page walk gets wrong: a full last page looks like there
-  // may be more, so it costs one empty request rather than dropping rows.
+  // A full last page looks like there may be more, so it costs one empty request rather than dropping rows.
   it('asks once more after a page that fills exactly, then stops', async () => {
     const all = Array.from({ length: 20 }, (_, i) => i);
     const readPage = reader(all);
@@ -74,8 +73,7 @@ describe('readAllPages', () => {
     expect(readPage).toHaveBeenCalledTimes(2);
   });
 
-  // A reader answering with neither rows nor an error still has to end the
-  // walk rather than being read for a length.
+  // A reader answering with neither rows nor an error must end the walk, not be read for a length.
   it('stops on a page that answers with nothing at all', async () => {
     const readPage = vi.fn().mockResolvedValue({ data: null, error: null });
 

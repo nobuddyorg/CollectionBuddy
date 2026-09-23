@@ -12,8 +12,7 @@ describe('useRequestSequence', () => {
     expect(result.current.next()).toBe(2);
   });
 
-  // The whole point: the answer to a request a newer one has superseded is
-  // dropped rather than raced against it.
+  // The answer to a request a newer one has superseded is dropped rather than raced against it.
   it('recognises only the latest request as current', () => {
     const { result } = renderHook(() => useRequestSequence());
 
@@ -25,8 +24,7 @@ describe('useRequestSequence', () => {
     expect(result.current.isCurrent(second)).toBe(true);
   });
 
-  // Both are meant to be safe to name in another callback's dependency
-  // array; an identity that changed per render would defeat that.
+  // An identity that changed per render would defeat a dependent callback's memoization.
   it('keeps one identity for both across re-renders', () => {
     const { result, rerender } = renderHook(() => useRequestSequence());
     const { next, isCurrent } = result.current;

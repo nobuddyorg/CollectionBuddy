@@ -13,8 +13,7 @@ describe('useServiceWorker', () => {
     const register = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal('navigator', { serviceWorker: { register } });
     renderHook(() => useServiceWorker());
-    // NEXT_PUBLIC_BASE_PATH is unset outside a production build (see
-    // next.config.ts); the production value is just a literal prefix on both.
+    // NEXT_PUBLIC_BASE_PATH is unset outside a production build; production only adds a literal prefix.
     expect(register).toHaveBeenCalledWith('/sw.js', { scope: '/' });
   });
 

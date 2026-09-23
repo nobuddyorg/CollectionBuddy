@@ -26,8 +26,7 @@ describe('restoreAt', () => {
   });
 
   it('clamps a negative index rather than splicing from the end', () => {
-    // splice(-1) would insert *before the last* element, putting the entry
-    // in the wrong place instead of the first.
+    // splice(-1) would insert before the last element, not at the front.
     expect(restoreAt([a, b], -1, c).map((i) => i.id)).toEqual(['c', 'a', 'b']);
   });
 

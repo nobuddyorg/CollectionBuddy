@@ -58,8 +58,7 @@ describe('I18nProvider', () => {
 
   it('detects a language stored from a previous visit', () => {
     localStorage.setItem('lang', 'en');
-    // Deliberately the *other* supported language, so 'en' below can only
-    // have come from storage and not from the browser's own preference.
+    // The other supported language, so 'en' below can only have come from storage.
     vi.stubGlobal('navigator', { ...navigator, language: 'de-DE' });
     renderProbe();
 
@@ -150,10 +149,7 @@ describe('I18nProvider', () => {
     expect(meta.getAttribute('content')).toBe('Sammeln • Ordnen • Behalten');
   });
 
-  // A defensive fallback against `page.footer` disappearing from a
-  // translations file without this hardcoded reference being updated --
-  // the parity test only guards `t()`/`tCount()` literals, not this direct
-  // `resolveTranslationKey` call, so nothing else in the suite catches it.
+  // The parity test guards only t()/tCount() literals, not this direct resolveTranslationKey call.
   it('falls back to an empty meta description when the active language is missing page.footer', async () => {
     vi.resetModules();
     vi.doMock('./en.json', () => ({
@@ -188,10 +184,7 @@ describe('I18nProvider', () => {
   it('picks the singular form for a count of exactly one, in either language', () => {
     localStorage.setItem('lang', 'en');
     renderProbe();
-    // Plain `.textContent` equality, not `toHaveTextContent`: that matcher
-    // does a substring match, and "1 tag" is a substring of the plural
-    // "1 tags", so it can't tell a wrongly-pluralized answer from a
-    // correct one.
+    // Plain textContent equality: toHaveTextContent substring-matches, and "1 tag" is inside "1 tags".
     expect(screen.getByTestId('tags-1').textContent).toBe('1 tag');
     expect(screen.getByTestId('tags-0').textContent).toBe('0 tags');
     expect(screen.getByTestId('tags-2').textContent).toBe('2 tags');
@@ -224,9 +217,7 @@ describe('I18nProvider', () => {
       result.current.setLang('de');
     });
 
-    // Same function identity throughout (that's the whole point of the
-    // langRef indirection) -- but it must answer for German now, not the
-    // English it was created under.
+    // Same function identity throughout, yet it must answer for German now, not the English it was made under.
     expect(result.current.t).toBe(tBeforeSwitch);
     expect(tBeforeSwitch('common.close')).toBe('Schließen');
   });

@@ -8,9 +8,7 @@ export function useGoogleSignIn() {
   return useCallback(async () => {
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
     const url = new URL(basePath || '/', window.location.origin);
-    // signInWithOAuth resolves with { error } instead of throwing; if this
-    // promise isn't awaited, failures never reach the caller's catch and
-    // GoogleSignInButton's loading overlay is stuck with no error shown.
+    // Awaited because signInWithOAuth resolves with { error } instead of throwing; the overlay would hang.
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: url.toString() },

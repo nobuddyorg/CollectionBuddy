@@ -3,49 +3,46 @@ import { describe, expect, it } from 'vitest';
 import { resolveTranslationKey } from './I18nProvider';
 
 describe('resolveTranslationKey', () => {
-  const dict = {
+  const dictionary = {
     common: { close: 'Close', nested: { deep: 'Deep value' } },
   };
 
   it('resolves a top-level nested key', () => {
-    expect(resolveTranslationKey(dict, 'common.close')).toBe('Close');
+    expect(resolveTranslationKey(dictionary, 'common.close')).toBe('Close');
   });
 
   it('resolves a deeply nested key', () => {
-    expect(resolveTranslationKey(dict, 'common.nested.deep')).toBe(
+    expect(resolveTranslationKey(dictionary, 'common.nested.deep')).toBe(
       'Deep value',
     );
   });
 
   it('returns undefined for a missing top-level segment', () => {
-    expect(resolveTranslationKey(dict, 'missing.key')).toBeUndefined();
+    expect(resolveTranslationKey(dictionary, 'missing.key')).toBeUndefined();
   });
 
   it('returns undefined for a missing leaf segment', () => {
-    expect(resolveTranslationKey(dict, 'common.missing')).toBeUndefined();
+    expect(resolveTranslationKey(dictionary, 'common.missing')).toBeUndefined();
   });
 
   it('returns undefined when the path resolves to an object, not a string', () => {
-    expect(resolveTranslationKey(dict, 'common.nested')).toBeUndefined();
+    expect(resolveTranslationKey(dictionary, 'common.nested')).toBeUndefined();
   });
 
   it('returns undefined instead of throwing when a segment resolves to a string too early', () => {
-    // An extra trailing segment must report a miss, not do `'extra' in
-    // 'Close'` (a TypeError).
-    expect(resolveTranslationKey(dict, 'common.close.extra')).toBeUndefined();
+    // An extra trailing segment must be a miss, not `'extra' in 'Close'` (a TypeError).
+    expect(
+      resolveTranslationKey(dictionary, 'common.close.extra'),
+    ).toBeUndefined();
   });
 
   it('returns undefined for a numeric trailing segment instead of indexing into a leaf string', () => {
-    // A boxed string has its characters as own, enumerable properties
-    // (`Object.hasOwn('Close', '0')` is true), so a looser type check here
-    // would resolve 'common.close.0' to 'C' instead of reporting the extra
-    // segment as a miss, the same way 'common.close.extra' already does.
-    expect(resolveTranslationKey(dict, 'common.close.0')).toBeUndefined();
+    // A boxed string has its characters as own properties, so a looser check would resolve this to 'C'.
+    expect(resolveTranslationKey(dictionary, 'common.close.0')).toBeUndefined();
   });
 
   it('returns undefined instead of throwing when a segment resolves to null', () => {
-    // Translation JSON always bottoms out in strings, so this forces past
-    // the type to exercise the runtime guard for malformed data.
+    // Translation JSON bottoms out in strings; this forces past the type to reach the runtime guard.
     const withNull = { a: null } as unknown as Parameters<
       typeof resolveTranslationKey
     >[0];
@@ -53,10 +50,8 @@ describe('resolveTranslationKey', () => {
   });
 
   it('stops at the first missing segment instead of continuing to match later segments against the original dict', () => {
-    // Without an immediate return on miss, the loop would re-check 'b'
-    // against the original dict (since `value` was never reassigned) and
-    // wrongly resolve it.
-    const dict2 = { b: 'real-value' };
-    expect(resolveTranslationKey(dict2, 'missing.b')).toBeUndefined();
+    // Without an immediate return on miss, 'b' would be re-checked against the original dictionary and resolve.
+    const flatDictionary = { b: 'real-value' };
+    expect(resolveTranslationKey(flatDictionary, 'missing.b')).toBeUndefined();
   });
 });

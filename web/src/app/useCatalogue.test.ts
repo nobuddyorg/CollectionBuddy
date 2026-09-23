@@ -16,7 +16,7 @@ vi.mock('./components/ItemList/firstPagePrefetch', () => ({
   prefetchFirstPage: vi.fn(),
 }));
 
-const cats = [
+const categories = [
   { id: 'a', name: 'Coins', user_id: 'owner-1' },
   { id: 'b', name: 'Stamps', user_id: 'owner-1' },
 ];
@@ -25,12 +25,12 @@ function categoriesState(
   overrides: Partial<UseCategories> = {},
 ): UseCategories {
   return {
-    cats,
+    cats: categories,
     isLoading: false,
     isCreating: false,
     isDeleting: false,
     isRenaming: false,
-    reload: vi.fn().mockResolvedValue(cats),
+    reload: vi.fn().mockResolvedValue(categories),
     createCategory: vi.fn(),
     renameCategory: vi.fn(),
     deleteCategory: vi.fn(),
@@ -48,7 +48,7 @@ describe('useCatalogue', () => {
 
   it("starts the stored category's first page alongside the category list, not after it", () => {
     window.localStorage.setItem(SELECTED_CATEGORY_KEY, 'b');
-    const reload = vi.fn(() => new Promise<typeof cats>(() => {}));
+    const reload = vi.fn(() => new Promise<typeof categories>(() => {}));
     vi.mocked(useCategories).mockReturnValue(categoriesState({ reload }));
 
     renderHook(() => useCatalogue(false, 'user-1'));
@@ -73,7 +73,7 @@ describe('useCatalogue', () => {
   });
 
   it('does not load while the session is still resolving', () => {
-    const reload = vi.fn().mockResolvedValue(cats);
+    const reload = vi.fn().mockResolvedValue(categories);
     vi.mocked(useCategories).mockReturnValue(categoriesState({ reload }));
 
     renderHook(() => useCatalogue(true, 'user-1'));
@@ -81,7 +81,7 @@ describe('useCatalogue', () => {
   });
 
   it('does not load without a signed-in user', () => {
-    const reload = vi.fn().mockResolvedValue(cats);
+    const reload = vi.fn().mockResolvedValue(categories);
     vi.mocked(useCategories).mockReturnValue(categoriesState({ reload }));
 
     renderHook(() => useCatalogue(false, undefined));
@@ -112,10 +112,9 @@ describe('useCatalogue', () => {
     expect(result.current.selectedCategoryId).toBe('b');
   });
 
-  // The load is gated on the session, so it has to run again when the
-  // session resolves -- not only on the first render.
+  // Gated on the session, so it must run again when the session resolves, not only on first render.
   it('loads once the session stops resolving, not only on first render', async () => {
-    const reload = vi.fn().mockResolvedValue(cats);
+    const reload = vi.fn().mockResolvedValue(categories);
     vi.mocked(useCategories).mockReturnValue(categoriesState({ reload }));
     const { rerender, result } = renderHook(
       ({ loading }: { loading: boolean }) => useCatalogue(loading, 'user-1'),

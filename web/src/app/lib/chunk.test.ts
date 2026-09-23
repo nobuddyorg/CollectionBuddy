@@ -13,8 +13,7 @@ describe('chunk', () => {
     expect(chunk(items, 100).flat()).toEqual(items);
   });
 
-  // The boundary an index walk gets wrong: an exact multiple must not end
-  // with a trailing empty run, which would be one request for no rows.
+  // An exact multiple must not end with a trailing empty run, which would be one request for no rows.
   it('produces no trailing empty run for an exact multiple', () => {
     expect(chunk([1, 2, 3, 4], 2)).toEqual([
       [1, 2],

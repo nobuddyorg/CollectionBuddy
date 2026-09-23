@@ -8,8 +8,7 @@ import type { User } from '@supabase/supabase-js';
 
 type SessionState = { user: SessionUser | null; loading: boolean };
 
-// user_metadata is an untyped bag from the auth provider, so `name` is
-// narrowed here rather than trusted as a string.
+// user_metadata is an untyped bag from the auth provider, so `name` is narrowed rather than trusted.
 function sessionUserFrom(user: User | undefined): SessionUser | null {
   if (!user) return null;
   const name: unknown = user.user_metadata?.name;
@@ -26,21 +25,19 @@ export function useSession(): SessionState {
 
   useEffect(() => {
     const load = async () => {
-      // getSession() reads the persisted session locally, no network round
-      // trip; getUser() would revalidate and block first paint.
-      // onAuthStateChange below still catches a session that turns out
-      // to be stale. A response landing after unmount is a safe no-op --
-      // React 18+ silently drops a state update for an unmounted fiber.
+      // getSession() reads the persisted session locally; getUser() would revalidate and block first paint.
       const { data } = await supabase.auth.getSession();
       setUser(sessionUserFrom(data.session?.user));
       setLoading(false);
     };
     void load();
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(sessionUserFrom(session?.user));
-    });
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(sessionUserFrom(session?.user));
+      },
+    );
     return () => {
-      sub.subscription.unsubscribe();
+      authListener.subscription.unsubscribe();
     };
   }, []);
 
