@@ -117,6 +117,8 @@ describe('useCategories deleteCategory image cleanup', () => {
         message: 'Could not read images for orphaned items',
       }),
     );
+    const reported: unknown = consoleError.mock.calls[0]?.[1];
+    expect(reported).toMatchObject({ cause: { message: 'offline' } });
     consoleError.mockRestore();
   });
   it('treats an empty image-paths answer as no photographs to remove', async () => {
