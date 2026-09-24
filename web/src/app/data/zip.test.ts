@@ -1,16 +1,36 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
+  assertZipRoom,
   centralDirectoryEntry,
+  createZipWriter,
   crc32,
   crc32Table,
   dosDateTime,
   encodePath,
   endOfCentralDirectory,
   localFileHeader,
+  MAX_ZIP_BYTES,
+  MAX_ZIP_ENTRIES,
+  readZipEntries,
+  ZipLimitError,
+  ZipReadError,
   type ZipEntry,
 } from './zip';
-import { encoder, uint32, uint16 } from './zip.test-support';
+
+const encoder = new TextEncoder();
+
+async function bytesOf(blob: Blob): Promise<Uint8Array<ArrayBuffer>> {
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+function uint32(bytes: Uint8Array, at: number): number {
+  return new DataView(bytes.buffer, bytes.byteOffset).getUint32(at, true);
+}
+
+function uint16(bytes: Uint8Array, at: number): number {
+  return new DataView(bytes.buffer, bytes.byteOffset).getUint16(at, true);
+}
 
 function entry(overrides: Partial<ZipEntry> = {}): ZipEntry {
   return {
@@ -22,6 +42,16 @@ function entry(overrides: Partial<ZipEntry> = {}): ZipEntry {
     date: 0x5cc6,
     ...overrides,
   };
+}
+
+async function oneEntryArchive(): Promise<Uint8Array<ArrayBuffer>> {
+  const writer = createZipWriter();
+  writer.add({ path: 'a.txt', bytes: new Uint8Array([1, 2, 3]) });
+  return bytesOf(writer.finish());
+}
+
+function dataViewOf(bytes: Uint8Array): DataView {
+  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
 describe('crc32', () => {
@@ -182,5 +212,301 @@ describe('endOfCentralDirectory', () => {
     expect(uint32(bytes, 12)).toBe(150);
     expect(uint32(bytes, 16)).toBe(900);
     expect(uint16(bytes, 20)).toBe(0);
+  });
+});
+
+describe('createZipWriter', () => {
+  const modified = new Date(2026, 7, 6, 13, 45, 30);
+
+  it('lays entries out header-then-bytes, in the order they were added', async () => {
+    const writer = createZipWriter();
+    writer.add({ path: 'one.txt', bytes: encoder.encode('hello'), modified });
+    writer.add({ path: 'two.txt', bytes: encoder.encode('!'), modified });
+    const bytes = await bytesOf(writer.finish());
+
+    expect(uint32(bytes, 0)).toBe(0x04034b50);
+    const firstName = 'one.txt'.length;
+    expect(new TextDecoder().decode(bytes.slice(30, 30 + firstName))).toBe(
+      'one.txt',
+    );
+    const firstData = 30 + firstName;
+    expect(
+      new TextDecoder().decode(bytes.slice(firstData, firstData + 5)),
+    ).toBe('hello');
+    // The second entry's local header starts immediately after the first.
+    expect(uint32(bytes, firstData + 5)).toBe(0x04034b50);
+  });
+
+  it('reports the running size, which is where the next entry begins', () => {
+    const writer = createZipWriter();
+    expect(writer.size()).toBe(0);
+    writer.add({ path: 'one.txt', bytes: encoder.encode('hello'), modified });
+    expect(writer.size()).toBe(30 + 'one.txt'.length + 5);
+    writer.add({ path: 'two.txt', bytes: encoder.encode('!'), modified });
+    expect(writer.size()).toBe(30 + 7 + 5 + 30 + 7 + 1);
+  });
+
+  it('records each entry’s offset so the directory points at its header', async () => {
+    const writer = createZipWriter();
+    writer.add({ path: 'one.txt', bytes: encoder.encode('hello'), modified });
+    const secondOffset = writer.size();
+    writer.add({ path: 'two.txt', bytes: encoder.encode('!'), modified });
+    const bytes = await bytesOf(writer.finish());
+
+    const trailerAt = bytes.length - 22;
+    const directoryAt = uint32(bytes, trailerAt + 16);
+    const firstRecord = directoryAt;
+    const secondRecord = firstRecord + 46 + 'one.txt'.length;
+    expect(uint32(bytes, firstRecord + 42)).toBe(0);
+    expect(uint32(bytes, secondRecord + 42)).toBe(secondOffset);
+    // Every offset the directory gives has to land on a local header.
+    expect(uint32(bytes, uint32(bytes, secondRecord + 42))).toBe(0x04034b50);
+  });
+
+  it('ends with a trailer describing the directory it just wrote', async () => {
+    const writer = createZipWriter();
+    writer.add({ path: 'one.txt', bytes: encoder.encode('hello'), modified });
+    writer.add({ path: 'two.txt', bytes: encoder.encode('!'), modified });
+    const bytes = await bytesOf(writer.finish());
+
+    const trailerAt = bytes.length - 22;
+    expect(uint32(bytes, trailerAt)).toBe(0x06054b50);
+    expect(uint16(bytes, trailerAt + 8)).toBe(2);
+    expect(uint16(bytes, trailerAt + 10)).toBe(2);
+    const directorySize = 46 + 7 + 46 + 7;
+    expect(uint32(bytes, trailerAt + 12)).toBe(directorySize);
+    expect(uint32(bytes, trailerAt + 16)).toBe(trailerAt - directorySize);
+    expect(uint32(bytes, uint32(bytes, trailerAt + 16))).toBe(0x02014b50);
+  });
+
+  it('writes a valid empty archive', async () => {
+    const bytes = await bytesOf(createZipWriter().finish());
+    expect(bytes).toHaveLength(22);
+    expect(uint32(bytes, 0)).toBe(0x06054b50);
+    expect(uint16(bytes, 8)).toBe(0);
+    expect(uint32(bytes, 12)).toBe(0);
+    expect(uint32(bytes, 16)).toBe(0);
+  });
+
+  it('stores the bytes verbatim, so the CRC in the header matches them', async () => {
+    const payload = encoder.encode('the quick brown fox');
+    const writer = createZipWriter();
+    writer.add({ path: 'f.txt', bytes: payload, modified });
+    const bytes = await bytesOf(writer.finish());
+    expect(uint32(bytes, 14)).toBe(crc32(payload));
+    const at = 30 + 'f.txt'.length;
+    expect(bytes.slice(at, at + payload.length)).toEqual(payload);
+  });
+
+  it('carries the modification time given to add, not the time of the run', async () => {
+    const writer = createZipWriter();
+    writer.add({ path: 'f.txt', bytes: encoder.encode('x'), modified });
+    const bytes = await bytesOf(writer.finish());
+    const { time, date } = dosDateTime(modified);
+    expect(uint16(bytes, 10)).toBe(time);
+    expect(uint16(bytes, 12)).toBe(date);
+  });
+
+  // Pinned clock, so the writer's own `new Date()` and the assertion cannot straddle midnight.
+  it('defaults the modification time to now when none is given', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 15, 23, 59, 59));
+    try {
+      const writer = createZipWriter();
+      writer.add({ path: 'f.txt', bytes: encoder.encode('x') });
+      const bytes = await bytesOf(writer.finish());
+      expect(uint16(bytes, 12)).toBe(dosDateTime(new Date()).date);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps directory paths as they were given', async () => {
+    const writer = createZipWriter();
+    const path = 'photos/001-coin/1.webp';
+    writer.add({ path, bytes: encoder.encode('x'), modified });
+    const bytes = await bytesOf(writer.finish());
+    expect(new TextDecoder().decode(bytes.slice(30, 30 + path.length))).toBe(
+      path,
+    );
+  });
+
+  it('refuses an entry that would push the archive past what 32 bits describe', () => {
+    const writer = createZipWriter();
+    // Only the length is read before the refusal, so a stand-in avoids allocating four gigabytes.
+    const huge = {
+      length: MAX_ZIP_BYTES,
+    } as unknown as Uint8Array<ArrayBuffer>;
+    expect(() =>
+      writer.add({ path: 'big.bin', bytes: huge, modified }),
+    ).toThrow(ZipLimitError);
+  });
+
+  // A removed byte guard would fall through to crc32 over the huge stand-in until Stryker's timeout.
+  it('refuses an entry through the writer once a lowered byte limit is reached', () => {
+    const writer = createZipWriter({ maxBytes: 39 });
+    expect(() =>
+      writer.add({ path: 'a.txt', bytes: encoder.encode('hello') }),
+    ).toThrow(ZipLimitError);
+  });
+
+  it('refuses an entry through the writer once a lowered entry-count limit is reached', () => {
+    const writer = createZipWriter({ maxEntries: 1 });
+    writer.add({ path: 'a.txt', bytes: encoder.encode('x'), modified });
+    expect(() =>
+      writer.add({ path: 'b.txt', bytes: encoder.encode('y'), modified }),
+    ).toThrow(ZipLimitError);
+  });
+
+  // Every add() fits on its own; only the directory and trailer finish() appends push it over.
+  it('refuses at finish() when the directory and trailer push the total past a lowered byte limit', () => {
+    const writer = createZipWriter({ maxBytes: 100 });
+    writer.add({ path: 'a.txt', bytes: encoder.encode('x'), modified });
+    expect(() => writer.finish()).toThrow(ZipLimitError);
+  });
+});
+
+describe('assertZipRoom', () => {
+  it('allows an archive exactly at each limit', () => {
+    expect(() =>
+      assertZipRoom({ totalBytes: MAX_ZIP_BYTES, entryCount: MAX_ZIP_ENTRIES }),
+    ).not.toThrow();
+  });
+
+  it('rejects one byte past the size limit', () => {
+    expect(() =>
+      assertZipRoom({ totalBytes: MAX_ZIP_BYTES + 1, entryCount: 0 }),
+    ).toThrow(ZipLimitError);
+    expect(() =>
+      assertZipRoom({ totalBytes: MAX_ZIP_BYTES + 1, entryCount: 0 }),
+    ).toThrow(/4 GiB/);
+  });
+
+  it('rejects one entry past what the trailer’s 16-bit count can hold', () => {
+    expect(() =>
+      assertZipRoom({ totalBytes: 0, entryCount: MAX_ZIP_ENTRIES + 1 }),
+    ).toThrow(ZipLimitError);
+    expect(() =>
+      assertZipRoom({ totalBytes: 0, entryCount: MAX_ZIP_ENTRIES + 1 }),
+    ).toThrow(/65535/);
+  });
+
+  it('states the limits the headers actually impose', () => {
+    expect(MAX_ZIP_BYTES).toBe(0xffffffff);
+    expect(MAX_ZIP_ENTRIES).toBe(0xffff);
+  });
+
+  it('names its errors, so a caller can tell them from an I/O failure', () => {
+    expect(new ZipLimitError('x').name).toBe('ZipLimitError');
+    expect(new ZipLimitError('x')).toBeInstanceOf(Error);
+  });
+});
+
+// Every archive read back here was produced by createZipWriter, so a round trip proves they agree.
+describe('readZipEntries', () => {
+  it('reads back every entry a writer produced, byte for byte', async () => {
+    const writer = createZipWriter();
+    writer.add({ path: 'collection.json', bytes: encoder.encode('{"a":1}') });
+    writer.add({
+      path: 'photos/1.webp',
+      bytes: new Uint8Array([1, 2, 3, 4, 5]),
+    });
+    const entries = await readZipEntries(writer.finish());
+
+    expect(entries.size).toBe(2);
+    expect(new TextDecoder().decode(entries.get('collection.json'))).toBe(
+      '{"a":1}',
+    );
+    expect(entries.get('photos/1.webp')).toEqual(
+      new Uint8Array([1, 2, 3, 4, 5]),
+    );
+  });
+
+  it('reads an empty archive as an empty map, not an error', async () => {
+    const entries = await readZipEntries(createZipWriter().finish());
+    expect(entries.size).toBe(0);
+  });
+
+  it('keeps entries with the same name apart by path, not by basename', async () => {
+    const writer = createZipWriter();
+    writer.add({ path: 'a/1.webp', bytes: new Uint8Array([1]) });
+    writer.add({ path: 'b/1.webp', bytes: new Uint8Array([2]) });
+    const entries = await readZipEntries(writer.finish());
+
+    expect(entries.get('a/1.webp')).toEqual(new Uint8Array([1]));
+    expect(entries.get('b/1.webp')).toEqual(new Uint8Array([2]));
+  });
+
+  it('rejects a file too small to hold even the end-of-central-directory record', async () => {
+    await expect(
+      readZipEntries(new Blob([new Uint8Array(10)])),
+    ).rejects.toThrow(/file is too small/);
+  });
+
+  // Both bounds are `>`, not `>=`: a structure ending on the file's last byte is inside the file.
+  it('reads an entry whose data ends on the very last byte', async () => {
+    const bytes = await oneEntryArchive();
+    const dataView = dataViewOf(bytes);
+    const directoryAt = bytes.length - 22 - (46 + 'a.txt'.length);
+    const dataStart = 30 + 'a.txt'.length;
+    dataView.setUint32(directoryAt + 24, bytes.length - dataStart, true);
+
+    const entries = await readZipEntries(new Blob([bytes]));
+
+    expect(entries.get('a.txt')).toHaveLength(bytes.length - dataStart);
+  });
+
+  it('reads a directory pointer that leaves exactly one header of room', async () => {
+    const bytes = await oneEntryArchive();
+    const dataView = dataViewOf(bytes);
+    // Not past the end, so the bound lets it through; the signature found there is what rejects it.
+    dataView.setUint32(bytes.length - 22 + 16, bytes.length - 46, true);
+
+    await expect(readZipEntries(new Blob([bytes]))).rejects.toThrow(
+      /malformed central directory entry/,
+    );
+  });
+
+  it('rejects a file with no end-of-central-directory signature at all', async () => {
+    const junk = new Uint8Array(30);
+    await expect(readZipEntries(new Blob([junk]))).rejects.toThrow(
+      /end-of-central-directory/,
+    );
+  });
+
+  it('rejects a directory entry claiming a size that runs past the file', async () => {
+    const bytes = await oneEntryArchive();
+    // The one entry's size field sits 24 bytes into its directory record, which precedes the trailer.
+    const directoryAt = bytes.length - 22 - (46 + 'a.txt'.length);
+    dataViewOf(bytes).setUint32(directoryAt + 24, 0xffffff, true);
+    await expect(readZipEntries(new Blob([bytes]))).rejects.toThrow(
+      /runs past the file/,
+    );
+  });
+
+  it('rejects when the end-of-central-directory record claims more entries than the file actually holds', async () => {
+    const bytes = await oneEntryArchive();
+    const dataView = dataViewOf(bytes);
+    const trailerAt = bytes.length - 22;
+    // Both entry-count fields say 2 for one real entry, so the second directory pointer overruns.
+    dataView.setUint16(trailerAt + 8, 2, true);
+    dataView.setUint16(trailerAt + 10, 2, true);
+    await expect(readZipEntries(new Blob([bytes]))).rejects.toThrow(
+      /central directory runs past the file/,
+    );
+  });
+
+  it('rejects a central directory entry with the wrong signature', async () => {
+    const bytes = await oneEntryArchive();
+    const directoryAt = bytes.length - 22 - (46 + 'a.txt'.length);
+    dataViewOf(bytes).setUint32(directoryAt, 0xdeadbeef, true);
+    await expect(readZipEntries(new Blob([bytes]))).rejects.toThrow(
+      /malformed central directory entry/,
+    );
+  });
+
+  it('names its errors, so a caller can tell them from any other failure', () => {
+    expect(new ZipReadError('x').name).toBe('ZipReadError');
+    expect(new ZipReadError('x')).toBeInstanceOf(Error);
   });
 });
