@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import ItemList from './index';
+import {
+  defaultImagesState,
+  defaultMutationsState,
+  itemsState,
+  renderList,
+} from './index.test-support';
 import type { useItems } from './useItems';
 import type { useItemImages } from './useItemImages';
 import type { useItemMutations } from './useItemMutations';
@@ -37,50 +39,14 @@ vi.mock('./useItemMutations', () => ({
     useItemMutationsMock(...args) as ReturnType<typeof useItemMutations>,
 }));
 
-function renderList() {
-  return render(
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <ItemList categoryId="cat-1" canEdit={true} />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>,
-  );
-}
-
 describe('ItemList prefetch failures', () => {
   let onUnhandledRejection: Mock<() => void>;
 
   beforeEach(() => {
     window.localStorage.setItem('lang', 'en');
-    useItemsMock.mockReturnValue({
-      items: [],
-      total: 0,
-      loading: false,
-      page: 1,
-      setPage: vi.fn(),
-      totalPages: 1,
-      reload: vi.fn(),
-      setItems: vi.fn(),
-    });
-    useItemImagesMock.mockReturnValue({
-      images: {},
-      loadingItems: new Set(),
-      refreshAllImages: vi.fn(),
-      showImages: vi.fn(),
-      signAllFor: vi.fn(),
-      uploadImage: vi.fn(),
-      deleteImage: vi.fn(),
-      captureItemImagePaths: vi.fn(),
-      removeImageBytes: vi.fn(),
-      pendingUploads: {},
-    });
-    useItemMutationsMock.mockReturnValue({
-      saveEdit: vi.fn(),
-      isSaving: false,
-      removeItem: vi.fn(),
-    });
+    useItemsMock.mockReturnValue(itemsState());
+    useItemImagesMock.mockReturnValue(defaultImagesState());
+    useItemMutationsMock.mockReturnValue(defaultMutationsState());
     onUnhandledRejection = vi.fn();
     window.addEventListener('unhandledrejection', onUnhandledRejection);
   });

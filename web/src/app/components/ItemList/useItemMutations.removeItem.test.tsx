@@ -4,39 +4,15 @@ import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import { deleteItem } from '../../data/items';
 import { useItemMutations } from './useItemMutations';
+import { item, wrapper } from './useItemMutations.test-support';
 import type { ItemLite } from './types';
 
 vi.mock('../../data/items', () => ({
   deleteItem: vi.fn(),
   updateItem: vi.fn(),
 }));
-
-function item(id: string): ItemLite {
-  return {
-    id,
-    title: `Item ${id}`,
-    description: null,
-    place: null,
-    place_lat: null,
-    place_lng: null,
-    tags: [],
-  };
-}
-
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>{children}</ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>
-  );
-}
 
 // A real ConfirmProvider, not a mock: the index-capture-before-removal ordering lives past that await.
 async function acceptDeleteConfirmation() {

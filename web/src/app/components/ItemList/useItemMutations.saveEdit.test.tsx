@@ -3,11 +3,9 @@ import { useState } from 'react';
 import { act, renderHook, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import { updateItem } from '../../data/items';
 import { useItemMutations } from './useItemMutations';
+import { item, wrapper } from './useItemMutations.test-support';
 import { EMPTY_ITEM_FORM_VALUES } from '../ItemForm/types';
 import type { ItemLite } from './types';
 
@@ -15,28 +13,6 @@ vi.mock('../../data/items', () => ({
   deleteItem: vi.fn(),
   updateItem: vi.fn(),
 }));
-
-function item(id: string): ItemLite {
-  return {
-    id,
-    title: `Item ${id}`,
-    description: null,
-    place: null,
-    place_lat: null,
-    place_lng: null,
-    tags: [],
-  };
-}
-
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>{children}</ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>
-  );
-}
 
 // `items` is the harness's own state, so a stale closure over it can't pass by never re-rendering.
 function useHarness(initial: ItemLite[]) {

@@ -1,61 +1,19 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ModalImage } from './ModalImage';
-import type { ImageEntry } from './types';
-
-const photo = (name: string): ImageEntry => ({
-  id: `id-${name}`,
-  pathFull: `${name}.webp`,
-  urlFull: `https://example.test/${name}.webp`,
-});
-
-function renderModal(
-  overrides: Partial<Parameters<typeof ModalImage>[0]> = {},
-) {
-  const props = {
-    images: [photo('a')],
-    index: 0 as number | null,
-    itemTitle: 'Blue Mauritius',
-    onIndexChange: vi.fn(),
-    onClose: vi.fn(),
-    onDelete: vi.fn(),
-    ...overrides,
-  };
-  const { rerender } = render(
-    <I18nProvider>
-      <ModalImage {...props} />
-    </I18nProvider>,
-  );
-  return {
-    ...props,
-    rerender: (next: Partial<Parameters<typeof ModalImage>[0]>) =>
-      rerender(
-        <I18nProvider>
-          <ModalImage {...{ ...props, ...next }} />
-        </I18nProvider>,
-      ),
-  };
-}
-
-function appRoot() {
-  return document.getElementById('app-root') as HTMLElement;
-}
+import {
+  mountAppRoot,
+  photo,
+  removeAppRoot,
+  renderModal,
+} from './ModalImage.test-support';
 
 describe('ModalImage', () => {
-  beforeEach(() => {
-    window.localStorage.setItem('lang', 'en');
-    const root = document.createElement('div');
-    root.id = 'app-root';
-    document.body.appendChild(root);
-  });
+  beforeEach(mountAppRoot);
 
-  afterEach(() => {
-    appRoot()?.remove();
-  });
+  afterEach(removeAppRoot);
 
   // Every photograph, including ones past the strip's limit, is one click or keypress away.
   describe('navigating a multi-photograph entry', () => {

@@ -1,18 +1,18 @@
 // @vitest-environment jsdom
-import { act, renderHook } from '@testing-library/react';
+import { act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import {
-  createSignedUrls,
   listImagePathsForItems,
   listImagesForItems,
   removeImageObjects,
 } from '../../data/images';
-import { clearImageCache } from './imageCache';
-import { useItemImages } from './useItemImages';
+import {
+  renderItemImages,
+  resetImageTestState,
+  row,
+  signsEverything,
+} from './useItemImages.test-support';
 
 vi.mock('../../data/auth', () => ({ verifiedUserId: vi.fn() }));
 
@@ -33,37 +33,10 @@ vi.mock('../../data/images', async () => {
   };
 });
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>{children}</ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>
-  );
-}
-
-function row(id: string, itemId: string) {
-  return {
-    id,
-    item_id: itemId,
-    path_full: `uid/${itemId}/${id}.webp`,
-    path_thumb: null,
-  };
-}
-
 describe('useItemImages when an entry is deleted', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    clearImageCache();
-    window.localStorage.setItem('lang', 'en');
-    vi.mocked(createSignedUrls).mockImplementation(
-      async (paths: string[]) =>
-        ({
-          data: paths.map((path) => ({ path, signedUrl: `signed://${path}` })),
-          error: null,
-        }) as never,
-    );
+    resetImageTestState();
+    signsEverything();
   });
 
   it('reads the paths a cascade is about to take with it', async () => {
@@ -72,7 +45,7 @@ describe('useItemImages when an entry is deleted', () => {
       data: paths,
       error: null,
     } as never);
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await expect(
       result.current.captureItemImagePaths('item-1'),
@@ -84,7 +57,7 @@ describe('useItemImages when an entry is deleted', () => {
       data: [],
       error: null,
     });
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await expect(
       result.current.captureItemImagePaths('item-1'),
@@ -96,7 +69,7 @@ describe('useItemImages when an entry is deleted', () => {
       data: [],
       error: null,
     });
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await result.current.captureItemImagePaths('item-1');
 
@@ -109,7 +82,7 @@ describe('useItemImages when an entry is deleted', () => {
       data: null,
       error: pathsError,
     });
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await expect(
       result.current.captureItemImagePaths('item-1'),
@@ -124,7 +97,7 @@ describe('useItemImages when an entry is deleted', () => {
       data: [row('img-1', 'item-1'), row('img-2', 'item-2')],
       error: null,
     });
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
     await act(async () => {
       await result.current.refreshAllImages(['item-1', 'item-2']);
     });
@@ -148,7 +121,7 @@ describe('useItemImages when an entry is deleted', () => {
   });
 
   it('does not call Storage at all for an entry with no photographs', async () => {
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await act(async () => {
       await result.current.removeImageBytes('item-1', []);
@@ -161,7 +134,7 @@ describe('useItemImages when an entry is deleted', () => {
     vi.mocked(removeImageObjects).mockResolvedValue({
       error: new Error('gone'),
     } as never);
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await expect(
       result.current.removeImageBytes('item-1', [

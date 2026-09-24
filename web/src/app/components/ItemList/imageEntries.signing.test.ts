@@ -11,6 +11,7 @@ import {
   signEntries,
   type ImageEntryData,
 } from './imageEntries';
+import { sevenPhotos } from './imageEntries.test-support';
 
 describe('signEntries', () => {
   beforeEach(() => {
@@ -123,20 +124,6 @@ describe('signEntries', () => {
     expect(result['item-5']).toEqual([]);
   });
 });
-
-// Seven photographs of one item: more than a card's hero and strip can show.
-function sevenPhotos(): Map<string, ImageEntryData> {
-  return new Map(
-    Array.from({ length: 7 }, (_, i) => [
-      `img-${i}`,
-      {
-        id: `img-${i}`,
-        pathFull: `p/${i}.webp`,
-        pathThumb: `p/${i}.thumb.webp`,
-      },
-    ]),
-  );
-}
 
 function signsEverything() {
   return vi.fn(async (paths: string[]) => ({

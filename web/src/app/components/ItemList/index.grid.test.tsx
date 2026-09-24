@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import ItemList from './index';
-import type { ItemLite } from './types';
+import {
+  item,
+  itemsState,
+  renderList,
+  resetHookMocks,
+} from './index.test-support';
 import type { useItems } from './useItems';
 import type { useItemImages } from './useItemImages';
 import type { useItemMutations } from './useItemMutations';
@@ -32,66 +33,8 @@ vi.mock('./useItemMutations', () => ({
 }));
 
 beforeEach(() => {
-  window.localStorage.setItem('lang', 'en');
-  useItemsMock.mockReset();
-  useItemImagesMock.mockReset().mockReturnValue({
-    images: {} as Record<string, unknown>,
-    loadingItems: new Set<string>(),
-    refreshAllImages: vi.fn(),
-    showImages: vi.fn(),
-    signAllFor: vi.fn(),
-    uploadImage: vi.fn(),
-    deleteImage: vi.fn(),
-    captureItemImagePaths: vi.fn(),
-    removeImageBytes: vi.fn(),
-    pendingUploads: {} as Record<string, number>,
-  });
-  useItemMutationsMock.mockReset().mockReturnValue({
-    saveEdit: vi.fn(),
-    isSaving: false,
-    removeItem: vi.fn(),
-  });
+  resetHookMocks({ useItemsMock, useItemImagesMock, useItemMutationsMock });
 });
-
-const item = (id: string): ItemLite => ({
-  id,
-  title: `Item ${id}`,
-  description: null,
-  place: null,
-  place_lat: null,
-  place_lng: null,
-  tags: [],
-});
-
-function itemsState(overrides: Partial<ReturnType<typeof defaultState>> = {}) {
-  return { ...defaultState(), ...overrides };
-}
-
-function defaultState() {
-  return {
-    items: [] as ItemLite[],
-    pageImages: null,
-    total: 0,
-    loading: false,
-    page: 1,
-    setPage: vi.fn(),
-    totalPages: 1,
-    reload: vi.fn(),
-    setItems: vi.fn(),
-  };
-}
-
-function renderList(props: Partial<Parameters<typeof ItemList>[0]> = {}) {
-  return render(
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <ItemList categoryId="cat-1" canEdit={true} {...props} />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>,
-  );
-}
 
 describe('ItemList empty state', () => {
   it('shows "No entries yet" when the category genuinely holds nothing', () => {

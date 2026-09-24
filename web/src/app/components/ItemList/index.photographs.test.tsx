@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import ItemList from './index';
-import type { ItemLite } from './types';
+import {
+  defaultImagesState,
+  item,
+  itemsState,
+  renderList,
+  resetHookMocks,
+} from './index.test-support';
 import type { useItems } from './useItems';
 import type { useItemImages } from './useItemImages';
 import type { useItemMutations } from './useItemMutations';
@@ -31,79 +33,9 @@ vi.mock('./useItemMutations', () => ({
     useItemMutationsMock(...args) as ReturnType<typeof useItemMutations>,
 }));
 
-function defaultImagesState() {
-  return {
-    images: {} as Record<string, unknown>,
-    loadingItems: new Set<string>(),
-    refreshAllImages: vi.fn(),
-    showImages: vi.fn(),
-    signAllFor: vi.fn(),
-    uploadImage: vi.fn(),
-    deleteImage: vi.fn(),
-    captureItemImagePaths: vi.fn(),
-    removeImageBytes: vi.fn(),
-    pendingUploads: {} as Record<string, number>,
-  };
-}
-
 beforeEach(() => {
-  window.localStorage.setItem('lang', 'en');
-  useItemsMock.mockReset();
-  useItemImagesMock.mockReset().mockReturnValue(defaultImagesState());
-  useItemMutationsMock.mockReset().mockReturnValue({
-    saveEdit: vi.fn(),
-    isSaving: false,
-    removeItem: vi.fn(),
-  });
+  resetHookMocks({ useItemsMock, useItemImagesMock, useItemMutationsMock });
 });
-
-const item = (id: string): ItemLite => ({
-  id,
-  title: `Item ${id}`,
-  description: null,
-  place: null,
-  place_lat: null,
-  place_lng: null,
-  tags: [],
-});
-
-function itemsState(overrides: Partial<ReturnType<typeof defaultState>> = {}) {
-  return { ...defaultState(), ...overrides };
-}
-
-function defaultState() {
-  return {
-    items: [] as ItemLite[],
-    pageImages: null as {
-      itemIdsKey: string;
-      rows: {
-        id: string;
-        item_id: string;
-        path_full: string;
-        path_thumb: null;
-      }[];
-    } | null,
-    total: 0,
-    loading: false,
-    page: 1,
-    setPage: vi.fn(),
-    totalPages: 1,
-    reload: vi.fn(),
-    setItems: vi.fn(),
-  };
-}
-
-function renderList() {
-  return render(
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <ItemList categoryId="cat-1" canEdit={true} />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>,
-  );
-}
 
 describe('ItemList image carousel', () => {
   function imagesFor(itemId: string) {

@@ -1,19 +1,14 @@
 // @vitest-environment jsdom
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import { verifiedUserId } from '../../data/auth';
+import { createSignedUrls, uploadImageObject } from '../../data/images';
 import {
-  createImageRow,
-  createSignedUrls,
-  listImagesForItems,
-  uploadImageObject,
-} from '../../data/images';
-import { clearImageCache } from './imageCache';
-import { useItemImages } from './useItemImages';
+  acceptsUploads,
+  listsNoImages,
+  renderItemImages,
+  resetImageTestState,
+} from './useItemImages.test-support';
 
 vi.mock('../../data/auth', () => ({ verifiedUserId: vi.fn() }));
 
@@ -41,36 +36,19 @@ vi.mock('browser-image-compression', () => ({
   }),
 }));
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>{children}</ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>
-  );
-}
-
 describe('useItemImages pending upload count', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    clearImageCache();
-    window.localStorage.setItem('lang', 'en');
-    vi.mocked(verifiedUserId).mockResolvedValue('uid');
-    vi.mocked(listImagesForItems).mockResolvedValue({
-      data: [],
-      error: null,
-    });
+    resetImageTestState();
+    listsNoImages();
     vi.mocked(createSignedUrls).mockResolvedValue({
       data: [],
       error: null,
     });
-    vi.mocked(uploadImageObject).mockResolvedValue({ error: null } as never);
-    vi.mocked(createImageRow).mockResolvedValue({ error: null } as never);
+    acceptsUploads();
   });
 
   it('counts concurrent uploads rather than flagging one', async () => {
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
     let held: (() => void)[] = [];
     vi.mocked(uploadImageObject).mockImplementation(
       () =>
@@ -102,7 +80,7 @@ describe('useItemImages pending upload count', () => {
   });
 
   it('drops the count by one rather than clearing it, while a second upload for the same item is still pending', async () => {
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
     let releaseFull!: () => void;
     vi.mocked(uploadImageObject).mockImplementationOnce(
       () =>
@@ -132,7 +110,7 @@ describe('useItemImages pending upload count', () => {
   });
 
   it('does not let one item finishing its upload touch another item still uploading', async () => {
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
     let releaseItem1!: () => void;
     vi.mocked(uploadImageObject).mockImplementationOnce(
       () =>

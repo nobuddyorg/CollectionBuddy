@@ -1,19 +1,18 @@
 // @vitest-environment jsdom
-import { act, renderHook, screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
+import { deleteImageRow, listImagesForItems } from '../../data/images';
 import {
-  createSignedUrls,
-  deleteImageRow,
-  listImagesForItems,
-} from '../../data/images';
-import { clearImageCache } from './imageCache';
-import { useItemImages } from './useItemImages';
-import type { ImageEntry } from './types';
+  acceptConfirmation,
+  entry,
+  renderItemImages,
+  resetImageTestState,
+  row,
+  signsEverything,
+  withOnePhotograph,
+} from './useItemImages.test-support';
 
 vi.mock('../../data/auth', () => ({ verifiedUserId: vi.fn() }));
 
@@ -34,70 +33,13 @@ vi.mock('../../data/images', async () => {
   };
 });
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>{children}</ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>
-  );
-}
-
-function row(id: string, itemId: string) {
-  return {
-    id,
-    item_id: itemId,
-    path_full: `uid/${itemId}/${id}.webp`,
-    path_thumb: null,
-  };
-}
-
-function signsEverything() {
-  vi.mocked(createSignedUrls).mockImplementation(
-    async (paths: string[]) =>
-      ({
-        data: paths.map((path) => ({ path, signedUrl: `signed://${path}` })),
-        error: null,
-      }) as never,
-  );
-}
-
-function entry(id: string, itemId: string): ImageEntry {
-  return {
-    id,
-    pathFull: `uid/${itemId}/${id}.webp`,
-    urlFull: `signed://uid/${itemId}/${id}.webp`,
-    pathThumb: undefined,
-    urlThumb: undefined,
-  };
-}
-
-async function acceptConfirmation() {
-  await userEvent.click(await screen.findByTestId('confirm-accept'));
-}
-
 describe('useItemImages deleteImage undo', () => {
   const image = entry('img-1', 'item-1');
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    clearImageCache();
-    window.localStorage.setItem('lang', 'en');
+    resetImageTestState();
     signsEverything();
   });
-
-  async function withOnePhotograph() {
-    vi.mocked(listImagesForItems).mockResolvedValue({
-      data: [row('img-1', 'item-1')],
-      error: null,
-    });
-    const hook = renderHook(() => useItemImages(), { wrapper });
-    await act(async () => {
-      await hook.result.current.refreshAllImages(['item-1']);
-    });
-    return hook;
-  }
 
   it('puts the photograph back when undo is used', async () => {
     const { result } = await withOnePhotograph();
@@ -126,7 +68,7 @@ describe('useItemImages deleteImage undo', () => {
         ],
         error: null,
       });
-      const hook = renderHook(() => useItemImages(), { wrapper });
+      const hook = renderItemImages();
       await act(async () => {
         await hook.result.current.refreshAllImages(['item-1']);
       });

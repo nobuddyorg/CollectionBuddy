@@ -1,12 +1,9 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ReactNode } from 'react';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
 import { useItems } from './useItems';
-import { takePrefetchedFirstPage } from './firstPagePrefetch';
+import { page, resetItemsTestState, wrapper } from './useItems.test-support';
 import type { listItems } from '../../data/items';
 
 const { listItemsMock } = vi.hoisted(() => ({ listItemsMock: vi.fn() }));
@@ -15,14 +12,6 @@ vi.mock('../../data/items', () => ({
   listItems: (...args: unknown[]) =>
     listItemsMock(...args) as ReturnType<typeof listItems>,
 }));
-
-function wrapper({ children }: { children: ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>{children}</ToastProvider>
-    </I18nProvider>
-  );
-}
 
 // A response the test controls the timing of, so several requests can come back in any order.
 function deferred<T>() {
@@ -33,27 +22,9 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-function page(items: { id: string }[] = [], count = items.length) {
-  return {
-    data: items.map((entry) => ({
-      id: entry.id,
-      title: entry.id,
-      description: null,
-      place: null,
-      place_lat: null,
-      place_lng: null,
-      tags: [],
-    })),
-    error: null,
-    count,
-  };
-}
-
 describe('useItems with requests in flight', () => {
   beforeEach(() => {
-    window.localStorage.setItem('lang', 'en');
-    listItemsMock.mockReset();
-    void takePrefetchedFirstPage('');
+    resetItemsTestState(listItemsMock);
   });
 
   // A non-silent request superseded by a silent one used to leave `loading` stuck true forever.

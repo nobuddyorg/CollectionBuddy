@@ -1,18 +1,19 @@
 // @vitest-environment jsdom
-import { act, renderHook } from '@testing-library/react';
+import { act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import {
   createSignedUrls,
   listImagesForItems,
   removeImageObjects,
 } from '../../data/images';
-import { clearImageCache } from './imageCache';
-import { useItemImages } from './useItemImages';
-import type { ImageEntry } from './types';
+import {
+  entry,
+  installDefaultImageMocks,
+  renderItemImages,
+  row,
+  withOnePhotograph,
+} from './useItemImages.test-support';
 
 vi.mock('../../data/auth', () => ({ verifiedUserId: vi.fn() }));
 
@@ -33,56 +34,8 @@ vi.mock('../../data/images', async () => {
   };
 });
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>{children}</ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>
-  );
-}
-
-function row(id: string, itemId: string) {
-  return {
-    id,
-    item_id: itemId,
-    path_full: `uid/${itemId}/${id}.webp`,
-    path_thumb: null,
-  };
-}
-
-function signsEverything() {
-  vi.mocked(createSignedUrls).mockImplementation(
-    async (paths: string[]) =>
-      ({
-        data: paths.map((path) => ({ path, signedUrl: `signed://${path}` })),
-        error: null,
-      }) as never,
-  );
-}
-
-function entry(id: string, itemId: string): ImageEntry {
-  return {
-    id,
-    pathFull: `uid/${itemId}/${id}.webp`,
-    urlFull: `signed://uid/${itemId}/${id}.webp`,
-    pathThumb: undefined,
-    urlThumb: undefined,
-  };
-}
-
 describe('useItemImages', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    clearImageCache();
-    window.localStorage.setItem('lang', 'en');
-    vi.mocked(listImagesForItems).mockResolvedValue({
-      data: [],
-      error: null,
-    });
-    signsEverything();
-  });
+  beforeEach(installDefaultImageMocks);
 
   describe('signAllFor', () => {
     it('signs the photographs past the plates and shows them signed', async () => {
@@ -90,7 +43,7 @@ describe('useItemImages', () => {
         data: Array.from({ length: 6 }, (_, i) => row(`img-${i}`, 'item-1')),
         error: null,
       });
-      const { result } = renderHook(() => useItemImages(), { wrapper });
+      const { result } = renderItemImages();
       await act(async () => {
         await result.current.refreshAllImages(['item-1']);
       });
@@ -113,7 +66,7 @@ describe('useItemImages', () => {
         data: [row('img-1', 'item-1')],
         error: null,
       });
-      const { result } = renderHook(() => useItemImages(), { wrapper });
+      const { result } = renderItemImages();
       await act(async () => {
         await result.current.refreshAllImages(['item-1']);
       });
@@ -127,7 +80,7 @@ describe('useItemImages', () => {
     });
 
     it('asks for nothing for an item it has no photographs of', async () => {
-      const { result } = renderHook(() => useItemImages(), { wrapper });
+      const { result } = renderItemImages();
 
       await act(async () => {
         await result.current.signAllFor('item-unknown');
@@ -142,15 +95,7 @@ describe('useItemImages', () => {
     // Installed before the hook mounts, so the interval it registers is one this test can advance.
     async function withOnePhotographAndFakeTimers() {
       vi.useFakeTimers();
-      vi.mocked(listImagesForItems).mockResolvedValue({
-        data: [row('img-1', 'item-1')],
-        error: null,
-      });
-      const hook = renderHook(() => useItemImages(), { wrapper });
-      await act(async () => {
-        await hook.result.current.refreshAllImages(['item-1']);
-      });
-      return hook;
+      return withOnePhotograph();
     }
 
     it('re-signs what is on screen once the signatures are near expiry', async () => {
@@ -229,7 +174,7 @@ describe('useItemImages', () => {
     it('does nothing before anything has been signed at all', async () => {
       vi.useFakeTimers();
       try {
-        renderHook(() => useItemImages(), { wrapper });
+        renderItemImages();
         vi.mocked(listImagesForItems).mockClear();
         await act(async () => {
           await vi.advanceTimersByTimeAsync(2 * 3600_000);

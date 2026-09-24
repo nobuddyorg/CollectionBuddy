@@ -1,19 +1,19 @@
 // @vitest-environment jsdom
-import { act, renderHook, screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import { verifiedUserId } from '../../data/auth';
 import {
   createImageRow,
-  createSignedUrls,
   listImagesForItems,
   uploadImageObject,
 } from '../../data/images';
-import { clearImageCache } from './imageCache';
-import { useItemImages } from './useItemImages';
+import {
+  acceptsUploads,
+  installDefaultImageMocks,
+  renderItemImages,
+  row,
+} from './useItemImages.test-support';
 
 vi.mock('../../data/auth', () => ({ verifiedUserId: vi.fn() }));
 
@@ -43,53 +43,15 @@ vi.mock('browser-image-compression', () => ({
   }),
 }));
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>{children}</ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>
-  );
-}
-
-function row(id: string, itemId: string) {
-  return {
-    id,
-    item_id: itemId,
-    path_full: `uid/${itemId}/${id}.webp`,
-    path_thumb: null,
-  };
-}
-
-function signsEverything() {
-  vi.mocked(createSignedUrls).mockImplementation(
-    async (paths: string[]) =>
-      ({
-        data: paths.map((path) => ({ path, signedUrl: `signed://${path}` })),
-        error: null,
-      }) as never,
-  );
-}
-
 describe('useItemImages uploadImage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    installDefaultImageMocks();
     compressions.length = 0;
-    clearImageCache();
-    window.localStorage.setItem('lang', 'en');
-    vi.mocked(verifiedUserId).mockResolvedValue('uid');
-    vi.mocked(listImagesForItems).mockResolvedValue({
-      data: [],
-      error: null,
-    });
-    vi.mocked(uploadImageObject).mockResolvedValue({ error: null } as never);
-    vi.mocked(createImageRow).mockResolvedValue({ error: null } as never);
-    signsEverything();
+    acceptsUploads();
   });
 
   it('stores a full size and a thumbnail under the uploader own prefix, then records the row', async () => {
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await act(async () => {
       await result.current.uploadImage(
@@ -122,7 +84,7 @@ describe('useItemImages uploadImage', () => {
     vi.mocked(uploadImageObject)
       .mockResolvedValueOnce({ error: null } as never)
       .mockResolvedValueOnce({ error: thumbError } as never);
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await act(async () => {
       await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
@@ -140,7 +102,7 @@ describe('useItemImages uploadImage', () => {
 
   it('warns about nothing when both uploads succeed', async () => {
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await act(async () => {
       await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
@@ -154,7 +116,7 @@ describe('useItemImages uploadImage', () => {
     vi.mocked(uploadImageObject).mockResolvedValue({
       error: new Error('storage full'),
     } as never);
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await act(async () => {
       await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
@@ -174,7 +136,7 @@ describe('useItemImages uploadImage', () => {
         message: 'photo storage quota of 1 GiB reached',
       },
     } as never);
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await act(async () => {
       await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
@@ -189,7 +151,7 @@ describe('useItemImages uploadImage', () => {
     vi.mocked(createImageRow).mockResolvedValue({
       error: new Error('rls'),
     } as never);
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await act(async () => {
       await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
@@ -205,7 +167,7 @@ describe('useItemImages uploadImage', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
     vi.mocked(verifiedUserId).mockResolvedValue(null);
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await act(async () => {
       await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
@@ -226,7 +188,7 @@ describe('useItemImages uploadImage', () => {
       data: [row('other-img', 'other-item')],
       error: null,
     });
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await act(async () => {
       await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
@@ -240,7 +202,7 @@ describe('useItemImages uploadImage', () => {
       data: [],
       error: null,
     });
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await act(async () => {
       await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
@@ -257,7 +219,7 @@ describe('useItemImages uploadImage', () => {
       data: null,
       error: new Error('boom'),
     });
-    const { result } = renderHook(() => useItemImages(), { wrapper });
+    const { result } = renderItemImages();
 
     await act(async () => {
       await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));

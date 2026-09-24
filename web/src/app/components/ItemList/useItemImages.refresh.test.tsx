@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
-import { act, renderHook } from '@testing-library/react';
+import { act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import { createSignedUrls, listImagesForItems } from '../../data/images';
-import { clearImageCache } from './imageCache';
-import { useItemImages } from './useItemImages';
-import type { ImageEntry } from './types';
+import {
+  entry,
+  installDefaultImageMocks,
+  renderItemImages,
+  row,
+} from './useItemImages.test-support';
 
 vi.mock('../../data/auth', () => ({ verifiedUserId: vi.fn() }));
 
@@ -29,56 +29,8 @@ vi.mock('../../data/images', async () => {
   };
 });
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>{children}</ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>
-  );
-}
-
-function row(id: string, itemId: string) {
-  return {
-    id,
-    item_id: itemId,
-    path_full: `uid/${itemId}/${id}.webp`,
-    path_thumb: null,
-  };
-}
-
-function signsEverything() {
-  vi.mocked(createSignedUrls).mockImplementation(
-    async (paths: string[]) =>
-      ({
-        data: paths.map((path) => ({ path, signedUrl: `signed://${path}` })),
-        error: null,
-      }) as never,
-  );
-}
-
-function entry(id: string, itemId: string): ImageEntry {
-  return {
-    id,
-    pathFull: `uid/${itemId}/${id}.webp`,
-    urlFull: `signed://uid/${itemId}/${id}.webp`,
-    pathThumb: undefined,
-    urlThumb: undefined,
-  };
-}
-
 describe('useItemImages', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    clearImageCache();
-    window.localStorage.setItem('lang', 'en');
-    vi.mocked(listImagesForItems).mockResolvedValue({
-      data: [],
-      error: null,
-    });
-    signsEverything();
-  });
+  beforeEach(installDefaultImageMocks);
 
   describe('refreshAllImages', () => {
     it('signs every listed photograph and keys them to their item', async () => {
@@ -86,7 +38,7 @@ describe('useItemImages', () => {
         data: [row('img-1', 'item-1'), row('img-2', 'item-2')],
         error: null,
       });
-      const { result } = renderHook(() => useItemImages(), { wrapper });
+      const { result } = renderItemImages();
 
       await act(async () => {
         await result.current.refreshAllImages(['item-1', 'item-2']);
@@ -102,7 +54,7 @@ describe('useItemImages', () => {
     });
 
     it('asks for nothing when given no items', async () => {
-      const { result } = renderHook(() => useItemImages(), { wrapper });
+      const { result } = renderItemImages();
 
       await act(async () => {
         await result.current.refreshAllImages([]);
@@ -116,7 +68,7 @@ describe('useItemImages', () => {
         data: [],
         error: null,
       });
-      const { result } = renderHook(() => useItemImages(), { wrapper });
+      const { result } = renderItemImages();
 
       await act(async () => {
         await result.current.refreshAllImages(['item-1']);
@@ -134,7 +86,7 @@ describe('useItemImages', () => {
         data: null,
         error: listError,
       });
-      const { result } = renderHook(() => useItemImages(), { wrapper });
+      const { result } = renderItemImages();
 
       await act(async () => {
         await result.current.refreshAllImages(['item-1']);
@@ -157,7 +109,7 @@ describe('useItemImages', () => {
         data: [row('img-1', 'item-1')],
         error: null,
       });
-      const { result } = renderHook(() => useItemImages(), { wrapper });
+      const { result } = renderItemImages();
 
       await act(async () => {
         await result.current.refreshAllImages(['item-1']);
@@ -172,7 +124,7 @@ describe('useItemImages', () => {
         data: [row('img-1', 'item-1'), row('img-2', 'item-2')],
         error: null,
       });
-      const { result } = renderHook(() => useItemImages(), { wrapper });
+      const { result } = renderItemImages();
       await act(async () => {
         await result.current.refreshAllImages(['item-1', 'item-2']);
       });
@@ -203,7 +155,7 @@ describe('useItemImages', () => {
           resolveList = resolve;
         }) as never,
       );
-      const { result } = renderHook(() => useItemImages(), { wrapper });
+      const { result } = renderItemImages();
 
       let pending!: Promise<void>;
       act(() => {
@@ -223,7 +175,7 @@ describe('useItemImages', () => {
 
   describe('showImages', () => {
     it('signs rows the page read already carried, without listing again', async () => {
-      const { result } = renderHook(() => useItemImages(), { wrapper });
+      const { result } = renderItemImages();
 
       await act(async () => {
         await result.current.showImages(
@@ -247,7 +199,7 @@ describe('useItemImages', () => {
           resolveSign = resolve;
         }) as never,
       );
-      const { result } = renderHook(() => useItemImages(), { wrapper });
+      const { result } = renderItemImages();
 
       let pending!: Promise<void>;
       act(() => {

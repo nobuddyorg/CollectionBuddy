@@ -7,12 +7,9 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ReactNode } from 'react';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
 import { useItems } from './useItems';
-import { takePrefetchedFirstPage } from './firstPagePrefetch';
+import { page, resetItemsTestState, wrapper } from './useItems.test-support';
 import type { listItems } from '../../data/items';
 
 const { listItemsMock } = vi.hoisted(() => ({ listItemsMock: vi.fn() }));
@@ -22,35 +19,9 @@ vi.mock('../../data/items', () => ({
     listItemsMock(...args) as ReturnType<typeof listItems>,
 }));
 
-function wrapper({ children }: { children: ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>{children}</ToastProvider>
-    </I18nProvider>
-  );
-}
-
-function page(items: { id: string }[] = [], count = items.length) {
-  return {
-    data: items.map((entry) => ({
-      id: entry.id,
-      title: entry.id,
-      description: null,
-      place: null,
-      place_lat: null,
-      place_lng: null,
-      tags: [],
-    })),
-    error: null,
-    count,
-  };
-}
-
 describe('useItems', () => {
   beforeEach(() => {
-    window.localStorage.setItem('lang', 'en');
-    listItemsMock.mockReset();
-    void takePrefetchedFirstPage('');
+    resetItemsTestState(listItemsMock);
   });
 
   it('reports a failed listing rather than throwing', async () => {
