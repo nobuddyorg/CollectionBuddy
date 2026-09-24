@@ -6,25 +6,14 @@ import {
   placeFromPhotonResponse,
   withTitles,
 } from './usePlaces';
+import { group } from './usePlaces.test-support';
 import type { PlaceCoords } from './types';
-import type { PlaceGroupRow } from '../../data/items';
 
 const cologne: PlaceCoords = { name: 'Cologne', lat: 50.94, lng: 6.96 };
 const berlin: PlaceCoords = { name: 'Berlin', lat: 52.52, lng: 13.4 };
 
 function photon(coordinates: unknown) {
   return { features: [{ geometry: { coordinates } }] };
-}
-
-// Builds the one-row-per-place shape `list_category_places` returns, not the per-item rows it groups.
-function group(
-  place: string,
-  place_lat: number | null = null,
-  place_lng: number | null = null,
-  titles: string[] = ['An entry'],
-  ids: string[] = ['row-id'],
-): PlaceGroupRow {
-  return { place, place_lat, place_lng, titles, ids };
 }
 
 describe('partitionByStoredCoords', () => {

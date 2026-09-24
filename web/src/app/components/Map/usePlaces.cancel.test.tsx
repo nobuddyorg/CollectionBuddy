@@ -3,6 +3,12 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { usePlaces } from './usePlaces';
+import {
+  installUsePlacesMocks,
+  renderUsePlaces,
+  restoreGlobalsAndTimers,
+} from './usePlaces.hook.test-support';
+import { group, photonOk } from './usePlaces.test-support';
 import { listCategoryPlaces, updateItemsPlace } from '../../data/items';
 import type { PlaceGroupRow } from '../../data/items';
 
@@ -10,24 +16,6 @@ vi.mock('../../data/items', () => ({
   listCategoryPlaces: vi.fn(),
   updateItemsPlace: vi.fn(),
 }));
-
-function group(
-  place: string,
-  place_lat: number | null = null,
-  place_lng: number | null = null,
-  titles: string[] = ['An entry'],
-  ids: string[] = ['row-id'],
-): PlaceGroupRow {
-  return { place, place_lat, place_lng, titles, ids };
-}
-
-function photonOk(coordinates: [number, number]) {
-  return {
-    ok: true,
-    status: 200,
-    json: async () => ({ features: [{ geometry: { coordinates } }] }),
-  };
-}
 
 type Listing = { data: PlaceGroupRow[] | null; error: unknown };
 
@@ -47,16 +35,9 @@ function renderByCategory() {
 }
 
 describe('usePlaces cancellation', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(updateItemsPlace).mockResolvedValue({ error: null });
-    localStorage.clear();
-  });
+  beforeEach(installUsePlacesMocks);
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.useRealTimers();
-  });
+  afterEach(restoreGlobalsAndTimers);
 
   it('aborts the listing fetch on unmount, before it has a chance to resolve', async () => {
     let capturedSignal: AbortSignal | undefined;
@@ -67,9 +48,7 @@ describe('usePlaces cancellation', () => {
         }),
     );
 
-    const { unmount } = renderHook(() =>
-      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
-    );
+    const { unmount } = renderUsePlaces();
     await act(async () => {
       await Promise.resolve();
     });
@@ -94,9 +73,7 @@ describe('usePlaces cancellation', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    const { unmount } = renderHook(() =>
-      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
-    );
+    const { unmount } = renderUsePlaces();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();

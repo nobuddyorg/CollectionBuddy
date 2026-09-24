@@ -4,23 +4,8 @@ import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 
 import { usePhotonSearch } from './usePhoton';
+import { feature } from './usePhoton.test-support';
 import type { PhotonFeature, PlaceChoice } from './types';
-
-function feature(
-  osm_id: number,
-  partial: Partial<PhotonFeature['properties']> = {},
-): PhotonFeature {
-  return {
-    properties: {
-      osm_id,
-      osm_type: 'N',
-      osm_key: 'place',
-      osm_value: 'city',
-      ...partial,
-    },
-    geometry: { type: 'Point', coordinates: [0, 0] },
-  };
-}
 
 describe('usePhotonSearch choose', () => {
   // `focus` stays `false`: set true first, the search effect's own focus reset would mask choose()'s work.

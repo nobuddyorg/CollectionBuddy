@@ -3,60 +3,12 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { useCurrentLocation } from './useCurrentLocation';
-
-const POSITION: GeolocationPosition = {
-  coords: {
-    latitude: 50.94,
-    longitude: 6.96,
-    accuracy: 10,
-    altitude: null,
-    altitudeAccuracy: null,
-    heading: null,
-    speed: null,
-    toJSON() {
-      return this;
-    },
-  },
-  timestamp: Date.now(),
-  toJSON() {
-    return this;
-  },
-};
-
-function mockGeolocation() {
-  const lastFix: {
-    success?: PositionCallback;
-    error?: PositionErrorCallback;
-  } = {};
-  const getCurrentPosition = vi.fn(
-    (success: PositionCallback, error?: PositionErrorCallback) => {
-      lastFix.success = success;
-      lastFix.error = error;
-    },
-  );
-  const watchPosition = vi.fn(() => 1);
-  const clearWatch = vi.fn();
-  return { getCurrentPosition, watchPosition, clearWatch, lastFix };
-}
-
-// vi.fn() records every argument a call passed, including the PositionOptions the typed signature omits.
-function thirdArgument(
-  mocked: { mock: { calls: unknown[][] } },
-  callIndex = 0,
-) {
-  return mocked.mock.calls[callIndex]?.[2] as PositionOptions | undefined;
-}
-
-function stubNavigator(
-  geolocation: ReturnType<typeof mockGeolocation> | undefined,
-) {
-  vi.stubGlobal('navigator', {
-    geolocation,
-    permissions: {
-      query: vi.fn(async () => ({ state: 'granted' })),
-    },
-  });
-}
+import {
+  POSITION,
+  mockGeolocation,
+  stubNavigator,
+  thirdArgument,
+} from './useCurrentLocation.test-support';
 
 describe('useCurrentLocation request', () => {
   afterEach(() => {

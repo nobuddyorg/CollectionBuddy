@@ -3,23 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { usePhotonSearch } from './usePhoton';
-import type { PhotonFeature } from './types';
-
-function feature(
-  osm_id: number,
-  partial: Partial<PhotonFeature['properties']> = {},
-): PhotonFeature {
-  return {
-    properties: {
-      osm_id,
-      osm_type: 'N',
-      osm_key: 'place',
-      osm_value: 'city',
-      ...partial,
-    },
-    geometry: { type: 'Point', coordinates: [0, 0] },
-  };
-}
+import { feature } from './usePhoton.test-support';
 
 function emptyPhoton() {
   return vi.fn().mockResolvedValue({

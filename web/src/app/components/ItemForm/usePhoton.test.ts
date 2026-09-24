@@ -5,29 +5,7 @@ import {
   formatPlaceDisplay,
   isQueryLongEnough,
 } from './usePhoton';
-import type { PhotonFeature } from './types';
-
-function props(
-  partial: Partial<PhotonFeature['properties']> = {},
-): PhotonFeature['properties'] {
-  return {
-    osm_id: 1,
-    osm_type: 'N',
-    osm_key: 'place',
-    osm_value: 'city',
-    ...partial,
-  };
-}
-
-function feature(
-  osm_id: number,
-  partial: Partial<PhotonFeature['properties']> = {},
-): PhotonFeature {
-  return {
-    properties: props({ osm_id, ...partial }),
-    geometry: { type: 'Point', coordinates: [0, 0] },
-  };
-}
+import { feature, props } from './usePhoton.test-support';
 
 describe('formatPlaceDisplay', () => {
   it('prefers city, falling back through town/village/municipality/name', () => {

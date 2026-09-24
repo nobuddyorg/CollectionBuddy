@@ -3,35 +3,23 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { usePlaces } from './usePlaces';
-import { listCategoryPlaces, updateItemsPlace } from '../../data/items';
-import type { PlaceGroupRow } from '../../data/items';
+import {
+  installUsePlacesMocks,
+  renderUsePlaces,
+  restoreGlobalsAndTimers,
+} from './usePlaces.hook.test-support';
+import { group } from './usePlaces.test-support';
+import { listCategoryPlaces } from '../../data/items';
 
 vi.mock('../../data/items', () => ({
   listCategoryPlaces: vi.fn(),
   updateItemsPlace: vi.fn(),
 }));
 
-function group(
-  place: string,
-  place_lat: number | null = null,
-  place_lng: number | null = null,
-  titles: string[] = ['An entry'],
-  ids: string[] = ['row-id'],
-): PlaceGroupRow {
-  return { place, place_lat, place_lng, titles, ids };
-}
-
 describe('usePlaces listing', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(updateItemsPlace).mockResolvedValue({ error: null });
-    localStorage.clear();
-  });
+  beforeEach(installUsePlacesMocks);
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.useRealTimers();
-  });
+  afterEach(restoreGlobalsAndTimers);
 
   it('does nothing while disabled, leaving the initial loading/error state untouched', async () => {
     const { result } = renderHook(() =>
@@ -55,9 +43,7 @@ describe('usePlaces listing', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
-    const { result } = renderHook(() =>
-      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
-    );
+    const { result } = renderUsePlaces();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -77,9 +63,7 @@ describe('usePlaces listing', () => {
       error: new Error('offline'),
     });
 
-    const { result } = renderHook(() =>
-      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
-    );
+    const { result } = renderUsePlaces();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -98,9 +82,7 @@ describe('usePlaces listing', () => {
       error: listingError,
     });
 
-    renderHook(() =>
-      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
-    );
+    renderUsePlaces();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -176,9 +158,7 @@ describe('usePlaces listing', () => {
   it('reports no error when there is nothing at all to plot', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({ data: [], error: null });
 
-    const { result } = renderHook(() =>
-      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
-    );
+    const { result } = renderUsePlaces();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -194,9 +174,7 @@ describe('usePlaces listing', () => {
       error: null,
     });
 
-    const { result } = renderHook(() =>
-      usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
-    );
+    const { result } = renderUsePlaces();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();

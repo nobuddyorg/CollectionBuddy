@@ -1,50 +1,15 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { PlaceAutocomplete } from './PlaceAutocomplete';
-import type { PhotonFeature } from './types';
-
-function feature(osm_id: number, city: string): PhotonFeature {
-  return {
-    properties: {
-      osm_id,
-      osm_type: 'N',
-      osm_key: 'place',
-      osm_value: 'city',
-      city,
-      country: 'Germany',
-    },
-    geometry: { type: 'Point', coordinates: [6.96, 50.94] },
-  };
-}
-
-function renderInDialog(value = 'Col') {
-  const view = render(
-    <I18nProvider>
-      <div role="dialog" aria-modal="true">
-        <PlaceAutocomplete value={value} onChange={vi.fn()} />
-      </div>
-    </I18nProvider>,
-  );
-  return { unmount: view.unmount };
-}
+import {
+  installDefaultPlaceSearch,
+  renderInDialog,
+} from './PlaceAutocomplete.test-support';
 
 describe('PlaceAutocomplete menu', () => {
-  beforeEach(() => {
-    window.localStorage.setItem('lang', 'en');
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          features: [feature(1, 'Cologne'), feature(2, 'Colmar')],
-        }),
-      }),
-    );
-  });
+  beforeEach(installDefaultPlaceSearch);
 
   afterEach(() => {
     vi.unstubAllGlobals();
