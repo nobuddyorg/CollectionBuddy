@@ -6,8 +6,7 @@ import type { PlaceCoords } from './types';
 import { fieldClasses } from '../ui/fieldClasses';
 import { MAX_PLACE_LENGTH } from '../../lib/textLimits';
 
-// `onChange` reports null coords for hand-typed edits, so stale coordinates
-// never outlive the name they were looked up for.
+// `onChange` reports null coords for hand-typed edits, so stale coordinates never outlive their name.
 export function PlaceAutocomplete({
   id,
   value,
@@ -15,9 +14,9 @@ export function PlaceAutocomplete({
 }: {
   id?: string;
   value: string;
-  onChange: (v: string, coords: PlaceCoords | null) => void;
+  onChange: (value: string, coords: PlaceCoords | null) => void;
 }) {
-  const { t, lang } = useI18n();
+  const { t, language } = useI18n();
   const {
     setQuery,
     focus,
@@ -26,14 +25,14 @@ export function PlaceAutocomplete({
     loading,
     error,
     searched,
-    activeIdx,
+    activeIndex,
     dropdownRef,
     inputRef,
     menuRef,
     choose,
     onKeyDown,
     formatDisplay,
-  } = usePhotonSearch(lang);
+  } = usePhotonSearch(language);
   const listId = useId();
 
   useEffect(() => {
@@ -43,24 +42,24 @@ export function PlaceAutocomplete({
   const showMenu =
     focus && (loading || results.length > 0 || error || searched);
 
-  // The menu is positioned absolute inside the anchor, so it moves with the
-  // input on scroll for free; only the below/above choice needs recomputing.
+  // Positioned absolute inside the anchor, so it scrolls with the input; only below/above is recomputed.
   const [placement, setPlacement] = useState<'below' | 'above'>('below');
   useEffect(() => {
     if (!showMenu) return;
     const compute = () => {
-      const r = inputRef.current!.getBoundingClientRect();
+      const inputRect = inputRef.current!.getBoundingClientRect();
       const menuHeight = menuRef.current!.offsetHeight;
-      const spaceBelow = window.innerHeight - r.bottom;
+      const spaceBelow = window.innerHeight - inputRect.bottom;
       setPlacement(
-        spaceBelow < menuHeight && r.top > spaceBelow ? 'above' : 'below',
+        spaceBelow < menuHeight && inputRect.top > spaceBelow
+          ? 'above'
+          : 'below',
       );
     };
     compute();
     window.addEventListener('resize', compute);
     return () => window.removeEventListener('resize', compute);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showMenu, results.length, loading, error]);
+  }, [showMenu, results.length, loading, error, inputRef, menuRef]);
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -73,21 +72,23 @@ export function PlaceAutocomplete({
         aria-controls={listId}
         aria-autocomplete="list"
         aria-activedescendant={
-          showMenu && activeIdx >= 0 ? `${listId}-opt-${activeIdx}` : undefined
+          showMenu && activeIndex >= 0
+            ? `${listId}-opt-${activeIndex}`
+            : undefined
         }
         aria-label={t('item_create.place_placeholder')}
         value={value}
         maxLength={MAX_PLACE_LENGTH}
-        onChange={(e) => {
-          const v = e.target.value;
-          onChange(v, null);
-          setFocus(isQueryLongEnough(v));
+        onChange={(event) => {
+          const typed = event.target.value;
+          onChange(typed, null);
+          setFocus(isQueryLongEnough(typed));
         }}
         onFocus={() => {
           if (isQueryLongEnough(value)) setFocus(true);
         }}
-        onKeyDown={(e) => {
-          const picked = onKeyDown(e);
+        onKeyDown={(event) => {
+          const picked = onKeyDown(event);
           if (picked) {
             onChange(picked.label, picked.coords);
             setFocus(false);
@@ -133,12 +134,12 @@ export function PlaceAutocomplete({
                   data-testid="place-option"
                   id={`${listId}-opt-${i}`}
                   role="option"
-                  aria-selected={i === activeIdx}
+                  aria-selected={i === activeIndex}
                   type="button"
                   tabIndex={-1}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
                   }}
                   onClick={() => {
                     const picked = choose(hit);
@@ -146,7 +147,7 @@ export function PlaceAutocomplete({
                     setFocus(false);
                   }}
                   className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 ${
-                    i === activeIdx ? 'bg-primary/10' : ''
+                    i === activeIndex ? 'bg-primary/10' : ''
                   }`}
                 >
                   <div className="font-medium">{city}</div>

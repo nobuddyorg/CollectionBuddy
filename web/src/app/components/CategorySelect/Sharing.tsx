@@ -10,8 +10,7 @@ type Props = {
   shares: UseShares;
 };
 
-// Only ever mounted for a category the viewer owns -- a grantee manages
-// their own grant via the panel's Delete button (onLeave in index.tsx).
+// Mounted only for a category the viewer owns; a grantee's own grant ends via Delete (onLeave).
 export function SharingSection({ shares }: Props) {
   const { t } = useI18n();
   return (

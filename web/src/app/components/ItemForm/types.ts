@@ -22,20 +22,10 @@ export type PhotonFeature = {
 
 export type PlaceCoords = { lat: number; lng: number };
 
-/**
- * What picking a suggestion produces: the label to show, and where it is.
- *
- * `coords` is null when the gazetteer's answer had no usable geometry; the
- * label is still worth keeping, it just has to be geocoded later like any
- * hand-typed place.
- */
+/** `coords` is null when the gazetteer's answer had no usable geometry; the label is still kept. */
 export type PlaceChoice = { label: string; coords: PlaceCoords | null };
 
-// `description`/`place` are widened to plain `string`: the database stores
-// blank as NULL, but a controlled input needs to hold something, and every
-// caller normalizes null to '' at the boundary. `place_lat`/`place_lng`
-// travel with `place`: anything that changes `place` must set these to
-// match, or a pin outlives the name it belonged to.
+// Widened to plain `string`: the database stores blank as NULL, but a controlled input needs a value.
 export type ItemFormValues = Omit<
   ItemFields,
   'id' | 'description' | 'place'
@@ -59,8 +49,6 @@ export type ItemFormProps = {
   submitLabel: string;
   onSubmit: (values: ItemFormValues) => void;
   onCancel?: () => void;
-  /** Reported whenever any field's value stops (or resumes) matching
-   * `initial`, so a caller can confirm before a backdrop tap or Escape
-   * silently discards it. */
+  /** Reported whenever any field stops (or resumes) matching `initial`, so a caller can confirm a discard. */
   onDirtyChange?: (dirty: boolean) => void;
 };

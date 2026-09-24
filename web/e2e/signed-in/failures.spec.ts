@@ -1,14 +1,10 @@
 import { resolve } from 'node:path';
 
-// Not './test': both cases here drive the app into `toast.reportError`,
-// which logs to the console by design, and that spec's `quietConsole`
-// fixture treats a console error as a failure.
+// Not './test': both cases drive the app into toast.reportError, which logs to the console by design.
 import { expect, test } from '../fixture';
 
 import { SEED } from './fixtures';
-// The paths a collector only sees when something outside the app breaks:
-// the geocoder being down, and an upload that does not arrive. Both are
-// injected at the network boundary, so the app's own code runs for real.
+// Failures are injected at the network boundary, so the app's own code runs for real.
 test.use({ locale: 'en-GB' });
 
 test.describe.configure({ timeout: 120_000 });
@@ -21,8 +17,7 @@ test.describe('when something outside the app fails', () => {
     await on(page).categories.do.open(SEED.failureCategory);
   });
 
-  // The geocoder is somebody else's service; the form has to stay usable
-  // when it is down rather than blocking an entry that needs no lookup.
+  // The form has to stay usable with the geocoder down rather than block an entry needing no lookup.
   test('a hand-typed place is still saved with the geocoder down', async ({
     on,
     page,
@@ -49,8 +44,7 @@ test.describe('when something outside the app fails', () => {
     }
   });
 
-  // A photograph that never reaches storage must say so and leave the
-  // entry alone, rather than showing a picture that is not there.
+  // A photograph that never reaches storage must say so, not show a picture that is not there.
   test('a photograph that cannot be stored is reported, not pretended', async ({
     on,
     page,
@@ -66,8 +60,7 @@ test.describe('when something outside the app fails', () => {
       );
       await card.do.uploadPhoto(PHOTO);
 
-      // Read out rather than quietly posted as a status: a failed upload
-      // is the one kind of toast that interrupts.
+      // role=alert: a failed upload is the one kind of toast that interrupts.
       await expect(app.toast()).toContainText('Could not upload this');
       await expect(app.toast()).toHaveAttribute('role', 'alert');
       await expect(card.locators.images).toHaveCount(0);

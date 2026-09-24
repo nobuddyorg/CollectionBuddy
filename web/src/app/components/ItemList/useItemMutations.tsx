@@ -11,8 +11,6 @@ import { restoreAt } from '../../lib/optimistic';
 import type { ItemFormValues } from '../ItemForm';
 import type { ItemLite } from './types';
 
-// Separated from the component tree so save/delete aren't redefined on
-// every render the list triggers for unrelated reasons.
 export function useItemMutations({
   items,
   setItems,
@@ -22,10 +20,8 @@ export function useItemMutations({
 }: {
   items: ItemLite[];
   setItems: Dispatch<SetStateAction<ItemLite[]>>;
-  reload: (opts?: { silent?: boolean }) => Promise<void>;
-  /** Read-only: the item's photograph paths, captured before `deleteItem`
-   * -- the images rows they name are gone once the item row cascades away
-   * (0003_tables.sql). */
+  reload: (options?: { silent?: boolean }) => Promise<void>;
+  /** Read before `deleteItem`: the item row's cascade takes the images rows, and their paths, with it. */
   captureItemImagePaths: (
     itemId: string,
   ) => Promise<{ path_full: string; path_thumb: string | null }[]>;
@@ -38,20 +34,15 @@ export function useItemMutations({
   const toast = useToast();
   const confirm = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
-  // Ids optimistically removed but not yet actually deleted (the real
-  // deleteItem() is deferred to the undo window below) -- kept out of
-  // `items` even if a reload reports the row as still there.
+  // Removed optimistically, deleted only after the undo window; kept out of `items` across a reload.
   const pendingDeleteIds = useRef<Set<string>>(new Set());
 
-  // Shared by removeItem's own removal and the effect below; returns the
-  // same reference when nothing changes so the effect can't loop forever.
+  // Returns the same reference when nothing changes, so the effect below can't loop.
   const excludePendingDeletes = useCallback((list: ItemLite[]) => {
-    const next = list.filter((it) => !pendingDeleteIds.current.has(it.id));
+    const next = list.filter((item) => !pendingDeleteIds.current.has(item.id));
     return next.length === list.length ? list : next;
   }, []);
 
-  // Re-applies the filter whenever `items` changes, not just the change
-  // removeItem makes itself.
   useEffect(() => {
     setItems(excludePendingDeletes);
   }, [items, setItems, excludePendingDeletes]);
@@ -61,15 +52,16 @@ export function useItemMutations({
       if (isSaving) return false;
       setIsSaving(true);
       try {
-        // The DB is the normalization authority -- merge the row it
-        // returns rather than re-deriving a client-side copy.
+        // The DB is the normalization authority: merge the row it returns, not a client-side copy.
         const { data, error } = await updateItem(id, values);
         if (error || !data) {
           toast.reportError('save item', error, t('item_list.save_error'));
           return false;
         }
-        setItems((prev) =>
-          prev.map((it) => (it.id === id ? { ...it, ...data } : it)),
+        setItems((previous) =>
+          previous.map((item) =>
+            item.id === id ? { ...item, ...data } : item,
+          ),
         );
         toast.announce(t('item_list.changes_saved'));
         return true;
@@ -80,17 +72,13 @@ export function useItemMutations({
     [isSaving, setItems, t, toast],
   );
 
-  // The card goes the moment deletion is confirmed; the actual delete is
-  // deferred to the toast's undo window (see useToast). Failure or undo
-  // puts it back where it was rather than leaving a card the database
-  // still has silently missing from the grid.
+  // The card goes on confirm; the delete runs once the toast's undo window closes, else it is restored.
   const removeItem = useCallback(
     async (id: string) => {
       if (!(await confirm(t('item_list.confirm_delete')))) return;
 
-      // From the rendered list, not inside the state updater -- updaters
-      // can run more than once.
-      const index = items.findIndex((it) => it.id === id);
+      // From the rendered list, not inside the state updater: updaters can run more than once.
+      const index = items.findIndex((item) => item.id === id);
       const snapshot = items[index];
       pendingDeleteIds.current.add(id);
       setItems(excludePendingDeletes);
@@ -98,21 +86,21 @@ export function useItemMutations({
       const restore = () => {
         pendingDeleteIds.current.delete(id);
         if (!snapshot) return;
-        setItems((prev) => restoreAt(prev, index, snapshot));
+        setItems((previous) =>
+          restoreAt({ list: previous, index, item: snapshot }),
+        );
       };
 
       toast.success(t('item_list.entry_deleted'), {
         action: { label: t('common.undo'), onClick: restore },
         onExpire: async () => {
-          // Must run before deleteItem: once the item row is gone, its
-          // images rows cascade away with it (0003_tables.sql) -- this is
-          // the last point their paths can be read.
-          const imagePaths = await captureItemImagePaths(id);
-
-          // The row before the objects: if this fails, nothing happened
-          // yet and the restore above is honest.
-          const { error } = await deleteItem(id);
-          if (error) {
+          try {
+            // Objects before the row: the row's cascade takes the images rows, and their paths, with it.
+            const imagePaths = await captureItemImagePaths(id);
+            await removeImageBytes(id, imagePaths);
+            const { error } = await deleteItem(id);
+            if (error) throw error;
+          } catch (error) {
             toast.reportError(
               'delete item',
               error,
@@ -120,18 +108,6 @@ export function useItemMutations({
             );
             restore();
             return;
-          }
-
-          try {
-            // Row already gone here. A failure below is a storage leak,
-            // not data loss.
-            await removeImageBytes(id, imagePaths);
-          } catch (err) {
-            toast.reportError(
-              'delete item images',
-              err,
-              t('item_list.delete_images_cleanup_error'),
-            );
           }
           void reload({ silent: true });
         },

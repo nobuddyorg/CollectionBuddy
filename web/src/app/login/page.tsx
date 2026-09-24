@@ -19,8 +19,7 @@ const EMOJIS = ['🪙', '📮', '🎟️', '🐚', '🎖️', '🧩', '📀'] as
 
 const COIN_SIZE = 420;
 
-// Sets --coin-size, which fanPositions/fanOffsetX/fanOffsetY read to size
-// chip offsets relative to the coin.
+// Publishes --coin-size, which fanOffsetX/fanOffsetY read.
 const COIN_BOX = {
   ['--coin-size']: coinSizeCss(COIN_SIZE),
 } as CSSProperties;
@@ -34,8 +33,8 @@ export default function LoginPage() {
   const { error: demoError } = useDemoSignIn(demoMode && !checking);
   const positions = useMemo(() => fanPositions(EMOJIS.length), []);
 
-  const handleSignInError = (err: unknown) => {
-    toast.reportError('google sign-in', err, t('login_page.sign_in_error'));
+  const handleSignInError = (error: unknown) => {
+    toast.reportError('google sign-in', error, t('login_page.sign_in_error'));
   };
 
   useEffect(() => {
@@ -48,10 +47,7 @@ export default function LoginPage() {
     }
   }, [demoError, t, toast]);
 
-  // While demo mode is signing the visitor in there is no login screen to
-  // show; a failed attempt (e.g. this build pointed at a Supabase project
-  // with anonymous sign-ins turned off) falls back to the Google button
-  // below rather than leaving the overlay up forever.
+  // A failed demo sign-in (e.g. anonymous sign-ins off) falls back to the Google button, not an endless overlay.
   if (checking || (demoMode && !demoError))
     return <LoadingOverlay label={t('item_list.loading')} theme="auto" />;
 
@@ -61,10 +57,15 @@ export default function LoginPage() {
         data-testid="wordmark"
         className="font-display text-4xl sm:text-5xl mb-3 text-center"
       >
-        <span className="border-b-[3px] border-foreground pb-0.5">
+        <span
+          data-testid="wordmark-part"
+          className="border-b-[3px] border-foreground pb-0.5"
+        >
           {t('brand.collection')}
         </span>
-        <span className="text-accent">{t('brand.buddy')}</span>
+        <span data-testid="wordmark-part" className="text-accent">
+          {t('brand.buddy')}
+        </span>
       </h1>
 
       <p
@@ -74,8 +75,7 @@ export default function LoginPage() {
         {t('page.footer')}
       </p>
 
-      {/* Chips are positioned against this box, not the page, so their
-          offsets stay relative to the coin wherever it drifts on screen. */}
+      {/* Chips are positioned against this box, not the page, so their offsets stay relative to the coin. */}
       <div className="relative" style={COIN_BOX}>
         <Coin
           size={COIN_SIZE}
@@ -85,16 +85,15 @@ export default function LoginPage() {
           }
         />
 
-        {/* The chips need real width to fan into without clipping; below
-            `sm` the medallion carries the page on its own. */}
+        {/* Below `sm` there is no width to fan into without clipping; the medallion carries the page alone. */}
         <div className="hidden sm:contents">
-          {positions.map((p, i) => (
+          {positions.map((position, i) => (
             <Collectible
               key={i}
               delay={i * 0.35}
               emoji={EMOJIS[i % EMOJIS.length]}
-              x={fanOffsetX(p.ux)}
-              y={fanOffsetY(p.uy)}
+              x={fanOffsetX(position.ux)}
+              y={fanOffsetY(position.uy)}
             />
           ))}
         </div>

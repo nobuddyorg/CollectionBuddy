@@ -6,7 +6,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { Pagination } from './Pagination';
 
-function renderPagination(page: number, totalPages: number, setPage = vi.fn()) {
+function renderPagination({
+  page,
+  totalPages,
+}: {
+  page: number;
+  totalPages: number;
+}) {
+  const setPage = vi.fn();
   const view = render(
     <I18nProvider>
       <Pagination page={page} setPage={setPage} totalPages={totalPages} />
@@ -20,10 +27,9 @@ describe('Pagination', () => {
     window.localStorage.setItem('lang', 'en');
   });
 
-  // The browser suite reaches this control by test id alone, so the ids are
-  // part of its contract rather than incidental markup.
+  // The browser suite reaches this control by test id alone, so the ids are its contract.
   it('names both bars and every control the browser suite drives', () => {
-    renderPagination(2, 3);
+    renderPagination({ page: 2, totalPages: 3 });
 
     expect(screen.getByTestId('pagination')).toBeInTheDocument();
     expect(screen.getByTestId('pagination-compact')).toBeInTheDocument();
@@ -52,7 +58,7 @@ describe('Pagination', () => {
   });
 
   it('disables Previous on the first page', () => {
-    renderPagination(1, 3);
+    renderPagination({ page: 1, totalPages: 3 });
     expect(
       screen.getAllByRole('button', { name: 'Previous' })[0],
     ).toBeDisabled();
@@ -62,7 +68,7 @@ describe('Pagination', () => {
   });
 
   it('disables Next on the last page', () => {
-    renderPagination(3, 3);
+    renderPagination({ page: 3, totalPages: 3 });
     expect(
       screen.getAllByRole('button', { name: 'Previous' })[0],
     ).not.toBeDisabled();
@@ -71,7 +77,7 @@ describe('Pagination', () => {
 
   it('moves one page back or forward from the buttons', async () => {
     const user = userEvent.setup();
-    const { setPage } = renderPagination(3, 5);
+    const { setPage } = renderPagination({ page: 3, totalPages: 5 });
 
     await user.click(screen.getAllByRole('button', { name: 'Previous' })[0]);
     expect(setPage).toHaveBeenCalledWith(2);
@@ -82,14 +88,14 @@ describe('Pagination', () => {
 
   it('jumps straight to the page number that was clicked', async () => {
     const user = userEvent.setup();
-    const { setPage } = renderPagination(1, 10);
+    const { setPage } = renderPagination({ page: 1, totalPages: 10 });
 
     await user.click(screen.getAllByRole('button', { name: 'Page 5' })[0]);
     expect(setPage).toHaveBeenCalledWith(5);
   });
 
   it('marks only the current page as aria-current', () => {
-    renderPagination(3, 5);
+    renderPagination({ page: 3, totalPages: 5 });
 
     expect(
       screen.getAllByRole('button', { name: 'Page 3' })[0],
@@ -100,7 +106,7 @@ describe('Pagination', () => {
   });
 
   it('gives the current page button the highlighted style, and only that one', () => {
-    renderPagination(3, 5);
+    renderPagination({ page: 3, totalPages: 5 });
 
     const current = screen.getAllByRole('button', { name: 'Page 3' })[0];
     const other = screen.getAllByRole('button', { name: 'Page 1' })[0];
@@ -116,7 +122,7 @@ describe('Pagination', () => {
   });
 
   it('shows an ellipsis as non-interactive text, not a button', () => {
-    renderPagination(1, 10);
+    renderPagination({ page: 1, totalPages: 10 });
 
     const ellipses = screen.getAllByText('...');
     expect(ellipses.length).toBeGreaterThan(0);
@@ -126,15 +132,13 @@ describe('Pagination', () => {
     }
   });
 
-  // Two ellipses (desktop nav's centered-window case) need two distinct
-  // React keys -- react logs a "same key" warning otherwise, which would
-  // still not show up as anything a person looking at the page notices.
+  // Two ellipses need distinct React keys; the "same key" warning never shows on the page itself.
   it('gives each ellipsis its own key rather than colliding on a shared one', () => {
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
-    renderPagination(5, 10);
+    renderPagination({ page: 5, totalPages: 10 });
     expect(screen.getAllByText('...')).toHaveLength(2);
 
     expect(consoleError).not.toHaveBeenCalled();
@@ -142,13 +146,13 @@ describe('Pagination', () => {
   });
 
   it("shows the mobile 'page of' text alongside the full page list", () => {
-    renderPagination(2, 5);
+    renderPagination({ page: 2, totalPages: 5 });
 
     expect(screen.getByText('2 / 5')).toBeInTheDocument();
   });
 
   it('gives each pagination landmark the localized label', () => {
-    renderPagination(1, 3);
+    renderPagination({ page: 1, totalPages: 3 });
 
     expect(
       screen.getAllByRole('navigation', { name: 'Pagination' }),
@@ -156,7 +160,7 @@ describe('Pagination', () => {
   });
 
   it('recomputes the page list when the page or total changes, not just on mount', () => {
-    const { rerender } = renderPagination(1, 10);
+    const { rerender } = renderPagination({ page: 1, totalPages: 10 });
     expect(screen.getByRole('button', { name: 'Page 5' })).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Page 8' }),
@@ -174,11 +178,9 @@ describe('Pagination', () => {
     ).not.toBeInTheDocument();
   });
 
-  // Located by `title` (not accessible name) so the assertion on `aria-label`
-  // below is checking that attribute's own value, not just whichever of the
-  // two happens to still resolve a matching accessible name.
+  // Located by `title`, so the `aria-label` assertion checks that attribute's own value.
   it('sets Previous and Next aria-labels independently of their title', () => {
-    renderPagination(2, 3);
+    renderPagination({ page: 2, totalPages: 3 });
 
     for (const button of screen.getAllByTitle('Previous')) {
       expect(button).toHaveAttribute('aria-label', 'Previous');
@@ -188,10 +190,9 @@ describe('Pagination', () => {
     }
   });
 
-  // The other half: located by `aria-label` this time, so a broken `title`
-  // can't hide behind the aria-label still being correct.
+  // Located by `aria-label` this time, so a broken `title` can't hide behind it.
   it('sets Previous and Next titles independently of their aria-label', () => {
-    renderPagination(2, 3);
+    renderPagination({ page: 2, totalPages: 3 });
 
     for (const button of screen.getAllByRole('button', {
       name: 'Previous',

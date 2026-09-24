@@ -1,8 +1,7 @@
 import { expect, test } from './test';
 
 import type { PageTree } from '../pages';
-// map.spec.ts counts pins; this is what happens when one is pressed, and
-// what the map does with a browser that has a location to give.
+// map.spec.ts counts pins; this is what happens when one is pressed, and with a location to give.
 test.use({ locale: 'en-GB' });
 
 async function openMap(app: PageTree) {
@@ -11,8 +10,7 @@ async function openMap(app: PageTree) {
 }
 
 test.describe('the map, up close', () => {
-  // The popup is built as DOM rather than markup, precisely so a collector's
-  // own text is never parsed as HTML -- so it is worth reading back.
+  // The popup is built as DOM, not markup, so a collector's own text is never parsed as HTML.
   test('names the place and its entries when a pin is pressed', async ({
     on,
     page,
@@ -29,9 +27,7 @@ test.describe('the map, up close', () => {
     );
   });
 
-  // Driven by Leaflet's own zoom rather than the "zoom to me" control: that
-  // one awaits a position fix before it moves the map, so the framing this
-  // is about would be racing an arrival it cannot see.
+  // Leaflet's own zoom, not "zoom to me": that one awaits a position fix, which this would race.
   test('frames every pin again after zooming away from them', async ({
     on,
     page,
@@ -46,8 +42,7 @@ test.describe('the map, up close', () => {
 
     await app.map.do.frameAllPins();
 
-    // What framing promises: the pins are back on screen, not merely back
-    // in the document after the view moved away from them.
+    // What framing promises: the pins are back on screen, not merely in the document.
     await expect(app.map.locators.pins).toHaveCount(2);
     await expect(app.map.locators.pins.first()).toBeInViewport();
   });
@@ -59,8 +54,7 @@ test.describe('the map, with a location to show', () => {
     permissions: ['geolocation'],
   });
 
-  // Permission already granted means no prompt to raise, so the marker
-  // arrives with the map rather than waiting to be asked for.
+  // Permission already granted, so the marker arrives with the map rather than after a prompt.
   test('puts the collector on the map beside the collection', async ({
     on,
     page,
@@ -73,7 +67,7 @@ test.describe('the map, with a location to show', () => {
     await expect(app.map.locators.popup).toContainText('You are here');
   });
 
-  // #694: the fix may land after the second tap; MapModal.test.tsx forces that order, real geolocation cannot.
+  // The position fix may land after the second tap; MapModal.test.tsx forces that order, geolocation cannot.
   test('keeps the later of two quick framing taps', async ({ on, page }) => {
     const app = on(page);
     await openMap(app);

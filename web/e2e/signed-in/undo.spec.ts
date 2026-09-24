@@ -2,11 +2,7 @@ import { expect, test } from './test';
 
 import { SEED } from './fixtures';
 import type { PageTree } from '../pages';
-// Deleting an entry hides it at once and defers the actual delete to the
-// toast's undo window, which is the one place the interface and the
-// database deliberately disagree for a few seconds. Both halves of that
-// bargain are browser behaviour: the undo, and a reload landing inside the
-// window not resurrecting a card the collector just watched go.
+// The undo window is the one place the interface and the database deliberately disagree for a while.
 test.use({ locale: 'en-GB' });
 
 const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
@@ -44,8 +40,7 @@ test.describe('taking a deletion back', () => {
     }
   });
 
-  // #682: the deferred delete meant a reload inside the undo window
-  // refetched a row that was still there and put the card back.
+  // A refetch inside the undo window finds the row still there and must not put the card back.
   test('stays gone when the catalogue reloads inside the undo window', async ({
     on,
     page,
@@ -56,12 +51,10 @@ test.describe('taking a deletion back', () => {
       await app.catalogue.do.addEntry(title);
       await app.catalogue.do.removeEntry(title);
 
-      // A refetch of the same collection, while the delete is still
-      // pending -- what clearing the search box does for real.
+      // Clearing the search box refetches the collection while the delete is still pending.
       await app.catalogue.do.search(title);
       await app.catalogue.do.search('');
-      // Waits for that refetch to land before asking about the card, or
-      // the absence below is the one from before the request went out.
+      // Waits for that refetch to land, or the absence below predates the request.
       await expect(app.catalogue.card('Rückgängigstück')()).toBeVisible();
       await expect(app.catalogue.card(title)()).toHaveCount(0);
     } finally {

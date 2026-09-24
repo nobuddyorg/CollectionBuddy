@@ -7,13 +7,7 @@ export async function visibleTitles(page: Page) {
   return createPageTree(page).catalogue.locators.cardTitles.allTextContents();
 }
 
-/**
- * Waits for the grid to be showing exactly these titles, in this order.
- *
- * Polled rather than read once: the grid is two async waits away from any
- * keystroke (debounce, then query), so a fixed sleep would be either flaky
- * or slow.
- */
+/** Polled: the grid is two async waits (debounce, then query) away from any keystroke. */
 export async function expectTitles(page: Page, expected: string[]) {
   await expect.poll(() => visibleTitles(page)).toEqual(expected);
 }

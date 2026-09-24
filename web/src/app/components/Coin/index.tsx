@@ -2,7 +2,7 @@
 
 import React, { useId, useMemo } from 'react';
 
-import type { CoinProps } from '../Coin/types';
+import type { CoinProps } from './types';
 import Icon, { IconType } from '../Icon';
 import { coinSizeCss } from './size';
 import { TextRing } from './TextRing';
@@ -20,8 +20,6 @@ export default function Coin({
 }: CoinProps) {
   const rimId = useId();
 
-  // Scales with the viewport rather than a fixed floor, or a 390px screen
-  // has the medallion touching both edges.
   const style = useMemo<React.CSSProperties>(() => {
     const clamped = coinSizeCss(size);
     return { width: clamped, height: clamped };

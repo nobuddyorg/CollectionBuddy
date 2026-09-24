@@ -1,13 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
 interface CategoryPanel {
-  /**
-   * Points to self.
-   */
   (): Locator;
-  /**
-   * High-level interactions.
-   */
   do: {
     create(name: string): Promise<void>;
     delete(): Promise<void>;
@@ -17,9 +11,6 @@ interface CategoryPanel {
     openPanel(): Promise<void>;
     rename(name: string): Promise<void>;
   };
-  /**
-   * Raw locators.
-   */
   locators: {
     buttons: {
       add: Locator;
@@ -68,8 +59,7 @@ export function initCategoryPanel(page: Page): CategoryPanel {
       label: root.getByTestId('category-label'),
     },
   };
-  // Exact, not a substring: the import spec puts "X (2)" beside "X", and
-  // each has to be reachable without also matching the other.
+  // Exact, not a substring: the import spec puts "X (2)" beside "X".
   const tab = (name: string) =>
     locators.tabs.filter({
       has: page
@@ -78,8 +68,7 @@ export function initCategoryPanel(page: Page): CategoryPanel {
     });
 
   const openPanel = async () => {
-    // The strip collapses on every selection, so which button is on screen
-    // depends on what the test did last rather than on the test's order.
+    // The strip collapses on every selection, so whether the expand button is there depends on the last action.
     if (await locators.buttons.expand.isVisible()) {
       await locators.buttons.expand.click();
     }
@@ -106,14 +95,11 @@ export function initCategoryPanel(page: Page): CategoryPanel {
     },
     open: async (name: string) => {
       await page.goto('', { waitUntil: 'networkidle' });
-      // `isVisible()` answers immediately rather than waiting, so this must
-      // wait for the strip to have loaded before asking about the panel.
+      // isVisible() answers immediately, so the strip has to have loaded before openPanel asks about it.
       await expect(locators.selected).not.toBeEmpty();
       await openPanel();
       await tab(name).click();
-      // Selecting collapses the strip and takes the tab with it, so the
-      // heading confirms the choice instead. Then wait for the grid to
-      // refetch -- every collection this suite opens is seeded non-empty.
+      // Selecting collapses the strip, so the heading confirms the choice; every seeded collection has a card.
       await expect(locators.selected).toHaveText(name);
       await expect(root.getByTestId('item-card').first()).toBeVisible();
     },

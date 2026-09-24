@@ -2,8 +2,7 @@
 
 import { Spinner } from '../ui/Spinner';
 
-// Always shows its label; a bare icon gave no indication of what confirming
-// would do.
+// Always shows its label; a bare icon gave no indication of what confirming would do.
 export function Submit({
   submitting,
   disabled,
@@ -16,8 +15,7 @@ export function Submit({
   return (
     <button
       type="submit"
-      // Named for the end-to-end suite: the label differs between creating
-      // and editing, and both are translated.
+      // Named for the end-to-end suite: the label differs between creating and editing, and is translated.
       data-testid="item-submit"
       disabled={disabled}
       aria-busy={submitting}

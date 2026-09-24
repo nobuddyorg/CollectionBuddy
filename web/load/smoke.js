@@ -35,7 +35,7 @@ export function browseOwn(data) {
 }
 
 export function searchOwn(data) {
-  search(data.owner, data.searchedCategoryId);
+  search({ session: data.owner, categoryId: data.searchedCategoryId });
 }
 
 export function browseShared(data) {
@@ -43,7 +43,7 @@ export function browseShared(data) {
 }
 
 export function searchShared(data) {
-  search(data.viewer, data.sharedCategoryId);
+  search({ session: data.viewer, categoryId: data.sharedCategoryId });
 }
 
 export function writeEntry(data) {
@@ -51,5 +51,5 @@ export function writeEntry(data) {
 }
 
 export function handleSummary(data) {
-  return summarize('smoke', data);
+  return summarize({ flow: 'smoke', data });
 }

@@ -36,8 +36,7 @@ describe('useLockBodyScroll', () => {
     expect(document.body.style.overflow).toBe('');
   });
 
-  // Restores what was there rather than clearing: a second dialog opening
-  // over the first must not unlock the page when only it closes.
+  // Restores rather than clears: a second dialog closing must not unlock the page under the first.
   it('puts back the value it found rather than blanking it', () => {
     document.body.style.overflow = 'scroll';
     const { unmount } = render(<Harness active />);

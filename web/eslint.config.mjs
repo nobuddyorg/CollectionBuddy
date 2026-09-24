@@ -5,13 +5,10 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';
 import sonarjs from 'eslint-plugin-sonarjs';
 
 const eslintConfig = [
-  // Generated output and working directories from an interrupted run
-  // (Stryker's sandbox is a second copy of the project). database.types.ts
-  // is kept honest by CI's own drift check, not lint.
+  // Generated output and interrupted-run leftovers; database.types.ts is kept honest by CI's drift check.
   {
     ignores: [
       'coverage/**',
-      // The e2e coverage report ships a bundled viewer of its own.
       'coverage-e2e/**',
       '.stryker-tmp/**',
       'reports/**',
@@ -24,15 +21,11 @@ const eslintConfig = [
   },
   ...nextCoreWebVitals,
   ...nextTypescript,
-  // eslint-plugin-react's auto-detection calls a context.getFilename() that
-  // ESLint 10 removed, crashing react/display-name on every file. Setting
-  // the version explicitly skips that detection path.
+  // eslint-plugin-react's version auto-detection calls context.getFilename(), which ESLint 10 removed.
   {
     settings: { react: { version: '19.2.8' } },
   },
-  // Type-aware linting, scoped to source -- type-checking e2e/ too would
-  // mean a second tsconfig. no-floating-promises/no-misused-promises catch
-  // an event handler or effect that drops an async rejection on the floor.
+  // Type-aware linting for src/ only: e2e/ would need a second tsconfig.
   ...tseslint.configs.recommendedTypeChecked.map((config) => ({
     ...config,
     files: ['src/**/*.{ts,tsx}'],
@@ -46,90 +39,43 @@ const eslintConfig = [
       },
     },
   },
-  // A mock standing in for an async API rarely needs to await anything --
-  // the point being tested is the shape of the call, not the implementation.
+  // A mock standing in for an async API rarely needs to await anything.
   {
-    files: ['src/**/*.test.{ts,tsx}'],
+    files: ['src/**/*.test.{ts,tsx}', 'src/**/*.test-support.{ts,tsx}'],
     rules: {
       '@typescript-eslint/require-await': 'off',
     },
   },
-  // eslint-config-next's core-web-vitals bundles eslint-plugin-jsx-a11y
-  // transitively but only enables 6 of its rules (verified with
-  // `eslint --print-config`). core-web-vitals already registers the
-  // plugin under the "jsx-a11y" namespace, so only apply the fuller rule
-  // set here -- redeclaring `plugins` errors with "Cannot redefine plugin".
-  // Scoped to JSX-bearing app source, not tests (which don't ship to users).
+  // core-web-vitals already registers jsx-a11y (6 rules); redeclaring `plugins` errors, so only rules go here.
   {
     files: ['src/app/**/*.tsx'],
-    ignores: ['src/app/**/*.test.tsx'],
+    ignores: ['src/app/**/*.test.tsx', 'src/app/**/*.test-support.tsx'],
     rules: {
       ...jsxA11y.flatConfigs.strict.rules,
-      // Crashes ("_minimatch.default is not a function") under this repo's
-      // minimatch@10 override (see design-decisions.md's advisory section)
-      // -- the rule's `mayContainChildComponent` helper calls minimatch as
-      // a default export, which v10's CJS build no longer has. No other
-      // jsx-a11y rule uses that helper. @axe-core/playwright's runtime
-      // check covers missing form labels instead.
+      // Calls minimatch as a default export, which the minimatch@10 override lacks; axe covers form labels instead.
       'jsx-a11y/label-has-associated-control': 'off',
     },
   },
-  // Maintainability/code-smell analysis, scoped like the type-aware block
-  // above and not to tests -- a test's job is to be exhaustive, not
-  // non-repetitive, and cognitive-complexity budgets belong to the logic
-  // under test, not the assertions describing it.
+  // Code-smell analysis for non-test source: a test's job is to be exhaustive, not non-repetitive.
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/**/*.test.{ts,tsx}'],
+    ignores: ['src/**/*.test.{ts,tsx}', 'src/**/*.test-support.{ts,tsx}'],
     ...sonarjs.configs.recommended,
-    // sonarjs.configs.recommended sets settings.react to a placeholder
-    // version; without repeating the fix above, ESLint's flat config would
-    // let that clobber it for every file this block also matches, since a
-    // later config's `settings` key wins over an earlier one wholesale
-    // rather than merging per nested field.
+    // The recommended config sets a placeholder settings.react; a later `settings` replaces an earlier one wholesale.
     settings: { react: { version: '19.2.8' } },
     rules: {
       ...sonarjs.configs.recommended.rules,
-      // Fires on every repeated Tailwind className string, not on
-      // duplicated business logic -- see design-decisions.md's advisory
-      // section for the same near-identical problem already documented for
-      // Stryker mutating JSX/Tailwind strings.
+      // Fires on every repeated Tailwind className string, not on duplicated logic.
       'sonarjs/no-duplicate-string': 'off',
-      // Conflicts with this codebase's established `void somePromise`
-      // convention for marking an intentionally-unawaited promise (~30
-      // call sites) and TypeScript's own `const x: never = y; void x;`
-      // exhaustiveness-check idiom (Icon/index.tsx) -- both are exactly
-      // what `@typescript-eslint/no-floating-promises` (already on, via
-      // recommendedTypeChecked above) requires as the fix for a dropped
-      // promise, so this rule would flag the correct answer to another
-      // rule's own error.
+      // Flags `void promise`, the very fix @typescript-eslint/no-floating-promises asks for.
       'sonarjs/void-use': 'off',
-      // Would require wrapping nearly every component's props type in
-      // `Readonly<...>` -- a house-style adoption this codebase hasn't
-      // made anywhere yet (checked: zero existing uses), not a small fix
-      // to the ~30 files the initial run flagged. Worth adopting
-      // incrementally, the same way component test coverage was rolled
-      // out (see design-decisions.md), not as a drive-by of this change.
+      // Would wrap every props type in `Readonly<...>`, a house style adopted nowhere yet.
       'sonarjs/prefer-read-only-props': 'off',
-      // The plugin's default (15) flagged functions with real, deliberate
-      // branching -- straight-line guard clauses and small state
-      // dispatch, not deep nesting -- as "too complex" project-wide.
-      // Raised to the lowest value that leaves the codebase's actual
-      // distribution clean: after simplifying ItemList/index.tsx's main
-      // component (28, mostly nested-ternary JSX flattened into `&&`
-      // blocks elsewhere in this change) the highest score left is 21,
-      // Map/usePlaces.tsx's partitionByStoredCoords -- suppressed at its
-      // own definition instead of lowering this further, since it's
-      // already covered by mutation-targets.mjs's 100% floor and
-      // splitting its two bookkeeping loops wouldn't reduce the actual
-      // logic, just where the lines sit. Everything else in the codebase
-      // is at 18 or below.
+      // 20: lowest value that leaves the codebase clean; cognitive-complexity is reviewed, not gamed.
       'sonarjs/cognitive-complexity': ['warn', 20],
     },
   },
-  // Components talk to Supabase through data/, never the client directly.
-  // Scoped to components/, not the whole app: the top-level auth/session
-  // surface has nowhere else to live.
+  // Scoped to components/: the top-level auth/session surface has nowhere else to live.
   {
     files: ['src/app/components/**/*.{ts,tsx}'],
     rules: {

@@ -5,11 +5,7 @@ type FirstPage = ReturnType<typeof listItems>;
 
 let pending: { categoryId: string; page: FirstPage } | null = null;
 
-/**
- * Starts reading a category's unsearched first page before ItemList mounts,
- * so on a cold start it overlaps the category list instead of waiting on it
- * (#627). A category the caller can no longer read just comes back empty.
- */
+/** Reads the unsearched first page before ItemList mounts, so a cold start overlaps the category list. */
 export function prefetchFirstPage(
   categoryId: string,
   read: typeof listItems = listItems,

@@ -6,9 +6,7 @@ const source = readFileSync(
   'utf8',
 );
 
-// sw.js runs outside any bundler as a plain script, with no import path
-// back into this suite, so its two decision functions are pulled out of
-// the raw source and evaluated in isolation here.
+// sw.js is a plain script with no import path, so its decision functions are evaluated from raw source.
 function extractFunction(name: string): string {
   const start = source.indexOf(`function ${name}(`);
   if (start === -1) throw new Error(`${name} not found in sw.js`);
@@ -17,7 +15,7 @@ function extractFunction(name: string): string {
 }
 
 function load<T>(name: string): T {
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval -- sw.js exports nothing; evaluating its source is the only way in
   const factory = new Function(
     `${extractFunction(name)}\nreturn ${name};`,
   ) as () => T;
@@ -73,11 +71,7 @@ describe('the fetch handler', () => {
     expect(source).toContain("request.method !== 'GET'");
   });
 
-  // Supabase must be excluded from caching: PostgREST/Auth responses must
-  // never be served stale, and Storage's signed URLs expire in an hour
-  // (data/images.ts). There's no Supabase-specific allowlist for that --
-  // this same-origin check excludes every cross-origin request outright,
-  // and every Supabase call is cross-origin by construction.
+  // Every Supabase call is cross-origin, so this check alone keeps its responses and signed URLs uncached.
   it('never intercepts a cross-origin request, which is what excludes Supabase', () => {
     expect(source).toContain('url.origin !== self.location.origin');
   });

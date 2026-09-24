@@ -6,27 +6,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import Header from './index';
 
-// Language/theme choices persist to localStorage, which jsdom keeps across
-// tests in this file -- reset it so each test starts from the same
-// detected-language state.
+// jsdom keeps localStorage across a file's tests; reset so each starts from the detected language.
 beforeEach(() => {
   localStorage.clear();
 });
 
 function renderHeader(onSignOut = vi.fn()) {
-  const utils = render(
+  const rendered = render(
     <I18nProvider>
       <Header user={{ email: 'collector@example.com' }} onSignOut={onSignOut} />
     </I18nProvider>,
   );
-  return { ...utils, onSignOut };
+  return { ...rendered, onSignOut };
 }
 
 async function openMenu() {
   const user = userEvent.setup();
-  const utils = renderHeader();
+  const rendered = renderHeader();
   await user.click(screen.getByRole('button', { name: 'Account menu' }));
-  return { user, ...utils };
+  return { user, ...rendered };
 }
 
 describe('Menu', () => {

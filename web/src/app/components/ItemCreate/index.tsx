@@ -8,8 +8,7 @@ import { EMPTY_ITEM_FORM_VALUES, ItemFormValues } from '../ItemForm/types';
 import { useCreateItem } from './useCreateItem';
 import { Props } from './types';
 
-// Split from the main bundle: PlaceAutocomplete's geocoder and its deps are
-// dead weight on every page load that never opens this form.
+// Loaded lazily: PlaceAutocomplete's geocoder is dead weight on pages that never open this form.
 const ItemForm = dynamic(() => import('../ItemForm'), { ssr: false });
 
 export default function ItemCreate({
@@ -26,7 +25,7 @@ export default function ItemCreate({
       const ok = await create(values);
       if (!ok) return;
       onCreated();
-      setFormKey((k) => k + 1);
+      setFormKey((key) => key + 1);
     },
     [create, onCreated],
   );

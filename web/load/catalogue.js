@@ -25,9 +25,9 @@ export function browseOwn(data) {
 }
 
 export function searchOwn(data) {
-  search(data.owner, data.searchedCategoryId);
+  search({ session: data.owner, categoryId: data.searchedCategoryId });
 }
 
 export function handleSummary(data) {
-  return summarize('catalogue', data);
+  return summarize({ flow: 'catalogue', data });
 }

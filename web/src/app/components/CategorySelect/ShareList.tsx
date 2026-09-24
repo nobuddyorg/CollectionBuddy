@@ -6,7 +6,7 @@ import { useI18n } from '../../i18n/useI18n';
 import CenteredModal from '../CenteredModal';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import Icon, { IconType } from '../Icon';
-import type { CategoryShareSummary } from '../../data/shares';
+import type { CategoryShareSummary, ShareRole } from '../../data/shares';
 import type { UseShares } from './useShares';
 import { labelClasses } from '../ui/labelClasses';
 
@@ -21,37 +21,33 @@ export function ShareList({ shares }: { shares: UseShares }) {
     deleteShare,
     updateShareRole,
   } = shares;
-  // Below `sm` a share row has no room for the "Can edit" label alongside
-  // email/expiry/revoke -- swapped for a pen icon that opens the same
-  // checkbox in a modal.
+  // Below sm the row has no room for "Can edit"; a pen icon opens the same checkbox in a modal.
   const [roleModalShareId, setRoleModalShareId] = useState<string | null>(null);
 
   const onToggleRole = useCallback(
-    async (shareId: string, invitedEmail: string, canEdit: boolean) => {
-      // Only granting needs confirmation -- taking edit access back away is
-      // the safe direction.
-      if (canEdit) {
+    async (share: CategoryShareSummary, role: ShareRole) => {
+      // Only granting needs confirmation; taking edit access away is the safe direction.
+      if (role === 'editor') {
         const message = t('category_select.share_editor_confirm').replace(
           '{email}',
-          invitedEmail,
+          share.invited_email,
         );
         if (!(await confirm(message))) return;
       }
-      await updateShareRole(shareId, canEdit ? 'editor' : 'viewer');
+      await updateShareRole(share.id, role);
     },
     [confirm, t, updateShareRole],
   );
 
-  // `className` sets the label's display too -- a hardcoded `flex` here
-  // would fight a caller's `hidden ... sm:flex`.
-  const roleCheckbox = (s: CategoryShareSummary, className: string) => (
+  // className sets display too: a hardcoded flex would fight a caller's hidden sm:flex.
+  const roleCheckbox = (share: CategoryShareSummary, className: string) => (
     <label className={className}>
       <input
         type="checkbox"
         data-testid="share-can-edit"
-        checked={s.role === 'editor'}
-        onChange={(e) =>
-          void onToggleRole(s.id, s.invited_email, e.target.checked)
+        checked={share.role === 'editor'}
+        onChange={(event) =>
+          void onToggleRole(share, event.target.checked ? 'editor' : 'viewer')
         }
         disabled={isUpdatingRole}
         className="h-4 w-4 rounded-sm ring-1 ring-inset ring-control-border accent-foreground"
@@ -88,26 +84,22 @@ export function ShareList({ shares }: { shares: UseShares }) {
           <li className={labelClasses('pb-1.5')}>
             {t('category_select.share_list_title')}
           </li>
-          {list.map((s) => {
+          {list.map((share) => {
             const isExpired =
-              !!s.expires_at &&
-              new Date(s.expires_at).getTime() <= new Date().getTime();
+              !!share.expires_at &&
+              new Date(share.expires_at).getTime() <= new Date().getTime();
             let expiryLabel = t('category_select.share_no_expiry');
-            if (s.expires_at) {
-              const date = new Date(s.expires_at).toLocaleDateString();
+            if (share.expires_at) {
+              const date = new Date(share.expires_at).toLocaleDateString();
               expiryLabel = isExpired
                 ? t('category_select.share_expired_on').replace('{date}', date)
                 : t('category_select.share_expires_on').replace('{date}', date);
             }
             return (
               <li
-                key={s.id}
+                key={share.id}
                 data-testid="share-row"
-                // `sm:flex-1` on email below, not `justify-between` here:
-                // with three items, justify-between free-floats the middle
-                // one (expiry) depending on email length. `ml-4` rather
-                // than `pl-4` so the `divide-y` border indents too --
-                // padding doesn't move a box's border.
+                // ml-4, not pl-4, so the divide-y border indents too; padding does not move a border.
                 className="ml-4 flex flex-col gap-1.5 py-2 text-sm sm:flex-row sm:items-center sm:gap-2"
               >
                 <div className="flex min-w-0 items-center gap-1.5 sm:flex-1">
@@ -115,9 +107,9 @@ export function ShareList({ shares }: { shares: UseShares }) {
                     data-testid="share-email-label"
                     className="truncate min-w-0"
                   >
-                    {s.invited_email}
+                    {share.invited_email}
                   </span>
-                  {s.role === 'editor' && (
+                  {share.role === 'editor' && (
                     <span
                       data-testid="share-editor-badge"
                       className="tag-chip shrink-0"
@@ -136,10 +128,10 @@ export function ShareList({ shares }: { shares: UseShares }) {
                   </span>
 
                   <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-                    {roleCheckbox(s, 'hidden items-center gap-1.5 sm:flex')}
+                    {roleCheckbox(share, 'hidden items-center gap-1.5 sm:flex')}
                     <button
                       type="button"
-                      onClick={() => setRoleModalShareId(s.id)}
+                      onClick={() => setRoleModalShareId(share.id)}
                       aria-label={t('category_select.share_edit_access')}
                       title={t('category_select.share_edit_access')}
                       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:hidden sm:h-9 sm:w-9"
@@ -153,7 +145,9 @@ export function ShareList({ shares }: { shares: UseShares }) {
                     <button
                       type="button"
                       data-testid="share-revoke"
-                      onClick={() => void onRevoke(s.id, s.invited_email)}
+                      onClick={() =>
+                        void onRevoke(share.id, share.invited_email)
+                      }
                       disabled={isRevoking}
                       aria-label={t('category_select.share_revoke')}
                       title={t('category_select.share_revoke')}
@@ -174,7 +168,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
       )}
 
       <RoleModal
-        share={list.find((s) => s.id === roleModalShareId) ?? null}
+        share={list.find((share) => share.id === roleModalShareId) ?? null}
         onOpenChange={(open) => !open && setRoleModalShareId(null)}
         renderCheckbox={roleCheckbox}
       />
@@ -190,7 +184,7 @@ function RoleModal({
   share: CategoryShareSummary | null;
   onOpenChange: (open: boolean) => void;
   renderCheckbox: (
-    s: CategoryShareSummary,
+    share: CategoryShareSummary,
     className: string,
   ) => React.ReactNode;
 }) {

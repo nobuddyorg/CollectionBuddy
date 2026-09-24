@@ -12,11 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ToastProvider, useToast } from './ToastProvider';
 
-// A minimal consumer, standing in for the real callers (useCreateItem,
-// useItemMutations) that reach the provider only through useToast() -- never
-// through its internals. Each message gets its own button so a test can
-// fire one, or several in sequence, entirely through userEvent (and so
-// entirely inside React's act()).
+// One button per message so a test fires one or several through userEvent, and so inside act().
 function Trigger({ messages }: { messages: string[] }) {
   const toast = useToast();
   return (
@@ -110,9 +106,7 @@ const liveRegion = (container: HTMLElement) =>
 
 describe('ToastProvider', () => {
   beforeEach(() => {
-    // I18nProvider falls back to navigator.language ('en-US' in jsdom)
-    // unless a stored preference says otherwise; pin it so this doesn't
-    // depend on that incidental default.
+    // Pinned: I18nProvider otherwise falls back to jsdom's incidental navigator.language.
     window.localStorage.setItem('lang', 'en');
   });
 
@@ -186,13 +180,13 @@ describe('ToastProvider', () => {
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
-    const err = new Error('boom');
+    const error = new Error('boom');
     render(
       <I18nProvider>
         <ToastProvider>
           <ReportErrorTrigger
             message="Could not save this entry."
-            error={err}
+            error={error}
           />
         </ToastProvider>
       </I18nProvider>,
@@ -204,7 +198,7 @@ describe('ToastProvider', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Could not save this entry.');
-    expect(consoleError).toHaveBeenCalledWith('trigger', err);
+    expect(consoleError).toHaveBeenCalledWith('trigger', error);
     consoleError.mockRestore();
   });
 

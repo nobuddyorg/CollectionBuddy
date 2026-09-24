@@ -3,8 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getFocusable } from './getFocusable';
 
-// The focus trap is built on this list; a hand-written selector can silently
-// lose an entry in a refactor, letting Tab escape the dialog.
+// The focus trap is built on this list; a lost selector clause lets Tab escape the dialog.
 function container(html: string): HTMLElement {
   const div = document.createElement('div');
   div.innerHTML = html;
@@ -24,8 +23,7 @@ describe('getFocusable', () => {
     expect(getFocusable(container('<p>just words</p>'))).toEqual([]);
   });
 
-  // One case per selector: each is its own clause, and a lost clause is
-  // invisible until somebody tabs onto that element.
+  // One case per selector clause: a lost clause is invisible until somebody tabs onto it.
   it.each([
     ['a link with a target', '<a href="#x" data-name="a">link</a>'],
     ['a button', '<button data-name="a">press</button>'],
@@ -55,8 +53,7 @@ describe('getFocusable', () => {
     expect(getFocusable(container('<div tabindex="-1"></div>'))).toEqual([]);
   });
 
-  // Document order is the order Tab moves in; the first and last of this
-  // list are what the trap wraps between.
+  // Document order is Tab order; the trap wraps between the first and last of this list.
   it('returns them in the order they appear', () => {
     const element = container(`
       <button data-name="first">one</button>
@@ -73,8 +70,7 @@ describe('getFocusable', () => {
     expect(namesIn(element)).toEqual(['deep']);
   });
 
-  // A file input hidden via Tailwind's `.hidden` is a real shape in this
-  // app; focusing one silently fails, leaving focus outside the dialog.
+  // A file input hidden via Tailwind's `.hidden` is real here; focusing it silently fails.
   it('skips a display:none element', () => {
     const element = container(
       '<button style="display:none" data-name="a">press</button><button data-name="b">press</button>',

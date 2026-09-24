@@ -8,15 +8,15 @@ import { parseArgs } from 'node:util';
 
 import {
   STATS_FLUSH_MS,
-  dbReportMarkdown,
-  finishDbCapture,
-  startDbCapture,
+  databaseReportMarkdown,
+  finishDatabaseCapture,
+  startDatabaseCapture,
 } from './load-db-report.mjs';
 
 const FLOWS = ['smoke', 'catalogue', 'shared-viewer', 'write', 'population'];
 const PROFILES = ['normal', 'peak', 'stress'];
-const webDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const repoRoot = resolve(webDir, '..');
+const webDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const repositoryRoot = resolve(webDirectory, '..');
 
 function fail(message) {
   console.error(message);
@@ -26,7 +26,7 @@ function fail(message) {
 function supabaseStatus() {
   try {
     return execFileSync('supabase', ['status', '-o', 'json'], {
-      cwd: repoRoot,
+      cwd: repositoryRoot,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -39,7 +39,7 @@ function supabaseStatus() {
 
 function localStack() {
   const { API_URL, ANON_KEY, DB_URL } = JSON.parse(supabaseStatus());
-  return { url: API_URL, anonKey: ANON_KEY, dbUrl: DB_URL };
+  return { url: API_URL, anonKey: ANON_KEY, databaseUrl: DB_URL };
 }
 
 function hosted(confirmed) {
@@ -78,7 +78,7 @@ if (!Object.hasOwn(targets, values.target)) {
 const project = targets[values.target]();
 
 // k6 writes the summary files handleSummary names but will not create their directory.
-mkdirSync(resolve(webDir, 'load-results'), { recursive: true });
+mkdirSync(resolve(webDirectory, 'load-results'), { recursive: true });
 
 function runK6() {
   console.log(
@@ -88,7 +88,7 @@ function runK6() {
     'k6',
     ['run', '--out', 'web-dashboard', `load/${flow}.js`],
     {
-      cwd: webDir,
+      cwd: webDirectory,
       stdio: 'inherit',
       env: {
         ...process.env,
@@ -98,7 +98,7 @@ function runK6() {
         LOAD_CONFIRM_PRODUCTION: String(confirmed),
         LOAD_PROFILE: values.profile,
         K6_NO_USAGE_REPORT: 'true',
-        // The dashboard's HTML report only; port -1 keeps k6 from serving a live page it would then wait on.
+        // Port -1 keeps k6 from serving a live dashboard it would then wait on; the HTML export is enough.
         K6_WEB_DASHBOARD_PORT: '-1',
         K6_WEB_DASHBOARD_EXPORT: `load-results/${flow}.html`,
       },
@@ -107,12 +107,12 @@ function runK6() {
   return status ?? 1;
 }
 
-// The hosted database is never reachable from here (CLAUDE.md: no SUPABASE_DB_URL), so only a local run gets the Postgres report.
+// Only a local run gets the Postgres report: the hosted database is never reachable from here.
 if (values.target !== 'local-stack') process.exit(runK6());
 
 let before;
 try {
-  before = startDbCapture(project.dbUrl);
+  before = startDatabaseCapture(project.databaseUrl);
 } catch (error) {
   fail(
     `Could not read Postgres statistics (needs psql on PATH, as supabase/splinter.sh does): ${error.message}`,
@@ -120,12 +120,12 @@ try {
 }
 const status = runK6();
 await setTimeout(STATS_FLUSH_MS);
-const dbReport = `load-results/${flow}.db.md`;
-const dbMarkdown = dbReportMarkdown(
+const databaseReport = `load-results/${flow}.db.md`;
+const databaseMarkdown = databaseReportMarkdown(
   `\`${flow}\`, \`${values.profile}\` profile`,
-  finishDbCapture(project.dbUrl, before),
+  finishDatabaseCapture(project.databaseUrl, before),
 );
-writeFileSync(resolve(webDir, dbReport), dbMarkdown);
+writeFileSync(resolve(webDirectory, databaseReport), databaseMarkdown);
 // Printed like k6's own table, so the job log carries it for whoever cannot open the artifact.
-console.log(`${dbMarkdown}\nPostgres report: ${dbReport}`);
+console.log(`${databaseMarkdown}\nPostgres report: ${databaseReport}`);
 process.exit(status);

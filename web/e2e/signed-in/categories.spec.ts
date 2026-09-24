@@ -1,7 +1,6 @@
 import { expect, test } from './test';
 
-// Throwaway category, unique per run, so this can run alongside every other
-// spec without touching the collections they read or write.
+// A throwaway category, unique per run, so no other spec's collection is touched.
 test.use({ locale: 'en-GB' });
 
 test.describe('managing categories', () => {
@@ -22,14 +21,12 @@ test.describe('managing categories', () => {
     await categories.do.openPanel();
     await expect(categories.tab(name)).toBeVisible();
 
-    // Rename doesn't collapse the panel, so this reads back the row the DB
-    // returned rather than just the typed value.
+    // Rename does not collapse the panel, so this reads back the row the database returned.
     await categories.do.rename(renamed);
     await expect(categories.tab(renamed)).toBeVisible();
 
     await categories.do.delete();
-    // Category is empty, so this is the unqualified confirmation, not the
-    // entry-count warning.
+    // The category is empty, so this is the unqualified confirmation, not the entry-count warning.
     await expect(on(page).confirm.locators.message).toHaveText(
       `Delete "${renamed}"?`,
     );

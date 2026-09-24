@@ -9,7 +9,7 @@ import {
 } from './api.js';
 import { PROFILE } from './profile.js';
 
-// Below a few thousand rows every plan is a sequential scan and the numbers say nothing (#662).
+// Below a few thousand rows every plan is a sequential scan and the numbers say nothing.
 export const SEARCHED_ITEMS = PROFILE.searchedItems;
 export const SHARED_ITEMS = PROFILE.sharedItems;
 // One INSERT per request, set-based, at a body size no proxy in front of PostgREST refuses.
@@ -17,7 +17,7 @@ const SEED_BATCH = 10000;
 
 export const NOUNS = ['Denar', 'Sesterz', 'Taler', 'Groschen', 'Dukat', 'Obol'];
 const PLACES = ['Rom', 'Wien', 'Prag', 'Athen', 'Trier', 'Köln'];
-const COORDS = {
+const COORDINATES = {
   Rom: [41.9, 12.5],
   Wien: [48.21, 16.37],
   Prag: [50.08, 14.43],
@@ -32,22 +32,23 @@ export const SEARCH_TERMS = ['Denar', 'Wien', 'silber', 'Dukat 42', 'zzqx'];
 // Two paths per row, so one page stays within Storage's 1,000 prefixes per delete.
 const PHOTO_PAGE = 500;
 
-/** `count` items newest-first, a minute apart, with the links that file them into one category; nine in ten carry their place's coordinates, as a picked suggestion does. */
-function itemRows(count, categoryId, now, nouns) {
+/** `count` items newest-first, a minute apart, filed into one category; nine in ten carry their place's coordinates. */
+function itemRows({ count, categoryId, now, nouns }) {
   const items = [];
   const links = [];
   for (let n = 0; n < count; n++) {
     const id = crypto.randomUUID();
     const createdAt = new Date(now - n * 60000).toISOString();
     const place = PLACES[n % PLACES.length];
-    const [lat, lng] = n % 10 === 9 ? [null, null] : COORDS[place];
+    const [latitude, longitude] =
+      n % 10 === 9 ? [null, null] : COORDINATES[place];
     items.push({
       id,
       title: `${nouns[n % nouns.length]} ${n}`,
       description: `Probe ${n} aus ${place}`,
       place,
-      place_lat: lat,
-      place_lng: lng,
+      place_lat: latitude,
+      place_lng: longitude,
       tags: [TAGS[n % TAGS.length], TAGS[(n + 2) % TAGS.length]],
       created_at: createdAt,
     });
@@ -56,12 +57,25 @@ function itemRows(count, categoryId, now, nouns) {
   return { items, links };
 }
 
-/** Titles cycle through `nouns`, so one collector's word can be made rare in their own collection and common in everyone else's. */
-export function fillCategory(session, categoryId, count, nouns = NOUNS) {
-  const { items, links } = itemRows(count, categoryId, Date.now(), nouns);
+/** Titles cycle through `nouns`, so one collector's word can be rare in their own collection and common elsewhere. */
+export function fillCategory({ session, categoryId, count, nouns = NOUNS }) {
+  const { items, links } = itemRows({
+    count,
+    categoryId,
+    now: Date.now(),
+    nouns,
+  });
   for (let i = 0; i < count; i += SEED_BATCH) {
-    insertRows(session, 'items', items.slice(i, i + SEED_BATCH));
-    insertRows(session, 'item_categories', links.slice(i, i + SEED_BATCH));
+    insertRows({
+      session,
+      table: 'items',
+      rows: items.slice(i, i + SEED_BATCH),
+    });
+    insertRows({
+      session,
+      table: 'item_categories',
+      rows: links.slice(i, i + SEED_BATCH),
+    });
   }
 }
 
@@ -81,32 +95,45 @@ export function setup() {
     crypto.randomUUID(),
   );
 
-  const categories = insertReturning(
-    owner,
-    'categories',
-    [{ name: 'Load: searched' }, { name: 'Load: shared' }],
-    'id,name',
-  );
-  const idOf = (name) => categories.find((c) => c.name === name).id;
+  const categories = insertReturning({
+    session: owner,
+    table: 'categories',
+    rows: [{ name: 'Load: searched' }, { name: 'Load: shared' }],
+    select: 'id,name',
+  });
+  const idOf = (name) =>
+    categories.find((category) => category.name === name).id;
   const searchedCategoryId = idOf('Load: searched');
   const sharedCategoryId = idOf('Load: shared');
 
-  fillCategory(owner, searchedCategoryId, SEARCHED_ITEMS);
-  fillCategory(owner, sharedCategoryId, SHARED_ITEMS);
-  insertRows(owner, 'category_shares', [
-    {
-      category_id: sharedCategoryId,
-      invited_email: viewer.email,
-      role: 'viewer',
-    },
-  ]);
+  fillCategory({
+    session: owner,
+    categoryId: searchedCategoryId,
+    count: SEARCHED_ITEMS,
+  });
+  fillCategory({
+    session: owner,
+    categoryId: sharedCategoryId,
+    count: SHARED_ITEMS,
+  });
+  insertRows({
+    session: owner,
+    table: 'category_shares',
+    rows: [
+      {
+        category_id: sharedCategoryId,
+        invited_email: viewer.email,
+        role: 'viewer',
+      },
+    ],
+  });
 
-  const [written] = insertReturning(
-    writer,
-    'categories',
-    [{ name: 'Load: written' }],
-    'id',
-  );
+  const [written] = insertReturning({
+    session: writer,
+    table: 'categories',
+    rows: [{ name: 'Load: written' }],
+    select: 'id',
+  });
 
   return {
     owner,
@@ -118,10 +145,10 @@ export function setup() {
   };
 }
 
-// Storage objects before rows, never after (CLAUDE.md); items cascade their photographs and links, categories their shares.
+// Storage objects before rows, never after; items cascade their photographs and links, categories their shares.
 export function clearAccount(session) {
   for (let offset = 0; ; offset += PHOTO_PAGE) {
-    const rows = listImagePaths(session, offset, PHOTO_PAGE);
+    const rows = listImagePaths({ session, offset, limit: PHOTO_PAGE });
     if (rows.length === 0) break;
     removeObjects(
       session,

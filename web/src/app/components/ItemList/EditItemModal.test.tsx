@@ -36,9 +36,7 @@ function renderModal(onOpenChange = vi.fn()) {
 }
 
 describe('EditItemModal', () => {
-  // ItemFields types `tags` as always an array, but nothing stops a stored
-  // row from actually holding null -- the form should still start empty
-  // rather than throwing.
+  // Nothing stops a stored row from holding null tags despite the type; the form must still start empty.
   it('starts with no tags when the item has none', async () => {
     render(
       <I18nProvider>
@@ -58,9 +56,7 @@ describe('EditItemModal', () => {
   });
 });
 
-// A stray backdrop tap or Escape used to drop an edit with no prompt. The
-// dialog's X and the form's Cancel button funnel through the same guard, so
-// exercising Escape and Cancel here covers all four dismissal paths.
+// The dialog's X and the form's Cancel share one guard, so Escape and Cancel cover all four paths.
 describe('EditItemModal — discarding unsaved changes', () => {
   it('closes immediately on Escape when the form has not been touched', async () => {
     const user = userEvent.setup();

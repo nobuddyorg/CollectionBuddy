@@ -1,9 +1,4 @@
-// Turns zap-baseline's report_json.json into a markdown table for the
-// zap_baseline job's Actions summary, applying .zap/rules.tsv so an alert
-// the rules file ignores reads as ignored, with its reason, not as an open
-// warning. Informational alerts are listed but never counted.
-//
-// Usage: node scripts/zap-summary.mjs --title '<heading>' <report_json.json>
+// zap-baseline's report_json.json as a markdown table (`--title '<heading>' <report>`), applying .zap/rules.tsv's ignores.
 import { readFile, appendFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -19,6 +14,7 @@ function parseRules(tsv) {
   return rules;
 }
 
+// Informational alerts are listed but never counted.
 function verdictFor(alert, rules) {
   if (alert.riskcode === '0') return { label: 'info', counted: false };
   const rule = rules[alert.pluginid];
@@ -28,7 +24,7 @@ function verdictFor(alert, rules) {
   return { label: '⚠️ WARN', counted: true };
 }
 
-function renderSummary(title, report, rules) {
+function renderSummary({ title, report, rules }) {
   const alerts = report.site.flatMap((site) => site.alerts);
   const rows = alerts.map((alert) => {
     const verdict = verdictFor(alert, rules);
@@ -60,7 +56,7 @@ async function main() {
   const title =
     titleIndex === -1 ? 'OWASP ZAP baseline scan' : args[titleIndex + 1];
   const reportPath = args.filter(
-    (arg, i) => arg !== '--title' && i !== titleIndex + 1,
+    (argument, index) => argument !== '--title' && index !== titleIndex + 1,
   )[0];
   if (!reportPath) throw new Error('report_json.json path is required');
 
@@ -68,7 +64,7 @@ async function main() {
     readFile(reportPath, 'utf8').then(JSON.parse),
     readFile(RULES_PATH, 'utf8'),
   ]);
-  const markdown = renderSummary(title, report, parseRules(tsv));
+  const markdown = renderSummary({ title, report, rules: parseRules(tsv) });
   if (process.env.GITHUB_STEP_SUMMARY) {
     await appendFile(process.env.GITHUB_STEP_SUMMARY, markdown);
   } else {

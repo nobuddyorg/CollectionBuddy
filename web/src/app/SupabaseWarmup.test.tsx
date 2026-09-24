@@ -4,9 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { SupabaseWarmup } from './SupabaseWarmup';
 
-// There's nothing to assert about bundling from a unit test; rendering
-// without throwing at least proves the `./supabase` reference resolves
-// (it throws if the required env vars are missing).
+// Bundling is not unit-testable; rendering without throwing proves the `./supabase` reference resolves.
 describe('SupabaseWarmup', () => {
   it('renders nothing', () => {
     const { container } = render(<SupabaseWarmup />);

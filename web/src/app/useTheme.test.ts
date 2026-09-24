@@ -47,19 +47,12 @@ describe('resolveTheme', () => {
   });
 });
 
-// The pre-paint script can't import this module -- it's a string inlined
-// into <head> -- so it restates the storage key and media query by hand.
-// The two copies must agree, or the page flashes the wrong theme before
-// React catches up.
+// The pre-paint script is an inlined string that restates the key and query by hand; both copies must agree.
 describe('the pre-paint script in layout.tsx', () => {
   const layout = readFileSync(new URL('layout.tsx', import.meta.url), 'utf8');
   const initScript = layout.slice(layout.indexOf('const THEME_INIT_SCRIPT'));
 
-  // Both sides spelled out. Interpolating the constant into the expectation
-  // instead compares the script against whatever the constant happens to
-  // say, which is a test that cannot fail when the constant is the thing
-  // that changed -- and the constant changing while the inlined string does
-  // not is the whole failure this pair is here to catch.
+  // Both sides spelled out: interpolating the constant could not fail when the constant is what changed.
   it('reads the same storage key the hook writes', () => {
     expect(THEME_STORAGE_KEY).toBe('theme');
     expect(initScript).toContain(`localStorage.getItem('theme')`);

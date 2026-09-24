@@ -27,18 +27,16 @@ import { labelClasses } from '../ui/labelClasses';
 import { MAX_CATEGORY_NAME_LENGTH } from '../../lib/textLimits';
 
 type Props = {
-  selectedCat: string | null;
+  selectedCategoryId: string | null;
   onSelect: (id: string | null) => void;
   categories: UseCategories;
   userId: string | null;
-  /** False until the page's own initial load has resolved (see
-   *  `catalogueReady` in page.tsx) -- keeps the header from showing "None
-   *  selected" for one render before the real selection lands. */
+  /** False until the page's initial load resolves; stops a one-render "None selected" flash. */
   ready?: boolean;
 };
 
 export default function CategorySelect({
-  selectedCat,
+  selectedCategoryId,
   onSelect,
   categories,
   userId,
@@ -46,7 +44,7 @@ export default function CategorySelect({
 }: Props) {
   const { t } = useI18n();
   const {
-    cats,
+    categories: categoryList,
     isLoading,
     isCreating,
     isDeleting,
@@ -61,7 +59,10 @@ export default function CategorySelect({
     runExport,
     cancelExport,
   } = useExportCategory();
-  const existingCategoryNames = useMemo(() => cats.map((c) => c.name), [cats]);
+  const existingCategoryNames = useMemo(
+    () => categoryList.map((category) => category.name),
+    [categoryList],
+  );
   const {
     isImporting,
     message: importMessage,
@@ -70,49 +71,43 @@ export default function CategorySelect({
   } = useImportCategory(existingCategoryNames);
   const [name, setName] = useState('');
   const [renameValue, setRenameValue] = useState('');
-  const [expanded, setExpanded] = useState(!selectedCat);
+  const [expanded, setExpanded] = useState(!selectedCategoryId);
 
-  // Collapses/expands in response to the selection changing (e.g. a
-  // category getting deleted out from under it) without the extra
-  // render-then-effect round trip a useEffect would add.
-  const [prevSelectedCat, setPrevSelectedCat] = useState(selectedCat);
-  if (selectedCat !== prevSelectedCat) {
-    setPrevSelectedCat(selectedCat);
-    setExpanded(!selectedCat);
+  // Render-time transition, not an effect: no extra render between selection change and collapse.
+  const [previousSelectedCategoryId, setPreviousSelectedCategoryId] =
+    useState(selectedCategoryId);
+  if (selectedCategoryId !== previousSelectedCategoryId) {
+    setPreviousSelectedCategoryId(selectedCategoryId);
+    setExpanded(!selectedCategoryId);
   }
 
-  // Initial load and auto-select of a lone category happen in the page, not
-  // here -- it needs the answer to decide what renders below this strip.
-
-  // The same order the page picks "the first category" from, so the tab it
-  // opens on is the tab that reads as first.
-  const sortedCats = useMemo(() => sortCategories(cats), [cats]);
+  // Same order the page picks "the first category" from, so the tab it opens on reads as first.
+  const sortedCategories = useMemo(
+    () => sortCategories(categoryList),
+    [categoryList],
+  );
 
   const selected = useMemo<Category | null>(
     () =>
-      selectedCat ? (cats.find((c) => c.id === selectedCat) ?? null) : null,
-    [cats, selectedCat],
+      selectedCategoryId
+        ? (categoryList.find(
+            (category) => category.id === selectedCategoryId,
+          ) ?? null)
+        : null,
+    [categoryList, selectedCategoryId],
   );
 
-  // listCategories() returns both owned and shared-with-me rows (the
-  // select policy in 0006_policies.sql); user_id is the only thing
-  // distinguishing which is which.
+  // listCategories() returns owned and shared rows alike; user_id is what tells them apart.
   const isShared = !!selected && !!userId && selected.user_id !== userId;
 
-  // One instance per open panel. For an owned category this lists every
-  // grant the owner has made (for SharingSection, below); for a shared one
-  // it resolves to the viewer's own single grant row, which onDelete needs
-  // to leave it. Either way, the "select own or invited category_shares"
-  // RLS policy already decided which rows come back.
-  const shares = useShares(selectedCat);
+  // For an owned category every grant; for a shared one the viewer's own single row, which onLeave needs.
+  const shares = useShares(selectedCategoryId);
   const { reload: reloadShares } = shares;
   useEffect(() => {
-    if (expanded && selectedCat) void reloadShares();
-  }, [expanded, selectedCat, reloadShares]);
+    if (expanded && selectedCategoryId) void reloadShares();
+  }, [expanded, selectedCategoryId, reloadShares]);
 
-  // Render-time transition rather than an effect, so the rename field is
-  // never briefly out of sync with the selection (including a server-side
-  // rename normalisation).
+  // Render-time transition, not an effect: the rename field never lags the selection by a render.
   const [syncedName, setSyncedName] = useState<string | null>(null);
   if (selected && selected.name !== syncedName) {
     setSyncedName(selected.name);
@@ -125,9 +120,9 @@ export default function CategorySelect({
     renameValue.trim() !== selected.name;
 
   const onRename = useCallback(async () => {
-    if (!selectedCat || !renameIsDirty) return;
-    await renameCategory(selectedCat, renameValue);
-  }, [selectedCat, renameIsDirty, renameCategory, renameValue]);
+    if (!selectedCategoryId || !renameIsDirty) return;
+    await renameCategory(selectedCategoryId, renameValue);
+  }, [selectedCategoryId, renameIsDirty, renameCategory, renameValue]);
 
   const onCreate = useCallback(async () => {
     const trimmed = name.trim();
@@ -142,9 +137,7 @@ export default function CategorySelect({
 
   const onImportFile = useCallback(
     async (file: File) => {
-      // Import creates its category out from under this component, so
-      // `cats` hasn't picked it up yet -- reload() must resolve before
-      // onSelect, or there is nothing yet to select.
+      // reload() must resolve before onSelect, or the imported category is not yet there to select.
       await runImport(file, (categoryId) => {
         void reload().then(() => onSelect(categoryId));
       });
@@ -152,13 +145,10 @@ export default function CategorySelect({
     [runImport, reload, onSelect],
   );
 
-  // Same button, same position, two different operations: owning this
-  // category means the trash destroys it; being a grantee means it only
-  // ends *this viewer's* access.
   const { onDelete, onLeave } = useCategoryRemoval({
-    selectedCat,
+    selectedCategoryId,
     selected,
-    sortedCats,
+    sortedCategories,
     categories,
     shares,
     onSelect,
@@ -166,8 +156,7 @@ export default function CategorySelect({
 
   return (
     <section className="space-y-3">
-      {/* One heading in both states, so opening/closing the panel doesn't
-          shift the header or anything below it. */}
+      {/* One heading in both states, so toggling the panel never shifts the header. */}
       <div className="flex items-end justify-between gap-3 border-b border-border pb-3">
         <CategoryText
           title={t('category_select.title')}
@@ -175,9 +164,7 @@ export default function CategorySelect({
           placeholder={!selected}
           loading={!ready}
         />
-        {/* Nothing to collapse to until a category exists, so on first run
-            the slot stays empty rather than offering a way back to no
-            selection at all. */}
+        {/* No toggle until a category exists: nothing to collapse to on first run. */}
         {selected &&
           (expanded ? (
             <CollapseButton
@@ -195,17 +182,15 @@ export default function CategorySelect({
       {expanded && (
         <>
           <CategorySelectDropdown
-            selectedCat={selectedCat}
+            selectedCategoryId={selectedCategoryId}
             onSelect={onSelect}
-            sortedCats={sortedCats}
+            sortedCategories={sortedCategories}
             isLoading={isLoading}
             setExpanded={setExpanded}
             userId={userId}
           />
 
-          {/* Rename and create are separate rows with their own field and
-              button, but share one grid so the two fields line up at the
-              same width despite the rename row's extra delete button. */}
+          {/* One grid for both rows, so the fields line up despite the rename row's extra button. */}
           <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1.5">
             {selected && (
               <>
@@ -220,24 +205,18 @@ export default function CategorySelect({
                   data-testid="rename-category-input"
                   value={renameValue}
                   maxLength={MAX_CATEGORY_NAME_LENGTH}
-                  // Shared categories keep this field in the same slot,
-                  // disabled rather than hidden or readOnly: RLS's "update
-                  // own categories" policy would reject the write anyway,
-                  // and readOnly still shows every visual cue of an
-                  // editable field except the one that matters (typing).
+                  // Disabled, not readOnly: readOnly keeps every visual cue of an editable field but typing.
                   disabled={isShared}
                   title={
                     isShared
                       ? t('category_select.shared_marker_label')
                       : undefined
                   }
-                  onChange={(e) => setRenameValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void onRename();
-                    if (e.key === 'Escape') {
-                      // First Escape discards the edit; only a second one
-                      // (nothing left to discard) closes the panel, same
-                      // as the new-category field below.
+                  onChange={(event) => setRenameValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') void onRename();
+                    if (event.key === 'Escape') {
+                      // First Escape discards the edit; a second one (nothing left to discard) closes the panel.
                       if (renameValue !== selected.name) {
                         setRenameValue(selected.name);
                       } else {
@@ -254,13 +233,7 @@ export default function CategorySelect({
                   }
                   label={t('category_select.rename_confirm')}
                 />
-                {/* Disabled for the whole export run, not just while the
-                    delete request is in flight: a confirmed delete would
-                    remove storage objects the export is still reading,
-                    failing silently as 404s rather than stopping either
-                    action. Also disabled while a shared category's grants
-                    haven't loaded, since onLeave needs shares.shares[0] to
-                    exist. */}
+                {/* Disabled during an export (it still reads the objects) and until a grantee's share row has loaded. */}
                 <DeleteButtonWithLabel
                   onClick={() => void (isShared ? onLeave() : onDelete())}
                   disabled={
@@ -293,9 +266,7 @@ export default function CategorySelect({
             />
           </div>
 
-          {/* Only for a category this viewer owns -- a grantee manages
-              their own access through Delete (onLeave) and never sees who
-              else a category is shared with. */}
+          {/* Owner only: a grantee never sees who else the category is shared with. */}
           {selected && !isShared && <SharingSection shares={shares} />}
 
           <ImportRow
@@ -305,8 +276,7 @@ export default function CategorySelect({
             onCancel={cancelImport}
           />
 
-          {/* Below its own rule, only once there is a category to take a
-              copy of. */}
+          {/* Under its own rule, away from Delete: a thumb slip between the two would be destructive. */}
           {selected && (
             <ExportRow
               isExporting={isExporting}
@@ -317,9 +287,7 @@ export default function CategorySelect({
             />
           )}
 
-          {/* Closes the panel off from whatever renders next; only needed
-              while expanded, since the collapsed header already has its
-              own border-b. */}
+          {/* Bottom rule only while expanded; the collapsed header has its own border-b. */}
           <div aria-hidden="true" className="border-t border-border pt-3" />
         </>
       )}

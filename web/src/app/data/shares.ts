@@ -10,9 +10,7 @@ export type CategoryShareSummary = Pick<
 
 const SHARE_COLUMNS = 'id,invited_email,expires_at,owner_user_id,role';
 
-// The RLS policy on category_shares (0011) only ever returns rows where the
-// caller is the owner or the invited grantee, so no client-side filtering
-// by uid is needed.
+// RLS returns only rows where the caller is the owner or the invited grantee; no client uid filter.
 export function listSharesForCategory(categoryId: string) {
   return supabase
     .from('category_shares')
@@ -21,16 +19,18 @@ export function listSharesForCategory(categoryId: string) {
     .overrideTypes<CategoryShareSummary[], { merge: false }>();
 }
 
-// owner_user_id is cast around here since the not-null column has no
-// default; tg_category_shares_enforce (0002_functions.sql) fills it
-// in from the category's own owner and re-normalizes the email, so the row
-// the insert returns, not the value sent, is what a caller should use.
-export function createShare(
-  categoryId: string,
-  invitedEmail: string,
-  expiresAt: string | null,
-  role: ShareRole = 'viewer',
-) {
+// tg_category_shares_enforce fills owner_user_id and re-normalizes the email: use the returned row.
+export function createShare({
+  categoryId,
+  invitedEmail,
+  expiresAt,
+  role = 'viewer',
+}: {
+  categoryId: string;
+  invitedEmail: string;
+  expiresAt: string | null;
+  role?: ShareRole;
+}) {
   return supabase
     .from('category_shares')
     .insert({
@@ -43,9 +43,7 @@ export function createShare(
     .single<CategoryShareSummary>();
 }
 
-// tg_category_shares_enforce (0002_functions.sql) rejects any other
-// column changing in the same update, and the "update own category_shares
-// role" policy limits this to the owner.
+// tg_category_shares_enforce rejects any other column changing; the update policy limits this to owners.
 export function updateShareRole(id: string, role: ShareRole) {
   return supabase
     .from('category_shares')
@@ -55,9 +53,7 @@ export function updateShareRole(id: string, role: ShareRole) {
     .single<CategoryShareSummary>();
 }
 
-// Same call for both an owner revoking and a recipient leaving: the
-// "delete own or invited category_shares" policy already limits which row
-// a given caller may target.
+// One call for an owner revoking and a recipient leaving: the delete policy limits each to its rows.
 export function deleteShare(id: string) {
   return supabase.from('category_shares').delete().eq('id', id);
 }

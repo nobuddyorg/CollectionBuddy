@@ -15,12 +15,7 @@ import { downloadBlob } from './downloadBlob';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { ZipLimitError } from '../../data/zip';
 
-/**
- * What to say while an export runs. Reading rows counts up once a page has
- * landed, since a large category takes a while; packing gets a word; photos
- * count against their total. A photo phase with nothing to fetch falls back
- * to the packing wording instead of reading "0 of 0".
- */
+/** Reading counts up per page, photos count against their total, and "0 of 0" falls back to packing. */
 export function exportProgressMessage(
   progress: ExportProgress | null,
   t: (key: TranslationKey) => string,
@@ -45,11 +40,9 @@ export function useExportCategory() {
   const { t } = useI18n();
   const toast = useToast();
   const confirm = useConfirm();
-  // Null means "not exporting" -- a separate boolean would be a second
-  // source of truth that could disagree.
+  // Null means not exporting; a separate boolean would be a second source of truth.
   const [progress, setProgress] = useState<ExportProgress | null>(null);
-  // One controller per run, so Cancel always aborts the export actually in
-  // flight, not a stale one from a previous click.
+  // One controller per run, so Cancel always aborts the export actually in flight.
   const controllerRef = useRef<AbortController | null>(null);
 
   const runExport = useCallback(
@@ -63,8 +56,7 @@ export function useExportCategory() {
           category,
           onProgress: setProgress,
           signal: controller.signal,
-          // Asked once the listing has totalled the photographs' real
-          // size; declining reads as a cancel.
+          // Asked once the listing has totalled the real size; declining reads as a cancel.
           confirmLargeExport: (totalBytes) =>
             confirm(
               t('category_select.export_large_confirm').replace(
@@ -74,9 +66,7 @@ export function useExportCategory() {
             ),
         });
         downloadBlob(result.blob, result.filename);
-        // The download never fails on a skipped photograph -- an archive
-        // missing a few is still worth having -- but export-then-delete is
-        // a canonical use, so a silent gap here is unrecoverable data loss.
+        // Export-then-delete is a canonical use, so a skipped photograph must never go unsaid.
         if (result.skippedItemCount > 0) {
           toast.error(
             t('category_select.export_listing_partial').replace(
@@ -95,17 +85,17 @@ export function useExportCategory() {
               ),
           );
         }
-      } catch (e) {
-        if (e instanceof ExportCancelledError) {
+      } catch (error) {
+        if (error instanceof ExportCancelledError) {
           // Confirmed, not a failure.
           toast.announce(t('category_select.export_cancelled'));
-        } else if (e instanceof ZipLimitError) {
+        } else if (error instanceof ZipLimitError) {
           // Retrying produces the same refusal, so this isn't "try again".
           toast.error(t('category_select.export_too_large'));
         } else {
           toast.reportError(
             'export category',
-            e,
+            error,
             t('category_select.export_error'),
           );
         }
@@ -117,18 +107,16 @@ export function useExportCategory() {
     [progress, t, toast, confirm],
   );
 
-  // Not memoized: it goes straight onto a button in a component nothing
-  // memoizes, so a stable identity would buy nothing.
+  // Not memoized: it goes straight onto a button in a component nothing memoizes.
   const cancelExport = () => {
     controllerRef.current?.abort();
   };
 
-  // An export can run for minutes; closing the tab mid-run would silently
-  // discard it with no way back.
+  // An export can run for minutes; closing the tab mid-run would silently discard it.
   useEffect(() => {
     if (!progress) return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);

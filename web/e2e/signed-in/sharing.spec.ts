@@ -1,7 +1,7 @@
 import { expect, test } from './test';
 
 import { SEED } from './fixtures';
-// The owner's half, through the panel; rls.spec.ts has what a grant opens.
+// The owner's half, through the panel; rls/viewer-share.spec.ts has what a grant opens.
 test.use({ locale: 'en-GB' });
 
 test.describe('sharing a collection', () => {
@@ -39,7 +39,7 @@ test.describe('sharing a collection', () => {
     await app.confirm.do.accept();
     await expect(app.sharing.locators.texts.empty).toBeVisible();
 
-    // Revoking is deferred to the toast's undo window; closing the toast ends it, so the grant row is really gone on the next visit.
+    // Revoking is deferred to the undo window; closing the toast ends it, so the row is gone on the next visit.
     await app.toast.do.close();
     await app.categories.do.open(SEED.shareCategory);
     await app.categories.do.openPanel();
@@ -47,9 +47,7 @@ test.describe('sharing a collection', () => {
     await expect(app.sharing.locators.rows).toHaveCount(0);
   });
 
-  // The expiry is a real column with a check constraint behind it
-  // (rls.spec.ts asserts what an expired grant then stops opening); this
-  // is the picker that sets it, whose own input is deliberately sr-only.
+  // The picker that sets expires_at, whose own input is deliberately sr-only.
   test('carries an expiry date, and lets it be taken off again', async ({
     on,
     page,

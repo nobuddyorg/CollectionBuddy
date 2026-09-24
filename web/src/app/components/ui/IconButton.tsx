@@ -10,13 +10,7 @@ const SIZE_CLASSES = {
   xl: 'w-11 h-11',
 } as const;
 
-// Faint but permanent frame, not hover-only: on a phone a hover-only
-// outline never appears at all, and these buttons exist because the
-// actions were invisible on mobile without one.
-//
-// Ring colour only ever changes inside `[@media(hover:hover)]` so the
-// variants stack predictably -- mixing in plain `hover:` overrides would
-// leave which rule wins up to Tailwind's sort order.
+// Always framed (hover-only never shows on phones); ring colour changes only under hover:hover.
 const OUTLINE_BASE =
   'bg-card text-muted-foreground ring-1 ring-control-border/60 [@media(hover:hover)]:ring-transparent';
 
@@ -40,8 +34,7 @@ export function iconButtonClasses({
   size?: IconButtonSize;
   className?: string;
 } = {}) {
-  // disabled:pointer-events-none: :hover doesn't care about the disabled
-  // attribute, so a merely-dimmed button would still trigger hover:* above.
+  // :hover ignores the disabled attribute; only pointer-events-none stops a disabled button hovering.
   return `${SIZE_CLASSES[size]} flex items-center justify-center rounded-sm transition disabled:pointer-events-none ${VARIANT_CLASSES[variant]} ${className}`.trim();
 }
 

@@ -9,20 +9,16 @@ import { useI18n } from '../../i18n/useI18n';
 import { useGuardedModalClose } from '../../lib/useGuardedModalClose';
 import type { ItemLite } from './types';
 
-// See ItemCreate/index.tsx: same form, same reason to split it out.
 const ItemForm = dynamic(() => import('../ItemForm'), { ssr: false });
 
-// The entry is a snapshot taken when edit was pressed, not a live lookup by
-// id, so the form can't shift under the user if the list changes while the
-// modal is open.
+// A snapshot taken when edit was pressed, so the form can't shift under the user if the list changes.
 function valuesFor(item: ItemLite | null): ItemFormValues {
   if (!item) return EMPTY_ITEM_FORM_VALUES;
   return {
     title: item.title,
     description: item.description ?? '',
     place: item.place ?? '',
-    // Round-tripped rather than dropped: only replaced when the place field
-    // itself is edited, so other edits keep the existing pin.
+    // Round-tripped, so only an edit of the place field itself replaces the existing pin.
     place_lat: item.place_lat,
     place_lng: item.place_lng,
     tags: item.tags ?? [],
@@ -47,7 +43,11 @@ export function EditItemModal({
 
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
   const discard = useCallback(() => setIsDirty(false), []);
-  const guardedClose = useGuardedModalClose(isDirty, close, discard);
+  const guardedClose = useGuardedModalClose({
+    isDirty,
+    onClose: close,
+    onDiscard: discard,
+  });
 
   return (
     <CenteredModal

@@ -22,17 +22,18 @@ function sessionWith(user: User): Session {
   return { user } as Session;
 }
 
-// Captures the handler so a test can fire it directly, as sign-out or
-// token expiry would.
+// Captures the handler so a test can fire it directly, as sign-out or token expiry would.
 function mockAuthStateChange() {
   const unsubscribe = vi.fn();
   let handler: AuthChangeHandler | null = null;
-  vi.spyOn(supabase.auth, 'onAuthStateChange').mockImplementation((cb) => {
-    handler = cb;
-    return {
-      data: { subscription: { unsubscribe } },
-    } as unknown as ReturnType<typeof supabase.auth.onAuthStateChange>;
-  });
+  vi.spyOn(supabase.auth, 'onAuthStateChange').mockImplementation(
+    (callback) => {
+      handler = callback;
+      return {
+        data: { subscription: { unsubscribe } },
+      } as unknown as ReturnType<typeof supabase.auth.onAuthStateChange>;
+    },
+  );
   return {
     unsubscribe,
     fire: (
@@ -119,8 +120,7 @@ describe('useSession', () => {
     expect(result.current.user?.name).toBeNull();
   });
 
-  // Sign-out and token expiry both surface as onAuthStateChange firing
-  // with session: null.
+  // Sign-out and token expiry both surface as onAuthStateChange firing with session: null.
   it('clears the user when onAuthStateChange later fires with no session', async () => {
     vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
       data: { session: sessionWith(userWith()) },
@@ -152,8 +152,7 @@ describe('useSession', () => {
     expect(result.current.user?.id).toBe('user-4');
   });
 
-  // The `active` guard is what stops a getSession that resolves after
-  // unmount from updating state React no longer owns.
+  // A getSession resolving after unmount must neither warn nor update state React no longer owns.
   it('does not update state from a getSession that resolves after unmount', async () => {
     const consoleError = vi
       .spyOn(console, 'error')
@@ -181,8 +180,7 @@ describe('useSession', () => {
     consoleError.mockRestore();
   });
 
-  // user_metadata is whatever the auth provider sent; a provider that sends
-  // none at all must not take the session down with it.
+  // A provider that sends no user_metadata at all must not take the session down with it.
   it('survives a user carrying no metadata at all', async () => {
     vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
       data: {

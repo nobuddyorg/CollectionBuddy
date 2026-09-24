@@ -6,11 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { SearchInput } from './SearchInput';
 
-// The clear button is the whole reason this is a component rather than an
-// input: the browser draws its own inside a search field, unlabelled and with
-// no touch target, and globals.css suppresses it so this one can take over
-// (#233). A silent regression here leaves a search bar with no way to empty
-// it on a phone.
+// The browser's own clear glyph is unlabelled with no touch target; globals.css suppresses it for this one.
 function renderSearch(value = '') {
   const onChange = vi.fn();
   render(
@@ -41,8 +37,7 @@ describe('SearchInput', () => {
     expect(field).toHaveValue('coin');
   });
 
-  // Nothing to clear, nothing to offer -- and a button that does nothing is
-  // one more thing between a thumb and the field.
+  // A button that does nothing is one more thing between a thumb and the field.
   it('offers no way to clear an empty field', () => {
     renderSearch('');
     expect(clearButton()).toBeNull();
@@ -61,20 +56,17 @@ describe('SearchInput', () => {
     expect(onChange).toHaveBeenCalledWith('');
   });
 
-  // Named, unlike the browser's own glyph, so it can be reached and
-  // understood without sight.
+  // Named, unlike the browser's own glyph, so it can be reached without sight.
   it('names the clear button for a screen reader', () => {
     renderSearch('coin');
     expect(clearButton()).toHaveAccessibleName(/clear/i);
   });
 
-  // Regression: the button's own box was centred in the field, but its
-  // icon was not centred within the button, so the × sat off the field's
-  // vertical centre.
+  // Regression: the icon sat off-centre within its button, so the × sat off the field's centre.
   it('centres the clear icon within its button', () => {
     renderSearch('coin');
-    for (const cls of ['items-center', 'justify-center']) {
-      expect(clearButton()!.className).toContain(cls);
+    for (const className of ['items-center', 'justify-center']) {
+      expect(clearButton()!.className).toContain(className);
     }
   });
 
@@ -83,8 +75,7 @@ describe('SearchInput', () => {
     expect(field).toHaveAccessibleName(/search/i);
   });
 
-  // `type="search"` is what tells a phone keyboard to offer a search key, and
-  // what the CSS suppressing the native clear button selects on.
+  // `type="search"` offers a phone keyboard's search key, and the clear-suppressing CSS selects on it.
   it('is a search field, not a text field', () => {
     const { field } = renderSearch();
     expect(field).toHaveAttribute('type', 'search');

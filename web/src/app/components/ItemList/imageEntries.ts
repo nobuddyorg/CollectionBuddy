@@ -4,7 +4,7 @@ import {
   getCachedSignedUrl,
   unsignedPaths,
 } from './imageCache';
-import type { ImgEntry } from './types';
+import type { ImageEntry } from './types';
 
 export type ImageEntryData = {
   id: string;
@@ -15,8 +15,7 @@ export type ImageEntryData = {
 /** Photograph rows a page read carried, tagged with the items they cover. */
 export type PageImages = { itemIdsKey: string; rows: ImageListRow[] };
 
-/** The carried rows, but only for the exact item set they were read with --
- * any other set (an optimistic removal, a later page) must re-list. */
+/** The carried rows only for the exact item set they were read with; any other set must re-list. */
 export function pageImageRowsFor(
   pageImages: PageImages | null,
   itemIdsKey: string,
@@ -24,8 +23,7 @@ export function pageImageRowsFor(
   return pageImages?.itemIdsKey === itemIdsKey ? pageImages.rows : null;
 }
 
-// Query order is preserved per item, which is what keeps an item's first
-// photograph in the hero slot as more are added.
+// Query order is preserved per item, which keeps the first photograph in the hero slot.
 export function groupImageRows(
   rows: ImageListRow[],
 ): Map<string, Map<string, ImageEntryData>> {
@@ -46,17 +44,15 @@ export function groupImageRows(
 /** Strip cells beside the hero; photographs past them only show as "+N". */
 export const STRIP_MAX = 4;
 
-/** Plates a card can ever render: the hero plus the strip. Only these are
- * signed up front; the rest wait until the carousel opens (#630). */
+/** Plates a card can render; only these are signed up front, the rest wait for the carousel. */
 export const RENDERABLE_PLATES = 1 + STRIP_MAX;
 
-// A plate a card renders is only kept once signed, as before; one past them
-// is kept unsigned, so counts and carousel navigation still see it.
-export function toImgEntries(
+// A renderable plate is kept only once signed; later ones stay unsigned so counts still see them.
+export function toImageEntries(
   entryData: Map<string, ImageEntryData>,
   signedUrlMap: ReadonlyMap<string, string | undefined>,
-): ImgEntry[] {
-  const entries: ImgEntry[] = [];
+): ImageEntry[] {
+  const entries: ImageEntry[] = [];
   for (const [position, data] of [...entryData.values()].entries()) {
     const urlFull = signedUrlMap.get(data.pathFull);
     if (!urlFull && position < RENDERABLE_PLATES) continue;
@@ -72,19 +68,16 @@ export function toImgEntries(
 }
 
 function pathsOf(entries: Iterable<ImageEntryData>): string[] {
-  return [...entries].flatMap((e) =>
-    e.pathThumb ? [e.pathFull, e.pathThumb] : [e.pathFull],
+  return [...entries].flatMap((entry) =>
+    entry.pathThumb ? [entry.pathFull, entry.pathThumb] : [entry.pathFull],
   );
 }
 
-// Signs whatever isn't already cached, then hands back every item's entries
-// keyed to the current signed URLs. On a signing failure, falls back to
-// whatever was already cached rather than returning nothing -- a stale but
-// real photograph beats none.
+// On a signing failure, falls back to whatever is already cached: a stale photograph beats none.
 async function signItems(
   perItem: ReadonlyArray<readonly [string, Map<string, ImageEntryData>]>,
   { signUrls, limit }: { signUrls: typeof createSignedUrls; limit: number },
-): Promise<Record<string, ImgEntry[]>> {
+): Promise<Record<string, ImageEntry[]>> {
   const wanted = perItem.flatMap(([, entryData]) =>
     pathsOf([...entryData.values()].slice(0, limit)),
   );
@@ -96,8 +89,14 @@ async function signItems(
     } else {
       cacheSignedUrls(
         signedUrls
-          .filter((s) => s.path && s.signedUrl)
-          .map((s) => [s.path as string, s.signedUrl as string] as const),
+          .filter((signature) => signature.path && signature.signedUrl)
+          .map(
+            (signature) =>
+              [
+                signature.path as string,
+                signature.signedUrl as string,
+              ] as const,
+          ),
       );
     }
   }
@@ -109,9 +108,9 @@ async function signItems(
     allPaths.map((path) => [path, getCachedSignedUrl(path)] as const),
   );
 
-  const result: Record<string, ImgEntry[]> = {};
+  const result: Record<string, ImageEntry[]> = {};
   for (const [itemId, entryData] of perItem) {
-    result[itemId] = toImgEntries(entryData, signedUrlMap);
+    result[itemId] = toImageEntries(entryData, signedUrlMap);
   }
   return result;
 }
@@ -120,7 +119,7 @@ async function signItems(
 export function signEntries(
   perItem: ReadonlyArray<readonly [string, Map<string, ImageEntryData>]>,
   signUrls: typeof createSignedUrls = createSignedUrls,
-): Promise<Record<string, ImgEntry[]>> {
+): Promise<Record<string, ImageEntry[]>> {
   return signItems(perItem, { signUrls, limit: RENDERABLE_PLATES });
 }
 
@@ -128,16 +127,18 @@ export function signEntries(
 export function signAllEntries(
   perItem: ReadonlyArray<readonly [string, Map<string, ImageEntryData>]>,
   signUrls: typeof createSignedUrls = createSignedUrls,
-): Promise<Record<string, ImgEntry[]>> {
+): Promise<Record<string, ImageEntry[]>> {
   return signItems(perItem, { signUrls, limit: Infinity });
 }
 
 /** Back from shown entries to what signing takes, for a carousel top-up. */
-export function entryDataOf(entries: ImgEntry[]): Map<string, ImageEntryData> {
+export function entryDataOf(
+  entries: ImageEntry[],
+): Map<string, ImageEntryData> {
   return new Map(
-    entries.map((e) => [
-      e.id,
-      { id: e.id, pathFull: e.pathFull, pathThumb: e.pathThumb },
+    entries.map((entry) => [
+      entry.id,
+      { id: entry.id, pathFull: entry.pathFull, pathThumb: entry.pathThumb },
     ]),
   );
 }

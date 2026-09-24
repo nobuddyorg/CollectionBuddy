@@ -1,18 +1,4 @@
-// Architectural-boundary checks for web/src/app, web/e2e and web/scripts.
-//
-// This does not duplicate eslint.config.mjs's no-restricted-imports rule
-// (components/** may not import Supabase directly) -- that rule only sees a
-// single file's own import statements. dependency-cruiser walks the whole
-// module graph instead, so it catches the case ESLint structurally cannot:
-// some *other* module (lib/, a new components-adjacent helper, ...) importing
-// Supabase directly and a component then reaching it through that module.
-// See `supabase-behind-data-layer` below, which is scoped to the whole app
-// rather than components/** for exactly that reason.
-//
-// Every rule here was checked against the actual dependency graph in
-// discovery mode before being turned into an `error` (see the PR that added
-// this file) -- run `npm run depcruise` locally after changing a rule to
-// confirm it still reflects reality rather than an aspiration.
+// Walks the whole module graph, so it catches a component reaching Supabase through another module, which ESLint's per-file no-restricted-imports cannot.
 const config = {
   forbidden: [
     {
@@ -114,10 +100,7 @@ const config = {
   ],
   options: {
     tsConfig: { fileName: 'tsconfig.json' },
-    // Regular (non-`import type`) imports of type-only bindings get erased by
-    // the TypeScript compiler and carry nothing at runtime, but they are still
-    // real, intentional coupling between modules -- and without this, most
-    // sibling `types.ts` files misreport as orphans (see no-orphans above).
+    // Type-only imports are erased at runtime but are real coupling; without this most sibling `types.ts` files misreport as orphans.
     tsPreCompilationDeps: true,
     doNotFollow: { path: 'node_modules' },
     progress: { type: 'none' },

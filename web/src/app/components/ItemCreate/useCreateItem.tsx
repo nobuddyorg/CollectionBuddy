@@ -16,8 +16,7 @@ export function useCreateItem(categoryId: string) {
   const create = useCallback(
     async (values: ItemFormValues): Promise<boolean> => {
       if (isCreating) return false;
-      // The DB normalizes everything else; only guard an obviously-blank
-      // title here so we don't submit for nothing.
+      // The DB normalizes everything else; only a blank title is worth refusing client-side.
       if (!values.title.trim()) return false;
       const tags = Array.isArray(values.tags) ? values.tags : [];
 
@@ -38,14 +37,14 @@ export function useCreateItem(categoryId: string) {
 
         toast.announce(t('item_create.entry_added'));
         return true;
-      } catch (e) {
+      } catch (error) {
         if (itemId) {
           await deleteItem(itemId);
         }
         toast.reportError(
           'create item',
-          e,
-          isQuotaExceeded(e)
+          error,
+          isQuotaExceeded(error)
             ? t('item_create.quota_error')
             : t('item_create.save_error'),
         );

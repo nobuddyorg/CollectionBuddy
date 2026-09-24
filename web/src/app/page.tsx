@@ -29,9 +29,7 @@ export default function Page() {
     }
   }, [loading, user, router]);
 
-  // `user` is a fresh object on every onAuthStateChange event, so depending
-  // on it by identity re-ran this effect far more than the session actually
-  // changed. The id is stable across those events.
+  // The id, not `user`: a fresh user object arrives on every onAuthStateChange event.
   const userId = user?.id;
   const { categories, selectedCategoryId, selectCategory, catalogueReady } =
     useCatalogue(loading, userId);
@@ -44,17 +42,16 @@ export default function Page() {
   const hasCategory = !!selectedCategoryId;
   const headerUser = { ...user, email: user.email ?? '' };
 
-  // Not memoized: cats is short, and this only runs on renders the
-  // component is already doing for its own reasons.
   const selectedCategory =
-    categories.cats.find((c) => c.id === selectedCategoryId) ?? null;
-  // Owner, or an active editor grant (0006_policies.sql); a viewer
-  // grant or no grant both fall through to false.
+    categories.categories.find(
+      (category) => category.id === selectedCategoryId,
+    ) ?? null;
+  // UX only, RLS decides: owner or an editor grant; a viewer grant or none falls through to false.
   const canEditSelected =
     !!selectedCategory &&
     (selectedCategory.user_id === userId ||
       (selectedCategory.category_shares ?? []).some(
-        (s) => s.role === 'editor',
+        (share) => share.role === 'editor',
       ));
 
   return (
@@ -68,17 +65,15 @@ export default function Page() {
 
       <Header user={headerUser} onSignOut={signOut} />
 
-      {/* No wrapper panels: nesting cards inside bordered trays ate the
-          width on a 390px screen. */}
+      {/* No wrapper panels: cards nested in bordered trays ate the width on a 390px screen. */}
       <main
         id="main-content"
-        // Focusable so a closing dialog can land focus here when the
-        // control that opened it is gone -- see useFocusTrap's fallback.
+        // Focusable so a closing dialog can land focus here when its opener is gone (useFocusTrap's fallback).
         tabIndex={-1}
         className="mx-auto max-w-6xl px-4 py-5 sm:py-8 space-y-5 sm:space-y-7"
       >
         <CategorySelect
-          selectedCat={selectedCategoryId}
+          selectedCategoryId={selectedCategoryId}
           onSelect={selectCategory}
           categories={categories}
           userId={userId ?? null}
@@ -86,8 +81,7 @@ export default function Page() {
         />
 
         {!catalogueReady && (
-          // Holds the shape of the entries about to appear, so the page
-          // fills in rather than assembling itself in visible steps.
+          // Holds the shape of the entries about to appear, so the page fills in rather than assembling in steps.
           <ItemListSkeleton />
         )}
 
@@ -95,9 +89,7 @@ export default function Page() {
           <section
             role="tabpanel"
             id={CATEGORY_TABPANEL_ID}
-            // The tab id only resolves while the category strip is
-            // expanded; a dangling id is just skipped, so the heading id
-            // still gives the panel an accessible name either way.
+            // The tab id only resolves while the strip is expanded; the heading id names the panel either way.
             aria-labelledby={`entries-heading ${categoryTabId(selectedCategoryId)}`}
             className="relative z-50 space-y-4"
           >

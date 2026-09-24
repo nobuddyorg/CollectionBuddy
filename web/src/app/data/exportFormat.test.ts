@@ -3,14 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   archiveName,
   archiveRootFolder,
-  buildCsv,
-  buildManifest,
-  csvCell,
-  CSV_COLUMNS,
   CSV_NAME,
-  EXPORT_FORMAT,
-  EXPORT_FORMAT_VERSION,
-  exportEntries,
   extensionOf,
   formatExportBytes,
   indexPrefix,
@@ -18,22 +11,7 @@ import {
   MANIFEST_NAME,
   PHOTOS_DIR,
   slugify,
-  type ExportItem,
 } from './exportFormat';
-
-function item(overrides: Partial<ExportItem> = {}): ExportItem {
-  return {
-    id: 'item-1',
-    title: 'Seated Dime',
-    description: null,
-    place: null,
-    place_lat: null,
-    place_lng: null,
-    tags: [],
-    created_at: '2026-01-02T03:04:05.000Z',
-    ...overrides,
-  };
-}
 
 describe('slugify', () => {
   it('lowercases and joins words with a single separator', () => {
@@ -64,8 +42,7 @@ describe('slugify', () => {
   });
 
   it('never ends on the separator the cap cut it at', () => {
-    // 'ab ' repeated puts a separator on the 60th character, so the cut
-    // lands mid-word and leaves one dangling.
+    // 'ab ' repeated puts a separator on the 60th character, so the cut leaves one dangling.
     const slug = slugify('ab '.repeat(40));
     expect(slug).toBe('ab-'.repeat(19) + 'ab');
     expect(slug).toHaveLength(59);
@@ -112,9 +89,7 @@ describe('extensionOf', () => {
     expect(extensionOf('uid/some.dir/abc')).toBe('.bin');
   });
 
-  // A backslash in an entry path is a path separator to Windows Explorer's
-  // extractor, and quotes/trailing dots make the file fail to extract even
-  // without one.
+  // A backslash is a path separator to Windows Explorer's extractor; quotes and trailing dots fail too.
   it('falls back for an extension containing a path separator', () => {
     expect(extensionOf('uid/item/x.a\\..\\evil')).toBe('.bin');
   });
@@ -145,289 +120,6 @@ describe('formatExportBytes', () => {
   });
 });
 
-describe('exportEntries', () => {
-  it('numbers each folder and each photograph inside it', () => {
-    const entries = exportEntries(
-      [item({ id: 'a', title: 'Seated Dime' })],
-      new Map([['a', ['uid/a/one.webp', 'uid/a/two.webp']]]),
-    );
-    expect(entries[0].folder).toBe('001-seated-dime');
-    expect(entries[0].photos).toEqual([
-      {
-        storagePath: 'uid/a/one.webp',
-        archivePath: `${PHOTOS_DIR}/001-seated-dime/1.webp`,
-      },
-      {
-        storagePath: 'uid/a/two.webp',
-        archivePath: `${PHOTOS_DIR}/001-seated-dime/2.webp`,
-      },
-    ]);
-  });
-
-  it('pairs each photograph with the exact storage path it came from', () => {
-    const entries = exportEntries(
-      [item({ id: 'a' })],
-      new Map([['a', ['uid/a/one.webp', 'uid/a/two.webp']]]),
-    );
-    expect(entries[0].photos.map((p) => p.storagePath)).toEqual([
-      'uid/a/one.webp',
-      'uid/a/two.webp',
-    ]);
-  });
-
-  it('keeps two items of the same title in folders of their own', () => {
-    const entries = exportEntries(
-      [item({ id: 'a', title: 'Coin' }), item({ id: 'b', title: 'Coin' })],
-      new Map([
-        ['a', ['uid/a/x.webp']],
-        ['b', ['uid/b/y.webp']],
-      ]),
-    );
-    expect(entries[0].folder).not.toBe(entries[1].folder);
-    expect(entries.map((e) => e.folder)).toEqual(['001-coin', '002-coin']);
-    expect(entries[0].photos[0].archivePath).not.toBe(
-      entries[1].photos[0].archivePath,
-    );
-  });
-
-  it('gives an item with no photographs an empty list, not a missing one', () => {
-    const entries = exportEntries([item({ id: 'a' })], new Map());
-    expect(entries[0].photos).toEqual([]);
-    expect(entries[0].folder).toBe('001-seated-dime');
-  });
-
-  it('carries the item through untouched', () => {
-    const original = item({ id: 'a', tags: ['silver'] });
-    expect(exportEntries([original], new Map())[0].item).toEqual(original);
-  });
-
-  it('takes each photograph’s extension from the object it came from', () => {
-    const entries = exportEntries(
-      [item({ id: 'a', title: 'Coin' })],
-      new Map([['a', ['uid/a/x.jpeg']]]),
-    );
-    expect(entries[0].photos).toEqual([
-      {
-        storagePath: 'uid/a/x.jpeg',
-        archivePath: `${PHOTOS_DIR}/001-coin/1.jpeg`,
-      },
-    ]);
-  });
-});
-
-describe('buildManifest', () => {
-  const exportedAt = new Date('2026-08-06T10:20:30.000Z');
-
-  it('states its own format and version, so an importer can check them', () => {
-    const manifest = buildManifest({
-      category: { id: 'c1', name: 'Coins' },
-      entries: [],
-      exportedAt,
-    });
-    // Spelled out, not just compared to the constant: a future importer
-    // keys off this exact string, so a rename here must break this test.
-    expect(manifest.format).toBe('collectionbuddy-category-export');
-    expect(manifest.format).toBe(EXPORT_FORMAT);
-    expect(manifest.version).toBe(1);
-    expect(manifest.version).toBe(EXPORT_FORMAT_VERSION);
-    expect(manifest.exported_at).toBe('2026-08-06T10:20:30.000Z');
-    expect(manifest.category).toEqual({ id: 'c1', name: 'Coins' });
-    expect(manifest.items).toEqual([]);
-  });
-
-  it('keeps every field at full fidelity, unlike the CSV beside it', () => {
-    const entries = exportEntries(
-      [
-        item({
-          id: 'a',
-          description: 'A note',
-          place: 'Cologne',
-          place_lat: 50.9,
-          place_lng: 6.9,
-          tags: ['silver', 'us'],
-        }),
-      ],
-      new Map([['a', ['uid/a/x.webp']]]),
-    );
-    const [row] = buildManifest({
-      category: { id: 'c1', name: 'Coins' },
-      entries,
-      exportedAt,
-    }).items;
-
-    expect(row.place_lat).toBe(50.9);
-    expect(row.tags).toEqual(['silver', 'us']);
-    expect(row.id).toBe('a');
-    expect(row.folder).toBe('001-seated-dime');
-    expect(row.photos).toEqual([`${PHOTOS_DIR}/001-seated-dime/1.webp`]);
-  });
-
-  it('keeps an absent field absent rather than emptying it', () => {
-    const entries = exportEntries([item({ id: 'a' })], new Map());
-    const [row] = buildManifest({
-      category: { id: 'c1', name: 'Coins' },
-      entries,
-      exportedAt,
-    }).items;
-    expect(row.description).toBeNull();
-    expect(row.place_lat).toBeNull();
-  });
-
-  it('survives the round trip through JSON it is written as', () => {
-    const manifest = buildManifest({
-      category: { id: 'c1', name: 'Münzen' },
-      entries: exportEntries([item({ id: 'a' })], new Map()),
-      exportedAt,
-    });
-    expect(JSON.parse(JSON.stringify(manifest))).toEqual(manifest);
-  });
-});
-
-describe('csvCell', () => {
-  it('leaves an ordinary value alone', () => {
-    expect(csvCell('Seated Dime')).toBe('Seated Dime');
-  });
-
-  it('quotes a value containing the delimiter', () => {
-    expect(csvCell('a,b')).toBe('"a,b"');
-  });
-
-  it('quotes and doubles an embedded quote', () => {
-    expect(csvCell('say "hi"')).toBe('"say ""hi"""');
-  });
-
-  it('quotes a value containing a line break', () => {
-    expect(csvCell('a\nb')).toBe('"a\nb"');
-    expect(csvCell('a\r\nb')).toBe('"a\r\nb"');
-  });
-
-  it('defuses a value a spreadsheet would run as a formula', () => {
-    expect(csvCell('=1+1')).toBe("'=1+1");
-    expect(csvCell('+49 221')).toBe("'+49 221");
-    expect(csvCell('-5')).toBe("'-5");
-    expect(csvCell('@user')).toBe("'@user");
-  });
-
-  it('quotes a defused value that also needs quoting', () => {
-    expect(csvCell('=HYPERLINK("x","y")')).toBe('"\'=HYPERLINK(""x"",""y"")"');
-  });
-
-  it('only defuses a leading formula character', () => {
-    expect(csvCell('1+1')).toBe('1+1');
-    expect(csvCell('a=b')).toBe('a=b');
-  });
-
-  it('leaves an empty cell empty', () => {
-    expect(csvCell('')).toBe('');
-  });
-});
-
-describe('buildCsv', () => {
-  it('leads with a byte-order mark, so Excel reads it as UTF-8', () => {
-    expect(buildCsv([]).startsWith('﻿')).toBe(true);
-  });
-
-  it('writes the header row even with nothing under it', () => {
-    expect(buildCsv([])).toBe(`﻿${CSV_COLUMNS.join(',')}\r\n`);
-  });
-
-  it('separates rows with CRLF and ends on one', () => {
-    const csv = buildCsv(exportEntries([item({ id: 'a' })], new Map()));
-    expect(csv.split('\r\n')).toHaveLength(3);
-    expect(csv.endsWith('\r\n')).toBe(true);
-  });
-
-  it('writes the columns in the order the header promises', () => {
-    const entries = exportEntries(
-      [
-        item({
-          id: 'a',
-          title: 'Seated Dime',
-          description: 'A note',
-          place: 'Cologne',
-          place_lat: 50.9,
-          place_lng: 6.9,
-          tags: ['silver', 'us'],
-        }),
-      ],
-      new Map([['a', ['uid/a/x.webp']]]),
-    );
-    const [, row] = buildCsv(entries).split('\r\n');
-    expect(row).toBe(
-      [
-        'Seated Dime',
-        'A note',
-        'Cologne',
-        '50.9',
-        '6.9',
-        '"silver, us"',
-        `${PHOTOS_DIR}/001-seated-dime/1.webp`,
-        '001-seated-dime',
-        '2026-01-02T03:04:05.000Z',
-        'a',
-      ].join(','),
-    );
-  });
-
-  it('empties a missing value rather than writing "null"', () => {
-    const entries = exportEntries([item({ id: 'a' })], new Map());
-    const [, row] = buildCsv(entries).split('\r\n');
-    expect(row).not.toContain('null');
-    expect(row).toBe(
-      'Seated Dime,,,,,,,001-seated-dime,2026-01-02T03:04:05.000Z,a',
-    );
-  });
-
-  it('keeps a coordinate of zero, which is a place and not a blank', () => {
-    const entries = exportEntries(
-      [item({ id: 'a', place: 'Null Island', place_lat: 0, place_lng: 0 })],
-      new Map(),
-    );
-    const [, row] = buildCsv(entries).split('\r\n');
-    expect(row.split(',').slice(3, 5)).toEqual(['0', '0']);
-  });
-
-  // Regression: the formula-injection guard matches a leading `-`, which is
-  // also how every negative number starts. Applied to a coordinate cell, it
-  // quoted every southern/western coordinate as text a re-import couldn't
-  // read back as a number.
-  it('writes a southern/western coordinate as a plain number, not a quoted formula guard', () => {
-    const entries = exportEntries(
-      [
-        item({
-          id: 'a',
-          place: 'Sydney Opera House',
-          place_lat: -33.8688,
-          place_lng: 151.2093,
-        }),
-      ],
-      new Map(),
-    );
-    const [, row] = buildCsv(entries).split('\r\n');
-    expect(row.split(',').slice(3, 5)).toEqual(['-33.8688', '151.2093']);
-  });
-
-  it('separates several photographs with a space, not the delimiter', () => {
-    const entries = exportEntries(
-      [item({ id: 'a', title: 'Coin' })],
-      new Map([['a', ['uid/a/x.webp', 'uid/a/y.webp']]]),
-    );
-    const [, row] = buildCsv(entries).split('\r\n');
-    expect(row).toContain(
-      `${PHOTOS_DIR}/001-coin/1.webp ${PHOTOS_DIR}/001-coin/2.webp`,
-    );
-  });
-
-  it('escapes a title that would otherwise break the row apart', () => {
-    const entries = exportEntries(
-      [item({ id: 'a', title: 'Half, "Dollar"' })],
-      new Map(),
-    );
-    const [, row] = buildCsv(entries).split('\r\n');
-    expect(row.startsWith('"Half, ""Dollar"""')).toBe(true);
-  });
-});
-
 describe('localDateStamp', () => {
   it('formats the local date, zero-padded', () => {
     expect(localDateStamp(new Date(2026, 7, 6))).toBe('2026-08-06');
@@ -435,8 +127,7 @@ describe('localDateStamp', () => {
   });
 
   it('reads the date the exporter is having, not the one in UTC', () => {
-    // Late enough that a timezone west of UTC would otherwise stamp
-    // yesterday.
+    // Late enough that a timezone west of UTC would otherwise stamp yesterday.
     expect(localDateStamp(new Date(2026, 7, 6, 23, 30))).toBe('2026-08-06');
   });
 });

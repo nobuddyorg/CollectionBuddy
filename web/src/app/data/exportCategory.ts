@@ -1,14 +1,3 @@
-/**
- * Building one category's archive, end to end.
- *
- * No server: this is a static export, so the whole archive is assembled in
- * the tab, with authorization enforced entirely by Postgres Row Level
- * Security. Rows come over PostgREST, photographs over signed URLs, zipped
- * by `./zip`. The download itself (the DOM anchor click) lives in
- * `CategorySelect/downloadBlob.ts`, not here.
- *
- */
-
 import { chunk } from '../lib/chunk';
 import { supabase } from '../supabase';
 import {
@@ -16,7 +5,7 @@ import {
   listExportImagesForItems,
   ITEM_IMAGES_BUCKET,
 } from './images';
-import { listItemsForExport, type ExportCursor } from './items';
+import { listItemsForExport, type ExportCursor } from './exportItemPages';
 import {
   archiveName,
   archiveRootFolder,
@@ -46,34 +35,23 @@ export type ExportResult = {
   photoCount: number;
   /** Photographs that could not be fetched after retrying, and were left out. */
   skippedPhotoCount: number;
-  /** Always 0, kept for API stability: a batched `images` query (see
-   * fetchPhotoPaths) has no per-item listing failure left to count. */
+  /** Always 0: the batched `images` query has no per-item listing failure to count. */
   skippedItemCount: number;
 };
 
 /** PostgREST caps a response, so items are walked a page at a time until a short page ends it. */
 export const ITEM_PAGE_SIZE = 500;
 
-/** How many photographs are signed in one call, so a failed batch only takes its own photographs down with it. */
+/** Photographs signed per call, so a failed batch only takes its own photographs down with it. */
 export const SIGN_BATCH_SIZE = 100;
 
 /** Sign calls in flight at once, bounded like the photo downloads. */
 export const SIGN_CONCURRENCY = 6;
 
-/**
- * Above this, iOS/WebKit risks killing the tab outright with no error: a
- * constructed Blob stays memory-resident there (unlike Chromium/Firefox,
- * which page large blobs to disk), and per-tab memory tops out around
- * 1-2 GB. Well below `assertZipRoom`'s 4 GiB ZIP-format ceiling, which
- * never gets a chance to raise its own error first. A conservative warning
- * threshold, not the real limit.
- */
+/** iOS/WebKit keeps a Blob in memory and kills a tab near 1-2 GB, well before the 4 GiB ZIP limit. */
 export const LARGE_EXPORT_WARN_BYTES = 1.5 * 1024 ** 3;
 
-/** Signed URLs default to a 1-hour TTL, which a large export on a slow
- * connection can outlive; asked for with room to spare (independent of
- * useItemImages.tsx's own signed-URL refresh margin, a different purpose)
- * so a URL never expires mid-download. */
+/** A large export on a slow connection can outlive the default 1-hour signed-URL TTL. */
 const EXPORT_SIGNED_URL_TTL_SECONDS = 6 * 3600;
 
 export class ExportError extends Error {
@@ -83,9 +61,7 @@ export class ExportError extends Error {
   }
 }
 
-/** Thrown when the caller's `signal` is aborted -- a user-requested cancel,
- * not a failure -- so the UI can stay quiet about it instead of reporting a
- * "try again" that misdescribes what happened. */
+/** Thrown when the caller's `signal` aborts: a user-requested cancel, not a failure. */
 export class ExportCancelledError extends Error {
   constructor() {
     super('Export cancelled');
@@ -102,17 +78,22 @@ function realGetSession() {
 }
 
 /** Walks every page of a category's items, reporting the running count. */
-async function fetchAllItems(
-  categoryId: string,
-  listItems: typeof listItemsForExport,
-  onProgress?: (progress: ExportProgress) => void,
-  signal?: AbortSignal,
-): Promise<ExportItem[]> {
+async function fetchAllItems({
+  categoryId,
+  listItems,
+  onProgress,
+  signal,
+}: {
+  categoryId: string;
+  listItems: typeof listItemsForExport;
+  onProgress?: (progress: ExportProgress) => void;
+  signal?: AbortSignal;
+}): Promise<ExportItem[]> {
   const items: ExportItem[] = [];
   let after: ExportCursor | null = null;
   do {
     checkCancelled(signal);
-    const page = await listItems(categoryId, { after, size: ITEM_PAGE_SIZE });
+    const page = await listItems({ categoryId, after, size: ITEM_PAGE_SIZE });
     if (page.error !== null) {
       throw new ExportError('Could not read items', { cause: page.error });
     }
@@ -127,27 +108,22 @@ function isRetryableStatus(status: number): boolean {
   return status === 429 || status >= 500;
 }
 
-/**
- * Every fetched item's full-size photograph paths and total byte weight, in
- * one batched `images` query rather than one storage.list() call per item --
- * a single indexed Postgres query has no per-item failure mode, so a
- * failure here aborts the export the same way a failed items page does.
- */
-async function fetchPhotoPaths(
-  items: ExportItem[],
-  listImages: typeof listExportImagesForItems,
-  signal?: AbortSignal,
-): Promise<{
+/** Every item's full-size paths and total bytes from one `images` query, which fails as a whole. */
+async function fetchPhotoPaths({
+  items,
+  listImages,
+  signal,
+}: {
+  items: ExportItem[];
+  listImages: typeof listExportImagesForItems;
+  signal?: AbortSignal;
+}): Promise<{
   photoPathsByItemId: Map<string, string[]>;
-  /** Summed from the query's own size_bytes column, so the archive's total
-   * weight is known before a single photograph is downloaded. */
   totalBytes: number;
 }> {
   checkCancelled(signal);
   const { data, error } = await listImages(items.map((item) => item.id));
-  // No rows is `[]`, so a null payload means the query did not answer --
-  // exporting an archive with no photographs in it would be the wrong way
-  // to find that out.
+  // No rows is `[]`; a null payload means the query did not answer, not an archive without photos.
   if (error || !data) {
     throw new ExportError('Could not list photographs', { cause: error });
   }
@@ -163,27 +139,19 @@ async function fetchPhotoPaths(
   return { photoPathsByItemId, totalBytes };
 }
 
-// Over hundreds of photographs, a radio blip, a 5xx or a rate limit is
-// common enough that one failed request must not mean one permanently
-// missing photograph.
 const PHOTO_FETCH_ATTEMPTS = 3;
 const PHOTO_RETRY_BASE_MS = 500;
 
-/** Bounded rather than unbounded so only a handful of response Blobs are
- * ever held in memory at once; the writer turns each into a Blob off the
- * JS heap as soon as it's added. */
+/** Bounded so only a handful of response Blobs are ever held in memory at once. */
 export const PHOTO_DOWNLOAD_CONCURRENCY = 6;
 
-/** Browser `fetch` has no response timeout of its own, so a stalled
- * response would otherwise hang forever. Long enough that a real photo on a
- * slow connection is never mistaken for a stall. */
+/** Browser `fetch` has no response timeout of its own, so a stalled response would hang forever. */
 export const PHOTO_FETCH_TIMEOUT_MS = 30_000;
 
-/** Distinguishes a response retrying cannot fix (a 404 is a 404 three times over). */
+/** A response retrying cannot fix: a 404 is a 404 three times over. */
 class PermanentFetchError extends Error {}
 
-/** ORs the caller's cancellation with a fresh per-attempt timeout, so
- * neither a user cancel nor a black-holed connection hangs the request. */
+/** The caller's cancellation OR'd with a fresh per-attempt timeout. */
 function fetchSignal(signal?: AbortSignal): AbortSignal {
   const timeout = AbortSignal.timeout(PHOTO_FETCH_TIMEOUT_MS);
   return signal ? AbortSignal.any([timeout, signal]) : timeout;
@@ -193,7 +161,7 @@ async function fetchPhotoBytes(
   url: string,
   signal?: AbortSignal,
 ): Promise<Uint8Array<ArrayBuffer>> {
-  let lastErr: unknown;
+  let lastError: unknown;
   for (const attempt of attempts(PHOTO_FETCH_ATTEMPTS)) {
     checkCancelled(signal);
     if (attempt > 0) {
@@ -207,31 +175,32 @@ async function fetchPhotoBytes(
       if (!isRetryableStatus(response.status)) {
         throw new PermanentFetchError(`HTTP ${response.status}`);
       }
-      lastErr = new Error(`HTTP ${response.status}`);
-    } catch (err) {
-      if (err instanceof PermanentFetchError) throw err;
-      // A cancel and a per-attempt timeout both surface as an aborted
-      // fetch; only the caller's own signal aborting means "stop
-      // altogether" -- a timeout is retried like any other failure below.
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      if (error instanceof PermanentFetchError) throw error;
+      // A cancel and a per-attempt timeout both abort the fetch; only the caller's signal stops.
       checkCancelled(signal);
-      lastErr = err;
+      lastError = error;
     }
   }
-  throw lastErr;
+  throw lastError;
 }
 
-/** Exported for its own test: the map it builds is the whole contract --
- * a row Storage could not sign must leave no entry behind at all. */
-export async function signAll(
-  paths: string[],
-  signUrls: typeof createSignedUrls,
-  signal?: AbortSignal,
-): Promise<Map<string, string>> {
+/** A row Storage could not sign leaves no entry behind at all. */
+export async function signAll({
+  paths,
+  signUrls,
+  signal,
+}: {
+  paths: string[];
+  signUrls: typeof createSignedUrls;
+  signal?: AbortSignal;
+}): Promise<Map<string, string>> {
   const signed = new Map<string, string>();
-  await runPool(
-    chunk(paths, SIGN_BATCH_SIZE),
-    SIGN_CONCURRENCY,
-    async (batch) => {
+  await runPool({
+    items: chunk(paths, SIGN_BATCH_SIZE),
+    concurrency: SIGN_CONCURRENCY,
+    worker: async (batch) => {
       checkCancelled(signal);
       const result = await signUrls(batch, EXPORT_SIGNED_URL_TTL_SECONDS);
       if (result.error) {
@@ -243,25 +212,16 @@ export async function signAll(
         if (row.path && row.signedUrl) signed.set(row.path, row.signedUrl);
       }
     },
-  );
+  });
   return signed;
 }
 
-/**
- * Builds the archive for one category.
- *
- * A photograph that still cannot be fetched after retrying is reported and
- * skipped rather than failing the export: an archive missing one picture is
- * still worth having, and the manifest still names what should have been
- * there. It must never go missing silently, since the canonical use of an
- * export is "export, then delete the originals".
- */
+/** Builds the archive; a photograph unfetchable after retrying is skipped and counted, never silent. */
 export async function exportCategory({
   category,
   onProgress,
   now = () => new Date(),
   signal,
-  // The four raw calls this file makes: real by default, faked in tests.
   getSession = realGetSession,
   listItems = listItemsForExport,
   listImages = listExportImagesForItems,
@@ -271,34 +231,31 @@ export async function exportCategory({
   category: { id: string; name: string };
   onProgress?: (progress: ExportProgress) => void;
   now?: () => Date;
-  /** Aborted to cancel a run in progress -- checked between phases, between
-   * batches within a phase, and before every retry, so cancelling stops new
-   * work promptly rather than only once the current phase finishes. */
+  /** Checked between phases, between batches and before every retry. */
   signal?: AbortSignal;
   getSession?: () => ReturnType<typeof supabase.auth.getSession>;
   listItems?: typeof listItemsForExport;
   listImages?: typeof listExportImagesForItems;
   signUrls?: typeof createSignedUrls;
-  /** Asked once the total photograph size is known, only when it exceeds
-   * `LARGE_EXPORT_WARN_BYTES`. Declining cancels the export the same way
-   * the user's own Cancel button does. Omitted, a large export proceeds
-   * unprompted, so a caller with nowhere to show a dialog isn't forced to
-   * supply one. */
+  /** Asked only past `LARGE_EXPORT_WARN_BYTES`; declining cancels, omitting it skips the prompt. */
   confirmLargeExport?: (totalBytes: number) => Promise<boolean> | boolean;
 }): Promise<ExportResult> {
   const { data: sessionData } = await getSession();
   if (!sessionData.session?.user.id) throw new ExportError('No user session');
 
   onProgress?.({ phase: 'items', done: 0, total: 0 });
-  const items = await fetchAllItems(category.id, listItems, onProgress, signal);
+  const items = await fetchAllItems({
+    categoryId: category.id,
+    listItems,
+    onProgress,
+    signal,
+  });
 
-  // Paths come fully-qualified from the images table, so nothing here
-  // needs the session beyond the guard above.
-  const { photoPathsByItemId, totalBytes } = await fetchPhotoPaths(
+  const { photoPathsByItemId, totalBytes } = await fetchPhotoPaths({
     items,
     listImages,
     signal,
-  );
+  });
 
   if (totalBytes > LARGE_EXPORT_WARN_BYTES && confirmLargeExport) {
     checkCancelled(signal);
@@ -309,9 +266,9 @@ export async function exportCategory({
   const entries = exportEntries(items, photoPathsByItemId);
 
   const storagePaths = entries.flatMap((entry) =>
-    entry.photos.map((p) => p.storagePath),
+    entry.photos.map((photo) => photo.storagePath),
   );
-  const signed = await signAll(storagePaths, signUrls, signal);
+  const signed = await signAll({ paths: storagePaths, signUrls, signal });
 
   const exportedAt = now();
   const archiveRoot = archiveRootFolder(category.name, exportedAt);
@@ -323,41 +280,49 @@ export async function exportCategory({
   const total = tasks.length;
   onProgress?.({ phase: 'photos', done, total });
 
-  // A ZipLimitError or a cancellation stops the whole pool rather than
-  // being counted as one more skipped photograph: the export as a whole has
-  // failed or been called off, a different thing from one picture that
-  // could not be fetched.
-  await runPool(tasks, PHOTO_DOWNLOAD_CONCURRENCY, async (task) => {
-    checkCancelled(signal);
-    const url = signed.get(task.storagePath);
-    try {
-      if (!url) throw new Error(`Unsigned path in ${ITEM_IMAGES_BUCKET}`);
-      const bytes = await fetchPhotoBytes(url, signal);
-      writer.add(`${archiveRoot}/${task.archivePath}`, bytes, exportedAt);
-    } catch (err) {
-      if (err instanceof ZipLimitError || err instanceof ExportCancelledError) {
-        throw err;
+  // A ZipLimitError or a cancellation fails the whole export, not one more skipped photograph.
+  await runPool({
+    items: tasks,
+    concurrency: PHOTO_DOWNLOAD_CONCURRENCY,
+    worker: async (task) => {
+      checkCancelled(signal);
+      const url = signed.get(task.storagePath);
+      try {
+        if (!url) throw new Error(`Unsigned path in ${ITEM_IMAGES_BUCKET}`);
+        const bytes = await fetchPhotoBytes(url, signal);
+        writer.add({
+          path: `${archiveRoot}/${task.archivePath}`,
+          bytes,
+          modified: exportedAt,
+        });
+      } catch (error) {
+        if (
+          error instanceof ZipLimitError ||
+          error instanceof ExportCancelledError
+        ) {
+          throw error;
+        }
+        console.error('Skipping photograph', task.storagePath, error);
+        skipped++;
       }
-      console.error('Skipping photograph', task.storagePath, err);
-      skipped++;
-    }
-    onProgress?.({ phase: 'photos', done: ++done, total });
+      onProgress?.({ phase: 'photos', done: ++done, total });
+    },
   });
 
   onProgress?.({ phase: 'packing', done: total, total });
 
   const encoder = new TextEncoder();
   const manifest = buildManifest({ category, entries, exportedAt });
-  writer.add(
-    `${archiveRoot}/${MANIFEST_NAME}`,
-    encoder.encode(JSON.stringify(manifest, null, 2)),
-    exportedAt,
-  );
-  writer.add(
-    `${archiveRoot}/${CSV_NAME}`,
-    encoder.encode(buildCsv(entries)),
-    exportedAt,
-  );
+  writer.add({
+    path: `${archiveRoot}/${MANIFEST_NAME}`,
+    bytes: encoder.encode(JSON.stringify(manifest, null, 2)),
+    modified: exportedAt,
+  });
+  writer.add({
+    path: `${archiveRoot}/${CSV_NAME}`,
+    bytes: encoder.encode(buildCsv(entries)),
+    modified: exportedAt,
+  });
 
   return {
     blob: writer.finish(),

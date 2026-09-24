@@ -5,11 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TranslationKey } from '../../i18n/I18nProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
-import {
-  ImportCancelledError,
-  importCategory,
-  type ImportProgress,
-} from '../../data/importCategory';
+import { ImportCancelledError } from '../../data/importCancellation';
+import { importCategory, type ImportProgress } from '../../data/importCategory';
 import {
   findManifestPath,
   ImportFormatError,
@@ -39,11 +36,9 @@ export function importProgressMessage(
 export function useImportCategory(existingCategoryNames: string[]) {
   const { t } = useI18n();
   const toast = useToast();
-  // Null means "not importing" -- a separate boolean would be a second
-  // source of truth that could disagree.
+  // Null means not importing; a separate boolean would be a second source of truth.
   const [progress, setProgress] = useState<ImportProgress | null>(null);
-  // One controller per run, so Cancel always aborts the import actually in
-  // flight, not a stale one from a previous pick.
+  // One controller per run, so Cancel always aborts the import actually in flight.
   const controllerRef = useRef<AbortController | null>(null);
 
   const runImport = useCallback(
@@ -53,9 +48,7 @@ export function useImportCategory(existingCategoryNames: string[]) {
       controllerRef.current = controller;
       setProgress({ phase: 'reading', done: 0, total: 0 });
       try {
-        // Peeked ahead of the real read only to name the category first:
-        // disambiguated against existing names the way a filesystem calls
-        // a second copy "Coins (2)" rather than overwriting the first.
+        // Peeked ahead of the real read only to name the category first ("Coins (2)" if taken).
         const entries = await readZipEntries(file);
         const manifestPath = findManifestPath(entries.keys());
         if (!manifestPath) {
@@ -92,21 +85,21 @@ export function useImportCategory(existingCategoryNames: string[]) {
               ),
           );
         }
-      } catch (e) {
-        if (e instanceof ImportCancelledError) {
+      } catch (error) {
+        if (error instanceof ImportCancelledError) {
           // Confirmed, not a failure.
           toast.announce(t('category_select.import_cancelled'));
-        } else if (e instanceof ImportFormatError) {
+        } else if (error instanceof ImportFormatError) {
           toast.reportError(
             'import category',
-            e,
+            error,
             t('category_select.import_format_error'),
           );
         } else {
           toast.reportError(
             'import category',
-            e,
-            isQuotaExceeded(e)
+            error,
+            isQuotaExceeded(error)
               ? t('category_select.import_quota_error')
               : t('category_select.import_error'),
           );
@@ -119,8 +112,7 @@ export function useImportCategory(existingCategoryNames: string[]) {
     [progress, t, toast, existingCategoryNames],
   );
 
-  // Not memoized: it goes straight onto a button in a component nothing
-  // memoizes, so a stable identity would buy nothing.
+  // Not memoized: it goes straight onto a button in a component nothing memoizes.
   const cancelImport = () => {
     controllerRef.current?.abort();
   };
@@ -128,8 +120,8 @@ export function useImportCategory(existingCategoryNames: string[]) {
   // Same beforeunload guard as useExportCategory.tsx, for the same reason.
   useEffect(() => {
     if (!progress) return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);

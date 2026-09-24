@@ -1,24 +1,16 @@
-// Builds the app against a running local Supabase stack and runs the
-// signed-in end-to-end suite against it.
-//
-// Usage: npm run e2e:local        (with `supabase start` already up)
-//
-// One script, not a list of commands in docs and the workflow: the build
-// has to be pointed at the running stack too, since the Supabase URL is
-// baked in at build time -- getting that wrong tests a bundle talking to
-// production.
+// Builds against the running local stack (the Supabase URL is baked in at build time) and runs the signed-in e2e suite.
 import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const webDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const repoRoot = resolve(webDir, '..');
+const webDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const repositoryRoot = resolve(webDirectory, '..');
 
 function status() {
   try {
     return JSON.parse(
       execFileSync('supabase', ['status', '-o', 'json'], {
-        cwd: repoRoot,
+        cwd: repositoryRoot,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
       }),
@@ -37,28 +29,28 @@ if (!API_URL || !ANON_KEY || !SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
-const env = {
+const environment = {
   ...process.env,
-  // Baked in at build time, which is why the build happens here.
   NEXT_PUBLIC_SUPABASE_URL: API_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: ANON_KEY,
-  // What the suite's setup step uses to create the user and sign it in.
   E2E_SUPABASE_URL: API_URL,
   E2E_SUPABASE_ANON_KEY: ANON_KEY,
   E2E_SUPABASE_SERVICE_KEY: SERVICE_ROLE_KEY,
-  // This build only ever feeds this script's own e2e run, never a deploy,
-  // so source maps are free here -- they make the coverage report
-  // (e2e/coverage.ts) point at real source instead of the bundle.
+  // This build never deploys, so source maps are free; they make e2e/coverage.ts point at real source.
   E2E_COVERAGE_SOURCEMAPS: 'true',
 };
 
 const run = (command, args) =>
-  execFileSync(command, args, { cwd: webDir, env, stdio: 'inherit' });
+  execFileSync(command, args, {
+    cwd: webDirectory,
+    env: environment,
+    stdio: 'inherit',
+  });
 
 console.log(`Building against ${API_URL}`);
 run('npx', ['next', 'build']);
 
-// Every Chromium-based project, so one coverage report covers the whole app; `signed-in` pulls in its `setup` dependency. Firefox adds no coverage and stays with `npm run e2e`.
+// Every Chromium project, so one coverage report covers the whole app; Firefox adds no coverage.
 run('npx', [
   'playwright',
   'test',

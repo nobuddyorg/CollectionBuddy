@@ -34,10 +34,7 @@ describe('Icon', () => {
   });
 });
 
-/**
- * Walks the line-only subset of path syntax the Frame icon uses (M/L/H/V and
- * their relative forms) and returns every point the pen visits.
- */
+/** Walks the line-only path subset the Frame icon uses (M/L/H/V and relatives): every pen point. */
 function penPoints(d: string): Array<[number, number]> {
   const tokens = d.match(/[a-zA-Z]|-?\d*\.?\d+/g) ?? [];
   const points: Array<[number, number]> = [];
@@ -94,13 +91,12 @@ function penPoints(d: string): Array<[number, number]> {
   return points;
 }
 
-// A corner arrow whose head runs the wrong way leaves the 0..24 viewBox and
-// renders with a leg missing.
+// A corner arrow whose head runs the wrong way leaves the viewBox and renders with a leg missing.
 describe('Frame icon geometry', () => {
   const paths = () => {
     const { container } = render(<Icon icon={IconType.Frame} />);
     return [...container.querySelectorAll('path')].map(
-      (p) => p.getAttribute('d') ?? '',
+      (path) => path.getAttribute('d') ?? '',
     );
   };
 
@@ -120,8 +116,7 @@ describe('Frame icon geometry', () => {
   });
 
   it('gives each arrow a head with two legs meeting at its corner', () => {
-    // Every arrow is a diagonal plus a two-legged head; a dropped or
-    // reversed leg changes the point count or collapses the legs together.
+    // A dropped or reversed leg changes the point count or collapses the legs together.
     for (const d of paths()) {
       const points = penPoints(d);
       expect(points, `points of "${d}"`).toHaveLength(6);

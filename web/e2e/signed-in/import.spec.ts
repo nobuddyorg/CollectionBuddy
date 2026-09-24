@@ -68,7 +68,7 @@ test.describe('importing an exported archive', () => {
     }
   });
 
-  // The archive carries only the full-size file; the import compresses a new thumbnail and uploads both under the importer's own prefix.
+  // The archive carries only the full-size file; the import compresses a thumbnail and uploads both.
   test('brings a photograph back with its entry', async ({ on, page }) => {
     const app = on(page);
     await app.categories.do.open(SEED.importCategory);

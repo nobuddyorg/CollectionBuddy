@@ -11,9 +11,7 @@ function requireEnv(name: string, value: string | undefined): string {
   return value;
 }
 
-// Next's static export only inlines NEXT_PUBLIC_* vars when accessed as a
-// literal `process.env.NEXT_PUBLIC_X` expression -- a computed lookup stays
-// undefined in the browser.
+// Read as a literal `process.env.NEXT_PUBLIC_X` expression, the only form Next's static export inlines.
 const url = requireEnv(
   'NEXT_PUBLIC_SUPABASE_URL',
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -25,9 +23,7 @@ const anon = requireEnv(
 
 export const supabase = createClient<Database>(url, anon, {
   auth: {
-    // PKCE returns a single-use ?code= instead of putting tokens in the URL
-    // fragment; auth-js defaults to the implicit flow, which leaks the
-    // refresh token to history and extensions.
+    // auth-js defaults to the implicit flow, which leaks the refresh token to history via the URL fragment.
     flowType: 'pkce',
     persistSession: true,
     autoRefreshToken: true,

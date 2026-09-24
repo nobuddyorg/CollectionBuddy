@@ -1,7 +1,7 @@
 'use client';
 import { memo, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
-import type { ItemLite, ImgEntry } from './types';
+import type { ItemLite, ImageEntry } from './types';
 import { Actions, AddPhotoPlate } from './Actions';
 import { ImageGrid } from './ImageGrid';
 import { CaptionSkeleton } from './Skeleton';
@@ -9,30 +9,25 @@ import { labelClasses } from '../ui/labelClasses';
 
 type ItemCardProps = {
   item: ItemLite;
-  imgs: ImgEntry[];
+  images: ImageEntry[];
   /** Photographs handed over for this entry that have not landed yet. */
   pendingUploads?: number;
   imagesLoading?: boolean;
   onUpload: (file: File) => void;
   onEditItem: () => void;
   onDeleteItem: () => void;
-  onDeleteImage: (img: ImgEntry) => void;
-  /** Opens the full-size carousel at this photograph's position in `imgs`. */
+  onDeleteImage: (image: ImageEntry) => void;
+  /** Opens the full-size carousel at this photograph's position in `images`. */
   onOpenModal: (index: number) => void;
-  /** This card is one of the first few on the page -- its hero photograph
-   * is likely the LCP element. */
+  /** Among the first cards on the page: its hero photograph is likely the LCP element. */
   priority?: boolean;
-  /** Category shared with, not owned by, the viewer: no edit, delete, or
-   * upload control anywhere on the card. */
+  /** Shared category: no edit, delete, or upload control anywhere on the card. */
   readOnly?: boolean;
 };
 
-// Photos lead, the label sits beneath: what a collector actually
-// recognises an item by. Actions live in the label area rather than
-// floating over the photo, since the photo has its own delete control.
 function ItemCardComponent({
   item,
-  imgs,
+  images,
   pendingUploads = 0,
   imagesLoading = false,
   onUpload,
@@ -48,67 +43,52 @@ function ItemCardComponent({
   const busy = pendingUploads > 0;
   const dropDisabled = readOnly || busy;
 
-  // An upload in flight counts as something coming, so the empty-mount
-  // state doesn't invite a second upload on top of one already running.
-  const awaitingPhoto = !imgs.length && !imagesLoading && !busy;
+  // An upload in flight counts as something coming, so the empty mount doesn't invite a second one.
+  const awaitingPhoto = !images.length && !imagesLoading && !busy;
 
-  // Counts enter/leave pairs rather than toggling on either one, so the
-  // highlight doesn't flicker off while the drag crosses a child element's
-  // own border (each child fires its own leave+enter as the pointer passes).
+  // Counts enter/leave pairs: each child fires its own leave+enter as the pointer crosses it.
   const dragDepth = useRef(0);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const onDragEnter = (e: React.DragEvent) => {
+  const onDragEnter = (event: React.DragEvent) => {
     if (dropDisabled) return;
-    e.preventDefault();
+    event.preventDefault();
     dragDepth.current += 1;
     setIsDragOver(true);
   };
-  const onDragOver = (e: React.DragEvent) => {
+  const onDragOver = (event: React.DragEvent) => {
     if (dropDisabled) return;
     // Required for the element to become a valid drop target at all.
-    e.preventDefault();
+    event.preventDefault();
   };
-  const onDragLeave = (e: React.DragEvent) => {
+  const onDragLeave = (event: React.DragEvent) => {
     if (dropDisabled) return;
-    e.preventDefault();
+    event.preventDefault();
     dragDepth.current -= 1;
     if (dragDepth.current <= 0) {
       dragDepth.current = 0;
       setIsDragOver(false);
     }
   };
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
+  const onDrop = (event: React.DragEvent) => {
+    event.preventDefault();
     dragDepth.current = 0;
     setIsDragOver(false);
     if (dropDisabled) return;
-    const file = e.dataTransfer.files?.[0];
+    const file = event.dataTransfer.files?.[0];
     if (file) onUpload(file);
   };
 
-  // Held until the hero photograph settles, so the label never appears
-  // before the picture it describes. Deliberately one-way: an edit made
-  // after the card has already settled once (swapping the photo) fades the
-  // new plate in on its own rather than hiding the label again.
+  // Deliberately one-way: a later photo swap fades in on its own rather than hiding the label again.
   const [heroLoaded, setHeroLoaded] = useState(false);
   const captionReady =
-    awaitingPhoto || (busy && !imgs.length && !imagesLoading) || heroLoaded;
+    awaitingPhoto || (busy && !images.length && !imagesLoading) || heroLoaded;
 
-  // h-full so cards in a desktop row share a height; the caption grows and
-  // pushes the action row to the bottom, keeping rows lined up.
   return (
-    // Drag-and-drop-to-upload is a pointer-only progressive enhancement --
-    // AddPhotoPlate below already renders a real keyboard/screen-reader
-    // accessible <label>/<input type="file"> for adding a photograph.
-    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- drag-to-upload is a pointer-only enhancement; AddPhotoPlate's file input is the accessible path
     <li
-      // Lets the e2e suite count/target cards without depending on contents.
       data-testid="item-card"
-      // outline, not ring: `.card-lift` below sets `box-shadow` directly and
-      // wins the cascade over a box-shadow-based ring utility (same
-      // `@layer utilities`, later in source order), so a ring here would
-      // never actually paint.
+      // outline, not ring: `.card-lift` sets `box-shadow` directly and would win over a box-shadow ring.
       className={`fade-up group relative flex h-full flex-col overflow-hidden rounded-sm bg-card text-card-foreground ring-1 ring-border card-lift card-lift-hover transition-shadow ${
         isDragOver ? 'outline-2 outline-offset-2 outline-foreground' : ''
       }`}
@@ -121,7 +101,7 @@ function ItemCardComponent({
         <AddPhotoPlate onUpload={onUpload} busy={busy} readOnly={readOnly} />
       ) : (
         <ImageGrid
-          imgs={imgs}
+          images={images}
           itemTitle={item.title}
           onOpenModal={onOpenModal}
           onDelete={onDeleteImage}
@@ -199,21 +179,18 @@ function ItemCardComponent({
   );
 }
 
-// Handler props (onUpload, onEditItem, ...) are left out of the comparison:
-// ItemList recreates them as fresh closures each render, but each only
-// closes over `item.id` and stable hook functions, so an old closure
-// behaves like a new one as long as `item` itself hasn't changed.
+// Handlers are left out: each closes over `item.id` and stable hook functions, so a stale one is fine.
 export function itemCardPropsAreEqual(
-  prev: ItemCardProps,
+  previous: ItemCardProps,
   next: ItemCardProps,
 ): boolean {
   return (
-    prev.item === next.item &&
-    prev.imgs === next.imgs &&
-    prev.pendingUploads === next.pendingUploads &&
-    prev.imagesLoading === next.imagesLoading &&
-    prev.priority === next.priority &&
-    prev.readOnly === next.readOnly
+    previous.item === next.item &&
+    previous.images === next.images &&
+    previous.pendingUploads === next.pendingUploads &&
+    previous.imagesLoading === next.imagesLoading &&
+    previous.priority === next.priority &&
+    previous.readOnly === next.readOnly
   );
 }
 

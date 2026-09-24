@@ -9,12 +9,7 @@ import { initLoginPage } from './login';
 import { initMap } from './map';
 import { initSharingPanel } from './sharing';
 
-/**
- * Every screen this suite drives, hung off one page.
- *
- * Getters, so a spec that wants one screen pays for one screen: each call
- * builds only the locators it is asked for.
- */
+/** Getters, so a spec that wants one screen builds only that screen's locators. */
 export type PageTree = ReturnType<typeof createPageTree>;
 
 export function createPageTree(page: Page) {

@@ -39,8 +39,7 @@ describe('photonSearchUrl', () => {
 });
 
 describe('coordsFromFeature', () => {
-  // These shapes stand in for a third-party response the type forbids but
-  // the network can still deliver.
+  // Shapes the type forbids but a third-party response can still deliver.
   const withGeometry = (coordinates: unknown) => ({
     geometry: { coordinates },
   });

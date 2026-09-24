@@ -5,27 +5,20 @@ import type { Database } from './database.types';
 import type { ShareRole } from './shares';
 
 type CategoryRow = Database['public']['Tables']['categories']['Row'];
-// user_id distinguishes "mine" from "shared with me". category_shares is
-// scoped by RLS to the caller's own role; treat a missing array the same as
-// an empty one, see page.tsx's canEditSelected.
+// category_shares is RLS-scoped to the caller's own role; a missing array reads as empty.
 export type CategorySummary = Pick<CategoryRow, 'id' | 'name' | 'user_id'> & {
   category_shares?: { role: ShareRole }[];
 };
 type CategoryCore = Pick<CategoryRow, 'id' | 'name' | 'user_id'>;
 
-/**
- * Returns `base`, or `base (2)`, `base (3)`, ... past every name in
- * `existingNames`, matching case-insensitively like the database's unique
- * index on `categories.name` so an import can't collide on insert.
- */
+/** `base`, or `base (2)`, `base (3)`, ... past every name, case-insensitive like the unique index. */
 export function uniqueCategoryName(
   base: string,
   existingNames: string[],
 ): string {
-  const taken = new Set(existingNames.map((n) => n.toLowerCase()));
+  const taken = new Set(existingNames.map((name) => name.toLowerCase()));
   if (!taken.has(base.toLowerCase())) return base;
-  // `base` itself is one of the taken names, so at most `taken.size - 1` of
-  // these suffixed candidates can also be taken: one of them is always free.
+  // `base` is itself taken, so at most `taken.size - 1` candidates can be: one is always free.
   return Array.from(
     { length: taken.size },
     (_, i) => `${base} (${i + 2})`,
@@ -43,18 +36,14 @@ export function createCategory(name: string) {
   return (
     supabase
       .from('categories')
-      // user_id is required by the generated Insert type, but the client
-      // never sends it: enforce_user_id() fills it from the JWT, so RLS
-      // can't be handed another user's id.
+      // user_id is never sent: enforce_user_id() fills it from the JWT, so no row changes hands.
       .insert({ name } as Database['public']['Tables']['categories']['Insert'])
       .select('id,name,user_id')
       .single<CategoryCore>()
   );
 }
 
-// A trigger normalises the name and updates updated_at, so merge the
-// returned row, not the sent value. No category_shares in the select: the
-// merge treats a missing key as unchanged, not cleared.
+// A trigger normalises the name, so callers merge the returned row; category_shares stays unselected.
 export function renameCategory(id: string, name: string) {
   return supabase
     .from('categories')
@@ -68,19 +57,21 @@ export function deleteCategory(id: string) {
   return supabase.from('categories').delete().eq('id', id);
 }
 
-// PostgREST caps an unranged request at max_rows (1000, supabase/config.toml)
-// and truncates silently.
+// PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.
 const ITEM_LINK_PAGE_SIZE = 1000;
 
-// Ids per `.in()` filter; more risks hitting a URL length limit before the
-// row cap does.
+// Ids per `.in()` filter; more risks a URL length limit before the row cap.
 const ID_FILTER_CHUNK_SIZE = 100;
 
-function rawListItemIdsForCategory(
-  categoryId: string,
-  from: number,
-  to: number,
-) {
+function rawListItemIdsForCategory({
+  categoryId,
+  from,
+  to,
+}: {
+  categoryId: string;
+  from: number;
+  to: number;
+}) {
   return supabase
     .from('item_categories')
     .select('item_id')
@@ -88,26 +79,20 @@ function rawListItemIdsForCategory(
     .range(from, to);
 }
 
-/**
- * Every item id linked to this category, used to find what a category
- * deletion would orphan. Paged past PostgREST's row cap to avoid silently
- * undercounting. `listPage` is a parameter so the paging loop can be driven
- * with a fake instead of a real database.
- */
+/** Every item id linked to this category, paged past the row cap; `listPage` exists for the test. */
 export async function listItemIdsForCategory(
   categoryId: string,
   listPage: typeof rawListItemIdsForCategory = rawListItemIdsForCategory,
 ): Promise<{ data: string[] | null; error: unknown }> {
   const paged = await readAllPages<{ item_id: string }>(
     ITEM_LINK_PAGE_SIZE,
-    (from, to) => listPage(categoryId, from, to),
+    (from, to) => listPage({ categoryId, from, to }),
   );
   if (paged.error !== null) return { data: null, error: paged.error };
   return { data: paged.data.map((row) => row.item_id), error: null };
 }
 
-// Exact count with no rows fetched, so the confirmation dialog can show the
-// number at risk without the full scan listItemIdsForCategory does.
+// Exact count with no rows fetched, for the confirmation dialog.
 export function countItemsForCategory(categoryId: string) {
   return supabase
     .from('item_categories')
@@ -115,12 +100,17 @@ export function countItemsForCategory(categoryId: string) {
     .eq('category_id', categoryId);
 }
 
-function rawListItemIdsLinkedElsewhere(
-  itemIds: string[],
-  excludingCategoryId: string,
-  from: number,
-  to: number,
-) {
+function rawListItemIdsLinkedElsewhere({
+  itemIds,
+  excludingCategoryId,
+  from,
+  to,
+}: {
+  itemIds: string[];
+  excludingCategoryId: string;
+  from: number;
+  to: number;
+}) {
   return supabase
     .from('item_categories')
     .select('item_id')
@@ -129,23 +119,19 @@ function rawListItemIdsLinkedElsewhere(
     .range(from, to);
 }
 
-/**
- * Of the given items, which are still linked to some category other than the
- * one being deleted, i.e. which would NOT be orphaned. Chunks the id list
- * (URL length) and pages each chunk (row cap) so neither truncates the
- * answer. Callers must still treat an `error` as a reason to abort the
- * deletion rather than act on a partial `keep` set.
- */
+/** Which items would NOT be orphaned; on `error` abort the deletion rather than act on a partial set. */
 export async function listItemIdsLinkedElsewhere(
-  itemIds: string[],
-  excludingCategoryId: string,
+  {
+    itemIds,
+    excludingCategoryId,
+  }: { itemIds: string[]; excludingCategoryId: string },
   listPage: typeof rawListItemIdsLinkedElsewhere = rawListItemIdsLinkedElsewhere,
 ): Promise<{ data: string[] | null; error: unknown }> {
   const rows = await readAllChunks(
     chunk(itemIds, ID_FILTER_CHUNK_SIZE),
     (ids) =>
       readAllPages<{ item_id: string }>(ITEM_LINK_PAGE_SIZE, (from, to) =>
-        listPage(ids, excludingCategoryId, from, to),
+        listPage({ itemIds: ids, excludingCategoryId, from, to }),
       ),
   );
   if (rows.error !== null) return { data: null, error: rows.error };

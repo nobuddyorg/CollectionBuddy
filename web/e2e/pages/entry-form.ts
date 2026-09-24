@@ -1,13 +1,7 @@
 import { type Locator, type Page } from '@playwright/test';
 
 interface EntryForm {
-  /**
-   * Points to self.
-   */
   (): Locator;
-  /**
-   * High-level interactions.
-   */
   do: {
     addTag(tag: string, key?: 'Enter' | ','): Promise<void>;
     cancel(): Promise<void>;
@@ -18,9 +12,6 @@ interface EntryForm {
     removeTag(tag: string): Promise<void>;
     submit(): Promise<void>;
   };
-  /**
-   * Raw locators.
-   */
   locators: {
     buttons: {
       cancel: Locator;

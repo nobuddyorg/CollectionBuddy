@@ -1,25 +1,18 @@
-// Runs Lighthouse CI against the real production export, twice: once
-// signed out (the plain static build) and once signed in (demo mode, which
-// signs the visitor in as a fresh anonymous user -- see scripts/demo.mjs).
-// Both builds point at a local Supabase stack rather than needing repo
-// secrets, and both are served exactly as GitHub Pages serves the real
-// site (scripts/serve-export.mjs), never `next dev`.
-//
-// Usage: npm run lighthouse        (with `supabase start` already up)
+// Lighthouse CI against the production export, signed out and signed in (demo mode), served as GitHub Pages serves it.
 import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { chromium } from '@playwright/test';
 
-const webDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const repoRoot = resolve(webDir, '..');
+const webDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const repositoryRoot = resolve(webDirectory, '..');
 
 function status() {
   try {
     return JSON.parse(
       execFileSync('supabase', ['status', '-o', 'json'], {
-        cwd: repoRoot,
+        cwd: repositoryRoot,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
       }),
@@ -38,35 +31,45 @@ if (!API_URL || !ANON_KEY) {
   process.exit(1);
 }
 
-const run = (command, args, env) =>
-  execFileSync(command, args, { cwd: webDir, env, stdio: 'inherit' });
+const run = ({ command, args, environment }) =>
+  execFileSync(command, args, {
+    cwd: webDirectory,
+    env: environment,
+    stdio: 'inherit',
+  });
 
-const baseEnv = {
+const baseEnvironment = {
   ...process.env,
   NEXT_PUBLIC_SUPABASE_URL: API_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: ANON_KEY,
-  // Same Chromium the e2e suite already needs (`npx playwright install
-  // --with-deps chromium`), not a second browser download -- chrome-launcher
-  // (what Lighthouse itself uses to drive Chrome) reads this variable.
+  // chrome-launcher reads CHROME_PATH; the e2e suite's Chromium spares a second browser download.
   CHROME_PATH: process.env.CHROME_PATH ?? chromium.executablePath(),
 };
 
 console.log(`Building the signed-out export against ${API_URL}`);
-run('npx', ['next', 'build'], baseEnv);
+run({
+  command: 'npx',
+  args: ['next', 'build'],
+  environment: baseEnvironment,
+});
 
 console.log('Running Lighthouse CI against the signed-out export...');
-run(
-  'npx',
-  ['lhci', 'autorun', '--config=lighthouserc.signed-out.json'],
-  baseEnv,
-);
+run({
+  command: 'npx',
+  args: ['lhci', 'autorun', '--config=lighthouserc.signed-out.json'],
+  environment: baseEnvironment,
+});
 
 console.log(`Building the signed-in (demo mode) export against ${API_URL}`);
-run('npx', ['next', 'build'], { ...baseEnv, NEXT_PUBLIC_DEMO_MODE: 'true' });
+run({
+  command: 'npx',
+  args: ['next', 'build'],
+  environment: { ...baseEnvironment, NEXT_PUBLIC_DEMO_MODE: 'true' },
+});
 
 console.log('Running Lighthouse CI against the signed-in export...');
-run(
-  'npx',
-  ['lhci', 'autorun', '--config=lighthouserc.signed-in.json'],
-  baseEnv,
-);
+run({
+  command: 'npx',
+  args: ['lhci', 'autorun', '--config=lighthouserc.signed-in.json'],
+  environment: baseEnvironment,
+});

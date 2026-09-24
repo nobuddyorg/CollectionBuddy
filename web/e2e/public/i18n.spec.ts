@@ -1,12 +1,9 @@
-// Not '../coverage': every test here opens its own `browser.newContext()`
-// rather than using the `page` fixture, so the autoCoverage fixture there
-// would have nothing to attach to.
+// Not '../fixture': every test opens its own browser context, so autoCoverage would have no page.
 import { expect, test } from '@playwright/test';
 
 import { createPageTree } from '../pages';
 
-// Language is decided client-side (storage, then browser); a wrong `<html lang>`
-// mispronounces the page for screen readers without any visible symptom.
+// Language is decided client-side; a wrong <html lang> mispronounces the page with no visible symptom.
 test.describe('the language a page arrives in', () => {
   test('follows a German browser', async ({ browser }) => {
     const context = await browser.newContext({ locale: 'de-DE' });

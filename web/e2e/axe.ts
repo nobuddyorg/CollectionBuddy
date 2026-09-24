@@ -4,17 +4,10 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, type TestInfo } from '@playwright/test';
 import type { Result } from 'axe-core';
 
-/** Target level per #650: WCAG 2.2 AA. */
+/** WCAG 2.2 AA. */
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 
-/**
- * Runs axe-core against the page's current state.
- *
- * Excludes rules `eslint-plugin-jsx-a11y` already catches statically (missing
- * `alt` text, invalid ARIA attributes/roles) -- axe's value here is what only
- * the rendered DOM reveals: computed contrast, focus order, the real
- * accessible-name computation, dynamic ARIA state.
- */
+/** Excludes the rules eslint-plugin-jsx-a11y already catches statically; axe is for the rendered DOM. */
 function axeOn(page: Page) {
   return new AxeBuilder({ page })
     .withTags(WCAG_TAGS)
@@ -25,11 +18,7 @@ function describeViolation(violation: Result) {
   return `${violation.id} (${violation.impact}): ${violation.help} -- ${violation.nodes.length} node(s)`;
 }
 
-// In CI only -- a local run has no $GITHUB_STEP_SUMMARY to write to, and
-// nobody's triaging a summary file on their own machine. Each call appends
-// its own heading rather than sharing one across tests, since parallel
-// Playwright workers can call this concurrently and there's no cheap way to
-// coordinate who writes a shared header first.
+// Each call appends its own heading: parallel workers cannot cheaply coordinate a shared one.
 async function reportNonBlockingFindings(
   testInfo: TestInfo,
   violations: Result[],
@@ -38,22 +27,16 @@ async function reportNonBlockingFindings(
   if (!summaryPath || violations.length === 0) return;
 
   const title = testInfo.titlePath.slice(1).join(' › ');
-  const body = violations.map((v) => `- ${describeViolation(v)}`).join('\n');
+  const body = violations
+    .map((violation) => `- ${describeViolation(violation)}`)
+    .join('\n');
   await appendFile(
     summaryPath,
     `### ♿️ Accessibility -- ${title}\n\nNot blocking; needs human triage (see \`axe-violations.json\` on the test for full detail).\n\n${body}\n\n`,
   );
 }
 
-/**
- * Fails the test on any serious/critical finding.
- *
- * Moderate/minor findings are surfaced (attached to the test, and to the
- * job summary) but not blocking -- per #650, every automated finding needs
- * human triage before it gates CI, and moderate/minor axe findings are
- * frequently ambiguous (contrast on a decorative element, a landmark
- * preference) in a way serious/critical ones are not.
- */
+/** Serious/critical findings fail the test; moderate/minor ones are attached and summarised for triage. */
 export async function expectNoSeriousA11yViolations(
   page: Page,
   testInfo: TestInfo,

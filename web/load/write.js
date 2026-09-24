@@ -28,5 +28,5 @@ export function writeEntry(data) {
 }
 
 export function handleSummary(data) {
-  return summarize('write', data);
+  return summarize({ flow: 'write', data });
 }

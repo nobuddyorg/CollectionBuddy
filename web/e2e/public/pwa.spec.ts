@@ -1,7 +1,6 @@
 import { expect, test } from '../fixture';
 
-// manifest.test.ts checks the manifest's own claims on disk; this checks that
-// what it links actually resolves at the real deployed origin and base path.
+// manifest.test.ts checks the file on disk; this checks what it links resolves at the deployed base path.
 test.describe('the installable app', () => {
   test('links a manifest that the browser can fetch', async ({ page }) => {
     await page.goto('login/');
@@ -41,8 +40,7 @@ test.describe('the installable app', () => {
       expect(response.status(), `${icon.src} (${icon.sizes})`).toBe(200);
       expect(response.headers()['content-type']).toContain('image/png');
 
-      // Read real dimensions from the PNG header to catch a manifest entry
-      // that has drifted from its file.
+      // Real dimensions from the PNG header, to catch a manifest entry that drifted from its file.
       const bytes = Buffer.from(await response.body());
       const [width, height] = [bytes.readUInt32BE(16), bytes.readUInt32BE(20)];
       expect(`${width}x${height}`, `${icon.src} real size`).toBe(icon.sizes);
@@ -75,8 +73,7 @@ test.describe('the installable app', () => {
     expect(response.status()).toBe(200);
   });
 
-  // Manifest paths are written by hand: a static file can't interpolate the
-  // base path the way the app's own links do.
+  // Manifest paths are written by hand: a static file cannot interpolate the base path.
   test('scopes the manifest to where the app is actually served', async ({
     page,
   }) => {

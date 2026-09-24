@@ -6,10 +6,7 @@ import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 import { MAX_TAG_LENGTH, MAX_TAGS } from '../../lib/textLimits';
 
-// Matches .tag-flash's animation-duration in globals.css. A timer, not
-// onAnimationEnd, so the flash always clears even if the animation is
-// somehow skipped (and so this is testable with fake timers rather than a
-// native browser event nothing but a real browser dispatches).
+// Matches .tag-flash's animation-duration in globals.css; a timer, not onAnimationEnd, so it always clears.
 const FLASH_DURATION_MS = 350;
 
 export function TagsInput({
@@ -23,29 +20,28 @@ export function TagsInput({
 }) {
   const { t, tCount } = useI18n();
   const [tagInput, setTagInput] = useState('');
-  // Flashes the chip already covering a repeated tag, since the field
-  // clearing on Enter otherwise looks identical to nothing happening.
+  // Flashes the chip already covering a repeated tag, or the field clearing looks like nothing happened.
   const [flashedTag, setFlashedTag] = useState<string | null>(null);
 
   useEffect(() => {
     if (!flashedTag) return;
-    const id = setTimeout(() => setFlashedTag(null), FLASH_DURATION_MS);
-    return () => clearTimeout(id);
+    const timer = setTimeout(() => setFlashedTag(null), FLASH_DURATION_MS);
+    return () => clearTimeout(timer);
   }, [flashedTag]);
 
   const addTag = useCallback(() => {
-    const v = tagInput.trim();
-    if (!v) return;
+    const value = tagInput.trim();
+    if (!value) return;
     setTagInput('');
-    if (tags.includes(v)) {
-      setFlashedTag(v);
+    if (tags.includes(value)) {
+      setFlashedTag(value);
       return;
     }
-    setTags([...tags, v]);
+    setTags([...tags, value]);
   }, [tagInput, tags, setTags]);
 
   const removeTag = useCallback(
-    (v: string) => setTags(tags.filter((x) => x !== v)),
+    (value: string) => setTags(tags.filter((tag) => tag !== value)),
     [tags, setTags],
   );
 
@@ -54,11 +50,11 @@ export function TagsInput({
   const emptyPlaceholder =
     tags.length === 0 ? t('item_create.tags_placeholder') : '';
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault();
       addTag();
-    } else if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
+    } else if (event.key === 'Backspace' && !tagInput && tags.length > 0) {
       removeTag(tags[tags.length - 1]);
     }
   };
@@ -95,7 +91,7 @@ export function TagsInput({
         value={tagInput}
         maxLength={MAX_TAG_LENGTH}
         readOnly={atLimit}
-        onChange={(e) => setTagInput(e.target.value)}
+        onChange={(event) => setTagInput(event.target.value)}
         onKeyDown={onKeyDown}
         aria-label={t('item_create.tags_placeholder')}
         placeholder={atLimit ? t('item_create.tags_limit') : emptyPlaceholder}

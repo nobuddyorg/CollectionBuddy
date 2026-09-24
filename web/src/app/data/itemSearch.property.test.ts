@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
-import { buildSearchFilter } from './items';
+import { buildSearchFilter } from './itemSearch';
 
 // Characters that mean something to PostgREST's or=() grammar or to LIKE.
 const HOSTILE = fc.constantFrom('"', '\\', ',', '(', ')', '.', ':', '%', '_');
@@ -55,7 +55,9 @@ describe('buildSearchFilter, for any search term', () => {
     fc.assert(
       fc.property(anyTerm, (term) => {
         expect(
-          conditions(buildSearchFilter(term)).map((c) => unquote(c).column),
+          conditions(buildSearchFilter(term)).map(
+            (condition) => unquote(condition).column,
+          ),
         ).toEqual(['title', 'description', 'place', 'tags_text']);
       }),
     );

@@ -23,7 +23,8 @@ describe('useGuardedModalClose', () => {
   it('closes without asking when there is nothing to lose', () => {
     const onClose = vi.fn();
     const { result } = renderHook(
-      () => useGuardedModalClose(false, onClose, vi.fn()),
+      () =>
+        useGuardedModalClose({ isDirty: false, onClose, onDiscard: vi.fn() }),
       { wrapper },
     );
 
@@ -37,7 +38,7 @@ describe('useGuardedModalClose', () => {
     const onClose = vi.fn();
     const onDiscard = vi.fn();
     const { result } = renderHook(
-      () => useGuardedModalClose(true, onClose, onDiscard),
+      () => useGuardedModalClose({ isDirty: true, onClose, onDiscard }),
       { wrapper },
     );
 
@@ -52,7 +53,8 @@ describe('useGuardedModalClose', () => {
   it('keeps the modal open when the question is declined', async () => {
     const onClose = vi.fn();
     const { result } = renderHook(
-      () => useGuardedModalClose(true, onClose, vi.fn()),
+      () =>
+        useGuardedModalClose({ isDirty: true, onClose, onDiscard: vi.fn() }),
       { wrapper },
     );
 
@@ -64,9 +66,12 @@ describe('useGuardedModalClose', () => {
 
   it('closes a caller that has no dirty state of its own to clear', async () => {
     const onClose = vi.fn();
-    const { result } = renderHook(() => useGuardedModalClose(true, onClose), {
-      wrapper,
-    });
+    const { result } = renderHook(
+      () => useGuardedModalClose({ isDirty: true, onClose }),
+      {
+        wrapper,
+      },
+    );
 
     act(() => result.current());
     await userEvent.click(await screen.findByTestId('confirm-accept'));

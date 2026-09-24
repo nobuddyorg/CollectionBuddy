@@ -6,8 +6,7 @@ import { Portal } from './Portal';
 describe('Portal', () => {
   it('renders nothing when there is no document to portal into', () => {
     const original = globalThis.document;
-    // @ts-expect-error -- simulating a server render, where `document`
-    // doesn't exist at all.
+    // @ts-expect-error -- simulates a server render, where document does not exist
     delete globalThis.document;
     try {
       expect(Portal({ children: 'content' })).toBeNull();

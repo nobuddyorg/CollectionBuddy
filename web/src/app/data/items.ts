@@ -2,15 +2,13 @@ import { chunk } from '../lib/chunk';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
 import type { ImageListRow } from './images';
+import { likePatternFor, searchFilterFor } from './itemSearch';
 
 type ItemRow = Database['public']['Tables']['items']['Row'];
 export type ItemInsert = Database['public']['Tables']['items']['Insert'];
 export type ItemUpdate = Database['public']['Tables']['items']['Update'];
 
-// Single source for both the field list and the `.select()` string built
-// from it below, so a dropped field can't silently vanish from responses
-// while TypeScript still believes it's there -- `.overrideTypes<T, { merge:
-// false }>()` is an assertion, not a check.
+// One list for the type and the `.select()` string: `.overrideTypes()` asserts, it never checks.
 const ITEM_FIELD_KEYS = [
   'id',
   'title',
@@ -25,20 +23,10 @@ export type ItemEditableFieldKey = Exclude<
   (typeof ITEM_FIELD_KEYS)[number],
   'id'
 >;
-/** What a page read returns per matching `item_categories` row, before
- * `listItems` flattens it to the item and its photographs. */
+/** One `item_categories` row of a page read, before `listItems` flattens it. */
 type ItemCategoryPageRow = { items: ItemFields & { images: ImageListRow[] } };
 
-/**
- * One distinct place in a category, already folded down from every item
- * catalogued there (`list_category_places`, 0002_functions.sql)
- * instead of one row per item -- the map used to download the whole
- * category and do this fold on the client (#PERF-H5). `titles` names the
- * entries for the popup; `ids` is every item at a place without finite
- * coordinates (empty otherwise), so a geocoded result can be written back
- * onto them instead of repeating the lookup on the next map open. Both are
- * newest-first, the same order the list uses.
- */
+/** One distinct place in a category; `ids` is every item there without finite coordinates. */
 export interface PlaceGroupRow {
   place: string;
   place_lat: number | null;
@@ -47,83 +35,12 @@ export interface PlaceGroupRow {
   ids: string[];
 }
 
-// Coordinates come back with every item read so an item edited without
-// touching its place keeps the pin it already had.
-const ITEM_FIELDS_SELECT = ITEM_FIELD_KEYS.join(',');
-// Embeds items as the many-to-one side of item_categories rather than the
-// other way around, so item_categories -- not items -- is the driving,
-// top-level table. That is what lets .order() below sort and .range() page
-// on item_categories' own created_at, walking idx_item_categories_cat_created
-// (0005_indexes.sql) instead of scanning every item
-// in the category before sorting (#618, #619).
+export const ITEM_FIELDS_SELECT = ITEM_FIELD_KEYS.join(',');
+// item_categories drives the read so .order()/.range() walk idx_item_categories_cat_created.
 const ITEM_CATEGORY_PAGE_SELECT = `items!inner(${ITEM_FIELDS_SELECT})`;
-// The page also embeds each item's photograph rows, saving the separate
-// `images` round trip before signing (#627).
 const ITEM_CATEGORY_PAGE_WITH_IMAGES_SELECT = `items!inner(${ITEM_FIELDS_SELECT},images(id,item_id,path_full,path_thumb))`;
 
-// Escapes LIKE metacharacters (and a literal backslash, so it survives as
-// one once ILIKE unescapes it) and wraps the term for a substring match.
-// Shared by buildSearchFilter and likePatternFor below, so every reader of
-// a search term -- the list, the map, and the searched-page RPC -- treats
-// it identically.
-function likePattern(needle: string): string {
-  const likeEscaped = needle.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&');
-  return `%${likeEscaped}%`;
-}
-
-// Quotes the value so PostgREST's or=() grammar (which treats , . ( ) as
-// structural delimiters) sees one opaque string instead of parsing the
-// term as extra filter conditions.
-export function buildSearchFilter(needle: string): string {
-  const like = likePattern(needle);
-  const quoted = like.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  return `title.ilike."${quoted}",description.ilike."${quoted}",place.ilike."${quoted}",tags_text.ilike."${quoted}"`;
-}
-
-// Below 3 characters the trigram indexes can't produce any candidates
-// (ILIKE %q% needs at least one 3-char trigram to seed a bitmap scan), so a
-// 1-2 char search would force a sequential scan on every keystroke.
-export const SEARCH_MIN_LENGTH = 3;
-
-// A non-ASCII character (CJK, Cyrillic, a currency symbol) carries more
-// meaning per character than a Latin letter, so the floor is lower. A plain
-// two-letter ASCII term still waits for a third character; that gap is
-// accepted, not closed, since closing it gives up the scan-cost argument.
-export const SEARCH_MIN_LENGTH_NON_ASCII = 2;
-
-const NON_ASCII_PATTERN = /[^\x00-\x7F]/;
-
-/** The minimum length `search` needs before it earns a filter. */
-export function searchMinLength(search: string): number {
-  return NON_ASCII_PATTERN.test(search)
-    ? SEARCH_MIN_LENGTH_NON_ASCII
-    : SEARCH_MIN_LENGTH;
-}
-
-/**
- * The filter a search term earns, or null for a term too short to be worth
- * one. Shared rather than restated at each call site: the list and the map
- * are two views of one filtered set, and if they disagreed about what
- * counts as a search the map would show pins for entries the list hides.
- */
-export function searchFilterFor(search: string): string | null {
-  return search.length >= searchMinLength(search)
-    ? buildSearchFilter(search)
-    : null;
-}
-
-/**
- * The raw ILIKE pattern a search term earns, or null for a term too short
- * to be worth one -- same gate as searchFilterFor, but as a plain value
- * for `list_category_places`' `like_pattern` argument rather than a
- * PostgREST or=() filter string.
- */
-export function likePatternFor(search: string): string | null {
-  return search.length >= searchMinLength(search) ? likePattern(search) : null;
-}
-
-/** `abortSignal` is typed as requiring a signal but only stores what it is
- * given, so an absent one needs no branch of its own at five call sites. */
+/** `abortSignal` only stores what it is given, so an absent signal needs no branch at call sites. */
 function withSignal<T extends { abortSignal(signal: AbortSignal): T }>(
   query: T,
   signal: AbortSignal | undefined,
@@ -142,15 +59,10 @@ export function rawListItems({
   search: string;
   from: number;
   to: number;
-  /** Aborts a request superseded by a newer one, so the bytes don't finish
-   * downloading for nothing. */
+  /** Aborts a request superseded by a newer one. */
   signal?: AbortSignal;
 }) {
-  // Driven from item_categories (see ITEM_CATEGORY_PAGE_SELECT above), with
-  // category_id a plain column filter on that same top-level table rather
-  // than an embedded-table one. The exact total lives in the separate,
-  // cheaper rawCountItems request below (#PERF-H3) instead of riding along
-  // here as `count: 'exact'`.
+  // No `count: 'exact'` here: the total comes from the cheaper rawCountItems request.
   let query = supabase
     .from('item_categories')
     .select(ITEM_CATEGORY_PAGE_WITH_IMAGES_SELECT)
@@ -163,7 +75,7 @@ export function rawListItems({
     withSignal(query, signal)
       .order('created_at', { ascending: false })
       // The item id breaks ties, so entries linked in one statement page stably.
-      .order('item_id', { ascending: true })
+      .order('item_id')
       // Photographs oldest-first per item, as listImagesForItems orders them.
       .order('created_at', { referencedTable: 'items.images', ascending: true })
       .order('id', { referencedTable: 'items.images', ascending: true })
@@ -172,14 +84,7 @@ export function rawListItems({
   );
 }
 
-/**
- * The page's exact total, asked for separately from `rawListItems`
- * (#PERF-H3). Counting through `items!inner(...)` pays for a join on every
- * row even with no search filter -- a plain `head: true` count on
- * `item_categories` alone measures ~15x cheaper (194 ms -> 13.3 ms at
- * 100,000 items). Only a search filter, which narrows on `items`' own
- * columns, needs that join back for the count to stay accurate.
- */
+/** The exact total; the items join is ~15x dearer and only a search filter needs it back. */
 export function rawCountItems({
   categoryId,
   search,
@@ -206,16 +111,7 @@ export function rawCountItems({
   return withSignal(query, signal);
 }
 
-/**
- * The searched page and its exact total in one request, via
- * `search_category_items` (0002_functions.sql) -- a `SECURITY
- * DEFINER` function that applies the read-access check itself and then
- * queries with RLS bypassed, since ILIKE can never use the trigram indexes
- * under RLS (#PERF-H4). Used only once a search term has earned a filter;
- * an unfiltered read stays on `rawListItems`/`rawCountItems` above, which
- * already perform well via idx_item_categories_cat_created (#618/#619) and
- * have no ILIKE clause to be blocked on.
- */
+/** The searched page and its total in one `search_category_items` call, an RLS-bypassing ILIKE. */
 export function rawSearchCategoryItems({
   categoryId,
   likePattern,
@@ -260,18 +156,13 @@ function itemFieldsOf({
   return { id, title, description, place, place_lat, place_lng, tags };
 }
 
-/**
- * The catalogue page: every item currently linked into `categoryId`,
- * newest first. A search that has earned a filter (likePatternFor) goes
- * through `search_category_items` instead -- one request rather than the
- * unfiltered path's two, since that RPC returns the exact total alongside
- * the rows (#PERF-H4). A thin flatten over `rawListItems`/`rawSearch...`
- * otherwise -- kept outside the ignored block above (unlike those builders)
- * because unwrapping the response is real logic worth a real test.
- * `rawList`/`rawCount`/`rawSearch` are parameters for exactly that test,
- * not for production callers. `imageRows` is the page's photograph rows
- * when the read carried them (the unfiltered path), else null.
- */
+type ListItemsCalls = {
+  rawList?: typeof rawListItems;
+  rawCount?: typeof rawCountItems;
+  rawSearch?: typeof rawSearchCategoryItems;
+};
+
+/** The catalogue page, newest first; `imageRows` is null on the searched path, which has none. */
 export async function listItems(
   params: {
     categoryId: string;
@@ -280,9 +171,11 @@ export async function listItems(
     to: number;
     signal?: AbortSignal;
   },
-  rawList: typeof rawListItems = rawListItems,
-  rawCount: typeof rawCountItems = rawCountItems,
-  rawSearch: typeof rawSearchCategoryItems = rawSearchCategoryItems,
+  {
+    rawList = rawListItems,
+    rawCount = rawCountItems,
+    rawSearch = rawSearchCategoryItems,
+  }: ListItemsCalls = {},
 ): Promise<{
   data: ItemFields[] | null;
   error: unknown;
@@ -330,9 +223,7 @@ export function createItem(payload: Pick<ItemInsert, ItemEditableFieldKey>) {
   return (
     supabase
       .from('items')
-      // user_id is never sent: enforce_user_id() (0002_functions.sql) fills
-      // it in from the JWT on every insert. RLS plus that trigger is what
-      // makes it impossible to hand a row to another user.
+      // user_id is never sent: enforce_user_id() fills it from the JWT, so no row changes hands.
       .insert(payload as ItemInsert)
       .select('id')
       .single<{ id: string }>()
@@ -351,9 +242,7 @@ export function updateItem(
     .single<ItemFields>();
 }
 
-// One `.in()` filter's worth of items, not one row -- what `updateItemsPlace`
-// below chunks over so a place shared by thousands of items becomes a
-// handful of requests instead of one per row (#PERF-H6).
+/** One `.in()` filter's worth of items, what `updateItemsPlace` chunks over. */
 export function rawUpdateItemsPlace(
   ids: string[],
   payload: Pick<ItemUpdate, 'place_lat' | 'place_lng'>,
@@ -361,9 +250,7 @@ export function rawUpdateItemsPlace(
   return supabase.from('items').update(payload).in('id', ids);
 }
 
-// `.select().single()` turns an RLS-refused delete (zero rows affected,
-// which a bare `.delete()` reports as `{ error: null }`) into an error a
-// caller can see.
+// `.select().single()` turns an RLS-refused delete (zero rows, `{ error: null }`) into an error.
 export function deleteItem(id: string) {
   return supabase
     .from('items')
@@ -377,8 +264,7 @@ export function linkItemToCategory(itemId: string, categoryId: string) {
   return supabase.from('item_categories').insert({
     item_id: itemId,
     category_id: categoryId,
-    // tg_item_categories_enforce() derives and rechecks this from the
-    // item/category it links, not from the client.
+    // tg_item_categories_enforce() derives user_id from the linked rows, never from the client.
   } as Database['public']['Tables']['item_categories']['Insert']);
 }
 
@@ -408,22 +294,16 @@ export function deleteItems(ids: string[]) {
   return supabase.from('items').delete().in('id', ids);
 }
 
-// Narrowed by the same search as the list (via likePatternFor, the same
-// gate and escaping as searchFilterFor), so the map is the same set of
-// entries seen from above. Grouped by place in Postgres itself
-// (list_category_places, 0002_functions.sql) rather than
-// downloaded one row per item and folded on the client (#PERF-H5) -- the
-// wire now carries one row per distinct place, bounded by PostgREST's own
-// max_rows the way every other unranged read in this app already is,
-// rather than one row per item in the category. `security invoker`, so
-// this changes nothing about who may see what: the function runs under
-// the caller's own RLS, exactly as if items/item_categories were queried
-// directly.
-export function rawListCategoryPlaces(
-  categoryId: string,
-  search: string,
-  signal?: AbortSignal,
-) {
+/** Places grouped in Postgres (`list_category_places`, security invoker) under the list's search gate. */
+export function rawListCategoryPlaces({
+  categoryId,
+  search,
+  signal,
+}: {
+  categoryId: string;
+  search: string;
+  signal?: AbortSignal;
+}) {
   const query = supabase.rpc(
     'list_category_places',
     { cat_id: categoryId, like_pattern: likePatternFor(search) ?? undefined },
@@ -435,111 +315,28 @@ export function rawListCategoryPlaces(
   >();
 }
 
-/** Where the next export page starts: the last page's final link row. */
-export type ExportCursor = { linkedAt: string; itemId: string };
-
-/**
- * Rows strictly after `cursor` in (created_at, item_id) order, as a PostgREST
- * or=() filter. Both values come from the database, and are quoted anyway
- * since a timestamp carries `.` and `:`.
- */
-export function exportCursorFilter(cursor: ExportCursor): string {
-  const at = `"${cursor.linkedAt}"`;
-  return `created_at.gt.${at},and(created_at.eq.${at},item_id.gt."${cursor.itemId}")`;
-}
-
-// Unfiltered by the search box on purpose: an export is of a category, not
-// of whatever happens to be typed into the field when the button is
-// pressed. Oldest-first, so the archive numbers its folders from the
-// collection's first entry, `item_id` breaking ties. Driven from
-// item_categories and paged by keyset rather than offset, so every page walks
-// idx_item_categories_cat_created and stops, instead of re-sorting the whole
-// category per page (#625). The `gte` repeats the cursor's lower bound so the
-// index scan can start there; the or=() then drops the ties already read.
-export function rawListItemsForExport(
-  categoryId: string,
-  page: { after: ExportCursor | null; size: number },
-) {
-  let query = supabase
-    .from('item_categories')
-    .select(`created_at,item_id,items!inner(${ITEM_FIELDS_SELECT},created_at)`)
-    .eq('category_id', categoryId);
-  if (page.after) {
-    query = query
-      .gte('created_at', page.after.linkedAt)
-      .or(exportCursorFilter(page.after));
-  }
-  return query
-    .order('created_at')
-    .order('item_id')
-    .limit(page.size)
-    .overrideTypes<ExportLinkRow[], { merge: false }>();
-}
-
-type ExportLinkRow = {
-  created_at: string;
-  item_id: string;
-  items: ExportItemRow;
-};
-
-/**
- * One export page, flattened to its items, with the cursor for the next page
- * -- or none once a page comes back short. `rawList` is a parameter for the
- * test, not for production callers.
- */
-export async function listItemsForExport(
-  categoryId: string,
-  page: { after: ExportCursor | null; size: number },
-  rawList: typeof rawListItemsForExport = rawListItemsForExport,
-): Promise<
-  | { data: { items: ExportItemRow[]; next: ExportCursor | null }; error: null }
-  | { data: null; error: NonNullable<unknown> }
-> {
-  const { data, error } = await rawList(categoryId, page);
-  if (error) return { data: null, error };
-  const rows = data ?? [];
-  const last = rows.at(-1);
-  const next =
-    last && rows.length === page.size
-      ? { linkedAt: last.created_at, itemId: last.item_id }
-      : null;
-  return { data: { items: rows.map((row) => row.items), next }, error: null };
-}
-
-export type ExportItemRow = ItemFields & { created_at: string };
-
-/**
- * The map's places for a category: a thin await over `rawListCategoryPlaces`
- * -- kept outside the ignored block above so it has a plain, mockable
- * return type instead of the raw postgrest builder's, the same reasoning
- * `listItems` is kept alongside `rawListItems`. `rawList` is a parameter
- * for exactly that test, not for production callers.
- */
+/** A plain, mockable await over `rawListCategoryPlaces`; `rawList` exists for its test. */
 export async function listCategoryPlaces(
-  categoryId: string,
-  search: string,
-  signal?: AbortSignal,
+  {
+    categoryId,
+    search,
+    signal,
+  }: { categoryId: string; search: string; signal?: AbortSignal },
   rawList: typeof rawListCategoryPlaces = rawListCategoryPlaces,
 ): Promise<{ data: PlaceGroupRow[] | null; error: unknown }> {
-  const { data, error } = await rawList(categoryId, search, signal);
+  const { data, error } = await rawList({ categoryId, search, signal });
   return { data: data ?? null, error };
 }
 
-// Ids per `.in()` filter; more risks hitting a URL length limit before
-// PostgREST's own row cap does (same constant, and same reasoning, as
-// data/categories.ts and data/images.ts).
+// Ids per `.in()` filter; more risks a URL length limit before PostgREST's row cap.
 const ID_FILTER_CHUNK_SIZE = 100;
 
-/**
- * Writes a geocoded place back onto every item at that place, one request
- * per `ID_FILTER_CHUNK_SIZE` items rather than one per item (#PERF-H6) --
- * `Map/usePlaces.tsx` calls this once per resolved place, not once per row.
- * `updatePage` is a parameter so the chunking can be driven with a fake
- * instead of a real database.
- */
+/** Writes a geocoded place onto every item at it, one request per chunk; `updatePage` is for the test. */
 export async function updateItemsPlace(
-  ids: string[],
-  payload: Pick<ItemUpdate, 'place_lat' | 'place_lng'>,
+  {
+    ids,
+    payload,
+  }: { ids: string[]; payload: Pick<ItemUpdate, 'place_lat' | 'place_lng'> },
   updatePage: typeof rawUpdateItemsPlace = rawUpdateItemsPlace,
 ): Promise<{ error: unknown }> {
   for (const page of chunk(ids, ID_FILTER_CHUNK_SIZE)) {

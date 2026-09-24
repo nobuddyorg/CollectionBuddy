@@ -6,10 +6,10 @@ export function useLockBodyScroll(active: boolean) {
   useEffect(() => {
     if (!active) return;
     const { body } = document;
-    const prev = body.style.overflow;
+    const previous = body.style.overflow;
     body.style.overflow = 'hidden';
     return () => {
-      body.style.overflow = prev;
+      body.style.overflow = previous;
     };
   }, [active]);
 }

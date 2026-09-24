@@ -11,16 +11,14 @@ export function markerKey(marker: MarkerInput): string {
   ]);
 }
 
-/**
- * What changed between the pins on the map and the pins wanted: which to
- * draw and which to take away. Unchanged pins are left alone, so pins landing
- * one at a time cost one marker each rather than a rebuild of all (#628).
- */
+/** Unchanged pins are left alone, so pins landing one at a time cost one marker each, not a rebuild. */
 export function diffMarkers(
   drawnKeys: ReadonlySet<string>,
   wanted: readonly MarkerInput[],
 ): { add: Map<string, MarkerInput>; removeKeys: string[] } {
-  const wantedByKey = new Map(wanted.map((m) => [markerKey(m), m] as const));
+  const wantedByKey = new Map(
+    wanted.map((marker) => [markerKey(marker), marker] as const),
+  );
   const add = new Map([...wantedByKey].filter(([key]) => !drawnKeys.has(key)));
   const removeKeys = [...drawnKeys].filter((key) => !wantedByKey.has(key));
   return { add, removeKeys };

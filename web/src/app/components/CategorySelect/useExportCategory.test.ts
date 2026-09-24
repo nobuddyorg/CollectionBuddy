@@ -2,9 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { exportProgressMessage } from './useExportCategory';
 
-// Stands in for the real `t`: returns the key's own English string so the
-// assertions below read as what a user would see, and proves which key was
-// asked for at the same time.
+// Stands in for the real t: the key's English string, so an assertion also proves which key was asked for.
 const strings: Record<string, string> = {
   'category_select.export_reading': 'Reading entries…',
   'category_select.export_reading_count': 'Entries read: {done}…',
@@ -55,8 +53,7 @@ describe('exportProgressMessage', () => {
   });
 
   it('does not count to zero for a category whose items have no photographs', () => {
-    // "0 of 0" reads as a stall. There is nothing to count here, so the
-    // message falls through to the phase that is actually doing work.
+    // "0 of 0" reads as a stall, so the message falls through to the phase doing the work.
     expect(
       exportProgressMessage({ phase: 'photos', done: 0, total: 0 }, t),
     ).toBe('Packing the archive…');

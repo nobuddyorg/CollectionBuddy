@@ -17,8 +17,7 @@ export function Dialog({
 }: {
   open: boolean;
   title: string;
-  /** Rendered above `children` and wired to `aria-describedby`, for content
-   *  that isn't just the dialog's label (e.g. a confirm's question). */
+  /** Rendered above `children` and wired to `aria-describedby`, e.g. a confirm's question. */
   description?: string;
   closeLabel?: string;
   onClose: () => void;
@@ -28,13 +27,11 @@ export function Dialog({
   role?: 'dialog' | 'alertdialog';
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
-  // A constant id breaks once two CenteredModals are mounted at once (a
-  // confirm raised from inside another modal): aria-labelledby would
-  // resolve to whichever dialog mounted first.
+  // Not a constant id: a confirm raised inside another modal would label the wrong dialog.
   const titleId = useId();
   const descriptionId = useId();
 
-  useFocusTrap(open, panelRef, initialFocusRef);
+  useFocusTrap({ open, containerRef: panelRef, initialFocusRef });
 
   return (
     <div
@@ -44,10 +41,7 @@ export function Dialog({
           : 'p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]'
       } ${open ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
     >
-      {/* The onClick below isn't an interactive action -- it only stops a
-          click inside the panel from bubbling to the backdrop's
-          close-on-click-outside handler. */}
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- onClick only stops a click inside the panel from reaching the backdrop's close handler */}
       <div
         ref={panelRef}
         role={role}
@@ -59,7 +53,7 @@ export function Dialog({
             ? 'h-[100dvh] max-w-none rounded-none pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
             : 'max-w-2xl max-h-[90dvh] rounded-sm'
         } ${open ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <h3 id={titleId} className="font-display text-base">
@@ -74,8 +68,7 @@ export function Dialog({
             <Icon icon={IconType.Close} className="w-5 h-5" />
           </button>
         </div>
-        {/* Fullscreen drops the padding so content sized to 100% (the map)
-            fills the screen rather than collapsing to nothing. */}
+        {/* Fullscreen drops the padding, or 100%-sized content (the map) collapses to nothing. */}
         <div
           className={
             size === 'full'

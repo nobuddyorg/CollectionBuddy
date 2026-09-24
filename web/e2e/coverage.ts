@@ -2,7 +2,7 @@ import { type Page, test as base } from '@playwright/test';
 import MCR from 'monocart-coverage-reports';
 
 // Playwright's Coverage API is Chromium-only (CDP); the fixture skips collection on other engines.
-const mcr = MCR({
+const coverageReports = MCR({
   name: 'CollectionBuddy e2e coverage',
   outputDir: 'coverage-e2e',
   reports: ['v8', 'console-summary', 'markdown-summary'],
@@ -20,7 +20,7 @@ const COVERAGE_THRESHOLDS = {
   lines: 83,
 };
 
-// Only the local-stack run collects: it is the one run with source maps and every Chromium project. A deployed bundle has no source maps, so its numbers would be minified-line counts.
+// Only the local-stack run collects: it alone has source maps and every Chromium project.
 const COLLECT = Boolean(process.env.E2E_SUPABASE_URL);
 
 type PageCoverage = Page['coverage'];
@@ -39,10 +39,10 @@ async function flushCollected(coverage: PageCoverage) {
   ]);
   const entries = [...jsCoverage, ...cssCoverage];
   // Before the first navigation nothing is loaded, and monocart logs an error for an empty list.
-  if (entries.length > 0) await mcr.add(entries);
+  if (entries.length > 0) await coverageReports.add(entries);
 }
 
-// V8 discards a document's counts on a full navigation whatever `resetOnNavigation` says, so they are flushed before every `goto`/`reload`.
+// V8 discards a document's counts on a full navigation whatever `resetOnNavigation` says, so flush first.
 function flushBeforeNavigation(page: Page) {
   const goto = page.goto.bind(page);
   const reload = page.reload.bind(page);
@@ -75,18 +75,18 @@ export const test = base.extend<{ autoCoverage: void }>({
   ],
 });
 
-// Called once from globalTeardown; each worker's `add()` persisted to `outputDir`, and throwing here fails the whole run.
+// Called once from globalTeardown; throwing here fails the whole run.
 export async function generateCoverageReport() {
   if (!COLLECT) return;
-  const results = await mcr.generate();
+  const results = await coverageReports.generate();
   if (!results) return;
 
   const failures = Object.entries(COVERAGE_THRESHOLDS)
     .map(([metric, floor]) => {
-      const pct =
+      const percentage =
         results.summary[metric as keyof typeof COVERAGE_THRESHOLDS]?.pct;
-      return typeof pct === 'number' && pct < floor
-        ? `${metric}: ${pct.toFixed(2)}% is below the ${floor}% floor`
+      return typeof percentage === 'number' && percentage < floor
+        ? `${metric}: ${percentage.toFixed(2)}% is below the ${floor}% floor`
         : null;
     })
     .filter((failure) => failure !== null);

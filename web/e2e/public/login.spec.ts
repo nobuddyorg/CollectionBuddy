@@ -2,8 +2,7 @@ import { expect, test } from '../fixture';
 
 import { horizontalOverflow } from '../helpers';
 
-// Pinned so the assertions below can name what is on screen; language
-// selection itself is covered separately in i18n.spec.ts.
+// Pinned so the assertions can name what is on screen; i18n.spec.ts covers language selection.
 test.use({ locale: 'en-GB' });
 
 test.describe('the login page', () => {
@@ -12,10 +11,9 @@ test.describe('the login page', () => {
   });
 
   test('shows the wordmark in two parts', async ({ on, page }) => {
-    const wordmark = on(page).login.locators.wordmark;
+    const { wordmark, wordmarkParts } = on(page).login.locators;
     await expect(wordmark).toHaveText('CollectionBuddy');
-    // Two spans: "Buddy" carries the accent colour, "Collection" the rule beneath it.
-    await expect(wordmark.locator('span')).not.toHaveCount(0);
+    await expect(wordmarkParts).not.toHaveCount(0);
   });
 
   test('offers a way in', async ({ on, page }) => {
@@ -37,8 +35,7 @@ test.describe('the login page', () => {
     await expect(on(page).login.locators.coin).toBeVisible();
   });
 
-  // Checks opacity, not just count: an animated element can render but never
-  // actually arrive on screen after a refactor.
+  // Opacity, not just count: an animated element can render but never arrive on screen.
   test('flies the collectibles out where there is room for them', async ({
     on,
     page,
@@ -77,8 +74,7 @@ test.describe('the login page', () => {
     );
   });
 
-  // `redirect_to` is built from the base path baked in at build time, so a
-  // wrong one lands every returning visitor on a 404 of the host's.
+  // redirect_to is built from the base path baked in at build time; a wrong one lands every return on a 404.
   test('hands sign-in to the provider, pointed back at the app', async ({
     on,
     page,

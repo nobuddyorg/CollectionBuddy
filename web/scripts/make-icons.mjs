@@ -1,33 +1,20 @@
-// Renders the home-screen, splash-screen, header and favicon icons in
-// public/ from the one piece of artwork the app has, public/logo.png.
-//
-// Usage: node scripts/make-icons.mjs
-//
-// Run by hand and the results committed, not wired into the build.
-//
-// Every icon is the artwork scaled *down*, never up -- logo.png is 414px
-// across, the ceiling on how sharp any of this can be. Only a vector
-// source would lift that.
+// Renders public/'s icons from public/logo.png (414px wide, so every icon scales down, never up); run by hand, results committed.
 import { chromium } from 'playwright';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const publicDir = new URL('../public/', import.meta.url);
-const sourceFile = new URL('logo.png', publicDir);
+const publicDirectory = new URL('../public/', import.meta.url);
+const sourceFile = new URL('logo.png', publicDirectory);
 const source = readFileSync(sourceFile);
 
-// A PNG's IHDR is fixed-position, so the artwork's proportions come out of
-// the file itself rather than being restated here and drifting from it.
+// A PNG's IHDR is fixed-position, so the proportions come from the file rather than a restated constant.
 const sourceWidth = source.readUInt32BE(16);
 const sourceHeight = source.readUInt32BE(20);
 const aspect = sourceWidth / sourceHeight;
 
-// `themeColor` in layout.tsx / `background_color` in the manifest. Opaque
-// on purpose: iOS composites a transparent home-screen icon onto black,
-// erasing artwork drawn in dark brown ink.
+// `themeColor` in layout.tsx / manifest `background_color`; opaque because iOS composites a transparent icon onto black.
 const PAPER = '#f4f3ef';
 
-// `circle` is for a maskable icon: the launcher may crop to anything inside
-// the inner 80% circle, so what has to fit is the artwork's *diagonal*.
+// A maskable icon may be cropped to the inner 80% circle, so the artwork's diagonal is what has to fit.
 const SQUARE_SPAN = 0.78;
 const SAFE_CIRCLE = 0.8;
 
@@ -37,17 +24,13 @@ const artworkWidth = (size, fit) =>
     : size * SQUARE_SPAN;
 
 const targets = [
-  // 192 and 512 are the two sizes Android looks for: the home screen takes
-  // the first, the splash screen and the install prompt the second.
+  // The two sizes Android looks for: home screen, then splash screen and install prompt.
   { file: 'icon-192.png', size: 192, fit: 'square' },
   { file: 'icon-512.png', size: 512, fit: 'square' },
   { file: 'icon-maskable-512.png', size: 512, fit: 'circle' },
-  // iOS asks for exactly 180 and scales it itself; there is no larger size
-  // to give it.
+  // iOS asks for exactly 180 and scales it itself.
   { file: 'apple-touch-icon.png', size: 180, fit: 'square' },
-  // `raw`, not `square`: the header draws the artwork directly (transparent
-  // background, no paper tile), so it needs a small crop of the logo, not
-  // the full source scaled down by the browser at render time.
+  // The header draws the artwork on a transparent background, so it needs a small crop, not a paper tile.
   { file: 'logo-header.png', size: 48, fit: 'raw' },
 ];
 
@@ -56,8 +39,6 @@ const dataUri = `data:image/png;base64,${source.toString('base64')}`;
 const browser = await chromium.launch();
 const page = await browser.newPage({ deviceScaleFactor: 1 });
 
-// Returns the PNG buffer directly rather than writing it -- favicon.ico
-// below needs a 16px render with no reason to also exist as its own file.
 async function renderRaw(width) {
   const height = Math.round(width / aspect);
   await page.setViewportSize({ width, height });
@@ -73,11 +54,8 @@ async function renderRaw(width) {
   });
 }
 
-// Same square-canvas centering as the icon-*.png targets below, minus the
-// file write -- favicon.ico's 16px layer needs a square PNG buffer, and
-// renderRaw's non-square aspect-preserving crop (built for logo-header.png)
-// doesn't fit an ICONDIRENTRY declared 16x16.
-async function renderSquare(size, fit, background) {
+// Returns the buffer: favicon.ico's 16px layer needs a square render that never becomes its own file.
+async function renderSquare({ size, fit, background }) {
   const width = artworkWidth(size, fit);
   await page.setViewportSize({ width: size, height: size });
   await page.setContent(
@@ -96,7 +74,7 @@ for (const { file, size, fit } of targets) {
   if (fit === 'raw') {
     const width = Math.min(size, sourceWidth);
     const png = await renderRaw(width);
-    writeFileSync(new URL(file, publicDir), png);
+    writeFileSync(new URL(file, publicDirectory), png);
     console.log(
       `${file}: ${width}px wide, raw (${(width / sourceWidth).toFixed(2)}x source)`,
     );
@@ -112,17 +90,14 @@ for (const { file, size, fit } of targets) {
     process.exit(1);
   }
 
-  const png = await renderSquare(size, fit, PAPER);
-  writeFileSync(new URL(file, publicDir), png);
+  const png = await renderSquare({ size, fit, background: PAPER });
+  writeFileSync(new URL(file, publicDirectory), png);
   console.log(
     `${file}: ${size}x${size}, artwork ${Math.round(width)}px wide (${(width / sourceWidth).toFixed(2)}x source)`,
   );
 }
 
-// favicon.ico: a plain ICONDIR header followed by one ICONDIRENTRY per
-// image, then the raw PNG bytes. Built from a fresh 16px render plus the
-// 32px favicon already in public/ (framed by hand, read back not
-// re-derived).
+// An ICONDIR header, one ICONDIRENTRY per image, then the raw PNG bytes.
 function buildIco(images) {
   const header = Buffer.alloc(6);
   header.writeUInt16LE(0, 0); // reserved
@@ -148,12 +123,13 @@ function buildIco(images) {
   return Buffer.concat([header, ...entries, ...images.map(({ png }) => png)]);
 }
 
-// Transparent, unlike the app icons above: favicon-32x32.png (read back
-// below, not re-derived) already is, and a browser tab supplies its own
-// background -- there's no iOS-home-screen-style black composite to guard
-// against here.
-const favicon16 = await renderSquare(16, 'square', 'transparent');
-const favicon32 = readFileSync(new URL('favicon-32x32.png', publicDir));
+// Transparent, unlike the app icons: the hand-framed favicon-32x32.png already is, and a browser tab supplies its own background.
+const favicon16 = await renderSquare({
+  size: 16,
+  fit: 'square',
+  background: 'transparent',
+});
+const favicon32 = readFileSync(new URL('favicon-32x32.png', publicDirectory));
 const ico = buildIco([
   { width: 16, height: 16, png: favicon16 },
   {
@@ -162,7 +138,7 @@ const ico = buildIco([
     png: favicon32,
   },
 ]);
-writeFileSync(new URL('favicon.ico', publicDir), ico);
+writeFileSync(new URL('favicon.ico', publicDirectory), ico);
 console.log(`favicon.ico: 16px + 32px, ${ico.length} bytes`);
 
 await browser.close();

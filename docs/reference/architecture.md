@@ -61,7 +61,7 @@ No `update` policy means no row matches, so the omission is the denial. Category
 
 Grants are the second denial: `anon` has `revoke all` on every table, and `authenticated` holds exactly the DML each table's policies back — no `UPDATE` on `item_categories`/`images`, no `TRUNCATE`/`REFERENCES`/`TRIGGER` anywhere. `TRUNCATE` is the one RLS does not filter. `0007` raises at migration time if RLS is ever found disabled on `storage.objects`.
 
-`web/e2e/signed-in/rls.spec.ts` is the executable version of this section, covering owner-versus-stranger, `viewer` and `editor` with real tokens against a local stack; `supabase/tests/database/` covers the same logic directly in pgTAP.
+[`web/e2e/signed-in/rls/`](../../web/e2e/signed-in/rls/) is the executable version of this section, one spec per boundary (`isolation`, `viewer-share`, `editor-share`, each with a `-photographs` half for Storage, plus `search-rpc` and `quotas`), with real tokens against a local stack; `supabase/tests/database/` covers the same logic directly in pgTAP.
 
 ### Sharing
 
@@ -94,7 +94,7 @@ Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql
 - `storage_item_id()` — parses the item id out of a storage path, returning `NULL` rather than raising; it tests the segment with `pg_input_is_valid()` rather than catching the cast's error, so no call opens a subtransaction. See Storage.
 - `keepalive()` — no-op RPC, callable by `anon`, hit daily by `keep-alive.yml`.
 - `list_category_places()` — the map's distinct places for a category, `SECURITY INVOKER`.
-- `search_category_items()` — the searched catalogue page, `SECURITY DEFINER`: re-implements the read-access check (owns the item, or holds an active read grant on the category) and then queries with RLS bypassed so the trigram indexes are usable ([why](../explanation/design-decisions.md#why-search-uses-trigram-ilike-instead-of-full-text-search)). An authorization boundary in its own right, with its own `rls.spec.ts` case.
+- `search_category_items()` — the searched catalogue page, `SECURITY DEFINER`: re-implements the read-access check (owns the item, or holds an active read grant on the category) and then queries with RLS bypassed so the trigram indexes are usable ([why](../explanation/design-decisions.md#why-search-uses-trigram-ilike-instead-of-full-text-search)). An authorization boundary in its own right, with its own spec (`rls/search-rpc.spec.ts`).
 
 Every function pins `set search_path = ''`, and every one revokes `execute` from `public` and `anon` (trigger functions from `authenticated` too) before granting it to `authenticated` — except `keepalive()`, the one function `anon` may call. The revokes name `anon` and `authenticated` because hosted default privileges can give a new function a direct grant to each, which a revoke from `public` leaves in place (`0015`); `postgres`'s own default privileges no longer grant either.
 
@@ -127,7 +127,9 @@ Because `has_category_read_access()` excludes ownership and an owner cannot shar
 
 [`web/src/app/data/`](../../web/src/app/data/) holds every table and storage query, and the two other external boundaries:
 
-- `items.ts` — `listItems()` (paginated; a search goes through `search_category_items`), `createItem()`, `updateItem()`, `deleteItem()`, `linkItemToCategory()`, `listCategoryPlaces()`.
+- `items.ts` — `listItems()` (paginated; a search goes through `search_category_items`), `createItem()`, `updateItem()`, `deleteItem()`, `linkItemToCategory()`, `listCategoryPlaces()`. `itemSearch.ts` builds the `ILIKE` filter and decides the minimum search length; `exportItemPages.ts` pages a whole category oldest-first for an export, keyed on `(linked_at, item_id)` rather than an offset.
+- `exportCategory.ts`, `exportFormat.ts`, `zip.ts` — the export: a store-only ZIP assembled in the tab, laid out as `CollectionBuddy-<slug>-<date>/` with `collection.json` (every field, full fidelity: tags as a list, coordinates as numbers, ids kept as a future merge identity), `collection.csv` (the same rows flattened to text for a spreadsheet, RFC 4180-quoted, user text formula-guarded) and `photos/NNN-<slug>/N.webp`. `zip.ts` is hand-written because the bytes are already WebP-compressed, so deflate would cost a pass per megabyte for nothing; it has no Zip64, so 4 GiB and 65 535 entries are hard caps.
+- `importCategory.ts`, `importFormat.ts`, `importPhoto.ts`, `importCancellation.ts` — the import: always a new category, never a merge into an existing one (importing the same archive twice makes two categories); photos re-upload through a bounded pool with retries, and a cancel aborts between items.
 - `categories.ts` — list/create/rename/delete, plus the counts the deletion warning needs.
 - `images.ts` — the `images` table plus `createSignedUrls()` (1 h), `uploadImageObject()`, `removeImageObjects()`, and `imagePrefix()`, the one place the path scheme is written down.
 - `auth.ts` — `verifiedUserId()`, a round trip to the auth server for a caller about to write under a user-derived path.

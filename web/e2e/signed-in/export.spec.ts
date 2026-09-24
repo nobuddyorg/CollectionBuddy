@@ -3,9 +3,7 @@ import { resolve } from 'node:path';
 
 import { expect, test } from './test';
 import { SEED } from './fixtures';
-// Pagination, batching, and skip-on-failure are unit-tested with fake I/O in
-// exportCategory.test.ts. Only a real browser can prove that clicking Export
-// produces a download, and that a real, independent extractor can open it.
+// exportCategory.test.ts covers the logic; only a browser proves a download a real extractor opens.
 test.use({ locale: 'en-GB' });
 
 const PHOTO = resolve(process.cwd(), 'public/logo.png');
@@ -45,8 +43,7 @@ test.describe('exporting a category', () => {
     expect(listing).toContain('collection.csv');
     expect(listing).toMatch(/photos\/\d+-[^/]+\/1\.\w+/);
 
-    // Entries live under one root folder, so the member name needs a wildcard
-    // rather than the bare file name.
+    // Entries live under one root folder, so the member name needs a wildcard.
     const manifestJson = execFileSync(
       'unzip',
       ['-p', zipPath, '*/collection.json'],
@@ -55,7 +52,7 @@ test.describe('exporting a category', () => {
     const manifest: {
       items: { title: string; photos: string[] }[];
     } = JSON.parse(manifestJson);
-    const entry = manifest.items.find((i) => i.title === title);
+    const entry = manifest.items.find((item) => item.title === title);
     expect(entry).toBeTruthy();
     expect(entry?.photos).toHaveLength(1);
 

@@ -3,12 +3,7 @@ import { test } from './test';
 import { itemsIn } from './fixtures';
 import { expectTitles } from './helpers';
 
-// A term of three characters or more (likePatternFor) runs through
-// search_category_items, a SECURITY DEFINER RPC that bypasses RLS so ILIKE
-// can use the trigram indexes (#621/PERF-H4); its own authorization-boundary
-// coverage lives in e2e/signed-in/rls.spec.ts. Unit tests cover the pattern
-// it's called with; only a real database can confirm what that pattern
-// actually matches.
+// Unit tests cover the pattern sent to search_category_items; only a real database confirms what it matches.
 test.use({ locale: 'en-GB' });
 
 const allCoins = itemsIn('Münzen').map((item) => item.title);
@@ -43,10 +38,7 @@ test.describe('searching a collection', () => {
     await expectTitles(page, ['Silberdenar']);
   });
 
-  // Below three characters the app deliberately skips filtering rather than
-  // showing nothing -- not because an index needs the length (there is no
-  // index in play below the RPC path either), but to limit how often a
-  // full, filtered category scan runs at all.
+  // Below three characters the app skips filtering, to limit how often a filtered category scan runs.
   test('leaves the list alone for a term of two characters', async ({
     on,
     page,
@@ -71,8 +63,7 @@ test.describe('searching a collection', () => {
     await expectTitles(page, allCoins);
   });
 
-  // A percent sign is a LIKE wildcard, so it must be escaped before it
-  // reaches ILIKE -- otherwise it would match anything rather than nothing.
+  // A percent sign is a LIKE wildcard; unescaped it would match everything rather than nothing.
   test('treats a percent sign as text rather than a wildcard', async ({
     on,
     page,

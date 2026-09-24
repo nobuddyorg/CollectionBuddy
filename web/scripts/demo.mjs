@@ -1,20 +1,16 @@
-// Runs the app in demo mode against a local Supabase stack: every visitor
-// is signed in automatically as a fresh anonymous user, so there is no
-// Google account or OAuth credentials to set up.
-//
-// Usage: npm run demo   (with `supabase start` already up)
+// Demo mode against the local stack: every visitor is signed in as a fresh anonymous user, so no OAuth is needed.
 import { spawn, execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const webDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const repoRoot = resolve(webDir, '..');
+const webDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const repositoryRoot = resolve(webDirectory, '..');
 
 function status() {
   try {
     return JSON.parse(
       execFileSync('supabase', ['status', '-o', 'json'], {
-        cwd: repoRoot,
+        cwd: repositoryRoot,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
       }),
@@ -33,7 +29,7 @@ if (!API_URL || !ANON_KEY) {
   process.exit(1);
 }
 
-const env = {
+const environment = {
   ...process.env,
   NEXT_PUBLIC_SUPABASE_URL: API_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: ANON_KEY,
@@ -42,8 +38,8 @@ const env = {
 
 console.log(`Starting the demo against ${API_URL}`);
 const child = spawn('npx', ['next', 'dev'], {
-  cwd: webDir,
-  env,
+  cwd: webDirectory,
+  env: environment,
   stdio: 'inherit',
 });
 child.on('exit', (code) => process.exit(code ?? 0));

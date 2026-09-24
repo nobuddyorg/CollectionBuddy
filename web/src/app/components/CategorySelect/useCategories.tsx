@@ -34,42 +34,35 @@ function storagePathsOf(image: {
     : [image.path_full];
 }
 
-// Owned by the page rather than by CategorySelect: the page decides what
-// to render below the strip based on whether the categories have arrived
-// yet.
+// Owned by the page, which decides what renders below the strip once the categories have arrived.
 export function useCategories() {
   const { t } = useI18n();
   const toast = useToast();
-  const [cats, setCats] = useState<CategorySummary[]>([]);
-  // Starts loading: an initial `false` meant the tab strip rendered its
-  // "no categories" state for a render before the fetch had even started.
+  const [categories, setCategories] = useState<CategorySummary[]>([]);
+  // Starts true: an initial false flashed the "no categories" state before the first fetch.
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
-  // `reload` is called for every auth event with no guarantee those
-  // listings resolve in the order they were sent -- gated so a slower,
-  // older response can never clobber a newer one's result.
+  // Every auth event reloads, in no guaranteed order; gated so an older response never clobbers a newer one.
   const { next, isCurrent } = useRequestSequence();
 
   const reload = useCallback(async () => {
-    const mySeq = next();
+    const mySequence = next();
     setIsLoading(true);
     try {
       const { data, error } = await listCategories();
       if (error) throw error;
       const list = data ?? [];
-      if (isCurrent(mySeq)) setCats(list);
+      if (isCurrent(mySequence)) setCategories(list);
       return list;
-    } catch (e) {
-      // Logged unconditionally, unlike the toast below: still worth
-      // knowing about even for a request a newer one has already
-      // superseded, which is the only thing `isCurrent` is guarding here.
-      console.error(e);
-      if (isCurrent(mySeq)) toast.error(t('category_select.load_error'));
+    } catch (error) {
+      // Logged even for a superseded request; only the toast is gated.
+      console.error(error);
+      if (isCurrent(mySequence)) toast.error(t('category_select.load_error'));
       return [];
     } finally {
-      if (isCurrent(mySeq)) setIsLoading(false);
+      if (isCurrent(mySequence)) setIsLoading(false);
     }
   }, [t, toast, next, isCurrent]);
 
@@ -82,11 +75,11 @@ export function useCategories() {
         if (error) throw error;
         await reload();
         return data;
-      } catch (e) {
+      } catch (error) {
         toast.reportError(
           'create category',
-          e,
-          isQuotaExceeded(e)
+          error,
+          isQuotaExceeded(error)
             ? t('category_select.create_quota_error')
             : t('category_select.create_error'),
         );
@@ -106,20 +99,18 @@ export function useCategories() {
       try {
         const { data, error } = await renameCategoryRow(id, trimmed);
         if (error) throw error;
-        // Merge the row the DB returned, not the value sent -- a trigger
-        // normalises the name before it lands. `.single()` guarantees
-        // `data` is non-null whenever `error` isn't (see data/categories.ts):
-        // a write RLS denies, or that matches no row, comes back as an
-        // error, never as a silent `data: null`.
-        setCats((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, ...data } : c)),
+        // Merge the row the DB returned, not the value sent: a trigger normalises the name.
+        setCategories((previous) =>
+          previous.map((category) =>
+            category.id === id ? { ...category, ...data } : category,
+          ),
         );
         toast.success(t('category_select.rename_success'));
         return true;
-      } catch (e) {
+      } catch (error) {
         toast.reportError(
           'rename category',
-          e,
+          error,
           t('category_select.rename_error'),
         );
         return false;
@@ -130,29 +121,31 @@ export function useCategories() {
     [t, isRenaming, toast],
   );
 
-  // Hides a category from the strip immediately and hands back a restore
-  // closure -- shared by deleteCategory below and by CategorySelect's
-  // onLeave, which needs the same optimistic hide for a share removal
-  // rather than an owner delete.
+  // Shared with useCategoryRemoval's onLeave, which needs the same optimistic hide for a share removal.
   const optimisticRemove = useCallback(
     (id: string): (() => void) | null => {
-      const index = cats.findIndex((c) => c.id === id);
-      const snapshot = cats[index];
+      const index = categories.findIndex((category) => category.id === id);
+      const snapshot = categories[index];
       if (!snapshot) return null;
-      setCats((prev) => prev.filter((c) => c.id !== id));
-      return () => setCats((prev) => restoreAt(prev, index, snapshot));
+      setCategories((previous) =>
+        previous.filter((category) => category.id !== id),
+      );
+      return () =>
+        setCategories((previous) =>
+          restoreAt({ list: previous, index, item: snapshot }),
+        );
     },
-    [cats],
+    [categories],
   );
 
   const deleteCategory = useCallback(
-    (id: string, opts?: { onRestore?: () => void }) => {
+    (id: string, options?: { onRestore?: () => void }) => {
       if (!id || isDeleting) return;
       const restore = optimisticRemove(id);
       if (!restore) return;
       const restoreAndNotify = () => {
         restore();
-        opts?.onRestore?.();
+        options?.onRestore?.();
       };
 
       toast.success(t('category_select.delete_success'), {
@@ -160,12 +153,7 @@ export function useCategories() {
         onExpire: async () => {
           setIsDeleting(true);
           try {
-            // Deleting a category cascades (item_categories -> orphan-item
-            // deletion -> items) through DB triggers, removing only
-            // storage.objects metadata, not the underlying bytes. Work out
-            // which items this deletion would orphan *before* the row is
-            // gone -- the cascade takes item_categories with it, so this is
-            // the last point those links can still be read.
+            // Which items the delete orphans must be read before the row goes: the cascade takes item_categories.
             const { data: links, error: linksError } =
               await listItemIdsForCategory(id);
             if (linksError) {
@@ -178,92 +166,51 @@ export function useCategories() {
             let orphanedItemIds = itemIds;
             if (itemIds.length) {
               const { data: stillLinked, error: linkedError } =
-                await listItemIdsLinkedElsewhere(itemIds, id);
+                await listItemIdsLinkedElsewhere({
+                  itemIds,
+                  excludingCategoryId: id,
+                });
               if (linkedError) {
-                // An incomplete answer here (a truncated page, a failed
-                // chunk) must abort the whole deletion, including the
-                // category row itself, rather than being treated as
-                // "nothing else links these items" and silently orphaning
-                // the wrong photographs.
+                // An incomplete answer must abort the whole delete, not read as "nothing else links these".
                 throw new Error('Could not check items linked elsewhere', {
                   cause: linkedError,
                 });
               }
-              // `listItemIdsLinkedElsewhere` only ever returns a null `data`
-              // alongside a non-null `error` (see data/categories.ts), and
-              // that case already threw above -- `stillLinked` is always a
-              // real array here. `new Set(null)` is well-defined anyway (an
-              // empty set), so no fallback is needed either way.
               const keep = new Set(stillLinked);
               orphanedItemIds = itemIds.filter((itemId) => !keep.has(itemId));
             }
 
-            // Read-only, and must run before deleteCategoryRow below: once
-            // the category row is gone, the cascade removes the orphaned
-            // items and their images rows go with them (on delete cascade)
-            // -- this is the last point their paths can still be read. One
-            // batched query rather than one per item.
-            //
-            // Unlike listItemIdsLinkedElsewhere above, a failure here does
-            // not abort the deletion: getting *that* wrong misclassifies
-            // which items are orphaned at all, an active correctness bug.
-            // Getting *this* wrong only means fewer paths to clean up
-            // afterward -- logged, not fatal to the category the user
-            // asked to delete.
+            // Read before the row delete: the cascade would drop these rows and the paths with them.
             let orphanedPaths: string[] = [];
             if (orphanedItemIds.length) {
-              const { data: imageRows, error: imagesError } =
-                await listImagePathsForItems(orphanedItemIds);
-              if (imagesError) {
-                console.error(
-                  'Could not read images for orphaned items:',
-                  imagesError,
-                );
+              const listed = await listImagePathsForItems(orphanedItemIds);
+              if (listed.error !== null) {
+                throw new Error('Could not read images for orphaned items', {
+                  cause: listed.error,
+                });
               }
-              // `imageRows` is genuinely nullable here (unlike the other
-              // list* calls above): `imagesError` doesn't abort, so a real
-              // failure reaches this point with `data: null`.
               const orphaned = new Set(orphanedItemIds);
-              orphanedPaths =
-                imageRows
-                  ?.filter((row) => orphaned.has(row.item_id))
-                  .flatMap(storagePathsOf) ?? [];
+              orphanedPaths = listed.data
+                .filter((row) => orphaned.has(row.item_id))
+                .flatMap(storagePathsOf);
             }
 
-            // The row before the bytes: deleting the category row first
-            // means a failure here still means "nothing happened" -- no
-            // photograph is ever destroyed on a path that reports itself
-            // as failed. Capturing the paths above doesn't change that:
-            // it's a read, not a mutation.
+            // Objects before the row: only Storage can delete bytes, and a row that is gone cannot name them.
+            for (const paths of chunk(
+              orphanedPaths,
+              REMOVE_OBJECTS_BATCH_SIZE,
+            )) {
+              const { error: removeError } = await removeImageObjects(paths);
+              if (removeError) throw removeError;
+            }
+
             const { error } = await deleteCategoryRow(id);
             if (error) throw error;
             await reload();
-
-            // The row is already gone, irreversibly. A failure here is a
-            // storage leak, not data loss, so every batch runs to
-            // completion rather than aborting on the first rejection.
-            const results = await Promise.allSettled(
-              chunk(orphanedPaths, REMOVE_OBJECTS_BATCH_SIZE).map(
-                async (paths) => {
-                  const { error: removeError } =
-                    await removeImageObjects(paths);
-                  if (removeError) throw removeError;
-                },
-              ),
-            );
-            const failures = results.filter(
-              (r): r is PromiseRejectedResult => r.status === 'rejected',
-            );
-            if (failures.length) {
-              failures.forEach((f) =>
-                console.error('Failed to clean up category images:', f.reason),
-              );
-              toast.error(t('category_select.delete_images_cleanup_error'));
-            }
-          } catch (e) {
+          } catch (error) {
             toast.reportError(
               'delete category',
-              e,
+              error,
               t('category_select.delete_error'),
             );
             restoreAndNotify();
@@ -277,7 +224,7 @@ export function useCategories() {
   );
 
   return {
-    cats,
+    categories,
     isLoading,
     isCreating,
     isDeleting,

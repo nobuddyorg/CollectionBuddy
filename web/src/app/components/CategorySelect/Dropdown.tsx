@@ -7,34 +7,31 @@ import Icon, { IconType } from '../Icon';
 type CategoryTab = { id: string; name: string; user_id: string };
 
 type Props = {
-  selectedCat: string | null;
+  selectedCategoryId: string | null;
   onSelect: (id: string | null) => void;
-  sortedCats: CategoryTab[];
+  sortedCategories: CategoryTab[];
   isLoading: boolean;
-  setExpanded: (v: boolean) => void;
+  setExpanded: (value: boolean) => void;
   userId: string | null;
 };
 
-// Shared with page.tsx, which owns the panel this tablist controls -- one
-// fixed id since there is only ever one panel on screen.
+// Shared with page.tsx, which owns the one panel this tablist controls.
 export const CATEGORY_TABPANEL_ID = 'category-entries-panel';
 
 export const categoryTabId = (id: string) => `category-tab-${id}`;
 
 // No per-category colour or fill -- colour is reserved for the photographs.
 export function CategorySelectDropdown({
-  selectedCat,
+  selectedCategoryId,
   onSelect,
-  sortedCats,
+  sortedCategories,
   isLoading,
   setExpanded,
   userId,
 }: Props) {
   const { t } = useI18n();
 
-  // Placeholder dividers, not a "Loading…" line: keeps the strip's height so
-  // nothing shifts when the real tabs arrive. Uneven widths since real
-  // category names are uneven too.
+  // Placeholder bars of uneven width keep the strip's height until the real tabs arrive.
   if (isLoading) {
     return (
       <div
@@ -42,24 +39,24 @@ export function CategorySelectDropdown({
         aria-label={t('common.loading')}
         className="flex min-h-11 items-center gap-5 border-b border-border"
       >
-        {['4.5rem', '3rem', '5.5rem'].map((w) => (
+        {['4.5rem', '3rem', '5.5rem'].map((width) => (
           <div
-            key={w}
+            key={width}
             className="h-3 rounded-sm bg-muted"
-            style={{ width: w }}
+            style={{ width }}
           />
         ))}
       </div>
     );
   }
 
-  if (!sortedCats.length) return null;
+  if (!sortedCategories.length) return null;
 
   return (
     <CategoryTablist
-      selectedCat={selectedCat}
+      selectedCategoryId={selectedCategoryId}
       onSelect={onSelect}
-      sortedCats={sortedCats}
+      sortedCategories={sortedCategories}
       setExpanded={setExpanded}
       ariaLabel={t('category_select.select_placeholder')}
       userId={userId}
@@ -68,21 +65,19 @@ export function CategorySelectDropdown({
 }
 
 type TablistProps = {
-  selectedCat: string | null;
+  selectedCategoryId: string | null;
   onSelect: (id: string | null) => void;
-  sortedCats: CategoryTab[];
-  setExpanded: (v: boolean) => void;
+  sortedCategories: CategoryTab[];
+  setExpanded: (value: boolean) => void;
   ariaLabel: string;
   userId: string | null;
 };
 
-// Roving tabindex: only the selected tab is a Tab stop; arrow keys/Home/End
-// move both focus and selection. Wraps at the ends rather than stopping,
-// since the tab count is arbitrary.
+// Roving tabindex: one Tab stop; arrows/Home/End move focus and selection, wrapping at the ends.
 function CategoryTablist({
-  selectedCat,
+  selectedCategoryId,
   onSelect,
-  sortedCats,
+  sortedCategories,
   setExpanded,
   ariaLabel,
   userId,
@@ -90,40 +85,44 @@ function CategoryTablist({
   const { t } = useI18n();
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
 
-  const activeIndex = sortedCats.findIndex((c) => c.id === selectedCat);
+  const activeIndex = sortedCategories.findIndex(
+    (category) => category.id === selectedCategoryId,
+  );
   const rovingIndex = activeIndex === -1 ? 0 : activeIndex;
 
   const moveTo = useCallback(
     (index: number) => {
-      const target = sortedCats[index];
+      const target = sortedCategories[index];
       onSelect(target.id);
       tabRefs.current.get(target.id)?.focus();
     },
-    [sortedCats, onSelect],
+    [sortedCategories, onSelect],
   );
 
   const onKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
-      switch (e.key) {
+    (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+      switch (event.key) {
         case 'ArrowRight':
-          e.preventDefault();
-          moveTo((index + 1) % sortedCats.length);
+          event.preventDefault();
+          moveTo((index + 1) % sortedCategories.length);
           return;
         case 'ArrowLeft':
-          e.preventDefault();
-          moveTo((index - 1 + sortedCats.length) % sortedCats.length);
+          event.preventDefault();
+          moveTo(
+            (index - 1 + sortedCategories.length) % sortedCategories.length,
+          );
           return;
         case 'Home':
-          e.preventDefault();
+          event.preventDefault();
           moveTo(0);
           return;
         case 'End':
-          e.preventDefault();
-          moveTo(sortedCats.length - 1);
+          event.preventDefault();
+          moveTo(sortedCategories.length - 1);
           return;
       }
     },
-    [sortedCats.length, moveTo],
+    [sortedCategories.length, moveTo],
   );
 
   return (
@@ -132,27 +131,27 @@ function CategoryTablist({
       aria-label={ariaLabel}
       className="-mx-4 px-4 flex gap-5 overflow-x-auto border-b border-border sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
-      {sortedCats.map((c, index) => {
-        const active = c.id === selectedCat;
+      {sortedCategories.map((category, index) => {
+        const active = category.id === selectedCategoryId;
         return (
           <button
-            key={c.id}
-            ref={(el) => {
-              if (el) tabRefs.current.set(c.id, el);
-              else tabRefs.current.delete(c.id);
+            key={category.id}
+            ref={(element) => {
+              if (element) tabRefs.current.set(category.id, element);
+              else tabRefs.current.delete(category.id);
             }}
             type="button"
             role="tab"
             data-testid="category-tab"
-            id={categoryTabId(c.id)}
+            id={categoryTabId(category.id)}
             aria-selected={active}
             aria-controls={CATEGORY_TABPANEL_ID}
             tabIndex={index === rovingIndex ? 0 : -1}
             onClick={() => {
-              onSelect(c.id);
+              onSelect(category.id);
               setExpanded(false);
             }}
-            onKeyDown={(e) => onKeyDown(e, index)}
+            onKeyDown={(event) => onKeyDown(event, index)}
             className={[
               'font-label text-xs shrink-0 min-h-11 -mb-px border-b-2 transition-colors',
               active
@@ -161,7 +160,7 @@ function CategoryTablist({
             ].join(' ')}
           >
             <span className="inline-flex items-center gap-1">
-              {c.user_id !== userId && (
+              {category.user_id !== userId && (
                 <span
                   className="inline-flex shrink-0"
                   data-testid="shared-marker"
@@ -175,7 +174,7 @@ function CategoryTablist({
                   />
                 </span>
               )}
-              <span data-testid="category-tab-name">{c.name}</span>
+              <span data-testid="category-tab-name">{category.name}</span>
             </span>
           </button>
         );

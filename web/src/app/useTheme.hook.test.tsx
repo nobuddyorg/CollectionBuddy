@@ -12,15 +12,14 @@ function Probe() {
 
 function mockMatchMedia(initialMatches: boolean) {
   let matches = initialMatches;
-  const listeners = new Set<(e: { matches: boolean }) => void>();
-  const addEventListener = vi.fn(
-    (event: string, cb: (e: { matches: boolean }) => void) => {
-      if (event === 'change') listeners.add(cb);
-    },
-  );
+  type ChangeListener = (event: { matches: boolean }) => void;
+  const listeners = new Set<ChangeListener>();
+  const addEventListener = vi.fn((event: string, callback: ChangeListener) => {
+    if (event === 'change') listeners.add(callback);
+  });
   const removeEventListener = vi.fn(
-    (event: string, cb: (e: { matches: boolean }) => void) => {
-      if (event === 'change') listeners.delete(cb);
+    (event: string, callback: ChangeListener) => {
+      if (event === 'change') listeners.delete(callback);
     },
   );
   vi.stubGlobal(
@@ -37,7 +36,7 @@ function mockMatchMedia(initialMatches: boolean) {
   return {
     setMatches(next: boolean) {
       matches = next;
-      listeners.forEach((cb) => cb({ matches: next }));
+      listeners.forEach((callback) => callback({ matches: next }));
     },
     listenerCount: () => listeners.size,
   };
@@ -53,10 +52,7 @@ describe('useTheme', () => {
     vi.unstubAllGlobals();
   });
 
-  // useSyncExternalStore's third argument only ever runs during an actual
-  // server render (renderToString) or hydration -- never during a normal
-  // client re-render, which is all a mounted renderHook instance can
-  // exercise. Rendering to a string is the only way to reach it for real.
+  // useSyncExternalStore's server snapshot only runs in renderToString or hydration, never in a client re-render.
   it("renders the server's answer before any client store has a say", () => {
     const html = renderToString(<Probe />);
     expect(html).toContain('data-preference="system"');
@@ -113,9 +109,7 @@ describe('useTheme', () => {
     expect(result.current.preference).toBe('system');
   });
 
-  // Both sides spelled out, like the layout.tsx pair in useTheme.test.ts:
-  // the announcement travels over window, a namespace the whole page
-  // shares, so the name it travels under is a contract, not an internal.
+  // Spelled out: the event travels over window, a namespace the whole page shares, so its name is a contract.
   it('announces a same-tab change on its own namespaced window event', () => {
     mockMatchMedia(false);
     const { result } = renderHook(() => useTheme());
@@ -166,10 +160,9 @@ describe('useTheme', () => {
     unmount();
 
     expect(media.listenerCount()).toBe(0);
-    // Every addEventListener this hook made on window has a matching
-    // removeEventListener once it's gone.
-    for (const [event, cb] of addSpy.mock.calls) {
-      expect(removeSpy).toHaveBeenCalledWith(event, cb);
+    // Every addEventListener this hook made on window has a matching removeEventListener once unmounted.
+    for (const [event, callback] of addSpy.mock.calls) {
+      expect(removeSpy).toHaveBeenCalledWith(event, callback);
     }
     addSpy.mockRestore();
     removeSpy.mockRestore();

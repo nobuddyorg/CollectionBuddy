@@ -11,50 +11,38 @@ import { useRequestSequence } from '../../lib/useRequestSequence';
 import type { PageImages } from './imageEntries';
 import type { ItemLite } from './types';
 
-export function useItems(categoryId: string, q: string) {
+export function useItems(categoryId: string, query: string) {
   const { t } = useI18n();
   const toast = useToast();
   const [items, setItems] = useState<ItemLite[]>([]);
   const [pageImages, setPageImages] = useState<PageImages | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  // Starts true: mounting always fetches, and starting false gave one
-  // render that looked exactly like "No entries yet" before data arrived.
+  // Starts true: starting false gave one render that looked exactly like "No entries yet".
   const [loading, setLoading] = useState(true);
   const { next, isCurrent } = useRequestSequence();
-  // Aborts a superseded request's own fetch, not just its effect on state
-  // -- otherwise the response still finishes downloading after the sequence
-  // guard below has already discarded it.
+  // Aborts a superseded request's own fetch, not just its effect, so the response stops downloading.
   const abortRef = useRef<AbortController | null>(null);
-  // Counts non-silent requests in flight rather than trusting whichever one
-  // the sequence guard lets through: a non-silent request superseded by a
-  // silent one used to leave `loading` stuck true forever, since neither
-  // cleared it. Decrementing this for every non-silent settle, win or not,
-  // brings `loading` back down once none are left.
+  // Non-silent requests in flight: one superseded by a silent request used to leave `loading` stuck true.
   const pendingNonSilent = useRef(0);
 
-  // Computed at render time, not via useEffect, so resetting to page 1
-  // takes effect the same render the filters change, not one render later.
-  const filterKey = `${categoryId} ${q}`;
-  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
-  if (filterKey !== prevFilterKey) {
-    setPrevFilterKey(filterKey);
+  // At render time, not in an effect, so the page resets the same render the filters change.
+  const filterKey = `${categoryId} ${query}`;
+  const [previousFilterKey, setPreviousFilterKey] = useState(filterKey);
+  if (filterKey !== previousFilterKey) {
+    setPreviousFilterKey(filterKey);
     setPage(1);
   }
 
   const totalPages = useMemo(() => pageCount(total), [total]);
 
-  // Derived, not written back into `page` via an effect -- avoids a stale
-  // render where `.range()` below would request an out-of-bounds slice
-  // right after deleting the last item on the last page.
+  // Derived, not written back via an effect, so `.range()` never asks for an out-of-bounds slice.
   const currentPage = clampPage(page, totalPages);
 
-  // `silent` refetches without raising `loading` -- a delete already
-  // removed its card up front, so flagging this refetch would only dim a
-  // grid the user has already seen the result in.
+  // `silent` refetches without raising `loading`: a delete already removed its card up front.
   const load = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
-      const mySeq = next();
+      const sequenceNumber = next();
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -65,7 +53,7 @@ export function useItems(categoryId: string, q: string) {
 
       try {
         const { from, to } = pageRange(currentPage);
-        const search = q.trim();
+        const search = query.trim();
         const prefetched =
           !silent && currentPage === 1 && !search
             ? takePrefetchedFirstPage(categoryId)
@@ -80,20 +68,20 @@ export function useItems(categoryId: string, q: string) {
             signal: controller.signal,
           }));
 
-        if (!isCurrent(mySeq)) return;
+        if (!isCurrent(sequenceNumber)) return;
         if (error) {
           toast.reportError('load items', error, t('item_list.search_error'));
           return;
         }
 
-        const loaded = (data ?? []).map((d) => ({
-          id: d.id,
-          title: d.title,
-          description: d.description,
-          place: d.place ?? null,
-          place_lat: d.place_lat ?? null,
-          place_lng: d.place_lng ?? null,
-          tags: d.tags ?? [],
+        const loaded = (data ?? []).map((row) => ({
+          id: row.id,
+          title: row.title,
+          description: row.description,
+          place: row.place ?? null,
+          place_lat: row.place_lat ?? null,
+          place_lng: row.place_lng ?? null,
+          tags: row.tags ?? [],
         }));
         setItems(loaded);
         setPageImages(
@@ -104,37 +92,30 @@ export function useItems(categoryId: string, q: string) {
         );
         setTotal(count || 0);
       } finally {
-        // Runs even for a request the sequence guard above discarded, so
-        // `loading` ends up false regardless of which request resolves last.
+        // Runs for a discarded request too, so `loading` ends false whichever request resolves last.
         if (!silent) {
           pendingNonSilent.current -= 1;
           if (pendingNonSilent.current === 0) setLoading(false);
         }
       }
     },
-    [categoryId, currentPage, q, t, toast, next, isCurrent],
+    [categoryId, currentPage, query, t, toast, next, isCurrent],
   );
 
-  // Cleanup aborts whatever's still in flight on unmount -- a new `load`
-  // triggered by a filter change would already abort it, but unmounting
-  // never gets that chance otherwise.
+  // A filter change aborts the previous load itself; unmount never gets that chance otherwise.
   useEffect(() => {
     void load();
     return () => abortRef.current!.abort();
   }, [load]);
 
-  // `load` is recreated whenever the query/page/category change, but a
-  // caller that kicks off a slow round trip may be holding a `reload`
-  // reference from several renders ago. `reload` stays one stable identity
-  // and dispatches through this ref, so a late call resyncs against
-  // whatever is current when it runs, not when it was captured.
+  // One stable identity dispatching through a ref, so a late `reload` resyncs against what is current then.
   const loadRef = useRef(load);
   useEffect(() => {
     loadRef.current = load;
   }, [load]);
 
   const reload = useCallback(
-    (opts?: { silent?: boolean }) => loadRef.current(opts),
+    (options?: { silent?: boolean }) => loadRef.current(options),
     [],
   );
 

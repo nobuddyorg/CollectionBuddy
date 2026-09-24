@@ -1,13 +1,7 @@
 import { type Locator, type Page } from '@playwright/test';
 
 interface SharingPanel {
-  /**
-   * Points to self.
-   */
   (): Locator;
-  /**
-   * High-level interactions.
-   */
   do: {
     clearExpiry(): Promise<void>;
     invite(email: string): Promise<void>;
@@ -15,9 +9,6 @@ interface SharingPanel {
     toggleCanEdit(email: string): Promise<void>;
     revoke(email: string): Promise<void>;
   };
-  /**
-   * Raw locators.
-   */
   locators: {
     buttons: {
       clearExpiry: Locator;
@@ -95,8 +86,7 @@ export function initSharingPanel(page: Page): SharingPanel {
       await locators.inputs.expiry.fill(date);
     },
     toggleCanEdit: async (email: string) => {
-      // Clicked, not checked: the box follows the stored role, so it stays
-      // as it was until the confirmation behind it has been answered.
+      // Clicked, not checked: the box follows the stored role until the confirmation behind it is answered.
       await row(email).locators.canEdit.click();
     },
     revoke: async (email: string) => {

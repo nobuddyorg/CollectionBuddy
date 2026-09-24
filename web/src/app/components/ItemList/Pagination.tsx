@@ -31,7 +31,7 @@ export function Pagination({
   totalPages,
 }: {
   page: number;
-  setPage: (n: number) => void;
+  setPage: (page: number) => void;
   totalPages: number;
 }) {
   const { t } = useI18n();
@@ -42,7 +42,7 @@ export function Pagination({
 
   if (totalPages <= 1) return null;
 
-  const prevButton = (
+  const previousButton = (
     <button
       type="button"
       data-testid="page-previous"
@@ -77,7 +77,7 @@ export function Pagination({
         aria-label={t('item_list.pagination')}
         className="hidden sm:flex flex-wrap gap-1.5 items-center justify-center pt-2"
       >
-        {prevButton}
+        {previousButton}
 
         {paginationItems.map((item, index) =>
           typeof item === 'string' ? (
@@ -115,7 +115,7 @@ export function Pagination({
         aria-label={t('item_list.pagination')}
         className="flex sm:hidden gap-3 items-center justify-center pt-2"
       >
-        {prevButton}
+        {previousButton}
         <span className="font-label text-xs text-muted-foreground">
           {t('item_list.page_of')
             .replace('{n}', String(page))

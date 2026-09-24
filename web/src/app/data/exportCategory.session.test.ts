@@ -2,9 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { exportCategory } from './exportCategory';
 
-// Every other test in exportCategory.test.ts injects its own session reader,
-// which leaves the default -- the one real Supabase call this module makes --
-// never executed. This file exercises that default and nothing else.
+// Every other exportCategory test injects a session reader; this file exercises the real default alone.
 const { getSession } = vi.hoisted(() => ({ getSession: vi.fn() }));
 
 vi.mock('../supabase', () => ({ supabase: { auth: { getSession } } }));

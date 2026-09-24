@@ -28,34 +28,29 @@ type FlattenKeys<T, Prefix extends string = ''> = T extends string
 
 export type TranslationKey = FlattenKeys<typeof en>;
 
-// Returns undefined on any miss -- unknown segment, or a sub-object
-// instead of a string -- rather than the key itself, so callers decide
-// what a miss means.
+// undefined on any miss (unknown segment, or a sub-object), so callers decide what a miss means.
 export function resolveTranslationKey(
-  dict: TranslationValue,
+  dictionary: TranslationValue,
   key: string,
 ): string | undefined {
   const value = key.split('.').reduce<TranslationValue | undefined>(
     (current, segment) =>
       typeof current === 'object' &&
-      // `typeof null === 'object'`, and a translation JSON file can carry a literal `null` the type has not seen.
-      // eslint-disable-next-line sonarjs/different-types-comparison
+      // eslint-disable-next-line sonarjs/different-types-comparison -- a translation JSON can carry a literal null the type has not seen
       current !== null &&
       Object.hasOwn(current, segment)
         ? current[segment]
         : undefined,
-    dict,
+    dictionary,
   );
   return typeof value === 'string' ? value : undefined;
 }
 
 type I18nContextType = {
-  lang: Language;
-  setLang: (lang: Language) => void;
+  language: Language;
+  setLanguage: (language: Language) => void;
   t: (key: TranslationKey) => string;
-  /** Like `t`, but picks `${baseKey}_one` vs `baseKey` by the locale's
-   *  plural rule, not a naive `count === 1`, since German and English
-   *  disagree on it. Falls back to `baseKey` if no `_one` variant exists. */
+  /** Picks `${baseKey}_one` by the locale's plural rule (German and English disagree), else `baseKey`. */
   tCount: (baseKey: TranslationKey, count: number) => string;
 };
 
@@ -63,76 +58,69 @@ export const I18nContext = createContext<I18nContextType | undefined>(
   undefined,
 );
 
-const LANG_STORAGE_KEY = 'lang';
+const LANGUAGE_STORAGE_KEY = 'lang';
 
-function detectLang(): Language {
+function detectLanguage(): Language {
   try {
-    const stored = localStorage.getItem(LANG_STORAGE_KEY);
+    const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
     if (stored && stored in translations) return stored as Language;
-    const browserLang = navigator.language.split('-')[0];
-    if (browserLang in translations) return browserLang as Language;
+    const browserLanguage = navigator.language.split('-')[0];
+    if (browserLanguage in translations) return browserLanguage as Language;
   } catch {
-    // localStorage can throw (private browsing, disabled storage); falls
-    // through to the 'en' default below, same as a stored-language miss.
+    // localStorage can throw (private browsing); falls through to the 'en' default.
   }
   return 'en';
 }
 
 export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
-  // Starts at 'de', matching the prerendered markup -- seeding from detectLang() here is a hydration mismatch, so the layout effect below corrects it before paint.
-  const [lang, setLang] = useState<Language>('de');
-  // t reads lang through this ref, not directly, so its identity stays
-  // stable across a language change -- otherwise every callback/effect
-  // depending on it re-fires whenever someone switches language.
-  const langRef = useRef(lang);
-  // Written synchronously during render, not in an effect, so `t` never
-  // reads a stale `lang` during that same render cycle.
-  // eslint-disable-next-line react-hooks/refs
-  langRef.current = lang;
+  // Starts at 'de' to match the prerendered markup; the layout effect corrects it before paint.
+  const [language, setLanguage] = useState<Language>('de');
+  // t reads language through this ref so its identity survives a language change.
+  const languageRef = useRef(language);
+  // eslint-disable-next-line react-hooks/refs -- written during render so t never reads a stale language in this render
+  languageRef.current = language;
 
   useLayoutEffect(() => {
-    setLang(detectLang());
+    setLanguage(detectLanguage());
   }, []);
 
-  const setLangAndPersist = useCallback((next: Language) => {
-    setLang(next);
-    localStorage.setItem(LANG_STORAGE_KEY, next);
+  const setLanguageAndPersist = useCallback((next: Language) => {
+    setLanguage(next);
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
   }, []);
 
-  // Keeps <html lang> and the meta description in sync with the active
-  // language -- otherwise screen readers use the wrong phonetics and
-  // browsers offer to "translate" an already-matching page.
+  // Keeps <html lang> and the meta description with the language, or screen readers use the wrong phonetics.
   useEffect(() => {
-    document.documentElement.lang = lang;
+    document.documentElement.lang = language;
     document
       .querySelector('meta[name="description"]')
       ?.setAttribute(
         'content',
-        resolveTranslationKey(translations[lang], 'page.footer') ?? '',
+        resolveTranslationKey(translations[language], 'page.footer') ?? '',
       );
-  }, [lang]);
+  }, [language]);
 
   const t = useCallback(
     (key: TranslationKey) =>
-      resolveTranslationKey(translations[langRef.current], key) ?? key,
+      resolveTranslationKey(translations[languageRef.current], key) ?? key,
     [],
   );
 
   const tCount = useCallback((baseKey: TranslationKey, count: number) => {
-    const dict = translations[langRef.current];
-    const category = new Intl.PluralRules(langRef.current).select(count);
+    const dictionary = translations[languageRef.current];
+    const category = new Intl.PluralRules(languageRef.current).select(count);
     const template =
       (category === 'one'
-        ? resolveTranslationKey(dict, `${baseKey}_one`)
+        ? resolveTranslationKey(dictionary, `${baseKey}_one`)
         : undefined) ??
-      resolveTranslationKey(dict, baseKey) ??
+      resolveTranslationKey(dictionary, baseKey) ??
       baseKey;
     return template.replace('{count}', String(count));
   }, []);
 
   const value = useMemo(
-    () => ({ lang, setLang: setLangAndPersist, t, tCount }),
-    [lang, setLangAndPersist, t, tCount],
+    () => ({ language, setLanguage: setLanguageAndPersist, t, tCount }),
+    [language, setLanguageAndPersist, t, tCount],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

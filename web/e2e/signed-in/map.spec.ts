@@ -2,8 +2,7 @@ import { expect, test } from './test';
 
 import { expectTitles } from './helpers';
 
-// Pin coordinates come from the seed data, not a geocoder, so no run depends
-// on a public service being up.
+// Pin coordinates come from the seed data, so no run depends on a public geocoder being up.
 test.use({ locale: 'en-GB' });
 
 test.describe('the map', () => {
@@ -58,8 +57,7 @@ test.describe('the map', () => {
   });
 });
 
-// Hand-typed places carry no coordinates, so the map looks each one up and
-// draws its pin as that answer lands: pins arrive one place at a time.
+// Hand-typed places carry no coordinates, so the map looks each up and pins arrive one at a time.
 const LOOKED_UP: Record<string, [number, number]> = {
   Aachen: [6.0839, 50.7753],
   Bonn: [7.0982, 50.7374],
@@ -95,14 +93,15 @@ test.describe('a map whose places are still being looked up', () => {
 
       await page.unroute('https://photon.komoot.io/**');
       await page.route('https://photon.komoot.io/**', (route) => {
-        const q = new URL(route.request().url()).searchParams.get('q') ?? '';
-        const coordinates = LOOKED_UP[q];
+        const query =
+          new URL(route.request().url()).searchParams.get('q') ?? '';
+        const coordinates = LOOKED_UP[query];
         return route.fulfill({
           json: {
             features: coordinates
               ? [
                   {
-                    properties: { name: q },
+                    properties: { name: query },
                     geometry: { type: 'Point', coordinates },
                   },
                 ]

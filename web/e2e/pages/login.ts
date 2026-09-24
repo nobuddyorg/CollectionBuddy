@@ -1,20 +1,11 @@
 import { type Locator, type Page } from '@playwright/test';
 
 interface LoginPage {
-  /**
-   * Points to self.
-   */
   (): Locator;
-  /**
-   * High-level interactions.
-   */
   do: {
     open(): Promise<void>;
     signIn(): Promise<void>;
   };
-  /**
-   * Raw locators.
-   */
   locators: {
     buttons: {
       signIn: Locator;
@@ -23,6 +14,7 @@ interface LoginPage {
     collectibles: Locator;
     tagline: Locator;
     wordmark: Locator;
+    wordmarkParts: Locator;
   };
 }
 
@@ -36,6 +28,7 @@ export function initLoginPage(page: Page): LoginPage {
     collectibles: root.getByTestId('collectible'),
     tagline: root.getByTestId('tagline'),
     wordmark: root.getByTestId('wordmark'),
+    wordmarkParts: root.getByTestId('wordmark-part'),
   };
   const interactions = {
     open: async () => {

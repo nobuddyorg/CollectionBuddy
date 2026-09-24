@@ -1,12 +1,6 @@
-// Shared Photon transport for both geocoding surfaces (ItemForm/usePhoton.tsx
-// and Map/usePlaces.tsx). They used to hit the endpoint independently, with
-// two coordinate validators that disagreed on NaN -- one caller silently
-// dropped a malformed response, the other drew a pin at nowhere.
-
 const PHOTON_ENDPOINT = 'https://photon.komoot.io/api/';
 
-// Photon only recognises a couple of the app's locales; anything else
-// falls back to English.
+// Photon only recognises a couple of the app's locales; anything else falls back to English.
 export function photonLang(locale?: string): 'de' | 'en' {
   return locale === 'de' ? 'de' : 'en';
 }
@@ -22,13 +16,7 @@ export function photonSearchUrl(
   return url.toString();
 }
 
-/**
- * Reads the coordinates off a Photon feature, or null if it carries none
- * usable. GeoJSON orders coordinates lng-first, so the pair is deliberately
- * destructured the "wrong" way round. Checked with `Number.isFinite` rather
- * than trusted, since the runtime data is a third party's and a NaN slipping
- * through would put a pin nowhere.
- */
+/** GeoJSON orders coordinates lng-first; a non-finite value yields null rather than a pin nowhere. */
 export function coordsFromFeature(
   feature: unknown,
 ): { lat: number; lng: number } | null {
@@ -40,11 +28,7 @@ export function coordsFromFeature(
   return { lat, lng };
 }
 
-/**
- * Whether asking again could plausibly give a different answer: a refusal
- * to serve right now (429) or a broken service (5xx). Anything else is an
- * understood answer, and repeating it only spends quota.
- */
+/** Whether asking again could give a different answer: 429 or 5xx; anything else only spends quota. */
 export function isRetryableStatus(status: number): boolean {
   return status === 429 || status >= 500;
 }

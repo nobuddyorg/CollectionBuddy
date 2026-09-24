@@ -26,10 +26,12 @@ export async function horizontalOverflow(page: Page) {
   }));
 }
 
-export function cssVar(page: Page, name: string) {
+export function cssVariable(page: Page, name: string) {
   return page.evaluate(
-    (prop) =>
-      getComputedStyle(document.documentElement).getPropertyValue(prop).trim(),
+    (property) =>
+      getComputedStyle(document.documentElement)
+        .getPropertyValue(property)
+        .trim(),
     name,
   );
 }

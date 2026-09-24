@@ -54,10 +54,12 @@ what keeps a run against production read-only.
 
 `e2e/signed-in/` runs against a real database: catalogue, search, paging, map,
 entry forms, photos, export and import, sharing from both sides, the account
-menu, and — in `rls.spec.ts` — the row-level security boundary itself.
-`rls.spec.ts` bypasses the interface almost entirely: it asks Postgres, with a
-real token, the questions the app never would, including the `editor` grant in
-its own describe block. Change a policy and this file says whether it holds.
+menu, and — in `rls/` — the row-level security boundary itself. Those specs
+bypass the interface almost entirely: they ask Postgres, with a real token, the
+questions the app never would, one file per boundary (`isolation`,
+`viewer-share`, `editor-share`, each with a `-photographs` half for Storage,
+plus `search-rpc` and `quotas`; shared helpers in `rls/helpers.ts`). Change a
+policy and these files say whether it holds.
 
 ```bash
 supabase start     # repository root
@@ -157,10 +159,10 @@ supabase test db
 
 `_helpers.psql` holds the shared fixtures; it is `.psql` because
 `supabase test db` collects every `.sql` file as a test. pgTAP proves the
-policy, trigger and constraint logic fast; `rls.spec.ts` proves the same
+policy, trigger and constraint logic fast; `e2e/signed-in/rls/` proves the same
 properties through the real PostgREST-and-JWT pipeline and is the only place
 the Storage API and the bytes behind a `storage.objects` row are exercised. A
-policy, grant, or ownership-trigger change needs its `rls.spec.ts` case
+policy, grant, or ownership-trigger change needs its `rls/` case
 regardless of pgTAP coverage.
 
 A new query that names its index (CLAUDE.md, "measure, don't assume") also gets

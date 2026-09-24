@@ -1,9 +1,3 @@
-/**
- * The read side of ./exportFormat. Deliberately narrow: an import only
- * ever reads what an export of *this* app wrote, so validation exists to
- * give a clear refusal reason, not to accept a wide range of shapes.
- */
-
 import {
   EXPORT_FORMAT,
   EXPORT_FORMAT_VERSION,
@@ -17,14 +11,9 @@ export class ImportFormatError extends Error {
   }
 }
 
-/**
- * Validates and narrows already-parsed JSON into an `ExportManifest`. Only
- * checks the format tag and version number -- a manifest passing both was
- * written by `buildManifest`, whose own shape is trusted past that point.
- */
+/** Checks only the format tag and version: past those, the manifest is `buildManifest`'s own. */
 export function parseManifest(data: unknown): ExportManifest {
-  // No `typeof data === 'object'` check: anything that is not one has no
-  // `format` property either, so the tag check below already refuses it.
+  // No `typeof data === 'object'` check: anything else has no `format` and fails the tag check.
   if (!data || (data as { format?: unknown }).format !== EXPORT_FORMAT) {
     throw new ImportFormatError('Not a CollectionBuddy export archive');
   }
@@ -37,11 +26,7 @@ export function parseManifest(data: unknown): ExportManifest {
   return data as ExportManifest;
 }
 
-/**
- * The one directory every entry lives under, found by looking for whichever
- * entry ends in `/collection.json` -- the importer doesn't know the
- * category/date the name would otherwise be recomputed from.
- */
+/** The entry ending in `/collection.json`; the importer cannot recompute the root folder's name. */
 export function findManifestPath(entryNames: Iterable<string>): string | null {
   for (const name of entryNames) {
     if (name.endsWith('/collection.json')) return name;
@@ -54,11 +39,7 @@ export function rootFolderOf(manifestPath: string): string {
   return manifestPath.slice(0, -'/collection.json'.length);
 }
 
-/**
- * One `created_at` per imported item, 1 ms apart and ending at `now`, so a
- * batch inserted in one statement keeps the archive's order instead of
- * sharing one transaction timestamp.
- */
+/** One `created_at` per item, 1 ms apart, ending at `now`, so one insert keeps the archive order. */
 export function importTimestamps(count: number, now: Date): string[] {
   const last = now.getTime();
   return Array.from({ length: count }, (_, i) =>

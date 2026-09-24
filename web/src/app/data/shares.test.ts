@@ -8,9 +8,7 @@ import {
   updateShareRole,
 } from './shares';
 
-// Each function here only builds a query and hands it back for the caller
-// to await, so what's worth asserting is the shape of the query it built,
-// not a resolved value that would just echo the mock back at itself.
+// Each function only builds a query, so the query's shape is what is asserted, not an echoed mock.
 
 type Call = { method: string; args: unknown[] };
 
@@ -58,7 +56,12 @@ describe('listSharesForCategory', () => {
 describe('createShare', () => {
   it('inserts category_id, invited_email, expires_at and role, leaving owner_user_id to the enforce trigger', () => {
     const { from, calls } = mockFrom();
-    createShare('cat-1', 'grantee@example.com', null, 'viewer');
+    createShare({
+      categoryId: 'cat-1',
+      invitedEmail: 'grantee@example.com',
+      expiresAt: null,
+      role: 'viewer',
+    });
     expect(from).toHaveBeenCalledWith('category_shares');
     expect(calls[0]).toEqual({
       method: 'insert',
@@ -80,18 +83,22 @@ describe('createShare', () => {
 
   it('defaults to viewer when no role is given', () => {
     const { calls } = mockFrom();
-    createShare('cat-1', 'grantee@example.com', null);
+    createShare({
+      categoryId: 'cat-1',
+      invitedEmail: 'grantee@example.com',
+      expiresAt: null,
+    });
     expect(calls[0].args[0]).toMatchObject({ role: 'viewer' });
   });
 
   it('carries an expiry through unchanged when one is given', () => {
     const { calls } = mockFrom();
-    createShare(
-      'cat-1',
-      'grantee@example.com',
-      '2026-12-31T00:00:00.000Z',
-      'editor',
-    );
+    createShare({
+      categoryId: 'cat-1',
+      invitedEmail: 'grantee@example.com',
+      expiresAt: '2026-12-31T00:00:00.000Z',
+      role: 'editor',
+    });
     expect(calls[0]).toEqual({
       method: 'insert',
       args: [

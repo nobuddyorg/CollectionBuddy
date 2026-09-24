@@ -4,8 +4,7 @@ import { collectPageProblems, expectNoPageProblems } from '../helpers';
 
 test.use({ locale: 'en-GB' });
 
-// A green `next build` can't catch this: prerendering runs in Node with real
-// env vars, which papers over client code that only breaks as a browser bundle.
+// Prerendering runs in Node with real env vars, so only a browser catches code that breaks as a bundle.
 test.describe('the deployed bundle', () => {
   test('loads without throwing', async ({ page }) => {
     const problems = collectPageProblems(page);
@@ -27,9 +26,7 @@ test.describe('the deployed bundle', () => {
     expect(refused, 'requests the host refused').toEqual([]);
   });
 
-  // No server redirect exists: the root page itself checks for a session and
-  // routes away. If that ever broke, a signed-out visitor would be stuck on an
-  // empty catalogue waiting for entries that need a session to fetch.
+  // No server redirect exists: the root page itself checks for a session and routes away.
   test('sends a signed-out visitor to the login page', async ({ page }) => {
     await page.goto('', { waitUntil: 'networkidle' });
     await expect(page).toHaveURL(/\/login\/?$/);
@@ -53,8 +50,7 @@ test.describe('the deployed bundle', () => {
     await expect(page.locator('body')).not.toBeEmpty();
   });
 
-  // The 404 document the export ships, opened directly -- the harness above
-  // answers with its own instead of this one.
+  // Opened directly: the harness answers an unknown path with its own 404, not the one the export ships.
   test('ships a not-found page that is still the app', async ({ page }) => {
     const problems = collectPageProblems(page);
     await page.goto('404.html', { waitUntil: 'networkidle' });

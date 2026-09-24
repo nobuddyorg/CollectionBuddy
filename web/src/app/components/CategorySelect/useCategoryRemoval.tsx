@@ -10,22 +10,18 @@ import { nextAfterRemoving } from './selection';
 import type { UseCategories } from './useCategories';
 import type { UseShares } from './useShares';
 
-/**
- * Owning a category means the trash destroys it; being a grantee means it
- * only ends this viewer's own access. Both leave the selection on whatever
- * is left rather than on nothing.
- */
+/** Owner: the trash destroys the category; grantee: it only ends this viewer's own access. */
 export function useCategoryRemoval({
-  selectedCat,
+  selectedCategoryId,
   selected,
-  sortedCats,
+  sortedCategories,
   categories,
   shares,
   onSelect,
 }: {
-  selectedCat: string | null;
+  selectedCategoryId: string | null;
   selected: Category | null;
-  sortedCats: Category[];
+  sortedCategories: Category[];
   categories: UseCategories;
   shares: UseShares;
   onSelect: (id: string | null) => void;
@@ -34,10 +30,9 @@ export function useCategoryRemoval({
   const confirm = useConfirm();
   const { deleteCategory, optimisticRemove } = categories;
 
-  // Ends this viewer's access via deleteShare on shares.shares[0] -- the one
-  // row RLS ever hands back to a non-owner.
+  // shares.shares[0] is the one category_shares row RLS ever hands back to a non-owner.
   const onLeave = useCallback(async () => {
-    if (!selectedCat || !selected) return;
+    if (!selectedCategoryId || !selected) return;
     const myShareId = shares.shares[0]?.id;
     if (!myShareId) return;
 
@@ -47,37 +42,35 @@ export function useCategoryRemoval({
     );
     if (!(await confirm(message))) return;
 
-    const restoreCategory = optimisticRemove(selectedCat);
+    const restoreCategory = optimisticRemove(selectedCategoryId);
     if (!restoreCategory) return;
-    onSelect(nextAfterRemoving(sortedCats, selectedCat));
+    onSelect(nextAfterRemoving(sortedCategories, selectedCategoryId));
 
     shares.deleteShare(myShareId, {
       successMessage: t('category_select.leave_success'),
       errorMessage: t('category_select.leave_error'),
       onRestore: () => {
         restoreCategory();
-        onSelect(selectedCat);
+        onSelect(selectedCategoryId);
       },
     });
   }, [
-    selectedCat,
+    selectedCategoryId,
     selected,
     shares,
     t,
     confirm,
     onSelect,
-    sortedCats,
+    sortedCategories,
     optimisticRemove,
   ]);
 
   const onDelete = useCallback(async () => {
-    if (!selectedCat) return;
+    if (!selectedCategoryId) return;
     const categoryName = selected?.name ?? '';
 
-    // Named and counted rather than a bare "Confirm deletion": the trash
-    // sits right beside the rename field, and deletion is permanent.
     const { count, error: countError } =
-      await countItemsForCategory(selectedCat);
+      await countItemsForCategory(selectedCategoryId);
     if (countError) console.error(countError);
     let message;
     if (countError || count == null) {
@@ -97,9 +90,19 @@ export function useCategoryRemoval({
     }
 
     if (!(await confirm(message))) return;
-    onSelect(nextAfterRemoving(sortedCats, selectedCat));
-    deleteCategory(selectedCat, { onRestore: () => onSelect(selectedCat) });
-  }, [selectedCat, selected, deleteCategory, onSelect, sortedCats, t, confirm]);
+    onSelect(nextAfterRemoving(sortedCategories, selectedCategoryId));
+    deleteCategory(selectedCategoryId, {
+      onRestore: () => onSelect(selectedCategoryId),
+    });
+  }, [
+    selectedCategoryId,
+    selected,
+    deleteCategory,
+    onSelect,
+    sortedCategories,
+    t,
+    confirm,
+  ]);
 
   return { onDelete, onLeave };
 }

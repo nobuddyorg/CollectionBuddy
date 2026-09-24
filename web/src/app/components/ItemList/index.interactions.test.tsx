@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,7 +7,13 @@ import { I18nProvider } from '../../i18n/I18nProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import ItemList from './index';
-import type { ItemLite, ImgEntry } from './types';
+import {
+  defaultImagesState,
+  defaultMutationsState,
+  itemsState,
+  renderList,
+} from './index.test-support';
+import type { ItemLite, ImageEntry } from './types';
 import type { useItems } from './useItems';
 import type { useItemImages } from './useItemImages';
 import type { useItemMutations } from './useItemMutations';
@@ -44,7 +50,7 @@ const ITEM: ItemLite = {
   tags: [],
 };
 
-const PHOTO: ImgEntry = {
+const PHOTO: ImageEntry = {
   id: 'img-1',
   pathFull: 'uid/item-1/a.webp',
   urlFull: 'https://signed/a',
@@ -54,58 +60,25 @@ const PHOTO: ImgEntry = {
 
 function imagesState(overrides: Record<string, unknown> = {}) {
   return {
-    images: { 'item-1': [PHOTO] } as Record<string, ImgEntry[]>,
-    loadingItems: new Set<string>(),
-    refreshAllImages: vi.fn(),
-    showImages: vi.fn(),
-    signAllFor: vi.fn(),
-    uploadImage: vi.fn(),
-    deleteImage: vi.fn(),
+    ...defaultImagesState(),
+    images: { 'item-1': [PHOTO] } as Record<string, ImageEntry[]>,
     captureItemImagePaths: vi.fn().mockResolvedValue([]),
-    removeImageBytes: vi.fn(),
-    pendingUploads: {} as Record<string, number>,
     ...overrides,
   };
 }
 
-// A card only shows its caption and actions once its hero photograph has
-// loaded, which in jsdom only ever happens on request.
+// A card shows its caption and actions only once its hero has loaded, which jsdom does only on request.
 async function heroLoads() {
   fireEvent.load(await screen.findByRole('img'));
-}
-
-function renderList(props: Partial<Parameters<typeof ItemList>[0]> = {}) {
-  return render(
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <ItemList categoryId="cat-1" canEdit={true} {...props} />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>,
-  );
 }
 
 describe('the catalogue grid', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.setItem('lang', 'en');
-    useItemsMock.mockReturnValue({
-      items: [ITEM],
-      total: 1,
-      loading: false,
-      page: 1,
-      setPage: vi.fn(),
-      totalPages: 1,
-      reload: vi.fn(),
-      setItems: vi.fn(),
-    });
+    useItemsMock.mockReturnValue(itemsState({ items: [ITEM], total: 1 }));
     useItemImagesMock.mockReturnValue(imagesState());
-    useItemMutationsMock.mockReturnValue({
-      saveEdit: vi.fn(),
-      isSaving: false,
-      removeItem: vi.fn(),
-    });
+    useItemMutationsMock.mockReturnValue(defaultMutationsState());
   });
 
   it('hands a picked photograph to the entry it was picked for', async () => {
@@ -123,8 +96,7 @@ describe('the catalogue grid', () => {
   it('deletes the entry the delete button belongs to', async () => {
     const removeItem = vi.fn();
     useItemMutationsMock.mockReturnValue({
-      saveEdit: vi.fn(),
-      isSaving: false,
+      ...defaultMutationsState(),
       removeItem,
     });
     renderList();
@@ -172,16 +144,7 @@ describe('the catalogue grid', () => {
       screen.getByRole('dialog', { name: 'Full size image' }),
     ).toBeVisible();
 
-    useItemsMock.mockReturnValue({
-      items: [],
-      total: 0,
-      loading: false,
-      page: 1,
-      setPage: vi.fn(),
-      totalPages: 1,
-      reload: vi.fn(),
-      setItems: vi.fn(),
-    });
+    useItemsMock.mockReturnValue(itemsState({ items: [], total: 0 }));
     rerender(
       <I18nProvider>
         <ToastProvider>

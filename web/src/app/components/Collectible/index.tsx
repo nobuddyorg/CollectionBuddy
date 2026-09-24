@@ -9,13 +9,11 @@ type CSSVarStyle = React.CSSProperties & {
   ['--delay']?: string;
 };
 
-function cx(...parts: Array<string | false | null | undefined>) {
+function joinClasses(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ');
 }
 
-// Grayscaled deliberately: cartoon-bright emoji would supply their own
-// color, which this achromatic system never does outside the accent
-// wordmark.
+// Grayscaled: bright emoji would bring their own color into an achromatic system.
 function CollectibleComponent({
   delay,
   emoji,
@@ -38,7 +36,7 @@ function CollectibleComponent({
   return (
     <div
       data-testid="collectible"
-      className={cx(
+      className={joinClasses(
         'collectible-bob absolute z-0 select-none pointer-events-none',
         className,
       )}

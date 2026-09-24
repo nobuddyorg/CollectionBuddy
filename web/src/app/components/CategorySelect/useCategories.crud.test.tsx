@@ -2,14 +2,17 @@
 import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
 import {
   createCategory,
   listCategories,
   renameCategory,
 } from '../../data/categories';
 import { useCategories } from './useCategories';
+import {
+  listCategoriesReturns,
+  renderLoadedCategories,
+  wrapper,
+} from './useCategories.test-support';
 
 vi.mock('../../data/categories', () => ({
   listCategories: vi.fn(),
@@ -26,37 +29,14 @@ vi.mock('../../data/images', () => ({
   REMOVE_OBJECTS_BATCH_SIZE: 1000,
 }));
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>{children}</ToastProvider>
-    </I18nProvider>
-  );
-}
-
 const COINS = { id: 'cat-1', name: 'Coins', user_id: 'owner-1' };
 const STAMPS = { id: 'cat-2', name: 'Stamps', user_id: 'owner-1' };
-
-function lists(cats: (typeof COINS)[]) {
-  vi.mocked(listCategories).mockResolvedValue({
-    data: cats,
-    error: null,
-  } as never);
-}
-
-async function loaded() {
-  const hook = renderHook(() => useCategories(), { wrapper });
-  await act(async () => {
-    await hook.result.current.reload();
-  });
-  return hook;
-}
 
 describe('useCategories', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.setItem('lang', 'en');
-    lists([COINS, STAMPS]);
+    listCategoriesReturns([COINS, STAMPS]);
   });
 
   describe('reload', () => {
@@ -69,7 +49,7 @@ describe('useCategories', () => {
       });
 
       expect(result.current.isLoading).toBe(false);
-      expect(result.current.cats).toEqual([COINS, STAMPS]);
+      expect(result.current.categories).toEqual([COINS, STAMPS]);
     });
 
     it('falls back to an empty list when the server returns no rows', async () => {
@@ -83,7 +63,7 @@ describe('useCategories', () => {
         await expect(result.current.reload()).resolves.toEqual([]);
       });
 
-      expect(result.current.cats).toEqual([]);
+      expect(result.current.categories).toEqual([]);
     });
 
     it('reports a failed listing and leaves the strip empty', async () => {
@@ -101,13 +81,12 @@ describe('useCategories', () => {
       });
 
       expect(await screen.findByRole('alert')).toBeVisible();
-      expect(result.current.cats).toEqual([]);
+      expect(result.current.categories).toEqual([]);
       expect(result.current.isLoading).toBe(false);
       consoleError.mockRestore();
     });
 
-    // Every auth event reloads, with no guarantee the answers come back in
-    // the order they were asked for.
+    // Every auth event reloads, with no guarantee the answers come back in order.
     it('lets a newer listing win over one that resolves later', async () => {
       let releaseFirst: (value: unknown) => void = () => {};
       vi.mocked(listCategories)
@@ -129,7 +108,7 @@ describe('useCategories', () => {
         releaseFirst({ data: [COINS], error: null });
       });
 
-      expect(result.current.cats).toEqual([STAMPS]);
+      expect(result.current.categories).toEqual([STAMPS]);
     });
 
     it('logs but does not toast a superseded request that errors', async () => {
@@ -158,7 +137,7 @@ describe('useCategories', () => {
 
       expect(consoleError).toHaveBeenCalledWith(expect.any(Error));
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-      expect(result.current.cats).toEqual([STAMPS]);
+      expect(result.current.categories).toEqual([STAMPS]);
       consoleError.mockRestore();
     });
   });
@@ -169,7 +148,7 @@ describe('useCategories', () => {
         data: { id: 'cat-3', name: 'Cameras', user_id: 'owner-1' },
         error: null,
       } as never);
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       let created: unknown;
       await act(async () => {
@@ -182,7 +161,7 @@ describe('useCategories', () => {
     });
 
     it('refuses an empty name without asking the database', async () => {
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(result.current.createCategory('')).resolves.toBeNull();
@@ -196,7 +175,7 @@ describe('useCategories', () => {
         data: null,
         error: new Error('duplicate'),
       } as never);
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(
@@ -215,7 +194,7 @@ describe('useCategories', () => {
         data: null,
         error: { code: 'PT507', message: 'category quota of 1000 reached' },
       } as never);
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(
@@ -230,14 +209,13 @@ describe('useCategories', () => {
   });
 
   describe('renameCategory', () => {
-    // The trigger normalises the name, so what lands in the strip is the
-    // row the database answered with, not the text that was typed.
+    // The trigger normalises the name, so the strip shows the row the database answered with.
     it('keeps the name the database returned, not the one sent', async () => {
       vi.mocked(renameCategory).mockResolvedValue({
         data: { id: 'cat-1', name: 'Coins & Medals', user_id: 'owner-1' },
         error: null,
       } as never);
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(
@@ -246,12 +224,12 @@ describe('useCategories', () => {
       });
 
       expect(renameCategory).toHaveBeenCalledWith('cat-1', 'coins & medals');
-      expect(result.current.cats[0]?.name).toBe('Coins & Medals');
+      expect(result.current.categories[0]?.name).toBe('Coins & Medals');
       expect(await screen.findByRole('status')).toBeVisible();
     });
 
     it('refuses a blank new name without asking the database', async () => {
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(
@@ -267,7 +245,7 @@ describe('useCategories', () => {
         data: null,
         error: new Error('rls'),
       } as never);
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(
@@ -276,7 +254,7 @@ describe('useCategories', () => {
       });
 
       expect(await screen.findByRole('alert')).toBeVisible();
-      expect(result.current.cats[0]?.name).toBe('Coins');
+      expect(result.current.categories[0]?.name).toBe('Coins');
     });
 
     it('leaves the strip alone when the rename answers with no row', async () => {
@@ -284,7 +262,7 @@ describe('useCategories', () => {
         data: null,
         error: null,
       } as never);
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(
@@ -292,32 +270,34 @@ describe('useCategories', () => {
         ).resolves.toBe(true);
       });
 
-      expect(result.current.cats).toEqual([COINS, STAMPS]);
+      expect(result.current.categories).toEqual([COINS, STAMPS]);
     });
   });
 
   describe('optimisticRemove', () => {
     it('hides the category and puts it back at its own position', async () => {
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       let restore: (() => void) | null = null;
       act(() => {
         restore = result.current.optimisticRemove('cat-1');
       });
-      expect(result.current.cats).toEqual([STAMPS]);
+      expect(result.current.categories).toEqual([STAMPS]);
 
       act(() => restore?.());
-      await waitFor(() => expect(result.current.cats).toEqual([COINS, STAMPS]));
+      await waitFor(() =>
+        expect(result.current.categories).toEqual([COINS, STAMPS]),
+      );
     });
 
     it('answers with nothing for a category that is already gone', async () => {
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       act(() => {
         expect(result.current.optimisticRemove('cat-nope')).toBeNull();
       });
 
-      expect(result.current.cats).toEqual([COINS, STAMPS]);
+      expect(result.current.categories).toEqual([COINS, STAMPS]);
     });
   });
 });

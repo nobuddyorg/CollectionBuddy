@@ -1,10 +1,6 @@
 import { expect, test } from './test';
 
-// The one signed-in spec that calls the real signOut. It revokes the shared
-// user's refresh token server-side, but every other spec's browser context
-// holds its own copy of the still-valid access token (a JWT verified by
-// signature, not looked up against a session table), so this has nothing to
-// disturb elsewhere in the same run.
+// Revoking the refresh token leaves other specs' still-valid access tokens (JWTs) undisturbed.
 test.use({ locale: 'en-GB' });
 
 test.describe('signing out', () => {

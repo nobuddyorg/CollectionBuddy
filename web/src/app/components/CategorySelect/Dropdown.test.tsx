@@ -10,9 +10,8 @@ import {
   categoryTabId,
 } from './Dropdown';
 
-// user_id 'owner-1' throughout, matching renderDropdown's default userId --
-// none of these read as shared unless a test overrides one.
-const sortedCats = [
+// user_id 'owner-1' matches renderDropdown's default userId, so none read as shared.
+const sortedCategories = [
   { id: 'a', name: 'Coins', user_id: 'owner-1' },
   { id: 'b', name: 'Stamps', user_id: 'owner-1' },
   { id: 'c', name: 'Cards', user_id: 'owner-1' },
@@ -26,9 +25,9 @@ function renderDropdown(
   render(
     <I18nProvider>
       <CategorySelectDropdown
-        selectedCat="a"
+        selectedCategoryId="a"
         onSelect={onSelect}
-        sortedCats={sortedCats}
+        sortedCategories={sortedCategories}
         isLoading={false}
         setExpanded={setExpanded}
         userId="owner-1"
@@ -56,9 +55,9 @@ describe('CategorySelectDropdown', () => {
     const { container } = render(
       <I18nProvider>
         <CategorySelectDropdown
-          selectedCat={null}
+          selectedCategoryId={null}
           onSelect={vi.fn()}
-          sortedCats={[]}
+          sortedCategories={[]}
           isLoading={false}
           setExpanded={vi.fn()}
           userId="owner-1"
@@ -69,7 +68,7 @@ describe('CategorySelectDropdown', () => {
   });
 
   it('gives only the selected tab a tab stop', () => {
-    renderDropdown({ selectedCat: 'b' });
+    renderDropdown({ selectedCategoryId: 'b' });
     expect(screen.getByRole('tab', { name: 'Coins' })).toHaveAttribute(
       'tabIndex',
       '-1',
@@ -85,7 +84,7 @@ describe('CategorySelectDropdown', () => {
   });
 
   it('falls back to the first tab as the stop when nothing is selected', () => {
-    renderDropdown({ selectedCat: null });
+    renderDropdown({ selectedCategoryId: null });
     expect(screen.getByRole('tab', { name: 'Coins' })).toHaveAttribute(
       'tabIndex',
       '0',
@@ -94,16 +93,16 @@ describe('CategorySelectDropdown', () => {
 
   it('points each tab at the shared entries panel', () => {
     renderDropdown();
-    for (const c of sortedCats) {
-      const tab = screen.getByRole('tab', { name: c.name });
+    for (const category of sortedCategories) {
+      const tab = screen.getByRole('tab', { name: category.name });
       expect(tab).toHaveAttribute('aria-controls', CATEGORY_TABPANEL_ID);
-      expect(tab).toHaveAttribute('id', categoryTabId(c.id));
+      expect(tab).toHaveAttribute('id', categoryTabId(category.id));
     }
   });
 
   it('moves focus and selection with ArrowRight, wrapping past the last tab', async () => {
     const user = userEvent.setup();
-    const { onSelect } = renderDropdown({ selectedCat: 'a' });
+    const { onSelect } = renderDropdown({ selectedCategoryId: 'a' });
     screen.getByRole('tab', { name: 'Coins' }).focus();
 
     await user.keyboard('{ArrowRight}');
@@ -118,7 +117,7 @@ describe('CategorySelectDropdown', () => {
 
   it('moves focus and selection with ArrowLeft, wrapping before the first tab', async () => {
     const user = userEvent.setup();
-    const { onSelect } = renderDropdown({ selectedCat: 'a' });
+    const { onSelect } = renderDropdown({ selectedCategoryId: 'a' });
     screen.getByRole('tab', { name: 'Coins' }).focus();
 
     await user.keyboard('{ArrowLeft}');
@@ -127,7 +126,7 @@ describe('CategorySelectDropdown', () => {
 
   it('jumps to the first and last tab with Home and End', async () => {
     const user = userEvent.setup();
-    const { onSelect } = renderDropdown({ selectedCat: 'b' });
+    const { onSelect } = renderDropdown({ selectedCategoryId: 'b' });
     screen.getByRole('tab', { name: 'Stamps' }).focus();
 
     await user.keyboard('{End}');
@@ -137,11 +136,10 @@ describe('CategorySelectDropdown', () => {
     expect(onSelect).toHaveBeenLastCalledWith('a');
   });
 
-  // Arrow navigation is exploratory and shouldn't collapse the panel --
-  // only an explicit click does.
+  // Arrow navigation is exploratory and must not collapse the panel; only a click does.
   it('does not collapse the panel while arrowing between tabs', async () => {
     const user = userEvent.setup();
-    const { setExpanded } = renderDropdown({ selectedCat: 'a' });
+    const { setExpanded } = renderDropdown({ selectedCategoryId: 'a' });
     screen.getByRole('tab', { name: 'Coins' }).focus();
 
     await user.keyboard('{ArrowRight}');
@@ -158,18 +156,17 @@ describe('CategorySelectDropdown', () => {
 
   it('moves DOM focus onto the newly selected tab', async () => {
     const user = userEvent.setup();
-    renderDropdown({ selectedCat: 'a' });
+    renderDropdown({ selectedCategoryId: 'a' });
     screen.getByRole('tab', { name: 'Coins' }).focus();
 
     await user.keyboard('{ArrowRight}');
     expect(screen.getByRole('tab', { name: 'Stamps' })).toHaveFocus();
   });
 
-  // user_id is the only thing distinguishing a shared tab from an owned
-  // one -- there is no separate "kind" field anywhere in this data.
+  // user_id is the only thing distinguishing a shared tab from an owned one.
   it('marks a tab whose user_id does not match the viewer, and no other', () => {
     renderDropdown({
-      sortedCats: [
+      sortedCategories: [
         { id: 'a', name: 'Coins', user_id: 'someone-else' },
         { id: 'b', name: 'Stamps', user_id: 'owner-1' },
       ],

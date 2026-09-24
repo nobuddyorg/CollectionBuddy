@@ -13,9 +13,7 @@ import { buttonClasses } from '../ui/buttonClasses';
 export type { ItemFormValues } from './types';
 export { EMPTY_ITEM_FORM_VALUES } from './types';
 
-// `block` must be on all four labels or none: an inline label sits in a line
-// box sized by the inherited line-height, which pushes it (and the field
-// under it) out of alignment with the others.
+// `block` on all four labels or none: an inline label's line box pushes its field out of alignment.
 const LABEL = 'block text-xs font-medium text-muted-foreground';
 
 export default function ItemForm({
@@ -28,14 +26,11 @@ export default function ItemForm({
 }: ItemFormProps) {
   const { t } = useI18n();
 
-  // Callers reset the form by changing `key`, which remounts it and reruns
-  // these initializers; resyncing on `initial` identity here too would clear
-  // whatever the user typed on any unrelated parent re-render.
+  // Callers reset by changing `key`; resyncing on `initial` identity would clear typing on any re-render.
   const [title, setTitle] = useState(initial.title ?? '');
   const [description, setDescription] = useState(initial.description ?? '');
   const [place, setPlace] = useState(initial.place ?? '');
-  // Carried through untouched unless the field is edited, so editing an
-  // item's title doesn't quietly strip the coordinates off its place.
+  // Carried through untouched unless the field is edited, so editing a title keeps the place's coordinates.
   const [placeCoords, setPlaceCoords] = useState<PlaceCoords | null>(
     initial.place_lat != null && initial.place_lng != null
       ? { lat: initial.place_lat, lng: initial.place_lng }
@@ -44,9 +39,7 @@ export default function ItemForm({
   const [tags, setTags] = useState<string[]>(initial.tags ?? []);
   const [titleTouched, setTitleTouched] = useState(false);
 
-  // Compared against `initial` directly rather than a separate snapshot:
-  // `initial` doesn't change for the life of one mount, so it already is the
-  // "nothing typed yet" baseline.
+  // `initial` does not change for the life of one mount, so it already is the "nothing typed" baseline.
   const isDirty =
     title !== (initial.title ?? '') ||
     description !== (initial.description ?? '') ||
@@ -69,8 +62,8 @@ export default function ItemForm({
   const titleError = titleTouched && !title.trim();
 
   const handleSubmit = useCallback(
-    (e: React.SubmitEvent<HTMLFormElement>) => {
-      e.preventDefault();
+    (event: React.SubmitEvent<HTMLFormElement>) => {
+      event.preventDefault();
       if (!title.trim()) {
         setTitleTouched(true);
         titleRef.current?.focus();
@@ -98,9 +91,7 @@ export default function ItemForm({
 
   return (
     <form className="space-y-3" onSubmit={handleSubmit} noValidate>
-      {/* Desktop placement is done by the grid, not by DOM order, so source
-          order stays title -> description -> place -> tags and the
-          single-column phone layout still reads in that order. */}
+      {/* Desktop placement is done by the grid, not DOM order, so the phone column reads in source order. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-3">
         <div className="space-y-1">
           <label htmlFor={titleId} className={LABEL}>
@@ -109,13 +100,12 @@ export default function ItemForm({
           </label>
           <input
             id={titleId}
-            // Named for the end-to-end suite: every label in this form is
-            // translated, so naming a field by its label pins the language.
+            // Named for the end-to-end suite: every label is translated, so a label-based name pins a language.
             data-testid="item-title"
             ref={titleRef}
             value={title}
             maxLength={MAX_TITLE_LENGTH}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(event) => setTitle(event.target.value)}
             onBlur={() => setTitleTouched(true)}
             required
             aria-required="true"
@@ -134,15 +124,13 @@ export default function ItemForm({
           <label htmlFor={descriptionId} className={LABEL}>
             {t('item_create.description')}
           </label>
-          {/* `flex-auto` rather than `flex-1` keeps a manually dragged
-              height as the flex base size, so the grid row grows with it
-              instead of the browser writing a height the layout ignores. */}
+          {/* `flex-auto`, not `flex-1`, keeps a dragged height as the base size so the row grows with it. */}
           <textarea
             id={descriptionId}
             data-testid="item-description"
             value={description}
             maxLength={MAX_DESCRIPTION_LENGTH}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(event) => setDescription(event.target.value)}
             rows={2}
             className={fieldClasses(
               'sm:min-h-32 sm:flex-auto resize-none sm:resize-y',

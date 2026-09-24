@@ -1,13 +1,19 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
+import { countItemsForCategory } from '../../data/categories';
 import CategorySelect from './index';
 import type { UseCategories } from './useCategories';
+import {
+  categories as categoriesState,
+  openPanel,
+  renderSelect as renderCategorySelect,
+} from './index.test-support';
 
 vi.mock('./useShares', () => ({
   useShares: vi.fn().mockReturnValue({
@@ -25,53 +31,17 @@ vi.mock('./useShares', () => ({
 
 vi.mock('../../data/categories', () => ({ countItemsForCategory: vi.fn() }));
 
-const CATS = [
-  { id: 'a', name: 'Coins', user_id: 'owner-1' },
-  { id: 'b', name: 'Stamps', user_id: 'owner-1' },
-];
-
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
-  return {
-    cats: CATS,
-    isLoading: false,
-    isCreating: false,
-    isDeleting: false,
-    isRenaming: false,
-    reload: vi.fn().mockResolvedValue(CATS),
+  return categoriesState({
     createCategory: vi.fn().mockResolvedValue(null),
-    renameCategory: vi.fn(),
-    deleteCategory: vi.fn(),
-    optimisticRemove: vi.fn(() => vi.fn()),
     ...overrides,
-  };
+  });
 }
 
 function renderSelect(
   props: Partial<Parameters<typeof CategorySelect>[0]> = {},
 ) {
-  const onSelect = vi.fn();
-  const view = render(
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <CategorySelect
-            selectedCat="a"
-            onSelect={onSelect}
-            categories={categories()}
-            userId="owner-1"
-            {...props}
-          />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>,
-  );
-  return { onSelect, view };
-}
-
-async function openPanel() {
-  await userEvent.click(
-    screen.getByRole('button', { name: 'Open collection' }),
-  );
+  return renderCategorySelect({ categories: categories(), ...props });
 }
 
 describe('the category panel', () => {
@@ -115,8 +85,7 @@ describe('the category panel', () => {
       expect(renameCategory).toHaveBeenCalledWith('a', 'Münzen');
     });
 
-    // First Escape discards the edit; only a second one, with nothing left
-    // to discard, closes the panel.
+    // First Escape discards the edit; only a second one, with nothing left to discard, closes.
     it('discards an edit on Escape before closing the panel', async () => {
       renderSelect();
       await openPanel();
@@ -182,6 +151,52 @@ describe('the category panel', () => {
     });
   });
 
+  describe('deleting', () => {
+    it('names the category and states the entry count when it holds entries', async () => {
+      vi.mocked(countItemsForCategory).mockResolvedValue({
+        count: 40,
+        error: null,
+      } as never);
+      renderSelect();
+      await openPanel();
+      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+      expect(
+        await screen.findByText(
+          'Delete "Coins"? Its 40 entries and all their photographs will be permanently deleted.',
+        ),
+      ).toBeVisible();
+    });
+
+    it('does not claim entries or photographs will be lost when the category is empty', async () => {
+      vi.mocked(countItemsForCategory).mockResolvedValue({
+        count: 0,
+        error: null,
+      } as never);
+      renderSelect();
+      await openPanel();
+      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+      expect(await screen.findByText('Delete "Coins"?')).toBeVisible();
+    });
+
+    it('falls back to a generic warning rather than claiming zero entries when the count is unknown', async () => {
+      vi.mocked(countItemsForCategory).mockResolvedValue({
+        count: null,
+        error: new Error('network error'),
+      } as never);
+      renderSelect();
+      await openPanel();
+      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+      expect(
+        await screen.findByText(
+          'Delete "Coins"? Its entries and all their photographs will be permanently deleted.',
+        ),
+      ).toBeVisible();
+    });
+  });
+
   it('closes the panel again from its own Close button', async () => {
     renderSelect();
     await openPanel();
@@ -195,7 +210,7 @@ describe('the category panel', () => {
   });
 
   it('follows a selection that changes underneath it', async () => {
-    const { view } = renderSelect({ selectedCat: null });
+    const { view } = renderSelect({ selectedCategoryId: null });
     expect(screen.getByLabelText('New collection')).toBeVisible();
 
     view.rerender(
@@ -203,7 +218,7 @@ describe('the category panel', () => {
         <ToastProvider>
           <ConfirmProvider>
             <CategorySelect
-              selectedCat="a"
+              selectedCategoryId="a"
               onSelect={vi.fn()}
               categories={categories()}
               userId="owner-1"

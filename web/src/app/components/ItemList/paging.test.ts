@@ -11,8 +11,7 @@ describe('pageCount', () => {
     expect(pageCount(1)).toBe(1);
   });
 
-  // The boundary either side of a full page, which is where a rounding
-  // mistake shows up as a page of entries nobody can reach.
+  // Either side of a full page, where a rounding mistake leaves a page of entries nobody can reach.
   it('fills one page exactly before opening a second', () => {
     expect(pageCount(PAGE_SIZE)).toBe(1);
     expect(pageCount(PAGE_SIZE + 1)).toBe(2);
@@ -30,9 +29,7 @@ describe('clampPage', () => {
     expect(clampPage(2, 5)).toBe(2);
   });
 
-  // The case this exists for: deleting the last entry of the last page
-  // leaves a page number pointing past the end, and an unclamped one asks
-  // the database for a slice that isn't there.
+  // Deleting the last page's last entry leaves a page number pointing past the end.
   it('pulls a page past the end back to the last one', () => {
     expect(clampPage(5, 3)).toBe(3);
   });
@@ -54,8 +51,7 @@ describe('pageRange', () => {
     expect(pageRange(1)).toEqual({ from: 0, to: PAGE_SIZE - 1 });
   });
 
-  // Inclusive at both ends, because that is what PostgREST's range() takes.
-  // An exclusive end would fetch one row too few, per page, forever.
+  // Inclusive at both ends, as PostgREST's range() takes; exclusive would fetch one row too few.
   it('covers exactly one page worth of rows', () => {
     const { from, to } = pageRange(1);
     expect(to - from + 1).toBe(PAGE_SIZE);

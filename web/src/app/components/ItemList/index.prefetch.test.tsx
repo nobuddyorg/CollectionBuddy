@@ -1,20 +1,19 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import ItemList from './index';
+import {
+  defaultImagesState,
+  defaultMutationsState,
+  itemsState,
+  renderList,
+} from './index.test-support';
 import type { useItems } from './useItems';
 import type { useItemImages } from './useItemImages';
 import type { useItemMutations } from './useItemMutations';
 
-// Both the map modal and the edit form are lazy chunks warmed on intent
-// (hover/focus/press-down); a failed prefetch isn't reported since the real
-// dynamic() import just retries on the actual open, so it must be swallowed
-// rather than surfacing as an unhandled rejection.
+// A failed prefetch of a lazy chunk must be swallowed, not surfaced as an unhandled rejection.
 vi.mock('../Map', () => {
   throw new Error('chunk load failed');
 });
@@ -40,50 +39,14 @@ vi.mock('./useItemMutations', () => ({
     useItemMutationsMock(...args) as ReturnType<typeof useItemMutations>,
 }));
 
-function renderList() {
-  return render(
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <ItemList categoryId="cat-1" canEdit={true} />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>,
-  );
-}
-
 describe('ItemList prefetch failures', () => {
   let onUnhandledRejection: Mock<() => void>;
 
   beforeEach(() => {
     window.localStorage.setItem('lang', 'en');
-    useItemsMock.mockReturnValue({
-      items: [],
-      total: 0,
-      loading: false,
-      page: 1,
-      setPage: vi.fn(),
-      totalPages: 1,
-      reload: vi.fn(),
-      setItems: vi.fn(),
-    });
-    useItemImagesMock.mockReturnValue({
-      images: {},
-      loadingItems: new Set(),
-      refreshAllImages: vi.fn(),
-      showImages: vi.fn(),
-      signAllFor: vi.fn(),
-      uploadImage: vi.fn(),
-      deleteImage: vi.fn(),
-      captureItemImagePaths: vi.fn(),
-      removeImageBytes: vi.fn(),
-      pendingUploads: {},
-    });
-    useItemMutationsMock.mockReturnValue({
-      saveEdit: vi.fn(),
-      isSaving: false,
-      removeItem: vi.fn(),
-    });
+    useItemsMock.mockReturnValue(itemsState());
+    useItemImagesMock.mockReturnValue(defaultImagesState());
+    useItemMutationsMock.mockReturnValue(defaultMutationsState());
     onUnhandledRejection = vi.fn();
     window.addEventListener('unhandledrejection', onUnhandledRejection);
   });

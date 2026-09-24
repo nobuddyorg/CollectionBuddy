@@ -46,8 +46,7 @@ describe('useInertBackground', () => {
     expect(appRoot().inert).toBeFalsy();
   });
 
-  // A confirm dialog can open on top of an already-open edit modal. The
-  // root must stay inert until the last of them closes, not the first.
+  // A confirm can open over an edit modal; the root stays inert until the last one closes.
   it('stays inert while a second, independent dialog is still open', () => {
     const first = render(<Harness active />);
     const second = render(<Harness active />);
@@ -60,9 +59,7 @@ describe('useInertBackground', () => {
     expect(appRoot().inert).toBeFalsy();
   });
 
-  // Only the dialog that actually flips the root inert should ever touch
-  // the property -- a second, nested dialog finding it already inert must
-  // not write to it again.
+  // A nested dialog finding the root already inert must not write the property again.
   it('only sets inert once, on the first of two nested dialogs', () => {
     const setInert = vi.fn();
     Object.defineProperty(appRoot(), 'inert', {

@@ -75,8 +75,7 @@ describe('findManifestPath', () => {
   });
 
   it('returns the first match when more than one entry could be one', () => {
-    // A real archive never has two -- this pins the behavior rather than
-    // leaving "which one wins" as an accident of iteration order.
+    // A real archive never has two; this pins which one wins rather than leaving it to iteration order.
     expect(
       findManifestPath(['root/sub/collection.json', 'root/collection.json']),
     ).toBe('root/sub/collection.json');

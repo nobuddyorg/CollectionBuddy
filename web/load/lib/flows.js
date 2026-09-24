@@ -28,25 +28,25 @@ function pick(values) {
 
 /** Open the category, page forward twice, then open the map. */
 export function browse(session, categoryId) {
-  listPage(session, categoryId, 1);
+  listPage({ session, categoryId, page: 1 });
   countItems(session, categoryId);
   sleep(THINK_SECONDS);
-  listPage(session, categoryId, 2);
+  listPage({ session, categoryId, page: 2 });
   sleep(THINK_SECONDS);
-  listPage(session, categoryId, 3);
+  listPage({ session, categoryId, page: 3 });
   sleep(THINK_SECONDS);
-  listPlaces(session, categoryId);
+  listPlaces({ session, categoryId });
   sleep(THINK_SECONDS);
 }
 
 /** Type a term, read two pages of matches, then see them on the map. */
-export function search(session, categoryId, terms = SEARCH_TERMS) {
+export function search({ session, categoryId, terms = SEARCH_TERMS }) {
   const term = pick(terms);
-  searchPage(session, categoryId, term, 1);
+  searchPage({ session, categoryId, term, page: 1 });
   sleep(THINK_SECONDS);
-  searchPage(session, categoryId, term, 2);
+  searchPage({ session, categoryId, term, page: 2 });
   sleep(THINK_SECONDS);
-  listPlaces(session, categoryId, term);
+  listPlaces({ session, categoryId, term });
   sleep(THINK_SECONDS);
 }
 
@@ -59,11 +59,11 @@ export function write(session, categoryId) {
     tags: ['last'],
   });
   if (!itemId) return;
-  linkItem(session, itemId, categoryId);
+  linkItem({ session, itemId, categoryId });
 
   const base = `${session.userId}/${itemId}/${crypto.randomUUID()}`;
-  uploadObject(session, `${base}.webp`, PHOTO);
-  uploadObject(session, `${base}.thumb.webp`, PHOTO);
+  uploadObject({ session, path: `${base}.webp`, bytes: PHOTO });
+  uploadObject({ session, path: `${base}.thumb.webp`, bytes: PHOTO });
   createImageRow(session, {
     item_id: itemId,
     path_full: `${base}.webp`,

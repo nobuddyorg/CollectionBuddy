@@ -7,7 +7,7 @@ export const COLLECTORS = PROFILE.population.collectors;
 export const ENTRIES_EACH = PROFILE.population.entriesEach;
 const SHARED_EACH = Math.ceil(ENTRIES_EACH / 5);
 
-/** One word per collector, so every other collector's word is common across the table and absent from their own collection. */
+/** One word per collector, so every other collector's word is common across the table and absent from their own. */
 const nounOf = (index) => NOUNS[index % NOUNS.length];
 
 export const NOUNS_SEARCHED = [...NOUNS, 'zzqx'];
@@ -20,15 +20,26 @@ export function setup() {
       `load-member-${index}-${run}@collectionbuddy.test`,
       crypto.randomUUID(),
     );
-    const categories = insertReturning(
+    const categories = insertReturning({
       session,
-      'categories',
-      [{ name: 'Own' }, { name: 'Lent' }],
-      'id,name',
-    );
-    const idOf = (name) => categories.find((c) => c.name === name).id;
-    fillCategory(session, idOf('Own'), ENTRIES_EACH, [nounOf(index)]);
-    fillCategory(session, idOf('Lent'), SHARED_EACH, [nounOf(index)]);
+      table: 'categories',
+      rows: [{ name: 'Own' }, { name: 'Lent' }],
+      select: 'id,name',
+    });
+    const idOf = (name) =>
+      categories.find((category) => category.name === name).id;
+    fillCategory({
+      session,
+      categoryId: idOf('Own'),
+      count: ENTRIES_EACH,
+      nouns: [nounOf(index)],
+    });
+    fillCategory({
+      session,
+      categoryId: idOf('Lent'),
+      count: SHARED_EACH,
+      nouns: [nounOf(index)],
+    });
     members.push({
       session,
       ownCategoryId: idOf('Own'),
@@ -38,9 +49,16 @@ export function setup() {
   // A ring: each collector lends one category to the next, so every grantee holds a grant and every table holds many.
   members.forEach((member, index) => {
     const next = members[(index + 1) % members.length];
-    insertRows(member.session, 'category_shares', [
-      { category_id: member.lentCategoryId, invited_email: next.session.email },
-    ]);
+    insertRows({
+      session: member.session,
+      table: 'category_shares',
+      rows: [
+        {
+          category_id: member.lentCategoryId,
+          invited_email: next.session.email,
+        },
+      ],
+    });
   });
   return { members };
 }
