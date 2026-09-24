@@ -126,7 +126,8 @@ several real RLS bugs. Every policy change is security-critical.
   type prefixes; small functions with guard clauses; zero to two parameters,
   else a named object, never a boolean flag; command-query separation; no
   `null`/`undefined` as a signal where a type or empty collection models it;
-  files under ~350 lines; no dead code; no dependency without clear value over
+  files under ~350 lines (test files under ~600: every split repeats a
+  `vi.mock` block and its imports); no dead code; no dependency without clear value over
   what's here, and none that is deprecated or unmaintained.
 - **Comments:** one line, hard cap, only for a non-obvious constraint,
   workaround, invariant, or external behavior — never to narrate code or record
