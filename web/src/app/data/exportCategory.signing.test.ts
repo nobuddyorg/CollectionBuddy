@@ -6,69 +6,14 @@ import {
   SIGN_BATCH_SIZE,
   SIGN_CONCURRENCY,
 } from './exportCategory';
-import type { ExportItem } from './exportFormat';
-import type { supabase } from '../supabase';
-
-type GetSession = () => ReturnType<typeof supabase.auth.getSession>;
-type ListItems = Parameters<typeof exportCategory>[0]['listItems'];
-type ListImages = Parameters<typeof exportCategory>[0]['listImages'];
-type SignUrls = Parameters<typeof exportCategory>[0]['signUrls'];
-
-function item(overrides: Partial<ExportItem> = {}): ExportItem {
-  return {
-    id: 'item-1',
-    title: 'Item',
-    description: null,
-    place: null,
-    place_lat: null,
-    place_lng: null,
-    tags: [],
-    created_at: '2026-01-02T03:04:05.000Z',
-    ...overrides,
-  };
-}
-
-// Only `data.session.user.id` is ever read, so that's all the fake carries.
-function fakeGetSession(uid: string | null): GetSession {
-  return (async () => ({
-    data: { session: uid ? { user: { id: uid } } : null },
-  })) as unknown as GetSession;
-}
-
-// Pages a fixed array by cursor as listItemsForExport does: a full page points at its last item.
-function paginatedListItems(allItems: ExportItem[]): ListItems {
-  return vi.fn(
-    async (page: { after: { itemId: string } | null; size: number }) => {
-      const start = page.after
-        ? allItems.findIndex((entry) => entry.id === page.after!.itemId) + 1
-        : 0;
-      const items = allItems.slice(start, start + page.size);
-      const next =
-        items.length === page.size
-          ? { linkedAt: 'at', itemId: items[items.length - 1].id }
-          : null;
-      return { data: { items, next }, error: null };
-    },
-  );
-}
-
-// Keyed by item id, building the `uid/itemId/name` path shape a real row carries; `size_bytes` null.
-function fakeListImages(byItemId: Record<string, string[]>): ListImages {
-  return async (itemIds: string[]) => ({
-    data: itemIds.flatMap((itemId) =>
-      (byItemId[itemId] ?? []).map((name) => ({
-        item_id: itemId,
-        path_full: `uid/${itemId}/${name}`,
-        size_bytes: null,
-      })),
-    ),
-    error: null,
-  });
-}
-
-function okResponse(bytes: number[]): Response {
-  return new Response(new Uint8Array(bytes));
-}
+import {
+  type SignUrls,
+  item,
+  fakeGetSession,
+  paginatedListItems,
+  fakeListImages,
+  okResponse,
+} from './exportCategory.test-support';
 
 describe('exportCategory, signing the photograph URLs', () => {
   it('skips every photograph a signing call came back empty for', async () => {

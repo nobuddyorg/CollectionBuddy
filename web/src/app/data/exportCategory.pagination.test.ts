@@ -5,73 +5,13 @@ import {
   ITEM_PAGE_SIZE,
   type ExportProgress,
 } from './exportCategory';
-import type { ExportItem } from './exportFormat';
-import type { supabase } from '../supabase';
-
-type GetSession = () => ReturnType<typeof supabase.auth.getSession>;
-type ListItems = Parameters<typeof exportCategory>[0]['listItems'];
-type ListImages = Parameters<typeof exportCategory>[0]['listImages'];
-type SignUrls = Parameters<typeof exportCategory>[0]['signUrls'];
-
-function item(overrides: Partial<ExportItem> = {}): ExportItem {
-  return {
-    id: 'item-1',
-    title: 'Item',
-    description: null,
-    place: null,
-    place_lat: null,
-    place_lng: null,
-    tags: [],
-    created_at: '2026-01-02T03:04:05.000Z',
-    ...overrides,
-  };
-}
-
-// Only `data.session.user.id` is ever read, so that's all the fake carries.
-function fakeGetSession(uid: string | null): GetSession {
-  return (async () => ({
-    data: { session: uid ? { user: { id: uid } } : null },
-  })) as unknown as GetSession;
-}
-
-// Pages a fixed array by cursor as listItemsForExport does: a full page points at its last item.
-function paginatedListItems(allItems: ExportItem[]): ListItems {
-  return vi.fn(
-    async (page: { after: { itemId: string } | null; size: number }) => {
-      const start = page.after
-        ? allItems.findIndex((entry) => entry.id === page.after!.itemId) + 1
-        : 0;
-      const items = allItems.slice(start, start + page.size);
-      const next =
-        items.length === page.size
-          ? { linkedAt: 'at', itemId: items[items.length - 1].id }
-          : null;
-      return { data: { items, next }, error: null };
-    },
-  );
-}
-
-// Keyed by item id, building the `uid/itemId/name` path shape a real row carries; `size_bytes` null.
-function fakeListImages(byItemId: Record<string, string[]>): ListImages {
-  return async (itemIds: string[]) => ({
-    data: itemIds.flatMap((itemId) =>
-      (byItemId[itemId] ?? []).map((name) => ({
-        item_id: itemId,
-        path_full: `uid/${itemId}/${name}`,
-        size_bytes: null,
-      })),
-    ),
-    error: null,
-  });
-}
-
-// Every path signs to a URL derived from itself, so a test can tell which photograph a fetch was for.
-function fakeSignUrls(): SignUrls {
-  return (async (paths: string[]) => ({
-    data: paths.map((path) => ({ path, signedUrl: `signed://${path}` })),
-    error: null,
-  })) as unknown as SignUrls;
-}
+import {
+  item,
+  fakeGetSession,
+  paginatedListItems,
+  fakeListImages,
+  fakeSignUrls,
+} from './exportCategory.test-support';
 
 describe('exportCategory, paging through the items', () => {
   it('reads zero items in one call', async () => {

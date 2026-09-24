@@ -6,22 +6,8 @@ import {
   EXPORT_FORMAT_VERSION,
   exportEntries,
   PHOTOS_DIR,
-  type ExportItem,
 } from './exportFormat';
-
-function item(overrides: Partial<ExportItem> = {}): ExportItem {
-  return {
-    id: 'item-1',
-    title: 'Seated Dime',
-    description: null,
-    place: null,
-    place_lat: null,
-    place_lng: null,
-    tags: [],
-    created_at: '2026-01-02T03:04:05.000Z',
-    ...overrides,
-  };
-}
+import { item } from './exportFormat.test-support';
 
 describe('exportEntries', () => {
   it('numbers each folder and each photograph inside it', () => {

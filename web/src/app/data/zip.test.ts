@@ -10,8 +10,7 @@ import {
   localFileHeader,
   type ZipEntry,
 } from './zip';
-
-const encoder = new TextEncoder();
+import { encoder, uint32, uint16 } from './zip.test-support';
 
 function entry(overrides: Partial<ZipEntry> = {}): ZipEntry {
   return {
@@ -23,14 +22,6 @@ function entry(overrides: Partial<ZipEntry> = {}): ZipEntry {
     date: 0x5cc6,
     ...overrides,
   };
-}
-
-function u32(bytes: Uint8Array, at: number): number {
-  return new DataView(bytes.buffer, bytes.byteOffset).getUint32(at, true);
-}
-
-function u16(bytes: Uint8Array, at: number): number {
-  return new DataView(bytes.buffer, bytes.byteOffset).getUint16(at, true);
 }
 
 describe('crc32', () => {
@@ -122,27 +113,27 @@ describe('encodePath', () => {
 describe('localFileHeader', () => {
   it('writes the signature, sizes and name', () => {
     const bytes = localFileHeader(entry({ path: 'ab', size: 7 }));
-    expect(u32(bytes, 0)).toBe(0x04034b50);
-    expect(u16(bytes, 4)).toBe(20);
+    expect(uint32(bytes, 0)).toBe(0x04034b50);
+    expect(uint16(bytes, 4)).toBe(20);
     // Bit 11 set: the name that follows is UTF-8.
-    expect(u16(bytes, 6)).toBe(0x0800);
+    expect(uint16(bytes, 6)).toBe(0x0800);
     // Method 0, stored: a deflate marker would make every archive unreadable.
-    expect(u16(bytes, 8)).toBe(0);
-    expect(u16(bytes, 10)).toBe(0x4a2b);
-    expect(u16(bytes, 12)).toBe(0x5cc6);
-    expect(u32(bytes, 14)).toBe(0x12345678);
+    expect(uint16(bytes, 8)).toBe(0);
+    expect(uint16(bytes, 10)).toBe(0x4a2b);
+    expect(uint16(bytes, 12)).toBe(0x5cc6);
+    expect(uint32(bytes, 14)).toBe(0x12345678);
     // Stored, so both size fields carry the same number.
-    expect(u32(bytes, 18)).toBe(7);
-    expect(u32(bytes, 22)).toBe(7);
-    expect(u16(bytes, 26)).toBe(2);
-    expect(u16(bytes, 28)).toBe(0);
+    expect(uint32(bytes, 18)).toBe(7);
+    expect(uint32(bytes, 22)).toBe(7);
+    expect(uint16(bytes, 26)).toBe(2);
+    expect(uint16(bytes, 28)).toBe(0);
     expect(bytes).toHaveLength(32);
     expect(new TextDecoder().decode(bytes.slice(30))).toBe('ab');
   });
 
   it('sizes the header by the name’s bytes, not its characters', () => {
     expect(localFileHeader(entry({ path: 'ü' }))).toHaveLength(32);
-    expect(u16(localFileHeader(entry({ path: 'ü' })), 26)).toBe(2);
+    expect(uint16(localFileHeader(entry({ path: 'ü' })), 26)).toBe(2);
   });
 });
 
@@ -151,25 +142,25 @@ describe('centralDirectoryEntry', () => {
     const bytes = centralDirectoryEntry(
       entry({ path: 'a/b.webp', size: 9, offset: 1234 }),
     );
-    expect(u32(bytes, 0)).toBe(0x02014b50);
-    expect(u16(bytes, 4)).toBe(20);
-    expect(u16(bytes, 6)).toBe(20);
-    expect(u16(bytes, 8)).toBe(0x0800);
-    expect(u16(bytes, 10)).toBe(0);
-    expect(u16(bytes, 12)).toBe(0x4a2b);
-    expect(u16(bytes, 14)).toBe(0x5cc6);
-    expect(u32(bytes, 16)).toBe(0x12345678);
-    expect(u32(bytes, 20)).toBe(9);
-    expect(u32(bytes, 24)).toBe(9);
-    expect(u16(bytes, 28)).toBe(8);
+    expect(uint32(bytes, 0)).toBe(0x02014b50);
+    expect(uint16(bytes, 4)).toBe(20);
+    expect(uint16(bytes, 6)).toBe(20);
+    expect(uint16(bytes, 8)).toBe(0x0800);
+    expect(uint16(bytes, 10)).toBe(0);
+    expect(uint16(bytes, 12)).toBe(0x4a2b);
+    expect(uint16(bytes, 14)).toBe(0x5cc6);
+    expect(uint32(bytes, 16)).toBe(0x12345678);
+    expect(uint32(bytes, 20)).toBe(9);
+    expect(uint32(bytes, 24)).toBe(9);
+    expect(uint16(bytes, 28)).toBe(8);
     // Extra, comment, disk, attributes: all zero.
-    expect(u16(bytes, 30)).toBe(0);
-    expect(u16(bytes, 32)).toBe(0);
-    expect(u16(bytes, 34)).toBe(0);
-    expect(u16(bytes, 36)).toBe(0);
-    expect(u32(bytes, 38)).toBe(0);
+    expect(uint16(bytes, 30)).toBe(0);
+    expect(uint16(bytes, 32)).toBe(0);
+    expect(uint16(bytes, 34)).toBe(0);
+    expect(uint16(bytes, 36)).toBe(0);
+    expect(uint32(bytes, 38)).toBe(0);
     // The offset is what an extractor seeks to; a wrong one reads garbage.
-    expect(u32(bytes, 42)).toBe(1234);
+    expect(uint32(bytes, 42)).toBe(1234);
     expect(new TextDecoder().decode(bytes.slice(46))).toBe('a/b.webp');
   });
 });
@@ -182,14 +173,14 @@ describe('endOfCentralDirectory', () => {
       offset: 900,
     });
     expect(bytes).toHaveLength(22);
-    expect(u32(bytes, 0)).toBe(0x06054b50);
-    expect(u16(bytes, 4)).toBe(0);
-    expect(u16(bytes, 6)).toBe(0);
+    expect(uint32(bytes, 0)).toBe(0x06054b50);
+    expect(uint16(bytes, 4)).toBe(0);
+    expect(uint16(bytes, 6)).toBe(0);
     // On this disk, and in total -- the same number, single-disk archive.
-    expect(u16(bytes, 8)).toBe(3);
-    expect(u16(bytes, 10)).toBe(3);
-    expect(u32(bytes, 12)).toBe(150);
-    expect(u32(bytes, 16)).toBe(900);
-    expect(u16(bytes, 20)).toBe(0);
+    expect(uint16(bytes, 8)).toBe(3);
+    expect(uint16(bytes, 10)).toBe(3);
+    expect(uint32(bytes, 12)).toBe(150);
+    expect(uint32(bytes, 16)).toBe(900);
+    expect(uint16(bytes, 20)).toBe(0);
   });
 });

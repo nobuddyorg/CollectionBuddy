@@ -9,20 +9,7 @@ import {
   MAX_ZIP_ENTRIES,
   ZipLimitError,
 } from './zip';
-
-const encoder = new TextEncoder();
-
-async function bytesOf(blob: Blob): Promise<Uint8Array<ArrayBuffer>> {
-  return new Uint8Array(await blob.arrayBuffer());
-}
-
-function u32(bytes: Uint8Array, at: number): number {
-  return new DataView(bytes.buffer, bytes.byteOffset).getUint32(at, true);
-}
-
-function u16(bytes: Uint8Array, at: number): number {
-  return new DataView(bytes.buffer, bytes.byteOffset).getUint16(at, true);
-}
+import { encoder, bytesOf, uint32, uint16 } from './zip.test-support';
 
 describe('createZipWriter', () => {
   const modified = new Date(2026, 7, 6, 13, 45, 30);
@@ -33,7 +20,7 @@ describe('createZipWriter', () => {
     writer.add({ path: 'two.txt', bytes: encoder.encode('!'), modified });
     const bytes = await bytesOf(writer.finish());
 
-    expect(u32(bytes, 0)).toBe(0x04034b50);
+    expect(uint32(bytes, 0)).toBe(0x04034b50);
     const firstName = 'one.txt'.length;
     expect(new TextDecoder().decode(bytes.slice(30, 30 + firstName))).toBe(
       'one.txt',
@@ -43,7 +30,7 @@ describe('createZipWriter', () => {
       new TextDecoder().decode(bytes.slice(firstData, firstData + 5)),
     ).toBe('hello');
     // The second entry's local header starts immediately after the first.
-    expect(u32(bytes, firstData + 5)).toBe(0x04034b50);
+    expect(uint32(bytes, firstData + 5)).toBe(0x04034b50);
   });
 
   it('reports the running size, which is where the next entry begins', () => {
@@ -63,13 +50,13 @@ describe('createZipWriter', () => {
     const bytes = await bytesOf(writer.finish());
 
     const trailerAt = bytes.length - 22;
-    const directoryAt = u32(bytes, trailerAt + 16);
+    const directoryAt = uint32(bytes, trailerAt + 16);
     const firstRecord = directoryAt;
     const secondRecord = firstRecord + 46 + 'one.txt'.length;
-    expect(u32(bytes, firstRecord + 42)).toBe(0);
-    expect(u32(bytes, secondRecord + 42)).toBe(secondOffset);
+    expect(uint32(bytes, firstRecord + 42)).toBe(0);
+    expect(uint32(bytes, secondRecord + 42)).toBe(secondOffset);
     // Every offset the directory gives has to land on a local header.
-    expect(u32(bytes, u32(bytes, secondRecord + 42))).toBe(0x04034b50);
+    expect(uint32(bytes, uint32(bytes, secondRecord + 42))).toBe(0x04034b50);
   });
 
   it('ends with a trailer describing the directory it just wrote', async () => {
@@ -79,22 +66,22 @@ describe('createZipWriter', () => {
     const bytes = await bytesOf(writer.finish());
 
     const trailerAt = bytes.length - 22;
-    expect(u32(bytes, trailerAt)).toBe(0x06054b50);
-    expect(u16(bytes, trailerAt + 8)).toBe(2);
-    expect(u16(bytes, trailerAt + 10)).toBe(2);
+    expect(uint32(bytes, trailerAt)).toBe(0x06054b50);
+    expect(uint16(bytes, trailerAt + 8)).toBe(2);
+    expect(uint16(bytes, trailerAt + 10)).toBe(2);
     const directorySize = 46 + 7 + 46 + 7;
-    expect(u32(bytes, trailerAt + 12)).toBe(directorySize);
-    expect(u32(bytes, trailerAt + 16)).toBe(trailerAt - directorySize);
-    expect(u32(bytes, u32(bytes, trailerAt + 16))).toBe(0x02014b50);
+    expect(uint32(bytes, trailerAt + 12)).toBe(directorySize);
+    expect(uint32(bytes, trailerAt + 16)).toBe(trailerAt - directorySize);
+    expect(uint32(bytes, uint32(bytes, trailerAt + 16))).toBe(0x02014b50);
   });
 
   it('writes a valid empty archive', async () => {
     const bytes = await bytesOf(createZipWriter().finish());
     expect(bytes).toHaveLength(22);
-    expect(u32(bytes, 0)).toBe(0x06054b50);
-    expect(u16(bytes, 8)).toBe(0);
-    expect(u32(bytes, 12)).toBe(0);
-    expect(u32(bytes, 16)).toBe(0);
+    expect(uint32(bytes, 0)).toBe(0x06054b50);
+    expect(uint16(bytes, 8)).toBe(0);
+    expect(uint32(bytes, 12)).toBe(0);
+    expect(uint32(bytes, 16)).toBe(0);
   });
 
   it('stores the bytes verbatim, so the CRC in the header matches them', async () => {
@@ -102,7 +89,7 @@ describe('createZipWriter', () => {
     const writer = createZipWriter();
     writer.add({ path: 'f.txt', bytes: payload, modified });
     const bytes = await bytesOf(writer.finish());
-    expect(u32(bytes, 14)).toBe(crc32(payload));
+    expect(uint32(bytes, 14)).toBe(crc32(payload));
     const at = 30 + 'f.txt'.length;
     expect(bytes.slice(at, at + payload.length)).toEqual(payload);
   });
@@ -112,8 +99,8 @@ describe('createZipWriter', () => {
     writer.add({ path: 'f.txt', bytes: encoder.encode('x'), modified });
     const bytes = await bytesOf(writer.finish());
     const { time, date } = dosDateTime(modified);
-    expect(u16(bytes, 10)).toBe(time);
-    expect(u16(bytes, 12)).toBe(date);
+    expect(uint16(bytes, 10)).toBe(time);
+    expect(uint16(bytes, 12)).toBe(date);
   });
 
   // Pinned clock, so the writer's own `new Date()` and the assertion cannot straddle midnight.
@@ -124,7 +111,7 @@ describe('createZipWriter', () => {
       const writer = createZipWriter();
       writer.add({ path: 'f.txt', bytes: encoder.encode('x') });
       const bytes = await bytesOf(writer.finish());
-      expect(u16(bytes, 12)).toBe(dosDateTime(new Date()).date);
+      expect(uint16(bytes, 12)).toBe(dosDateTime(new Date()).date);
     } finally {
       vi.useRealTimers();
     }

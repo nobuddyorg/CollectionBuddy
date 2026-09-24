@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createZipWriter, readZipEntries, ZipReadError } from './zip';
-
-const encoder = new TextEncoder();
-
-async function bytesOf(blob: Blob): Promise<Uint8Array<ArrayBuffer>> {
-  return new Uint8Array(await blob.arrayBuffer());
-}
+import { encoder, bytesOf } from './zip.test-support';
 
 async function oneEntryArchive(): Promise<Uint8Array<ArrayBuffer>> {
   const writer = createZipWriter();
