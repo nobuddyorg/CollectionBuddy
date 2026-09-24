@@ -41,7 +41,7 @@ const eslintConfig = [
   },
   // A mock standing in for an async API rarely needs to await anything.
   {
-    files: ['src/**/*.test.{ts,tsx}'],
+    files: ['src/**/*.test.{ts,tsx}', 'src/**/*.test-support.{ts,tsx}'],
     rules: {
       '@typescript-eslint/require-await': 'off',
     },
@@ -49,7 +49,7 @@ const eslintConfig = [
   // core-web-vitals already registers jsx-a11y (6 rules); redeclaring `plugins` errors, so only rules go here.
   {
     files: ['src/app/**/*.tsx'],
-    ignores: ['src/app/**/*.test.tsx'],
+    ignores: ['src/app/**/*.test.tsx', 'src/app/**/*.test-support.tsx'],
     rules: {
       ...jsxA11y.flatConfigs.strict.rules,
       // Calls minimatch as a default export, which the minimatch@10 override lacks; axe covers form labels instead.
@@ -59,7 +59,7 @@ const eslintConfig = [
   // Code-smell analysis for non-test source: a test's job is to be exhaustive, not non-repetitive.
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/**/*.test.{ts,tsx}'],
+    ignores: ['src/**/*.test.{ts,tsx}', 'src/**/*.test-support.{ts,tsx}'],
     ...sonarjs.configs.recommended,
     // The recommended config sets a placeholder settings.react; a later `settings` replaces an earlier one wholesale.
     settings: { react: { version: '19.2.8' } },
