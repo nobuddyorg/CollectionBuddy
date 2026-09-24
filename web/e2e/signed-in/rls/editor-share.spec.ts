@@ -16,6 +16,7 @@ test.describe('a category shared at the editor role', () => {
     const { categoryId, itemId } = await ownerEntryIn({
       token,
       userId,
+      category: SEED.editorCategory,
       title: 'rls-editor-edit-probe',
     });
     const shareId = await editorShare(token, categoryId);

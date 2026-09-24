@@ -63,18 +63,15 @@ export async function ownedCategoryId(owner: {
   return data.id;
 }
 
-/** SEED.editorCategory, plus a throwaway entry of the owner's inside it. */
+/** One of the owner's seeded categories, plus a throwaway entry of the owner's inside it. */
 export async function ownerEntryIn(entry: {
   token: string;
   userId: string;
+  category: string;
   title: string;
 }): Promise<{ categoryId: string; itemId: string }> {
-  const { token, userId, title } = entry;
-  const categoryId = await ownedCategoryId({
-    token,
-    userId,
-    name: SEED.editorCategory,
-  });
+  const { token, userId, category, title } = entry;
+  const categoryId = await ownedCategoryId({ token, userId, name: category });
   const { data: item, error: itemError } = await apiAs(token)
     .from('items')
     .insert({ user_id: userId, title })

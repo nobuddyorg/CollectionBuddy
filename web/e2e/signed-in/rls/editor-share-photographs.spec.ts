@@ -1,5 +1,5 @@
 import { expect, test } from '../test';
-import { itemsIn } from '../fixtures';
+import { SEED, itemsIn } from '../fixtures';
 import { apiAs, context, editorShare, ownerEntryIn, unshare } from './helpers';
 
 // An editor's photographs, and the owner's prefix and objects that stay out of the editor's reach.
@@ -10,6 +10,7 @@ test.describe('a category shared at the editor role', () => {
     const { categoryId, itemId } = await ownerEntryIn({
       token,
       userId,
+      category: SEED.editorPhotoCategory,
       title: 'rls-editor-thumb-probe',
     });
     const shareId = await editorShare(token, categoryId);
@@ -43,6 +44,7 @@ test.describe('a category shared at the editor role', () => {
     const { categoryId, itemId } = await ownerEntryIn({
       token,
       userId,
+      category: SEED.editorPhotoCategory,
       title: 'rls-editor-photo-probe',
     });
     const shareId = await editorShare(token, categoryId);
@@ -89,6 +91,7 @@ test.describe('a category shared at the editor role', () => {
     const { categoryId, itemId } = await ownerEntryIn({
       token,
       userId,
+      category: SEED.editorPhotoCategory,
       title: 'rls-editor-move-probe',
     });
     const path = `${userId}/${itemId}/rls-editor-move-probe.webp`;
@@ -133,6 +136,7 @@ test.describe('a category shared at the editor role', () => {
     const { categoryId, itemId } = await ownerEntryIn({
       token,
       userId,
+      category: SEED.editorPhotoCategory,
       title: 'rls-editor-plant-probe',
     });
     const planted = `${userId}/${itemId}/planted-by-the-editor.webp`;
@@ -163,6 +167,7 @@ test.describe('a category shared at the editor role', () => {
     const { itemId } = await ownerEntryIn({
       token,
       userId,
+      category: SEED.editorPhotoCategory,
       title: 'rls-owner-move-probe',
     });
     const path = `${userId}/${itemId}/rls-owner-move-probe.webp`;

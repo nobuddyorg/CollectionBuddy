@@ -38,6 +38,9 @@ const BASELINE_ITEMS: SeedItem[] = [
   'Bildergalerie',
   'Rückgängig',
   'Pannenwerkstatt',
+  'Fotoalbum',
+  'Depot',
+  'Dunkelkammer',
 ].map((category) => ({
   category,
   title: `${category}stück`,
@@ -88,6 +91,10 @@ export const SEED = {
     'Bildergalerie',
     'Rückgängig',
     'Pannenwerkstatt',
+    'Fotoalbum',
+    'Bibliothek',
+    'Depot',
+    'Dunkelkammer',
   ],
   /** For entries.spec.ts. */
   scratchCategory: 'Werkstatt',
@@ -113,6 +120,15 @@ export const SEED = {
   undoCategory: 'Rückgängig',
   /** For failures.spec.ts, whose uploads are made to fail. */
   failureCategory: 'Pannenwerkstatt',
+  // The RLS specs below run in parallel files and category_shares is unique per (category, grantee).
+  /** For rls/viewer-share-photographs.spec.ts, which grants and revokes around a photograph. */
+  viewerPhotoCategory: 'Fotoalbum',
+  /** For rls/search-rpc.spec.ts, which searches this one through every kind of grant. */
+  searchCategory: 'Bibliothek',
+  /** For rls/editor-share-limits.spec.ts, whose grantee is refused everything but entries. */
+  editorLimitsCategory: 'Depot',
+  /** For rls/editor-share-photographs.spec.ts, whose grantee photographs the owner's entries. */
+  editorPhotoCategory: 'Dunkelkammer',
 
   // Oldest first; the list sorts newest first, so the last one here is the first card on the page.
   items: [
@@ -182,7 +198,6 @@ export const SEED = {
       tags: [],
     },
     {
-      // The editor-grant cases edit and delete this one, so they reseed it themselves.
       category: 'Leihgabe',
       title: 'Leihstück',
       description: 'Bleibt liegen, damit die Leihgabe nie leer bleibt.',
@@ -219,6 +234,16 @@ export const SEED = {
       place_lat: 53.0793,
       place_lng: 8.8017,
       tags: ['umzug'],
+    },
+    {
+      // What rls/search-rpc.spec.ts searches for, so the title must stay unique across the seed.
+      category: 'Bibliothek',
+      title: 'Erstausgabe',
+      description: 'Gebunden in Leinen, mit Widmung des Verfassers.',
+      place: null,
+      place_lat: null,
+      place_lng: null,
+      tags: ['buch'],
     },
     ...BASELINE_ITEMS,
     ...PAGING_ITEMS,

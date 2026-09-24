@@ -1,8 +1,10 @@
 import { expect, test } from '../test';
-import { SEED } from '../fixtures';
+import { SEED, itemsIn } from '../fixtures';
 import { apiAs, context, ownedCategoryId, share, unshare } from './helpers';
 
 // SECURITY DEFINER bypasses RLS, so the RPC's own read-access check is what any cat_id meets.
+const [seeded] = itemsIn(SEED.searchCategory);
+
 test.describe('search_category_items (the search RPC)', () => {
   async function searchIn(search: {
     token: string;
@@ -26,21 +28,29 @@ test.describe('search_category_items (the search RPC)', () => {
 
   test('an owner searches their own category and finds a matching title', async () => {
     const { token, userId } = context();
-    const categoryId = await ownedCategoryId({ token, userId, name: 'Münzen' });
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.searchCategory,
+    });
 
     const { titles, error } = await searchIn({
       token,
       categoryId,
-      term: 'Silberdenar',
+      term: seeded.title,
     });
 
     expect(error).toBeNull();
-    expect(titles).toContain('Silberdenar');
+    expect(titles).toContain(seeded.title);
   });
 
   test('a term matching nothing in the category returns an empty page, not an error', async () => {
     const { token, userId } = context();
-    const categoryId = await ownedCategoryId({ token, userId, name: 'Münzen' });
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.searchCategory,
+    });
 
     const { titles, error } = await searchIn({
       token,
@@ -73,7 +83,11 @@ test.describe('search_category_items (the search RPC)', () => {
 
   test('an active grant opens search the same as it opens a plain read', async () => {
     const { token, userId, otherToken } = context();
-    const categoryId = await ownedCategoryId({ token, userId, name: 'Münzen' });
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.searchCategory,
+    });
     const shareId = await share({
       token,
       categoryId,
@@ -84,10 +98,10 @@ test.describe('search_category_items (the search RPC)', () => {
       const { titles, error } = await searchIn({
         token: otherToken,
         categoryId,
-        term: 'Silberdenar',
+        term: seeded.title,
       });
       expect(error).toBeNull();
-      expect(titles).toContain('Silberdenar');
+      expect(titles).toContain(seeded.title);
     } finally {
       await unshare(token, shareId);
     }
@@ -95,7 +109,11 @@ test.describe('search_category_items (the search RPC)', () => {
 
   test('an expired grant is refused for search, exactly like no grant at all', async () => {
     const { token, userId, otherToken } = context();
-    const categoryId = await ownedCategoryId({ token, userId, name: 'Münzen' });
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.searchCategory,
+    });
     const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     const expiresAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const shareId = await share({
@@ -109,7 +127,7 @@ test.describe('search_category_items (the search RPC)', () => {
       const { titles, error } = await searchIn({
         token: otherToken,
         categoryId,
-        term: 'Silberdenar',
+        term: seeded.title,
       });
       expect(error).toBeNull();
       expect(titles).toEqual([]);
@@ -121,7 +139,11 @@ test.describe('search_category_items (the search RPC)', () => {
   // The entry is still there, so this proves the grant stopped working rather than the row vanishing.
   test('revoking the grant closes search again, with the entry still there', async () => {
     const { token, userId, otherToken } = context();
-    const categoryId = await ownedCategoryId({ token, userId, name: 'Münzen' });
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.searchCategory,
+    });
     const shareId = await share({
       token,
       categoryId,
@@ -131,16 +153,16 @@ test.describe('search_category_items (the search RPC)', () => {
     const opened = await searchIn({
       token: otherToken,
       categoryId,
-      term: 'Silberdenar',
+      term: seeded.title,
     });
-    expect(opened.titles).toContain('Silberdenar');
+    expect(opened.titles).toContain(seeded.title);
 
     await unshare(token, shareId);
 
     const { titles, error } = await searchIn({
       token: otherToken,
       categoryId,
-      term: 'Silberdenar',
+      term: seeded.title,
     });
     expect(error).toBeNull();
     expect(titles).toEqual([]);
@@ -149,9 +171,9 @@ test.describe('search_category_items (the search RPC)', () => {
     const stillThere = await searchIn({
       token,
       categoryId,
-      term: 'Silberdenar',
+      term: seeded.title,
     });
-    expect(stillThere.titles).toContain('Silberdenar');
+    expect(stillThere.titles).toContain(seeded.title);
   });
 
   // The asymmetry editor-share.spec.ts asserts; the RPC must reproduce it despite bypassing RLS.
@@ -160,7 +182,7 @@ test.describe('search_category_items (the search RPC)', () => {
     const categoryId = await ownedCategoryId({
       token,
       userId,
-      name: SEED.editorCategory,
+      name: SEED.searchCategory,
     });
     const shareId = await share({
       token,
@@ -199,7 +221,7 @@ test.describe('search_category_items (the search RPC)', () => {
     const categoryId = await ownedCategoryId({
       token,
       userId,
-      name: SEED.editorCategory,
+      name: SEED.searchCategory,
     });
     const shareId = await share({
       token,

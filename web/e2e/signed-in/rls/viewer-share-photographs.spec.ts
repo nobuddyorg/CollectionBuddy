@@ -7,12 +7,16 @@ test.describe('a category shared with another collector', () => {
   // Photos extend the grant through item_categories; the object's path never contains the grantee's uid.
   test('a shared photograph can be read through the grant, and stops the moment it is revoked', async () => {
     const { token, userId, otherToken } = context();
-    const categoryId = await ownedCategoryId({ token, userId, name: 'Münzen' });
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.viewerPhotoCategory,
+    });
     const { data: item } = await apiAs(token)
       .from('items')
       .select('id')
       .eq('user_id', userId)
-      .eq('title', itemsIn('Münzen')[0].title)
+      .eq('title', itemsIn(SEED.viewerPhotoCategory)[0].title)
       .single();
     const path = `${userId}/${item!.id}/rls-share-probe.webp`;
 
@@ -50,7 +54,11 @@ test.describe('a category shared with another collector', () => {
 
   test('a photograph cannot be signed through an expired grant, nor from the owner’s unshared category', async () => {
     const { token, userId, otherToken } = context();
-    const categoryId = await ownedCategoryId({ token, userId, name: 'Münzen' });
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.viewerPhotoCategory,
+    });
     const idOf = async (title: string) => {
       const { data } = await apiAs(token)
         .from('items')
@@ -60,7 +68,7 @@ test.describe('a category shared with another collector', () => {
         .single();
       return data!.id;
     };
-    const shared = `${userId}/${await idOf(itemsIn('Münzen')[0].title)}/rls-expiry-probe.webp`;
+    const shared = `${userId}/${await idOf(itemsIn(SEED.viewerPhotoCategory)[0].title)}/rls-expiry-probe.webp`;
     const sibling = `${userId}/${await idOf(itemsIn('Briefmarken')[0].title)}/rls-sibling-probe.webp`;
     const storage = apiAs(token).storage.from('item-images');
     for (const path of [shared, sibling]) {
@@ -113,12 +121,16 @@ test.describe('a category shared with another collector', () => {
   // The images select policy joins through item_categories by item_id rather than parsing a path.
   test('a shared photograph record can be read through the grant, and stops the moment it is revoked', async () => {
     const { token, userId, otherToken } = context();
-    const categoryId = await ownedCategoryId({ token, userId, name: 'Münzen' });
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.viewerPhotoCategory,
+    });
     const { data: item } = await apiAs(token)
       .from('items')
       .select('id')
       .eq('user_id', userId)
-      .eq('title', itemsIn('Münzen')[0].title)
+      .eq('title', itemsIn(SEED.viewerPhotoCategory)[0].title)
       .single();
 
     const { data: planted, error: insertError } = await apiAs(token)

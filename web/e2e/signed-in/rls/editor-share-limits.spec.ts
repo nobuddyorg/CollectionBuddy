@@ -18,7 +18,7 @@ test.describe('a category shared at the editor role', () => {
     const categoryId = await ownedCategoryId({
       token,
       userId,
-      name: SEED.editorCategory,
+      name: SEED.editorLimitsCategory,
     });
     const shareId = await editorShare(token, categoryId);
 
@@ -42,7 +42,7 @@ test.describe('a category shared at the editor role', () => {
         .select('name')
         .eq('id', categoryId)
         .single();
-      expect(after!.name).toBe(SEED.editorCategory);
+      expect(after!.name).toBe(SEED.editorLimitsCategory);
     } finally {
       await unshare(token, shareId);
     }
@@ -53,7 +53,7 @@ test.describe('a category shared at the editor role', () => {
     const categoryId = await ownedCategoryId({
       token,
       userId,
-      name: SEED.editorCategory,
+      name: SEED.editorLimitsCategory,
     });
     // Issued as a viewer, so a successful self-promotion shows as a role change, not a no-op.
     const shareId = await share({
@@ -98,7 +98,7 @@ test.describe('a category shared at the editor role', () => {
     const categoryId = await ownedCategoryId({
       token,
       userId,
-      name: SEED.editorCategory,
+      name: SEED.editorLimitsCategory,
     });
     const shareId = await editorShare(token, categoryId);
 
@@ -134,6 +134,7 @@ test.describe('a category shared at the editor role', () => {
     const { categoryId, itemId } = await ownerEntryIn({
       token,
       userId,
+      category: SEED.editorLimitsCategory,
       title: 'rls-editor-revoked-probe',
     });
 
@@ -170,6 +171,7 @@ test.describe('a category shared at the editor role', () => {
     const { categoryId, itemId } = await ownerEntryIn({
       token,
       userId,
+      category: SEED.editorLimitsCategory,
       title: 'rls-editor-expired-probe',
     });
     const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
@@ -208,7 +210,7 @@ test.describe('a category shared at the editor role', () => {
     const categoryId = await ownedCategoryId({
       token,
       userId,
-      name: SEED.editorCategory,
+      name: SEED.editorLimitsCategory,
     });
     const shareId = await editorShare(token, categoryId);
 
