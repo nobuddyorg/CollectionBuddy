@@ -1,13 +1,10 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import CategorySelect from './index';
 import type { UseCategories } from './useCategories';
+import { openPanel, renderSelect } from './index.test-support';
 
 // Mocked so the panel's expand-on-open never fires a real Supabase call.
 vi.mock('./useShares', () => ({
@@ -39,23 +36,6 @@ function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   } as UseCategories;
 }
 
-function renderSelect() {
-  render(
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <CategorySelect
-            selectedCategoryId="a"
-            onSelect={() => {}}
-            categories={categories()}
-            userId="owner-1"
-          />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>,
-  );
-}
-
 describe('exporting with no session', () => {
   beforeEach(() => {
     // Cleared, not assumed empty: getSession() finds no session only if nothing is persisted.
@@ -64,10 +44,8 @@ describe('exporting with no session', () => {
   });
 
   it('reports the failure and re-enables the button, without hanging as "exporting" forever', async () => {
-    renderSelect();
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Open collection' }),
-    );
+    renderSelect({ categories: categories() });
+    await openPanel();
 
     const exportButton = screen.getByRole('button', { name: 'Export' });
     expect(exportButton).toBeEnabled();

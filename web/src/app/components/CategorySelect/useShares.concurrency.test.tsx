@@ -1,17 +1,20 @@
 // @vitest-environment jsdom
-import { act, renderHook, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
 import {
   createShare as createShareRow,
   deleteShare as deleteShareRow,
-  listSharesForCategory,
   updateShareRole as updateShareRoleRow,
 } from '../../data/shares';
 import { useShares } from './useShares';
+import {
+  commitDeferredDelete,
+  grant,
+  listSharesReturns,
+  renderLoadedShares,
+  wrapper,
+} from './useShares.test-support';
 
 vi.mock('../../data/shares', () => ({
   createShare: vi.fn(),
@@ -19,22 +22,6 @@ vi.mock('../../data/shares', () => ({
   listSharesForCategory: vi.fn(),
   updateShareRole: vi.fn(),
 }));
-
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>{children}</ToastProvider>
-    </I18nProvider>
-  );
-}
-
-const grant = {
-  id: 'share-1',
-  invited_email: 'grantee@example.com',
-  expires_at: null,
-  owner_user_id: 'owner-1',
-  role: 'viewer' as const,
-};
 
 // The second click of a double-click must not issue a second grant, role write or delete.
 describe('useShares one request at a time', () => {
@@ -94,20 +81,14 @@ describe('useShares one request at a time', () => {
   });
 
   it('ignores a second revoke of a different grant while one is still deferred', async () => {
-    vi.mocked(listSharesForCategory).mockResolvedValue({
-      data: [grant, { ...grant, id: 'share-2' }],
-      error: null,
-    } as never);
+    listSharesReturns([grant, { ...grant, id: 'share-2' }]);
     let release: (() => void) | undefined;
     vi.mocked(deleteShareRow).mockReturnValue(
       new Promise((resolve) => {
         release = () => resolve({ error: null });
       }) as never,
     );
-    const { result } = renderHook(() => useShares('cat-1'), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedShares();
 
     act(() => {
       result.current.deleteShare('share-1', {
@@ -115,8 +96,7 @@ describe('useShares one request at a time', () => {
         errorMessage: 'Could not remove.',
       });
     });
-    await screen.findByRole('status');
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await commitDeferredDelete();
     await waitFor(() => expect(result.current.isRevoking).toBe(true));
 
     act(() => {

@@ -1,20 +1,16 @@
 // @vitest-environment jsdom
-import { act, renderHook, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import {
-  createCategory,
-  deleteCategory as deleteCategoryRow,
-  listCategories,
-  listItemIdsForCategory,
-  listItemIdsLinkedElsewhere,
-  renameCategory,
-} from '../../data/categories';
+import { deleteCategory as deleteCategoryRow } from '../../data/categories';
 import { listImagePathsForItems, removeImageObjects } from '../../data/images';
-import { useCategories } from './useCategories';
+import {
+  CATEGORY_ONE,
+  IMAGE_ROWS,
+  commitDeferredDelete,
+  installDeleteMocks,
+  renderLoadedCategories,
+} from './useCategories.test-support';
 
 vi.mock('../../data/categories', () => ({
   listCategories: vi.fn(),
@@ -32,59 +28,8 @@ vi.mock('../../data/images', () => ({
   REMOVE_OBJECTS_BATCH_SIZE: 2,
 }));
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>{children}</ToastProvider>
-    </I18nProvider>
-  );
-}
-
-const IMAGE_ROWS = [
-  { item_id: 'i1', path_full: 'u/i1/a.webp', path_thumb: null },
-  { item_id: 'i2', path_full: 'u/i2/b.webp', path_thumb: 'u/i2/b.thumb.webp' },
-];
-
-const CAT_1 = { id: 'cat-1', name: 'Cat 1', user_id: 'owner-1' };
-
-// Commits the deferred delete by closing the toast, the same as letting it auto-dismiss would.
-async function commitDeferredDelete() {
-  await screen.findByRole('status');
-  await userEvent.click(screen.getByRole('button', { name: 'Close' }));
-}
 describe('useCategories deleteCategory image cleanup', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    window.localStorage.setItem('lang', 'en');
-    vi.mocked(listCategories).mockResolvedValue({
-      data: [CAT_1],
-      error: null,
-    } as never);
-    vi.mocked(createCategory).mockResolvedValue({
-      data: null,
-      error: null,
-    } as never);
-    vi.mocked(renameCategory).mockResolvedValue({
-      data: null,
-      error: null,
-    } as never);
-    vi.mocked(listItemIdsForCategory).mockResolvedValue({
-      data: ['i1', 'i2'],
-      error: null,
-    });
-    vi.mocked(listItemIdsLinkedElsewhere).mockResolvedValue({
-      data: [],
-      error: null,
-    });
-    vi.mocked(listImagePathsForItems).mockResolvedValue({
-      data: IMAGE_ROWS,
-      error: null,
-    });
-    vi.mocked(removeImageObjects).mockResolvedValue({
-      data: [],
-      error: null,
-    });
-  });
+  beforeEach(installDeleteMocks);
 
   it('aborts and restores the collection when reading orphaned images fails', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
@@ -95,10 +40,7 @@ describe('useCategories deleteCategory image cleanup', () => {
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');
@@ -110,7 +52,7 @@ describe('useCategories deleteCategory image cleanup', () => {
     );
     expect(removeImageObjects).not.toHaveBeenCalled();
     expect(deleteCategoryRow).not.toHaveBeenCalled();
-    expect(result.current.categories).toEqual([CAT_1]);
+    expect(result.current.categories).toEqual([CATEGORY_ONE]);
     expect(consoleError).toHaveBeenCalledWith(
       'delete category',
       expect.objectContaining({
@@ -127,10 +69,7 @@ describe('useCategories deleteCategory image cleanup', () => {
       data: [],
       error: null,
     });
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');
@@ -149,10 +88,7 @@ describe('useCategories deleteCategory image cleanup', () => {
       data: [IMAGE_ROWS[0]],
       error: null,
     });
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');
@@ -170,10 +106,7 @@ describe('useCategories deleteCategory image cleanup', () => {
       error: new Error('storage down'),
     } as never);
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');
@@ -184,17 +117,14 @@ describe('useCategories deleteCategory image cleanup', () => {
       'Could not delete collection. Please try again.',
     );
     expect(deleteCategoryRow).not.toHaveBeenCalled();
-    expect(result.current.categories).toEqual([CAT_1]);
+    expect(result.current.categories).toEqual([CATEGORY_ONE]);
   });
   it('removes every photograph before the category row, and reports nothing on success', async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');
@@ -231,10 +161,7 @@ describe('useCategories deleteCategory image cleanup', () => {
   });
   it("reads every orphaned item's image paths in one batched query, not once per item", async () => {
     vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');
@@ -254,10 +181,7 @@ describe('useCategories deleteCategory image cleanup', () => {
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');
@@ -269,7 +193,7 @@ describe('useCategories deleteCategory image cleanup', () => {
     );
     expect(removeImageObjects).toHaveBeenCalledTimes(2);
     // The row is still there, so restoring shows what the database has.
-    expect(result.current.categories).toEqual([CAT_1]);
+    expect(result.current.categories).toEqual([CATEGORY_ONE]);
     expect(consoleError).toHaveBeenCalledWith(
       'delete category',
       expect.objectContaining({ message: 'offline' }),
@@ -284,10 +208,7 @@ describe('useCategories deleteCategory image cleanup', () => {
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');
@@ -299,7 +220,7 @@ describe('useCategories deleteCategory image cleanup', () => {
     );
     expect(removeImageObjects).toHaveBeenCalledTimes(2);
     expect(deleteCategoryRow).not.toHaveBeenCalled();
-    expect(result.current.categories).toEqual([CAT_1]);
+    expect(result.current.categories).toEqual([CATEGORY_ONE]);
     expect(consoleError).toHaveBeenCalledWith(
       'delete category',
       expect.objectContaining({ message: 'storage down' }),
@@ -312,10 +233,7 @@ describe('useCategories deleteCategory image cleanup', () => {
       .mockRejectedValueOnce(new Error('storage down'))
       .mockResolvedValueOnce({ data: [], error: null });
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');

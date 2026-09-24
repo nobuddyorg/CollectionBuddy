@@ -2,14 +2,17 @@
 import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
 import {
   createCategory,
   listCategories,
   renameCategory,
 } from '../../data/categories';
 import { useCategories } from './useCategories';
+import {
+  listCategoriesReturns,
+  renderLoadedCategories,
+  wrapper,
+} from './useCategories.test-support';
 
 vi.mock('../../data/categories', () => ({
   listCategories: vi.fn(),
@@ -26,37 +29,14 @@ vi.mock('../../data/images', () => ({
   REMOVE_OBJECTS_BATCH_SIZE: 1000,
 }));
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>{children}</ToastProvider>
-    </I18nProvider>
-  );
-}
-
 const COINS = { id: 'cat-1', name: 'Coins', user_id: 'owner-1' };
 const STAMPS = { id: 'cat-2', name: 'Stamps', user_id: 'owner-1' };
-
-function lists(categories: (typeof COINS)[]) {
-  vi.mocked(listCategories).mockResolvedValue({
-    data: categories,
-    error: null,
-  } as never);
-}
-
-async function loaded() {
-  const hook = renderHook(() => useCategories(), { wrapper });
-  await act(async () => {
-    await hook.result.current.reload();
-  });
-  return hook;
-}
 
 describe('useCategories', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.setItem('lang', 'en');
-    lists([COINS, STAMPS]);
+    listCategoriesReturns([COINS, STAMPS]);
   });
 
   describe('reload', () => {
@@ -168,7 +148,7 @@ describe('useCategories', () => {
         data: { id: 'cat-3', name: 'Cameras', user_id: 'owner-1' },
         error: null,
       } as never);
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       let created: unknown;
       await act(async () => {
@@ -181,7 +161,7 @@ describe('useCategories', () => {
     });
 
     it('refuses an empty name without asking the database', async () => {
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(result.current.createCategory('')).resolves.toBeNull();
@@ -195,7 +175,7 @@ describe('useCategories', () => {
         data: null,
         error: new Error('duplicate'),
       } as never);
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(
@@ -214,7 +194,7 @@ describe('useCategories', () => {
         data: null,
         error: { code: 'PT507', message: 'category quota of 1000 reached' },
       } as never);
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(
@@ -235,7 +215,7 @@ describe('useCategories', () => {
         data: { id: 'cat-1', name: 'Coins & Medals', user_id: 'owner-1' },
         error: null,
       } as never);
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(
@@ -249,7 +229,7 @@ describe('useCategories', () => {
     });
 
     it('refuses a blank new name without asking the database', async () => {
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(
@@ -265,7 +245,7 @@ describe('useCategories', () => {
         data: null,
         error: new Error('rls'),
       } as never);
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(
@@ -282,7 +262,7 @@ describe('useCategories', () => {
         data: null,
         error: null,
       } as never);
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       await act(async () => {
         await expect(
@@ -296,7 +276,7 @@ describe('useCategories', () => {
 
   describe('optimisticRemove', () => {
     it('hides the category and puts it back at its own position', async () => {
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       let restore: (() => void) | null = null;
       act(() => {
@@ -311,7 +291,7 @@ describe('useCategories', () => {
     });
 
     it('answers with nothing for a category that is already gone', async () => {
-      const { result } = await loaded();
+      const { result } = await renderLoadedCategories();
 
       act(() => {
         expect(result.current.optimisticRemove('cat-nope')).toBeNull();

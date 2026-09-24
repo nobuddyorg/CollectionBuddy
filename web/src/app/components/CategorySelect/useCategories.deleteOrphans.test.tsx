@@ -1,20 +1,19 @@
 // @vitest-environment jsdom
-import { act, renderHook, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
 import {
-  createCategory,
   deleteCategory as deleteCategoryRow,
-  listCategories,
   listItemIdsForCategory,
   listItemIdsLinkedElsewhere,
-  renameCategory,
 } from '../../data/categories';
 import { listImagePathsForItems, removeImageObjects } from '../../data/images';
-import { useCategories } from './useCategories';
+import {
+  CATEGORY_ONE,
+  commitDeferredDelete,
+  installDeleteMocks,
+  renderLoadedCategories,
+} from './useCategories.test-support';
 
 vi.mock('../../data/categories', () => ({
   listCategories: vi.fn(),
@@ -32,59 +31,8 @@ vi.mock('../../data/images', () => ({
   REMOVE_OBJECTS_BATCH_SIZE: 2,
 }));
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>{children}</ToastProvider>
-    </I18nProvider>
-  );
-}
-
-const IMAGE_ROWS = [
-  { item_id: 'i1', path_full: 'u/i1/a.webp', path_thumb: null },
-  { item_id: 'i2', path_full: 'u/i2/b.webp', path_thumb: 'u/i2/b.thumb.webp' },
-];
-
-const CAT_1 = { id: 'cat-1', name: 'Cat 1', user_id: 'owner-1' };
-
-// Commits the deferred delete by closing the toast, the same as letting it auto-dismiss would.
-async function commitDeferredDelete() {
-  await screen.findByRole('status');
-  await userEvent.click(screen.getByRole('button', { name: 'Close' }));
-}
 describe('useCategories deleteCategory orphan detection', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    window.localStorage.setItem('lang', 'en');
-    vi.mocked(listCategories).mockResolvedValue({
-      data: [CAT_1],
-      error: null,
-    } as never);
-    vi.mocked(createCategory).mockResolvedValue({
-      data: null,
-      error: null,
-    } as never);
-    vi.mocked(renameCategory).mockResolvedValue({
-      data: null,
-      error: null,
-    } as never);
-    vi.mocked(listItemIdsForCategory).mockResolvedValue({
-      data: ['i1', 'i2'],
-      error: null,
-    });
-    vi.mocked(listItemIdsLinkedElsewhere).mockResolvedValue({
-      data: [],
-      error: null,
-    });
-    vi.mocked(listImagePathsForItems).mockResolvedValue({
-      data: IMAGE_ROWS,
-      error: null,
-    });
-    vi.mocked(removeImageObjects).mockResolvedValue({
-      data: [],
-      error: null,
-    });
-  });
+  beforeEach(installDeleteMocks);
 
   it('aborts and reports when reading the category items fails', async () => {
     const listingError = new Error('offline');
@@ -95,10 +43,7 @@ describe('useCategories deleteCategory orphan detection', () => {
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');
@@ -107,7 +52,7 @@ describe('useCategories deleteCategory orphan detection', () => {
 
     await screen.findByRole('alert');
     expect(deleteCategoryRow).not.toHaveBeenCalled();
-    expect(result.current.categories).toEqual([CAT_1]);
+    expect(result.current.categories).toEqual([CATEGORY_ONE]);
     expect(consoleError).toHaveBeenCalledWith(
       'delete category',
       expect.objectContaining({
@@ -124,10 +69,7 @@ describe('useCategories deleteCategory orphan detection', () => {
       data: null,
       error: null,
     });
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');
@@ -147,10 +89,7 @@ describe('useCategories deleteCategory orphan detection', () => {
       data: null,
       error: null,
     });
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');
@@ -172,10 +111,7 @@ describe('useCategories deleteCategory orphan detection', () => {
       data: ['i1'],
       error: null,
     });
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');
@@ -206,10 +142,7 @@ describe('useCategories deleteCategory orphan detection', () => {
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');
@@ -220,7 +153,7 @@ describe('useCategories deleteCategory orphan detection', () => {
     expect(deleteCategoryRow).not.toHaveBeenCalled();
     expect(listImagePathsForItems).not.toHaveBeenCalled();
     expect(removeImageObjects).not.toHaveBeenCalled();
-    expect(result.current.categories).toEqual([CAT_1]);
+    expect(result.current.categories).toEqual([CATEGORY_ONE]);
     expect(consoleError).toHaveBeenCalledWith(
       'delete category',
       expect.objectContaining({
@@ -238,10 +171,7 @@ describe('useCategories deleteCategory orphan detection', () => {
       data: [],
       error: null,
     });
-    const { result } = renderHook(() => useCategories(), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedCategories();
 
     act(() => {
       result.current.deleteCategory('cat-1');

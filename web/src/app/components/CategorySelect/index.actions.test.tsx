@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,6 +9,11 @@ import { ToastProvider } from '../Toast/ToastProvider';
 import { countItemsForCategory } from '../../data/categories';
 import CategorySelect from './index';
 import type { UseCategories } from './useCategories';
+import {
+  categories as categoriesState,
+  openPanel,
+  renderSelect as renderCategorySelect,
+} from './index.test-support';
 
 vi.mock('./useShares', () => ({
   useShares: vi.fn().mockReturnValue({
@@ -26,53 +31,17 @@ vi.mock('./useShares', () => ({
 
 vi.mock('../../data/categories', () => ({ countItemsForCategory: vi.fn() }));
 
-const CATEGORIES = [
-  { id: 'a', name: 'Coins', user_id: 'owner-1' },
-  { id: 'b', name: 'Stamps', user_id: 'owner-1' },
-];
-
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
-  return {
-    categories: CATEGORIES,
-    isLoading: false,
-    isCreating: false,
-    isDeleting: false,
-    isRenaming: false,
-    reload: vi.fn().mockResolvedValue(CATEGORIES),
+  return categoriesState({
     createCategory: vi.fn().mockResolvedValue(null),
-    renameCategory: vi.fn(),
-    deleteCategory: vi.fn(),
-    optimisticRemove: vi.fn(() => vi.fn()),
     ...overrides,
-  };
+  });
 }
 
 function renderSelect(
   props: Partial<Parameters<typeof CategorySelect>[0]> = {},
 ) {
-  const onSelect = vi.fn();
-  const view = render(
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <CategorySelect
-            selectedCategoryId="a"
-            onSelect={onSelect}
-            categories={categories()}
-            userId="owner-1"
-            {...props}
-          />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>,
-  );
-  return { onSelect, view };
-}
-
-async function openPanel() {
-  await userEvent.click(
-    screen.getByRole('button', { name: 'Open collection' }),
-  );
+  return renderCategorySelect({ categories: categories(), ...props });
 }
 
 describe('the category panel', () => {

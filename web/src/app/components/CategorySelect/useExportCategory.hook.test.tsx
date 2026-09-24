@@ -3,9 +3,6 @@ import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import {
   ExportCancelledError,
   exportCategory,
@@ -14,6 +11,14 @@ import {
 import { ZipLimitError } from '../../data/zip';
 import { downloadBlob } from './downloadBlob';
 import { useExportCategory } from './useExportCategory';
+import {
+  CATEGORY,
+  type ExportArgs,
+  exported,
+  installExportMocks,
+  lastCall,
+  wrapper,
+} from './useExportCategory.test-support';
 
 vi.mock('../../data/exportCategory', async () => {
   const actual = await vi.importActual<
@@ -24,42 +29,8 @@ vi.mock('../../data/exportCategory', async () => {
 
 vi.mock('./downloadBlob', () => ({ downloadBlob: vi.fn() }));
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>{children}</ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>
-  );
-}
-
-const CATEGORY = { id: 'cat-1', name: 'Coins' };
-
-function exported(overrides: Record<string, unknown> = {}) {
-  return {
-    blob: new Blob(['zip']),
-    filename: 'CollectionBuddy-coins.zip',
-    photoCount: 2,
-    skippedPhotoCount: 0,
-    skippedItemCount: 0,
-    ...overrides,
-  };
-}
-
-type ExportArgs = Parameters<typeof exportCategory>[0];
-
-/** The argument object the hook handed `exportCategory` on its last call. */
-function lastCall(): ExportArgs {
-  return vi.mocked(exportCategory).mock.calls.at(-1)![0];
-}
-
 describe('useExportCategory', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    window.localStorage.setItem('lang', 'en');
-    vi.mocked(exportCategory).mockResolvedValue(exported() as never);
-  });
+  beforeEach(installExportMocks);
 
   it('exports the named category and hands the archive to the browser', async () => {
     const { result } = renderHook(() => useExportCategory(), { wrapper });

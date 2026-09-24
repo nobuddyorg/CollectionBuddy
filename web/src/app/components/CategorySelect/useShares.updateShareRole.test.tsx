@@ -1,14 +1,13 @@
 // @vitest-environment jsdom
-import { act, renderHook, screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
+import { updateShareRole as updateShareRoleRow } from '../../data/shares';
 import {
-  listSharesForCategory,
-  updateShareRole as updateShareRoleRow,
-} from '../../data/shares';
-import { useShares } from './useShares';
+  grant,
+  listSharesReturns,
+  renderLoadedShares,
+} from './useShares.test-support';
 
 vi.mock('../../data/shares', () => ({
   createShare: vi.fn(),
@@ -17,22 +16,6 @@ vi.mock('../../data/shares', () => ({
   updateShareRole: vi.fn(),
 }));
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>{children}</ToastProvider>
-    </I18nProvider>
-  );
-}
-
-const grant = {
-  id: 'share-1',
-  invited_email: 'grantee@example.com',
-  expires_at: null,
-  owner_user_id: 'owner-1',
-  role: 'viewer' as const,
-};
-
 describe('useShares updateShareRole', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -40,19 +23,13 @@ describe('useShares updateShareRole', () => {
   });
 
   it("replaces the grant with the server's row on success", async () => {
-    vi.mocked(listSharesForCategory).mockResolvedValue({
-      data: [grant],
-      error: null,
-    } as never);
+    listSharesReturns([grant]);
     const updated = { ...grant, role: 'editor' as const };
     vi.mocked(updateShareRoleRow).mockResolvedValue({
       data: updated,
       error: null,
     } as never);
-    const { result } = renderHook(() => useShares('cat-1'), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedShares();
 
     let ok: boolean | undefined;
     await act(async () => {
@@ -65,18 +42,12 @@ describe('useShares updateShareRole', () => {
   });
 
   it('succeeds without changing the list when the server returns no row', async () => {
-    vi.mocked(listSharesForCategory).mockResolvedValue({
-      data: [grant],
-      error: null,
-    } as never);
+    listSharesReturns([grant]);
     vi.mocked(updateShareRoleRow).mockResolvedValue({
       data: null,
       error: null,
     } as never);
-    const { result } = renderHook(() => useShares('cat-1'), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedShares();
 
     let ok: boolean | undefined;
     await act(async () => {
@@ -93,19 +64,13 @@ describe('useShares updateShareRole', () => {
       id: 'share-2',
       invited_email: 'other@example.com',
     };
-    vi.mocked(listSharesForCategory).mockResolvedValue({
-      data: [grant, other],
-      error: null,
-    } as never);
+    listSharesReturns([grant, other]);
     const updated = { ...grant, role: 'editor' as const };
     vi.mocked(updateShareRoleRow).mockResolvedValue({
       data: updated,
       error: null,
     } as never);
-    const { result } = renderHook(() => useShares('cat-1'), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedShares();
 
     await act(async () => {
       await result.current.updateShareRole('share-1', 'editor');
@@ -115,10 +80,7 @@ describe('useShares updateShareRole', () => {
   });
 
   it('leaves the list untouched when the update fails', async () => {
-    vi.mocked(listSharesForCategory).mockResolvedValue({
-      data: [grant],
-      error: null,
-    } as never);
+    listSharesReturns([grant]);
     const updateError = new Error('boom');
     vi.mocked(updateShareRoleRow).mockResolvedValue({
       data: null,
@@ -127,10 +89,7 @@ describe('useShares updateShareRole', () => {
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
-    const { result } = renderHook(() => useShares('cat-1'), { wrapper });
-    await act(async () => {
-      await result.current.reload();
-    });
+    const { result } = await renderLoadedShares();
 
     let ok: boolean | undefined;
     await act(async () => {

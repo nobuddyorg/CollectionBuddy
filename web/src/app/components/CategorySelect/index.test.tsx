@@ -1,16 +1,14 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import CategorySelect from './index';
-import type { UseCategories } from './useCategories';
-import { useExportCategory } from './useExportCategory';
-import { useImportCategory } from './useImportCategory';
-import { useShares } from './useShares';
+import {
+  categories,
+  installHookStates,
+  openPanel,
+  renderSelect,
+} from './index.test-support';
 
 vi.mock('../../data/categories', () => ({
   countItemsForCategory: vi.fn(),
@@ -31,103 +29,13 @@ vi.mock('./useShares', () => ({
   useShares: vi.fn(),
 }));
 
-function exportState(
-  overrides: Partial<ReturnType<typeof useExportCategory>> = {},
-) {
-  return {
-    progress: null,
-    isExporting: false,
-    message: null,
-    runExport: vi.fn(),
-    cancelExport: vi.fn(),
-    ...overrides,
-  };
-}
-
-function importState(
-  overrides: Partial<ReturnType<typeof useImportCategory>> = {},
-) {
-  return {
-    progress: null,
-    isImporting: false,
-    message: null,
-    runImport: vi.fn(),
-    cancelImport: vi.fn(),
-    ...overrides,
-  };
-}
-
-function sharesState(overrides: Partial<ReturnType<typeof useShares>> = {}) {
-  return {
-    shares: [],
-    isLoading: false,
-    isSharing: false,
-    isRevoking: false,
-    isUpdatingRole: false,
-    reload: vi.fn().mockResolvedValue([]),
-    createShare: vi.fn(),
-    deleteShare: vi.fn(),
-    updateShareRole: vi.fn(),
-    ...overrides,
-  };
-}
-
-// user_id 'owner-1' matches renderSelect's default userId, so both read as owned by the viewer.
-const CATEGORIES = [
-  { id: 'a', name: 'Coins', user_id: 'owner-1' },
-  { id: 'b', name: 'Stamps', user_id: 'owner-1' },
-];
-
-function categories(overrides: Partial<UseCategories> = {}): UseCategories {
-  return {
-    categories: CATEGORIES,
-    isLoading: false,
-    isCreating: false,
-    isDeleting: false,
-    isRenaming: false,
-    reload: vi.fn().mockResolvedValue(CATEGORIES),
-    createCategory: vi.fn(),
-    renameCategory: vi.fn(),
-    deleteCategory: vi.fn(),
-    optimisticRemove: vi.fn(() => vi.fn()),
-    ...overrides,
-  };
-}
-
-function renderSelect(
-  props: Partial<Parameters<typeof CategorySelect>[0]> = {},
-) {
-  const onSelect = vi.fn();
-  render(
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <CategorySelect
-            selectedCategoryId="a"
-            onSelect={onSelect}
-            categories={categories()}
-            userId="owner-1"
-            {...props}
-          />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>,
-  );
-  return { onSelect };
-}
-
 const heading = () => screen.getByRole('heading', { name: 'Collection' });
 
 // The header's name line, as distinct from the same name on a tab or in the rename field.
 const headerName = () => heading().parentElement?.lastElementChild;
 
 describe('CategorySelect', () => {
-  beforeEach(() => {
-    window.localStorage.setItem('lang', 'en');
-    vi.mocked(useExportCategory).mockReturnValue(exportState());
-    vi.mocked(useImportCategory).mockReturnValue(importState());
-    vi.mocked(useShares).mockReturnValue(sharesState());
-  });
+  beforeEach(installHookStates);
 
   it('names the selected category under the section label', () => {
     renderSelect();
@@ -145,9 +53,7 @@ describe('CategorySelect', () => {
     renderSelect();
     const before = heading().parentElement?.parentElement;
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Open collection' }),
-    );
+    await openPanel();
 
     // Same heading, name and enclosing row; only the glyph in the button slot changed.
     expect(heading()).toBeVisible();
@@ -175,9 +81,7 @@ describe('CategorySelect', () => {
     renderSelect();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Open collection' }),
-    );
+    await openPanel();
     expect(screen.getByRole('tablist')).toBeVisible();
     expect(screen.getByLabelText('Rename')).toHaveValue('Coins');
     expect(screen.getByLabelText('New collection')).toBeVisible();
@@ -185,9 +89,7 @@ describe('CategorySelect', () => {
 
   it('stops a rename at the 200 characters a category name may have', async () => {
     renderSelect();
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Open collection' }),
-    );
+    await openPanel();
     expect(screen.getByLabelText('Rename')).toHaveAttribute('maxlength', '200');
   });
 
@@ -199,9 +101,7 @@ describe('CategorySelect', () => {
   it('does not rename on Enter when the value has not actually changed', async () => {
     const renameCategory = vi.fn();
     renderSelect({ categories: categories({ renameCategory }) });
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Open collection' }),
-    );
+    await openPanel();
 
     await userEvent.type(screen.getByLabelText('Rename'), '{Enter}');
 
@@ -211,9 +111,7 @@ describe('CategorySelect', () => {
   it('does not create a category on Enter with no name typed', async () => {
     const createCategory = vi.fn();
     renderSelect({ categories: categories({ createCategory }) });
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Open collection' }),
-    );
+    await openPanel();
 
     await userEvent.type(screen.getByLabelText('New collection'), '{Enter}');
 
@@ -223,9 +121,7 @@ describe('CategorySelect', () => {
   describe('Escape in the rename field', () => {
     async function openAndEdit(text: string) {
       renderSelect();
-      await userEvent.click(
-        screen.getByRole('button', { name: 'Open collection' }),
-      );
+      await openPanel();
       const rename = screen.getByLabelText('Rename');
       await userEvent.clear(rename);
       await userEvent.type(rename, text);
@@ -250,9 +146,7 @@ describe('CategorySelect', () => {
 
   it('gives the two fields the same column', async () => {
     renderSelect();
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Open collection' }),
-    );
+    await openPanel();
 
     const rename = screen.getByLabelText('Rename');
     const create = screen.getByLabelText('New collection');
@@ -278,17 +172,13 @@ describe('CategorySelect', () => {
 
   it('offers sharing controls for a category the viewer owns', async () => {
     renderSelect();
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Open collection' }),
-    );
+    await openPanel();
     expect(screen.getByLabelText('Share with (email)')).toBeVisible();
   });
 
   it('collapses onto the category picked from the tabs', async () => {
     const { onSelect } = renderSelect();
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Open collection' }),
-    );
+    await openPanel();
     await userEvent.click(screen.getByRole('tab', { name: 'Stamps' }));
     expect(onSelect).toHaveBeenCalledWith('b');
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();

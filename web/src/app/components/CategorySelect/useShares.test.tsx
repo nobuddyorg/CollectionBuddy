@@ -2,13 +2,12 @@
 import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
 import {
   createShare as createShareRow,
   listSharesForCategory,
 } from '../../data/shares';
 import { useShares } from './useShares';
+import { grant, listSharesReturns, wrapper } from './useShares.test-support';
 
 vi.mock('../../data/shares', () => ({
   createShare: vi.fn(),
@@ -16,22 +15,6 @@ vi.mock('../../data/shares', () => ({
   listSharesForCategory: vi.fn(),
   updateShareRole: vi.fn(),
 }));
-
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>{children}</ToastProvider>
-    </I18nProvider>
-  );
-}
-
-const grant = {
-  id: 'share-1',
-  invited_email: 'grantee@example.com',
-  expires_at: null,
-  owner_user_id: 'owner-1',
-  role: 'viewer' as const,
-};
 
 describe('useShares', () => {
   beforeEach(() => {
@@ -61,10 +44,7 @@ describe('useShares', () => {
     });
 
     it('clears out whatever grants were previously loaded once the category goes away', async () => {
-      vi.mocked(listSharesForCategory).mockResolvedValue({
-        data: [grant],
-        error: null,
-      } as never);
+      listSharesReturns([grant]);
       const { result, rerender } = renderHook<
         ReturnType<typeof useShares>,
         { categoryId: string | null }
@@ -107,10 +87,7 @@ describe('useShares', () => {
     });
 
     it('loads the grants for the given category', async () => {
-      vi.mocked(listSharesForCategory).mockResolvedValue({
-        data: [grant],
-        error: null,
-      } as never);
+      listSharesReturns([grant]);
       const { result } = renderHook(() => useShares('cat-1'), { wrapper });
 
       await act(async () => {
