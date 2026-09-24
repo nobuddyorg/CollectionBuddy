@@ -157,10 +157,6 @@ jobs:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true' || needs.changes.outputs.sql == 'true'
     runs-on: ubuntu-latest
-    # packages: read lets start-local-stack log in to ghcr.io for the Supabase images.
-    permissions:
-      contents: read
-      packages: read
     defaults:
       run:
         working-directory: ./web
@@ -380,10 +376,6 @@ jobs:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
-    # packages: read lets start-local-stack log in to ghcr.io for the Supabase images.
-    permissions:
-      contents: read
-      packages: read
     defaults:
       run:
         working-directory: ./web
@@ -424,10 +416,6 @@ jobs:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
-    # packages: read lets start-local-stack log in to ghcr.io for the Supabase images.
-    permissions:
-      contents: read
-      packages: read
     defaults:
       run:
         working-directory: ./web

@@ -6,24 +6,7 @@ runs:
   steps:
     - uses: ./.github/actions/setup-supabase-cli
 
-    # Anonymous ghcr.io pulls share one rate limit per runner IP; a token makes them count per account.
-    - name: Log in to ghcr.io
-      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ github.token }}
-
-    # Only db, auth, rest, storage, kong and pg-meta serve a test; the rest is pull volume ghcr.io throttles.
-    # Pulled layers stay cached, so each retry needs fewer requests; the pause lets the throttle window pass.
     - name: Start Supabase
       shell: bash
       working-directory: ${{ github.workspace }}
-      run: |
-        for pause in 30 60 0; do
-          if supabase start -x studio,logflare,vector,edge-runtime,mailpit,realtime,imgproxy; then exit 0; fi
-          [ "$pause" -eq 0 ] && exit 1
-          echo "supabase start failed; retrying in ${pause}s"
-          supabase stop --no-backup || true
-          sleep "$pause"
-        done
+      run: supabase start
