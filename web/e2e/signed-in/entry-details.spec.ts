@@ -1,5 +1,6 @@
 import { expect, test } from './test';
 
+import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
 // The geocoder is always faked; what is real is that its coordinates survive the round trip to Postgres.
 test.use({ locale: 'en-GB' });
@@ -71,7 +72,7 @@ test.describe('an entry with a place and tags', () => {
       await expect(app.map.locators.pins).toHaveCount(1);
     } finally {
       await page.keyboard.press('Escape');
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -94,7 +95,7 @@ test.describe('an entry with a place and tags', () => {
       await app.form.do.submit();
       await expect(app.catalogue.card(title).locators.tags).toHaveCount(0);
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -139,7 +140,7 @@ test.describe('an entry with a place and tags', () => {
       await expect(app.form.locators.inputs.title).toHaveCount(0);
       await expect(app.catalogue.card(title).locators.place).toHaveCount(0);
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 });

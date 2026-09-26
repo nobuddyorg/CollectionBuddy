@@ -41,7 +41,6 @@ const BASELINE_ITEMS: SeedItem[] = [
   'Fotoalbum',
   'Depot',
   'Dunkelkammer',
-  'Garderobe',
 ].map((category) => ({
   category,
   title: `${category}stück`,
@@ -96,7 +95,6 @@ export const SEED = {
     'Bibliothek',
     'Depot',
     'Dunkelkammer',
-    'Garderobe',
   ],
   /** For entries.spec.ts. */
   scratchCategory: 'Werkstatt',
@@ -122,8 +120,12 @@ export const SEED = {
   undoCategory: 'Rückgängig',
   /** For failures.spec.ts, whose uploads are made to fail. */
   failureCategory: 'Pannenwerkstatt',
-  /** For sign-out.spec.ts, which deletes an entry and signs out inside the undo window. */
-  signOutCategory: 'Garderobe',
+  /** For sign-out.spec.ts, as a collector of its own per parallel slot: a global sign-out revokes every session of its user. */
+  signOut: {
+    password: 'sign-out-password-not-a-secret',
+    category: 'Garderobe',
+    item: 'Garderobenstück',
+  },
   // The RLS specs below run in parallel files and category_shares is unique per (category, grantee).
   /** For rls/viewer-share-photographs.spec.ts, which grants and revokes around a photograph. */
   viewerPhotoCategory: 'Fotoalbum',

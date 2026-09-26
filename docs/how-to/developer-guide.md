@@ -85,6 +85,18 @@ state. Before adding tests here:
 - **Spec files run in parallel against one database.** Tests that write use
   `SEED.scratchCategory`; the collections the reading tests describe are never
   touched.
+- **Clean up in `finally` through `e2e/signed-in/cleanup.ts`**, as the owner
+  over the API: objects first, then rows, throwing on any error. A delete in
+  the interface waits out its undo window and is never sent if the test ends
+  first. Where the committed delete is the journey,
+  `toast.do.commitDeletion(table)` closes the toast and waits for that table's
+  `DELETE`, so the next `goto` cannot abort it.
+- **Assert on a seeded row, never a count or a `limit(1)`.** RLS specs write
+  as the second collector and grant it editor access to other collections
+  meanwhile; pick by `SEED.other.item` or an `itemsIn(...)` title.
+- **Never end the shared session.** `sign-out.spec.ts` signs out as a collector
+  of its own, `e2e-sign-out-<n>@collectionbuddy.test`, one per parallel slot
+  and reseeded per test: a global sign-out revokes every session of its user.
 - **Poll, don't read once.** `expectTitles(page, [...])` waits for the
   debounced search round trip; an assertion straight after typing reads the
   previous answer.
