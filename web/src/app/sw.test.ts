@@ -8,11 +8,12 @@ const source = readFileSync(
 
 // sw.js is a plain script with no import path, so its decision functions are evaluated from raw source.
 function extractFunction(name: string): string {
-  const match = new RegExp(`^(async )?function ${name}\\(`, 'm').exec(source);
-  if (!match) throw new Error(`${name} not found in sw.js`);
-  const start = match.index;
-  const end = source.indexOf('\n}', start) + 2;
-  return source.slice(start, end);
+  const start = [`\nfunction ${name}(`, `\nasync function ${name}(`]
+    .map((signature) => source.indexOf(signature))
+    .find((index) => index >= 0);
+  if (start === undefined) throw new Error(`${name} not found in sw.js`);
+  const end = source.indexOf('\n}', start + 1) + 2;
+  return source.slice(start + 1, end);
 }
 
 function load<T>(name: string, preamble = ''): T {
