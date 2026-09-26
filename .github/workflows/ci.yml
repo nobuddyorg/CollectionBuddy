@@ -71,7 +71,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 2
 
-      # ci.yml is in both filters so a change to this file always exercises what it changed; the sweep runs 0022's pgTAP-tested query.
+      # Whatever the jobs run on (ci.yml, the composite actions, the local stack's config.toml) is in both; the sweep runs 0022's pgTAP-tested query.
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
@@ -80,13 +80,18 @@ jobs:
               - 'web/**'
               - '.zap/rules.tsv'
               - '.github/workflows/ci.yml'
+              - '.github/actions/**'
+              - 'supabase/config.toml'
             sql:
               - 'supabase/migrations/**'
               - 'supabase/tests/database/**'
               - 'supabase/splinter.sh'
+              - 'supabase/config.toml'
               - '.sqlfluff'
+              - '.semgrepignore'
               - '.github/workflows/cleanup-orphaned-photos.yml'
               - '.github/workflows/ci.yml'
+              - '.github/actions/**'
 
   build_and_test:
     needs: [prek, changes]

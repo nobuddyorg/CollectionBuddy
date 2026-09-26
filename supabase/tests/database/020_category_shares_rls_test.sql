@@ -1,9 +1,8 @@
 -- Sharing at the default 'viewer' role: an active grant opens exactly the
 -- shared category, its items, their links, and their photograph records --
 -- read-only, scoped to that one category, and closed again the moment it
--- expires or is revoked. Complements web/e2e/signed-in/rls.spec.ts's
--- "a category shared with another collector" describe block the same way
--- 010_ownership_rls_test.sql complements its stranger-access cases: same
+-- expires or is revoked. Complements web/e2e/signed-in/rls/viewer-share.spec.ts
+-- the same way 010_ownership_rls_test.sql complements isolation.spec.ts: same
 -- properties, proven at the SQL surface instead of through PostgREST.
 begin;
 select no_plan();

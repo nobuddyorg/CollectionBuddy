@@ -10,7 +10,8 @@
 -- Proven the way that issue asked for: the identical query is shown to
 -- fail under the wrong identity and pass once switched to the right one,
 -- and a read is shown to depend on the specific claim, not merely on
--- having assumed the authenticated role.
+-- having assumed the authenticated role. Every switch goes through
+-- pg_temp.auth_as() and auth_as_anon(), the helpers every other file uses.
 begin;
 select no_plan();
 
@@ -25,7 +26,7 @@ select ok(
 );
 
 -- Switching to anon: the identical query is refused outright, since anon holds no grant on the table (0006_policies.sql).
-set local role anon;
+select pg_temp.auth_as_anon();
 select ok(
   pg_temp.raises('select 1 from public.categories limit 1'),
   'as anon, the identical read is refused -- the grant is doing the work, not a coincidence of empty data'
@@ -34,12 +35,7 @@ select ok(
 -- Switching to authenticated with a real claim: the identical query
 -- succeeds again, because authenticated holds the grant and the policy
 -- now has an auth.uid() to evaluate.
-set local role authenticated;
-select set_config(
-  'request.jwt.claims',
-  jsonb_build_object('sub', gen_random_uuid()::text, 'role', 'authenticated')::text,
-  true
-);
+select pg_temp.auth_as(gen_random_uuid());
 select ok(
   not pg_temp.raises('select 1 from public.categories limit 1'),
   'as authenticated with a claim, the identical read is permitted again'
@@ -49,12 +45,7 @@ select ok(
 -- having assumed the authenticated role: a category created under one sub
 -- claim is visible to that same claim...
 select gen_random_uuid() as probe_user_id \gset
-set local role authenticated;
-select set_config(
-  'request.jwt.claims',
-  jsonb_build_object('sub', :'probe_user_id'::text, 'role', 'authenticated')::text,
-  true
-);
+select pg_temp.auth_as(:'probe_user_id'::uuid);
 insert into public.categories (name) values ('Impersonation probe')
 returning id as probe_category_id \gset
 
@@ -67,11 +58,7 @@ select is(
 -- ...and a second, different sub claim -- same role, same table grant --
 -- cannot see it, which is the part that proves the policy is reading
 -- request.jwt.claims and not merely checking role membership.
-select set_config(
-  'request.jwt.claims',
-  jsonb_build_object('sub', gen_random_uuid()::text, 'role', 'authenticated')::text,
-  true
-);
+select pg_temp.auth_as(gen_random_uuid());
 select is(
   (select count(*) from public.categories where id = :'probe_category_id'::uuid),
   0::bigint,

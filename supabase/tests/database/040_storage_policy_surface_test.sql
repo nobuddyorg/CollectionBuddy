@@ -2,10 +2,9 @@
 --
 -- Deliberately catalog-level, not behavioural: storage is the one boundary
 -- where the bytes, the Storage API's own guards and the policies only meet
--- in a running stack, so `web/e2e/signed-in/rls.spec.ts` is where a
--- grantee actually reads an owner's object and an editor actually fails to
--- plant one (TEST_STRATEGY.md §7 -- end-to-end tests "are usually the only
--- place storage-level authorization gets exercised at all"). What this
+-- in a running stack, so the `-photographs` specs in `web/e2e/signed-in/rls/`
+-- are where a grantee actually reads an owner's object and an editor
+-- actually fails to plant one (TEST_STRATEGY.md §7 rule 6). What this
 -- file adds is the half that is invisible from there: that the *capability*
 -- two separate security fixes removed is still absent, which no passing
 -- end-to-end test can demonstrate.

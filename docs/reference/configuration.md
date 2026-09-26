@@ -66,7 +66,10 @@ on any other branch cannot read them. `migrate`, `cleanup`, both
 `backup.yml` jobs and `hosted-auth-check.yml` reference it and also refuse
 any ref but `main`. The
 `github-pages` environment is restricted to `main` the same way. The other
-secrets are repository secrets.
+secrets are repository secrets. A run Dependabot starts reads Dependabot
+secrets only, so `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+and `CODECOV_TOKEN` are set there too, or every Dependabot PR fails
+`build_and_test`; no `production` value ever goes there.
 
 | Secret | Used by | Notes |
 | --- | --- | --- |
@@ -76,7 +79,8 @@ secrets are repository secrets.
 | `SUPABASE_ACCESS_TOKEN` | `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`) | Required. Scoped Management API token: runs a read-only query and fetches a fresh secret key ([Management API tokens](#management-api-tokens)). |
 | `SUPABASE_AUTH_CONFIG_TOKEN` | `hosted-auth-check.yml` | Recommended. Scoped Management API token that reads the Auth config ([Management API tokens](#management-api-tokens)). Until it is set, the check borrows `SUPABASE_ACCESS_TOKEN` and warns on every run. |
 | `SUPABASE_PROJECT_REF` | `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`), `hosted-auth-check.yml` | Required |
-| `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test`) | Optional; without it Stryker writes a local HTML report only |
+| `CODECOV_TOKEN` | `ci.yml` (`build_and_test`) | Required: the repository's upload token from codecov.io; a refused upload fails the job (`fail_ci_if_error`) |
+| `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test`, on `main` only) | Optional; without it Stryker writes a local HTML report only |
 
 None of these may appear in the repository. gitleaks
 ([`.gitleaks.toml`](../../.gitleaks.toml)) flags a JWT, a secret key
@@ -230,7 +234,7 @@ Each job writes its report to its own Actions summary (`$GITHUB_STEP_SUMMARY`); 
 | `E2E_PORT` | Local server port, default `4173` |
 | `E2E_SUPABASE_URL` | Enables the `setup` and `signed-in` projects |
 | `E2E_SUPABASE_ANON_KEY` | Signs the test user in |
-| `E2E_SUPABASE_SERVICE_KEY` | Creates the test user, nothing else — the `service_role` role it maps to has no table grants |
+| `E2E_SUPABASE_SERVICE_KEY` | Creates the test user, nothing else — the `service_role` role it maps to holds no `SELECT`, `INSERT`, `UPDATE` or `DELETE` on the app's tables |
 | `E2E_COVERAGE_SOURCEMAPS` | `true` makes `next build` emit source maps so the coverage report maps to `src/app/**` |
 
 `npm run e2e:local` sets the three `E2E_SUPABASE_*` values from `supabase status` (the publishable and secret keys) and builds the bundle against the local stack; nothing reads them from a deployed project's secrets, because the suite seeds whatever database it is pointed at. Retries are `0` locally: a page that fails one run in ten fails for a tenth of visitors.

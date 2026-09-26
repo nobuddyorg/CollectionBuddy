@@ -3,9 +3,8 @@
 -- inside someone else's category. Everything in 020_category_shares_rls_test.sql
 -- tests a viewer, whose grant stops at reading, so none of it says
 -- anything about this path -- the same reasoning
--- web/e2e/signed-in/rls.spec.ts's own "a category shared at the editor
--- role" describe block gives for testing it separately, on its own
--- collection.
+-- web/e2e/signed-in/rls/editor-share.spec.ts gives for testing it
+-- separately, on its own collection.
 begin;
 select no_plan();
 

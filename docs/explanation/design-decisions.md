@@ -71,11 +71,11 @@ Two costs, accepted. An uploader can no longer delete its own object once the en
 
 ## Why the migrations were squashed
 
-Three times: on 2026-08-06 sixteen migrations became a seven-file baseline; in #580 those seven plus the seven that had accumulated since were folded back into `0001`–`0007`; on 2026-09-22 the eight that had followed (`0008`–`0015`, three of them security fixes to `0007`) were folded in again, so each file once more holds one concern. A third of the original statements existed only to undo an earlier file — a table created and dropped, full-text-search columns added and removed, a trigger written three times. Reading them told you the history but not the schema.
+Three times: on 2026-08-06 sixteen migrations became a seven-file baseline; in #580 those seven plus the seven that had accumulated since were folded back into `0001`–`0007`; on 2026-09-22 the eight that had followed (the `0008`–`0015` of the time, three of them security fixes to `0007`; the files since reuse those numbers) were folded in again, so each file once more holds one concern. A third of the original statements existed only to undo an earlier file — a table created and dropped, full-text-search columns added and removed, a trigger written three times. Reading them told you the history but not the schema.
 
 Every squash was verified rather than asserted: the local stack was reset from the new files, both databases introspected down to column defaults, constraint expressions, index definitions, function bodies, trigger timing, policy predicates and grants, and diffed. The only differences were local-stack platform defaults no migration sets. Doing it again: [Developer guide](../how-to/developer-guide.md#squashing-migrations-again).
 
-Since the third squash every function lives in `0002_functions.sql`. The `language sql` ones that read tables are created with `check_function_bodies` off, as `pg_dump` restores them, because Postgres would otherwise parse their bodies before `0003_tables.sql` exists; the pgTAP suite calls every one of them, so a broken body still fails CI.
+The third squash put every function in `0002_functions.sql`; the files since add more and redefine several ([Architecture](../reference/architecture.md#triggers-and-functions)), and the latest `create or replace` is the live body. In `0002`, the `language sql` ones that read tables are created with `check_function_bodies` off, as `pg_dump` restores them, because Postgres would otherwise parse their bodies before `0003_tables.sql` exists; the pgTAP suite calls every one of them, so a broken body still fails CI.
 
 ## Why migrations only roll forward
 
@@ -240,7 +240,7 @@ A grantee's read used to call `has_category_read_access(category_id)` on every r
 
 ## Why the map and search RPCs are plpgsql
 
-Postgres 17 plans a SQL function's body without its argument values, so `category_id = cat_id` was costed on an average category. In the load test's `peak` run a 1,000-entry shared category was read by scanning all 26,000 links, 10,936 times. `0018` makes both RPCs plpgsql with `plan_cache_mode = force_custom_plan`: each call is planned with the category it names, as the SQL functions were already re-planned on every call, so planning costs nothing extra. The query text is unchanged, and `075_query_plans_test.sql` plans that same text with literal arguments, which is now also what runs.
+Postgres 17 plans a SQL function's body without its argument values, so `category_id = cat_id` was costed on an average category. In the load test's `peak` run a 1,000-entry shared category was read by scanning all 26,000 links, 10,936 times. `0018` makes both RPCs plpgsql with `plan_cache_mode = force_custom_plan`: each call is planned with the category it names, as the SQL functions were already re-planned on every call, so planning costs nothing extra. `075_query_plans_test.sql` reads each live body from `pg_proc` and plans its query with literal arguments, which is now also what runs.
 
 ## Why the service worker fetches pages network-first
 
