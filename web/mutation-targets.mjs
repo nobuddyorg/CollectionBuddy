@@ -16,6 +16,7 @@ export const MUTATE_TARGETS = [
   'src/app/components/ItemList/Pagination.tsx',
   'src/app/components/ItemList/imageEntries.ts',
   'src/app/lib/optimistic.ts',
+  'src/app/components/Toast/pendingToasts.ts',
   'src/app/components/ItemList/paging.ts',
   'src/app/components/ItemList/imageCache.ts',
   'src/app/components/ItemList/firstPagePrefetch.ts',
