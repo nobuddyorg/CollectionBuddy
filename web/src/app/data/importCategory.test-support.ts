@@ -121,7 +121,7 @@ export function fakeCreateImage(): CreateImage {
 }
 
 export function fakeCompressThumb(): CompressThumb {
-  return vi.fn(async () => new Blob(['thumb']));
+  return vi.fn(async () => new Blob(['thumb'], { type: 'image/webp' }));
 }
 
 export function baseFakes() {

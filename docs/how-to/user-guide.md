@@ -90,8 +90,8 @@ deduplicated and sorted.
 ## Photos
 
 - **Upload**: action row → upload icon → any image your browser can read. It
-  is compressed to WebP with a thumbnail before upload, so there is no size to
-  worry about.
+  is compressed to WebP (JPEG in Safari and on iOS) with a thumbnail before
+  upload, so there is no size to worry about.
 - **View full size**: click a thumbnail. Escape or the backdrop closes it.
 - **Delete**: from the full-size view or the per-photo control, confirm.
 

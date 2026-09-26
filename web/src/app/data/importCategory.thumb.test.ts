@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { importCategory } from './importCategory';
-import { WEBP_COMPRESSION_OPTIONS } from '../lib/imageCompression';
 import {
   buildManifest,
   exportEntries,
@@ -11,9 +10,9 @@ import {
 import { createZipWriter } from './zip';
 
 // Every other importCategory test injects a thumbnailer; this file exercises the real default alone.
-const compress = vi.fn(async () => new Blob(['thumb']));
-vi.mock('browser-image-compression', () => ({
-  default: (...args: unknown[]) => compress(...(args as [])),
+const compress = vi.fn(async () => new Blob(['thumb'], { type: 'image/webp' }));
+vi.mock('../lib/imageCompression', () => ({
+  compressPhoto: (...args: unknown[]) => compress(...(args as [])),
 }));
 
 const PHOTO = new Uint8Array([1, 2, 3]);
@@ -75,13 +74,7 @@ describe('importCategory with no thumbnailer injected', () => {
     });
 
     expect(result.photoCount).toBe(1);
-    expect(compress).toHaveBeenCalledWith(
-      expect.any(File),
-      expect.objectContaining({
-        maxWidthOrHeight: 600,
-        ...WEBP_COMPRESSION_OPTIONS,
-      }),
-    );
+    expect(compress).toHaveBeenCalledWith(expect.any(File), 600);
     // The archive only carries the full size, so the thumbnail comes from the bytes in it.
     const [file] = compress.mock.calls[0] as unknown as [File];
     expect(file.type).toBe('image/webp');

@@ -72,7 +72,7 @@ describe('importCategory, cancelled', () => {
     const controller = new AbortController();
     const compressThumb = vi.fn(async (bytes: Uint8Array<ArrayBuffer>) => {
       controller.abort();
-      return new Blob([bytes]);
+      return new Blob([bytes], { type: 'image/webp' });
     }) as unknown as CompressThumb;
     const deleteCategoryRow = fakeDeleteCategory();
     const createCategoryRow = fakeCreateCategory('new-cat-1');

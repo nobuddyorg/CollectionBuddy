@@ -45,7 +45,7 @@ It is designed for keeping a structured personal record of collected items rathe
 
 ## Features
 
-- **Photo-first entries**: one photo, a pair, or a whole strip. Phone photos are compressed to WebP in the browser before upload, so there's no manual resizing.
+- **Photo-first entries**: one photo, a pair, or a whole strip. Phone photos are compressed to WebP (JPEG in Safari and on iOS) in the browser before upload, so there's no manual resizing.
 - **Categories** to keep collections apart, with **sharing** so someone else can browse yours — read-only by default, or with edit access if you grant it.
 - **Place and map**: give an item a location, then see your whole collection pinned on a map.
 - **Tags and search** across title, description, place, and tags at once.

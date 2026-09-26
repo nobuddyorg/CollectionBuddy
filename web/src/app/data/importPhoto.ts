@@ -1,22 +1,20 @@
 import { createImageRow, imagePrefix, uploadImageObject } from './images';
 import { checkCancelled, ImportCancelledError } from './importCancellation';
 import { attempts, backoffDelayMs } from '../lib/backoff';
-import { WEBP_COMPRESSION_OPTIONS } from '../lib/imageCompression';
+import { compressPhoto } from '../lib/imageCompression';
+import { extensionForType, typeForArchivePath } from './photoType';
 
 const PHOTO_UPLOAD_ATTEMPTS = 3;
 const PHOTO_UPLOAD_RETRY_BASE_MS = 500;
 
 /** The archive carries only the full size, so the 600px thumbnail is remade the way uploads do. */
-export async function realCompressThumb(
+export function realCompressThumb(
   bytes: Uint8Array<ArrayBuffer>,
 ): Promise<Blob> {
-  const { default: imageCompression } =
-    await import('browser-image-compression');
-  const file = new File([bytes], 'photo.webp', { type: 'image/webp' });
-  return imageCompression(file, {
-    maxWidthOrHeight: 600,
-    ...WEBP_COMPRESSION_OPTIONS,
-  });
+  return compressPhoto(
+    new File([bytes], 'photo.webp', { type: 'image/webp' }),
+    600,
+  );
 }
 
 /** Storage attaches no reliable status, so every failure here is retried as transient. */
@@ -76,12 +74,16 @@ export async function importPhoto({
     return false;
   }
   try {
+    // Stored as the export named it, so a round trip keeps each photograph's own type.
+    const fullType = typeForArchivePath(task.archivePath);
     const thumb = await compressThumb(bytes);
     const base = crypto.randomUUID();
     const pathBase = `${imagePrefix(uid, task.itemId)}/${base}`;
+    const pathFull = `${pathBase}${extensionForType(fullType)}`;
+    const pathThumb = `${pathBase}.thumb${extensionForType(thumb.type)}`;
     const fullError = await uploadWithRetry({
-      path: `${pathBase}.webp`,
-      blob: new Blob([bytes], { type: 'image/webp' }),
+      path: pathFull,
+      blob: new Blob([bytes], { type: fullType }),
       uploadImage,
       signal,
     });
@@ -90,7 +92,7 @@ export async function importPhoto({
     }
     // A failed thumbnail is not a failed photograph: `path_thumb` goes null, as in the upload path.
     const thumbError = await uploadWithRetry({
-      path: `${pathBase}.thumb.webp`,
+      path: pathThumb,
       blob: thumb,
       uploadImage,
       signal,
@@ -101,8 +103,8 @@ export async function importPhoto({
 
     const { error: rowError } = await createImage({
       item_id: task.itemId,
-      path_full: `${pathBase}.webp`,
-      path_thumb: thumbError ? null : `${pathBase}.thumb.webp`,
+      path_full: pathFull,
+      path_thumb: thumbError ? null : pathThumb,
       size_bytes: bytes.length,
     });
     if (rowError) {

@@ -29,7 +29,8 @@ import {
   signEntries,
   type ImageEntryData,
 } from './imageEntries';
-import { WEBP_COMPRESSION_OPTIONS } from '../../lib/imageCompression';
+import { extensionForType } from '../../data/photoType';
+import { compressPhoto } from '../../lib/imageCompression';
 import { restoreAt } from '../../lib/optimistic';
 
 // Re-signs before Supabase's 1h server-side expiry, so a long-lived tab keeps its thumbnails.
@@ -158,22 +159,14 @@ export function useItemImages() {
         const userId = await verifiedUserId();
         if (!userId) throw new Error(t('item_list.no_user_session'));
 
-        const { default: imageCompression } =
-          await import('browser-image-compression');
-        const fullFile = await imageCompression(file, {
-          maxWidthOrHeight: 1000,
-          ...WEBP_COMPRESSION_OPTIONS,
-        });
+        const fullFile = await compressPhoto(file, 1000);
         // From the already-downscaled full size; 600px covers strip cells and pair halves at 3x density.
-        const thumbnailFile = await imageCompression(fullFile, {
-          maxWidthOrHeight: 600,
-          ...WEBP_COMPRESSION_OPTIONS,
-        });
+        const thumbnailFile = await compressPhoto(fullFile, 600);
 
         const base = crypto.randomUUID();
         const pathBase = `${imagePrefix(userId, itemId)}/${base}`;
-        const pathFull = `${pathBase}.webp`;
-        const pathThumb = `${pathBase}.thumb.webp`;
+        const pathFull = `${pathBase}${extensionForType(fullFile.type)}`;
+        const pathThumb = `${pathBase}.thumb${extensionForType(thumbnailFile.type)}`;
 
         const fullUpload = await uploadImageObject(pathFull, fullFile);
         if (fullUpload.error) throw fullUpload.error;

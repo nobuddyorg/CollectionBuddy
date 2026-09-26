@@ -71,6 +71,12 @@ The owner-only storage policies key on path segment 1, the uploader's uid. The s
 
 Pinning segment 1 would have closed the hole and left a strict subset of `"update own objects"` — a capability nothing uses. `data/images.ts` only ever calls `upload` (never with `upsert`), `remove` and `createSignedUrls`, so dropping the verb costs nothing. `e2e/signed-in/rls/editor-share-photographs.spec.ts` asserts it from both sides.
 
+## Why Safari uploads JPEG instead of WebP
+
+WebKit's canvas has no WebP encoder: `toBlob`, `toDataURL` and `OffscreenCanvas.convertToBlob` answer an `image/webp` request with PNG, silently (MDN browser-compat-data, `type_parameter_webp`: Safari `false`, iOS mirrors it). `browser-image-compression` passes that PNG through, so Safari and every iOS browser stored roughly 10x the bytes under a `.webp` name, and every viewer downloaded them.
+
+`lib/imageCompression.ts` now encodes a 1x1 canvas as WebP once per session and asks for JPEG at the same quality when the answer is anything else; JPEG is about 1.3x WebP's bytes, not 12x. The path is named after the type the encoder actually returned (`data/photoType.ts`), so a name never lies about its bytes. The bucket already accepted all three types, and no policy, trigger, constraint or the orphan sweep reads the extension, so no migration was needed. Objects uploaded before the fix keep their PNG bytes under a `.webp` name. CI has no WebKit project; `e2e/signed-in/photos.spec.ts` emulates WebKit's canvas in Chromium instead, and `web/load/proofs/browser/safari-webp.js` proves the same with k6.
+
 ## Why the orphan-cleanup trigger is statement-level
 
 `delete_item_if_orphan()` removes an item once it belongs to zero categories. The first version ran `FOR EACH ROW`, one `EXISTS` probe per deleted `item_categories` row — deleting a 500-item category meant ~500 sequential lookups. It now runs `FOR EACH STATEMENT` with a transition table, one set-based `DELETE ... WHERE id IN (...) AND NOT EXISTS (...)`. Same logic, one query instead of N.

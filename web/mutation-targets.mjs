@@ -33,6 +33,7 @@ export const MUTATE_TARGETS = [
   'src/app/data/itemSearch.ts',
   'src/app/data/exportItemPages.ts',
   'src/app/data/importPhoto.ts',
+  'src/app/data/photoType.ts',
   'src/app/data/importCancellation.ts',
   'src/app/components/CategorySelect/selection.ts',
   'src/app/components/CategorySelect/useImportCategory.tsx',
