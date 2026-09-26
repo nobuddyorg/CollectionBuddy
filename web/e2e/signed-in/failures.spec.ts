@@ -6,7 +6,7 @@ import { type Locator, type Page } from '@playwright/test';
 import { expect, test } from '../fixture';
 
 import { SEED } from './fixtures';
-import { context, ownedCategoryId, share, unshare } from './rls/helpers';
+import { apiAs, context, ownedCategoryId, share, unshare } from './rls/helpers';
 // Failures are injected at the network boundary, so the app's own code runs for real.
 test.use({ locale: 'en-GB' });
 
@@ -69,6 +69,58 @@ test.describe('when something outside the app fails', () => {
       await expect(card.locators.images).toHaveCount(0);
     } finally {
       await page.unroute('**/storage/v1/object/**');
+      await app.catalogue.do.removeEntry(title);
+    }
+  });
+
+  // Objects go before the row: a refused Storage delete must leave the row, so no file is left unnamed.
+  test('a photograph Storage will not remove stays, row and files', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const { token, userId } = context();
+    const api = apiAs(token);
+    const bulkDelete = '**/storage/v1/object/item-images';
+    const title = uniqueTitle('Bleibt ganz');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toBeVisible({ timeout: 45_000 });
+      const { data: item } = await api
+        .from('items')
+        .select('id')
+        .eq('title', title)
+        .single();
+      const itemId = (item as { id: string }).id;
+      const storedFiles = async () =>
+        (
+          (await api.storage.from('item-images').list(`${userId}/${itemId}`))
+            .data ?? []
+        ).length;
+      const filesBefore = await storedFiles();
+      expect(filesBefore).toBeGreaterThan(0);
+
+      await page.route(bulkDelete, (route) =>
+        route.request().method() === 'DELETE'
+          ? route.fulfill({ status: 500, json: { message: 'nope' } })
+          : route.fallback(),
+      );
+      await card.locators.buttons.deleteImage.click();
+      await app.confirm.do.accept();
+      await app.toast.do.close();
+
+      await expect(app.toast()).toContainText('Could not delete this image');
+      await expect(card.locators.images).toHaveCount(1);
+      const { data: rows } = await api
+        .from('images')
+        .select('id')
+        .eq('item_id', itemId);
+      expect(rows).toHaveLength(1);
+      expect(await storedFiles()).toBe(filesBefore);
+    } finally {
+      await page.unroute(bulkDelete);
       await app.catalogue.do.removeEntry(title);
     }
   });

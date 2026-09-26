@@ -13,10 +13,10 @@ import {
   imagePrefix,
   listImagePathsForItems,
   listImagesForItems,
-  removeImageObjects,
   uploadImageObject,
   type ImageListRow,
 } from '../../data/images';
+import { removeObjectsThenRows } from '../../data/imageRemoval';
 import { isQuotaExceeded } from '../../data/quota';
 import type { ImageEntry } from './types';
 import { useConfirm } from '../Confirm/ConfirmProvider';
@@ -213,7 +213,7 @@ export function useItemImages() {
     [fetchItemImages, t, toast],
   );
 
-  // The thumbnail goes on confirm; the row and its bytes go once the toast's undo window closes.
+  // The thumbnail goes on confirm; its bytes, then its row, go once the toast's undo window closes.
   const deleteImage = useCallback(
     async (itemId: string, image: ImageEntry) => {
       if (!(await confirm(t('item_list.confirm_delete_image')))) return;
@@ -238,30 +238,21 @@ export function useItemImages() {
       toast.success(t('item_list.delete_image_success'), {
         action: { label: t('common.undo'), onClick: restore },
         onExpire: async () => {
-          const { data, error } = await deleteImageRow(image.id);
-          if (error) {
-            toast.reportError(
-              'delete image',
-              error,
-              t('item_list.delete_image_error'),
-            );
-            restore();
-            return;
-          }
-
-          // Row already gone: a failure below is a storage leak, not data loss.
-          const paths = [
-            data.path_full,
-            ...(data.path_thumb ? [data.path_thumb] : []),
-          ];
-          const { error: removeError } = await removeImageObjects(paths);
-          if (removeError) {
-            toast.reportError(
-              'remove image bytes',
-              removeError,
-              t('item_list.delete_image_cleanup_error'),
-            );
-          }
+          const { error } = await removeObjectsThenRows({
+            paths: [
+              image.pathFull,
+              ...(image.pathThumb ? [image.pathThumb] : []),
+            ],
+            deleteRows: () => deleteImageRow(image.id),
+          });
+          if (!error) return;
+          // Back even when only the row delete failed: the row still exists, and deleting it again works.
+          toast.reportError(
+            'delete image',
+            error,
+            t('item_list.delete_image_error'),
+          );
+          restore();
         },
       });
     },
@@ -279,26 +270,13 @@ export function useItemImages() {
     return listed.data;
   }, []);
 
-  const removeImageBytes = useCallback(
-    async (
-      itemId: string,
-      paths: { path_full: string; path_thumb: string | null }[],
-    ) => {
-      const flat = paths.flatMap((row) =>
-        row.path_thumb ? [row.path_full, row.path_thumb] : [row.path_full],
-      );
-      if (flat.length) {
-        const { error } = await removeImageObjects(flat);
-        if (error) throw error;
-      }
-      setImages((previous) => {
-        const next = { ...previous };
-        delete next[itemId];
-        return next;
-      });
-    },
-    [],
-  );
+  const forgetItemImages = useCallback((itemId: string) => {
+    setImages((previous) => {
+      const next = { ...previous };
+      delete next[itemId];
+      return next;
+    });
+  }, []);
 
   return {
     images,
@@ -309,7 +287,7 @@ export function useItemImages() {
     uploadImage,
     deleteImage,
     captureItemImagePaths,
-    removeImageBytes,
+    forgetItemImages,
     pendingUploads,
   };
 }

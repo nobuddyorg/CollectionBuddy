@@ -60,14 +60,14 @@ export function createImageRow(row: {
     .single<ImageListRow>();
 }
 
-// The row itself is removed, not a cascade's side effect, so delete-and-capture in one call is safe.
+// `.single()` makes a delete that matched no row, hidden by RLS or already gone, an error.
 export function deleteImageRow(id: string) {
   return supabase
     .from('images')
     .delete()
     .eq('id', id)
-    .select('path_full, path_thumb')
-    .single<Pick<ImageRow, 'path_full' | 'path_thumb'>>();
+    .select('id')
+    .single<Pick<ImageRow, 'id'>>();
 }
 
 // PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.

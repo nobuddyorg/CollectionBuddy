@@ -50,7 +50,7 @@ export function defaultImagesState() {
     uploadImage: vi.fn(),
     deleteImage: vi.fn(),
     captureItemImagePaths: vi.fn(),
-    removeImageBytes: vi.fn(),
+    forgetItemImages: vi.fn(),
     pendingUploads: {} as Record<string, number>,
   };
 }

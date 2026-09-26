@@ -10,7 +10,12 @@ import {
   linkItemsToCategory,
   type ImportedItemInsert,
 } from './items';
-import { createImageRow, uploadImageObject } from './images';
+import {
+  createImageRow,
+  removeImageObjects,
+  uploadImageObject,
+} from './images';
+import { removeObjectsThenRows } from './imageRemoval';
 import {
   findManifestPath,
   ImportFormatError,
@@ -124,6 +129,7 @@ export async function importCategory({
   newItemId = () => crypto.randomUUID(),
   now = () => new Date(),
   uploadImage = uploadImageObject,
+  removeImages = removeImageObjects,
   createImage = createImageRow,
   compressThumb = realCompressThumb,
 }: {
@@ -142,6 +148,7 @@ export async function importCategory({
   newItemId?: () => string;
   now?: () => Date;
   uploadImage?: typeof uploadImageObject;
+  removeImages?: typeof removeImageObjects;
   createImage?: typeof createImageRow;
   compressThumb?: (bytes: Uint8Array<ArrayBuffer>) => Promise<Blob>;
 }): Promise<ImportResult> {
@@ -188,6 +195,13 @@ export async function importCategory({
     });
   }
 
+  // Every path an upload was tried at: a request that failed may still have stored its object.
+  const attemptedPaths = new Set<string>();
+  const recordingUpload: typeof uploadImageObject = (path, blob) => {
+    attemptedPaths.add(path);
+    return uploadImage(path, blob);
+  };
+
   // A failure past this point deletes the half-built category; a failed cleanup is only logged.
   try {
     onProgress?.({ phase: 'items', done: 0, total: manifestItems.length });
@@ -233,7 +247,12 @@ export async function importCategory({
           task,
           bytes: entries.get(`${root}/${task.archivePath}`),
           uid,
-          calls: { uploadImage, createImage, compressThumb, signal },
+          calls: {
+            uploadImage: recordingUpload,
+            createImage,
+            compressThumb,
+            signal,
+          },
         });
         if (imported) photoCount++;
         else skippedPhotoCount++;
@@ -248,7 +267,12 @@ export async function importCategory({
       skippedPhotoCount,
     };
   } catch (error) {
-    const { error: cleanupError } = await deleteCategoryRow(category.id);
+    // runPool settles in-flight uploads before rethrowing, so no object lands after this.
+    const { error: cleanupError } = await removeObjectsThenRows({
+      paths: [...attemptedPaths],
+      deleteRows: () => deleteCategoryRow(category.id),
+      removeObjects: removeImages,
+    });
     if (cleanupError) {
       console.error(
         'Could not clean up partially-imported category',

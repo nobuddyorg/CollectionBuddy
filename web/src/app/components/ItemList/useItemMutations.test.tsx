@@ -8,6 +8,7 @@ import { I18nProvider } from '../../i18n/I18nProvider';
 import { ToastProvider, useToast } from '../Toast/ToastProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import { deleteItem, updateItem } from '../../data/items';
+import { removeImageObjects } from '../../data/images';
 import { useItemMutations } from './useItemMutations';
 import { EMPTY_ITEM_FORM_VALUES } from '../ItemForm/types';
 import type { ItemLite } from './types';
@@ -15,6 +16,11 @@ import type { ItemLite } from './types';
 vi.mock('../../data/items', () => ({
   deleteItem: vi.fn(),
   updateItem: vi.fn(),
+}));
+
+vi.mock('../../data/images', () => ({
+  removeImageObjects: vi.fn(),
+  REMOVE_OBJECTS_BATCH_SIZE: 1000,
 }));
 
 function item(id: string): ItemLite {
@@ -68,7 +74,7 @@ function useHarness({
 function noopCollaborators(): Collaborators {
   return {
     captureItemImagePaths: vi.fn(),
-    removeImageBytes: vi.fn(),
+    forgetItemImages: vi.fn(),
     reload: vi.fn(),
   };
 }
@@ -107,7 +113,7 @@ describe('useItemMutations removeItem', () => {
     } as never);
     const collaborators = {
       captureItemImagePaths: vi.fn().mockResolvedValue([]),
-      removeImageBytes: vi.fn().mockResolvedValue(undefined),
+      forgetItemImages: vi.fn(),
       reload: vi.fn(),
     };
     const consoleError = vi
@@ -140,7 +146,8 @@ describe('useItemMutations removeItem', () => {
     );
     // The objects went first; the row is still there, so the restore shows what the database has.
     expect(collaborators.captureItemImagePaths).toHaveBeenCalledWith('b');
-    expect(collaborators.removeImageBytes).toHaveBeenCalledWith('b', []);
+    expect(removeImageObjects).not.toHaveBeenCalled();
+    expect(collaborators.forgetItemImages).not.toHaveBeenCalled();
     expect(collaborators.reload).not.toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalledWith('delete item', expect.anything());
     consoleError.mockRestore();
@@ -150,9 +157,13 @@ describe('useItemMutations removeItem', () => {
     const capturedPaths = [{ path_full: 'b/a.webp', path_thumb: null }];
     const collaborators = {
       captureItemImagePaths: vi.fn().mockResolvedValue(capturedPaths),
-      removeImageBytes: vi.fn().mockRejectedValue(new Error('storage down')),
+      forgetItemImages: vi.fn(),
       reload: vi.fn().mockResolvedValue(undefined),
     };
+    vi.mocked(removeImageObjects).mockResolvedValue({
+      data: null,
+      error: new Error('storage down'),
+    } as never);
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
@@ -181,11 +192,9 @@ describe('useItemMutations removeItem', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Could not delete this entry. Please try again.',
     );
-    expect(collaborators.removeImageBytes).toHaveBeenCalledWith(
-      'b',
-      capturedPaths,
-    );
+    expect(removeImageObjects).toHaveBeenCalledWith(['b/a.webp']);
     expect(deleteItem).not.toHaveBeenCalled();
+    expect(collaborators.forgetItemImages).not.toHaveBeenCalled();
     expect(collaborators.reload).not.toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalledWith('delete item', expect.anything());
     consoleError.mockRestore();
@@ -193,10 +202,17 @@ describe('useItemMutations removeItem', () => {
 
   it('deletes the row only after every photograph object is gone', async () => {
     vi.mocked(deleteItem).mockResolvedValue({ error: null } as never);
-    const capturedPaths = [{ path_full: 'b/a.webp', path_thumb: null }];
+    vi.mocked(removeImageObjects).mockResolvedValue({
+      data: [],
+      error: null,
+    });
+    const capturedPaths = [
+      { path_full: 'b/a.webp', path_thumb: 'b/a.thumb.webp' },
+      { path_full: 'b/c.webp', path_thumb: null },
+    ];
     const collaborators = {
       captureItemImagePaths: vi.fn().mockResolvedValue(capturedPaths),
-      removeImageBytes: vi.fn().mockResolvedValue(undefined),
+      forgetItemImages: vi.fn(),
       reload: vi.fn().mockResolvedValue(undefined),
     };
 
@@ -217,10 +233,18 @@ describe('useItemMutations removeItem', () => {
 
     await waitFor(() => expect(deleteItem).toHaveBeenCalledWith('b'));
     expect(result.current.items.map((entry) => entry.id)).toEqual(['a', 'c']);
+    expect(removeImageObjects).toHaveBeenCalledWith([
+      'b/a.webp',
+      'b/a.thumb.webp',
+      'b/c.webp',
+    ]);
     const removeOrder =
-      collaborators.removeImageBytes.mock.invocationCallOrder[0];
+      vi.mocked(removeImageObjects).mock.invocationCallOrder[0];
     const rowOrder = vi.mocked(deleteItem).mock.invocationCallOrder[0];
     expect(removeOrder).toBeLessThan(rowOrder);
+    await waitFor(() =>
+      expect(collaborators.forgetItemImages).toHaveBeenCalledWith('b'),
+    );
     expect(collaborators.reload).toHaveBeenCalledWith({ silent: true });
   });
   // Sign-out waits on this commit; a refetch still running after it would go out signed out.
@@ -229,7 +253,7 @@ describe('useItemMutations removeItem', () => {
     let finishReload = () => {};
     const collaborators = {
       captureItemImagePaths: vi.fn().mockResolvedValue([]),
-      removeImageBytes: vi.fn().mockResolvedValue(undefined),
+      forgetItemImages: vi.fn(),
       reload: vi.fn(
         () =>
           new Promise<void>((resolve) => {
@@ -266,7 +290,7 @@ describe('useItemMutations removeItem', () => {
     const staleReload = vi.fn();
     const freshReload = vi.fn();
     const captureItemImagePaths = vi.fn().mockResolvedValue([]);
-    const removeImageBytes = vi.fn().mockResolvedValue(undefined);
+    const forgetItemImages = vi.fn();
 
     const { result, rerender } = renderHook(
       (props: { reload: Collaborators['reload'] }) =>
@@ -275,7 +299,7 @@ describe('useItemMutations removeItem', () => {
           setItems: vi.fn(),
           reload: props.reload,
           captureItemImagePaths,
-          removeImageBytes,
+          forgetItemImages,
         }),
       { wrapper, initialProps: { reload: staleReload } },
     );
@@ -378,7 +402,7 @@ describe('useItemMutations saveEdit', () => {
           initial,
           reload: vi.fn(),
           captureItemImagePaths: vi.fn().mockResolvedValue([]),
-          removeImageBytes: vi.fn(),
+          forgetItemImages: vi.fn(),
         }),
       { wrapper },
     );

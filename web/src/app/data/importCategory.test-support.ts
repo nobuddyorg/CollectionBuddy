@@ -17,6 +17,7 @@ export type CreateItemRows = ImportParams['createItemRows'];
 export type LinkItemRows = ImportParams['linkItemRows'];
 export type DeleteItemRows = ImportParams['deleteItemRows'];
 export type UploadImage = ImportParams['uploadImage'];
+export type RemoveImages = ImportParams['removeImages'];
 export type CreateImage = ImportParams['createImage'];
 export type CompressThumb = ImportParams['compressThumb'];
 
@@ -113,6 +114,13 @@ export function fakeUploadImage(): UploadImage {
   return vi.fn(async () => ({ error: null })) as unknown as UploadImage;
 }
 
+export function fakeRemoveImages(): RemoveImages {
+  return vi.fn(async () => ({
+    data: [],
+    error: null,
+  }));
+}
+
 export function fakeCreateImage(): CreateImage {
   return vi.fn(async () => ({
     data: { id: 'img-1', item_id: 'item', path_full: 'a', path_thumb: null },
@@ -135,6 +143,7 @@ export function baseFakes() {
     newItemId: fakeNewItemId(),
     now: () => NOW,
     uploadImage: fakeUploadImage(),
+    removeImages: fakeRemoveImages(),
     createImage: fakeCreateImage(),
     compressThumb: fakeCompressThumb(),
   };

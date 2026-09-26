@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
 import { deleteItem, updateItem } from '../../data/items';
+import { objectPathsOf, removeObjectsThenRows } from '../../data/imageRemoval';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { useConfirm } from '../Confirm/ConfirmProvider';
@@ -16,7 +17,7 @@ export function useItemMutations({
   setItems,
   reload,
   captureItemImagePaths,
-  removeImageBytes,
+  forgetItemImages,
 }: {
   items: ItemLite[];
   setItems: Dispatch<SetStateAction<ItemLite[]>>;
@@ -25,10 +26,7 @@ export function useItemMutations({
   captureItemImagePaths: (
     itemId: string,
   ) => Promise<{ path_full: string; path_thumb: string | null }[]>;
-  removeImageBytes: (
-    itemId: string,
-    paths: { path_full: string; path_thumb: string | null }[],
-  ) => Promise<void>;
+  forgetItemImages: (itemId: string) => void;
 }) {
   const { t } = useI18n();
   const toast = useToast();
@@ -95,11 +93,13 @@ export function useItemMutations({
         action: { label: t('common.undo'), onClick: restore },
         onExpire: async () => {
           try {
-            // Objects before the row: the row's cascade takes the images rows, and their paths, with it.
             const imagePaths = await captureItemImagePaths(id);
-            await removeImageBytes(id, imagePaths);
-            const { error } = await deleteItem(id);
+            const { error } = await removeObjectsThenRows({
+              paths: imagePaths.flatMap(objectPathsOf),
+              deleteRows: () => deleteItem(id),
+            });
             if (error) throw error;
+            forgetItemImages(id);
           } catch (error) {
             toast.reportError(
               'delete item',
@@ -122,7 +122,7 @@ export function useItemMutations({
       t,
       toast,
       captureItemImagePaths,
-      removeImageBytes,
+      forgetItemImages,
       reload,
     ],
   );

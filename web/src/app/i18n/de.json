@@ -157,7 +157,6 @@
     "photo_quota_error": "Das Limit von 1 GiB an Fotos ist erreicht. Lösche welche, um weitere hinzuzufügen.",
     "delete_image_error": "Bild konnte nicht gelöscht werden. Bitte erneut versuchen.",
     "delete_image_success": "Bild gelöscht.",
-    "delete_image_cleanup_error": "Das Foto wurde gelöscht, aber die Datei konnte nicht vollständig entfernt werden und belegt möglicherweise weiterhin Speicherplatz.",
     "no_results_title": "Keine Treffer für \"{q}\"",
     "no_results_hint": "Versuche einen anderen Suchbegriff.",
     "no_items_title": "Noch keine Einträge",

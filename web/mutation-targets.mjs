@@ -29,6 +29,7 @@ export const MUTATE_TARGETS = [
   'src/app/data/importFormat.ts',
   'src/app/data/categories.ts',
   'src/app/data/images.ts',
+  'src/app/data/imageRemoval.ts',
   'src/app/data/shares.ts',
   'src/app/data/quota.ts',
   'src/app/data/itemSearch.ts',
