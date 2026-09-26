@@ -1,8 +1,20 @@
 import { expect, test } from './test';
 
 import { SEED } from './fixtures';
+import { apiAs, context } from './rls/helpers';
 // The owner's half, through the panel; rls/viewer-share.spec.ts has what a grant opens.
 test.use({ locale: 'en-GB' });
+
+/** Whether the second collector's own token can read the owner's category, i.e. whether a grant is live. */
+async function granteeSees(category: string) {
+  const { data, error } = await apiAs(context().otherToken)
+    .from('categories')
+    .select('id')
+    .eq('user_id', context().userId)
+    .eq('name', category);
+  if (error) throw error;
+  return data.length === 1;
+}
 
 test.describe('sharing a collection', () => {
   test.beforeEach(async ({ on, page }) => {
@@ -35,12 +47,21 @@ test.describe('sharing a collection', () => {
     await app.confirm.do.accept();
     await expect(row.locators.editorBadge).toBeVisible();
 
+    // Undo cannot unsend the delete, so it issues the grant again, role and all.
     await app.sharing.do.revoke(SEED.other.email);
     await app.confirm.do.accept();
     await expect(app.sharing.locators.texts.empty).toBeVisible();
+    await app.toast.do.undo();
+    await expect(row.locators.editorBadge).toBeVisible();
+    expect(await granteeSees(SEED.shareCategory)).toBe(true);
 
-    // Revoking is deferred to the undo window; closing the toast ends it, so the row is gone on the next visit.
-    await app.toast.do.close();
+    // Sent at once: reloading straight away, inside the old undo window, no longer keeps the grant alive.
+    await app.sharing.do.revoke(SEED.other.email);
+    await app.confirm.do.accept();
+    await expect(app.sharing.locators.texts.empty).toBeVisible();
+    await page.reload();
+    expect(await granteeSees(SEED.shareCategory)).toBe(false);
+
     await app.categories.do.open(SEED.shareCategory);
     await app.categories.do.openPanel();
     await expect(app.sharing.locators.texts.empty).toBeVisible();

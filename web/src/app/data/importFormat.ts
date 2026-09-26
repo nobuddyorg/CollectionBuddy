@@ -39,10 +39,31 @@ export function rootFolderOf(manifestPath: string): string {
   return manifestPath.slice(0, -'/collection.json'.length);
 }
 
-/** One `created_at` per item, 1 ms apart, ending at `now`, so one insert keeps the archive order. */
+/** One `created_at` per row, 1 ms apart, ending at `now`, so any insert order keeps the archive order. */
 export function importTimestamps(count: number, now: Date): string[] {
   const last = now.getTime();
   return Array.from({ length: count }, (_, i) =>
     new Date(last - (count - 1 - i)).toISOString(),
   );
+}
+
+export type PhotoTask = {
+  itemId: string;
+  archivePath: string;
+  createdAt: string;
+};
+
+/** Stamped per item in manifest order: photographs read oldest-first, so the first stays the cover. */
+export function importPhotoTasks(
+  items: { id: string; item: { photos: string[] } }[],
+  now: Date,
+): PhotoTask[] {
+  return items.flatMap(({ id, item: { photos } }) => {
+    const createdAts = importTimestamps(photos.length, now);
+    return photos.map((archivePath, i) => ({
+      itemId: id,
+      archivePath,
+      createdAt: createdAts[i],
+    }));
+  });
 }

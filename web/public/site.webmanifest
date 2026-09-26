@@ -1,29 +1,29 @@
 {
   "name": "CollectionBuddy",
   "short_name": "CollectionBuddy",
-  "start_url": "/CollectionBuddy/",
-  "scope": "/CollectionBuddy/",
+  "start_url": "./",
+  "scope": "./",
   "icons": [
     {
-      "src": "/CollectionBuddy/favicon-32x32.png",
+      "src": "favicon-32x32.png",
       "sizes": "32x32",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/CollectionBuddy/icon-192.png",
+      "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/CollectionBuddy/icon-512.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/CollectionBuddy/icon-maskable-512.png",
+      "src": "icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

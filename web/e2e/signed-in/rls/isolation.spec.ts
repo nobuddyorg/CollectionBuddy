@@ -161,25 +161,38 @@ test.describe('one collection cannot reach another', () => {
     });
   }
 
-  // Guarded by a trigger, not RLS: the insert policy checks a column the same trigger sets.
+  // Guarded by a trigger, not RLS; a fresh entry, so the one-collection quota cannot be what refuses it.
   test('an item cannot be filed into their category', async () => {
     const { token, otherToken } = context();
 
-    const { data: mine } = await apiAs(token)
+    const { data: mine, error: insertError } = await apiAs(token)
       .from('items')
+      .insert({ title: 'rls-stranger-filing-probe' })
       .select('id')
-      .eq('title', SEED.items[0].title)
       .single();
+    expect(insertError).toBeNull();
     const { data: theirs } = await apiAs(otherToken)
       .from('categories')
       .select('id')
       .eq('name', SEED.other.category)
       .single();
 
-    const { error } = await apiAs(token)
-      .from('item_categories')
-      .insert({ item_id: mine!.id, category_id: theirs!.id });
-    expect(error).not.toBeNull();
+    try {
+      const { error } = await apiAs(token)
+        .from('item_categories')
+        .insert({ item_id: mine!.id, category_id: theirs!.id });
+      expect(error?.message).toBe('cross-tenant assignment is not allowed');
+
+      // A link would be filed under the entry's owner, the one reader who sees it (not the category's owner).
+      const { data: after } = await apiAs(token)
+        .from('items')
+        .select('item_categories(category_id)')
+        .eq('id', mine!.id)
+        .single();
+      expect(after!.item_categories).toEqual([]);
+    } finally {
+      await apiAs(token).from('items').delete().eq('id', mine!.id);
+    }
   });
 
   test('a mapping cannot be updated, not even your own', async () => {

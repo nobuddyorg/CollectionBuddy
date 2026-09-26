@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   findManifestPath,
   ImportFormatError,
+  importPhotoTasks,
   importTimestamps,
   parseManifest,
   rootFolderOf,
@@ -107,5 +108,42 @@ describe('importTimestamps', () => {
 
   it('has nothing to stamp for no items', () => {
     expect(importTimestamps(0, now)).toEqual([]);
+  });
+});
+
+describe('importPhotoTasks', () => {
+  const now = new Date('2026-08-07T12:00:00.000Z');
+
+  it("stamps each item's photographs oldest first, in manifest order", () => {
+    expect(
+      importPhotoTasks(
+        [
+          { id: 'item-1', item: { photos: ['p/1/1.webp', 'p/1/2.jpg'] } },
+          { id: 'item-2', item: { photos: [] } },
+          { id: 'item-3', item: { photos: ['p/3/1.webp'] } },
+        ],
+        now,
+      ),
+    ).toEqual([
+      {
+        itemId: 'item-1',
+        archivePath: 'p/1/1.webp',
+        createdAt: '2026-08-07T11:59:59.999Z',
+      },
+      {
+        itemId: 'item-1',
+        archivePath: 'p/1/2.jpg',
+        createdAt: '2026-08-07T12:00:00.000Z',
+      },
+      {
+        itemId: 'item-3',
+        archivePath: 'p/3/1.webp',
+        createdAt: '2026-08-07T12:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('has nothing to upload for no items', () => {
+    expect(importPhotoTasks([], now)).toEqual([]);
   });
 });

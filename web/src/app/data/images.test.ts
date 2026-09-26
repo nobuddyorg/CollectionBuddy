@@ -110,16 +110,13 @@ describe('createImageRow', () => {
 });
 
 describe('deleteImageRow', () => {
-  it('deletes exactly the given row and returns its paths', () => {
+  it('deletes exactly the given row, as one row, so a delete that matched none fails', () => {
     const { from, calls } = mockTableFrom();
     deleteImageRow('image-1');
     expect(from).toHaveBeenCalledWith('images');
     expect(calls[0].method).toBe('delete');
     expect(calls[1]).toEqual({ method: 'eq', args: ['id', 'image-1'] });
-    expect(calls[2]).toEqual({
-      method: 'select',
-      args: ['path_full, path_thumb'],
-    });
+    expect(calls[2]).toEqual({ method: 'select', args: ['id'] });
     expect(calls[3].method).toBe('single');
   });
 });

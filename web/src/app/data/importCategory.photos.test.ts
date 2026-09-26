@@ -11,10 +11,14 @@ import {
   fakeCreateImage,
   fakeCompressThumb,
   baseFakes,
+  NOW,
 } from './importCategory.test-support';
 
-// A manifest item claiming a photo the archive never got, as a corrupt or hand-edited archive could.
-function archiveMissingOnePhoto(): Blob {
+// One manifest item with one photograph at `photoPath`, whose bytes the archive holds only if `bytes` has any.
+function archiveWithOnePhoto(
+  photoPath: string,
+  bytes: Uint8Array<ArrayBuffer>[],
+): Blob {
   const writer = createZipWriter();
   const encoder = new TextEncoder();
   const manifest = {
@@ -26,7 +30,7 @@ function archiveMissingOnePhoto(): Blob {
       {
         ...item(),
         folder: '001-seated-dime',
-        photos: ['photos/001-seated-dime/1.webp'],
+        photos: [photoPath],
       },
     ],
   };
@@ -34,7 +38,15 @@ function archiveMissingOnePhoto(): Blob {
     path: 'root/collection.json',
     bytes: encoder.encode(JSON.stringify(manifest)),
   });
+  for (const photo of bytes) {
+    writer.add({ path: `root/${photoPath}`, bytes: photo });
+  }
   return writer.finish();
+}
+
+// A manifest item claiming a photo the archive never got, as a corrupt or hand-edited archive could.
+function archiveMissingOnePhoto(): Blob {
+  return archiveWithOnePhoto('photos/001-seated-dime/1.webp', []);
 }
 
 describe('importCategory, recreating the photographs', () => {
@@ -79,9 +91,66 @@ describe('importCategory, recreating the photographs', () => {
       path_full: `${base}.webp`,
       path_thumb: `${base}.thumb.webp`,
       size_bytes: 3,
+      created_at: NOW.toISOString(),
     });
     expect(consoleWarn).not.toHaveBeenCalled();
     consoleWarn.mockRestore();
+  });
+
+  // Safari's uploads are JPEG (no WebP encoder), so their export names them .jpg; the round trip keeps that type.
+  it('stores each photograph as the type its archive name gives, and the thumbnail as encoded', async () => {
+    const uploadImage = fakeUploadImage();
+    const createImage = fakeCreateImage();
+    const result = await importCategory({
+      file: archiveWithOnePhoto('photos/001-seated-dime/1.jpg', [
+        new Uint8Array([4, 5]),
+      ]),
+      categoryName: 'Coins',
+      ...baseFakes(),
+      uploadImage,
+      createImage,
+      compressThumb: async () => new Blob(['thumb'], { type: 'image/jpeg' }),
+    });
+
+    expect(result.photoCount).toBe(1);
+    const [[fullPath, fullBlob], [thumbPath, thumbBlob]] = (
+      uploadImage as ReturnType<typeof vi.fn>
+    ).mock.calls as [string, Blob][];
+    expect(fullPath).toMatch(/^uid\/new-item-1\/[0-9a-f-]+\.jpg$/);
+    expect(fullBlob.type).toBe('image/jpeg');
+    expect(thumbPath).toBe(fullPath.replace('.jpg', '.thumb.jpg'));
+    expect(thumbBlob.type).toBe('image/jpeg');
+    expect(createImage).toHaveBeenCalledWith(
+      expect.objectContaining({ path_full: fullPath, path_thumb: thumbPath }),
+    );
+  });
+
+  it('skips a photograph the bucket would refuse, before uploading anything', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const uploadImage = fakeUploadImage();
+
+    const result = await importCategory({
+      file: archiveWithOnePhoto('photos/001-seated-dime/1.gif', [
+        new Uint8Array([6]),
+      ]),
+      categoryName: 'Coins',
+      ...baseFakes(),
+      uploadImage,
+    });
+
+    expect(result.skippedPhotoCount).toBe(1);
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      'Skipping photograph',
+      'photos/001-seated-dime/1.gif',
+      expect.objectContaining({
+        message:
+          'Not a photograph the bucket accepts: photos/001-seated-dime/1.gif',
+      }),
+    );
+    consoleError.mockRestore();
   });
 
   it('skips a photograph missing from the archive rather than failing the import', async () => {

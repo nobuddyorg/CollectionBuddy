@@ -2,11 +2,7 @@
 import { act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  createSignedUrls,
-  listImagesForItems,
-  removeImageObjects,
-} from '../../data/images';
+import { createSignedUrls, listImagesForItems } from '../../data/images';
 import {
   entry,
   installDefaultImageMocks,
@@ -146,17 +142,9 @@ describe('useItemImages', () => {
     });
 
     it('does nothing once every tracked item has been forgotten', async () => {
-      vi.mocked(removeImageObjects).mockResolvedValue({
-        data: [],
-        error: null,
-      });
       const { result } = await withOnePhotographAndFakeTimers();
       try {
-        await act(async () => {
-          await result.current.removeImageBytes('item-1', [
-            { path_full: 'uid/item-1/img-1.webp', path_thumb: null },
-          ]);
-        });
+        act(() => result.current.forgetItemImages('item-1'));
         expect(result.current.images['item-1']).toBeUndefined();
 
         vi.mocked(listImagesForItems).mockClear();

@@ -21,7 +21,8 @@ tags, and is searchable. Features: [README.md](README.md). Full docs:
   creates, edits and deletes entries and photos inside a shared category, so
   sharing is **not read-only**.
 - **Deploy**: `pages-deploy.yml` migrates the production database, then builds
-  and publishes to GitHub Pages, on every merge to `main`. No staging.
+  and publishes to GitHub Pages, once CI has passed on the merge commit on
+  `main`. No staging.
 
 ## Read before you touch
 
@@ -42,6 +43,10 @@ design-decisions.md, not here.
 - A client-side check is UX, never authorization. Every query is covered by an
   RLS policy.
 - No public/anonymous share links.
+- Sharing trusts the JWT email, so the hosted project keeps anonymous sign-ins,
+  the email provider and unverified email sign-ins off and Confirm email on
+  (`supabase/hosted-auth.json`, checked hourly). Never relax that file or
+  suggest those toggles, not even for a demo or a hosted load test.
 - Search stays trigram `ILIKE`; no `tsvector`/full-text search.
 - A storage object's path never changes: no `UPDATE` policy on
   `storage.objects`, no `move()`, no `upsert`. The missing policy is the only
@@ -63,11 +68,15 @@ design-decisions.md, not here.
   or `.pre-commit-config.yaml`'s security hooks unless the user explicitly asks.
 - Never run `npm audit fix --force` or a from-scratch `rm -rf node_modules
   package-lock.json && npm install` in `web/`; use targeted `overrides`.
-- Never write real Google OAuth credentials, service-role keys, or
-  `SUPABASE_DB_URL`/`SUPABASE_ACCESS_TOKEN` values anywhere — code, docs,
-  commits, chat, not even as an example. `NEXT_PUBLIC_SUPABASE_ANON_KEY` is
-  the one credential meant to be public. `service_role` lives only in CI
-  secrets, never in client code.
+- A package `next build` loads (a PostCSS or Next plugin, a loader,
+  TypeScript) goes in `dependencies`, never `devDependencies`: Dependabot
+  auto-merges bumps that change only `dev: true` lockfile entries.
+- Never write real Google OAuth credentials, secret (`sb_secret_…`) or
+  service-role keys, or `SUPABASE_DB_URL`/`SUPABASE_ACCESS_TOKEN` values anywhere — code, docs,
+  commits, chat, not even as an example. `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  (a publishable or legacy anon key) is the one credential meant to be
+  public. A `service_role`-level key lives only in CI, fetched per run,
+  never in client code.
 
 ## Database changes
 
@@ -79,6 +88,18 @@ several real RLS bugs. Every policy change is security-critical.
   job does that on merge.
 - A schema change is a new `supabase/migrations/NNNN_*.sql` file, never an edit
   to an existing one, plus a regenerated `web/src/app/data/database.types.ts`.
+- Roll forward only. Never edit, rename or delete a migration on `main`, not
+  even to revert a PR: revert the app code, keep the file, and undo it with a
+  compensating migration. `supabase/check-migration-history.sh` fails CI
+  otherwise; its `Rewrites-migrations:` trailer is only for a squash or a file
+  that failed in production and was never applied. `supabase migration repair`
+  against production is the owner's, by hand. Runbook: developer-guide.md,
+  "Roll back a bad deploy".
+- Expand, then contract: `migrate` runs before `build`/`deploy` and open tabs
+  keep the old bundle, so migration N must work with bundle N-1. A drop, a
+  rename, a changed RPC signature, or a constraint the old bundle's writes
+  could violate ships in a later PR, once the client that stops needing it is
+  live. A security fix may break the old bundle on the path it denies.
 - A new table ships, in the same migration, with `enable row level security`,
   its policies, `revoke all ... from anon`, and a grant to `authenticated` of
   exactly the DML those policies back. A new function pins
@@ -97,11 +118,15 @@ several real RLS bugs. Every policy change is security-critical.
   PR description as security-relevant, with one line on what it now allows or
   denies.
 - `.github/workflows/cleanup-orphaned-photos.yml` counts as a database change:
-  `service_role`, bulk Storage delete, daily cron, irreversible. Its query has
-  three load-bearing invariants — it matches **both `path_full` and
-  `path_thumb`**, casts **no path to `uuid`**, and keeps a **48h grace
-  period**. Never drop, narrow or shorten them; verify any change with the
-  default dry run (`workflow_dispatch`) first. Why: TEST_STRATEGY.md §12.
+  `service_role`, bulk Storage delete, daily cron, irreversible. Its query,
+  `public.orphan_sweep_plan()` (migration `0022`), has three load-bearing
+  invariants — it matches **both `path_full` and `path_thumb`**, casts **no
+  path to `uuid`**, and keeps a **48h grace period** — plus a mass-deletion
+  ceiling the workflow will not pass without its `allow_mass_delete` input.
+  Never drop, narrow or shorten them; `080_orphan_sweep_test.sql` asserts
+  each, and fails when `images` gains a path column the plan does not match.
+  Verify any change with the default dry run (`workflow_dispatch`) first.
+  Why: TEST_STRATEGY.md §12.
 
 ## How to work here
 
@@ -183,6 +208,8 @@ supabase test db          # repo root, needs `supabase start`; required alongsid
                           # e2e:local for RLS policies, grants, ownership triggers, schema
 supabase/splinter.sh      # repo root, needs `supabase start` and `psql`; same trigger as
                           # `supabase test db` -- the hosted dashboard's Advisors lints
+supabase/check-migration-history.sh origin/main
+                          # repo root; if you touched supabase/migrations/
 opengrep scan --config auto web/src web/scripts web/e2e supabase
                           # if you touched those paths; install: CONTRIBUTING.md
 npm run lighthouse        # needs `supabase start`

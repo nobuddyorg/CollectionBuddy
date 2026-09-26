@@ -18,7 +18,8 @@ function sharesState(overrides: Partial<UseShares> = {}): UseShares {
     isUpdatingRole: false,
     reload: vi.fn().mockResolvedValue([]),
     createShare: vi.fn().mockResolvedValue(true),
-    deleteShare: vi.fn().mockResolvedValue(true),
+    revokeShare: vi.fn().mockResolvedValue(undefined),
+    leaveShare: vi.fn().mockResolvedValue(true),
     updateShareRole: vi.fn().mockResolvedValue(true),
     ...overrides,
   };
@@ -421,7 +422,7 @@ describe('SharingSection list', () => {
   });
 
   it('revokes only after the confirmation is accepted', async () => {
-    const deleteShare = vi.fn<UseShares['deleteShare']>();
+    const revokeShare = vi.fn<UseShares['revokeShare']>();
     renderSection(
       sharesState({
         shares: [
@@ -433,12 +434,12 @@ describe('SharingSection list', () => {
             role: 'viewer',
           },
         ],
-        deleteShare,
+        revokeShare,
       }),
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Revoke' }));
-    expect(deleteShare).not.toHaveBeenCalled();
+    expect(revokeShare).not.toHaveBeenCalled();
 
     expect(
       await screen.findByText(
@@ -447,17 +448,11 @@ describe('SharingSection list', () => {
     ).toBeVisible();
     await userEvent.click(screen.getByTestId('confirm-accept'));
 
-    expect(deleteShare).toHaveBeenCalledWith(
-      'share-1',
-      expect.objectContaining({
-        successMessage: 'Sharing revoked.',
-        errorMessage: 'Could not revoke this share. Please try again.',
-      }),
-    );
+    expect(revokeShare).toHaveBeenCalledWith('share-1');
   });
 
   it('does not revoke when the confirmation is declined', async () => {
-    const deleteShare = vi.fn<UseShares['deleteShare']>();
+    const revokeShare = vi.fn<UseShares['revokeShare']>();
     renderSection(
       sharesState({
         shares: [
@@ -469,7 +464,7 @@ describe('SharingSection list', () => {
             role: 'viewer',
           },
         ],
-        deleteShare,
+        revokeShare,
       }),
     );
 
@@ -477,6 +472,28 @@ describe('SharingSection list', () => {
     await screen.findByTestId('confirm-cancel');
     await userEvent.click(screen.getByTestId('confirm-cancel'));
 
-    expect(deleteShare).not.toHaveBeenCalled();
+    expect(revokeShare).not.toHaveBeenCalled();
+  });
+
+  // A row clicked mid-reload may be gone, or changed, by the time the action reaches the server.
+  it('offers no row action while the list is reloading', () => {
+    renderSection(
+      sharesState({
+        isLoading: true,
+        shares: [
+          {
+            id: 'share-1',
+            invited_email: 'grantee@example.com',
+            expires_at: null,
+            owner_user_id: 'owner-1',
+            role: 'viewer',
+          },
+        ],
+      }),
+    );
+
+    expect(screen.getByRole('button', { name: 'Revoke' })).toBeDisabled();
+    expect(screen.getByLabelText('Can edit')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit access' })).toBeDisabled();
   });
 });

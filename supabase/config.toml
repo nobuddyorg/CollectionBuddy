@@ -47,29 +47,7 @@ site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://localhost:3000", "http://127.0.0.1:3000"]
 jwt_expiry = 3600
 enable_signup = true
-# Powers `npm run demo` (see CONTRIBUTING.md's "Try the local demo"
-# section): that build signs every visitor in as a fresh anonymous user
-# instead of showing the Google button. Anonymous users still get a real
-# auth.uid() and the `authenticated` role, so every RLS policy in
-# 0006_policies.sql and 0007_storage.sql applies to them unchanged.
-#
-# MUST STAY OFF ON THE HOSTED PROJECT, where it is off -- confirmed by the
-# maintainer on 2026-09-12. Recorded as that rather than as the
-# "checked via the management API" note the refresh-token block below
-# carries, because it was not read from `/config/auth`; re-confirm it there
-# if this ever has to be relied on.
-#
-# It is not merely "wider access to the same role". An anonymous session can
-# call updateUser({ email }) with any address nobody has registered yet and
-# is handed a token carrying it immediately, with no confirmation, with
-# is_anonymous flipped to false, user_metadata.email_verified set to true,
-# and auth.users.email_confirmed_at set to now. Sharing authorizes on that
-# address (caller_email(), 0002_functions.sql), so with this on, anyone can
-# take a pending invite addressed to someone who has not signed up yet --
-# executed end to end against the local stack, reading and writing the
-# owner's collection at the editor role. No SQL-side check distinguishes
-# such a caller from a real one, which is why this setting, and the
-# email/password provider beside it, are the control. See #634.
+# `npm run demo` only; hosted keeps it off, pinned in hosted-auth.json, because sharing trusts the JWT email (design-decisions.md, #634).
 enable_anonymous_sign_ins = true
 # Explicit rather than relying on GoTrue's own defaults (#476): a used
 # refresh token is retired and reissuing it is treated as token theft,
@@ -79,6 +57,11 @@ enable_anonymous_sign_ins = true
 # that already-true fact visible in the repo instead of implicit.
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
+
+# Local only: e2e signs in with a password and the load test signs up with no mailbox to confirm; hosted is the reverse (hosted-auth.json).
+[auth.email]
+enable_signup = true
+enable_confirmations = false
 
 # Local stack and CI only (production gets `supabase db push`, never this file): the population load test signs up one account per collector.
 [auth.rate_limit]

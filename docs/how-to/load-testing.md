@@ -80,7 +80,7 @@ npm run load -- smoke          # then: catalogue, shared-viewer, write, populati
 npm run load -- catalogue --profile peak
 ```
 
-`scripts/load-test.mjs` reads the URL and anon key from `supabase status`,
+`scripts/load-test.mjs` reads the URL and publishable key from `supabase status`,
 the same way `npm run e2e:local` does, and runs
 `k6 run --out web-dashboard load/<flow>.js`. Results land in
 `web/load-results/`:
@@ -195,8 +195,9 @@ anon key is the only credential involved; no script ever holds
 
 - **Sign-in is unresolved.** `setup()` signs up with email and password,
   which the hosted project does not offer: it signs in through Google only,
-  and the email provider staying off is itself a security control (the
-  anonymous sign-in note in `supabase/config.toml`, #634). A hosted run
+  and the email provider staying off is itself a security control
+  ([why](../explanation/design-decisions.md#why-the-hosted-auth-settings-are-pinned),
+  #634); `hosted-auth-check.yml` fails while it is on. A hosted run
   therefore fails at sign-up with the Auth server's own error. Until there is
   an answer that does not reopen that, the load test stays local.
 - **The Free tier is shared with real users.** A sustained run spends the

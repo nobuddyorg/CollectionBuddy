@@ -5,10 +5,14 @@ import { importCategory, ITEM_INSERT_BATCH_SIZE } from './importCategory';
 import {
   type CreateItemRows,
   type CompressThumb,
+  type DeleteCategoryRow,
+  type RemoveImages,
+  type UploadImage,
   item,
   buildArchive,
   fakeCreateCategory,
   fakeDeleteCategory,
+  fakeRemoveImages,
   baseFakes,
 } from './importCategory.test-support';
 
@@ -72,7 +76,7 @@ describe('importCategory, cancelled', () => {
     const controller = new AbortController();
     const compressThumb = vi.fn(async (bytes: Uint8Array<ArrayBuffer>) => {
       controller.abort();
-      return new Blob([bytes]);
+      return new Blob([bytes], { type: 'image/webp' });
     }) as unknown as CompressThumb;
     const deleteCategoryRow = fakeDeleteCategory();
     const createCategoryRow = fakeCreateCategory('new-cat-1');
@@ -88,6 +92,178 @@ describe('importCategory, cancelled', () => {
     });
 
     await expect(failure).rejects.toBeInstanceOf(ImportCancelledError);
+    expect(deleteCategoryRow).toHaveBeenCalledWith('new-cat-1');
+  });
+});
+
+// Two photographs, so the cancel lands while the other is still in the pool.
+async function twoPhotoArchive() {
+  return buildArchive({
+    items: [item({ id: 'o1' }), item({ id: 'o2' })],
+    photosByItemId: {
+      o1: [new Uint8Array([1])],
+      o2: [new Uint8Array([2])],
+    },
+  });
+}
+
+// Cancels on the first upload, which the fake still answers as `result`.
+function uploadThatCancels(
+  controller: AbortController,
+  result: { error: Error | null },
+): UploadImage {
+  return vi.fn(async () => {
+    controller.abort();
+    return { data: null, ...result };
+  }) as unknown as UploadImage;
+}
+
+function uploadedPaths(uploadImage: UploadImage): string[] {
+  return vi.mocked(uploadImage!).mock.calls.map(([path]) => path);
+}
+
+describe('importCategory, rolling back photographs already sent', () => {
+  it('removes every object it uploaded before it deletes the category', async () => {
+    const controller = new AbortController();
+    const uploadImage = uploadThatCancels(controller, { error: null });
+    const removeImages = fakeRemoveImages();
+    const deleteCategoryRow = fakeDeleteCategory();
+
+    const failure = importCategory({
+      file: await twoPhotoArchive(),
+      categoryName: 'Coins',
+      ...baseFakes(),
+      uploadImage,
+      removeImages,
+      deleteCategoryRow,
+      signal: controller.signal,
+    });
+
+    await expect(failure).rejects.toBeInstanceOf(ImportCancelledError);
+    const paths = uploadedPaths(uploadImage);
+    expect(paths).toHaveLength(1);
+    expect(removeImages).toHaveBeenCalledExactlyOnceWith(paths);
+    expect(deleteCategoryRow).toHaveBeenCalledWith('new-cat-1');
+    expect(vi.mocked(removeImages!).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(deleteCategoryRow!).mock.invocationCallOrder[0],
+    );
+  });
+
+  it('removes an upload that reported failure too, since its object may still have been stored', async () => {
+    const controller = new AbortController();
+    const uploadImage = uploadThatCancels(controller, {
+      error: new Error('timed out'),
+    });
+    const removeImages = fakeRemoveImages();
+
+    const failure = importCategory({
+      file: await twoPhotoArchive(),
+      categoryName: 'Coins',
+      ...baseFakes(),
+      uploadImage,
+      removeImages,
+      signal: controller.signal,
+    });
+
+    await expect(failure).rejects.toBeInstanceOf(ImportCancelledError);
+    expect(removeImages).toHaveBeenCalledExactlyOnceWith(
+      uploadedPaths(uploadImage),
+    );
+  });
+
+  it('names a retried path once, however many attempts it took', async () => {
+    const controller = new AbortController();
+    const attemptsByPath = new Map<string, number>();
+    const uploadImage = vi.fn(async (path: string) => {
+      const attempt = (attemptsByPath.get(path) ?? 0) + 1;
+      attemptsByPath.set(path, attempt);
+      if (attempt === 2) controller.abort();
+      return { data: null, error: new Error('flaky') };
+    }) as unknown as UploadImage;
+    const removeImages = fakeRemoveImages();
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const archive = await twoPhotoArchive();
+    vi.useFakeTimers();
+    try {
+      const failure = importCategory({
+        file: archive,
+        categoryName: 'Coins',
+        ...baseFakes(),
+        uploadImage,
+        removeImages,
+        signal: controller.signal,
+      });
+      const settled =
+        expect(failure).rejects.toBeInstanceOf(ImportCancelledError);
+      await vi.advanceTimersByTimeAsync(10_000);
+      await settled;
+    } finally {
+      vi.useRealTimers();
+      consoleError.mockRestore();
+    }
+
+    expect(uploadedPaths(uploadImage).length).toBeGreaterThan(2);
+    expect(removeImages).toHaveBeenCalledExactlyOnceWith([
+      ...attemptsByPath.keys(),
+    ]);
+    expect(attemptsByPath.size).toBe(2);
+  });
+
+  it('keeps the category, and logs, when its objects cannot be removed', async () => {
+    const controller = new AbortController();
+    const removeError = new Error('storage down');
+    const removeImages = vi.fn(async () => ({
+      data: null,
+      error: removeError,
+    })) as unknown as RemoveImages;
+    const deleteCategoryRow: DeleteCategoryRow = fakeDeleteCategory();
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    const failure = importCategory({
+      file: await twoPhotoArchive(),
+      categoryName: 'Coins',
+      ...baseFakes(),
+      uploadImage: uploadThatCancels(controller, { error: null }),
+      removeImages,
+      deleteCategoryRow,
+      signal: controller.signal,
+    });
+
+    await expect(failure).rejects.toBeInstanceOf(ImportCancelledError);
+    expect(deleteCategoryRow).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      'Could not clean up partially-imported category',
+      'new-cat-1',
+      removeError,
+    );
+    consoleError.mockRestore();
+  });
+
+  it('sends Storage nothing when no photograph was uploaded yet', async () => {
+    const controller = new AbortController();
+    const compressThumb = vi.fn(async () => {
+      controller.abort();
+      return new Blob(['thumb'], { type: 'image/webp' });
+    }) as unknown as CompressThumb;
+    const removeImages = fakeRemoveImages();
+    const deleteCategoryRow = fakeDeleteCategory();
+
+    const failure = importCategory({
+      file: await twoPhotoArchive(),
+      categoryName: 'Coins',
+      ...baseFakes(),
+      compressThumb,
+      removeImages,
+      deleteCategoryRow,
+      signal: controller.signal,
+    });
+
+    await expect(failure).rejects.toBeInstanceOf(ImportCancelledError);
+    expect(removeImages).not.toHaveBeenCalled();
     expect(deleteCategoryRow).toHaveBeenCalledWith('new-cat-1');
   });
 });

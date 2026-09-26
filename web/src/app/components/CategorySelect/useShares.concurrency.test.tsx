@@ -9,7 +9,6 @@ import {
 } from '../../data/shares';
 import { useShares } from './useShares';
 import {
-  commitDeferredDelete,
   grant,
   listSharesReturns,
   renderLoadedShares,
@@ -56,13 +55,14 @@ describe('useShares one request at a time', () => {
   });
 
   it('ignores a second role change while the first is still in flight', async () => {
+    listSharesReturns([grant]);
     let release: (() => void) | undefined;
     vi.mocked(updateShareRoleRow).mockReturnValue(
       new Promise((resolve) => {
         release = () => resolve({ data: grant, error: null });
       }) as never,
     );
-    const { result } = renderHook(() => useShares('cat-1'), { wrapper });
+    const { result } = await renderLoadedShares();
 
     act(() => {
       void result.current.updateShareRole('share-1', 'editor');
@@ -80,7 +80,7 @@ describe('useShares one request at a time', () => {
     });
   });
 
-  it('ignores a second revoke of a different grant while one is still deferred', async () => {
+  it('ignores a second revoke of a different grant while the first is still in flight', async () => {
     listSharesReturns([grant, { ...grant, id: 'share-2' }]);
     let release: (() => void) | undefined;
     vi.mocked(deleteShareRow).mockReturnValue(
@@ -91,22 +91,14 @@ describe('useShares one request at a time', () => {
     const { result } = await renderLoadedShares();
 
     act(() => {
-      result.current.deleteShare('share-1', {
-        successMessage: 'Removed.',
-        errorMessage: 'Could not remove.',
-      });
+      void result.current.revokeShare('share-1');
     });
-    await commitDeferredDelete();
     await waitFor(() => expect(result.current.isRevoking).toBe(true));
 
-    act(() => {
-      result.current.deleteShare('share-2', {
-        successMessage: 'Removed.',
-        errorMessage: 'Could not remove.',
-      });
+    await act(async () => {
+      await result.current.revokeShare('share-2');
     });
 
-    expect(result.current.shares).toEqual([{ ...grant, id: 'share-2' }]);
     expect(deleteShareRow).toHaveBeenCalledTimes(1);
     await act(async () => {
       release?.();

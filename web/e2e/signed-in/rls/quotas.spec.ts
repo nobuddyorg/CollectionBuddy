@@ -15,7 +15,7 @@ test.describe('per-owner quotas', () => {
     expect(error?.message).toBe('entry quota of 50000 reached');
   });
 
-  test('photographs that would pass 1 GiB are refused, however small the client says they are', async () => {
+  test('photographs that would pass 256 MiB are refused, however small the client says they are', async () => {
     const { otherToken, otherUserId } = context();
     const { data: item } = await apiAs(otherToken)
       .from('items')
@@ -23,11 +23,11 @@ test.describe('per-owner quotas', () => {
       .eq('title', SEED.other.item)
       .single();
 
-    // A row with nothing stored behind it counts as the bucket's 5 MiB cap, so 205 pass 1 GiB.
+    // A row with nothing stored behind it counts as the bucket's 5 MiB cap, so 52 pass 256 MiB.
     const { error } = await apiAs(otherToken)
       .from('images')
       .insert(
-        Array.from({ length: 205 }, (_, i) => ({
+        Array.from({ length: 52 }, (_, i) => ({
           item_id: item!.id,
           path_full: `${otherUserId}/${item!.id}/quota-probe-${i}.webp`,
           size_bytes: 1,
@@ -35,10 +35,10 @@ test.describe('per-owner quotas', () => {
       );
 
     expect(error?.code).toBe('PT507');
-    expect(error?.message).toBe('photo storage quota of 1 GiB reached');
+    expect(error?.message).toBe('photo storage quota of 256 MiB reached');
   });
 
-  test('a photograph is recorded at the size Storage holds, not the size claimed', async () => {
+  test('a photograph and its thumbnail are recorded at the sizes Storage holds, not the size claimed', async () => {
     const { token, userId } = context();
     const { data: item } = await apiAs(token)
       .from('items')
@@ -46,24 +46,39 @@ test.describe('per-owner quotas', () => {
       .select('id')
       .single();
     const path = `${userId}/${item!.id}/size-probe.png`;
+    const thumbPath = `${userId}/${item!.id}/size-probe.thumb.png`;
     const bytes = new Uint8Array(1234);
+    const thumbBytes = new Uint8Array(567);
 
     try {
-      const { error: uploadError } = await apiAs(token)
-        .storage.from('item-images')
-        .upload(path, new Blob([bytes], { type: 'image/png' }));
-      expect(uploadError).toBeNull();
+      for (const [target, content] of [
+        [path, bytes],
+        [thumbPath, thumbBytes],
+      ] as const) {
+        const { error: uploadError } = await apiAs(token)
+          .storage.from('item-images')
+          .upload(target, new Blob([content], { type: 'image/png' }));
+        expect(uploadError).toBeNull();
+      }
 
       const { data: row, error } = await apiAs(token)
         .from('images')
-        .insert({ item_id: item!.id, path_full: path, size_bytes: 1 })
-        .select('size_bytes')
+        .insert({
+          item_id: item!.id,
+          path_full: path,
+          path_thumb: thumbPath,
+          size_bytes: 1,
+        })
+        .select('size_bytes, thumb_size_bytes')
         .single();
 
       expect(error).toBeNull();
-      expect(row!.size_bytes).toBe(bytes.length);
+      expect(row).toEqual({
+        size_bytes: bytes.length,
+        thumb_size_bytes: thumbBytes.length,
+      });
     } finally {
-      await apiAs(token).storage.from('item-images').remove([path]);
+      await apiAs(token).storage.from('item-images').remove([path, thumbPath]);
       await apiAs(token).from('items').delete().eq('id', item!.id);
     }
   });

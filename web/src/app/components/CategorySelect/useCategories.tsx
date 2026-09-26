@@ -3,7 +3,6 @@
 import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
-import { chunk } from '../../lib/chunk';
 import { restoreAt } from '../../lib/optimistic';
 import { useRequestSequence } from '../../lib/useRequestSequence';
 import { useToast } from '../Toast/ToastProvider';
@@ -16,23 +15,11 @@ import {
   listItemIdsLinkedElsewhere,
   renameCategory as renameCategoryRow,
 } from '../../data/categories';
-import {
-  listImagePathsForItems,
-  REMOVE_OBJECTS_BATCH_SIZE,
-  removeImageObjects,
-} from '../../data/images';
+import { listImagePathsForItems } from '../../data/images';
+import { objectPathsOf, removeObjectsThenRows } from '../../data/imageRemoval';
 import type { CategorySummary } from '../../data/categories';
 
 export type UseCategories = ReturnType<typeof useCategories>;
-
-function storagePathsOf(image: {
-  path_full: string;
-  path_thumb: string | null;
-}): string[] {
-  return image.path_thumb
-    ? [image.path_full, image.path_thumb]
-    : [image.path_full];
-}
 
 // Owned by the page, which decides what renders below the strip once the categories have arrived.
 export function useCategories() {
@@ -192,19 +179,13 @@ export function useCategories() {
               const orphaned = new Set(orphanedItemIds);
               orphanedPaths = listed.data
                 .filter((row) => orphaned.has(row.item_id))
-                .flatMap(storagePathsOf);
+                .flatMap(objectPathsOf);
             }
 
-            // Objects before the row: only Storage can delete bytes, and a row that is gone cannot name them.
-            for (const paths of chunk(
-              orphanedPaths,
-              REMOVE_OBJECTS_BATCH_SIZE,
-            )) {
-              const { error: removeError } = await removeImageObjects(paths);
-              if (removeError) throw removeError;
-            }
-
-            const { error } = await deleteCategoryRow(id);
+            const { error } = await removeObjectsThenRows({
+              paths: orphanedPaths,
+              deleteRows: () => deleteCategoryRow(id),
+            });
             if (error) throw error;
             await reload();
           } catch (error) {

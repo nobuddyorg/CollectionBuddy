@@ -33,9 +33,11 @@ test.describe('the installable app', () => {
     const icons: { src: string; sizes: string; purpose?: string }[] =
       manifest.icons;
     expect(icons.length).toBeGreaterThan(0);
+    // A manifest's URLs resolve against the manifest, not the page that links it.
+    const manifestUrl = new URL(href!, page.url());
 
     for (const icon of icons) {
-      const url = new URL(icon.src, page.url()).toString();
+      const url = new URL(icon.src, manifestUrl).toString();
       const response = await request.get(url);
       expect(response.status(), `${icon.src} (${icon.sizes})`).toBe(200);
       expect(response.headers()['content-type']).toContain('image/png');
@@ -73,7 +75,7 @@ test.describe('the installable app', () => {
     expect(response.status()).toBe(200);
   });
 
-  // Manifest paths are written by hand: a static file cannot interpolate the base path.
+  // Relative in the file, so what matters is where they resolve at the deployed base path.
   test('scopes the manifest to where the app is actually served', async ({
     page,
   }) => {
@@ -85,8 +87,10 @@ test.describe('the installable app', () => {
       async (url) => (await fetch(url as string)).json(),
       href,
     );
-    const appRoot = new URL('./', new URL(href!, page.url())).pathname;
-    expect(manifest.scope).toBe(appRoot);
-    expect(manifest.start_url).toBe(appRoot);
+    const manifestUrl = new URL(href!, page.url());
+    // The page is `<app root>/login/`.
+    const appRoot = new URL('../', page.url()).pathname;
+    expect(new URL(manifest.scope, manifestUrl).pathname).toBe(appRoot);
+    expect(new URL(manifest.start_url, manifestUrl).pathname).toBe(appRoot);
   });
 });

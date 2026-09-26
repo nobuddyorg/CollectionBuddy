@@ -46,14 +46,9 @@ export function useCategoryRemoval({
     if (!restoreCategory) return;
     onSelect(nextAfterRemoving(sortedCategories, selectedCategoryId));
 
-    shares.deleteShare(myShareId, {
-      successMessage: t('category_select.leave_success'),
-      errorMessage: t('category_select.leave_error'),
-      onRestore: () => {
-        restoreCategory();
-        onSelect(selectedCategoryId);
-      },
-    });
+    if (await shares.leaveShare(myShareId)) return;
+    restoreCategory();
+    onSelect(selectedCategoryId);
   }, [
     selectedCategoryId,
     selected,

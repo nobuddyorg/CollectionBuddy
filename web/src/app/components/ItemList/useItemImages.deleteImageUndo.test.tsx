@@ -3,7 +3,11 @@ import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { deleteImageRow, listImagesForItems } from '../../data/images';
+import {
+  deleteImageRow,
+  listImagesForItems,
+  removeImageObjects,
+} from '../../data/images';
 import {
   acceptConfirmation,
   entry,
@@ -51,6 +55,7 @@ describe('useItemImages deleteImage undo', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Undo' }));
 
     expect(result.current.images['item-1']).toEqual([image]);
+    expect(removeImageObjects).not.toHaveBeenCalled();
     expect(deleteImageRow).not.toHaveBeenCalled();
   });
 

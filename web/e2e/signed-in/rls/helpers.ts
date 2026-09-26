@@ -95,3 +95,41 @@ export async function editorShare(token: string, categoryId: string) {
     role: 'editor',
   });
 }
+
+/** An entry the grantee creates and files into the owner's category, so its `user_id` is the grantee's. */
+export async function entryFiledBy(
+  grantee: { token: string; categoryId: string },
+  title: string,
+): Promise<string> {
+  const { data: item, error: itemError } = await apiAs(grantee.token)
+    .from('items')
+    .insert({ title })
+    .select('id')
+    .single();
+  if (itemError) throw itemError;
+
+  const { error: linkError } = await apiAs(grantee.token)
+    .from('item_categories')
+    .insert({ item_id: item!.id, category_id: grantee.categoryId });
+  if (linkError) throw linkError;
+  return item!.id;
+}
+
+/** Grants edit access again for as long as the grantee takes to remove its entry and photographs. */
+export async function removeFiledEntry(entry: {
+  token: string;
+  otherToken: string;
+  categoryId: string;
+  itemId: string;
+  paths: string[];
+}) {
+  const shareId = await editorShare(entry.token, entry.categoryId);
+  try {
+    const grantee = apiAs(entry.otherToken);
+    if (entry.paths.length)
+      await grantee.storage.from('item-images').remove(entry.paths);
+    await grantee.from('items').delete().eq('id', entry.itemId);
+  } finally {
+    await unshare(entry.token, shareId);
+  }
+}

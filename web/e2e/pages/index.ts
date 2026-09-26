@@ -1,6 +1,7 @@
 import { type Page } from '@playwright/test';
 
 import { initAccountMenu } from './account-menu';
+import { initAppError } from './app-error';
 import { initCatalogue } from './catalogue';
 import { initCategoryPanel } from './category-panel';
 import { initConfirm, initImageViewer, initToast } from './dialogs';
@@ -16,6 +17,9 @@ export function createPageTree(page: Page) {
   return {
     get account() {
       return initAccountMenu(page);
+    },
+    get appError() {
+      return initAppError(page);
     },
     get catalogue() {
       return initCatalogue(page);

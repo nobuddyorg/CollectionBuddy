@@ -88,6 +88,7 @@ export type Database = {
           path_full: string;
           path_thumb: string | null;
           size_bytes: number | null;
+          thumb_size_bytes: number;
           user_id: string;
         };
         Insert: {
@@ -97,6 +98,7 @@ export type Database = {
           path_full: string;
           path_thumb?: string | null;
           size_bytes?: number | null;
+          thumb_size_bytes?: number;
           user_id: string;
         };
         Update: {
@@ -106,6 +108,7 @@ export type Database = {
           path_full?: string;
           path_thumb?: string | null;
           size_bytes?: number | null;
+          thumb_size_bytes?: number;
           user_id?: string;
         };
         Relationships: [
@@ -205,6 +208,10 @@ export type Database = {
       granted_category_ids: { Args: never; Returns: string[] };
       has_category_read_access: { Args: { cat_id: string }; Returns: boolean };
       has_category_write_access: { Args: { cat_id: string }; Returns: boolean };
+      has_item_write_access: {
+        Args: { item_owner_id: string; target_item_id: string };
+        Returns: boolean;
+      };
       join_tags: { Args: { tags: string[] }; Returns: string };
       keepalive: { Args: never; Returns: undefined };
       list_category_places: {
@@ -218,6 +225,17 @@ export type Database = {
         }[];
       };
       normalize_text: { Args: { txt: string }; Returns: string };
+      orphan_sweep_plan: {
+        Args: { max_objects: number };
+        Returns: {
+          deletion_ceiling: number;
+          object_count: number;
+          orphan_count: number;
+          paths: Json;
+          total_bytes: number;
+        }[];
+      };
+      photo_upload_has_room: { Args: never; Returns: boolean };
       search_category_items: {
         Args: {
           cat_id: string;

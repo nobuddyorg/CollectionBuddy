@@ -25,9 +25,9 @@ function status() {
   }
 }
 
-const { API_URL, ANON_KEY } = status();
-if (!API_URL || !ANON_KEY) {
-  console.error('The local stack reported no API URL or anon key.');
+const { API_URL, PUBLISHABLE_KEY } = status();
+if (!API_URL || !PUBLISHABLE_KEY) {
+  console.error('The local stack reported no API URL or publishable key.');
   process.exit(1);
 }
 
@@ -41,7 +41,7 @@ const run = ({ command, args, environment }) =>
 const baseEnvironment = {
   ...process.env,
   NEXT_PUBLIC_SUPABASE_URL: API_URL,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: ANON_KEY,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: PUBLISHABLE_KEY,
   // chrome-launcher reads CHROME_PATH; the e2e suite's Chromium spares a second browser download.
   CHROME_PATH: process.env.CHROME_PATH ?? chromium.executablePath(),
 };

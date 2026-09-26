@@ -13,6 +13,8 @@ export function useSignOut() {
 
   return useCallback(async () => {
     try {
+      // A delete still inside its undo window would otherwise run later as anon, and fail.
+      await toast.commitPending();
       // Global sign-out revokes the refresh token server-side; on failure a local clear still ends it here.
       const { error } = await supabase.auth.signOut();
       if (error) {

@@ -54,7 +54,7 @@ function UndoableSuccessTrigger({
   onUndo,
 }: {
   message: string;
-  onExpire: () => void;
+  onExpire: () => void | Promise<void>;
   onUndo: () => void;
 }) {
   const toast = useToast();
@@ -89,6 +89,45 @@ function ReportErrorTrigger({
       {message}
     </button>
   );
+}
+
+function CommitTrigger({ onCommitted }: { onCommitted: () => void }) {
+  const toast = useToast();
+  return (
+    <button
+      type="button"
+      onClick={() => void toast.commitPending().then(onCommitted)}
+    >
+      Commit
+    </button>
+  );
+}
+
+function renderUndoable(handlers: {
+  onExpire: () => void | Promise<void>;
+  onUndo?: () => void;
+  onCommitted?: () => void;
+}) {
+  render(
+    <I18nProvider>
+      <ToastProvider>
+        <UndoableSuccessTrigger
+          message="Entry deleted."
+          onExpire={handlers.onExpire}
+          onUndo={handlers.onUndo ?? vi.fn()}
+        />
+        <SuccessTrigger message="Entry added." />
+        <CommitTrigger onCommitted={handlers.onCommitted ?? vi.fn()} />
+      </ToastProvider>
+    </I18nProvider>,
+  );
+}
+
+/** Dispatches a cancelable beforeunload and reports whether anything asked the browser to hold it. */
+function leavingIsHeld() {
+  const event = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(event);
+  return event.defaultPrevented;
 }
 
 function renderProvider(messages: string[]) {
@@ -297,5 +336,66 @@ describe('ToastProvider', () => {
     expect(onUndo).toHaveBeenCalledTimes(1);
     expect(onExpire).not.toHaveBeenCalled();
     expect(status).not.toBeInTheDocument();
+  });
+
+  // Sign-out calls this so a delete inside its undo window is sent while there is still a session.
+  it('commitPending runs a pending onExpire once and resolves only after it has finished', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let finish = () => {};
+    const onExpire = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const onCommitted = vi.fn();
+    renderUndoable({ onExpire, onCommitted });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Entry deleted.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
+
+    expect(onExpire).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(onCommitted).not.toHaveBeenCalled();
+
+    await act(async () => {
+      finish();
+      await vi.advanceTimersByTimeAsync(6000);
+    });
+    expect(onCommitted).toHaveBeenCalledTimes(1);
+    expect(onExpire).toHaveBeenCalledTimes(1);
+  });
+
+  it('commitPending leaves an undone delete alone', async () => {
+    const onExpire = vi.fn();
+    const onCommitted = vi.fn();
+    renderUndoable({ onExpire, onCommitted });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Entry deleted.' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Commit' }));
+
+    expect(onCommitted).toHaveBeenCalledTimes(1);
+    expect(onExpire).not.toHaveBeenCalled();
+  });
+
+  it('asks before the tab goes only while a delete is waiting out its undo window', async () => {
+    renderUndoable({ onExpire: vi.fn() });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Entry added.' }));
+    expect(leavingIsHeld()).toBe(false);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Entry deleted.' }),
+    );
+    expect(leavingIsHeld()).toBe(true);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(leavingIsHeld()).toBe(false);
   });
 });

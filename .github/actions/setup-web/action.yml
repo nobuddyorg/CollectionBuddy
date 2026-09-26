@@ -1,5 +1,5 @@
 name: Set up the web toolchain
-description: Node.js with an npm cache keyed on web/package-lock.json, then `npm ci` in web/; the Node version is pinned here once.
+description: Node.js with an npm cache keyed on web/package-lock.json, then `npm ci --ignore-scripts` in web/; the Node version is pinned here once.
 
 runs:
   using: composite
@@ -13,4 +13,5 @@ runs:
     - name: Install dependencies
       shell: bash
       working-directory: web
-      run: npm ci
+      # No lifecycle scripts, so a bumped package cannot rewrite node_modules before the deploy build (design-decisions.md, Dependabot auto-merge).
+      run: npm ci --ignore-scripts

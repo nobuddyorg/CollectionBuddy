@@ -43,8 +43,19 @@ can be granted access, and it is read-only until you say otherwise.
   you, as does taking edit access away again.
 - **Expiry**: access ends at the end of the chosen day. Blank means no expiry.
 - **Revoke**: trash icon beside the email in the shared-with list, confirm.
+  Access ends at once. **Undo** in the confirmation shares it again with the
+  same role and expiry.
+- **Entries an editor added** stay theirs: you do not see them in your copy
+  of the category, while everyone it is shared with does. Once you revoke the
+  editor or take edit access away, they can no longer change or delete those
+  entries or their photos. Deleting the category removes them; so can the
+  editor, if you let them edit again.
+- **Photos an editor adds to your entries** are yours: you see them, they
+  count towards your storage, and once you revoke the editor they can no
+  longer remove or replace them.
 - **Leave a category shared with you**: the delete control on a shared category
-  leaves it instead. The owner's copy is untouched.
+  leaves it instead, at once and with no undo: only the owner can share it with
+  you again. The owner's copy is untouched.
 
 ## Import and export a category
 
@@ -53,7 +64,8 @@ can be granted access, and it is read-only until you say otherwise.
   progress and **Cancel** stops it.
 - **Import**: click **Import**, pick a `.zip` exported from CollectionBuddy. It
   becomes a new category. A taken name gets a suffix (`Coins (2)`) rather than
-  overwriting or failing.
+  overwriting or failing. Each item keeps its photos in their order, so its
+  cover photo stays the same.
 
 ## Items
 
@@ -62,6 +74,12 @@ can be granted access, and it is read-only until you say otherwise.
   pencil icon.
 - **Delete**: trash icon on the action row, confirm. Photos are deleted first,
   then the item.
+
+Deleting an item, a photo or a category can be taken back: **Undo** in the
+confirmation that appears. The delete is sent when that confirmation closes,
+after a few seconds or with its close button. Signing out sends it first;
+reloading or closing the tab before then asks, because leaving would cancel
+the delete and keep the item.
 
 | Field | Notes |
 | --- | --- |
@@ -76,8 +94,8 @@ deduplicated and sorted.
 ## Photos
 
 - **Upload**: action row → upload icon → any image your browser can read. It
-  is compressed to WebP with a thumbnail before upload, so there is no size to
-  worry about.
+  is compressed to WebP (JPEG in Safari and on iOS) with a thumbnail before
+  upload, so there is no size to worry about.
 - **View full size**: click a thumbnail. Escape or the backdrop closes it.
 - **Delete**: from the full-size view or the per-photo control, confirm.
 

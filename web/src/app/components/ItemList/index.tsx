@@ -92,7 +92,7 @@ export default function ItemList({
     uploadImage,
     deleteImage,
     captureItemImagePaths,
-    removeImageBytes,
+    forgetItemImages,
     pendingUploads,
   } = useItemImages();
 
@@ -112,7 +112,7 @@ export default function ItemList({
     setItems,
     reload,
     captureItemImagePaths,
-    removeImageBytes,
+    forgetItemImages,
   });
 
   const [editOpen, setEditOpen] = useState(false);

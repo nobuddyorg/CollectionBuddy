@@ -231,21 +231,22 @@ select pg_temp.plan_uses_index(
   'preferred: deleting a category cascades to its links through idx_item_categories_cat_created'
 );
 
--- tg_images_quota()'s per-owner sum reads size_bytes from the index alone, never the owner's heap rows (#718).
+-- tg_images_quota()'s per-owner sum reads both sizes from the index alone, never the owner's heap rows (#718, 0025).
+-- 50 rows with nothing stored count 250 MiB, inside the owner's 256 MiB.
 select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
 insert into public.images (item_id, path_full)
 select i.id, :'owner_id'::text || '/' || i.id::text || '/plan.webp'
 from public.items i
 where i.title like 'Plan filler %'
-limit 100;
+limit 50;
 reset role;
 analyze public.images;
 set local enable_seqscan = off;
 set local enable_bitmapscan = off;
 select pg_temp.plan_uses_index_only(
-  format('select coalesce(sum(im.size_bytes), 0) from public.images im where im.user_id = %L::uuid', :'owner_id'),
-  'idx_images_user_size',
-  'reachable: the photo quota sum is an index-only scan on idx_images_user_size'
+  format('select coalesce(sum(im.size_bytes + im.thumb_size_bytes), 0) from public.images im where im.user_id = %L::uuid', :'owner_id'),
+  'idx_images_user_sizes',
+  'reachable: the photo quota sum is an index-only scan on idx_images_user_sizes'
 );
 
 -- The map's query for a small category beside a large one, planned for the category it names as 0018 makes every call.

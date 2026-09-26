@@ -57,14 +57,12 @@ select is(
   'only the own-prefix policy authorizes an insert -- there is no shared-write path'
 );
 
--- The read and delete policies that do remain, and are what let the owner
--- (or a second editor) reach an object that legitimately landed under a
--- different editor's prefix.
+-- Beside the own-prefix pair, what reaches an object under another uploader's prefix: grants, and the entry owner's own records (0023, #741).
 select is(
   (select array_agg(policyname::text order by policyname)
    from pg_catalog.pg_policies
    where schemaname = 'storage' and tablename = 'objects' and cmd in ('SELECT', 'DELETE')),
-  array['delete own objects', 'delete shared objects', 'read own signed objects', 'read shared objects'],
+  array['delete own objects', 'delete shared objects', 'read objects own photograph records name', 'read own signed objects', 'read shared objects'],
   'the own-prefix and shared read/delete policies are all present'
 );
 
@@ -91,6 +89,27 @@ select is(
                         'update shared objects', 'write shared objects')),
   null,
   'none of the superseded storage policies has come back'
+);
+
+-- An own-prefix write needs an entry the caller may write, not merely no entry it can see (0021 #739, 0023 #741).
+select is(
+  (select array_agg(policyname::text order by policyname)
+   from pg_catalog.pg_policies
+   where schemaname = 'storage' and tablename = 'objects'
+     and policyname in ('upload own objects', 'delete own objects')
+     and coalesce(qual, with_check) like '%has_item_write_access(%'),
+  array['delete own objects', 'upload own objects'],
+  'the own-prefix upload and delete policies both require write access to the entry'
+);
+
+-- A recorded path's bytes were sampled for the quota, and the bucket has a ceiling of its own (0025, #753).
+select ok(
+  (select with_check like '%im.path_full = objects.name%'
+      and with_check like '%im.path_thumb = objects.name%'
+      and with_check like '%photo_upload_has_room()%'
+   from pg_catalog.pg_policies
+   where schemaname = 'storage' and tablename = 'objects' and policyname = 'upload own objects'),
+  'the own-prefix upload refuses a path a photograph record names, and a bucket or prefix past its backstop'
 );
 
 -- Splinter's auth_rls_initplan skips the storage schema, so this is its check here: auth.uid() only ever inside a scalar subquery (0012, #719).

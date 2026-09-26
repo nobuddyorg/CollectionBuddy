@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import type { TranslationKey } from '../../i18n/I18nProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
+import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
 import {
   ExportCancelledError,
   exportCategory,
@@ -113,14 +114,7 @@ export function useExportCategory() {
   };
 
   // An export can run for minutes; closing the tab mid-run would silently discard it.
-  useEffect(() => {
-    if (!progress) return;
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [progress]);
+  useBeforeUnloadGuard(progress !== null);
 
   return {
     progress,

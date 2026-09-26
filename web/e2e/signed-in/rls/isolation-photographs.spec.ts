@@ -25,10 +25,15 @@ test.describe('one collection cannot reach another', () => {
     expect(error).not.toBeNull();
   });
 
-  // No item row exists for this object, so no shared policy can match: only the owner-only ones apply.
+  // An entry in no category, so no grant reaches it and no shared policy can match: only the owner-only ones apply.
   test('only the owner lists, signs and removes an object under their prefix', async () => {
     const { token, userId, otherToken } = context();
-    const folder = `${userId}/${crypto.randomUUID()}`;
+    const { data: item } = await apiAs(token)
+      .from('items')
+      .insert({ title: 'rls-owner-only-probe' })
+      .select('id')
+      .single();
+    const folder = `${userId}/${item!.id}`;
     const path = `${folder}/rls-owner-only-probe.webp`;
     const owner = apiAs(token).storage.from('item-images');
     const other = apiAs(otherToken).storage.from('item-images');
@@ -63,6 +68,33 @@ test.describe('one collection cannot reach another', () => {
       expect(ownRemoved?.map((object) => object.name)).toEqual([path]);
     } finally {
       await owner.remove([path]);
+      await apiAs(token).from('items').delete().eq('id', item!.id);
+    }
+  });
+
+  // An object needs an entry its uploader may write (0023): a known entry id of someone else's is not one.
+  test('nothing can be uploaded under their entry, not even to your own prefix', async () => {
+    const { token, userId, otherToken } = context();
+    const { data: theirItem } = await apiAs(otherToken)
+      .from('items')
+      .select('id')
+      .eq('title', SEED.other.item)
+      .single();
+    const planted = `${userId}/${theirItem!.id}/rls-planted-probe.webp`;
+    const storage = apiAs(token).storage.from('item-images');
+
+    try {
+      const { error } = await storage.upload(
+        planted,
+        new Blob(['x'], { type: 'image/webp' }),
+      );
+      expect(error).not.toBeNull();
+
+      // Own prefix, so listable: empty is the refused upload, not a hidden object.
+      const { data } = await storage.list(`${userId}/${theirItem!.id}`);
+      expect(data ?? []).toEqual([]);
+    } finally {
+      await storage.remove([planted]);
     }
   });
 
@@ -241,8 +273,13 @@ test.describe('one collection cannot reach another', () => {
   // Signing a path known to exist proves the policy refuses it; list() returning [] would not.
   test('a known photograph of theirs cannot be signed', async () => {
     const { token, otherToken, otherUserId } = context();
+    const { data: theirItem } = await apiAs(otherToken)
+      .from('items')
+      .select('id')
+      .eq('title', SEED.other.item)
+      .single();
 
-    const path = `${otherUserId}/rls-signed-url-probe.webp`;
+    const path = `${otherUserId}/${theirItem!.id}/rls-signed-url-probe.webp`;
     // Typed Blob: the bucket restricts allowed_mime_types, and an untyped one would be refused on that alone.
     const { error: uploadError } = await apiAs(otherToken)
       .storage.from('item-images')

@@ -94,7 +94,8 @@
     "share_revoke": "Entziehen",
     "share_revoke_confirm": "Freigabe für {email} aufheben? Diese Person kann die Sammlung danach nicht mehr sehen.",
     "share_revoke_success": "Freigabe aufgehoben.",
-    "share_revoke_error": "Freigabe konnte nicht aufgehoben werden. Bitte erneut versuchen."
+    "share_revoke_error": "Freigabe konnte nicht aufgehoben werden. Bitte erneut versuchen.",
+    "share_reinstate_error": "Freigabe konnte nicht wiederhergestellt werden. Bitte erneut teilen."
   },
   "item_create": {
     "new_entry": "Neuer Eintrag",
@@ -153,10 +154,10 @@
     "delete_error": "Eintrag konnte nicht gelöscht werden. Bitte erneut versuchen.",
     "entry_deleted": "Eintrag gelöscht.",
     "upload_error": "Bild konnte nicht hochgeladen werden. Bitte erneut versuchen.",
-    "photo_quota_error": "Das Limit von 1 GiB an Fotos ist erreicht. Lösche welche, um weitere hinzuzufügen.",
+    "photo_quota_error": "Das Limit von 256 MiB an Fotos ist erreicht. Lösche welche, um weitere hinzuzufügen.",
+    "photo_storage_full_error": "Der Fotospeicher der App ist voll, deshalb kann vorerst kein Foto hinzugefügt werden.",
     "delete_image_error": "Bild konnte nicht gelöscht werden. Bitte erneut versuchen.",
     "delete_image_success": "Bild gelöscht.",
-    "delete_image_cleanup_error": "Das Foto wurde gelöscht, aber die Datei konnte nicht vollständig entfernt werden und belegt möglicherweise weiterhin Speicherplatz.",
     "no_results_title": "Keine Treffer für \"{q}\"",
     "no_results_hint": "Versuche einen anderen Suchbegriff.",
     "no_items_title": "Noch keine Einträge",
@@ -190,5 +191,10 @@
     "confirm": "Bestätigen",
     "cancel": "Abbrechen",
     "undo": "Rückgängig machen"
+  },
+  "app_error": {
+    "title": "Das hat nicht geklappt",
+    "body": "Diese Seite konnte nicht angezeigt werden. Neu laden holt die aktuelle Version der App.",
+    "reload": "Neu laden"
   }
 }

@@ -28,7 +28,7 @@ repos:
             web/package-lock\.json
           )$
 
-  # Staged changes on commit; rules and the anon-key allowlist in .gitleaks.toml.
+  # Staged changes on commit; CI's prek job scans the history instead. Rules and the anon-key allowlist in .gitleaks.toml.
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:

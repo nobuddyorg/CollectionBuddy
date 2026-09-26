@@ -1,0 +1,81 @@
+name: Back up the database off-site
+description: "Dumps roles, schema and data with the Supabase CLI (the caller runs setup-supabase-cli first), encrypts the archive to the age recipient on the runner, and uploads it under `database/` in the backup bucket. Missing configuration fails the step."
+
+inputs:
+  label:
+    description: Appended to the archive's name, e.g. `daily` or `pre-migration`.
+    required: true
+  db-url:
+    description: The session pooler connection string (SUPABASE_DB_URL).
+    required: true
+  s3-endpoint:
+    description: BACKUP_S3_ENDPOINT.
+    required: true
+  s3-region:
+    description: BACKUP_S3_REGION.
+    required: true
+  s3-bucket:
+    description: BACKUP_S3_BUCKET.
+    required: true
+  s3-access-key-id:
+    description: BACKUP_S3_ACCESS_KEY_ID.
+    required: true
+  s3-secret-access-key:
+    description: BACKUP_S3_SECRET_ACCESS_KEY.
+    required: true
+  age-recipient:
+    description: BACKUP_AGE_RECIPIENT, the public half of the key that decrypts the archive.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install age
+      shell: bash
+      run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+
+    - name: Dump, encrypt and upload
+      shell: bash
+      env:
+        LABEL: ${{ inputs.label }}
+        SUPABASE_DB_URL: ${{ inputs.db-url }}
+        BACKUP_S3_ENDPOINT: ${{ inputs.s3-endpoint }}
+        BACKUP_S3_REGION: ${{ inputs.s3-region }}
+        BACKUP_S3_BUCKET: ${{ inputs.s3-bucket }}
+        BACKUP_S3_ACCESS_KEY_ID: ${{ inputs.s3-access-key-id }}
+        BACKUP_S3_SECRET_ACCESS_KEY: ${{ inputs.s3-secret-access-key }}
+        BACKUP_AGE_RECIPIENT: ${{ inputs.age-recipient }}
+        # Newer AWS CLIs send checksum headers that several S3-compatible stores reject.
+        AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+        AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      run: |
+        set -euo pipefail
+
+        missing=0
+        for name in SUPABASE_DB_URL BACKUP_S3_ENDPOINT BACKUP_S3_REGION BACKUP_S3_BUCKET BACKUP_S3_ACCESS_KEY_ID BACKUP_S3_SECRET_ACCESS_KEY BACKUP_AGE_RECIPIENT; do
+          if [ -z "${!name}" ]; then
+            echo "::error::$name is not set in the production environment (docs/reference/configuration.md#backups)."
+            missing=1
+          fi
+        done
+        [ "$missing" = 0 ] || exit 1
+
+        export AWS_ENDPOINT_URL="$BACKUP_S3_ENDPOINT" AWS_REGION="$BACKUP_S3_REGION"
+        export AWS_ACCESS_KEY_ID="$BACKUP_S3_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$BACKUP_S3_SECRET_ACCESS_KEY"
+
+        dump=$(mktemp -d)
+        supabase db dump --db-url "$SUPABASE_DB_URL" --role-only -f "$dump/roles.sql"
+        supabase db dump --db-url "$SUPABASE_DB_URL" -f "$dump/schema.sql"
+        # No storage data: 0007 recreates the bucket, a photograph's re-upload its row, and `postgres` may not write Storage's other tables.
+        supabase db dump --db-url "$SUPABASE_DB_URL" --data-only --use-copy --schema auth,public -f "$dump/data.sql"
+        echo "$GITHUB_SHA" > "$dump/commit.txt"
+        # A pre-migration commit.txt already holds the pending migrations; this names the last one production has.
+        supabase migration list --db-url "$SUPABASE_DB_URL" --output-format json \
+          | jq -er '[.migrations[].remote | select(. != "")] | last' > "$dump/migration.txt"
+
+        archive="$(date -u +%Y-%m-%dT%H%M%SZ)-$LABEL.tar.gz.age"
+        tar -czf - -C "$dump" roles.sql schema.sql data.sql commit.txt migration.txt \
+          | age -r "$BACKUP_AGE_RECIPIENT" -o "$RUNNER_TEMP/$archive"
+        aws s3 cp --only-show-errors "$RUNNER_TEMP/$archive" "s3://$BACKUP_S3_BUCKET/database/$archive"
+
+        echo "Uploaded database/$archive ($(stat -c %s "$RUNNER_TEMP/$archive") bytes, encrypted)." | tee -a "$GITHUB_STEP_SUMMARY"

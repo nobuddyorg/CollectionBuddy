@@ -32,7 +32,7 @@ select is(
   'every function in schema public pins search_path to the empty string'
 );
 
--- Every security-definer function, in full: fourteen trigger functions plus search_category_items, a deliberate boundary. A sixteenth must be added here on purpose.
+-- Every security-definer function, in full: fourteen trigger functions, search_category_items and photo_upload_has_room, deliberate boundaries. A seventeenth must be added here on purpose.
 select is(
   (select array_agg(p.proname::text order by p.proname)
    from pg_catalog.pg_proc p
@@ -44,14 +44,14 @@ select is(
        where d.objid = p.oid and d.deptype = 'e'
      )),
   array[
-    'delete_item_if_orphan', 'enforce_user_id', 'search_category_items',
+    'delete_item_if_orphan', 'enforce_user_id', 'photo_upload_has_room', 'search_category_items',
     'tg_categories_normalize', 'tg_categories_quota', 'tg_category_shares_enforce',
     'tg_category_shares_quota', 'tg_images_enforce',
     'tg_images_quota', 'tg_images_size_from_storage',
     'tg_item_categories_enforce', 'tg_item_categories_quota',
     'tg_items_normalize', 'tg_items_quota', 'tg_set_updated_at'
   ],
-  'exactly fifteen functions run as their owner, and search_category_items is the only non-trigger one'
+  'exactly sixteen functions run as their owner, and search_category_items and photo_upload_has_room are the only non-trigger ones'
 );
 
 -- A `security definer` function runs as whoever owns it, so the owner is
@@ -71,7 +71,7 @@ select is(
   'every security definer function is owned by postgres, not by a lesser role'
 );
 
--- A trigger fires without EXECUTE, so the API roles hold it on one definer only: the deliberate RPC (0010, Splinter 0028/0029).
+-- A trigger fires without EXECUTE, so the API roles hold it on two definers only: the search RPC and the upload policy's bucket count (0010, 0025, Splinter 0028/0029).
 select is(
   (select array_agg(p.proname::text || ' to ' || r.rolname order by p.proname, r.rolname)
    from pg_catalog.pg_proc p
@@ -80,8 +80,8 @@ select is(
    where n.nspname = 'public'
      and p.prosecdef
      and has_function_privilege(r.rolname, p.oid, 'EXECUTE')),
-  array['search_category_items to authenticated'],
-  'the API roles can execute exactly one security definer function: search_category_items, signed in'
+  array['photo_upload_has_room to authenticated', 'search_category_items to authenticated'],
+  'the API roles can execute exactly two security definer functions, both signed in only'
 );
 
 -- Two must stay `security invoker`. list_category_places checks nothing itself; as a definer it would be an unsound second boundary.
@@ -106,6 +106,10 @@ select ok(
 select ok(
   not (select prosecdef from pg_catalog.pg_proc where oid = 'public.granted_category_ids()'::regprocedure),
   'granted_category_ids runs as its caller'
+);
+select ok(
+  not (select prosecdef from pg_catalog.pg_proc where oid = 'public.has_item_write_access(uuid, uuid)'::regprocedure),
+  'has_item_write_access runs as its caller'
 );
 
 -- 001_grants_test.sql leaves the trigger functions out of anon's reachable

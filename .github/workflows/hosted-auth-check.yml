@@ -1,0 +1,69 @@
+name: Check hosted Auth settings
+# Sharing authorizes on the JWT email; these dashboard settings are what make it trustworthy (docs/explanation/design-decisions.md).
+on:
+  schedule:
+    - cron: "23 * * * *"
+  push:
+    branches: [main]
+    paths:
+      - supabase/hosted-auth.json
+      - .github/workflows/hosted-auth-check.yml
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  # Main only: the Management token lives in the main-only `production` environment.
+  check:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compare the hosted Auth config with supabase/hosted-auth.json
+        run: |
+          set -euo pipefail
+          api="https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth"
+
+          if [ "$AUTH_CONFIG_TOKEN_SET" != true ]; then
+            echo "::warning::SUPABASE_AUTH_CONFIG_TOKEN is not set, so this hourly job borrows SUPABASE_ACCESS_TOKEN, which can reveal the secret key: docs/reference/configuration.md#management-api-tokens."
+          fi
+
+          # The response holds the Google client secret and every hook secret: compared below, never printed.
+          if ! config=$(curl -sS --fail-with-body "$api" -H "Authorization: Bearer $AUTH_CONFIG_TOKEN"); then
+            echo "::error::Could not read the Auth config: $config"
+            exit 1
+          fi
+          # A third-party auth integration makes PostgREST accept another issuer's JWTs, and their email claim.
+          integrations=$(curl -sS --fail-with-body "$api/third-party-auth" -H "Authorization: Bearer $AUTH_CONFIG_TOKEN" | jq length)
+
+          # A pinned field the API no longer returns reads as null, so a renamed field fails too; any sign-in provider not pinned must be off.
+          drift=$(jq -r --slurpfile expected supabase/hosted-auth.json --argjson integrations "$integrations" '
+            . as $actual
+            | ($expected[0] | to_entries[] | select($actual[.key] != .value)
+                | "- \(.key): expected \(.value | tojson), found \($actual[.key] | tojson)"),
+              ($actual | to_entries[]
+                | select(.value == true and (.key | test("^external_.+_enabled$")) and (.key as $key | $expected[0] | has($key) | not))
+                | "- \(.key): expected false, found true"),
+              (select($integrations > 0) | "- third-party auth: expected no integration, found \($integrations)")
+          ' <<<"$config")
+
+          if [ -n "$drift" ]; then
+            {
+              echo "The hosted Auth settings drifted from supabase/hosted-auth.json:"
+              echo "$drift"
+              echo "Fix the dashboard, or change the file in a reviewed PR: docs/how-to/developer-guide.md#check-the-hosted-auth-settings."
+            } | tee -a "$GITHUB_STEP_SUMMARY" >&2
+            exit 1
+          fi
+          echo "The hosted Auth settings match supabase/hosted-auth.json." | tee -a "$GITHUB_STEP_SUMMARY"
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          # Auth Config: Read only; the fallback keeps the check running until the owner adds that token.
+          AUTH_CONFIG_TOKEN: ${{ secrets.SUPABASE_AUTH_CONFIG_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
+          AUTH_CONFIG_TOKEN_SET: ${{ secrets.SUPABASE_AUTH_CONFIG_TOKEN != '' }}

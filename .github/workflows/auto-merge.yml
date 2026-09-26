@@ -22,12 +22,36 @@ jobs:
               with:
                   github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-            # `direct:development` only: a devDependency reaches the CI runner, a runtime one reaches every user's browser (TEST_STRATEGY.md §13).
-            # `--auto` waits for every *required* check, so branch protection must require e2e_local_stack and prek, not only build_and_test.
-            - name: Merge devDependency patch-level updates only
+            - name: Check out the merge result
               if: |
                   steps.metadata.outputs.update-type == 'version-update:semver-patch' &&
                   steps.metadata.outputs.dependency-type == 'direct:development'
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+                  fetch-depth: 2
+
+            # The deploy build installs without scripts and runs no code of a `dev: true` lockfile entry, so a bump that changes only those never reaches users (design-decisions.md).
+            - name: Check the bump changes only dev-only lockfile entries
+              id: lockfile
+              if: |
+                  steps.metadata.outputs.update-type == 'version-update:semver-patch' &&
+                  steps.metadata.outputs.dependency-type == 'direct:development'
+              run: |
+                  set -euo pipefail
+                  reaching=$(git show HEAD^1:web/package-lock.json | jq -r --slurpfile head web/package-lock.json '
+                    .packages as $base | $head[0].packages | to_entries[]
+                    | select(.key != "" and .value != $base[.key] and .value.dev != true) | .key')
+                  if [ -n "$reaching" ]; then
+                    echo "::notice::Left for review: the deploy build installs $(tr '\n' ' ' <<<"$reaching")"
+                    echo "dev-only=false" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "dev-only=true" >> "$GITHUB_OUTPUT"
+                  fi
+
+            # `--auto` waits for every *required* check, so branch protection must require e2e_local_stack and prek, not only build_and_test.
+            - name: Merge devDependency patch-level updates only
+              if: steps.lockfile.outputs.dev-only == 'true'
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |

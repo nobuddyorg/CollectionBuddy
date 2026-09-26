@@ -79,6 +79,8 @@ select function_privs_are('public', 'has_category_write_access', array['uuid'],
   'anon', array[]::text[], 'anon cannot execute has_category_write_access');
 select function_privs_are('public', 'has_category_read_access', array['uuid'],
   'anon', array[]::text[], 'anon cannot execute has_category_read_access');
+select function_privs_are('public', 'has_item_write_access', array['uuid', 'uuid'],
+  'anon', array[]::text[], 'anon cannot execute has_item_write_access');
 select function_privs_are('public', 'caller_email', array[]::text[],
   'anon', array[]::text[], 'anon cannot execute caller_email');
 select function_privs_are('public', 'granted_category_ids', array[]::text[],
@@ -94,6 +96,8 @@ select function_privs_are('public', 'join_tags', array['text[]'],
   'anon', array[]::text[], 'anon cannot execute join_tags');
 select function_privs_are('public', 'storage_item_id', array['text'],
   'anon', array[]::text[], 'anon cannot execute storage_item_id');
+select function_privs_are('public', 'photo_upload_has_room', array[]::text[],
+  'anon', array[]::text[], 'anon cannot execute photo_upload_has_room');
 
 -- ...and the same set from the other side: the application's own role can
 -- reach every function it actually calls. An EXECUTE quietly lost here is
@@ -103,11 +107,13 @@ select function_privs_are('public', f.name, f.args, 'authenticated', array['EXEC
 from (values
   ('has_category_write_access', array['uuid']),
   ('has_category_read_access', array['uuid']),
+  ('has_item_write_access', array['uuid', 'uuid']),
   ('caller_email', array[]::text[]),
   ('granted_category_ids', array[]::text[]),
   ('list_category_places', array['uuid', 'text']),
   ('search_category_items', array['uuid', 'text', 'int', 'int']),
   ('storage_item_id', array['text']),
+  ('photo_upload_has_room', array[]::text[]),
   ('normalize_text', array['text']),
   ('join_tags', array['text[]']),
   ('keepalive', array[]::text[])

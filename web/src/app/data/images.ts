@@ -46,13 +46,18 @@ export type ExportImageRow = Pick<
   'item_id' | 'path_full' | 'size_bytes'
 >;
 
-// user_id is never sent: tg_images_enforce derives it from the item's owner and rejects the rest.
-export function createImageRow(row: {
+type NewImageRow = {
   item_id: string;
   path_full: string;
   path_thumb: string | null;
   size_bytes: number;
-}) {
+};
+
+/** An import stamps `created_at` in archive order; an upload leaves it to the column default. */
+type ImportedImageRow = NewImageRow & { created_at: string };
+
+// user_id is never sent: tg_images_enforce derives it from the item's owner and rejects the rest.
+export function createImageRow(row: NewImageRow | ImportedImageRow) {
   return supabase
     .from('images')
     .insert(row as Database['public']['Tables']['images']['Insert'])
@@ -60,14 +65,14 @@ export function createImageRow(row: {
     .single<ImageListRow>();
 }
 
-// The row itself is removed, not a cascade's side effect, so delete-and-capture in one call is safe.
+// `.single()` makes a delete that matched no row, hidden by RLS or already gone, an error.
 export function deleteImageRow(id: string) {
   return supabase
     .from('images')
     .delete()
     .eq('id', id)
-    .select('path_full, path_thumb')
-    .single<Pick<ImageRow, 'path_full' | 'path_thumb'>>();
+    .select('id')
+    .single<Pick<ImageRow, 'id'>>();
 }
 
 // PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.

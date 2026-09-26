@@ -1,10 +1,10 @@
-import { act, renderHook, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, renderHook } from '@testing-library/react';
 import { vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
 import { listSharesForCategory } from '../../data/shares';
+import type { CategoryShareSummary } from '../../data/shares';
 import { useShares } from './useShares';
 
 export function wrapper({ children }: { children: React.ReactNode }) {
@@ -15,15 +15,15 @@ export function wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-export const grant = {
+export const grant: CategoryShareSummary = {
   id: 'share-1',
   invited_email: 'grantee@example.com',
   expires_at: null,
   owner_user_id: 'owner-1',
-  role: 'viewer' as const,
+  role: 'viewer',
 };
 
-export function listSharesReturns(grants: (typeof grant)[]) {
+export function listSharesReturns(grants: CategoryShareSummary[]) {
   vi.mocked(listSharesForCategory).mockResolvedValue({
     data: grants,
     error: null,
@@ -36,10 +36,4 @@ export async function renderLoadedShares() {
     await hook.result.current.reload();
   });
   return hook;
-}
-
-// The row disappears at once; the deferred deleteShareRow is committed by closing the toast.
-export async function commitDeferredDelete() {
-  await screen.findByRole('status');
-  await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 }

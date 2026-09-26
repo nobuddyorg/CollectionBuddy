@@ -3,6 +3,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 interface CategoryPanel {
   (): Locator;
   do: {
+    cancelImport(): Promise<void>;
     create(name: string): Promise<void>;
     delete(): Promise<void>;
     exportCollection(): Promise<void>;
@@ -14,6 +15,7 @@ interface CategoryPanel {
   locators: {
     buttons: {
       add: Locator;
+      cancelImport: Locator;
       delete: Locator;
       expand: Locator;
       export: Locator;
@@ -42,6 +44,7 @@ export function initCategoryPanel(page: Page): CategoryPanel {
   const locators = {
     buttons: {
       add: root.getByTestId('add-category'),
+      cancelImport: root.getByTestId('cancel-import'),
       delete: root.getByTestId('delete-category'),
       expand: root.getByTestId('expand-categories'),
       export: root.getByTestId('export-category'),
@@ -75,6 +78,9 @@ export function initCategoryPanel(page: Page): CategoryPanel {
   };
 
   const interactions = {
+    cancelImport: async () => {
+      await locators.buttons.cancelImport.click();
+    },
     create: async (name: string) => {
       await openPanel();
       await locators.inputs.newName.fill(name);

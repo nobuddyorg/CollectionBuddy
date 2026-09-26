@@ -24,7 +24,8 @@ vi.mock('./useShares', () => ({
     isUpdatingRole: false,
     reload: vi.fn().mockResolvedValue([]),
     createShare: vi.fn(),
-    deleteShare: vi.fn(),
+    revokeShare: vi.fn(),
+    leaveShare: vi.fn(),
     updateShareRole: vi.fn(),
   }),
 }));

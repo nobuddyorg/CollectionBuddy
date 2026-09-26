@@ -154,6 +154,32 @@ returning user_id as after_update_owner \gset
 select is(:'after_update_owner'::uuid, :'owner_id'::uuid,
   'an item cannot be handed to another owner by rewriting user_id');
 
+-- Destructive paths each have their own delete policy; a successful unlink would also sweep the orphaned item.
+select pg_temp.auth_as(:'stranger_id'::uuid, 'stranger@collectionbuddy.test');
+select is(
+  pg_temp.rows_written(format('delete from public.item_categories where item_id = %L returning item_id', :'owner_item_id')),
+  0::bigint,
+  'a stranger cannot unlink the owner''s item from its category'
+);
+select is(
+  pg_temp.rows_written(format('delete from public.images where id = %L returning id', :'owner_image_id')),
+  0::bigint,
+  'a stranger cannot delete the owner''s photograph record'
+);
+
+-- A fresh item of the stranger's own, so the one-collection quota and the ownership check both pass: only the write check is left.
+insert into public.items (title) values ('Stranger''s unfiled item')
+returning id as stranger_item_id \gset
+select throws_ok(
+  format(
+    'insert into public.item_categories (item_id, category_id) values (%L, %L)',
+    :'stranger_item_id'::uuid, :'owner_category_id'::uuid
+  ),
+  'P0001',
+  'cross-tenant assignment is not allowed',
+  'a stranger cannot file an item of its own into the owner''s category'
+);
+
 -- anon: refused outright (no grant at all) before any policy predicate
 -- runs -- not shown an empty result, which would instead mean the grant
 -- existed and RLS was doing the work (TEST_STRATEGY.md trust boundary 3).

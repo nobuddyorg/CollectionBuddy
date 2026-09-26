@@ -59,11 +59,11 @@ describe('useItemImages deleteImage', () => {
   });
 
   it('tolerates deleting a photo for an item with no tracked images yet', async () => {
+    vi.mocked(removeImageObjects).mockResolvedValue({ error: null } as never);
     vi.mocked(deleteImageRow).mockResolvedValue({
-      data: { path_full: 'uid/item-1/img-1.webp', path_thumb: null },
+      data: { id: 'img-1' },
       error: null,
     } as never);
-    vi.mocked(removeImageObjects).mockResolvedValue({ error: null } as never);
     const { result } = renderItemImages();
 
     act(() => {
@@ -77,6 +77,7 @@ describe('useItemImages deleteImage', () => {
   });
 
   it('tolerates undo for an item with no tracked images yet', async () => {
+    vi.mocked(removeImageObjects).mockResolvedValue({ error: null } as never);
     vi.mocked(deleteImageRow).mockResolvedValue({
       data: null,
       error: new Error('rls'),
@@ -104,59 +105,43 @@ describe('useItemImages deleteImage', () => {
     await userEvent.click(await screen.findByTestId('confirm-cancel'));
 
     expect(result.current.images['item-1']).toEqual([image]);
+    expect(removeImageObjects).not.toHaveBeenCalled();
     expect(deleteImageRow).not.toHaveBeenCalled();
   });
 
-  it('removes the row and then its objects once the undo window closes', async () => {
+  it('removes both objects before the row once the undo window closes', async () => {
+    vi.mocked(removeImageObjects).mockResolvedValue({ error: null } as never);
     vi.mocked(deleteImageRow).mockResolvedValue({
-      data: {
-        path_full: 'uid/item-1/img-1.webp',
-        path_thumb: 'uid/item-1/img-1.thumb.webp',
-      },
+      data: { id: 'img-1' },
       error: null,
     } as never);
-    vi.mocked(removeImageObjects).mockResolvedValue({ error: null } as never);
+    const withThumbnail = {
+      ...image,
+      pathThumb: 'uid/item-1/img-1.thumb.webp',
+    };
     const { result } = await withOnePhotograph();
 
     act(() => {
-      void result.current.deleteImage('item-1', image);
+      void result.current.deleteImage('item-1', withThumbnail);
     });
     await acceptConfirmation();
     expect(result.current.images['item-1']).toEqual([]);
+    expect(removeImageObjects).not.toHaveBeenCalled();
 
     await commitDeferredDelete();
 
-    expect(deleteImageRow).toHaveBeenCalledWith('img-1');
     expect(removeImageObjects).toHaveBeenCalledWith([
       'uid/item-1/img-1.webp',
       'uid/item-1/img-1.thumb.webp',
     ]);
+    expect(deleteImageRow).toHaveBeenCalledWith('img-1');
+    expect(
+      vi.mocked(removeImageObjects).mock.invocationCallOrder[0],
+    ).toBeLessThan(vi.mocked(deleteImageRow).mock.invocationCallOrder[0]);
   });
 
-  it('puts the photograph back when the row delete fails', async () => {
-    vi.mocked(deleteImageRow).mockResolvedValue({
-      data: null,
-      error: new Error('rls'),
-    } as never);
-    const { result } = await withOnePhotograph();
-
-    act(() => {
-      void result.current.deleteImage('item-1', image);
-    });
-    await acceptConfirmation();
-    await commitDeferredDelete();
-
-    expect(result.current.images['item-1']).toEqual([image]);
-    expect(removeImageObjects).not.toHaveBeenCalled();
-  });
-
-  // The row is already gone by then: a leak for the sweep, not an undo.
-  it('reports objects it could not remove without restoring the entry', async () => {
-    vi.mocked(deleteImageRow).mockResolvedValue({
-      data: { path_full: 'uid/item-1/img-1.webp', path_thumb: null },
-      error: null,
-    } as never);
-    const removeError = new Error('gone');
+  it('keeps the row and puts the photograph back when its objects cannot be removed', async () => {
+    const removeError = new Error('storage down');
     vi.mocked(removeImageObjects).mockResolvedValue({
       error: removeError,
     } as never);
@@ -169,18 +154,17 @@ describe('useItemImages deleteImage', () => {
     await commitDeferredDelete();
 
     expect(removeImageObjects).toHaveBeenCalledWith(['uid/item-1/img-1.webp']);
-    expect(result.current.images['item-1']).toEqual([]);
+    expect(deleteImageRow).not.toHaveBeenCalled();
+    expect(result.current.images['item-1']).toEqual([image]);
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'This photograph was deleted, but its file could not be fully removed and may still count against your storage.',
+      'Could not delete this image. Please try again.',
     );
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'remove image bytes',
-      removeError,
-    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith('delete image', removeError);
   });
 
-  it('reports a row it could not delete, tagged under its own scope', async () => {
+  it('puts the photograph back when the row delete fails after its objects went', async () => {
     const rowError = new Error('rls');
+    vi.mocked(removeImageObjects).mockResolvedValue({ error: null } as never);
     vi.mocked(deleteImageRow).mockResolvedValue({
       data: null,
       error: rowError,
@@ -193,6 +177,7 @@ describe('useItemImages deleteImage', () => {
     await acceptConfirmation();
     await commitDeferredDelete();
 
+    expect(removeImageObjects).toHaveBeenCalledWith(['uid/item-1/img-1.webp']);
     expect(result.current.images['item-1']).toEqual([image]);
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not delete this image. Please try again.',
@@ -201,11 +186,11 @@ describe('useItemImages deleteImage', () => {
   });
 
   it('reports nothing when the delete succeeds cleanly', async () => {
+    vi.mocked(removeImageObjects).mockResolvedValue({ error: null } as never);
     vi.mocked(deleteImageRow).mockResolvedValue({
-      data: { path_full: 'uid/item-1/img-1.webp', path_thumb: null },
+      data: { id: 'img-1' },
       error: null,
     } as never);
-    vi.mocked(removeImageObjects).mockResolvedValue({ error: null } as never);
     const { result } = await withOnePhotograph();
 
     act(() => {
@@ -214,6 +199,7 @@ describe('useItemImages deleteImage', () => {
     await acceptConfirmation();
     await commitDeferredDelete();
 
+    await vi.waitFor(() => expect(deleteImageRow).toHaveBeenCalled());
     expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 

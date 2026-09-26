@@ -1,0 +1,28 @@
+name: Call the keepalive RPC
+description: "One anonymous request to `rpc/keepalive` with the given URL and public key; any non-2xx fails the step, so a key the project rejects (revoked, mistyped, another project's) fails loudly."
+
+inputs:
+  supabase-url:
+    description: NEXT_PUBLIC_SUPABASE_URL.
+    required: true
+  anon-key:
+    description: NEXT_PUBLIC_SUPABASE_ANON_KEY, a publishable key (`sb_publishable_…`) or the legacy anon JWT.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        SUPABASE_URL: ${{ inputs.supabase-url }}
+        ANON_KEY: ${{ inputs.anon-key }}
+      run: |
+        set -euo pipefail
+        # A publishable key is not a JWT, so it goes on `apikey` alone; only a legacy anon JWT also rides as the Bearer token.
+        auth=(-H "apikey: $ANON_KEY")
+        case "$ANON_KEY" in sb_*) ;; *) auth+=(-H "Authorization: Bearer $ANON_KEY") ;; esac
+        curl -sS --fail-with-body -X POST "$SUPABASE_URL/rest/v1/rpc/keepalive" \
+          "${auth[@]}" \
+          -H "Accept-Profile: public" \
+          -H "Content-Type: application/json" \
+          --data '{}'

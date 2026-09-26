@@ -1,23 +1,80 @@
 name: Deploy Pages
 
+# Only a commit that passed CI on main deploys; a push alone never reaches production.
 on:
-  push:
-    branches: [ main ]
+  # Runs main's copy of this file; it checks out a push to main that CI passed, never a pull request's code.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
-# Read-only by default: `pages: write` and `id-token: write` at the top would reach the jobs that run `npm ci` and its install scripts.
+# Read-only by default: `pages: write` and `id-token: write` at the top would reach the jobs that install and run npm packages.
 permissions:
   contents: read
 
+# Queued, never cancelled, so a migration is never interrupted; a run for a commit main has already moved past gets its own group so it cannot displace the queued deploy.
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: ${{ (github.event_name != 'workflow_run' || github.event.workflow_run.head_sha == github.sha) && 'pages' || format('pages-superseded-{0}', github.run_id) }}
+  cancel-in-progress: false
 
 jobs:
-  # Database first: a bundle referencing a column that does not exist yet is rejected by PostgREST, and a failed migration leaves the old bundle on the old schema.
-  # `cancel-in-progress` can interrupt this mid-push; each migration is its own transaction, so a prefix applies and the rest waits for the next run.
-  migrate:
+  # CI finishes out of order and can be re-run, so only main's current tip deploys; a dispatch deploys it only if CI passed on it.
+  gate:
+    if: >-
+      github.ref == 'refs/heads/main' && (
+        github.event_name == 'workflow_dispatch' || (
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_repository.full_name == github.repository
+        )
+      )
     runs-on: ubuntu-latest
+    permissions:
+      actions: read # CI's runs of the commit, on a dispatch
+      contents: read # main's current tip
+      pages: read # the site's URL, custom domain included
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+      pages-url: ${{ steps.pages.outputs.base_url }}
+    steps:
+      - name: Pick the commit to deploy
+        id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          # The jobs below check out github.sha (main when this run started), so CI's commit must be exactly that one.
+          COMMIT: ${{ github.sha }}
+          CI_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$CI_COMMIT" != "$COMMIT" ] || [ "$COMMIT" != "$tip" ]; then
+            echo "::notice::Skipped: $CI_COMMIT is no longer main's tip ($tip), which deploys once CI passes on it."
+            exit 0
+          fi
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&event=push&status=success" --jq .total_count)
+            if [ "$passed" = 0 ]; then
+              echo "::error::CI has not passed on $COMMIT; nothing deploys."
+              exit 1
+            fi
+          fi
+          echo "sha=$COMMIT" >> "$GITHUB_OUTPUT"
+
+      # The build's base path follows the Pages settings, so a custom domain needs no code change (docs/how-to/developer-guide.md#move-to-a-custom-domain).
+      - name: Read the Pages site URL
+        id: pages
+        if: steps.commit.outputs.sha != ''
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+  # Database first: PostgREST rejects a bundle naming a column not there yet, a failed migration leaves the old bundle on the old schema, and a passed one runs it on the new (expand/contract: docs/how-to/developer-guide.md#change-the-database-schema).
+  # A dispatch may name any branch: only main's reviewed migrations reach production, whose secrets live in the main-only `production` environment.
+  migrate:
+    needs: gate
+    if: github.ref == 'refs/heads/main' && needs.gate.outputs.sha != ''
+    runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -27,31 +84,46 @@ jobs:
 
       # Not `supabase link` + `--linked`: that resolves db.<ref>.supabase.co, which has only an AAAA record, and runners have no IPv6. The URL is one secret so log masking covers it whole.
       - name: Show pending migrations
-        run: supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
+        id: pending
+        run: |
+          set -euo pipefail
+          result=$(supabase db push --db-url "$SUPABASE_DB_URL" --dry-run --output-format json)
+          echo "$result"
+          # Anything but an explicit "up to date" takes the backup below.
+          case "$(jq -r '.upToDate' <<<"$result")" in
+            true) echo "migrations=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "migrations=true" >> "$GITHUB_OUTPUT" ;;
+          esac
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+
+      # Only when something will be applied, so a deploy without migrations never waits on the backup bucket; a failed backup stops the migration.
+      - name: Back up before migrating
+        if: steps.pending.outputs.migrations == 'true'
+        uses: ./.github/actions/backup-database
+        with:
+          label: pre-migration
+          db-url: ${{ secrets.SUPABASE_DB_URL }}
+          s3-endpoint: ${{ vars.BACKUP_S3_ENDPOINT }}
+          s3-region: ${{ vars.BACKUP_S3_REGION }}
+          s3-bucket: ${{ vars.BACKUP_S3_BUCKET }}
+          s3-access-key-id: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          age-recipient: ${{ vars.BACKUP_AGE_RECIPIENT }}
 
       - name: Apply migrations
         run: supabase db push --db-url "$SUPABASE_DB_URL"
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
-      # PostgREST caches the schema and this project cannot create the `pgrst_ddl_watch` event trigger (needs superuser); NOTIFY needs a session, which `db push` does not leave open.
+      # PostgREST caches the schema and this project cannot create the `pgrst_ddl_watch` event trigger (needs superuser); over the DB URL, so no Management API token reaches this job.
       - name: Reload the PostgREST schema cache
-        run: |
-          curl -sS --fail-with-body -X POST \
-            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data @- <<'JSON'
-          {"query": "notify pgrst, 'reload schema'"}
-          JSON
+        run: supabase db query --db-url "$SUPABASE_DB_URL" "notify pgrst, 'reload schema'"
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
   build:
-    needs: migrate
+    needs: [gate, migrate]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -59,6 +131,7 @@ jobs:
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      PAGES_BASE_URL: ${{ needs.gate.outputs.pages-url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -69,6 +142,13 @@ jobs:
       - run: npm run build
       - run: test -d out && test -f out/index.html
       - run: touch out/.nojekyll
+
+      # Before publishing, so a mistyped, stale or revoked key leaves the working bundle live; the smoke test runs signed out and never authenticates.
+      - name: Check the baked-in URL and key reach the project
+        uses: ./.github/actions/call-keepalive
+        with:
+          supabase-url: ${{ env.NEXT_PUBLIC_SUPABASE_URL }}
+          anon-key: ${{ env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
@@ -92,7 +172,7 @@ jobs:
   # The signed-out suite against the live origin: Node prerendering masks failures only the browser bundle shows, and signed-out keeps the run read-only.
   smoke_test:
     runs-on: ubuntu-latest
-    needs: deploy
+    needs: [gate, deploy]
     defaults:
       run:
         working-directory: web
