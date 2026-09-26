@@ -64,3 +64,18 @@ exception when others then
   return true;
 end;
 $$;
+
+-- Rows one write would touch, always rolled back, so an attempt that wrongly succeeds cannot hide the ones after it.
+create or replace function pg_temp.rows_written(p_sql text)
+returns bigint
+language plpgsql
+as $$
+declare
+  touched bigint;
+begin
+  execute format('with attempt as (%s) select count(*) from attempt', p_sql) into touched;
+  raise exception using errcode = 'UNDO0';
+exception when sqlstate 'UNDO0' then
+  return touched;
+end
+$$;

@@ -94,6 +94,64 @@ test.describe('a category shared at the editor role', () => {
     }
   });
 
+  // The positive side of the policies a viewer is refused: 'delete shared objects' reaches the owner's own prefix.
+  test('an editor removes the owner’s photograph, its record and the entry’s link', async () => {
+    const { token, userId, otherToken } = context();
+    const { categoryId, itemId } = await ownerEntryIn({
+      token,
+      userId,
+      category: SEED.editorPhotoCategory,
+      title: 'rls-editor-remove-probe',
+    });
+    const path = `${userId}/${itemId}/rls-editor-remove-probe.webp`;
+    const owner = apiAs(token);
+    const editor = apiAs(otherToken);
+    const shareId = await editorShare(token, categoryId);
+
+    try {
+      const { error: uploadError } = await owner.storage
+        .from('item-images')
+        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+      expect(uploadError).toBeNull();
+      const { error: recordError } = await owner
+        .from('images')
+        .insert({ item_id: itemId, path_full: path });
+      expect(recordError).toBeNull();
+
+      const { data: removedObjects } = await editor.storage
+        .from('item-images')
+        .remove([path]);
+      expect(removedObjects?.map((object) => object.name)).toEqual([path]);
+      const { data: removedRecord } = await editor
+        .from('images')
+        .delete()
+        .eq('item_id', itemId)
+        .select('id');
+      expect(removedRecord).toHaveLength(1);
+      const { data: unlinked } = await editor
+        .from('item_categories')
+        .delete()
+        .eq('item_id', itemId)
+        .select('item_id');
+      expect(unlinked).toHaveLength(1);
+
+      // Read back as the owner: the bytes are gone, and the unlinked entry with them.
+      const { data: listed } = await owner.storage
+        .from('item-images')
+        .list(`${userId}/${itemId}`);
+      expect(listed ?? []).toEqual([]);
+      const { data: entry } = await owner
+        .from('items')
+        .select('id')
+        .eq('id', itemId);
+      expect(entry).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+      await owner.storage.from('item-images').remove([path]);
+      await owner.from('items').delete().eq('id', itemId);
+    }
+  });
+
   // Own-prefix bytes under an entry it can no longer write: removing one and uploading at its path would swap the photograph (#739).
   test('a revoked editor can no longer change the photographs of the entry it filed', async () => {
     const { token, userId, otherToken, otherUserId } = context();

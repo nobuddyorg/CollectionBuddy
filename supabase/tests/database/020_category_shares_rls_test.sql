@@ -91,6 +91,38 @@ with attempt as (
 select is((select count(*) from attempt), 0::bigint,
   'a viewer grant does not extend to editing an item inside it');
 
+-- Nor to removing: the viewer reads each row above, so only a delete policy can refuse it. An unlink would also sweep the entry.
+select is(
+  pg_temp.rows_written(format('delete from public.item_categories where item_id = %L returning item_id', :'item_id')),
+  0::bigint,
+  'a viewer grant does not extend to unlinking the owner''s entry'
+);
+select is(
+  pg_temp.rows_written(format('delete from public.images where id = %L returning id', :'image_id')),
+  0::bigint,
+  'nor to deleting its photograph record'
+);
+select ok(
+  pg_temp.raises(format(
+    'insert into public.images (item_id, path_full) values (%L, %L)',
+    :'item_id'::uuid, :'grantee_id'::text || '/' || :'item_id'::text || '/planted.webp'
+  )),
+  'nor to adding a photograph record to it'
+);
+
+-- A fresh entry of the viewer's own, so the one-collection quota and the ownership check both pass: only the write check is left.
+insert into public.items (title) values ('Viewer''s unfiled item')
+returning id as viewer_item_id \gset
+select throws_ok(
+  format(
+    'insert into public.item_categories (item_id, category_id) values (%L, %L)',
+    :'viewer_item_id'::uuid, :'category_id'::uuid
+  ),
+  'P0001',
+  'cross-tenant assignment is not allowed',
+  'nor to filing an entry of its own into the collection'
+);
+
 -- Revoke, then it is gone -- with the row still there, so this is the
 -- revocation itself being tested, not a row that stopped existing.
 select pg_temp.auth_as(:'owner_id'::uuid, 'share-owner@collectionbuddy.test');

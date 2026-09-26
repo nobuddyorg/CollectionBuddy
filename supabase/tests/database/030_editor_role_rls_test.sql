@@ -43,6 +43,27 @@ with attempt as (
 select is((select count(*) from attempt), 1::bigint,
   'an editor can delete the owner''s entry in the shared collection');
 
+-- The positive side of the delete policies a viewer is refused (020), each probe undone again.
+select pg_temp.auth_as(:'owner_id'::uuid, 'editor-test-owner@collectionbuddy.test');
+insert into public.items (title) values ('Photographed owner entry')
+returning id as photographed_id \gset
+insert into public.item_categories (item_id, category_id)
+values (:'photographed_id'::uuid, :'category_id'::uuid);
+insert into public.images (item_id, path_full)
+values (:'photographed_id'::uuid, :'owner_id'::text || '/' || :'photographed_id'::text || '/a.webp');
+
+select pg_temp.auth_as(:'editor_id'::uuid, 'editor@collectionbuddy.test');
+select is(
+  pg_temp.rows_written(format('delete from public.images where item_id = %L returning id', :'photographed_id')),
+  1::bigint,
+  'an editor can delete the photograph record on the owner''s entry'
+);
+select is(
+  pg_temp.rows_written(format('delete from public.item_categories where item_id = %L returning item_id', :'photographed_id')),
+  1::bigint,
+  'and unlink the owner''s entry from the shared collection'
+);
+
 -- An editor files an entry of its own into the shared collection --
 -- tg_item_categories_enforce, not a bare RLS predicate.
 insert into public.items (title) values ('Editor''s own entry')

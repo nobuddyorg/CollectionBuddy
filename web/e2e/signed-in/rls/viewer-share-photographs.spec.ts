@@ -1,6 +1,13 @@
 import { expect, test } from '../test';
 import { SEED, itemsIn } from '../fixtures';
-import { apiAs, context, ownedCategoryId, share, unshare } from './helpers';
+import {
+  apiAs,
+  context,
+  ownedCategoryId,
+  ownerEntryIn,
+  share,
+  unshare,
+} from './helpers';
 
 // The viewer grant extended to photographs, on both surfaces, and withdrawn with it.
 test.describe('a category shared with another collector', () => {
@@ -167,6 +174,145 @@ test.describe('a category shared with another collector', () => {
       expect(after).toEqual([]);
     } finally {
       await apiAs(token).from('images').delete().eq('id', planted!.id);
+    }
+  });
+
+  // Each surface is its own delete policy; the link's delete also sweeps the orphaned entry (delete_item_if_orphan).
+  test('neither a stranger nor a viewer removes a photograph, its record or the entry’s link', async () => {
+    const { token, userId, otherToken } = context();
+    const { categoryId, itemId } = await ownerEntryIn({
+      token,
+      userId,
+      category: SEED.viewerPhotoCategory,
+      title: 'rls-viewer-remove-probe',
+    });
+    const path = `${userId}/${itemId}/rls-viewer-remove-probe.webp`;
+    const owner = apiAs(token);
+    const other = apiAs(otherToken);
+    let shareId = '';
+
+    const removalsRefused = async () => {
+      const { data: removedObjects } = await other.storage
+        .from('item-images')
+        .remove([path]);
+      expect(removedObjects ?? []).toEqual([]);
+      const { data: removedRecord } = await other
+        .from('images')
+        .delete()
+        .eq('item_id', itemId)
+        .select('id');
+      expect(removedRecord).toEqual([]);
+      const { data: unlinked } = await other
+        .from('item_categories')
+        .delete()
+        .eq('item_id', itemId)
+        .select('item_id');
+      expect(unlinked).toEqual([]);
+
+      // Read back as the owner: all three are still there.
+      const { data: after } = await owner
+        .from('items')
+        .select('images(path_full),item_categories(category_id)')
+        .eq('id', itemId)
+        .single();
+      expect(after).toEqual({
+        images: [{ path_full: path }],
+        item_categories: [{ category_id: categoryId }],
+      });
+      const { error: signError } = await owner.storage
+        .from('item-images')
+        .createSignedUrl(path, 60);
+      expect(signError).toBeNull();
+    };
+
+    try {
+      const { error: uploadError } = await owner.storage
+        .from('item-images')
+        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+      expect(uploadError).toBeNull();
+      const { error: recordError } = await owner
+        .from('images')
+        .insert({ item_id: itemId, path_full: path });
+      expect(recordError).toBeNull();
+
+      await removalsRefused();
+
+      shareId = await share({
+        token,
+        categoryId,
+        invitedEmail: SEED.other.email,
+      });
+      // Satisfiable: the viewer reads the record, the link and the bytes, so an empty delete is the delete policy.
+      const { data: seen } = await other
+        .from('items')
+        .select('images(id),item_categories(item_id)')
+        .eq('id', itemId)
+        .single();
+      expect(seen!.images).toHaveLength(1);
+      expect(seen!.item_categories).toHaveLength(1);
+      expect(
+        (await other.storage.from('item-images').createSignedUrl(path, 60))
+          .error,
+      ).toBeNull();
+
+      await removalsRefused();
+    } finally {
+      if (shareId) await unshare(token, shareId);
+      await owner.storage.from('item-images').remove([path]);
+      await owner.from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // An own-prefix upload names the entry in its second segment, so it is refused under an entry the caller may only read (0021).
+  test('a viewer cannot add a photograph to a shared entry, on either surface', async () => {
+    const { token, userId, otherToken, otherUserId } = context();
+    const { categoryId, itemId } = await ownerEntryIn({
+      token,
+      userId,
+      category: SEED.viewerPhotoCategory,
+      title: 'rls-viewer-add-probe',
+    });
+    const path = `${otherUserId}/${itemId}/rls-viewer-add-probe.webp`;
+    const viewer = apiAs(otherToken);
+    const shareId = await share({
+      token,
+      categoryId,
+      invitedEmail: SEED.other.email,
+    });
+
+    try {
+      const { data: seen } = await viewer
+        .from('items')
+        .select('id')
+        .eq('id', itemId);
+      expect(seen).toHaveLength(1);
+
+      const { error: uploadError } = await viewer.storage
+        .from('item-images')
+        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+      expect(uploadError).not.toBeNull();
+
+      const { data: record, error: recordError } = await viewer
+        .from('images')
+        .insert({ item_id: itemId, path_full: path })
+        .select('id');
+      expect(record).toBeNull();
+      expect(recordError).not.toBeNull();
+
+      // Its own prefix, so listable to it: empty is the refused upload, not a hidden object.
+      const { data: listed } = await viewer.storage
+        .from('item-images')
+        .list(`${otherUserId}/${itemId}`);
+      expect(listed ?? []).toEqual([]);
+      const { data: records } = await apiAs(token)
+        .from('images')
+        .select('id')
+        .eq('item_id', itemId);
+      expect(records).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+      await viewer.storage.from('item-images').remove([path]);
+      await apiAs(token).from('items').delete().eq('id', itemId);
     }
   });
 });

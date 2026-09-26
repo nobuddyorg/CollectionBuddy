@@ -4,21 +4,6 @@ select no_plan();
 
 \ir _helpers.psql
 
--- Rows one write would touch, always rolled back, so an attempt that wrongly succeeds cannot hide the ones after it.
-create function pg_temp.rows_written(p_sql text)
-returns bigint
-language plpgsql
-as $$
-declare
-  touched bigint;
-begin
-  execute format('with attempt as (%s) select count(*) from attempt', p_sql) into touched;
-  raise exception using errcode = 'UNDO0';
-exception when sqlstate 'UNDO0' then
-  return touched;
-end
-$$;
-
 -- Every write the entry's owner branch used to allow, tried once per grant state below.
 create function pg_temp.writes_refused(p_state text)
 returns setof text
