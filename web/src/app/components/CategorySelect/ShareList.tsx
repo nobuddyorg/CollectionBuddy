@@ -13,6 +13,7 @@ import { labelClasses } from '../ui/labelClasses';
 export function ShareList({ shares }: { shares: UseShares }) {
   const { t } = useI18n();
   const confirm = useConfirm();
+  // Every row action is off while a reload is in flight: the rows may be about to change under the click.
   const {
     shares: list,
     isLoading,
@@ -49,7 +50,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
         onChange={(event) =>
           void onToggleRole(share, event.target.checked ? 'editor' : 'viewer')
         }
-        disabled={isUpdatingRole}
+        disabled={isUpdatingRole || isLoading}
         className="h-4 w-4 rounded-sm ring-1 ring-inset ring-control-border accent-foreground"
       />
       {t('category_select.share_can_edit')}
@@ -129,9 +130,10 @@ export function ShareList({ shares }: { shares: UseShares }) {
                     <button
                       type="button"
                       onClick={() => setRoleModalShareId(share.id)}
+                      disabled={isLoading}
                       aria-label={t('category_select.share_edit_access')}
                       title={t('category_select.share_edit_access')}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:hidden sm:h-9 sm:w-9"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40 sm:hidden sm:h-9 sm:w-9"
                     >
                       <Icon
                         icon={IconType.Edit}
@@ -145,7 +147,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
                       onClick={() =>
                         void onRevoke(share.id, share.invited_email)
                       }
-                      disabled={isRevoking}
+                      disabled={isRevoking || isLoading}
                       aria-label={t('category_select.share_revoke')}
                       title={t('category_select.share_revoke')}
                       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-40 sm:h-9 sm:w-9"

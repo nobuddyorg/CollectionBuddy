@@ -1,9 +1,10 @@
 import { resolve } from 'node:path';
 
-// Not './test': both cases drive the app into toast.reportError, which logs to the console by design.
+// Not './test': every case drives the app into toast.reportError, which logs to the console by design.
 import { expect, test } from '../fixture';
 
 import { SEED } from './fixtures';
+import { context, ownedCategoryId, share, unshare } from './rls/helpers';
 // Failures are injected at the network boundary, so the app's own code runs for real.
 test.use({ locale: 'en-GB' });
 
@@ -67,6 +68,44 @@ test.describe('when something outside the app fails', () => {
     } finally {
       await page.unroute('**/storage/v1/object/**');
       await app.catalogue.do.removeEntry(title);
+    }
+  });
+
+  // Each row acts by its share id: one left over from the previous collection would revoke or promote there.
+  test("a collection whose grants fail to load never shows the previous one's", async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const { token, userId } = context();
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.failureCategory,
+    });
+    const shareId = await share({
+      token,
+      categoryId,
+      invitedEmail: SEED.other.email,
+    });
+    const shareList = (url: URL) =>
+      url.pathname.endsWith('/rest/v1/category_shares');
+    try {
+      await app.categories.do.openPanel();
+      await expect(app.sharing.row(SEED.other.email)()).toBeVisible();
+
+      await page.route(shareList, (route) =>
+        route.fulfill({ status: 500, json: { message: 'nope' } }),
+      );
+      await app.categories.tab('Münzen').click();
+      await expect(app.categories.locators.selected).toHaveText('Münzen');
+      await app.categories.do.openPanel();
+
+      await expect(app.toast()).toContainText('Could not load sharing');
+      await expect(app.sharing.locators.rows).toHaveCount(0);
+    } finally {
+      await page.unroute(shareList);
+      await unshare(token, shareId);
     }
   });
 });

@@ -474,4 +474,26 @@ describe('SharingSection list', () => {
 
     expect(revokeShare).not.toHaveBeenCalled();
   });
+
+  // A row clicked mid-reload may be gone, or changed, by the time the action reaches the server.
+  it('offers no row action while the list is reloading', () => {
+    renderSection(
+      sharesState({
+        isLoading: true,
+        shares: [
+          {
+            id: 'share-1',
+            invited_email: 'grantee@example.com',
+            expires_at: null,
+            owner_user_id: 'owner-1',
+            role: 'viewer',
+          },
+        ],
+      }),
+    );
+
+    expect(screen.getByRole('button', { name: 'Revoke' })).toBeDisabled();
+    expect(screen.getByLabelText('Can edit')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit access' })).toBeDisabled();
+  });
 });

@@ -55,13 +55,14 @@ describe('useShares one request at a time', () => {
   });
 
   it('ignores a second role change while the first is still in flight', async () => {
+    listSharesReturns([grant]);
     let release: (() => void) | undefined;
     vi.mocked(updateShareRoleRow).mockReturnValue(
       new Promise((resolve) => {
         release = () => resolve({ data: grant, error: null });
       }) as never,
     );
-    const { result } = renderHook(() => useShares('cat-1'), { wrapper });
+    const { result } = await renderLoadedShares();
 
     act(() => {
       void result.current.updateShareRole('share-1', 'editor');
