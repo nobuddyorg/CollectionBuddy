@@ -16,6 +16,7 @@ interface CategoryPanel {
     buttons: {
       add: Locator;
       cancelImport: Locator;
+      collapse: Locator;
       delete: Locator;
       expand: Locator;
       export: Locator;
@@ -29,6 +30,7 @@ interface CategoryPanel {
     selected: Locator;
     sharedMarker: Locator;
     tabs: Locator;
+    tabNames: Locator;
     texts: {
       label: Locator;
     };
@@ -45,6 +47,7 @@ export function initCategoryPanel(page: Page): CategoryPanel {
     buttons: {
       add: root.getByTestId('add-category'),
       cancelImport: root.getByTestId('cancel-import'),
+      collapse: root.getByTestId('collapse-categories'),
       delete: root.getByTestId('delete-category'),
       expand: root.getByTestId('expand-categories'),
       export: root.getByTestId('export-category'),
@@ -58,6 +61,7 @@ export function initCategoryPanel(page: Page): CategoryPanel {
     selected: root.getByTestId('selected-category'),
     sharedMarker: root.getByTestId('shared-marker'),
     tabs: root.getByTestId('category-tab'),
+    tabNames: root.getByTestId('category-tab-name'),
     texts: {
       label: root.getByTestId('category-label'),
     },
