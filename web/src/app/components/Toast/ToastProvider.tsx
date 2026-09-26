@@ -14,6 +14,7 @@ import ReactDOM from 'react-dom';
 import { useI18n } from '../../i18n/useI18n';
 import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
 import Icon, { IconType } from '../Icon';
+import { createPendingToasts } from './pendingToasts';
 
 type ToastKind = 'error' | 'success';
 type ToastAction = { label: string; onClick: () => void };
@@ -23,6 +24,10 @@ type ToastEntry = {
   kind: ToastKind;
   action?: ToastAction;
   onExpire?: () => void | Promise<void>;
+};
+type PendingToast = {
+  entry: ToastEntry;
+  timer: ReturnType<typeof setTimeout>;
 };
 type SuccessOptions = {
   /** A second button that cancels `onExpire` and runs its own `onClick`: the toast's undo. */
@@ -66,26 +71,37 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => setMounted(true), []);
 
   // Kept by id so expire() reads onExpire outside a setState updater, which Strict Mode runs twice.
-  const entriesRef = useRef<Map<number, ToastEntry>>(new Map());
+  const [pending] = useState(() => createPendingToasts<PendingToast>());
 
-  const remove = useCallback((id: number) => {
-    entriesRef.current.delete(id);
-    setToasts((previous) => previous.filter((entry) => entry.id !== id));
-  }, []);
+  // Every way out of a toast goes through here; take() makes it the toast's only one.
+  const settle = useCallback(
+    (id: number) => {
+      const taken = pending.take(id);
+      setToasts((previous) => previous.filter((entry) => entry.id !== id));
+      clearTimeout(taken?.timer);
+      return taken?.entry;
+    },
+    [pending],
+  );
 
   // Auto-dismiss and the close button both commit; only the action button (undo) skips onExpire.
   const expire = useCallback(
     async (id: number) => {
-      const pending = entriesRef.current.get(id)?.onExpire?.();
-      remove(id);
-      await pending;
+      await settle(id)?.onExpire?.();
     },
-    [remove],
+    [settle],
+  );
+
+  const undo = useCallback(
+    (id: number) => {
+      settle(id)?.action?.onClick();
+    },
+    [settle],
   );
 
   const commitPending = useCallback(async () => {
-    await Promise.all([...entriesRef.current.keys()].map(expire));
-  }, [expire]);
+    await Promise.all(pending.ids().map(expire));
+  }, [pending, expire]);
 
   // A deferred delete lives only in this tab: leaving inside its undo window would drop it unsent.
   useBeforeUnloadGuard(toasts.some((entry) => entry.onExpire));
@@ -100,11 +116,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         action: options?.action,
         onExpire: options?.onExpire,
       };
-      entriesRef.current.set(id, entry);
+      const timer = setTimeout(() => void expire(id), AUTO_DISMISS_MS);
+      pending.add(id, { entry, timer });
       setToasts((previous) => [...previous, entry]);
-      setTimeout(() => void expire(id), AUTO_DISMISS_MS);
     },
-    [expire],
+    [pending, expire],
   );
 
   const error = useCallback(
@@ -161,10 +177,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   <button
                     type="button"
                     data-testid="toast-action"
-                    onClick={() => {
-                      entry.action?.onClick();
-                      remove(entry.id);
-                    }}
+                    onClick={() => undo(entry.id)}
                     className="shrink-0 -my-1 px-1 py-1 text-sm font-medium underline underline-offset-2"
                   >
                     {entry.action.label}

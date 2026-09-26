@@ -201,6 +201,24 @@ select is(
   'a like_pattern narrows to the places matching it, the same as the searched list'
 );
 
+-- 0026: places come back ordered by place, so PostgREST's offset and limit page past max_rows (1,000) with no gap or repeat.
+insert into public.categories (name) values ('Many places test')
+returning id as many_places_category \gset
+with inserted as (
+  insert into public.items (title, place)
+  select 'Many places ' || n as title, 'Fundort ' || n as place from generate_series(1, 1001) as n
+  returning id
+)
+insert into public.item_categories (item_id, category_id)
+select id, :'many_places_category'::uuid from inserted;
+
+select is(
+  array(select place from public.list_category_places(:'many_places_category'::uuid, null) limit 1000)
+    || array(select place from public.list_category_places(:'many_places_category'::uuid, null) limit 1000 offset 1000),
+  array(select 'Fundort ' || n from generate_series(1, 1001) as n order by 1),
+  'two pages of 1,000 read back all 1,001 places, each once, in place order'
+);
+
 -- SECURITY INVOKER: a bystander gets nothing back, not an error, the same
 -- as an ordinary RLS-scoped read would deny them.
 select gen_random_uuid() as places_bystander \gset

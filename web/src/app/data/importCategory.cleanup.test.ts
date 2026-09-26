@@ -30,7 +30,7 @@ describe('importCategory, cleaning up after a failure', () => {
 
     const failure = importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       linkItemRows,
@@ -57,7 +57,7 @@ describe('importCategory, cleaning up after a failure', () => {
 
     const failure = importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       linkItemRows: vi.fn(async () => ({
         error: new Error('link failed'),
@@ -87,7 +87,7 @@ describe('importCategory, cleaning up after a failure', () => {
 
     const failure = importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       createItemRows,
@@ -118,7 +118,7 @@ describe('importCategory, cleaning up after a failure', () => {
 
     const failure = importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       createItemRows,

@@ -338,6 +338,53 @@ describe('ToastProvider', () => {
     expect(status).not.toBeInTheDocument();
   });
 
+  it('Undo cancels the commit for good: the window closing later runs nothing', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const onExpire = vi.fn();
+    const onUndo = vi.fn();
+    renderUndoable({ onExpire, onUndo });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Entry deleted.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(12000);
+    });
+
+    expect(onUndo).toHaveBeenCalledTimes(1);
+    expect(onExpire).not.toHaveBeenCalled();
+  });
+
+  it('Close commits once: the window closing later does not run it again', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const onExpire = vi.fn();
+    renderUndoable({ onExpire });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Entry deleted.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(12000);
+    });
+
+    expect(onExpire).toHaveBeenCalledTimes(1);
+  });
+
+  it('commitPending after Close commits nothing a second time', async () => {
+    const onExpire = vi.fn();
+    const onCommitted = vi.fn();
+    renderUndoable({ onExpire, onCommitted });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Entry deleted.' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Commit' }));
+
+    expect(onCommitted).toHaveBeenCalledTimes(1);
+    expect(onExpire).toHaveBeenCalledTimes(1);
+  });
+
   // Sign-out calls this so a delete inside its undo window is sent while there is still a session.
   it('commitPending runs a pending onExpire once and resolves only after it has finished', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });

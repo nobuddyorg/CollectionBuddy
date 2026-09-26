@@ -190,6 +190,114 @@ describe('useItemImages', () => {
       }
     });
 
+    // #757: re-showing a page from the cache must not postpone the re-sign its older signatures need.
+    it('re-signs a page on its own signatures clock, however recently another page was shown', async () => {
+      const { result } = await withOnePhotographAndFakeTimers();
+      try {
+        const signedAt = Date.now();
+        vi.setSystemTime(signedAt + 50 * 60_000);
+        await act(async () => {
+          await result.current.showImages(['item-2'], [row('img-2', 'item-2')]);
+        });
+        vi.setSystemTime(signedAt + 52 * 60_000);
+        await act(async () => {
+          await result.current.showImages(['item-1'], [row('img-1', 'item-1')]);
+        });
+        vi.mocked(listImagesForItems).mockClear();
+
+        vi.setSystemTime(signedAt + 55 * 60_000 - 60_000);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(60_000);
+        });
+
+        expect(listImagesForItems).toHaveBeenCalledExactlyOnceWith(['item-1']);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps the photographs through a failed re-sign and tries again a minute later', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const { result } = await withOnePhotographAndFakeTimers();
+      try {
+        const before = result.current.images['item-1'];
+        vi.mocked(createSignedUrls).mockResolvedValueOnce({
+          data: null,
+          error: new Error('offline'),
+        } as never);
+        vi.setSystemTime(Date.now() + 56 * 60_000);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(60_000);
+        });
+        expect(result.current.images['item-1']).toEqual(before);
+
+        vi.mocked(listImagesForItems).mockClear();
+        vi.mocked(createSignedUrls).mockClear();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(60_000);
+        });
+
+        expect(listImagesForItems).toHaveBeenCalledWith(['item-1']);
+        expect(createSignedUrls).toHaveBeenCalledWith([
+          'uid/item-1/img-1.webp',
+        ]);
+      } finally {
+        consoleError.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps the photographs when the re-listing fails, and tries again a minute later', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const { result } = await withOnePhotographAndFakeTimers();
+      try {
+        const before = result.current.images['item-1'];
+        vi.mocked(listImagesForItems).mockResolvedValueOnce({
+          data: null,
+          error: new Error('offline'),
+        });
+        vi.setSystemTime(Date.now() + 56 * 60_000);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(60_000);
+        });
+        expect(result.current.images['item-1']).toBe(before);
+        expect(result.current.loadingItems.size).toBe(0);
+
+        vi.mocked(listImagesForItems).mockClear();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(60_000);
+        });
+
+        expect(listImagesForItems).toHaveBeenCalledWith(['item-1']);
+      } finally {
+        consoleError.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
+    it('stays quiet once a re-sign has succeeded', async () => {
+      await withOnePhotographAndFakeTimers();
+      try {
+        vi.setSystemTime(Date.now() + 56 * 60_000);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(60_000);
+        });
+        vi.mocked(listImagesForItems).mockClear();
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(5 * 60_000);
+        });
+
+        expect(listImagesForItems).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('stops refreshing and stops listening for visibility changes once unmounted', async () => {
       const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
       const { unmount } = await withOnePhotographAndFakeTimers();

@@ -34,7 +34,7 @@ describe('importCategory, uploading through the pool', () => {
 
     const promise = importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage,
     });
@@ -75,7 +75,7 @@ describe('importCategory, uploading through the pool', () => {
 
     await importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage,
       createImage,

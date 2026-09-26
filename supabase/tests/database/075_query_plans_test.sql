@@ -122,15 +122,14 @@ select
 from pg_catalog.pg_proc p
 where p.oid = 'public.search_category_items(uuid, text, int, int)'::regprocedure \gset
 
--- The catalogue page as data/items.ts rawListItems composes it through PostgREST: driven from item_categories, newest first.
+-- The catalogue page's ids as data/itemPage.ts rawListItemIds reads them: item_categories alone, newest first, no embed (#758).
 select format(
   $sql$
-    select ic.item_id, i.title
+    select ic.item_id
     from public.item_categories ic
-    join public.items i on i.id = ic.item_id
     where ic.category_id = %L::uuid
     order by ic.created_at desc, ic.item_id
-    limit 50 offset 0
+    limit 9 offset 0
   $sql$,
   :'category_id'
 ) as catalogue_sql \gset
@@ -217,6 +216,37 @@ select pg_temp.plan_has_no_seq_scan_on(
   :'catalogue_sql', 'item_categories', 'preferred: the catalogue page does not scan item_categories sequentially'
 );
 
+-- rawListItemsByIds, as PostgREST embeds the photographs: nine entries by id, each with its own ordered lateral read of images.
+select format(
+  $sql$
+    select i.id, i.title, coalesce(photos.body, '[]') as images
+    from public.items i
+    left join lateral (
+      select json_agg(im) as body
+      from (
+        select im.id, im.item_id, im.path_full, im.path_thumb
+        from public.images im
+        where im.item_id = i.id
+        order by im.created_at, im.id
+      ) im
+    ) photos on true
+    where i.id = any(%L::uuid[])
+  $sql$,
+  (select array_agg(page.item_id)
+   from (
+     select ic.item_id
+     from public.item_categories ic
+     where ic.category_id = :'category_id'::uuid
+     order by ic.created_at desc, ic.item_id
+     limit 9
+   ) page)
+) as page_items_sql \gset
+
+select pg_temp.plan_uses_index(
+  :'page_items_sql', 'items_pkey',
+  'preferred: the page''s entries are read by id through items_pkey under RLS'
+);
+
 -- The FK cascades' own queries, planned as the owner that runs them: item_categories keeps no index on item_id or category_id alone (#717).
 reset role;
 select pg_temp.plan_uses_index(
@@ -247,6 +277,11 @@ select pg_temp.plan_uses_index_only(
   format('select coalesce(sum(im.size_bytes + im.thumb_size_bytes), 0) from public.images im where im.user_id = %L::uuid', :'owner_id'),
   'idx_images_user_sizes',
   'reachable: the photo quota sum is an index-only scan on idx_images_user_sizes'
+);
+select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
+select pg_temp.plan_uses_index(
+  :'page_items_sql', 'idx_images_item_created_at',
+  'reachable: the page''s photographs come in order from idx_images_item_created_at under RLS'
 );
 
 -- The map's query for a small category beside a large one, planned for the category it names as 0018 makes every call.

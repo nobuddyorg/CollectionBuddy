@@ -171,34 +171,74 @@ export class ZipReadError extends Error {
   }
 }
 
-/** Reads an archive `createZipWriter` produced back into entries by path, via the central directory. */
-export async function readZipEntries(
-  blob: Blob,
-): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  if (bytes.length < END_OF_CENTRAL_DIR_BYTES) {
+/** Reads an entry's bytes out of the archive; until called, nothing past the directory is loaded. */
+export type ZipEntryReader = () => Promise<Blob>;
+
+async function readRange(blob: Blob, start: number, end: number) {
+  return new Uint8Array(await blob.slice(start, end).arrayBuffer());
+}
+
+function dataViewOf(bytes: Uint8Array<ArrayBuffer>): DataView {
+  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+}
+
+/** A slice of the archive, not a copy: the local header is read only to find where the bytes start. */
+function entryReader({
+  archive,
+  name,
+  size,
+  localOffset,
+}: {
+  archive: Blob;
+  name: string;
+  size: number;
+  localOffset: number;
+}): ZipEntryReader {
+  return async () => {
+    const header = await readRange(
+      archive,
+      localOffset,
+      localOffset + LOCAL_HEADER_BYTES,
+    );
+    if (header.length < LOCAL_HEADER_BYTES) {
+      throw new ZipReadError(`Corrupt archive: "${name}" runs past the file`);
+    }
+    const localNameLength = dataViewOf(header).getUint16(26, true);
+    const dataStart = localOffset + LOCAL_HEADER_BYTES + localNameLength;
+    if (dataStart + size > archive.size) {
+      throw new ZipReadError(`Corrupt archive: "${name}" runs past the file`);
+    }
+    return archive.slice(dataStart, dataStart + size);
+  };
+}
+
+/** Opens an archive `createZipWriter` produced by its trailer and central directory, the only parts read up front. */
+export async function openZip(
+  archive: Blob,
+): Promise<Map<string, ZipEntryReader>> {
+  if (archive.size < END_OF_CENTRAL_DIR_BYTES) {
     throw new ZipReadError('Not a ZIP archive: file is too small');
   }
-  const dataView = new DataView(
-    bytes.buffer,
-    bytes.byteOffset,
-    bytes.byteLength,
-  );
-  const trailerAt = bytes.length - END_OF_CENTRAL_DIR_BYTES;
-  if (dataView.getUint32(trailerAt, true) !== END_OF_CENTRAL_DIR_SIGNATURE) {
+  const trailerAt = archive.size - END_OF_CENTRAL_DIR_BYTES;
+  const trailer = dataViewOf(await readRange(archive, trailerAt, archive.size));
+  if (trailer.getUint32(0, true) !== END_OF_CENTRAL_DIR_SIGNATURE) {
     // No backward scan for an archive comment: `createZipWriter` never writes one.
     throw new ZipReadError(
       'Not a ZIP archive: no end-of-central-directory record',
     );
   }
 
-  const entryCount = dataView.getUint16(trailerAt + 8, true);
-  let directoryAt = dataView.getUint32(trailerAt + 16, true);
+  const entryCount = trailer.getUint16(8, true);
+  const directoryOffset = trailer.getUint32(16, true);
+  // Up to the end of the file, not the trailer: a directory the trailer misplaces is judged by the bytes found there.
+  const directory = await readRange(archive, directoryOffset, archive.size);
+  const dataView = dataViewOf(directory);
 
-  const entries = new Map<string, Uint8Array<ArrayBuffer>>();
+  const entries = new Map<string, ZipEntryReader>();
   const decoder = new TextDecoder();
+  let directoryAt = 0;
   for (let i = 0; i < entryCount; i++) {
-    if (directoryAt + CENTRAL_HEADER_BYTES > bytes.length) {
+    if (directoryAt + CENTRAL_HEADER_BYTES > directory.length) {
       throw new ZipReadError(
         'Corrupt archive: central directory runs past the file',
       );
@@ -212,18 +252,12 @@ export async function readZipEntries(
     const nameLength = dataView.getUint16(directoryAt + 28, true);
     const localOffset = dataView.getUint32(directoryAt + 42, true);
     const name = decoder.decode(
-      bytes.slice(
+      directory.subarray(
         directoryAt + CENTRAL_HEADER_BYTES,
         directoryAt + CENTRAL_HEADER_BYTES + nameLength,
       ),
     );
-
-    const localNameLength = dataView.getUint16(localOffset + 26, true);
-    const dataStart = localOffset + LOCAL_HEADER_BYTES + localNameLength;
-    if (dataStart + size > bytes.length) {
-      throw new ZipReadError(`Corrupt archive: "${name}" runs past the file`);
-    }
-    entries.set(name, bytes.slice(dataStart, dataStart + size));
+    entries.set(name, entryReader({ archive, name, size, localOffset }));
 
     directoryAt += CENTRAL_HEADER_BYTES + nameLength;
   }

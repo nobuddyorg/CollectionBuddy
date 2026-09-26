@@ -15,15 +15,15 @@ These scripts belong at `web/load/proofs/`. Each shared helper lands with the fi
 
 Some proofs replay the client's own request sequence, the way `lib/api.js` mirrors `data/*.ts`. When the fix changes that sequence, update the mirror in the same PR, or the proof keeps measuring the old code.
 
-| Proof                            | Mirrors                                                                                         | What to update with the fix                                                                                                                                                    |
-| -------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `deep-offset.js` (#758)          | `lib/api.js` `listPage` → `data/items.ts`                                                       | How a page is read                                                                                                                                                             |
-| `short-search.js` (#779)         | `SEARCH_MIN_LENGTH_NON_ASCII` → `data/itemSearch.ts`                                            | The floor, if the fix raises it                                                                                                                                                |
-| `map-places-cap.js` (#756)       | `CLIENT_PAGE_SIZE` → `data/items.ts listCategoryPlaces`                                         | The page size, once the RPC is paged. If the fix returns one jsonb value with a cap instead, rework `readPlaces` to read the list from it and check its "showing N of M" count |
-| `sign-many.js` (#757)            | `useItemImages.tsx` / `imageEntries.ts` refresh                                                 | Batching of the refresh                                                                                                                                                        |
-| `quota-refused-import.js` (#765) | `importPhoto.ts` retry loop                                                                     | Stop after a quota refusal; 4xx is permanent                                                                                                                                   |
-| `round-trips.js` (#780)          | `exportCategory.ts`, `images.ts`, `categories.ts`/`useCategories.tsx` delete reads, search path | Embedded export read; one keyset-paged images read for delete; search returning image rows                                                                                     |
-| `gate-blind-spots.js` (#781)     | `lib/flows.js` `browse`                                                                         | Name the new requests `catalogue last page` and `sign urls`                                                                                                                    |
+| Proof                            | Mirrors                                                                                         | What to update with the fix                                                                |
+| -------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `deep-offset.js` (#758)          | `lib/api.js` `listPage` → `data/itemPage.ts`                                                    | How a page is read                                                                         |
+| `short-search.js` (#779)         | `SEARCH_MIN_LENGTH_NON_ASCII` → `data/itemSearch.ts`                                            | The floor, if the fix raises it                                                            |
+| `map-places-cap.js` (#756)       | `CLIENT_PAGE_SIZE` → `data/items.ts` `PLACE_PAGE_SIZE`                                          | The page size, if the client's changes                                                     |
+| `sign-many.js` (#757)            | `useItemImages.tsx` / `imageEntries.ts` refresh                                                 | Batching of the refresh                                                                    |
+| `quota-refused-import.js` (#765) | `importPhoto.ts` retry loop                                                                     | Stop after a quota refusal; 4xx is permanent                                               |
+| `round-trips.js` (#780)          | `exportCategory.ts`, `images.ts`, `categories.ts`/`useCategories.tsx` delete reads, search path | Embedded export read; one keyset-paged images read for delete; search returning image rows |
+| `gate-blind-spots.js` (#781)     | `lib/flows.js` `browse`                                                                         | Name the new requests `catalogue last page` and `sign urls`                                |
 
 The browser proofs drive the real app, so they need no mirror.
 
@@ -50,9 +50,10 @@ The browser proofs launch Chromium through k6: point `K6_BROWSER_EXECUTABLE_PATH
 
 Knobs:
 
-- **Seed sizes:** `PROOF_ENTRIES` (default 40,000, under the 50,000-entry quota), `PROOF_OTHER_ENTRIES`, `PROOF_PLACES`, `PROOF_PAGES`, `PROOF_PHOTOS`, `PROOF_FITTING`, `PROOF_ARCHIVE_MB` (at most 500).
+- **Seed sizes:** `PROOF_ENTRIES` (default 40,000, under the 50,000-entry quota), `PROOF_OTHER_ENTRIES`, `PROOF_PLACES`, `PROOF_PAGES`, `PROOF_PHOTOS`, `PROOF_FITTING`, `PROOF_ARCHIVE_MB` (default 100, also the most: the seeded photos and their imported copies share one owner's 256 MiB).
 - **Sampling and format:** `PROOF_SAMPLES`, `PROOF_SAFARI_FORMAT`.
 - **App URL:** `PROOF_APP_URL`.
+- **Replay a pre-fix client:** `PROOF_CLIENT_PAGE_SIZE=0` reads the map unranged, as before #756.
 - **Separate report for a second run:** `PROOF_VARIANT` (for example a control run).
 
 A failed setup is cleaned up. A setup killed by its 5-minute timeout can leave rows behind, so run `supabase db reset` before the #779 control run.

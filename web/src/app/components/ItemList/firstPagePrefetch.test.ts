@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { listItems } from '../../data/items';
+import type { listItems } from '../../data/itemPage';
 import {
   prefetchFirstPage,
   takePrefetchedFirstPage,

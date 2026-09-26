@@ -20,7 +20,7 @@ describe('importCategory, retrying a photograph upload', () => {
     try {
       const promise = importCategory({
         file: archive,
-        categoryName: 'Coins',
+        nameCategory: () => 'Coins',
         ...baseFakes(),
         uploadImage,
       });
@@ -52,7 +52,7 @@ describe('importCategory, retrying a photograph upload', () => {
     try {
       const promise = importCategory({
         file: archive,
-        categoryName: 'Coins',
+        nameCategory: () => 'Coins',
         ...baseFakes(),
         uploadImage,
       });
@@ -104,7 +104,7 @@ describe('importCategory, retrying a photograph upload', () => {
     try {
       const promise = importCategory({
         file: archive,
-        categoryName: 'Coins',
+        nameCategory: () => 'Coins',
         ...baseFakes(),
         uploadImage,
         createImage,
@@ -139,7 +139,7 @@ describe('importCategory, retrying a photograph upload', () => {
     try {
       const promise = importCategory({
         file: archive,
-        categoryName: 'Coins',
+        nameCategory: () => 'Coins',
         ...baseFakes(),
         uploadImage,
         createImage,

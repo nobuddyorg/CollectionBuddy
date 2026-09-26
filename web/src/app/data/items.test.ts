@@ -7,30 +7,21 @@ import {
   deleteItems,
   linkItemToCategory,
   linkItemsToCategory,
-  rawCountItems,
   rawListCategoryPlaces,
-  rawListItems,
-  rawSearchCategoryItems,
   rawUpdateItemsPlace,
   updateItem,
 } from './items';
 import { likePatternFor } from './itemSearch';
 
 // A PostgREST builder holds its URL and only hits the network when awaited.
-describe('the queries behind the list and the map', () => {
+describe('the query behind the map', () => {
   const paramsOf = (builder: unknown) =>
     (builder as { url: URL }).url.searchParams;
 
-  const listQuery = (search: string) =>
-    paramsOf(rawListItems({ categoryId: 'cat-1', search, from: 0, to: 8 }));
   const mapQuery = (search: string) =>
-    paramsOf(rawListCategoryPlaces({ categoryId: 'cat-1', search }));
-  const countBuilder = (search: string) =>
-    rawCountItems({ categoryId: 'cat-1', search }) as unknown as {
-      url: URL;
-      method: string;
-      headers: Headers;
-    };
+    paramsOf(
+      rawListCategoryPlaces({ categoryId: 'cat-1', search, from: 0, to: 999 }),
+    );
 
   it('calls the grouped-places RPC as a GET, with the category and a raw LIKE pattern', () => {
     const params = mapQuery('coin');
@@ -39,6 +30,8 @@ describe('the queries behind the list and the map', () => {
     const builder = rawListCategoryPlaces({
       categoryId: 'cat-1',
       search: 'coin',
+      from: 0,
+      to: 999,
     }) as unknown as {
       method: string;
       url: URL;
@@ -48,75 +41,35 @@ describe('the queries behind the list and the map', () => {
     expect(builder.url.pathname).toMatch(/\/rpc\/list_category_places$/);
   });
 
-  it('carries an abort signal through to each cancellable query', () => {
-    const controller = new AbortController();
-    const signalOf = (builder: unknown) =>
-      (builder as { signal?: AbortSignal }).signal;
+  // PostgREST truncates an unranged function result at max_rows without an error.
+  it('asks the grouped-places RPC for exactly the page it is given', () => {
+    const params = paramsOf(
+      rawListCategoryPlaces({
+        categoryId: 'cat-1',
+        search: '',
+        from: 1000,
+        to: 1999,
+      }),
+    );
+    expect(params.get('offset')).toBe('1000');
+    expect(params.get('limit')).toBe('1000');
+  });
 
-    expect(
-      signalOf(
-        rawListItems({
-          categoryId: 'cat-1',
-          search: '',
-          from: 0,
-          to: 8,
-          signal: controller.signal,
-        }),
-      ),
-    ).toBe(controller.signal);
-    expect(
-      signalOf(
-        rawCountItems({
-          categoryId: 'cat-1',
-          search: '',
-          signal: controller.signal,
-        }),
-      ),
-    ).toBe(controller.signal);
-    expect(
-      signalOf(
-        rawCountItems({
-          categoryId: 'cat-1',
-          search: 'coin',
-          signal: controller.signal,
-        }),
-      ),
-    ).toBe(controller.signal);
-    expect(
-      signalOf(
-        rawSearchCategoryItems({
-          categoryId: 'cat-1',
-          likePattern: '%coin%',
-          from: 0,
-          to: 8,
-          signal: controller.signal,
-        }),
-      ),
-    ).toBe(controller.signal);
-    expect(
-      signalOf(
+  it('carries an abort signal through, and leaves it off when none is given', () => {
+    const controller = new AbortController();
+    const signalOf = (signal?: AbortSignal) =>
+      (
         rawListCategoryPlaces({
           categoryId: 'cat-1',
           search: 'coin',
-          signal: controller.signal,
-        }),
-      ),
-    ).toBe(controller.signal);
-  });
-
-  it('leaves a query with nothing to cancel without a signal', () => {
-    expect(
-      (
-        rawListItems({
-          categoryId: 'cat-1',
-          search: '',
           from: 0,
-          to: 8,
-        }) as unknown as {
-          signal?: AbortSignal;
-        }
-      ).signal,
-    ).toBeUndefined();
+          to: 999,
+          signal,
+        }) as unknown as { signal?: AbortSignal }
+      ).signal;
+
+    expect(signalOf(controller.signal)).toBe(controller.signal);
+    expect(signalOf()).toBeUndefined();
   });
 
   it('omits like_pattern rather than sending it as the literal text "null"', () => {
@@ -127,101 +80,6 @@ describe('the queries behind the list and the map', () => {
   it('narrows the map by the same escaping and minimum length as the list', () => {
     expect(mapQuery('coin').get('like_pattern')).toBe(likePatternFor('coin'));
     expect(mapQuery('50%').get('like_pattern')).toBe(likePatternFor('50%'));
-  });
-
-  const searchParamsOf = (search: string) =>
-    paramsOf(
-      rawSearchCategoryItems({
-        categoryId: 'cat-1',
-        likePattern: likePatternFor(search)!,
-        from: 0,
-        to: 8,
-      }),
-    );
-
-  it('calls the searched-items RPC as a GET, with the category, pattern and page bounds', () => {
-    expect(
-      (
-        rawSearchCategoryItems({
-          categoryId: 'cat-1',
-          likePattern: '%coin%',
-          from: 0,
-          to: 8,
-        }) as unknown as { url: URL }
-      ).url.pathname,
-    ).toMatch(/\/rpc\/search_category_items$/);
-    const params = searchParamsOf('coin');
-    expect(params.get('cat_id')).toBe('cat-1');
-    expect(params.get('like_pattern')).toBe(likePatternFor('coin'));
-    expect(params.get('page_from')).toBe('0');
-    expect(params.get('page_to')).toBe('8');
-    expect(
-      (
-        rawSearchCategoryItems({
-          categoryId: 'cat-1',
-          likePattern: '%coin%',
-          from: 0,
-          to: 8,
-        }) as unknown as { method: string }
-      ).method,
-    ).toBe('GET');
-  });
-
-  it('narrows the list by category as a plain column filter, not an embedded one', () => {
-    expect(listQuery('coin').get('category_id')).toBe('eq.cat-1');
-  });
-
-  it('drives the list from item_categories, embedding items as the inner join that carries the search filter, and their photographs', () => {
-    expect(listQuery('coin').get('select')).toBe(
-      'items!inner(id,title,description,place,place_lat,place_lng,tags,images(id,item_id,path_full,path_thumb))',
-    );
-  });
-
-  it("orders each item's embedded photographs oldest-first, id breaking ties", () => {
-    expect(listQuery('').get('items.images.order')).toBe(
-      'created_at.asc,id.asc',
-    );
-  });
-
-  it('counts item_categories alone, with no join to items, when there is no search filter', () => {
-    const builder = countBuilder('');
-    expect(builder.url.searchParams.get('select')).toBe('item_id');
-    expect(builder.method).toBe('HEAD');
-    expect(builder.headers.get('Prefer')).toContain('count=exact');
-  });
-
-  it('narrows the count query by category the same way the page query is', () => {
-    expect(countBuilder('').url.searchParams.get('category_id')).toBe(
-      'eq.cat-1',
-    );
-    // Still so once the search filter brings the items join back: a whole-table count is someone else's.
-    expect(countBuilder('coin').url.searchParams.get('category_id')).toBe(
-      'eq.cat-1',
-    );
-  });
-
-  it('brings the items join back into the count only once a search filter applies', () => {
-    const builder = countBuilder('coin');
-    expect(builder.url.searchParams.get('select')).toBe(
-      'items!inner(id,title,description,place,place_lat,place_lng,tags)',
-    );
-    expect(builder.method).toBe('HEAD');
-    expect(builder.headers.get('Prefer')).toContain('count=exact');
-    expect(builder.url.searchParams.get('items.or')).toBe(
-      listQuery('coin').get('items.or'),
-    );
-  });
-
-  it('leaves the count query unfiltered for a search term below the minimum length', () => {
-    expect(countBuilder('ab').url.searchParams.get('select')).toBe('item_id');
-  });
-
-  it('leaves the list unfiltered for a term below the minimum length', () => {
-    expect(listQuery('ab').has('items.or')).toBe(false);
-  });
-
-  it('orders the list newest-first, the item id breaking ties', () => {
-    expect(listQuery('coin').get('order')).toBe('created_at.desc,item_id.asc');
   });
 });
 

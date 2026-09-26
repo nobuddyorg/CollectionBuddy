@@ -145,7 +145,7 @@ export function setup() {
   };
 }
 
-// Storage objects before rows, never after; items cascade their photographs and links, categories their shares.
+// Storage objects before rows, never after; categories go first, as their cascade drops filed items set-based, not per-row checked.
 export function clearAccount(session) {
   for (let offset = 0; ; offset += PHOTO_PAGE) {
     const rows = listImagePaths({ session, offset, limit: PHOTO_PAGE });
@@ -157,8 +157,8 @@ export function clearAccount(session) {
       ),
     );
   }
-  deleteOwnRows(session, 'items');
   deleteOwnRows(session, 'categories');
+  deleteOwnRows(session, 'items');
 }
 
 export function teardown({ owner, writer }) {

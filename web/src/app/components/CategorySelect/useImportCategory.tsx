@@ -8,13 +8,8 @@ import { useToast } from '../Toast/ToastProvider';
 import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
 import { ImportCancelledError } from '../../data/importCancellation';
 import { importCategory, type ImportProgress } from '../../data/importCategory';
-import {
-  findManifestPath,
-  ImportFormatError,
-  parseManifest,
-} from '../../data/importFormat';
+import { ImportFormatError } from '../../data/importFormat';
 import { uniqueCategoryName } from '../../data/categories';
-import { readZipEntries } from '../../data/zip';
 import { isQuotaExceeded } from '../../data/quota';
 
 /** What to say while an import runs. Same shape as exportProgressMessage. */
@@ -49,23 +44,11 @@ export function useImportCategory(existingCategoryNames: string[]) {
       controllerRef.current = controller;
       setProgress({ phase: 'reading', done: 0, total: 0 });
       try {
-        // Peeked ahead of the real read only to name the category first ("Coins (2)" if taken).
-        const entries = await readZipEntries(file);
-        const manifestPath = findManifestPath(entries.keys());
-        if (!manifestPath) {
-          throw new ImportFormatError('Not a CollectionBuddy export archive');
-        }
-        const manifest = parseManifest(
-          JSON.parse(new TextDecoder().decode(entries.get(manifestPath))),
-        );
-        const categoryName = uniqueCategoryName(
-          manifest.category.name,
-          existingCategoryNames,
-        );
-
         const result = await importCategory({
           file,
-          categoryName,
+          // "Coins (2)" if taken, named from the one read of the archive importCategory makes.
+          nameCategory: (archivedName) =>
+            uniqueCategoryName(archivedName, existingCategoryNames),
           onProgress: setProgress,
           signal: controller.signal,
         });

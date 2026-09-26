@@ -1,6 +1,7 @@
 // Modules under both mutation testing (stryker.config.mjs) and the per-file coverage floor (vitest.config.mts).
 export const MUTATE_TARGETS = [
   'src/app/data/items.ts',
+  'src/app/data/itemPage.ts',
   'src/app/data/zip.ts',
   'src/app/data/exportFormat.ts',
   'src/app/data/exportCategory.ts',
@@ -15,6 +16,7 @@ export const MUTATE_TARGETS = [
   'src/app/components/ItemList/Pagination.tsx',
   'src/app/components/ItemList/imageEntries.ts',
   'src/app/lib/optimistic.ts',
+  'src/app/components/Toast/pendingToasts.ts',
   'src/app/components/ItemList/paging.ts',
   'src/app/components/ItemList/imageCache.ts',
   'src/app/components/ItemList/firstPagePrefetch.ts',

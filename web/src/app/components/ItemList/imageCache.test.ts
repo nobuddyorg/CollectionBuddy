@@ -5,7 +5,9 @@ import {
   SIGNED_URL_TTL_MS,
   cacheSignedUrls,
   clearImageCache,
+  forgetSignedUrls,
   getCachedSignedUrl,
+  lastSignedUrl,
   unsignedPaths,
 } from './imageCache';
 
@@ -51,11 +53,41 @@ describe('signed URL cache', () => {
     ).toBeUndefined();
   });
 
-  it('forgets an expired entry rather than re-checking it forever', () => {
+  // Kept past its margin as the last resort a card shows while re-signing it fails.
+  it('keeps an aged-out signature only as the last one signed', () => {
     cacheSignedUrls([['a.webp', 'u']], T0);
-    getCachedSignedUrl('a.webp', T0 + SIGNED_URL_TTL_MS);
-    // Even asked about at the original time again, it is gone.
-    expect(getCachedSignedUrl('a.webp', T0)).toBeUndefined();
+    expect(
+      getCachedSignedUrl('a.webp', T0 + SIGNED_URL_TTL_MS),
+    ).toBeUndefined();
+    expect(lastSignedUrl('a.webp')).toBe('u');
+    expect(unsignedPaths(['a.webp'], T0 + SIGNED_URL_TTL_MS)).toEqual([
+      'a.webp',
+    ]);
+  });
+
+  it('has no last signature for a path it has never seen', () => {
+    expect(lastSignedUrl('nope.webp')).toBeUndefined();
+  });
+
+  it('replaces an aged-out signature with a fresh one, stamped when it was signed', () => {
+    cacheSignedUrls([['a.webp', 'old']], T0);
+    const later = T0 + SIGNED_URL_TTL_MS;
+    cacheSignedUrls([['a.webp', 'new']], later);
+    expect(lastSignedUrl('a.webp')).toBe('new');
+    expect(getCachedSignedUrl('a.webp', later + 1000)).toBe('new');
+  });
+
+  it('forgets exactly the paths it is told to', () => {
+    cacheSignedUrls(
+      [
+        ['gone.webp', 'u'],
+        ['kept.webp', 'v'],
+      ],
+      T0,
+    );
+    forgetSignedUrls(['gone.webp']);
+    expect(lastSignedUrl('gone.webp')).toBeUndefined();
+    expect(getCachedSignedUrl('kept.webp', T0)).toBe('v');
   });
 });
 

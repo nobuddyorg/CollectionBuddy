@@ -17,7 +17,7 @@ describe('importCategory', () => {
     const archive = await buildArchive();
     const failure = importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       getUid: fakeGetUid(null),
     });
@@ -28,7 +28,7 @@ describe('importCategory', () => {
   it('rejects a file that is not a ZIP archive at all', async () => {
     const failure = importCategory({
       file: new Blob(['not a zip']),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
     });
     await expect(failure).rejects.toHaveProperty('name', 'ImportError');
@@ -44,7 +44,7 @@ describe('importCategory', () => {
     writer.add({ path: 'root/photos/1.webp', bytes: new Uint8Array([1]) });
     const failure = importCategory({
       file: writer.finish(),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
     });
     await expect(failure).rejects.toBeInstanceOf(ImportFormatError);
@@ -63,7 +63,7 @@ describe('importCategory', () => {
     });
     const failure = importCategory({
       file: writer.finish(),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
     });
     await expect(failure).rejects.toBeInstanceOf(ImportFormatError);
@@ -83,7 +83,7 @@ describe('importCategory', () => {
     });
     const failure = importCategory({
       file: writer.finish(),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
     });
     await expect(failure).rejects.toBeInstanceOf(ImportFormatError);
@@ -93,15 +93,17 @@ describe('importCategory', () => {
     );
   });
 
-  it("creates a new category with the given name, not the archive's original name", async () => {
+  it("creates the new category under the name nameCategory makes of the archive's own", async () => {
     const archive = await buildArchive();
     const createCategoryRow = fakeCreateCategory();
+    const nameCategory = vi.fn((archivedName: string) => `${archivedName} (2)`);
     await importCategory({
       file: archive,
-      categoryName: 'Coins (2)',
+      nameCategory,
       ...baseFakes(),
       createCategoryRow,
     });
+    expect(nameCategory).toHaveBeenCalledWith('Coins');
     expect(createCategoryRow).toHaveBeenCalledWith('Coins (2)');
   });
 
@@ -116,7 +118,7 @@ describe('importCategory', () => {
 
     const failure = importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       deleteCategoryRow,
@@ -140,7 +142,7 @@ describe('importCategory', () => {
 
     const failure = importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
     });
@@ -153,7 +155,7 @@ describe('importCategory', () => {
     const progress: ImportProgress[] = [];
     await importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       onProgress: (step) => progress.push(step),
     });

@@ -25,7 +25,7 @@ describe('importCategory, cancelled', () => {
 
     const failure = importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       signal: controller.signal,
@@ -58,7 +58,7 @@ describe('importCategory, cancelled', () => {
 
     const failure = importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       createItemRows,
@@ -74,16 +74,16 @@ describe('importCategory, cancelled', () => {
   it('stops the whole photo pool and cleans up when cancelled mid-upload, rather than skipping just one photo', async () => {
     const archive = await buildArchive();
     const controller = new AbortController();
-    const compressThumb = vi.fn(async (bytes: Uint8Array<ArrayBuffer>) => {
+    const compressThumb = vi.fn(async (photo: Blob) => {
       controller.abort();
-      return new Blob([bytes], { type: 'image/webp' });
+      return new Blob([photo], { type: 'image/webp' });
     }) as unknown as CompressThumb;
     const deleteCategoryRow = fakeDeleteCategory();
     const createCategoryRow = fakeCreateCategory('new-cat-1');
 
     const failure = importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       deleteCategoryRow,
@@ -131,7 +131,7 @@ describe('importCategory, rolling back photographs already sent', () => {
 
     const failure = importCategory({
       file: await twoPhotoArchive(),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage,
       removeImages,
@@ -158,7 +158,7 @@ describe('importCategory, rolling back photographs already sent', () => {
 
     const failure = importCategory({
       file: await twoPhotoArchive(),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage,
       removeImages,
@@ -189,7 +189,7 @@ describe('importCategory, rolling back photographs already sent', () => {
     try {
       const failure = importCategory({
         file: archive,
-        categoryName: 'Coins',
+        nameCategory: () => 'Coins',
         ...baseFakes(),
         uploadImage,
         removeImages,
@@ -225,7 +225,7 @@ describe('importCategory, rolling back photographs already sent', () => {
 
     const failure = importCategory({
       file: await twoPhotoArchive(),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage: uploadThatCancels(controller, { error: null }),
       removeImages,
@@ -254,7 +254,7 @@ describe('importCategory, rolling back photographs already sent', () => {
 
     const failure = importCategory({
       file: await twoPhotoArchive(),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       compressThumb,
       removeImages,
