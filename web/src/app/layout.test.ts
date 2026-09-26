@@ -48,6 +48,11 @@ describe('the Content-Security-Policy meta tag in layout.tsx', () => {
     expect(policy).toContain(`worker-src 'self' blob:`);
   });
 
+  // A blob: worker inherits this policy, so a CDN here would run third-party code over every photo uploaded.
+  it("loads scripts, a worker's imports included, from the app's own origin only", () => {
+    expect(policy).toContain("`script-src 'self' 'unsafe-inline'`,");
+  });
+
   it('allows a data: URI image, which Leaflet loads internally', () => {
     expect(policy).toMatch(/img-src[^;]*\bdata:/);
   });

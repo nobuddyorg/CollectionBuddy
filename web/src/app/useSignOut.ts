@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from './components/Toast/ToastProvider';
 import { useI18n } from './i18n/useI18n';
 import { supabase } from './supabase';
+import { forgetUserData } from './userData';
 
 export function useSignOut() {
   const router = useRouter();
@@ -29,6 +30,8 @@ export function useSignOut() {
       );
       await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
     } finally {
+      // The session is over either way; the next person at this browser gets none of its places or links.
+      forgetUserData();
       router.replace('/login');
     }
   }, [router, t, toast]);

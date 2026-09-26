@@ -1,3 +1,5 @@
+import { type Page } from '@playwright/test';
+
 import { expect, test as base } from './test';
 
 import { SEED } from './fixtures';
@@ -35,6 +37,16 @@ const test = base.extend<{ collector: { email: string; userId: string } }>({
 
 test.use({ locale: 'en-GB' });
 
+// What one account leaves in the browser; the appearance belongs to the device.
+const PER_USER_KEYS = [
+  'collectionbuddy.selectedCategory',
+  'cb_geocode_cache_v1',
+  'collectionbuddy.storageOwner',
+];
+
+const storedKeys = (page: Page) =>
+  page.evaluate(() => Object.keys(window.localStorage));
+
 test.describe('signing out', () => {
   test('sends a deletion still inside its undo window, returns to the login page, and stays signed out', async ({
     on,
@@ -63,5 +75,40 @@ test.describe('signing out', () => {
     // Confirms the session itself is gone, not just a client-side navigation.
     await page.reload({ waitUntil: 'networkidle' });
     await expect(page).toHaveURL(/\/login\/?$/);
+  });
+
+  test('leaves the next person none of its collection or looked-up places, and keeps the appearance', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await page.route('https://photon.komoot.io/**', (route) =>
+      route.fulfill({
+        json: {
+          features: [
+            {
+              properties: { name: 'Garmisch' },
+              geometry: { type: 'Point', coordinates: [11.08, 47.49] },
+            },
+          ],
+        },
+      }),
+    );
+    await app.categories.do.open(SEED.signOut.category);
+    await app.map.do.open();
+    await expect(app.map.locators.pins).toHaveCount(1);
+    await expect
+      .poll(() => storedKeys(page))
+      .toEqual(expect.arrayContaining(PER_USER_KEYS));
+    await app.map.do.close();
+    await app.account.do.open();
+    await app.account.do.chooseTheme('dark');
+
+    await app.account.do.signOut();
+    await expect(page).toHaveURL(/\/login\/?$/);
+
+    const left = await storedKeys(page);
+    expect(left).toContain('theme');
+    for (const key of PER_USER_KEYS) expect(left).not.toContain(key);
   });
 });

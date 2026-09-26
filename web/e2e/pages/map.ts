@@ -3,6 +3,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 interface MapView {
   (): Locator;
   do: {
+    close(): Promise<void>;
     frameAllPins(): Promise<void>;
     open(): Promise<void>;
     openPin(index?: number): Promise<void>;
@@ -12,6 +13,7 @@ interface MapView {
   /** The pins and the popup are Leaflet's own DOM, the one place reached by class rather than a test id. */
   locators: {
     buttons: {
+      close: Locator;
       frameAll: Locator;
       zoomIn: Locator;
       zoomToLocation: Locator;
@@ -28,6 +30,7 @@ export function initMap(page: Page): MapView {
   const root = page.locator('.leaflet-container');
   const locators = {
     buttons: {
+      close: page.getByTestId('dialog-close'),
       frameAll: page.getByTestId('frame-all-pins'),
       zoomIn: page.locator('.leaflet-control-zoom-in'),
       zoomToLocation: page.getByTestId('zoom-to-location'),
@@ -39,6 +42,10 @@ export function initMap(page: Page): MapView {
     },
   };
   const interactions = {
+    close: async () => {
+      await locators.buttons.close.click();
+      await expect(root).toBeHidden();
+    },
     frameAllPins: async () => {
       await locators.buttons.frameAll.click();
     },
