@@ -9,6 +9,8 @@ import {
   categoryTabId,
 } from './components/CategorySelect/Dropdown';
 import Header from './components/Header';
+import HelpDialog from './components/Help';
+import { useHelp } from './components/Help/useHelp';
 import ItemList from './components/ItemList';
 import { ItemListSkeleton } from './components/ItemList/Skeleton';
 import LoadingOverlay from './components/LoadingOverlay';
@@ -35,6 +37,7 @@ export default function Page() {
   const { categories, selectedCategoryId, selectCategory, catalogueReady } =
     useCatalogue(loading, userId);
   const signOut = useSignOut();
+  const help = useHelp();
 
   if (loading)
     return <LoadingOverlay label={t('item_list.loading')} theme="auto" />;
@@ -59,7 +62,8 @@ export default function Page() {
         {t('page.skip_to_content')}
       </a>
 
-      <Header user={headerUser} onSignOut={signOut} />
+      <Header user={headerUser} onSignOut={signOut} onOpenHelp={help.show} />
+      <HelpDialog open={help.open} onOpenChange={help.setOpen} />
 
       {/* No wrapper panels: cards nested in bordered trays ate the width on a 390px screen. */}
       <main
@@ -115,6 +119,14 @@ export default function Page() {
                   {t('page.name_first_category')}
                 </p>
               </div>
+              <button
+                type="button"
+                data-testid="empty-open-help"
+                onClick={help.show}
+                className="min-h-11 px-3 font-label text-xs text-foreground underline underline-offset-4"
+              >
+                {t('page.open_help')}
+              </button>
             </div>
           </section>
         )}

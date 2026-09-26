@@ -142,6 +142,10 @@ export const SEED = {
     category: 'Garderobe',
     item: 'Garderobenstück',
   },
+  /** For help.spec.ts's first run, as a collector of its own per parallel slot who owns nothing. */
+  firstRun: {
+    password: 'first-run-password-not-a-secret',
+  },
   // The RLS specs below run in parallel files and category_shares is unique per (category, grantee).
   /** For rls/viewer-share-photographs.spec.ts, which grants and revokes around a photograph. */
   viewerPhotoCategory: 'Fotoalbum',

@@ -51,6 +51,10 @@ Deleting an entry, a photo or a collection hides it at once and sends the delete
 
 A grant cannot wait like that. A deferred revoke is access that continues after the owner was told it had ended, so revoking and leaving send the `category_shares` delete at once, and the row leaves the list only when the delete has succeeded (#737). The owner's Undo inserts the same grant again, email, role and expiry, as a new row; one already expired cannot be re-inserted (`expires_at` must be after `created_at`) and says so. Leaving has no Undo, because only the owner may insert a grant.
 
+## Why help lives in the app, and opens with Ctrl+/
+
+**Help** in the account menu, the first-run page's **How it works**, and Ctrl+/ (Cmd+/) open a short dialog in the app's own language rather than linking to this documentation: the docs are English-only and partly written for developers, and leaving the app strands an installed PWA that is offline. The dialog says what each feature is and where to find it; the edge cases stay in the [user guide](../how-to/user-guide.md), which leaves the two less to drift on. The shortcut carries a modifier because a bare `?`, the web's usual help key, is a single-character shortcut, which WCAG 2.1.4 allows only when it can be turned off or remapped, a setting nobody needs. Ctrl+/ types nothing, so it works from inside a text field too.
+
 ## Why an editor's filed entries follow the grant
 
 An entry an editor files into someone else's category stays the editor's row: `user_id` is the editor, which keeps it on the editor's quota and outside the owner's read predicate. Every write policy used to carry an owner branch that ignored grants, so revoking or demoting the editor only stopped new filings. The ex-editor kept editing, re-photographing and deleting what it had filed, inside a collection the owner goes on sharing with others (#739). Since `0021`, each of those writes needs `has_item_write_access()`: write access to every category the entry is in. Ownership alone still covers an entry in no category (one being created) and entries in the editor's own categories.

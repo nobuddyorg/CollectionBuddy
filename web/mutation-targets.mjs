@@ -19,6 +19,8 @@ export const MUTATE_TARGETS = [
   'src/app/components/Toast/pendingToasts.ts',
   'src/app/components/Toast/countdown.ts',
   'src/app/components/Toast/undoShortcut.ts',
+  'src/app/components/Help/helpShortcut.ts',
+  'src/app/components/Help/useHelp.ts',
   'src/app/components/ItemList/paging.ts',
   'src/app/components/ItemList/imageCache.ts',
   'src/app/components/ItemList/firstPagePrefetch.ts',

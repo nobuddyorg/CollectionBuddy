@@ -11,13 +11,17 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-function renderHeader(onSignOut = vi.fn()) {
+function renderHeader(onSignOut = vi.fn(), onOpenHelp = vi.fn()) {
   const rendered = render(
     <I18nProvider>
-      <Header user={{ email: 'collector@example.com' }} onSignOut={onSignOut} />
+      <Header
+        user={{ email: 'collector@example.com' }}
+        onSignOut={onSignOut}
+        onOpenHelp={onOpenHelp}
+      />
     </I18nProvider>,
   );
-  return { ...rendered, onSignOut };
+  return { ...rendered, onSignOut, onOpenHelp };
 }
 
 async function openMenu() {
@@ -90,5 +94,26 @@ describe('Menu', () => {
     await vi.waitFor(() => {
       expect(document.getElementById('user-menu')).toBeNull();
     });
+  });
+
+  it('opens help, closes the menu and leaves focus on the trigger for the dialog to return to', async () => {
+    const onOpenHelp = vi.fn();
+    const user = userEvent.setup();
+    renderHeader(vi.fn(), onOpenHelp);
+    const trigger = screen.getByRole('button', { name: 'Account menu' });
+    await user.click(trigger);
+    const menu = document.getElementById('user-menu') as HTMLElement;
+    await user.click(within(menu).getByRole('button', { name: 'Help' }));
+    expect(onOpenHelp).toHaveBeenCalledTimes(1);
+    expect(document.getElementById('user-menu')).toBeNull();
+    expect(trigger).toHaveFocus();
+  });
+
+  it('names the help shortcut for assistive tech rather than in the button name', async () => {
+    await openMenu();
+    const menu = document.getElementById('user-menu') as HTMLElement;
+    const help = within(menu).getByRole('button', { name: 'Help' });
+    expect(help).toHaveAttribute('aria-keyshortcuts', 'Control+/ Meta+/');
+    expect(within(help).getByText('Ctrl+/')).toBeVisible();
   });
 });

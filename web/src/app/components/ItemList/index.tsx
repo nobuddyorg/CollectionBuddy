@@ -152,6 +152,10 @@ export default function ItemList({
   const isEmpty = items.length === 0;
   const showSkeleton = isEmpty && (loading || total > 0);
   const showEmptyState = isEmpty && !showSkeleton;
+  // A viewer's New entry button is disabled, so their hint must not point at it.
+  const noItemsHint = canEdit
+    ? t('item_list.no_items_hint')
+    : t('item_list.no_items_hint_read_only');
 
   let searchAnnouncement = '';
   if (!loading) {
@@ -234,7 +238,7 @@ export default function ItemList({
               <p className="text-sm text-muted-foreground">
                 {searchStatus.kind === 'active'
                   ? t('item_list.no_results_hint')
-                  : t('item_list.no_items_hint')}
+                  : noItemsHint}
               </p>
             </div>
             {debouncedQuery && (

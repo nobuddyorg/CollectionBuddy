@@ -17,7 +17,7 @@ with Google** and complete the flow.
 
 Items live in categories ("Coins", "Stamps", "Vinyl"), and you browse one at
 a time. On first sign-in you have none, so the category picker is open and
-empty.
+empty; **How it works** below it opens the in-app help.
 
 1. Type a name into the text field.
 2. Click **+**.
@@ -39,10 +39,9 @@ Save. Items sort newest first, and the list jumps to page 1 so you see it.
 
 ## 4. Add a photo
 
-Hover the card (or tap **⋯** on a touch screen) to show its action row, click
-the upload icon, and pick any image. The browser compresses it to WebP (JPEG
-in Safari and on iOS) and makes a thumbnail before uploading, so a full-size
-phone photo is fine.
+Click **+** at the bottom of the card and pick any image. The browser
+compresses it to WebP (JPEG in Safari and on iOS) and makes a thumbnail before
+uploading, so a full-size phone photo is fine.
 
 Click the thumbnail to open it full size. A second photo makes a pair; from the
 third on, the first photo gets the large slot and the rest form a strip under
@@ -61,13 +60,15 @@ Add one or two more items with different titles and places, then:
 
 ## 6. Housekeeping
 
-- **Edit**: pencil icon on the action row — the same form, pre-filled.
+- **Edit**: pencil icon at the bottom of the card — the same form, pre-filled.
 - **Delete an item**: trash icon, confirm. Its photos go with it.
-- **Delete a category**: open the picker, select the category, clear the text
-  field, click delete. Its items are deleted with it: every item belongs to
+- **Delete a category**: open the picker, select the category, click
+  **Delete**, confirm. Its items are deleted with it: every item belongs to
   exactly one category.
 - **Language and theme**: click your email in the header. German/English and
   System/Light/Dark are independent.
+- **Help**: click your email in the header, then **Help**, or press Ctrl+/
+  (Cmd+/ on a Mac).
 
 ## What's next
 

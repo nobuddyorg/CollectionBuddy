@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { useFocusTrap } from './useFocusTrap';
 
@@ -53,6 +53,35 @@ function Harness({
 
 const button = (name: string) => screen.getByRole('button', { name });
 
+function TrappedPanel() {
+  const container = useRef<HTMLDivElement>(null);
+  useFocusTrap({ open: true, containerRef: container });
+  return (
+    <div ref={container}>
+      <button>inside</button>
+    </div>
+  );
+}
+
+// Stands in for CenteredModal: its inert (a disabled opener here, as jsdom ignores inert) lifts after the dialog's cleanup.
+function BlockingHost({ open }: { open: boolean }) {
+  const opener = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const blocked = opener.current!;
+    blocked.disabled = true;
+    return () => {
+      blocked.disabled = false;
+    };
+  }, [open]);
+  return (
+    <div>
+      <button ref={opener}>opener</button>
+      {open && <TrappedPanel />}
+    </div>
+  );
+}
+
 // Keeps the container mounted while closed: `open` alone must gate the hook, not callers' unmounts.
 function AlwaysMountedHarness({ open }: { open: boolean }) {
   const container = useRef<HTMLDivElement>(null);
@@ -91,10 +120,31 @@ describe('useFocusTrap', () => {
     expect(button('first')).toHaveFocus();
 
     rerender(<Harness open={false} />);
-    expect(button('outside before')).toHaveFocus();
+    await vi.waitFor(() => expect(button('outside before')).toHaveFocus());
   });
 
-  it('falls back to the main landmark when the trigger was removed while open', () => {
+  it('gives focus back once the page behind is focusable again, not while it is still inert', async () => {
+    const { rerender } = render(<BlockingHost open={false} />);
+    button('opener').focus();
+    rerender(<BlockingHost open />);
+    expect(button('inside')).toHaveFocus();
+
+    rerender(<BlockingHost open={false} />);
+    await vi.waitFor(() => expect(button('opener')).toHaveFocus());
+  });
+
+  it('leaves focus alone when something else took it before the restore', async () => {
+    const { rerender } = render(<Harness open={false} />);
+    button('outside before').focus();
+    rerender(<Harness open />);
+
+    rerender(<Harness open={false} />);
+    button('outside after').focus();
+    await Promise.resolve();
+    expect(button('outside after')).toHaveFocus();
+  });
+
+  it('falls back to the main landmark when the trigger was removed while open', async () => {
     const { rerender } = render(<Harness open={false} removeTrigger={false} />);
 
     button('outside before').focus();
@@ -104,7 +154,7 @@ describe('useFocusTrap', () => {
     rerender(<Harness open removeTrigger />);
     rerender(<Harness open={false} removeTrigger />);
 
-    expect(screen.getByText('main')).toHaveFocus();
+    await vi.waitFor(() => expect(screen.getByText('main')).toHaveFocus());
   });
 
   it('sends Tab from the last control round to the first', async () => {
