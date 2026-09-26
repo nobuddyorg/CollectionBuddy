@@ -4,8 +4,8 @@
 -- total confidentiality failure, and the interface would look identical
 -- while showing somebody else's collection.
 --
--- Complements web/e2e/signed-in/rls.spec.ts's "one collection cannot reach
--- another" describe block rather than duplicating it: that suite proves
+-- Complements web/e2e/signed-in/rls/isolation.spec.ts rather than
+-- duplicating it: that suite proves
 -- the same properties through a real PostgREST request carrying a real
 -- JWT; this file proves them at the SQL surface directly, in a rolled-back
 -- transaction, without a browser or a running application stack.

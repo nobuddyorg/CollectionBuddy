@@ -12,11 +12,16 @@ stack-dependent jobs — `e2e_local_stack`, `opengrep`, `lighthouse`,
 `zap_baseline` — each have a section below.
 
 On a pull request, CI's `changes` job skips `build_and_test`, `mutation_test`,
-`lighthouse` and `zap_baseline` unless `web/**` changed, and `e2e_local_stack`
-and `opengrep` unless `web/**` or `supabase/**` changed; a push to `main` or
-a dispatch runs everything. A skipped job reports as passed. Every job writes its report to its
-own Actions summary rather than a PR comment — see
-[Configuration](../reference/configuration.md#ci-job-summaries).
+`lighthouse` and `zap_baseline` unless `web/**` or `.zap/rules.tsv` changed,
+and `e2e_local_stack` and `opengrep` unless one of those or
+`supabase/migrations/**`, `supabase/tests/database/**`,
+`supabase/splinter.sh`, `.sqlfluff` or `cleanup-orphaned-photos.yml`
+changed; a change to `ci.yml` runs everything. Nothing else runs them on a
+PR: not `.github/actions/**`, `supabase/config.toml` or `.semgrepignore`, so
+run the matching checks locally for those. A push to `main` or a dispatch
+runs everything, and the deploy waits for that run. A skipped job reports as
+passed. Every job writes its report to its own Actions summary rather than a
+PR comment — see [Configuration](../reference/configuration.md#ci-job-summaries).
 
 ## Run the end-to-end suite
 
@@ -60,7 +65,8 @@ menu, and — in `rls/` — the row-level security boundary itself. Those specs
 bypass the interface almost entirely: they ask Postgres, with a real token, the
 questions the app never would, one file per boundary (`isolation`,
 `viewer-share`, `editor-share`, each with a `-photographs` half for Storage,
-plus `search-rpc`, `orphan-sweep-rpc` and `quotas`; shared helpers in `rls/helpers.ts`). Change a
+and `editor-share` a `-limits` one, plus `search-rpc`, `orphan-sweep-rpc` and
+`quotas`; shared helpers in `rls/helpers.ts`). Change a
 policy and these files say whether it holds.
 
 ```bash
@@ -74,12 +80,13 @@ Supabase URL is baked in at build time, so a build pointed elsewhere would test
 a bundle talking to production — and runs the suite. CI runs the same script.
 
 Sign-in does not go through the interface, since no runner can drive Google
-OAuth. `e2e/signed-in.setup.ts` creates a user through the auth admin API,
-signs in, and writes the session into `localStorage` as Playwright storage
-state. Before adding tests here:
+OAuth. `e2e/signed-in.setup.ts` creates a user through the auth admin API
+(`e2e/signed-in/collectors.ts`), signs in, and writes the session into
+`localStorage` as Playwright storage state. Before adding tests here:
 
-- **Seeding runs as the user, not as `service_role`.** That role has no table
-  grants; its key opens one door, creating the user. Everything else goes
+- **Seeding runs as the user, not as `service_role`.** That role holds no
+  `SELECT`, `INSERT`, `UPDATE` or `DELETE` on the app's tables; its key opens
+  one door, creating the user. Everything else goes
   through the same policies the app does, so a fixture cannot reach a state
   the app could not.
 - **Spec files run in parallel against one database.** Tests that write use
@@ -117,7 +124,7 @@ the shape and the rules; the screens are:
 - `categories` — the collection strip, the panel behind it, `tab(name)`
 - `form` — the entry form, tag chips, place autocomplete
 - `sharing` — the invite box; `row(email)` for a grant's role, expiry, revoke
-- `map`, `viewer`, `confirm`, `toast`, `account`, `login`
+- `map`, `viewer`, `confirm`, `toast`, `account`, `login`, `appError`
 
 Leaflet's pins and popups are the one thing reached by class name, inside
 `e2e/pages/map.ts`: that markup is the library's. A new case that needs an
@@ -167,6 +174,7 @@ supabase test db
 | `002_function_hardening_test.sql` | `search_path` pinning; which functions run as their owner |
 | `005_impersonation_sanity_test.sql` | That the impersonation the suite relies on works |
 | `010`, `020`, `025`, `030` | Ownership, viewer grants, a grant's lifecycle, the editor role |
+| `032`, `034` | What an editor keeps once its grant ends: the entries it filed, and the photographs it added to the owner's entries |
 | `040_storage_policy_surface_test.sql` | Bucket configuration; the storage verbs two security fixes removed |
 | `050`, `055` | The SQL functions and every branch of the write-path triggers |
 | `060`, `065` | The two read RPCs: who may call them, what they return |
@@ -396,7 +404,9 @@ names exists at the size it claims.
    to revert one ([Roll back a bad deploy](#roll-back-a-bad-deploy)); CI's
    `prek` job runs `supabase/check-migration-history.sh` against the PR's
    base, which fails on any of those, and on a new file not numbered after
-   the last one there. The migration keeps the bundle `main` serves working
+   the last one there; on `main` the base is the previous tip, so of two PRs
+   that picked the same number the second merge fails CI and deploys nothing.
+   The migration keeps the bundle `main` serves working
    ([Expand, then contract](#expand-then-contract)). A file that takes a lock
    starts with `set local lock_timeout` and `set local statement_timeout`
    after its `begin;`, so it fails fast instead of queueing every read behind
@@ -463,13 +473,24 @@ from the old files and introspect, reset from the new files and introspect
 again — column defaults, constraint expressions, index definitions, function
 bodies, trigger timing, policy predicates, grants — and diff the two. A commit
 of the squash carries a `Rewrites-migrations: <why>` trailer, the history
-check's one override. Then, in
-the hosted project's SQL editor and right before merging, delete the rows of
-the files that no longer exist so `db push` stops looking for them:
+check's one override.
+
+The last step is the repository owner's, by hand: it runs SQL against the
+hosted project, which an assistant never does, so an assistant stops here and
+hands it over. Right before merging, disable *Deploy Pages* (Actions →
+*Deploy Pages* → ⋯ → *Disable workflow*), then in the hosted project's SQL editor delete the rows
+of the files that no longer exist so `db push` stops looking for them. Merge,
+check the table holds `0001`–`0007` only, enable *Deploy Pages* and run it by
+hand from `main`; its *Show pending migrations* step must list nothing:
 
 ```sql
 delete from supabase_migrations.schema_migrations where version > '0007';
+select version, name from supabase_migrations.schema_migrations order by version;
 ```
+
+A deploy between the delete and the merge would run the old `0008` onward
+against the populated database again, and since a squash frees those numbers
+for reuse, the versions alone would never show it.
 
 That table is the only reason the chain cannot be rewritten in place. Versions
 0001–0007 stay recorded as applied, so the new files never run on the populated
@@ -480,9 +501,13 @@ database; the diff above is what proves they would have produced it.
 For a fork, or a new production project:
 
 1. Create a Supabase project.
-2. `supabase link --project-ref <ref>` then `supabase db push`. Pasting files
-   into the SQL editor also works but leaves `supabase_migrations.schema_migrations`
-   untouched; `supabase migration repair --status applied <version>` reconciles it.
+2. From the repository root, `supabase db push --db-url "<session pooler URL>"`,
+   the string `SUPABASE_DB_URL` will hold
+   ([Configuration](../reference/configuration.md#github-actions-secrets)).
+   Not `supabase link`: it resolves the IPv6-only direct host, which an
+   IPv4-only network cannot reach. Pasting files into the SQL editor also
+   works but leaves `supabase_migrations.schema_migrations` untouched;
+   `supabase migration repair --status applied <version>` reconciles it.
 3. Auth settings: enable **Google** with an OAuth client whose redirect URI is
    `<project-url>/auth/v1/callback`. Then set every value in [Hosted Auth
    settings](../reference/configuration.md#hosted-auth-settings), and Data
@@ -539,11 +564,14 @@ One-time setup for a fork:
 3. Secrets: `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`,
    `SUPABASE_AUTH_CONFIG_TOKEN`, `SUPABASE_PROJECT_REF` as **`production`
    environment** secrets; `NEXT_PUBLIC_SUPABASE_URL`,
-   `NEXT_PUBLIC_SUPABASE_ANON_KEY` as repository secrets — what each is and
-   why the DB URL must be the session pooler:
-   [Configuration](../reference/configuration.md#github-actions-secrets). The
-   two tokens are scoped to the project, with exactly the [permissions
-   listed there](../reference/configuration.md#management-api-tokens).
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `CODECOV_TOKEN` as repository secrets,
+   and those three again as **Dependabot** secrets, since a Dependabot PR's
+   run reads no other — what each is and why the DB URL must be the session
+   pooler: [Configuration](../reference/configuration.md#github-actions-secrets).
+   The two tokens are scoped to the project, with exactly the [permissions
+   listed there](../reference/configuration.md#management-api-tokens). A pull
+   request from another fork gets no secrets, so its `build_and_test` fails:
+   push the branch to the repository itself.
 4. Nothing to change for another repository name or a custom domain: the
    deploy takes `basePath` from the Pages site URL. A fork's own Site URL
    still goes into `supabase/hosted-auth.json`.

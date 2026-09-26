@@ -1,6 +1,6 @@
 -- Direct, fast tests of the pure and near-pure SQL functions and triggers
 -- underneath the RLS layer -- normalization, path parsing, and the
--- set-based orphan sweep CLAUDE.md calls out by name. Most of this needs
+-- set-based orphan cleanup trigger (delete_item_if_orphan). Most of this needs
 -- no identity at all; the parts that do use the same impersonation as the
 -- rest of this suite (see 005_impersonation_sanity_test.sql).
 begin;
@@ -43,7 +43,7 @@ select is(public.longest_tag_length(null), 0, 'a NULL array measures 0 too');
 
 -- storage_item_id: parses the item id out of a well-formed path, and
 -- answers NULL rather than raising on one that does not parse -- the same
--- reasoning as images_path_full_matches_item (0012): a raised error inside
+-- reasoning as images_path_full_matches_item (0003): a raised error inside
 -- an RLS predicate would abort the whole query, not just fail to match one
 -- row.
 select gen_random_uuid() as probe_item_id \gset
