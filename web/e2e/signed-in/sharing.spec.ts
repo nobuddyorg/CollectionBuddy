@@ -1,7 +1,7 @@
 import { expect, test } from './test';
 
 import { SEED } from './fixtures';
-import { apiAs, context } from './rls/helpers';
+import { apiAs, context, ownedCategoryId } from './rls/helpers';
 // The owner's half, through the panel; rls/viewer-share.spec.ts has what a grant opens.
 test.use({ locale: 'en-GB' });
 
@@ -14,6 +14,29 @@ async function granteeSees(category: string) {
     .eq('name', category);
   if (error) throw error;
   return data.length === 1;
+}
+
+/** The owner's grants to the second collector on the share collection, read and revoked past the interface. */
+async function grantsToOther() {
+  const { token, userId } = context();
+  const categoryId = await ownedCategoryId({
+    token,
+    userId,
+    name: SEED.shareCategory,
+  });
+  const table = () => apiAs(token).from('category_shares');
+  return {
+    read: () =>
+      table()
+        .select('expires_at')
+        .eq('category_id', categoryId)
+        .eq('invited_email', SEED.other.email),
+    revoke: () =>
+      table()
+        .delete()
+        .eq('category_id', categoryId)
+        .eq('invited_email', SEED.other.email),
+  };
 }
 
 test.describe('sharing a collection', () => {
@@ -82,5 +105,33 @@ test.describe('sharing a collection', () => {
 
     await app.sharing.do.clearExpiry();
     await expect(chip).toContainText('No expiry');
+  });
+
+  test('issues the grant with the expiry date it was given', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const grants = await grantsToOther();
+    try {
+      await app.sharing.do.setExpiry('2099-12-31');
+      await app.sharing.do.invite(SEED.other.email);
+
+      await expect(
+        app.sharing.row(SEED.other.email).locators.expiry,
+      ).toHaveText('Expires 31/12/2099');
+      // The end of that day in the browser's own time zone, which is what the picker means.
+      const endOfDay = await page.evaluate(() =>
+        new Date('2099-12-31T23:59:59').toISOString(),
+      );
+      const { data, error } = await grants.read();
+      if (error) throw error;
+      expect(
+        data.map((grant) => new Date(grant.expires_at!).toISOString()),
+      ).toEqual([endOfDay]);
+    } finally {
+      const { error } = await grants.revoke();
+      if (error) throw error;
+    }
   });
 });

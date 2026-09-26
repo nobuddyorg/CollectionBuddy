@@ -52,7 +52,7 @@ async function acceptDeleteConfirmation() {
 
 // deleteItem is deferred to the toast's undo window; closing the toast commits it, the same as expiry.
 async function commitDeferredDelete() {
-  await screen.findByRole('status');
+  await screen.findByTestId('toast');
   await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 }
 
@@ -273,7 +273,7 @@ describe('useItemMutations removeItem', () => {
       void result.current.removeItem('a');
     });
     await acceptDeleteConfirmation();
-    await screen.findByRole('status');
+    await screen.findByTestId('toast');
     const committed = vi.fn();
     act(() => {
       void result.current.toast.commitPending().then(committed);

@@ -197,8 +197,8 @@ describe('ToastProvider', () => {
     );
   });
 
-  it('posts a success toast as a visible, polite status rather than an assertive alert', async () => {
-    render(
+  it('shows a success toast and speaks it through the polite live region, never as an assertive alert', async () => {
+    const { container } = render(
       <I18nProvider>
         <ToastProvider>
           <SuccessTrigger message="Category deleted." />
@@ -210,9 +210,49 @@ describe('ToastProvider', () => {
       screen.getByRole('button', { name: 'Category deleted.' }),
     );
 
-    const status = await screen.findByRole('status');
-    expect(status).toHaveTextContent('Category deleted.');
+    expect(screen.getByTestId('toast')).toHaveTextContent('Category deleted.');
+    expect(liveRegion(container)).toHaveTextContent('Category deleted.');
+    expect(screen.getByTestId('toast')).not.toHaveAttribute('aria-live');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('tells a screen reader how to undo, and marks the shortcut on the Undo button', async () => {
+    const { container } = render(
+      <I18nProvider>
+        <ToastProvider>
+          <UndoableSuccessTrigger
+            message="Entry deleted."
+            onExpire={vi.fn()}
+            onUndo={vi.fn()}
+          />
+        </ToastProvider>
+      </I18nProvider>,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Entry deleted.' }),
+    );
+
+    expect(liveRegion(container)).toHaveTextContent(
+      'Entry deleted. Ctrl+Z undoes it.',
+    );
+    expect(screen.getByRole('button', { name: 'Undo' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'Control+Z Meta+Z',
+    );
+  });
+
+  // Replacing the text inside one node is not reliably read out; inserting a new node is.
+  it('announces the same message twice as a new node each time', async () => {
+    const { container } = renderProvider(['Entry added.']);
+    const button = screen.getByRole('button', { name: 'Entry added.' });
+
+    await userEvent.click(button);
+    const first = liveRegion(container)?.firstElementChild;
+    await userEvent.click(button);
+
+    expect(liveRegion(container)).toHaveTextContent('Entry added.');
+    expect(liveRegion(container)?.firstElementChild).not.toBe(first);
   });
 
   it('reportError posts an assertive alert and logs the scope and error', async () => {
@@ -276,7 +316,7 @@ describe('ToastProvider', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Collection deleted.' }),
     );
-    const status = await screen.findByRole('status');
+    const status = await screen.findByTestId('toast');
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(status).not.toBeInTheDocument();
@@ -301,13 +341,13 @@ describe('ToastProvider', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Collection deleted.' }),
     );
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByTestId('toast')).toBeInTheDocument();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(6000);
     });
 
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
     expect(onExpire).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });
@@ -330,7 +370,7 @@ describe('ToastProvider', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Collection deleted.' }),
     );
-    const status = await screen.findByRole('status');
+    const status = await screen.findByTestId('toast');
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
 
     expect(onUndo).toHaveBeenCalledTimes(1);
@@ -402,7 +442,7 @@ describe('ToastProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
 
     expect(onExpire).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });

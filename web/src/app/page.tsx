@@ -13,6 +13,7 @@ import ItemList from './components/ItemList';
 import { ItemListSkeleton } from './components/ItemList/Skeleton';
 import LoadingOverlay from './components/LoadingOverlay';
 import { labelClasses } from './components/ui/labelClasses';
+import { canEditCategory } from './data/categories';
 import { useI18n } from './i18n/useI18n';
 import { useCatalogue } from './useCatalogue';
 import { useSession } from './useSession';
@@ -46,13 +47,8 @@ export default function Page() {
     categories.categories.find(
       (category) => category.id === selectedCategoryId,
     ) ?? null;
-  // UX only, RLS decides: owner or an editor grant; a viewer grant or none falls through to false.
   const canEditSelected =
-    !!selectedCategory &&
-    (selectedCategory.user_id === userId ||
-      (selectedCategory.category_shares ?? []).some(
-        (share) => share.role === 'editor',
-      ));
+    !!selectedCategory && canEditCategory(selectedCategory, user.id);
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground">

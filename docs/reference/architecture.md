@@ -78,7 +78,7 @@ Grants are the second denial: `anon` has `revoke all` on every table, and `authe
 
 Account-based, one category at a time, `viewer` or `editor`. No public links ([why](../explanation/design-decisions.md#why-sharing-has-no-public-link)).
 
-- A viewer reads the category, its items, links and photos. An editor also adds, edits and deletes items and photos inside it, via `has_category_write_access()`. Neither touches the category itself. `page.tsx`'s `canEditSelected` mirrors this for the interface; the policies are the check.
+- A viewer reads the category, its items, links and photos. An editor also adds, edits and deletes items and photos inside it, via `has_category_write_access()`. Neither touches the category itself. `canEditCategory()` in `web/src/app/data/categories.ts` mirrors this for the interface; the policies are the check.
 - A grant is created as `viewer`; raising it is an `update` of `role`, gated by the owner-only update policy and by `tg_category_shares_enforce()`, which rejects any other column changing.
 - The owner invites by email. There is no accept step: both predicates compare `invited_email` with `public.caller_email()`, so a grant works the moment that email signs in, even for the first time. Who can sign in with an address is up to the hosted Auth settings, which are pinned and checked ([why](../explanation/design-decisions.md#why-the-hosted-auth-settings-are-pinned)).
 - `tg_category_shares_enforce()` derives `owner_user_id` from the category, rejects sharing a category the caller does not own or sharing with oneself, and lowercases the email.

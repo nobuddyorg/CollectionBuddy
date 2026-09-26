@@ -129,7 +129,7 @@ describe('useCategories deleteCategory image cleanup', () => {
     act(() => {
       result.current.deleteCategory('cat-1');
     });
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    expect(await screen.findByTestId('toast')).toHaveTextContent(
       'Collection deleted.',
     );
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();

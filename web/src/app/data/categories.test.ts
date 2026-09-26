@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { supabase } from '../supabase';
 import {
+  canEditCategory,
   countItemsForCategory,
   createCategory,
   deleteCategory,
@@ -318,5 +319,42 @@ describe('uniqueCategoryName', () => {
     expect(uniqueCategoryName('Coins', ['Coins', 'Coins (3)'])).toBe(
       'Coins (2)',
     );
+  });
+});
+
+describe('canEditCategory', () => {
+  const OWNER = 'owner-1';
+  const GRANTEE = 'grantee-1';
+  const category = (shares?: { role: 'viewer' | 'editor' }[]) => ({
+    id: 'cat-1',
+    name: 'Coins',
+    user_id: OWNER,
+    ...(shares && { category_shares: shares }),
+  });
+
+  it('lets the owner edit, with no grant at all', () => {
+    expect(canEditCategory(category([]), OWNER)).toBe(true);
+  });
+
+  it('lets the owner edit, whatever role her own grants carry', () => {
+    expect(canEditCategory(category([{ role: 'viewer' }]), OWNER)).toBe(true);
+  });
+
+  it('lets a grantee with an editor grant edit', () => {
+    expect(canEditCategory(category([{ role: 'editor' }]), GRANTEE)).toBe(true);
+  });
+
+  it('keeps a grantee with a viewer grant read-only', () => {
+    expect(canEditCategory(category([{ role: 'viewer' }]), GRANTEE)).toBe(
+      false,
+    );
+  });
+
+  it('keeps anyone else read-only when no share row came back', () => {
+    expect(canEditCategory(category([]), GRANTEE)).toBe(false);
+  });
+
+  it('reads a missing share embed as no grant', () => {
+    expect(canEditCategory(category(), GRANTEE)).toBe(false);
   });
 });

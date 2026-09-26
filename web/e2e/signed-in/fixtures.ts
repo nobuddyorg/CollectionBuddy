@@ -41,6 +41,7 @@ const BASELINE_ITEMS: SeedItem[] = [
   'Fotoalbum',
   'Depot',
   'Dunkelkammer',
+  'Tauschkiste',
 ].map((category) => ({
   category,
   title: `${category}stück`,
@@ -107,6 +108,7 @@ export const SEED = {
     'Bibliothek',
     'Depot',
     'Dunkelkammer',
+    'Tauschkiste',
   ],
   /** For entries.spec.ts. */
   scratchCategory: 'Werkstatt',
@@ -149,6 +151,8 @@ export const SEED = {
   editorLimitsCategory: 'Depot',
   /** For rls/editor-share-photographs.spec.ts, whose grantee photographs the owner's entries. */
   editorPhotoCategory: 'Dunkelkammer',
+  /** For shared-with-me-editor.spec.ts, whose grantee writes here through the interface until demoted. */
+  editorJourneyCategory: 'Tauschkiste',
 
   // Oldest first; the list sorts newest first, so the last one here is the first card on the page.
   items: [

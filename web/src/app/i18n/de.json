@@ -190,7 +190,9 @@
     "save": "Speichern",
     "confirm": "Bestätigen",
     "cancel": "Abbrechen",
-    "undo": "Rückgängig machen"
+    "undo": "Rückgängig machen",
+    "undo_shortcut": "Strg+Z",
+    "undo_shortcut_hint": "Strg+Z macht es rückgängig."
   },
   "app_error": {
     "title": "Das hat nicht geklappt",

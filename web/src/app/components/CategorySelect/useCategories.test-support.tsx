@@ -46,7 +46,7 @@ export async function renderLoadedCategories() {
 
 // Commits the deferred delete by closing the toast, the same as letting it auto-dismiss would.
 export async function commitDeferredDelete() {
-  await screen.findByRole('status');
+  await screen.findByTestId('toast');
   await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 }
 

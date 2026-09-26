@@ -41,7 +41,7 @@ vi.mock('../../data/images', async () => {
 
 // The delete waits out the toast's undo window; closing the toast commits it, the same as expiry.
 async function commitDeferredDelete() {
-  await screen.findByRole('status');
+  await screen.findByTestId('toast');
   await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 }
 
@@ -211,7 +211,7 @@ describe('useItemImages deleteImage', () => {
     });
     await acceptConfirmation();
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    expect(await screen.findByTestId('toast')).toHaveTextContent(
       'Image deleted.',
     );
   });

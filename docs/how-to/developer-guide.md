@@ -90,7 +90,9 @@ state. Before adding tests here:
   the interface waits out its undo window and is never sent if the test ends
   first. Where the committed delete is the journey,
   `toast.do.commitDeletion(table)` closes the toast and waits for that table's
-  `DELETE`, so the next `goto` cannot abort it.
+  `DELETE`, so the next `goto` cannot abort it. What an editor grantee wrote
+  goes through `removeGranteeWrites()`, which grants edit access again while
+  the grantee removes it: after a demotion, nobody else can.
 - **Assert on a seeded row, never a count or a `limit(1)`.** RLS specs write
   as the second collector and grant it editor access to other collections
   meanwhile; pick by `SEED.other.item` or an `itemsIn(...)` title.
