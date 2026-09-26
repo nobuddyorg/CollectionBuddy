@@ -76,6 +76,18 @@ describe('Menu', () => {
     expect(dark).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('links the privacy notice, closing the menu on the way', async () => {
+    const { user } = await openMenu();
+    const menu = document.getElementById('user-menu') as HTMLElement;
+    const link = within(menu).getByRole('link', { name: 'Privacy notice' });
+    // next.config.ts's trailingSlash adds the slash in a build.
+    expect(link).toHaveAttribute('href', '/privacy');
+    // jsdom cannot navigate; cancelled, the click still reaches the menu's handler.
+    link.addEventListener('click', (event) => event.preventDefault());
+    await user.click(link);
+    expect(document.getElementById('user-menu')).toBeNull();
+  });
+
   it('signs out and closes the menu when sign out is clicked', async () => {
     const onSignOut = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();

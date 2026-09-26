@@ -10,6 +10,10 @@ your email in the header). If the sign-out request fails — you are offline,
 say — the session is cleared locally anyway, so you are never stuck signed in
 on a device without network.
 
+The **Privacy notice** (`/privacy`) says what CollectionBuddy stores, who
+receives it and for how long. It opens without signing in: the sign-in page and
+the user menu link it.
+
 ## Categories
 
 You always browse one category at a time.

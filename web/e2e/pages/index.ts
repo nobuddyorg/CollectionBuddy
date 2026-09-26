@@ -8,6 +8,7 @@ import { initConfirm, initImageViewer, initToast } from './dialogs';
 import { initEntryForm } from './entry-form';
 import { initLoginPage } from './login';
 import { initMap } from './map';
+import { initPrivacyPage } from './privacy';
 import { initSharingPanel } from './sharing';
 
 /** Getters, so a spec that wants one screen builds only that screen's locators. */
@@ -38,6 +39,9 @@ export function createPageTree(page: Page) {
     },
     get map() {
       return initMap(page);
+    },
+    get privacy() {
+      return initPrivacyPage(page);
     },
     get sharing() {
       return initSharingPanel(page);

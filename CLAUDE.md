@@ -173,7 +173,10 @@ several real RLS bugs. Every policy change is security-critical.
   a design decision, or a testing assumption updates the matching `docs/` file
   (and `CONTRIBUTING.md`/`README.md`) in the same change. Two things that rotted
   before: migration filenames after a squash (`grep -rn '00NN_'`), and claims
-  that sharing is "read-only". TEST_STRATEGY.md stays generic: a CollectionBuddy
+  that sharing is "read-only". A change to what the app collects, whom it sends
+  data to, how long it keeps it, or what it stores in the browser updates the
+  privacy notice (`privacy.*` in both dictionaries) in the same change.
+  TEST_STRATEGY.md stays generic: a CollectionBuddy
   fact landing there is a bug — it goes in `docs/` or here.
 
 ## Development commands
