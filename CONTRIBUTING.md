@@ -1,5 +1,21 @@
 # Contributing to CollectionBuddy
 
+## No outside contributions
+
+CollectionBuddy is a personal hobby project. I don't accept pull requests,
+issues or feature requests from outside the project; they are closed without
+review.
+
+Want to change something? **Fork it.** The [MIT License](LICENSE) lets you
+use, change and redistribute the code in your own fork, no need to ask. There
+is no support for forks; the [developer guide](docs/how-to/developer-guide.md)
+covers setting one up with its own Supabase project and Pages site.
+
+The rest of this guide is how the project itself is worked on; it applies
+equally to a fork.
+
+## Run it locally
+
 CollectionBuddy needs a Supabase backend to run at all; there is no mock
 mode. The local stack in [`supabase/`](supabase/) runs one in Docker.
 

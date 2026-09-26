@@ -73,6 +73,6 @@ Add one or two more items with different titles and places, then:
 
 - [User guide](../how-to/user-guide.md): each feature as a recipe, with the
   edge cases — sharing, import/export, the map.
-- [Developer guide](../how-to/developer-guide.md) if you are contributing code.
+- [Developer guide](../how-to/developer-guide.md) if you are working on the code.
 - [Architecture](../reference/architecture.md) for the data model and how
   authorization works.

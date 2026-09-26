@@ -71,9 +71,7 @@ Full docs live in [`docs/`](docs/README.md), organised by [Diátaxis](https://di
 
 ## Contributing
 
-Contributions are welcome. Whether it's a bug fix, a new feature, or just improving the docs, open an issue or submit a pull request.
-
-Before contributing, please check out [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and the checks CI runs.
+CollectionBuddy is a personal hobby project and doesn't accept outside pull requests, issues or feature requests; they are closed without review. Want to change something? Fork it: [CONTRIBUTING.md](CONTRIBUTING.md) has why, local setup, and the checks CI runs.
 
 ## License
 

@@ -1,6 +1,6 @@
 # Developer guide
 
-Recipes for contributing to and operating CollectionBuddy. Local setup and the
+Recipes for developing and operating CollectionBuddy. Local setup and the
 pre-PR checklist are in [CONTRIBUTING.md](../../CONTRIBUTING.md); this guide
 covers each check in depth, and everything past the checklist.
 
