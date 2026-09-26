@@ -431,7 +431,7 @@ jobs:
         run: |
           status=$(supabase status -o json)
           echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL <<< "$status")" >> "$GITHUB_ENV"
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .ANON_KEY <<< "$status")" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .PUBLISHABLE_KEY <<< "$status")" >> "$GITHUB_ENV"
         working-directory: .
 
       - name: Build the signed-out export

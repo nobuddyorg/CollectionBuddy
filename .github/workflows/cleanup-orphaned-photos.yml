@@ -78,7 +78,7 @@ jobs:
 
           echo "Found $count orphaned object(s), $bytes bytes." | tee -a "$GITHUB_STEP_SUMMARY"
 
-          # Before the service_role key is fetched, so a dry run never puts that credential on the runner. A scheduled run sends no inputs, so DRY_RUN is empty.
+          # Before the secret key is fetched, so a dry run never puts that credential on the runner. A scheduled run sends no inputs, so DRY_RUN is empty.
           if [ "${DRY_RUN:-false}" = "true" ]; then
             {
               echo "Dry run -- deleting nothing. Would remove:"
@@ -87,19 +87,23 @@ jobs:
             exit 0
           fi
 
-          # Only the Storage API deletes bytes, and only service_role reaches another user's prefix. Fetched per run rather than stored as a second long-lived secret.
-          service_role_key=$(curl -sS --fail-with-body \
+          # Only Storage deletes bytes, and only the service_role role reaches every prefix: a secret key if one exists, else the legacy service_role JWT, fetched per run, never stored.
+          secret_key=$(curl -sS --fail-with-body \
             "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            | jq -r '.[] | select(.name == "service_role") | .api_key')
+            | jq -r '[(.[] | select(.type == "secret")), (.[] | select(.name == "service_role"))] | first | .api_key // empty')
 
           # A value fetched at run time is not a registered secret, so Actions does not mask it on its own.
-          echo "::add-mask::$service_role_key"
+          echo "::add-mask::$secret_key"
 
-          if [ -z "$service_role_key" ] || [ "$service_role_key" = "null" ]; then
-            echo "Could not read the service_role key; refusing to continue." >&2
+          if [ -z "$secret_key" ]; then
+            echo "Could not read a secret or service_role key; refusing to continue." >&2
             exit 1
           fi
+
+          # A secret key is not a JWT, so it goes on `apikey` alone; only the legacy JWT also rides as the Bearer token.
+          auth=(-H "apikey: $secret_key")
+          case "$secret_key" in sb_*) ;; *) auth+=(-H "Authorization: Bearer $secret_key") ;; esac
 
           # Storage's bulk delete refuses more than 1,000 objects per request.
           echo "$result" \
@@ -107,8 +111,7 @@ jobs:
             | while IFS= read -r remove_payload; do
                 curl -sS --fail-with-body -X DELETE \
                   "$NEXT_PUBLIC_SUPABASE_URL/storage/v1/object/item-images" \
-                  -H "apikey: $service_role_key" \
-                  -H "Authorization: Bearer $service_role_key" \
+                  "${auth[@]}" \
                   -H "Content-Type: application/json" \
                   --data "$remove_payload" > /dev/null
               done

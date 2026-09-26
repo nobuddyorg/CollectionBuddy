@@ -23,8 +23,9 @@ function status() {
   }
 }
 
-const { API_URL, ANON_KEY, SERVICE_ROLE_KEY } = status();
-if (!API_URL || !ANON_KEY || !SERVICE_ROLE_KEY) {
+// The variables take either key format; the publishable and secret keys here keep e2e:local on the non-JWT path.
+const { API_URL, PUBLISHABLE_KEY, SECRET_KEY } = status();
+if (!API_URL || !PUBLISHABLE_KEY || !SECRET_KEY) {
   console.error('The local stack reported no API URL or keys.');
   process.exit(1);
 }
@@ -32,10 +33,10 @@ if (!API_URL || !ANON_KEY || !SERVICE_ROLE_KEY) {
 const environment = {
   ...process.env,
   NEXT_PUBLIC_SUPABASE_URL: API_URL,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: ANON_KEY,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: PUBLISHABLE_KEY,
   E2E_SUPABASE_URL: API_URL,
-  E2E_SUPABASE_ANON_KEY: ANON_KEY,
-  E2E_SUPABASE_SERVICE_KEY: SERVICE_ROLE_KEY,
+  E2E_SUPABASE_ANON_KEY: PUBLISHABLE_KEY,
+  E2E_SUPABASE_SERVICE_KEY: SECRET_KEY,
   // This build never deploys, so source maps are free; they make e2e/coverage.ts point at real source.
   E2E_COVERAGE_SOURCEMAPS: 'true',
 };

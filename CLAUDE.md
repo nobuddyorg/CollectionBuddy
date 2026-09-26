@@ -64,11 +64,12 @@ design-decisions.md, not here.
   or `.pre-commit-config.yaml`'s security hooks unless the user explicitly asks.
 - Never run `npm audit fix --force` or a from-scratch `rm -rf node_modules
   package-lock.json && npm install` in `web/`; use targeted `overrides`.
-- Never write real Google OAuth credentials, service-role keys, or
-  `SUPABASE_DB_URL`/`SUPABASE_ACCESS_TOKEN` values anywhere — code, docs,
-  commits, chat, not even as an example. `NEXT_PUBLIC_SUPABASE_ANON_KEY` is
-  the one credential meant to be public. `service_role` lives only in CI
-  secrets, never in client code.
+- Never write real Google OAuth credentials, secret (`sb_secret_…`) or
+  service-role keys, or `SUPABASE_DB_URL`/`SUPABASE_ACCESS_TOKEN` values anywhere — code, docs,
+  commits, chat, not even as an example. `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  (a publishable or legacy anon key) is the one credential meant to be
+  public. A `service_role`-level key lives only in CI, fetched per run,
+  never in client code.
 
 ## Database changes
 

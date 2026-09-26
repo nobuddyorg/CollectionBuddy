@@ -142,6 +142,13 @@ jobs:
       - run: test -d out && test -f out/index.html
       - run: touch out/.nojekyll
 
+      # Before publishing, so a mistyped, stale or revoked key leaves the working bundle live; the smoke test runs signed out and never authenticates.
+      - name: Check the baked-in URL and key reach the project
+        uses: ./.github/actions/call-keepalive
+        with:
+          supabase-url: ${{ env.NEXT_PUBLIC_SUPABASE_URL }}
+          anon-key: ${{ env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: web/out

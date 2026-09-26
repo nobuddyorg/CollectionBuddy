@@ -23,16 +23,16 @@ function status() {
   }
 }
 
-const { API_URL, ANON_KEY } = status();
-if (!API_URL || !ANON_KEY) {
-  console.error('The local stack reported no API URL or anon key.');
+const { API_URL, PUBLISHABLE_KEY } = status();
+if (!API_URL || !PUBLISHABLE_KEY) {
+  console.error('The local stack reported no API URL or publishable key.');
   process.exit(1);
 }
 
 const environment = {
   ...process.env,
   NEXT_PUBLIC_SUPABASE_URL: API_URL,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: ANON_KEY,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: PUBLISHABLE_KEY,
   NEXT_PUBLIC_DEMO_MODE: 'true',
 };
 

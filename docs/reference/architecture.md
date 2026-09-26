@@ -142,7 +142,7 @@ Session code (`useSession.ts`, `page.tsx`, `login/`) reaches `supabase.ts` direc
 
 ## CI/CD
 
-Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (Node version, npm cache, `npm ci`), `setup-supabase-cli` (the one CLI version, so CI's stack and the production `db push` cannot diverge), `start-local-stack` (that CLI plus `supabase start`), `summary-section` (a tee'd output file into the job summary), `playwright-results` (job summary and artifacts for a Playwright run), `backup-database` (the encrypted off-site dump `backup.yml` and `migrate` share).
+Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (Node version, npm cache, `npm ci`), `setup-supabase-cli` (the one CLI version, so CI's stack and the production `db push` cannot diverge), `start-local-stack` (that CLI plus `supabase start`), `summary-section` (a tee'd output file into the job summary), `playwright-results` (job summary and artifacts for a Playwright run), `backup-database` (the encrypted off-site dump `backup.yml` and `migrate` share), `call-keepalive` (one anonymous `keepalive()` call, from `keep-alive.yml` and `build`).
 
 | Workflow (job) | Trigger | Does |
 | --- | --- | --- |
@@ -154,7 +154,7 @@ Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (N
 | `ci.yml` (`opengrep`) | `web` or `sql` changed | Opengrep SAST; SARIF to code scanning; fails on ERROR severity. |
 | `ci.yml` (`lighthouse`) | `web` changed | Lighthouse CI against the export, signed out and in demo mode. |
 | `ci.yml` (`zap_baseline`) | `web` changed | OWASP ZAP passive scan against the export, signed out and in demo mode, served on the runner. |
-| `pages-deploy.yml` (`gate` → `migrate` → `build` → `deploy` → `smoke_test`) | `ci.yml` passed on a push to `main` (`workflow_run`), manual from `main` | Only `main`'s tip, only once CI passed on it. When migrations are pending, upload an encrypted dump first; apply them and reload the PostgREST cache; export; publish to Pages; run the signed-out suite against the live site. |
+| `pages-deploy.yml` (`gate` → `migrate` → `build` → `deploy` → `smoke_test`) | `ci.yml` passed on a push to `main` (`workflow_run`), manual from `main` | Only `main`'s tip, only once CI passed on it. When migrations are pending, upload an encrypted dump first; apply them and reload the PostgREST cache; export, and call `keepalive()` with the URL and key just baked in, so a rejected key never publishes; publish to Pages; run the signed-out suite against the live site. |
 | `keep-alive.yml` | daily, manual | Calls `keepalive()` so a free-tier project does not pause. |
 | `cleanup-orphaned-photos.yml` | daily (`30 4 * * *`), manual | Deletes Storage objects no `images` row references as `path_full` or `path_thumb`, older than 48 h — at most 10,000 per run, in requests of 1,000 (Storage's bulk-delete cap). Manual runs are dry runs unless opted out. |
 | `backup.yml` (`database`, `photographs`) | daily (`47 2 * * *`), manual | Encrypted off-site copies: a dump of roles, schema and `auth`/`public` data, and each new `item-images` object; objects gone from the bucket move to a prefix the backup bucket expires ([Back up production](../how-to/developer-guide.md#back-up-production)). |

@@ -49,8 +49,9 @@ Google OAuth is the only real sign-in, and it needs credentials even locally
 on every commit; `pre-commit` reads the same file:
 
 - file hygiene, `typos`, `markdownlint`;
-- gitleaks over the staged changes: service-role keys and database URLs
-  block the commit, anon keys pass ([`.gitleaks.toml`](.gitleaks.toml));
+- gitleaks over the staged changes: secret (`sb_secret_…`) and legacy
+  `service_role` keys and database URLs block the commit, publishable and
+  legacy anon keys pass ([`.gitleaks.toml`](.gitleaks.toml));
 - `zizmor` and `actionlint` over `.github/` — security, then syntax,
   expression types, job references, and ShellCheck on workflow `run:` blocks
   when `shellcheck` is on your `PATH` (CI's runner has it; composite actions'

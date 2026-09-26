@@ -91,16 +91,18 @@ jobs:
 
           failed=0
           if [ -s "$work/new" ]; then
-            # Only service_role reads every user's prefix; fetched per run, as cleanup-orphaned-photos.yml does, instead of a second long-lived secret.
-            service_role_key=$(curl -sS --fail-with-body \
+            # Only the service_role role reads every user's prefix; the key is chosen and sent as in cleanup-orphaned-photos.yml, fetched per run, never stored.
+            secret_key=$(curl -sS --fail-with-body \
               "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" \
               -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-              | jq -r '.[] | select(.name == "service_role") | .api_key')
-            echo "::add-mask::$service_role_key"
-            if [ -z "$service_role_key" ] || [ "$service_role_key" = "null" ]; then
-              echo "Could not read the service_role key; refusing to continue." >&2
+              | jq -r '[(.[] | select(.type == "secret")), (.[] | select(.name == "service_role"))] | first | .api_key // empty')
+            echo "::add-mask::$secret_key"
+            if [ -z "$secret_key" ]; then
+              echo "Could not read a secret or service_role key; refusing to continue." >&2
               exit 1
             fi
+            auth=(-H "apikey: $secret_key")
+            case "$secret_key" in sb_*) ;; *) auth+=(-H "Authorization: Bearer $secret_key") ;; esac
 
             mkdir "$work/staging"
             while IFS= read -r name; do
@@ -109,8 +111,7 @@ jobs:
               # One failure (e.g. deleted since the listing) must not cost the rest of the run; the next run retries it.
               if curl -sS --fail --retry 3 --max-time 300 -o "$work/download" \
                 "$NEXT_PUBLIC_SUPABASE_URL/storage/v1/object/authenticated/item-images/$encoded" \
-                -H "apikey: $service_role_key" \
-                -H "Authorization: Bearer $service_role_key"; then
+                "${auth[@]}"; then
                 age -r "$BACKUP_AGE_RECIPIENT" -o "$work/staging/$name.age" "$work/download"
               else
                 echo "::warning::Could not download $name."

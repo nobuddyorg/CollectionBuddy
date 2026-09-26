@@ -308,7 +308,7 @@ supabase start   # repository root
 cd web
 status=$(supabase status -o json)
 export NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL <<< "$status")
-export NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .ANON_KEY <<< "$status")
+export NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .PUBLISHABLE_KEY <<< "$status")
 npm run build
 ln -s . out/CollectionBuddy   # zap-baseline.py always spiders from the host root
 npx serve out -l 4173
@@ -411,8 +411,11 @@ For a fork, or a new production project:
    untouched; `supabase migration repair --status applied <version>` reconciles it.
 3. Auth settings: enable **Google** with an OAuth client whose redirect URI is
    `<project-url>/auth/v1/callback`.
-4. Note the API URL and anon key (Project Settings → API); they become
-   `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+4. Note the API URL and the publishable key (Settings → API Keys; if the
+   tab offers **Create new API keys**, create them first); they become
+   `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Nothing
+   stores the secret key: the workflows fetch it
+   ([API keys](../reference/configuration.md#api-keys)).
 
 ## Deploy to GitHub Pages
 
@@ -587,15 +590,16 @@ to `backup.yml`, the dump, or the schema's shape.
      `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` at it, and
      the Google OAuth client's redirect URI. Collectors sign in with Google as
      before: `auth.identities` came back with their user ids.
-6. Upload the photographs with the target's `service_role` key (Project
-   Settings → API keys) and API URL:
+6. Upload the photographs with a secret key of the target (Settings → API
+   Keys) and its API URL. The key goes on `apikey` alone; a legacy
+   `service_role` JWT would also need `-H "Authorization: Bearer $SECRET_KEY"`:
 
    ```bash
    (cd item-images && find . -type f -printf '%P\n') | while IFS= read -r name; do
      encoded=$(jq -rn --arg name "$name" '$name | split("/") | map(@uri) | join("/")')
      curl -sS -o /dev/null -w "%{http_code} $name\n" -X POST \
        "$SUPABASE_URL/storage/v1/object/item-images/$encoded" \
-       -H "apikey: $SERVICE_ROLE_KEY" -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+       -H "apikey: $SECRET_KEY" \
        -H "Content-Type: $(file --brief --mime-type "item-images/$name")" \
        --data-binary "@item-images/$name"
    done
@@ -613,3 +617,90 @@ to `backup.yml`, the dump, or the schema's shape.
       or (im.path_thumb is not null
           and not exists (select 1 from storage.objects o where o.bucket_id = 'item-images' and o.name = im.path_thumb));
    ```
+
+## Migrate to publishable and secret keys
+
+Supabase deprecates the legacy `anon` and `service_role` keys by the end of
+2026; production must run on publishable and secret keys before then. The
+repository already takes both ([API keys](../reference/configuration.md#api-keys)),
+so this is dashboard and secret work only, and every step before the last is
+reversible. Budget a quiet evening, well before December.
+
+1. **Create the keys.** Supabase Dashboard → Settings → API Keys → tab
+   **Publishable and secret API keys** → **Create new API keys**. That adds a
+   `default` publishable and a `default` secret key; the legacy keys keep
+   working.
+2. **The sweep and the backup switch themselves.** From their next run,
+   `cleanup-orphaned-photos.yml` and `backup.yml` fetch the secret key
+   instead of `service_role`. To prove it now: add a photograph to any entry
+   in production, then run Actions → *Back up production*; `photographs`
+   must copy its two objects with `failed: 0`, downloading them with the
+   secret key.
+3. **Swap the public key.** Repository Settings → Secrets and variables →
+   Actions → `NEXT_PUBLIC_SUPABASE_ANON_KEY` → **Update**, paste the
+   publishable key (`sb_publishable_…`). The name stays.
+4. **Redeploy.** Actions → *Deploy Pages* → *Run workflow* from `main`.
+   `build` calls `keepalive()` with the key it baked in and stops before
+   publishing if the project rejects it. Then sign in on the live site, open a
+   category and a photograph, and run Actions → *CollectionBuddy Keepalive*
+   by hand.
+5. **Look for other holders.** Nothing else in this project uses a legacy
+   key: no Edge Functions, no `pg_net` or Database Webhooks. A fork that
+   added one follows [Supabase's migration guide](https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys).
+6. **Deactivate the legacy keys**, a day after step 4 so open tabs have
+   reloaded the new bundle: Settings → API Keys → tab **Legacy API keys** →
+   disable. Reversible from the same tab. Afterwards run *CollectionBuddy
+   Keepalive* again, and watch the next scheduled *Clean up orphaned
+   photographs* and *Back up production* runs.
+
+Supabase's separate JWT signing-keys migration (the key that signs users'
+sessions) is independent of this one and has no deadline attached here.
+
+## Rotate a credential
+
+Rotate after a suspected leak, when someone with access leaves, or when a
+token nears its expiry. Fix the cause of a leak first. Each procedure keeps the
+old credential working until the new one is proven, except the database
+password, which Supabase replaces at once.
+
+- **Publishable key** (`NEXT_PUBLIC_SUPABASE_ANON_KEY`). Public by design, so
+  rotation only cuts off copies of old bundles. Settings → API Keys → add a
+  publishable key, update the repository secret, run *Deploy Pages* (its
+  `build` step checks the new key), then delete the old key a day later. The
+  legacy anon key cannot be rotated on its own: its JWT secret also signs
+  `service_role` and every user session. Migrate instead.
+- **Secret key.** Stored nowhere in GitHub. Settings → API Keys → add a
+  secret key, then delete the old one; the workflows fetch whichever secret
+  key exists on their next run. A deleted secret key cannot be restored. The
+  legacy `service_role` key cannot be rotated on its own either: migrate, then
+  deactivate the legacy keys.
+- **Database password** (`SUPABASE_DB_URL`, a `production` environment
+  secret). Only `migrate` and the `database` backup use it; the app never
+  does. Wait until no *Deploy Pages* or *Back up production* run is in
+  progress, then Dashboard → Database → Settings → **Reset database
+  password**; it can take a few minutes to apply. Build the new session
+  pooler string with the password percent-encoded ([Configuration](../reference/configuration.md#github-actions-secrets)),
+  update the secret, and run *Back up production*: `database` must pass.
+- **Management API token** (`SUPABASE_ACCESS_TOKEN`, `production`). A
+  personal access token that carries its owner's access to every project, so
+  give it an expiry and a calendar reminder. Account → Access Tokens →
+  generate a new one, update the secret, run *Clean up orphaned photographs*
+  (a dry run by default) and *Back up production*; both must pass. Then
+  revoke the old token on the same page. A fine-grained token needs the
+  `api_gateway_keys_read` permission for the key fetch, besides running SQL.
+- **Google OAuth client secret** (Supabase Dashboard → Authentication →
+  Sign In / Providers → Google). Google Cloud Console → APIs & Services →
+  Credentials → the OAuth client → **Add secret**; the old secret stays
+  valid. Paste the new one into Supabase, save, and sign in on the live site.
+  Then disable and delete the old secret in Google Cloud. A developer whose
+  local stack uses this client updates `GOTRUE_EXTERNAL_GOOGLE_SECRET` and
+  restarts it.
+- **Backup store key** (`BACKUP_S3_ACCESS_KEY_ID`,
+  `BACKUP_S3_SECRET_ACCESS_KEY`, `production`). Create a new key scoped to
+  the bucket at the provider, update both secrets, run *Back up production*,
+  then delete the old key.
+- **Backup age identity.** Generate a new identity ([Back up
+  production](#back-up-production)), update `BACKUP_AGE_RECIPIENT`, and keep
+  the old identity: `database/` archives need it until they expire, and
+  objects already under `photos/` are never copied again, so they stay
+  encrypted to it for good.

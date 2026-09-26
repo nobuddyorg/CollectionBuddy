@@ -7,7 +7,7 @@
 | Variable | Local | Production |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | `http://127.0.0.1:54321` | The project's API URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase's well-known local anon key | The project's anon key |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase's well-known local anon key; the `npm run` scripts that read `supabase status` pass its publishable key | The project's publishable key (`sb_publishable_…`), or its legacy anon key until [migrated](../how-to/developer-guide.md#migrate-to-publishable-and-secret-keys) |
 | `NEXT_PUBLIC_DEMO_MODE` | `true` signs every visitor in anonymously; `npm run demo` sets it | unset |
 
 Place search uses the public [Photon](https://photon.komoot.io/) API unauthenticated; there is no key.
@@ -33,19 +33,53 @@ secrets are repository secrets.
 | Secret | Used by | Notes |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml`, `backup.yml`; `k6-load-test.yml` with `target=hosted` only | Required |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`; `k6-load-test.yml` with `target=hosted` only | Required |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`; `k6-load-test.yml` with `target=hosted` only | Required. Either key format ([API keys](#api-keys)); `pages-deploy.yml`'s `build` calls `keepalive()` with it and publishes nothing if the project rejects it |
 | `SUPABASE_DB_URL` | `pages-deploy.yml` (`migrate`), `backup.yml` (`database`) | Required. The **session pooler** string (`aws-0-<region>.pooler.supabase.com`), password percent-encoded. The direct `db.<ref>.supabase.co` host is IPv6-only and unreachable from GitHub runners; `supabase link` reports success anyway and the push fails. |
-| `SUPABASE_ACCESS_TOKEN` | `pages-deploy.yml` (`migrate`), `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`) | Required. Management-API token: reloads the PostgREST schema cache after a migration; in the cleanup job, runs the orphan query and fetches a fresh `service_role` key; in `photographs`, lists the bucket and fetches that key. Without it `migrate` returns 401 and the deploy stops. |
+| `SUPABASE_ACCESS_TOKEN` | `pages-deploy.yml` (`migrate`), `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`) | Required. Management-API token: reloads the PostgREST schema cache after a migration; in the cleanup job, runs the orphan query and fetches a fresh secret key ([API keys](#api-keys)); in `photographs`, lists the bucket and fetches that key. Without it `migrate` returns 401 and the deploy stops. |
 | `SUPABASE_PROJECT_REF` | same three | Required |
 | `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test`) | Optional; without it Stryker writes a local HTML report only |
 
 None of these may appear in the repository. The gitleaks hook
-([`.gitleaks.toml`](../../.gitleaks.toml)) blocks a commit that stages a JWT or
-a password-bearing `*.supabase.co` / `*.pooler.supabase.com` connection
-string. JWTs whose payload carries `"role":"anon"` are allowlisted, because
-the anon key is public by design; a `service_role` key still fails. The hook
+([`.gitleaks.toml`](../../.gitleaks.toml)) blocks a commit that stages a JWT,
+a secret key (`sb_secret_…`) or a password-bearing `*.supabase.co` /
+`*.pooler.supabase.com` connection string. JWTs whose payload carries
+`"role":"anon"` are allowlisted and no rule matches a publishable key,
+because both are public by design; a `service_role` key still fails. The hook
 sees only staged changes, so in CI it has nothing to scan; GitHub push
 protection is the server-side check.
+
+### API keys
+
+Supabase deprecates the legacy JWT `anon` and `service_role` keys by the end
+of 2026 in favour of publishable (`sb_publishable_…`) and secret
+(`sb_secret_…`) keys. Both kinds work side by side until the legacy ones are
+deactivated, and every workflow here takes either, so the switch is a
+dashboard and secret change with no code change: [Migrate to publishable and
+secret keys](../how-to/developer-guide.md#migrate-to-publishable-and-secret-keys).
+
+- **The public key keeps its name.** `NEXT_PUBLIC_SUPABASE_ANON_KEY` holds
+  the publishable key once migrated: both map to the `anon` Postgres role,
+  supabase-js takes either, and one secret swapping its value avoids a
+  rename across every workflow and script.
+- **No secret key is stored.** `cleanup-orphaned-photos.yml` and
+  `backup.yml` fetch one per run through the Management API
+  (`SUPABASE_ACCESS_TOKEN`): the first key of type `secret`, else the legacy
+  `service_role` key while the project has no secret key. Rotating it
+  therefore changes nothing in GitHub.
+- **Header rule.** A new-format key is not a JWT: it goes on the `apikey`
+  header alone. A legacy key also rides as `Authorization: Bearer`. The
+  workflows' `curl` calls branch on the `sb_` prefix; supabase-js handles
+  both on its own.
+- **Local stack.** `supabase status` prints both kinds. `web/.env.example`
+  holds the legacy anon key; `npm run e2e:local`, `demo`, `lighthouse` and
+  `load`, and CI's `zap_baseline`, pass the publishable key (`e2e:local` the
+  secret key too), so CI covers the new format while production may still run
+  the old one.
+  The local stack accepts an unknown `apikey` as `anon`; only the hosted
+  project rejects a wrong key.
+
+Rotating any credential in this section: [Rotate a
+credential](../how-to/developer-guide.md#rotate-a-credential).
 
 ### Backups
 
@@ -109,10 +143,10 @@ Each job writes its report to its own Actions summary (`$GITHUB_STEP_SUMMARY`); 
 | `E2E_PORT` | Local server port, default `4173` |
 | `E2E_SUPABASE_URL` | Enables the `setup` and `signed-in` projects |
 | `E2E_SUPABASE_ANON_KEY` | Signs the test user in |
-| `E2E_SUPABASE_SERVICE_KEY` | Creates the test user, nothing else — `service_role` has no table grants |
+| `E2E_SUPABASE_SERVICE_KEY` | Creates the test user, nothing else — the `service_role` role it maps to has no table grants |
 | `E2E_COVERAGE_SOURCEMAPS` | `true` makes `next build` emit source maps so the coverage report maps to `src/app/**` |
 
-`npm run e2e:local` sets the three `E2E_SUPABASE_*` values from `supabase status` and builds the bundle against the local stack; nothing reads them from a deployed project's secrets, because the suite seeds whatever database it is pointed at. Retries are `0` locally: a page that fails one run in ten fails for a tenth of visitors.
+`npm run e2e:local` sets the three `E2E_SUPABASE_*` values from `supabase status` (the publishable and secret keys) and builds the bundle against the local stack; nothing reads them from a deployed project's secrets, because the suite seeds whatever database it is pointed at. Retries are `0` locally: a page that fails one run in ten fails for a tenth of visitors.
 
 ## i18n
 

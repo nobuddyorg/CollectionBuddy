@@ -80,7 +80,7 @@ npm run load -- smoke          # then: catalogue, shared-viewer, write, populati
 npm run load -- catalogue --profile peak
 ```
 
-`scripts/load-test.mjs` reads the URL and anon key from `supabase status`,
+`scripts/load-test.mjs` reads the URL and publishable key from `supabase status`,
 the same way `npm run e2e:local` does, and runs
 `k6 run --out web-dashboard load/<flow>.js`. Results land in
 `web/load-results/`:
