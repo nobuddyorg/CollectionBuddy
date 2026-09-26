@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
-import { listItems } from '../../data/items';
+import { listItems } from '../../data/itemPage';
 import { clampPage, pageCount, pageRange } from './paging';
 import { takePrefetchedFirstPage } from './firstPagePrefetch';
 import { useRequestSequence } from '../../lib/useRequestSequence';

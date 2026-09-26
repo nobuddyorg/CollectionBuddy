@@ -16,11 +16,11 @@ import {
   takePrefetchedFirstPage,
 } from './firstPagePrefetch';
 import { useItems } from './useItems';
-import type { listItems } from '../../data/items';
+import type { listItems } from '../../data/itemPage';
 
 const { listItemsMock } = vi.hoisted(() => ({ listItemsMock: vi.fn() }));
 
-vi.mock('../../data/items', () => ({
+vi.mock('../../data/itemPage', () => ({
   listItems: (...args: unknown[]) =>
     listItemsMock(...args) as ReturnType<typeof listItems>,
 }));

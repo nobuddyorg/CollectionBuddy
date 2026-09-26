@@ -1,4 +1,4 @@
-import { listItems } from '../../data/items';
+import { listItems } from '../../data/itemPage';
 import { pageRange } from './paging';
 
 type FirstPage = ReturnType<typeof listItems>;

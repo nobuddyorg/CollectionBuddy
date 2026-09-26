@@ -23,7 +23,7 @@ export const TINY_WEBP_BASE64 =
   'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA';
 
 /** Per-probe timings, tagged so thresholds and the summary can split them. */
-const probeMs = new Trend('probe_ms', true);
+export const probeMs = new Trend('probe_ms', true);
 
 export function envInt(name, fallback) {
   const raw = __ENV[name];

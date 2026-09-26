@@ -153,10 +153,10 @@ export function probe({ owner, categoryId }) {
   // Browsing: each page signs its own cards' paths, a call well under the cap.
   const shown = [];
   for (let page = 1; page <= PAGES; page++) {
-    const rows = listPage({ session: owner, categoryId, page }).json();
-    const paths = rows.flatMap((row) => pathsOf(row.items.images));
+    const { items } = listPage({ session: owner, categoryId, page });
+    const paths = items.flatMap((item) => pathsOf(item.images));
     signedPaths({ session: owner, paths, probe: 'page_sign' });
-    shown.push(...rows.map((row) => row.items.id));
+    shown.push(...items.map((item) => item.id));
   }
 
   // An hour later every shown signature is due: refreshAllImages lists them all and imageEntries.ts signs them in batches.

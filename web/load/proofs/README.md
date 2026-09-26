@@ -17,7 +17,7 @@ Some proofs replay the client's own request sequence, the way `lib/api.js` mirro
 
 | Proof                            | Mirrors                                                                                         | What to update with the fix                                                                |
 | -------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `deep-offset.js` (#758)          | `lib/api.js` `listPage` → `data/items.ts`                                                       | How a page is read                                                                         |
+| `deep-offset.js` (#758)          | `lib/api.js` `listPage` → `data/itemPage.ts`                                                    | How a page is read                                                                         |
 | `short-search.js` (#779)         | `SEARCH_MIN_LENGTH_NON_ASCII` → `data/itemSearch.ts`                                            | The floor, if the fix raises it                                                            |
 | `map-places-cap.js` (#756)       | `CLIENT_PAGE_SIZE` → `data/items.ts` `PLACE_PAGE_SIZE`                                          | The page size, if the client's changes                                                     |
 | `sign-many.js` (#757)            | `useItemImages.tsx` / `imageEntries.ts` refresh                                                 | Batching of the refresh                                                                    |

@@ -11,8 +11,8 @@ const timeouts = new Counter('http_req_timeouts');
 
 const BUCKET = 'item-images';
 const ITEM_FIELDS = 'id,title,description,place,place_lat,place_lng,tags';
-// data/items.ts ITEM_CATEGORY_PAGE_WITH_IMAGES_SELECT.
-const PAGE_SELECT = `items!inner(${ITEM_FIELDS},images(id,item_id,path_full,path_thumb))`;
+// data/itemPage.ts ITEM_WITH_IMAGES_SELECT.
+const ITEM_WITH_IMAGES_SELECT = `${ITEM_FIELDS},images(id,item_id,path_full,path_thumb)`;
 // components/ItemList/paging.ts PAGE_SIZE.
 const PAGE_SIZE = 9;
 // data/items.ts PLACE_PAGE_SIZE.
@@ -79,25 +79,47 @@ export function signUp(email, password) {
   return { token, userId: user.id, email };
 }
 
-/** data/items.ts rawListItems, unfiltered: one catalogue page with its photographs. */
+/** data/itemPage.ts listItems, unfiltered: the page's ids, then its entries with their photographs, in page order. */
 export function listPage({ session, categoryId, page }) {
-  const params = query({
-    select: PAGE_SELECT,
+  const idParams = query({
+    select: 'item_id',
     category_id: `eq.${categoryId}`,
     order: 'created_at.desc,item_id.asc',
-    'items.images.order': 'created_at.asc,id.asc',
     offset: (page - 1) * PAGE_SIZE,
     limit: PAGE_SIZE,
   });
-  return send({
+  const idPage = send({
     method: 'GET',
-    path: `/rest/v1/item_categories?${params}`,
+    path: `/rest/v1/item_categories?${idParams}`,
     session,
-    name: 'catalogue page',
+    name: 'catalogue page ids',
   });
+  // A refused request already fails its check; an empty page keeps the flow going.
+  const ids =
+    idPage.status === 200 ? idPage.json().map((link) => link.item_id) : [];
+  if (ids.length === 0)
+    return { items: [], durationMs: idPage.timings.duration };
+
+  const itemParams = query({
+    select: ITEM_WITH_IMAGES_SELECT,
+    id: `in.(${ids.join(',')})`,
+    'images.order': 'created_at.asc,id.asc',
+  });
+  const itemPage = send({
+    method: 'GET',
+    path: `/rest/v1/items?${itemParams}`,
+    session,
+    name: 'catalogue page items',
+  });
+  const rows = itemPage.status === 200 ? itemPage.json() : [];
+  const byId = new Map(rows.map((item) => [item.id, item]));
+  return {
+    items: ids.flatMap((id) => byId.get(id) ?? []),
+    durationMs: idPage.timings.duration + itemPage.timings.duration,
+  };
 }
 
-/** data/items.ts rawCountItems, unfiltered: the exact total, as a HEAD. */
+/** data/itemPage.ts rawCountItems, unfiltered: the exact total, as a HEAD. */
 export function countItems(session, categoryId) {
   const params = query({
     select: 'item_id',
@@ -112,7 +134,7 @@ export function countItems(session, categoryId) {
   });
 }
 
-/** data/items.ts rawSearchCategoryItems: a searched page and its total. */
+/** data/itemPage.ts rawSearchCategoryItems: a searched page and its total. */
 export function searchPage({ session, categoryId, term, page }) {
   const params = query({
     cat_id: categoryId,
