@@ -2,8 +2,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { SELECTED_CATEGORY_KEY } from './components/CategorySelect/selection';
 import { supabase } from './supabase';
 import { useSession } from './useSession';
+import { STORAGE_OWNER_KEY as OWNER_KEY } from './userDataKeys';
 import type { Session, User } from '@supabase/supabase-js';
 
 type GetSessionResult = Awaited<ReturnType<typeof supabase.auth.getSession>>;
@@ -45,9 +47,17 @@ function mockAuthStateChange() {
   };
 }
 
+function signedInAs(user: User) {
+  vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
+    data: { session: sessionWith(user) },
+    error: null,
+  } satisfies GetSessionResult);
+}
+
 describe('useSession', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    window.localStorage.clear();
   });
 
   it('populates the user once getSession resolves one', async () => {
@@ -229,5 +239,62 @@ describe('useSession', () => {
     unmount();
 
     expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  describe('what the browser remembers of an account', () => {
+    it("forgets another account's last collection before the user is known", async () => {
+      window.localStorage.setItem(OWNER_KEY, 'someone-else');
+      window.localStorage.setItem(SELECTED_CATEGORY_KEY, 'their-category');
+      window.localStorage.setItem('theme', 'dark');
+      signedInAs(userWith());
+      mockAuthStateChange();
+
+      const { result } = renderHook(() => useSession());
+
+      await waitFor(() => expect(result.current.user).not.toBeNull());
+      expect(window.localStorage.getItem(SELECTED_CATEGORY_KEY)).toBeNull();
+      expect(window.localStorage.getItem(OWNER_KEY)).toBe('user-1');
+      expect(window.localStorage.getItem('theme')).toBe('dark');
+    });
+
+    it("keeps the same account's last collection", async () => {
+      window.localStorage.setItem(OWNER_KEY, 'user-1');
+      window.localStorage.setItem(SELECTED_CATEGORY_KEY, 'my-category');
+      signedInAs(userWith());
+      mockAuthStateChange();
+
+      const { result } = renderHook(() => useSession());
+
+      await waitFor(() => expect(result.current.user).not.toBeNull());
+      expect(window.localStorage.getItem(SELECTED_CATEGORY_KEY)).toBe(
+        'my-category',
+      );
+    });
+
+    it('forgets everything of the account once no one is signed in', async () => {
+      signedInAs(userWith());
+      const { fire } = mockAuthStateChange();
+      const { result } = renderHook(() => useSession());
+      await waitFor(() => expect(result.current.user).not.toBeNull());
+      window.localStorage.setItem(SELECTED_CATEGORY_KEY, 'my-category');
+
+      fire('SIGNED_OUT', null);
+
+      expect(window.localStorage.getItem(SELECTED_CATEGORY_KEY)).toBeNull();
+      expect(window.localStorage.getItem(OWNER_KEY)).toBeNull();
+    });
+
+    it("hands a different account none of the previous one's data", async () => {
+      signedInAs(userWith());
+      const { fire } = mockAuthStateChange();
+      const { result } = renderHook(() => useSession());
+      await waitFor(() => expect(result.current.user).not.toBeNull());
+      window.localStorage.setItem(SELECTED_CATEGORY_KEY, 'my-category');
+
+      fire('SIGNED_IN', sessionWith(userWith({ id: 'user-6' })));
+
+      expect(window.localStorage.getItem(SELECTED_CATEGORY_KEY)).toBeNull();
+      expect(window.localStorage.getItem(OWNER_KEY)).toBe('user-6');
+    });
   });
 });

@@ -20,3 +20,8 @@ export function takePrefetchedFirstPage(categoryId: string): FirstPage | null {
   pending = null;
   return taken;
 }
+
+/** Drops a read still waiting for its list, which belongs to the account that started it. */
+export function forgetPrefetchedFirstPage(): void {
+  pending = null;
+}

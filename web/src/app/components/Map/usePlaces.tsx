@@ -12,9 +12,8 @@ import {
   photonSearchUrl,
 } from '../../data/photon';
 import { attempts, backoffDelayMs } from '../../lib/backoff';
+import { GEOCODE_CACHE_KEY, storageOwner } from '../../userDataKeys';
 import { Place, PlaceCoords } from './types';
-
-const GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
 
 function readGeocodeCache(): Record<string, PlaceCoords> {
   try {
@@ -148,6 +147,7 @@ export function usePlaces({
           rows ?? [],
         );
         const cache = readGeocodeCache();
+        const owner = storageOwner();
         let cacheDirty = false;
 
         const { cached, pending } = partitionByCache(unlocated, cache);
@@ -211,7 +211,8 @@ export function usePlaces({
           ),
         );
 
-        if (cacheDirty) writeGeocodeCache(cache);
+        // A sign-out mid-lookup forgot this cache; writing it back would hand it to the next account.
+        if (cacheDirty && storageOwner() === owner) writeGeocodeCache(cache);
         // Every place failed, not "nothing to geocode": tells a broken geocoder from nothing to show.
         if (!cancelled && placeCount > 0 && resolvedCount === 0) {
           setError(true);

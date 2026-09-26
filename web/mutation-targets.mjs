@@ -57,6 +57,8 @@ export const MUTATE_TARGETS = [
   'src/app/useCatalogue.ts',
   'src/app/useServiceWorker.ts',
   'src/app/useSession.ts',
+  'src/app/userData.ts',
+  'src/app/userDataKeys.ts',
   'src/app/components/CategorySelect/useCategories.tsx',
   'src/app/components/CategorySelect/useShares.tsx',
   'src/app/components/CategorySelect/useCategoryRemoval.tsx',

@@ -8,7 +8,9 @@ Recipes for specific tasks. New to the app? Start with
 Google is the only sign-in (`/login`). **Sign out** is in the user menu (click
 your email in the header). If the sign-out request fails — you are offline,
 say — the session is cleared locally anyway, so you are never stuck signed in
-on a device without network.
+on a device without network. Signing out also makes the browser forget the
+collection you last had open and the places the map looked up; your theme and
+language stay.
 
 ## Categories
 
