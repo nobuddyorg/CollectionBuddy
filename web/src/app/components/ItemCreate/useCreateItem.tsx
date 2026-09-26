@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
-import { createItem, deleteItem, linkItemToCategory } from '../../data/items';
+import { createItemsInCategory } from '../../data/items';
 import { isQuotaExceeded } from '../../data/quota';
 import type { ItemFormValues } from '../ItemForm';
 
@@ -21,26 +21,15 @@ export function useCreateItem(categoryId: string) {
       const tags = Array.isArray(values.tags) ? values.tags : [];
 
       setIsCreating(true);
-      let itemId: string | null = null;
       try {
-        const { data, error } = await createItem({ ...values, tags });
-
-        if (error || !data) throw error ?? new Error('insert failed');
-        itemId = data.id;
-
-        const { error: linkError } = await linkItemToCategory(
-          itemId,
-          categoryId,
-        );
-
-        if (linkError) throw linkError;
+        const { error } = await createItemsInCategory(categoryId, [
+          { ...values, tags },
+        ]);
+        if (error) throw error;
 
         toast.announce(t('item_create.entry_added'));
         return true;
       } catch (error) {
-        if (itemId) {
-          await deleteItem(itemId);
-        }
         toast.reportError(
           'create item',
           error,

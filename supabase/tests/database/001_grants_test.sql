@@ -134,6 +134,8 @@ select function_privs_are('public', 'granted_category_ids', array[]::text[],
   'anon', array[]::text[], 'anon cannot execute granted_category_ids');
 select function_privs_are('public', 'list_category_places', array['uuid', 'text'],
   'anon', array[]::text[], 'anon cannot execute list_category_places');
+select function_privs_are('public', 'create_items_in_category', array['uuid', 'jsonb'],
+  'anon', array[]::text[], 'anon cannot execute create_items_in_category');
 select function_privs_are('public', 'search_category_items',
   array['uuid', 'text', 'int', 'int'], 'anon', array[]::text[],
   'anon cannot execute search_category_items -- SECURITY DEFINER makes this the highest-stakes grant to get right');
@@ -162,6 +164,7 @@ from (values
   ('caller_email', array[]::text[]),
   ('granted_category_ids', array[]::text[]),
   ('list_category_places', array['uuid', 'text']),
+  ('create_items_in_category', array['uuid', 'jsonb']),
   ('search_category_items', array['uuid', 'text', 'int', 'int']),
   ('storage_item_id', array['text']),
   ('photo_upload_has_room', array[]::text[]),

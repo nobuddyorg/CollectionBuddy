@@ -4,12 +4,7 @@ import {
   deleteCategory,
   type CategorySummary,
 } from './categories';
-import {
-  createItems,
-  deleteItems,
-  linkItemsToCategory,
-  type ImportedItemInsert,
-} from './items';
+import { createItemsInCategory, type ImportedItemInsert } from './items';
 import {
   createImageRow,
   removeImageObjects,
@@ -58,7 +53,7 @@ class ImportError extends Error {
 /** Bounded like exportCategory's PHOTO_DOWNLOAD_CONCURRENCY, so few Blobs are in memory at once. */
 export const PHOTO_UPLOAD_CONCURRENCY = 6;
 
-/** Items per insert request, and the id count of a cleanup's URL-length-safe `.in()` filter. */
+/** Entries per create request, each request one transaction. */
 export const ITEM_INSERT_BATCH_SIZE = 100;
 
 type ManifestItem = {
@@ -75,15 +70,13 @@ type ItemToCreate = { item: ManifestItem; id: string; createdAt: string };
 
 type ItemBatchCalls = {
   categoryId: string;
-  createItemRows: typeof createItems;
-  linkItemRows: typeof linkItemsToCategory;
-  deleteItemRows: typeof deleteItems;
+  createItemRows: typeof createItemsInCategory;
 };
 
-/** Creates and links one batch; a batch whose links fail is deleted, being outside the cascade. */
+/** Creates one batch and its links in one transaction, so a failed batch leaves no entry outside the category. */
 async function createImportedItems(
   batch: ItemToCreate[],
-  { categoryId, createItemRows, linkItemRows, deleteItemRows }: ItemBatchCalls,
+  { categoryId, createItemRows }: ItemBatchCalls,
 ): Promise<void> {
   const rows: ImportedItemInsert[] = batch.map(({ item, id, createdAt }) => ({
     id,
@@ -95,26 +88,8 @@ async function createImportedItems(
     place_lng: item.place_lng,
     tags: item.tags,
   }));
-  const { error } = await createItemRows(rows);
+  const { error } = await createItemRows(categoryId, rows);
   if (error) throw new ImportError('Could not create items', { cause: error });
-
-  const { error: linkError } = await linkItemRows(
-    batch.map(({ id, createdAt }) => ({
-      item_id: id,
-      category_id: categoryId,
-      created_at: createdAt,
-    })),
-  );
-  if (!linkError) return;
-  const { error: cleanupError } = await deleteItemRows(
-    batch.map(({ id }) => id),
-  );
-  if (cleanupError) {
-    console.error('Could not clean up unlinked items', cleanupError);
-  }
-  throw new ImportError('Could not link items to category', {
-    cause: linkError,
-  });
 }
 
 /** Imports an archive as a new category; `nameCategory` turns the archived name into one trusted as unique. */
@@ -126,9 +101,7 @@ export async function importCategory({
   getUid = verifiedUserId,
   createCategoryRow = createCategory,
   deleteCategoryRow = deleteCategory,
-  createItemRows = createItems,
-  linkItemRows = linkItemsToCategory,
-  deleteItemRows = deleteItems,
+  createItemRows = createItemsInCategory,
   newItemId = () => crypto.randomUUID(),
   now = () => new Date(),
   uploadImage = uploadImageObject,
@@ -144,9 +117,7 @@ export async function importCategory({
   getUid?: () => Promise<string | null>;
   createCategoryRow?: typeof createCategory;
   deleteCategoryRow?: typeof deleteCategory;
-  createItemRows?: typeof createItems;
-  linkItemRows?: typeof linkItemsToCategory;
-  deleteItemRows?: typeof deleteItems;
+  createItemRows?: typeof createItemsInCategory;
   newItemId?: () => string;
   now?: () => Date;
   uploadImage?: typeof uploadImageObject;
@@ -218,12 +189,7 @@ export async function importCategory({
       id: newItemId(),
       createdAt: createdAts[i],
     }));
-    const calls = {
-      categoryId: category.id,
-      createItemRows,
-      linkItemRows,
-      deleteItemRows,
-    };
+    const calls = { categoryId: category.id, createItemRows };
     let itemsDone = 0;
     for (const batch of chunk(toCreate, ITEM_INSERT_BATCH_SIZE)) {
       checkCancelled(signal);

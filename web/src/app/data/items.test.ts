@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  createItem,
-  createItems,
+  createItemsInCategory,
   deleteItem,
-  deleteItems,
-  linkItemToCategory,
-  linkItemsToCategory,
   rawListCategoryPlaces,
   rawUpdateItemsPlace,
   updateItem,
@@ -102,20 +98,30 @@ describe('the queries behind creating, editing and deleting an entry', () => {
     tags: [],
   };
 
-  it('inserts an entry into items and asks only for the new id back', () => {
-    const request = requestOf(createItem(fields));
+  // One request is one transaction: an entry whose link fails is never left behind in no category.
+  it('creates entries and their links through one RPC call, naming the category', () => {
+    const request = requestOf(createItemsInCategory('cat-1', [fields]));
 
-    expect(request.url.pathname).toMatch(/\/items$/);
+    expect(request.url.pathname).toMatch(/\/rpc\/create_items_in_category$/);
     expect(request.method).toBe('POST');
-    expect(request.url.searchParams.get('select')).toBe('id');
-    expect(request.headers.get('Accept')).toContain('pgrst.object');
+    expect(request.body).toEqual({
+      target_category_id: 'cat-1',
+      entries: [fields],
+    });
   });
 
   // A client sending its own user_id would hand the row to whoever it named.
-  it('sends the entry fields and nothing else -- never a user_id', () => {
-    const request = requestOf(createItem(fields));
+  it("sends an import batch with the caller's ids and timestamps, and never a user_id", () => {
+    const rows = [
+      { ...fields, id: 'a', created_at: '2026-01-01T00:00:00.000Z' },
+      { ...fields, id: 'b', created_at: '2026-01-01T00:00:00.001Z' },
+    ];
+    const request = requestOf(createItemsInCategory('cat-1', rows));
 
-    expect(request.body).toEqual(fields);
+    expect(request.body).toEqual({
+      target_category_id: 'cat-1',
+      entries: rows,
+    });
   });
 
   it('updates exactly the named row and reads back every field the list shows', () => {
@@ -151,45 +157,5 @@ describe('the queries behind creating, editing and deleting an entry', () => {
     expect(request.url.searchParams.get('id')).toBe('eq.item-1');
     expect(request.url.searchParams.get('select')).toBe('id');
     expect(request.headers.get('Accept')).toContain('pgrst.object');
-  });
-
-  it('links an entry to a category by both ids, and derives the rest server-side', () => {
-    const request = requestOf(linkItemToCategory('item-1', 'cat-1'));
-
-    expect(request.url.pathname).toMatch(/\/item_categories$/);
-    expect(request.method).toBe('POST');
-    expect(request.body).toEqual({ item_id: 'item-1', category_id: 'cat-1' });
-  });
-
-  it("inserts a whole import batch in one request, with the caller's ids and timestamps but no user_id", () => {
-    const rows = [
-      { ...fields, id: 'a', created_at: '2026-01-01T00:00:00.000Z' },
-      { ...fields, id: 'b', created_at: '2026-01-01T00:00:00.001Z' },
-    ];
-    const request = requestOf(createItems(rows));
-
-    expect(request.url.pathname).toMatch(/\/items$/);
-    expect(request.method).toBe('POST');
-    expect(request.body).toEqual(rows);
-  });
-
-  it('links a whole import batch to its category in one request', () => {
-    const links = [
-      { item_id: 'a', category_id: 'cat-1', created_at: 't1' },
-      { item_id: 'b', category_id: 'cat-1', created_at: 't2' },
-    ];
-    const request = requestOf(linkItemsToCategory(links));
-
-    expect(request.url.pathname).toMatch(/\/item_categories$/);
-    expect(request.method).toBe('POST');
-    expect(request.body).toEqual(links);
-  });
-
-  it('deletes a batch of entries by id in one request', () => {
-    const request = requestOf(deleteItems(['a', 'b']));
-
-    expect(request.url.pathname).toMatch(/\/items$/);
-    expect(request.method).toBe('DELETE');
-    expect(request.url.searchParams.get('id')).toBe('in.(a,b)');
   });
 });

@@ -109,6 +109,7 @@ export const SEED = {
     'Depot',
     'Dunkelkammer',
     'Tauschkiste',
+    'Neuzugänge',
   ],
   /** For entries.spec.ts. */
   scratchCategory: 'Werkstatt',
@@ -163,6 +164,8 @@ export const SEED = {
   editorPhotoCategory: 'Dunkelkammer',
   /** For shared-with-me-editor.spec.ts, whose grantee writes here through the interface until demoted. */
   editorJourneyCategory: 'Tauschkiste',
+  /** For rls/create-rpc.spec.ts, into which each kind of grantee tries to create an entry. */
+  createCategory: 'Neuzugänge',
 
   // Oldest first; the list sorts newest first, so the last one here is the first card on the page.
   items: [
