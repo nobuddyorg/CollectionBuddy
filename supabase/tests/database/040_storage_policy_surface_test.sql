@@ -57,14 +57,12 @@ select is(
   'only the own-prefix policy authorizes an insert -- there is no shared-write path'
 );
 
--- The read and delete policies that do remain, and are what let the owner
--- (or a second editor) reach an object that legitimately landed under a
--- different editor's prefix.
+-- Beside the own-prefix pair, what reaches an object under another uploader's prefix: grants, and the entry owner's own records (0023, #741).
 select is(
   (select array_agg(policyname::text order by policyname)
    from pg_catalog.pg_policies
    where schemaname = 'storage' and tablename = 'objects' and cmd in ('SELECT', 'DELETE')),
-  array['delete own objects', 'delete shared objects', 'read own signed objects', 'read shared objects'],
+  array['delete own objects', 'delete shared objects', 'read objects own photograph records name', 'read own signed objects', 'read shared objects'],
   'the own-prefix and shared read/delete policies are all present'
 );
 
@@ -93,7 +91,7 @@ select is(
   'none of the superseded storage policies has come back'
 );
 
--- An own-prefix write under an entry the caller can see but no longer write is refused (0021, #739).
+-- An own-prefix write needs an entry the caller may write, not merely no entry it can see (0021 #739, 0023 #741).
 select is(
   (select array_agg(policyname::text order by policyname)
    from pg_catalog.pg_policies

@@ -94,6 +94,101 @@ test.describe('a category shared at the editor role', () => {
     }
   });
 
+  // The editor's bytes sit under the editor's prefix, yet the record is the owner's, on the owner's entry (#741).
+  test('the owner signs and removes the photograph an editor added to the owner’s entry', async () => {
+    const { token, userId, otherToken, otherUserId } = context();
+    const { categoryId, itemId } = await ownerEntryIn({
+      token,
+      userId,
+      category: SEED.editorPhotoCategory,
+      title: 'rls-editor-added-probe',
+    });
+    const path = `${otherUserId}/${itemId}/rls-editor-added.webp`;
+    const unrecorded = `${otherUserId}/${itemId}/rls-editor-unrecorded.webp`;
+    const owner = apiAs(token).storage.from('item-images');
+    const editor = apiAs(otherToken);
+    const shareId = await editorShare(token, categoryId);
+
+    try {
+      for (const upload of [path, unrecorded]) {
+        const { error } = await editor.storage
+          .from('item-images')
+          .upload(upload, new Blob(['probe'], { type: 'image/webp' }));
+        expect(error).toBeNull();
+      }
+      const { error: rowError } = await editor
+        .from('images')
+        .insert({ item_id: itemId, path_full: path });
+      expect(rowError).toBeNull();
+
+      const { error: signError } = await owner.createSignedUrl(path, 60);
+      expect(signError).toBeNull();
+      // Only what the owner's own records name: the entry is no licence to read whatever lies under it.
+      const { error: unrecordedError } = await owner.createSignedUrl(
+        unrecorded,
+        60,
+      );
+      expect(unrecordedError).not.toBeNull();
+
+      const { data: removed } = await owner.remove([path]);
+      expect(removed?.map((object) => object.name)).toEqual([path]);
+    } finally {
+      await editor.storage.from('item-images').remove([path, unrecorded]);
+      await unshare(token, shareId);
+      await owner.remove([path]);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // The bytes are the editor's own prefix but the owner's photograph: revoking ends the editor's writes to them (#741).
+  test('a revoked editor can no longer remove or replace the photograph it added to the owner’s entry', async () => {
+    const { token, userId, otherToken, otherUserId } = context();
+    const { categoryId, itemId } = await ownerEntryIn({
+      token,
+      userId,
+      category: SEED.editorPhotoCategory,
+      title: 'rls-revoked-added-probe',
+    });
+    const path = `${otherUserId}/${itemId}/rls-revoked-added.webp`;
+    const pending = `${otherUserId}/${itemId}/rls-revoked-pending.webp`;
+    const owner = apiAs(token).storage.from('item-images');
+    const editor = apiAs(otherToken);
+    const shareId = await editorShare(token, categoryId);
+
+    try {
+      const { error: uploadError } = await editor.storage
+        .from('item-images')
+        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+      expect(uploadError).toBeNull();
+      // The second record names bytes not stored yet, a path the editor could fill later.
+      const { error: rowError } = await editor.from('images').insert([
+        { item_id: itemId, path_full: path },
+        { item_id: itemId, path_full: pending },
+      ]);
+      expect(rowError).toBeNull();
+
+      await unshare(token, shareId);
+
+      const { data: removed } = await editor.storage
+        .from('item-images')
+        .remove([path]);
+      expect(removed ?? []).toEqual([]);
+      const { error: fillError } = await editor.storage
+        .from('item-images')
+        .upload(pending, new Blob(['swapped'], { type: 'image/webp' }));
+      expect(fillError).not.toBeNull();
+
+      // Signing proves the bytes are still there; the owner's record names them.
+      const { error: signError } = await owner.createSignedUrl(path, 60);
+      expect(signError).toBeNull();
+    } finally {
+      await unshare(token, shareId);
+      await owner.remove([path, pending]);
+      await editor.storage.from('item-images').remove([path, pending]);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
   // The positive side of the policies a viewer is refused: 'delete shared objects' reaches the owner's own prefix.
   test('an editor removes the owner’s photograph, its record and the entry’s link', async () => {
     const { token, userId, otherToken } = context();

@@ -50,6 +50,9 @@ can be granted access, and it is read-only until you say otherwise.
   editor or take edit access away, they can no longer change or delete those
   entries or their photos. Deleting the category removes them; so can the
   editor, if you let them edit again.
+- **Photos an editor adds to your entries** are yours: you see them, they
+  count towards your storage, and once you revoke the editor they can no
+  longer remove or replace them.
 - **Leave a category shared with you**: the delete control on a shared category
   leaves it instead, at once and with no undo: only the owner can share it with
   you again. The owner's copy is untouched.
