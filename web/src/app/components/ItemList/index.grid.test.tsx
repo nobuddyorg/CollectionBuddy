@@ -43,6 +43,21 @@ describe('ItemList empty state', () => {
     );
     renderList();
     expect(screen.getByText('No entries yet')).toBeVisible();
+    expect(
+      screen.getByText(/Add your first entry with New entry above/),
+    ).toBeVisible();
+  });
+
+  // A viewer's New entry button is disabled, so the hint must not send them to it.
+  it('does not point a viewer at New entry', () => {
+    useItemsMock.mockReturnValue(
+      itemsState({ items: [], total: 0, loading: false }),
+    );
+    renderList({ canEdit: false });
+    expect(
+      screen.getByText('Nothing has been added to this collection yet.'),
+    ).toBeVisible();
+    expect(screen.queryByText(/New entry above/)).toBeNull();
   });
 
   // Deleting page 2's only card reloads it as items: [] with total: 9; the basket must not paint over that.

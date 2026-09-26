@@ -10,10 +10,17 @@ const withBasePath = (path: `/${string}`): string => {
   return `${basePath}${path}`;
 };
 
-export default function Header({ user, onSignOut }: HeaderProps) {
+export default function Header({ user, onSignOut, onOpenHelp }: HeaderProps) {
   const { open: menuOpen, toggle, close, anchorRef, panelRef } = useMenu();
   const { t } = useI18n();
   const displayEmail = user.email;
+
+  const openHelp = () => {
+    // The Help item unmounts with the menu, so the trigger is what the closing dialog returns focus to.
+    anchorRef.current!.focus();
+    close();
+    onOpenHelp();
+  };
 
   return (
     <header
@@ -70,6 +77,7 @@ export default function Header({ user, onSignOut }: HeaderProps) {
               open={menuOpen}
               onSignOut={onSignOut}
               onClose={close}
+              onOpenHelp={openHelp}
               labelSignOut={t('header.sign_out')}
             />
           </div>

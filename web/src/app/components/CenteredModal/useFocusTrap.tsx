@@ -20,12 +20,17 @@ export function useFocusTrap({
       initialFocusRef?.current ?? getFocusable(containerRef.current)[0]
     )?.focus();
     return () => {
-      // A confirmed delete may have removed the opener from the DOM, making focus() a silent no-op.
-      if (previous!.isConnected) {
-        previous!.focus();
-      } else {
-        document.getElementById('main-content')?.focus();
-      }
+      // Deferred: this cleanup runs before CenteredModal lifts the inert that makes focus() a no-op.
+      queueMicrotask(() => {
+        // Something else, such as the next dialog, already took focus; only a lost focus is restored.
+        if (document.activeElement !== document.body) return;
+        // A confirmed delete may have removed the opener from the DOM, making focus() a silent no-op.
+        if (previous!.isConnected) {
+          previous!.focus();
+        } else {
+          document.getElementById('main-content')?.focus();
+        }
+      });
     };
   }, [open, containerRef, initialFocusRef]);
 

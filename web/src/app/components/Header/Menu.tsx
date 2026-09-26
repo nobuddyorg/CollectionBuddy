@@ -46,6 +46,7 @@ export default function Menu({
   open,
   onSignOut,
   onClose,
+  onOpenHelp,
   labelSignOut,
 }: MenuProps) {
   const { t, language, setLanguage } = useI18n();
@@ -89,6 +90,20 @@ export default function Menu({
       </div>
 
       <div className="my-1 border-t" />
+
+      <button
+        type="button"
+        data-testid="open-help"
+        onClick={onOpenHelp}
+        aria-keyshortcuts="Control+/ Meta+/"
+        className="w-full text-left px-3 min-h-11 flex items-center justify-between gap-3 rounded-sm hover:bg-muted text-sm transition-colors"
+      >
+        {t('header.help')}
+        {/* Hidden from the name: aria-keyshortcuts already announces it. */}
+        <kbd aria-hidden="true" className={labelClasses()}>
+          {t('header.help_shortcut')}
+        </kbd>
+      </button>
 
       <button
         type="button"
