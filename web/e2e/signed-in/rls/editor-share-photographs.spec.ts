@@ -1,6 +1,15 @@
 import { expect, test } from '../test';
 import { SEED, itemsIn } from '../fixtures';
-import { apiAs, context, editorShare, ownerEntryIn, unshare } from './helpers';
+import {
+  apiAs,
+  context,
+  editorShare,
+  entryFiledBy,
+  ownedCategoryId,
+  ownerEntryIn,
+  removeFiledEntry,
+  unshare,
+} from './helpers';
 
 // An editor's photographs, and the owner's prefix and objects that stay out of the editor's reach.
 test.describe('a category shared at the editor role', () => {
@@ -82,6 +91,74 @@ test.describe('a category shared at the editor role', () => {
       await apiAs(otherToken).storage.from('item-images').remove([path]);
       await unshare(token, shareId);
       await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // Own-prefix bytes under an entry it can no longer write: removing one and uploading at its path would swap the photograph (#739).
+  test('a revoked editor can no longer change the photographs of the entry it filed', async () => {
+    const { token, userId, otherToken, otherUserId } = context();
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.editorPhotoCategory,
+    });
+    const shareId = await editorShare(token, categoryId);
+    const itemId = await entryFiledBy(
+      { token: otherToken, categoryId },
+      'rls-filed-photo-probe',
+    );
+    const path = `${otherUserId}/${itemId}/rls-filed-probe.webp`;
+    const replacement = `${otherUserId}/${itemId}/rls-filed-replacement.webp`;
+    const editor = apiAs(otherToken);
+
+    try {
+      const { error: uploadError } = await editor.storage
+        .from('item-images')
+        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+      expect(uploadError).toBeNull();
+      const { data: row, error: rowError } = await editor
+        .from('images')
+        .insert({ item_id: itemId, path_full: path })
+        .select('id')
+        .single();
+      expect(rowError).toBeNull();
+
+      await unshare(token, shareId);
+
+      await editor.storage.from('item-images').remove([path]);
+      const { error: replaceError } = await editor.storage
+        .from('item-images')
+        .upload(replacement, new Blob(['swapped'], { type: 'image/webp' }));
+      expect(replaceError).not.toBeNull();
+
+      const { data: removedRow } = await editor
+        .from('images')
+        .delete()
+        .eq('id', row!.id)
+        .select('id');
+      expect(removedRow).toEqual([]);
+
+      const { error: addError } = await editor
+        .from('images')
+        .insert({ item_id: itemId, path_full: replacement });
+      expect(addError).not.toBeNull();
+
+      // Its own prefix, so still listable to it: the object left in place is the refused remove, not a hidden one.
+      const { data: listed } = await editor.storage
+        .from('item-images')
+        .list(`${otherUserId}/${itemId}`);
+      expect((listed ?? []).map((object) => object.name)).toEqual([
+        'rls-filed-probe.webp',
+      ]);
+    } finally {
+      await unshare(token, shareId);
+      await removeFiledEntry({
+        token,
+        otherToken,
+        categoryId,
+        itemId,
+        paths: [path, replacement],
+      });
     }
   });
 

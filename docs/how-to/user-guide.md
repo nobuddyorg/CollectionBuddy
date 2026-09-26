@@ -45,6 +45,11 @@ can be granted access, and it is read-only until you say otherwise.
 - **Revoke**: trash icon beside the email in the shared-with list, confirm.
   Access ends at once. **Undo** in the confirmation shares it again with the
   same role and expiry.
+- **Entries an editor added** stay theirs: you do not see them in your copy
+  of the category, while everyone it is shared with does. Once you revoke the
+  editor or take edit access away, they can no longer change or delete those
+  entries or their photos. Deleting the category removes them; so can the
+  editor, if you let them edit again.
 - **Leave a category shared with you**: the delete control on a shared category
   leaves it instead, at once and with no undo: only the owner can share it with
   you again. The owner's copy is untouched.

@@ -28,6 +28,7 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | [`0018_rpc_custom_plans.sql`](../../supabase/migrations/0018_rpc_custom_plans.sql) | `list_category_places()` and `search_category_items()` become plpgsql with `plan_cache_mode = force_custom_plan`, so each call is planned for the category it names; search checks access once per call, and both order ties by id so pages and a place's titles, ids and coordinates stay consistent. The map sends `ids` only for a place without finite coordinates, the only one the client writes a geocode back to: 1,283 KB to 331 KB for 25,000 entries. Same rows, same security mode ([why](../explanation/design-decisions.md#why-the-map-and-search-rpcs-are-plpgsql)). |
 | [`0019_images_path_thumb_matches_item.sql`](../../supabase/migrations/0019_images_path_thumb_matches_item.sql) | `images.path_thumb` must name its own entry, as `path_full` must: the owner's client deletes both paths, so a planted thumbnail took another entry's photo with it. `not valid`: checked on every write from now on. |
 | [`0020_one_collection_per_entry.sql`](../../supabase/migrations/0020_one_collection_per_entry.sql) | `tg_item_categories_quota()` refuses an entry's second category link (was: an 11th), with `PT507`. Existing rows untouched. |
+| [`0021_item_writes_follow_the_grant.sql`](../../supabase/migrations/0021_item_writes_follow_the_grant.sql) | Adds `has_item_write_access()`. Writing an entry, its links, its `images` rows and the own-prefix objects under it needs write access to every category it is in, the entry's own owner included: revoking or demoting an editor ends their writes to the entries they filed ([why](../explanation/design-decisions.md#why-an-editors-filed-entries-follow-the-grant)). |
 
 ### Tables
 
@@ -46,16 +47,17 @@ All policies are in [`0006_policies.sql`](../../supabase/migrations/0006_policie
 - `user_id = (select auth.uid())` — the scalar subquery makes the planner evaluate it once per query, not per row.
 - `category_id = any(array(select granted_category_ids()))` — the categories an active `category_shares` grant to the caller's email opens, at either role, read once per statement as an initPlan. `has_category_read_access(cat_id)` asks the same set for one category.
 - `has_category_write_access(cat_id)` — category ownership, **or** an active grant at role `editor`.
+- `has_item_write_access(item_id, owner_id)` — every category the entry is in passes `has_category_write_access()`, and the caller owns the entry or it is in at least one. Owning an entry is not enough once it is filed in someone else's category. Links the caller cannot see do not count, so for a non-owner this is write access via one of its visible categories.
 
 Ownership is inside the write predicate and deliberately outside the read one; every read policy adds its own owner branch instead. Folding ownership into the read predicate would let a category's owner see every item linked into it, including ones an editor added that the owner was never granted.
 
 | Table | `select` | `insert` | `update` | `delete` |
 | --- | --- | --- | --- | --- |
 | `categories` | owner, or read access | owner | owner | owner |
-| `items` | owner, or read access via a linked category | owner | owner, or write access via a linked category | owner, or write access via a linked category |
-| `item_categories` | owner, or read access to the category | owner (the item's) | — | owner, or write access to the category |
+| `items` | owner, or read access via a linked category | owner | item write access | item write access |
+| `item_categories` | owner, or read access to the category | owner (the item's) | — | write access to the category |
 | `category_shares` | owner, or the invited email | owner | owner | owner, or the invited email |
-| `images` | owner, or read access via the item's categories | owner, or write access via the item's categories | — | owner, or write access via the item's categories |
+| `images` | owner, or read access via the item's categories | item write access | — | item write access |
 
 No `update` policy means no row matches, so the omission is the denial. Category-level actions — rename, delete, manage shares — are owner-only at every role.
 
@@ -72,6 +74,7 @@ Account-based, one category at a time, `viewer` or `editor`. No public links ([w
 - The owner invites by email. There is no accept step: both predicates compare `invited_email` with `public.caller_email()`, so a grant works the moment that email signs in, even for the first time.
 - `tg_category_shares_enforce()` derives `owner_user_id` from the category, rejects sharing a category the caller does not own or sharing with oneself, and lowercases the email.
 - One grant per `(category, email)`; re-sharing is a no-op, not a second row with a different expiry.
+- Ending or demoting an editor's grant also ends their writes to the entries they filed into the category: those stay the editor's rows, yet `has_item_write_access()` asks for write access to the category, not ownership. The entries stay in the category, readable to its grantees and to the editor, and invisible to the owner like every editor-filed entry; deleting the category removes them.
 - Ending a grant is a `delete` from either side — owner revoking and grantee leaving are the same operation on the same row. The client sends it at once, not after an undo window; the owner's Undo inserts the grant again ([why](../explanation/design-decisions.md#why-deletes-wait-out-an-undo-window-and-ending-a-grant-does-not)).
 - `expires_at` is optional and only constrained to be after `created_at`. Both predicates re-check the clock on every read; `select`/`delete` on `category_shares` do not, so an expired grant stays visible for either side to clean up.
 
@@ -86,7 +89,7 @@ Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql
 - `tg_categories_normalize()` / `tg_items_normalize()` — apply `normalize_text()`; items also dedupe and sort `tags`.
 - `tg_item_categories_enforce()` — verifies both rows exist, requires write access to the category, sets `user_id` from the item's owner, and rejects the row if that owner is not the caller.
 - `tg_category_shares_enforce()` — see Sharing.
-- `tg_images_enforce()` — derives `images.user_id` from the item's owner; rejects an insert whose item the caller neither owns nor has write access to.
+- `tg_images_enforce()` — derives `images.user_id` from the item's owner; rejects an insert without `has_item_write_access()` to the item.
 - `tg_images_size_from_storage()` — sets `images.size_bytes` to the size Storage recorded for `path_full`, or the bucket's 5 MiB cap while nothing is stored there; the client's claim is ignored.
 - `tg_images_quota()`, `tg_items_quota()`, `tg_categories_quota()`, `tg_category_shares_quota()`, `tg_item_categories_quota()` — `FOR EACH STATEMENT` after insert: refuse with SQLSTATE `PT507` (HTTP 507) a write that takes an owner past 1 GiB of photographs, 50,000 entries, 1,000 categories or 1,000 shares, or an entry into a second category ([why](../explanation/design-decisions.md#why-quotas-are-counted-in-the-database)).
 - `delete_item_if_orphan()` — after `item_categories` rows are deleted, deletes items now in zero categories. `FOR EACH STATEMENT` with a transition table ([why](../explanation/design-decisions.md#why-the-orphan-cleanup-trigger-is-statement-level)).
@@ -112,7 +115,7 @@ Nothing indexes `storage.objects`; hosted Supabase owns it and refuses DDL with 
 
 One private bucket, `item-images` ([`0007_storage.sql`](../../supabase/migrations/0007_storage.sql)), restricted to `image/webp`, `image/jpeg`, `image/png` at 5 MiB per file. Paths are `<uid>/<itemId>/<file>`, where the uid is the **uploader's**. The client reads through signed URLs.
 
-- **Owner-only policies** on `select`, `insert`, `delete`: `split_part(name, '/', 1) = (select auth.uid())::text`. Splinter skips the `storage` schema, so `040_storage_policy_surface_test.sql` checks that no policy here calls `auth.uid()` once per row.
+- **Owner-only policies** on `select`, `insert`, `delete`: `split_part(name, '/', 1) = (select auth.uid())::text`. `insert` and `delete` also refuse a path under an entry the caller can see but has no `has_item_write_access()` to, so an ex-editor cannot remove and re-upload the bytes an `images` row names (`0021`). Splinter skips the `storage` schema, so `040_storage_policy_surface_test.sql` checks that no policy here calls `auth.uid()` once per row.
 - **Shared policies** on `select` and `delete`: extract the item id with `storage_item_id()` and join through `item_categories` to the same read/write predicates the tables use (`granted_category_ids()` for reading). `storage_item_id()` returns `NULL` on a path that does not parse, because a raised error inside `USING` aborts the statement instead of failing to match the row.
 - **No shared `insert`**: an editor's upload lands under the editor's own prefix and satisfies the owner-only set.
 - **No `update` policy** for anyone, and that absence is the only denial — Storage's bootstrap re-grants the `UPDATE` privilege on every start. A path is fixed when written; `move()` and `upsert` are refused ([why](../explanation/design-decisions.md#why-a-storage-objects-path-can-never-change)).

@@ -93,6 +93,17 @@ select is(
   'none of the superseded storage policies has come back'
 );
 
+-- An own-prefix write under an entry the caller can see but no longer write is refused (0021, #739).
+select is(
+  (select array_agg(policyname::text order by policyname)
+   from pg_catalog.pg_policies
+   where schemaname = 'storage' and tablename = 'objects'
+     and policyname in ('upload own objects', 'delete own objects')
+     and coalesce(qual, with_check) like '%has_item_write_access(%'),
+  array['delete own objects', 'upload own objects'],
+  'the own-prefix upload and delete policies both require write access to the entry'
+);
+
 -- Splinter's auth_rls_initplan skips the storage schema, so this is its check here: auth.uid() only ever inside a scalar subquery (0012, #719).
 select is(
   (select array_agg(policyname::text order by policyname)

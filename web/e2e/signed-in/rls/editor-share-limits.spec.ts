@@ -4,8 +4,10 @@ import {
   apiAs,
   context,
   editorShare,
+  entryFiledBy,
   ownedCategoryId,
   ownerEntryIn,
+  removeFiledEntry,
   share,
   unshare,
 } from './helpers';
@@ -163,6 +165,119 @@ test.describe('a category shared at the editor role', () => {
       expect(after!.title).toBe('edited while granted');
     } finally {
       await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // The entry stays the editor's own row, so only the grant, not ownership, may decide its writes (#739).
+  test('a revoked editor can no longer write the entry it filed, with the entry still there', async () => {
+    const { token, userId, otherToken } = context();
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.editorLimitsCategory,
+    });
+    const shareId = await editorShare(token, categoryId);
+    const itemId = await entryFiledBy(
+      { token: otherToken, categoryId },
+      'rls-filed-revoked-probe',
+    );
+
+    try {
+      await unshare(token, shareId);
+      const formerEditor = apiAs(otherToken);
+
+      const { data: updated } = await formerEditor
+        .from('items')
+        .update({ title: 'edited after revocation' })
+        .eq('id', itemId)
+        .select('id');
+      expect(updated).toEqual([]);
+
+      const { data: unlinked } = await formerEditor
+        .from('item_categories')
+        .delete()
+        .eq('item_id', itemId)
+        .select('item_id');
+      expect(unlinked).toEqual([]);
+
+      const { data: deleted } = await formerEditor
+        .from('items')
+        .delete()
+        .eq('id', itemId)
+        .select('id');
+      expect(deleted).toEqual([]);
+
+      // Its own row, so still readable to it: an empty write above is the revocation, not a hidden row.
+      const { data: after } = await formerEditor
+        .from('items')
+        .select('title,item_categories(category_id)')
+        .eq('id', itemId)
+        .single();
+      expect(after).toEqual({
+        title: 'rls-filed-revoked-probe',
+        item_categories: [{ category_id: categoryId }],
+      });
+    } finally {
+      await unshare(token, shareId);
+      await removeFiledEntry({
+        token,
+        otherToken,
+        categoryId,
+        itemId,
+        paths: [],
+      });
+    }
+  });
+
+  test('an editor demoted to viewer reads the entry it filed but no longer writes it', async () => {
+    const { token, userId, otherToken } = context();
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.editorLimitsCategory,
+    });
+    const shareId = await editorShare(token, categoryId);
+    const itemId = await entryFiledBy(
+      { token: otherToken, categoryId },
+      'rls-filed-demoted-probe',
+    );
+
+    try {
+      const { error: demoteError } = await apiAs(token)
+        .from('category_shares')
+        .update({ role: 'viewer' })
+        .eq('id', shareId);
+      expect(demoteError).toBeNull();
+
+      const { data: updated } = await apiAs(otherToken)
+        .from('items')
+        .update({ title: 'edited as a viewer' })
+        .eq('id', itemId)
+        .select('id');
+      expect(updated).toEqual([]);
+
+      const { data: deleted } = await apiAs(otherToken)
+        .from('items')
+        .delete()
+        .eq('id', itemId)
+        .select('id');
+      expect(deleted).toEqual([]);
+
+      const { data: after } = await apiAs(otherToken)
+        .from('items')
+        .select('title')
+        .eq('id', itemId)
+        .single();
+      expect(after!.title).toBe('rls-filed-demoted-probe');
+    } finally {
+      await unshare(token, shareId);
+      await removeFiledEntry({
+        token,
+        otherToken,
+        categoryId,
+        itemId,
+        paths: [],
+      });
     }
   });
 

@@ -79,6 +79,8 @@ select function_privs_are('public', 'has_category_write_access', array['uuid'],
   'anon', array[]::text[], 'anon cannot execute has_category_write_access');
 select function_privs_are('public', 'has_category_read_access', array['uuid'],
   'anon', array[]::text[], 'anon cannot execute has_category_read_access');
+select function_privs_are('public', 'has_item_write_access', array['uuid', 'uuid'],
+  'anon', array[]::text[], 'anon cannot execute has_item_write_access');
 select function_privs_are('public', 'caller_email', array[]::text[],
   'anon', array[]::text[], 'anon cannot execute caller_email');
 select function_privs_are('public', 'granted_category_ids', array[]::text[],
@@ -103,6 +105,7 @@ select function_privs_are('public', f.name, f.args, 'authenticated', array['EXEC
 from (values
   ('has_category_write_access', array['uuid']),
   ('has_category_read_access', array['uuid']),
+  ('has_item_write_access', array['uuid', 'uuid']),
   ('caller_email', array[]::text[]),
   ('granted_category_ids', array[]::text[]),
   ('list_category_places', array['uuid', 'text']),

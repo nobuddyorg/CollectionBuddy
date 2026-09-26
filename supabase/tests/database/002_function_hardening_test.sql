@@ -107,6 +107,10 @@ select ok(
   not (select prosecdef from pg_catalog.pg_proc where oid = 'public.granted_category_ids()'::regprocedure),
   'granted_category_ids runs as its caller'
 );
+select ok(
+  not (select prosecdef from pg_catalog.pg_proc where oid = 'public.has_item_write_access(uuid, uuid)'::regprocedure),
+  'has_item_write_access runs as its caller'
+);
 
 -- 001_grants_test.sql leaves the trigger functions out of anon's reachable
 -- surface on the grounds that a trigger function cannot be called

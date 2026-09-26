@@ -205,6 +205,10 @@ export type Database = {
       granted_category_ids: { Args: never; Returns: string[] };
       has_category_read_access: { Args: { cat_id: string }; Returns: boolean };
       has_category_write_access: { Args: { cat_id: string }; Returns: boolean };
+      has_item_write_access: {
+        Args: { item_owner_id: string; target_item_id: string };
+        Returns: boolean;
+      };
       join_tags: { Args: { tags: string[] }; Returns: string };
       keepalive: { Args: never; Returns: undefined };
       list_category_places: {
