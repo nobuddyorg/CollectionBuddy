@@ -38,6 +38,7 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | [`0025_photo_ceilings_fit_the_plan.sql`](../../supabase/migrations/0025_photo_ceilings_fit_the_plan.sql) | Photograph ceilings sized to the Free plan's 1 GB: 256 MiB per owner with thumbnails counted (`images.thumb_size_bytes`, backfilled), 768 MiB in the bucket when a photograph is recorded, and `photo_upload_has_room()` in the upload policy: 832 MiB in the bucket, 320 MiB per uploader. The upload policy also refuses a path an `images` row names ([why](../explanation/design-decisions.md#why-quotas-are-counted-in-the-database)). |
 | [`0026_places_in_stable_order.sql`](../../supabase/migrations/0026_places_in_stable_order.sql) | `list_category_places()` returns its places ordered by place, so the map can page them past PostgREST's `max_rows` (1,000), which truncated a larger category's places without an error. |
 | [`0027_description_keeps_line_breaks.sql`](../../supabase/migrations/0027_description_keeps_line_breaks.sql) | `tg_items_normalize()` keeps the line breaks in an item's description through `normalize_multiline_text()`; `normalize_text()` had collapsed them to spaces. Title, place and tags stay single-line. Descriptions stored before it stay flattened. |
+| [`0028_schema_hardening_follow_ups.sql`](../../supabase/migrations/0028_schema_hardening_follow_ups.sql) | `postgres`'s default privileges grant a new table or sequence in `public` to neither `anon` nor `authenticated`, as `0015` did for functions. Clears any `path_thumb` naming another entry, planted before `0019`, and validates `images_path_thumb_matches_item`. `items_tag_length`: one tag at most 100 characters, `not valid`. `has_category_write_access()` asks `granted_category_ids()` whether a grant is active, so write never outlasts read ([why](../explanation/design-decisions.md#why-read-policies-take-the-callers-grants-as-one-set)). |
 
 ### Tables
 
@@ -55,7 +56,7 @@ All policies are in [`0006_policies.sql`](../../supabase/migrations/0006_policie
 
 - `user_id = (select auth.uid())` — the scalar subquery makes the planner evaluate it once per query, not per row.
 - `category_id = any(array(select granted_category_ids()))` — the categories an active `category_shares` grant to the caller's email opens, at either role, read once per statement as an initPlan. `has_category_read_access(cat_id)` asks the same set for one category.
-- `has_category_write_access(cat_id)` — category ownership, **or** an active grant at role `editor`.
+- `has_category_write_access(cat_id)` — category ownership, **or** the caller's own grant at role `editor`, active by `granted_category_ids()`.
 - `has_item_write_access(item_id, owner_id)` — every category the entry is in passes `has_category_write_access()`, and the caller owns the entry or it is in at least one. Owning an entry is not enough once it is filed in someone else's category. Links the caller cannot see do not count, so for a non-owner this is write access via one of its visible categories.
 
 Ownership is inside the write predicate and deliberately outside the read one; every read policy adds its own owner branch instead. Folding ownership into the read predicate would let a category's owner see every item linked into it, including ones an editor added that the owner was never granted.
@@ -70,7 +71,7 @@ Ownership is inside the write predicate and deliberately outside the read one; e
 
 No `update` policy means no row matches, so the omission is the denial. Category-level actions — rename, delete, manage shares — are owner-only at every role.
 
-Grants are the second denial: `anon` has `revoke all` on every table, and `authenticated` holds exactly the DML each table's policies back — no `UPDATE` on `item_categories`/`images`, no `TRUNCATE`/`REFERENCES`/`TRIGGER` anywhere. `TRUNCATE` is the one RLS does not filter. `0007` raises at migration time if RLS is ever found disabled on `storage.objects`.
+Grants are the second denial: `anon` has `revoke all` on every table, and `authenticated` holds exactly the DML each table's policies back — no `UPDATE` on `item_categories`/`images`, no `TRUNCATE`/`REFERENCES`/`TRIGGER` anywhere. `TRUNCATE` is the one RLS does not filter. A table or sequence a later migration creates starts with no grant to either role (`0028`), so its migration grants what its policies back; `001_grants_test.sql` derives both checks from the catalog. `0007` raises at migration time if RLS is ever found disabled on `storage.objects`.
 
 [`web/e2e/signed-in/rls/`](../../web/e2e/signed-in/rls/) is the executable version of this section, one spec per boundary (`isolation`, `viewer-share`, `editor-share`, each with a `-photographs` half for Storage, plus `search-rpc`, `orphan-sweep-rpc` and `quotas`), with real tokens against a local stack; `supabase/tests/database/` covers the same logic directly in pgTAP.
 
@@ -95,6 +96,7 @@ Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql
 - `normalize_text()` — trims, collapses whitespace, returns `NULL` for blank.
 - `normalize_multiline_text()` — for the description: turns CR LF and CR into LF, drops blanks before a line break, trims the ends, returns `NULL` for blank; line breaks and indentation stay ([`0027`](../../supabase/migrations/0027_description_keeps_line_breaks.sql)).
 - `join_tags()` — backs the `tags_text` generated column.
+- `longest_tag_length()` — the longest tag's length in characters, 0 for none; backs `items_tag_length` (`0028`), a check being unable to hold a subquery.
 - `caller_email()` — the caller's JWT email, trimmed and lowercased.
 - `enforce_user_id()` — sets `user_id = auth.uid()` on insert; on update restores the old owner rather than raising.
 - `tg_categories_normalize()` / `tg_items_normalize()` — apply `normalize_text()`, and `normalize_multiline_text()` to an item's description; items also dedupe and sort `tags`.
@@ -112,7 +114,7 @@ Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql
 - `photo_upload_has_room()` — whether the bucket holds under 832 MiB and the caller's uid prefix under 320 MiB, orphans included; the upload policy's backstop. `SECURITY DEFINER`, since the caller may not read the rest of the bucket; it scans the bucket's rows, as nothing may index `storage.objects`, and returns only a boolean.
 - `search_category_items()` — the searched catalogue page, `SECURITY DEFINER`: re-implements the read-access check (owns the item, or holds an active read grant on the category) and then queries with RLS bypassed so the trigram indexes are usable ([why](../explanation/design-decisions.md#why-search-uses-trigram-ilike-instead-of-full-text-search)). An authorization boundary in its own right, with its own spec (`rls/search-rpc.spec.ts`).
 
-Every function pins `set search_path = ''`, and every one revokes `execute` from `public` and `anon` (trigger functions from `authenticated` too) before granting it to `authenticated` — except `keepalive()`, the one function `anon` may call. The revokes name `anon` and `authenticated` because hosted default privileges can give a new function a direct grant to each, which a revoke from `public` leaves in place (`0015`); `postgres`'s own default privileges no longer grant either.
+Every function pins `set search_path = ''`, and every one revokes `execute` from `public` and `anon` (trigger functions from `authenticated` too) before granting it to `authenticated` — except `keepalive()`, the one function `anon` may call. The revokes name `anon` and `authenticated` because hosted default privileges can give a new function a direct grant to each, which a revoke from `public` leaves in place (`0015`); `postgres`'s own default privileges no longer grant either, nor, since `0028`, a table or sequence.
 
 ### Indexes
 

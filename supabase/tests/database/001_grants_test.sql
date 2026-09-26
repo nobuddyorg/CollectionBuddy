@@ -12,12 +12,59 @@ select no_plan();
 
 \ir _helpers.psql
 
--- anon holds nothing at all on any of the five tables. TRUNCATE is the one
--- that would matter most: row level security does not filter it, so the
--- privilege means "empty this table, every user's rows included".
-select table_privs_are('public', t, 'anon', array[]::text[],
-  'anon holds no privilege of any kind on ' || t)
-from unnest(array['categories', 'items', 'item_categories', 'category_shares', 'images']) as t;
+-- Derived from the catalog, so a table a later migration adds without its revoke fails here; TRUNCATE is the one RLS never filters.
+select is(
+  (select array_agg(c.relname::text || ' ' || p.privilege order by c.relname, p.privilege)
+   from pg_catalog.pg_class c
+   join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+   cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN']) as p(privilege)
+   where n.nspname = 'public'
+     and c.relkind in ('r', 'p', 'v', 'm', 'f')
+     and has_table_privilege('anon', c.oid, p.privilege)
+     and not exists (
+       select 1 from pg_catalog.pg_depend d
+       where d.objid = c.oid and d.deptype = 'e'
+     )),
+  null,
+  'anon holds no privilege of any kind on any table or view in schema public'
+);
+
+-- authenticated holds nothing a policy of its does not back: no TRUNCATE, REFERENCES or TRIGGER, and no verb without its policy.
+select is(
+  (select array_agg(c.relname::text || ' ' || p.privilege order by c.relname, p.privilege)
+   from pg_catalog.pg_class c
+   join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+   cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN']) as p(privilege)
+   where n.nspname = 'public'
+     and c.relkind in ('r', 'p', 'v', 'm', 'f')
+     and has_table_privilege('authenticated', c.oid, p.privilege)
+     and not exists (
+       select 1 from pg_catalog.pg_depend d
+       where d.objid = c.oid and d.deptype = 'e'
+     )
+     and not exists (
+       select 1 from pg_catalog.pg_policies pol
+       where pol.schemaname = 'public'
+         and pol.tablename = c.relname
+         and pol.cmd in (p.privilege, 'ALL')
+         and pol.roles && array['public', 'authenticated']::name[]
+     )),
+  null,
+  'authenticated holds no privilege on any table or view in schema public that none of its policies back'
+);
+
+select is(
+  (select array_agg(c.relname::text || ' ' || p.privilege || ' to ' || r.rolname order by c.relname, p.privilege, r.rolname)
+   from pg_catalog.pg_class c
+   join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+   cross join unnest(array['USAGE', 'SELECT', 'UPDATE']) as p(privilege)
+   cross join (values ('anon'), ('authenticated')) as r(rolname)
+   where n.nspname = 'public'
+     and c.relkind = 'S'
+     and has_sequence_privilege(r.rolname, c.oid, p.privilege)),
+  null,
+  'neither API role holds any privilege on a sequence in schema public'
+);
 
 -- authenticated holds exactly the DML each table's policies back, and no
 -- TRUNCATE, REFERENCES or TRIGGER anywhere.
@@ -94,6 +141,8 @@ select function_privs_are('public', 'normalize_text', array['text'],
   'anon', array[]::text[], 'anon cannot execute normalize_text');
 select function_privs_are('public', 'join_tags', array['text[]'],
   'anon', array[]::text[], 'anon cannot execute join_tags');
+select function_privs_are('public', 'longest_tag_length', array['text[]'],
+  'anon', array[]::text[], 'anon cannot execute longest_tag_length');
 select function_privs_are('public', 'normalize_multiline_text', array['text'],
   'authenticated', array[]::text[], 'only its trigger calls normalize_multiline_text, so authenticated cannot either');
 select function_privs_are('public', 'storage_item_id', array['text'],
@@ -118,6 +167,7 @@ from (values
   ('photo_upload_has_room', array[]::text[]),
   ('normalize_text', array['text']),
   ('join_tags', array['text[]']),
+  ('longest_tag_length', array['text[]']),
   ('keepalive', array[]::text[])
 ) as f(name, args);
 
@@ -160,17 +210,17 @@ select is(
   'neither API role holds EXECUTE on any trigger function'
 );
 
+-- Default privileges: a table, sequence or function the next migration creates starts ungranted (0015, 0028).
 select is(
-  (select array_agg(a.grantee::regrole::text order by a.grantee::regrole::text)
+  (select array_agg(d.defaclobjtype::text || ' ' || a.privilege_type || ' to ' || a.grantee::regrole::text
+     order by d.defaclobjtype, a.privilege_type, a.grantee::regrole::text)
    from pg_catalog.pg_default_acl d
    cross join lateral pg_catalog.aclexplode(d.defaclacl) a
    where d.defaclrole = 'postgres'::regrole
-     and d.defaclnamespace = 'public'::regnamespace
-     and d.defaclobjtype = 'f'
-     and a.privilege_type = 'EXECUTE'
+     and d.defaclnamespace in (0::oid, 'public'::regnamespace)
      and a.grantee in ('anon'::regrole, 'authenticated'::regrole)),
   null,
-  'a function the next migration creates is granted to neither API role by default'
+  'nothing the next migration creates in public is granted to either API role by default'
 );
 
 -- Row level security on every table in the schema, derived rather than
