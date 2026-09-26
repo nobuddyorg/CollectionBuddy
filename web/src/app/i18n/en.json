@@ -190,7 +190,9 @@
     "save": "Save",
     "confirm": "Confirm",
     "cancel": "Cancel",
-    "undo": "Undo"
+    "undo": "Undo",
+    "undo_shortcut": "Ctrl+Z",
+    "undo_shortcut_hint": "Ctrl+Z undoes it."
   },
   "app_error": {
     "title": "Something went wrong",

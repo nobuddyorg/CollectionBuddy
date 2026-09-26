@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createPendingToasts } from './pendingToasts';
 
@@ -29,6 +29,27 @@ describe('createPendingToasts', () => {
     pending.take(2);
 
     expect(pending.ids()).toEqual([1, 3]);
+  });
+
+  it('updates an entry while it is pending', () => {
+    const pending = createPendingToasts<string>();
+    pending.add(1, 'delete entry');
+
+    pending.update(1, (entry) => `${entry}, held`);
+
+    expect(pending.take(1)).toBe('delete entry, held');
+  });
+
+  it('never brings a taken entry back through an update', () => {
+    const pending = createPendingToasts<string>();
+    pending.add(1, 'delete entry');
+    pending.take(1);
+    const change = vi.fn((entry: string) => entry);
+
+    pending.update(1, change);
+
+    expect(change).not.toHaveBeenCalled();
+    expect(pending.ids()).toEqual([]);
   });
 
   it('keeps separate instances apart', () => {

@@ -47,7 +47,7 @@ describe('useShares revokeShare', () => {
 
     expect(deleteShareRow).toHaveBeenCalledWith('share-2');
     expect(result.current.shares).toEqual([grant]);
-    expect(screen.getByRole('status')).toHaveTextContent('Sharing revoked.');
+    expect(screen.getByTestId('toast')).toHaveTextContent('Sharing revoked.');
     expect(result.current.isRevoking).toBe(false);
   });
 
@@ -68,7 +68,7 @@ describe('useShares revokeShare', () => {
 
     await waitFor(() => expect(result.current.isRevoking).toBe(true));
     expect(result.current.shares).toEqual([grant]);
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByTestId('toast')).toBeNull();
     await act(async () => {
       release?.();
     });
@@ -170,7 +170,7 @@ describe('useShares revokeShare', () => {
     expect(deleteShareRow).not.toHaveBeenCalled();
     expect(result.current.shares).toEqual([grant]);
     // No undo toast either: promising a revoke that never happened is worse than the missing row.
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByTestId('toast')).toBeNull();
   });
 
   // Undo would have no category to issue the grant in again.
@@ -214,7 +214,7 @@ describe('useShares leaveShare', () => {
     expect(left).toBe(true);
     expect(deleteShareRow).toHaveBeenCalledWith('share-1');
     expect(result.current.shares).toEqual([]);
-    expect(screen.getByRole('status')).toHaveTextContent(
+    expect(screen.getByTestId('toast')).toHaveTextContent(
       'Left shared collection.',
     );
     expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
@@ -238,7 +238,8 @@ describe('useShares leaveShare', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Could not leave this collection. Please try again.',
     );
-    expect(screen.queryByRole('status')).toBeNull();
+    // The alert is the only toast: no success toast beside it.
+    expect(screen.getAllByTestId('toast')).toHaveLength(1);
     consoleError.mockRestore();
   });
 

@@ -239,7 +239,9 @@ describe('useShares', () => {
         await result.current.createShare('grantee@example.com', null);
       });
 
-      expect(await screen.findByText('Collection shared.')).toBeInTheDocument();
+      expect(await screen.findByTestId('toast')).toHaveTextContent(
+        'Collection shared.',
+      );
     });
   });
 });

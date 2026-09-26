@@ -234,7 +234,7 @@ describe('useCategories renameCategory', () => {
       { id: 'cat-a', name: 'Renamed A', user_id: 'owner-1' },
       CAT_B,
     ]);
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    expect(await screen.findByTestId('toast')).toHaveTextContent(
       'Collection renamed.',
     );
   });

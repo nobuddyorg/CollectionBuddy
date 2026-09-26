@@ -67,7 +67,7 @@ describe('useImportCategory', () => {
     );
     expect(namedFromArchive('Coins')).toBe('Coins (2)');
     expect(onImported).toHaveBeenCalledWith('cat-9');
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    expect(await screen.findByTestId('toast')).toHaveTextContent(
       'Imported as "Coins (2)".',
     );
     // Nothing was skipped, so nothing is reported as skipped.

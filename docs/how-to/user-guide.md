@@ -76,10 +76,12 @@ can be granted access, and it is read-only until you say otherwise.
   then the item.
 
 Deleting an item, a photo or a category can be taken back: **Undo** in the
-confirmation that appears. The delete is sent when that confirmation closes,
-after a few seconds or with its close button. Signing out sends it first;
-reloading or closing the tab before then asks, because leaving would cancel
-the delete and keep the item.
+confirmation that appears, or **Ctrl+Z** (**Cmd+Z** on a Mac) from anywhere
+outside a text field. The delete is sent when that confirmation closes,
+after a few seconds or with its close button; the seconds stop counting while
+the pointer rests on it or keyboard focus is inside it. Signing out sends it
+first; reloading or closing the tab before then asks, because leaving would
+cancel the delete and keep the item.
 
 | Field | Notes |
 | --- | --- |
@@ -139,4 +141,6 @@ action, and result counts for search and place suggestions are announced,
 since their dropdowns render outside normal reading order. In the collection
 strip, the arrow keys, Home and End move between collections without opening
 them; Enter or Space opens the one in focus, and focus returns to the button
-that reopens the strip.
+that reopens the strip. After a delete, Ctrl+Z (Cmd+Z) undoes it without
+tabbing to the confirmation at the bottom of the page, and a screen reader
+reads the confirmation out together with that shortcut.

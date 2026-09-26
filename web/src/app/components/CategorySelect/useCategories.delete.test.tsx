@@ -38,7 +38,7 @@ describe('useCategories deleteCategory', () => {
       result.current.deleteCategory('');
     });
 
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
     expect(result.current.categories).toEqual([CATEGORY_ONE]);
   });
 
@@ -49,7 +49,7 @@ describe('useCategories deleteCategory', () => {
       result.current.deleteCategory('cat-nope');
     });
 
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
     expect(result.current.categories).toEqual([CATEGORY_ONE]);
   });
 
@@ -89,7 +89,7 @@ describe('useCategories deleteCategory', () => {
       result.current.deleteCategory('cat-1', {});
     });
 
-    await screen.findByRole('status');
+    await screen.findByTestId('toast');
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
 
     expect(result.current.categories).toEqual([CATEGORY_ONE]);
@@ -104,7 +104,7 @@ describe('useCategories deleteCategory', () => {
       result.current.deleteCategory('cat-1', { onRestore });
     });
 
-    await screen.findByRole('status');
+    await screen.findByTestId('toast');
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
 
     expect(onRestore).toHaveBeenCalledTimes(1);

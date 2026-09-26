@@ -23,7 +23,9 @@ interface Toast {
   do: {
     close(): Promise<void>;
     commitDeletion(table: DeletedTable): Promise<void>;
+    hold(): Promise<void>;
     undo(): Promise<void>;
+    undoByKeyboard(): Promise<void>;
   };
   locators: {
     buttons: {
@@ -93,8 +95,16 @@ export function initToast(page: Page): Toast {
       await locators.buttons.close.click();
       expect((await deleted).ok()).toBe(true);
     },
+    // A pointer resting on the toast stops its timer until it leaves.
+    hold: async () => {
+      await pending.hover();
+    },
     undo: async () => {
       await locators.buttons.action.click();
+    },
+    // From wherever focus is: the toasts come last in the tab order.
+    undoByKeyboard: async () => {
+      await page.keyboard.press('ControlOrMeta+z');
     },
   };
   return Object.assign(() => root, { locators, do: interactions });

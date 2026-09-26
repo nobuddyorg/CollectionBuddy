@@ -6,6 +6,7 @@ interface Catalogue {
     addEntry(title: string, description?: string): Promise<void>;
     clearSearch(): Promise<void>;
     removeEntry(title: string): Promise<void>;
+    removeEntryByKeyboard(title: string): Promise<void>;
     openEntryForm(): Promise<void>;
     openMap(): Promise<void>;
     search(term: string): Promise<void>;
@@ -134,6 +135,17 @@ export function initCatalogue(page: Page): Catalogue {
       const card = locators.cards.filter({ hasText: title });
       await card.getByTestId('delete-entry').click();
       await page.getByTestId('confirm-accept').click();
+      await expect(card).toHaveCount(0);
+    },
+    // The confirmation opens on Cancel, so Tab reaches Confirm.
+    removeEntryByKeyboard: async (title: string) => {
+      const card = locators.cards.filter({ hasText: title });
+      await card.getByTestId('delete-entry').focus();
+      await page.keyboard.press('Enter');
+      await expect(page.getByTestId('confirm-cancel')).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(page.getByTestId('confirm-accept')).toBeFocused();
+      await page.keyboard.press('Enter');
       await expect(card).toHaveCount(0);
     },
     openEntryForm: async () => {
