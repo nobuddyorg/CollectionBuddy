@@ -19,12 +19,13 @@ import { removeObjectsThenRows } from './imageRemoval';
 import {
   findManifestPath,
   ImportFormatError,
+  importPhotoTasks,
   importTimestamps,
   parseManifest,
   rootFolderOf,
 } from './importFormat';
 import { checkCancelled } from './importCancellation';
-import { importPhoto, realCompressThumb, type PhotoTask } from './importPhoto';
+import { importPhoto, realCompressThumb } from './importPhoto';
 import { readZipEntries } from './zip';
 import { chunk } from '../lib/chunk';
 import { runPool } from '../lib/pool';
@@ -205,7 +206,8 @@ export async function importCategory({
   // A failure past this point deletes the half-built category; a failed cleanup is only logged.
   try {
     onProgress?.({ phase: 'items', done: 0, total: manifestItems.length });
-    const createdAts = importTimestamps(manifestItems.length, now());
+    const importedAt = now();
+    const createdAts = importTimestamps(manifestItems.length, importedAt);
     const toCreate = manifestItems.map((item, i) => ({
       item,
       id: newItemId(),
@@ -228,9 +230,7 @@ export async function importCategory({
         total: manifestItems.length,
       });
     }
-    const photoTasks: PhotoTask[] = toCreate.flatMap(({ item, id }) =>
-      item.photos.map((archivePath) => ({ itemId: id, archivePath })),
-    );
+    const photoTasks = importPhotoTasks(toCreate, importedAt);
 
     const total = photoTasks.length;
     let done = 0;

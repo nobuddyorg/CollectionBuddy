@@ -46,13 +46,18 @@ export type ExportImageRow = Pick<
   'item_id' | 'path_full' | 'size_bytes'
 >;
 
-// user_id is never sent: tg_images_enforce derives it from the item's owner and rejects the rest.
-export function createImageRow(row: {
+type NewImageRow = {
   item_id: string;
   path_full: string;
   path_thumb: string | null;
   size_bytes: number;
-}) {
+};
+
+/** An import stamps `created_at` in archive order; an upload leaves it to the column default. */
+type ImportedImageRow = NewImageRow & { created_at: string };
+
+// user_id is never sent: tg_images_enforce derives it from the item's owner and rejects the rest.
+export function createImageRow(row: NewImageRow | ImportedImageRow) {
   return supabase
     .from('images')
     .insert(row as Database['public']['Tables']['images']['Insert'])

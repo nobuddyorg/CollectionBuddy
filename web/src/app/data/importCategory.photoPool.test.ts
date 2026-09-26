@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { importCategory, PHOTO_UPLOAD_CONCURRENCY } from './importCategory';
 import {
+  type CreateImage,
   type UploadImage,
   item,
   buildArchive,
@@ -52,5 +53,44 @@ describe('importCategory, uploading through the pool', () => {
     const result = await promise;
     expect(result.photoCount).toBe(photoCount);
     expect(maxInFlight).toBeLessThanOrEqual(PHOTO_UPLOAD_CONCURRENCY);
+  });
+
+  // The cover is the oldest row, so a large first photograph finishing last must not lose its place.
+  it('stamps each row in archive order, whatever order the uploads finish in', async () => {
+    const cover = new Uint8Array([1, 1, 1, 1]);
+    const detail = new Uint8Array([2]);
+    const archive = await buildArchive({
+      photosByItemId: { 'orig-item-1': [cover, detail] },
+    });
+    let releaseCover = () => {};
+    const coverHeld = new Promise<void>((resolve) => (releaseCover = resolve));
+    const uploadImage = vi.fn(async (_path: string, blob: Blob) => {
+      if (blob.size === cover.length) await coverHeld;
+      return { error: null };
+    }) as unknown as UploadImage;
+    const createImage = vi.fn(async (row: { size_bytes: number }) => {
+      if (row.size_bytes === detail.length) releaseCover();
+      return { data: null, error: null };
+    }) as unknown as CreateImage;
+
+    await importCategory({
+      file: archive,
+      categoryName: 'Coins',
+      ...baseFakes(),
+      uploadImage,
+      createImage,
+    });
+
+    const rows = (createImage as ReturnType<typeof vi.fn>).mock.calls.map(
+      ([row]) => row as { size_bytes: number; created_at: string },
+    );
+    expect(rows.map((row) => row.size_bytes)).toEqual([
+      detail.length,
+      cover.length,
+    ]);
+    expect(rows.map((row) => row.created_at)).toEqual([
+      '2026-08-07T12:00:00.000Z',
+      '2026-08-07T11:59:59.999Z',
+    ]);
   });
 });

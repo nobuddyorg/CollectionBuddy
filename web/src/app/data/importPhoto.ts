@@ -3,6 +3,7 @@ import { checkCancelled, ImportCancelledError } from './importCancellation';
 import { attempts, backoffDelayMs } from '../lib/backoff';
 import { compressPhoto } from '../lib/imageCompression';
 import { extensionForType, typeForArchivePath } from './photoType';
+import type { PhotoTask } from './importFormat';
 
 const PHOTO_UPLOAD_ATTEMPTS = 3;
 const PHOTO_UPLOAD_RETRY_BASE_MS = 500;
@@ -46,8 +47,6 @@ async function uploadWithRetry({
   }
   return lastError;
 }
-
-export type PhotoTask = { itemId: string; archivePath: string };
 
 /** The raw calls one photograph's round trip makes, threaded through from `importCategory`. */
 export type PhotoImportCalls = {
@@ -106,6 +105,7 @@ export async function importPhoto({
       path_full: pathFull,
       path_thumb: thumbError ? null : pathThumb,
       size_bytes: bytes.length,
+      created_at: task.createdAt,
     });
     if (rowError) {
       throw new Error('Could not record photograph', { cause: rowError });

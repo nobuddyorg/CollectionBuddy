@@ -11,6 +11,7 @@ import {
   fakeCreateImage,
   fakeCompressThumb,
   baseFakes,
+  NOW,
 } from './importCategory.test-support';
 
 // One manifest item with one photograph at `photoPath`, whose bytes the archive holds only if `bytes` has any.
@@ -90,6 +91,7 @@ describe('importCategory, recreating the photographs', () => {
       path_full: `${base}.webp`,
       path_thumb: `${base}.thumb.webp`,
       size_bytes: 3,
+      created_at: NOW.toISOString(),
     });
     expect(consoleWarn).not.toHaveBeenCalled();
     consoleWarn.mockRestore();

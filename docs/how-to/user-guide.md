@@ -64,7 +64,8 @@ can be granted access, and it is read-only until you say otherwise.
   progress and **Cancel** stops it.
 - **Import**: click **Import**, pick a `.zip` exported from CollectionBuddy. It
   becomes a new category. A taken name gets a suffix (`Coins (2)`) rather than
-  overwriting or failing.
+  overwriting or failing. Each item keeps its photos in their order, so its
+  cover photo stays the same.
 
 ## Items
 
