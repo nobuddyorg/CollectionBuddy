@@ -62,6 +62,17 @@ const PAGING_ITEMS: SeedItem[] = Array.from({ length: 11 }, (_, index) => ({
   tags: [],
 }));
 
+/** One more than a page, so page two holds a single entry that a delete can empty. */
+const SORTING_ITEMS: SeedItem[] = Array.from({ length: 10 }, (_, index) => ({
+  category: 'Sortierkasten',
+  title: `Sortierstück ${String(index + 1).padStart(2, '0')}`,
+  description: 'Füllt den Sortierkasten um eines über eine Seite hinaus.',
+  place: null,
+  place_lat: null,
+  place_lng: null,
+  tags: [],
+}));
+
 /** Each search term below matches exactly one entry through a different column, so a broken column shows. */
 export const SEED = {
   email: 'e2e@collectionbuddy.test',
@@ -87,6 +98,7 @@ export const SEED = {
     'Schatulle',
     'Umzugskiste',
     'Schaukasten',
+    'Sortierkasten',
     'Etikett',
     'Bildergalerie',
     'Rückgängig',
@@ -112,6 +124,8 @@ export const SEED = {
   importCategory: 'Umzugskiste',
   /** For pagination.spec.ts -- the collection PAGING_ITEMS fills. */
   pagingCategory: 'Schaukasten',
+  /** For pagination.spec.ts's delete-then-create journey, which empties its second page. */
+  sortingCategory: 'Sortierkasten',
   /** For entry-details.spec.ts, which files entries with places and tags. */
   detailCategory: 'Etikett',
   /** For photo-viewer.spec.ts, which photographs an entry and opens it. */
@@ -253,6 +267,7 @@ export const SEED = {
     },
     ...BASELINE_ITEMS,
     ...PAGING_ITEMS,
+    ...SORTING_ITEMS,
   ],
 } as const;
 

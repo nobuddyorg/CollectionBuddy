@@ -26,18 +26,21 @@ export function useItems(categoryId: string, query: string) {
   // Non-silent requests in flight: one superseded by a silent request used to leave `loading` stuck true.
   const pendingNonSilent = useRef(0);
 
+  const totalPages = useMemo(() => pageCount(total), [total]);
+
+  // Clamped in render, not an effect, so `.range()` never asks for an out-of-bounds slice.
+  const currentPage = clampPage(page, totalPages);
+
   // At render time, not in an effect, so the page resets the same render the filters change.
   const filterKey = `${categoryId} ${query}`;
   const [previousFilterKey, setPreviousFilterKey] = useState(filterKey);
   if (filterKey !== previousFilterKey) {
     setPreviousFilterKey(filterKey);
     setPage(1);
+  } else if (page !== currentPage) {
+    // Written back, or a later rise in the total lifts the clamp and jumps to the stale page.
+    setPage(currentPage);
   }
-
-  const totalPages = useMemo(() => pageCount(total), [total]);
-
-  // Derived, not written back via an effect, so `.range()` never asks for an out-of-bounds slice.
-  const currentPage = clampPage(page, totalPages);
 
   // `silent` refetches without raising `loading`: a delete already removed its card up front.
   const load = useCallback(

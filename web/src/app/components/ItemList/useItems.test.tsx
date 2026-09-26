@@ -236,6 +236,46 @@ describe('useItems', () => {
     expect(result.current.page).toBe(2);
   });
 
+  // Unwritten, the clamp lifted once the total grew again, and a new entry jumped the grid to page 2.
+  it('stays on the page a delete clamped it to when the total grows again', async () => {
+    let ids = Array.from({ length: 10 }, (_, index) => `item-${10 - index}`);
+    listItemsMock.mockImplementation(
+      async ({ from, to }: { from: number; to: number }) =>
+        page(
+          ids.slice(from, to + 1).map((id) => ({ id })),
+          ids.length,
+        ),
+    );
+    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    await waitFor(() => expect(result.current.totalPages).toBe(2));
+    act(() => result.current.setPage(2));
+    await waitFor(() =>
+      expect(result.current.items.map((entry) => entry.id)).toEqual(['item-1']),
+    );
+
+    // The only entry on page 2 goes, and the delete's silent reload clamps the grid to page 1.
+    ids = ids.filter((id) => id !== 'item-1');
+    await act(async () => {
+      await result.current.reload({ silent: true });
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.page).toBe(1);
+
+    // A new entry sorts first; on page 1 already, handleCreated only reloads.
+    ids = ['item-11', ...ids];
+    await act(async () => {
+      await result.current.reload();
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.totalPages).toBe(2);
+    expect(result.current.page).toBe(1);
+    expect(result.current.items[0]?.id).toBe('item-11');
+    expect(listItemsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ from: 0 }),
+    );
+  });
+
   it('treats a null count as zero rather than crashing', async () => {
     listItemsMock.mockResolvedValue({
       data: [],
@@ -296,6 +336,8 @@ describe('useItems with a prefetched first page', () => {
     await waitFor(() => expect(listItemsMock).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.items.map((entry) => entry.id)).toEqual(['a']);
+    // The stale prefetch's total of one would have clamped the grid back to page 1.
+    expect(result.current.page).toBe(2);
   });
 
   it('leaves a prefetched page alone for a silent reload', async () => {
