@@ -15,7 +15,7 @@ test.describe('signing out', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueTitle('Vor dem Abmelden');
+    const title = uniqueTitle('Beim Abmelden');
     const owner = apiAs(context().token);
     try {
       await app.categories.do.open(SEED.signOutCategory);
