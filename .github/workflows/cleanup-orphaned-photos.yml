@@ -14,8 +14,11 @@ on:
 permissions: {}
 
 jobs:
+  # Main's reviewed sweep only; the Management token lives in the main-only `production` environment.
   cleanup:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Find and remove orphaned Storage objects
         run: |

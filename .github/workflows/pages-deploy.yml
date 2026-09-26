@@ -16,8 +16,11 @@ concurrency:
 jobs:
   # Database first: a bundle referencing a column that does not exist yet is rejected by PostgREST, and a failed migration leaves the old bundle on the old schema.
   # `cancel-in-progress` can interrupt this mid-push; each migration is its own transaction, so a prefix applies and the rest waits for the next run.
+  # A dispatch may name any branch: only main's reviewed migrations reach production, whose secrets live in the main-only `production` environment.
   migrate:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

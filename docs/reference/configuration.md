@@ -22,6 +22,13 @@ From `supabase/config.toml`: API `54321`, Postgres `54322`, Studio `54323`, Mail
 
 ## GitHub Actions secrets
 
+`SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` are
+secrets of the `production` environment, not repository secrets: that
+environment's deployment-branch policy allows only `main`, so a workflow run
+on any other branch cannot read them. `migrate` and `cleanup` reference it and
+also refuse any ref but `main`. The `github-pages` environment is restricted to
+`main` the same way. The other secrets are repository secrets.
+
 | Secret | Used by | Notes |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml`; `k6-load-test.yml` with `target=hosted` only | Required |

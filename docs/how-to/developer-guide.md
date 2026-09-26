@@ -426,13 +426,17 @@ Nothing deploys from a developer machine.
 One-time setup for a fork:
 
 1. Repo Settings → Pages → source **GitHub Actions**.
-2. Secrets: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-   `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF` — what
-   each is and why the DB URL must be the session pooler:
+2. Settings → Environments: create `production` with deployment branches
+   **Selected branches** → `main` only, and set the same rule on
+   `github-pages`.
+3. Secrets: `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`
+   as **`production` environment** secrets; `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` as repository secrets — what each is and
+   why the DB URL must be the session pooler:
    [Configuration](../reference/configuration.md#github-actions-secrets).
-3. If the repository is not named `CollectionBuddy`, change `repo` in
+4. If the repository is not named `CollectionBuddy`, change `repo` in
    `web/next.config.ts`; the production `basePath` derives from it.
-4. Optional: `STRYKER_DASHBOARD_API_KEY` to publish mutation reports;
+5. Optional: `STRYKER_DASHBOARD_API_KEY` to publish mutation reports;
    `keep-alive.yml` stays enabled on a free-tier project.
-5. The README's CodeQL badge relies on GitHub's default code-scanning setup
+6. The README's CodeQL badge relies on GitHub's default code-scanning setup
    (Settings → Code security), a per-repo setting that does not carry over.
