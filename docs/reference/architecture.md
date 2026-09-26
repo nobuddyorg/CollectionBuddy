@@ -160,7 +160,7 @@ The browser compresses every photograph before upload: WebP where its canvas can
 
 The catalogue keeps each signature's own age (`components/ItemList/imageCache.ts`). A card's photographs are re-signed a few minutes before their own signatures expire, however recently another page was signed, and in batches of 1,000 paths. A failed re-sign keeps the old URLs on screen, and the refresh tries again a minute later (#757).
 
-Session code (`useSession.ts`, `page.tsx`, `login/`) reaches `supabase.ts` directly; nothing under `components/` does. `depcruise` and an ESLint `no-restricted-imports` rule enforce both halves.
+Outside `data/`, only session code imports `supabase.ts` or `@supabase/*`: `login/`, `useSession.ts`, `useSignOut.ts` and `SupabaseWarmup.tsx`. No component, hook, or `lib/` helper does, not even for a type, so none can reach Supabase through a module of its own; and only `supabase.ts` imports `@supabase/supabase-js` as a value, so it builds the one client. `depcruise` enforces all of it, dynamic `import()` included; an ESLint `no-restricted-imports` rule repeats the static-import half in the editor.
 
 ## CI/CD
 

@@ -34,22 +34,30 @@ const config = {
       name: 'supabase-behind-data-layer',
       severity: 'error',
       comment:
-        "Components talk to Supabase through data/, never the client directly -- eslint.config.mjs's " +
-        'no-restricted-imports enforces the direct-import half of this for components/**. This rule ' +
-        'is the complement: it forbids *any* module outside data/, login/ and the top-level ' +
-        'auth/session bootstrap files (useSession.ts, useSignOut.ts, SupabaseWarmup.tsx -- "the ' +
-        'top-level auth/session surface has nowhere else to live", per eslint.config.mjs) from ' +
-        'importing supabase.ts directly, so a component cannot regain direct access by routing ' +
-        'through a new helper module that itself talks to Supabase.',
+        'Only data/, login/ and the session files (supabase.ts, useSession.ts, useSignOut.ts, ' +
+        'SupabaseWarmup.tsx, and their tests) import the client or @supabase/*, types included, ' +
+        'so no helper module can hand a component a Supabase reach of its own.',
       from: {
-        path: '^src/app',
+        path: '^src/app/',
         pathNot: [
           '^src/app/data/',
           '^src/app/login/',
-          '^src/app/[^/]+\\.(ts|tsx)$',
+          '^src/app/(supabase|useSession|useSignOut)(\\.test)?\\.ts$',
+          '^src/app/SupabaseWarmup(\\.test)?\\.tsx$',
         ],
       },
-      to: { path: '^src/app/supabase\\.ts$' },
+      to: { path: ['^src/app/supabase\\.ts$', '^node_modules/@supabase/'] },
+    },
+    {
+      name: 'one-supabase-client',
+      severity: 'error',
+      comment:
+        'supabase.ts builds the one client; anywhere else, @supabase/* is for types only.',
+      from: { path: '^src/app/', pathNot: '^src/app/supabase\\.ts$' },
+      to: {
+        path: '^node_modules/@supabase/',
+        dependencyTypesNot: ['type-only'],
+      },
     },
     {
       name: 'data-layer-no-components',
