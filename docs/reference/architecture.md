@@ -148,7 +148,7 @@ Session code (`useSession.ts`, `page.tsx`, `login/`) reaches `supabase.ts` direc
 
 ## CI/CD
 
-Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (Node version, npm cache, `npm ci`), `setup-supabase-cli` (the one CLI version, so CI's stack and the production `db push` cannot diverge), `start-local-stack` (that CLI plus `supabase start`), `summary-section` (a tee'd output file into the job summary), `playwright-results` (job summary and artifacts for a Playwright run), `backup-database` (the encrypted off-site dump `backup.yml` and `migrate` share), `call-keepalive` (one anonymous `keepalive()` call, from `keep-alive.yml` and `build`).
+Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (Node version, npm cache, `npm ci --ignore-scripts`), `setup-supabase-cli` (the one CLI version, so CI's stack and the production `db push` cannot diverge), `start-local-stack` (that CLI plus `supabase start`), `summary-section` (a tee'd output file into the job summary), `playwright-results` (job summary and artifacts for a Playwright run), `backup-database` (the encrypted off-site dump `backup.yml` and `migrate` share), `call-keepalive` (one anonymous `keepalive()` call, from `keep-alive.yml` and `build`).
 
 | Workflow (job) | Trigger | Does |
 | --- | --- | --- |
@@ -165,4 +165,4 @@ Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (N
 | `cleanup-orphaned-photos.yml` | daily (`30 4 * * *`), manual | Deletes Storage objects no `images` row references as `path_full` or `path_thumb`, older than 48 h, as `orphan_sweep_plan()` selects them — at most 10,000 per run, in requests of 1,000 (Storage's bulk-delete cap). Refuses to delete when more objects are orphaned than max(50, 5 % of the bucket), unless run by hand with `allow_mass_delete` ([Sweep orphaned photographs](../how-to/developer-guide.md#sweep-orphaned-photographs)). Manual runs are dry runs unless opted out. |
 | `backup.yml` (`database`, `photographs`) | daily (`47 2 * * *`), manual | Encrypted off-site copies: a dump of roles, schema and `auth`/`public` data, and each new `item-images` object; objects gone from the bucket move to a prefix the backup bucket expires ([Back up production](../how-to/developer-guide.md#back-up-production)). |
 | `k6-load-test.yml` | manual only | k6 against a Supabase stack started in the run, or the hosted project behind an explicit opt-in; reports, never gates ([Load testing](../how-to/load-testing.md)). |
-| `auto-merge.yml` | PR events | Auto-merges Dependabot patch-level devDependency bumps once checks pass; does not approve. |
+| `auto-merge.yml` | PR events | Auto-merges a Dependabot patch-level devDependency bump once checks pass, only if every `package-lock.json` entry it adds or changes is `dev: true`, which the deploy build never runs ([why](../explanation/design-decisions.md#why-dependabot-auto-merges-only-dev-only-lockfile-changes)); does not approve. |

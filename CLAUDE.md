@@ -64,6 +64,9 @@ design-decisions.md, not here.
   or `.pre-commit-config.yaml`'s security hooks unless the user explicitly asks.
 - Never run `npm audit fix --force` or a from-scratch `rm -rf node_modules
   package-lock.json && npm install` in `web/`; use targeted `overrides`.
+- A package `next build` loads (a PostCSS or Next plugin, a loader,
+  TypeScript) goes in `dependencies`, never `devDependencies`: Dependabot
+  auto-merges bumps that change only `dev: true` lockfile entries.
 - Never write real Google OAuth credentials, secret (`sb_secret_…`) or
   service-role keys, or `SUPABASE_DB_URL`/`SUPABASE_ACCESS_TOKEN` values anywhere — code, docs,
   commits, chat, not even as an example. `NEXT_PUBLIC_SUPABASE_ANON_KEY`

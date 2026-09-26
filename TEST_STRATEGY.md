@@ -640,8 +640,14 @@ Three lessons for the query itself:
 
 **Scheduled jobs:** a destructive sweep (dry-run by default, §12); a keep-alive
 (a mitigation, not a test); dependency updates — auto-merge patch-level
-dev-only bumps at most. A dev dependency reaches the CI runner; a runtime one
-reaches every user's browser. That asymmetry is a security control.
+bumps at most, and only of packages the build that produces the deployed
+artifact never runs. A package that only reaches the CI runner is a smaller
+risk than one that reaches every user's browser, and that asymmetry is a
+security control only if it is true: the manifest's dev/runtime split does not
+make it so, since build tools and install scripts run where the bundle is made.
+Keep build tools out of the dev section, install without lifecycle scripts, and
+gate auto-merge on the resolved lockfile, where a dev bump can also move a
+package the build shares.
 
 ---
 

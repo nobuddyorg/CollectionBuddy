@@ -100,6 +100,16 @@ CI and the deploy used to start side by side on every push, so production was mi
 - **Queued, not cancelled.** Cancelling a run in progress could stop `migrate` between two migrations; a newer deploy waits instead.
 - **`workflow_run` is safe here** because it only acts on `push` events of this repository: `branches: [main]` alone also matches a fork's pull request from a branch named `main`, whose code must never reach the production secrets.
 
+## Why Dependabot auto-merges only dev-only lockfile changes
+
+`auto-merge.yml` merges a Dependabot patch bump without review, so whatever it merges must never reach the shipped bundle. `package.json`'s `devDependencies` used to stand for that, and did not: the deploy build ran every install script and loaded Tailwind's CSS pipeline and TypeScript from `devDependencies`, so a malicious patch of either could have written into `web/out` (#746). The property now holds by construction:
+
+- **Everything `next build` runs is in `dependencies`**: `tailwindcss`, `@tailwindcss/postcss` and `typescript` moved there, so npm's lockfile no longer marks them, or what they pull in, `dev: true`. Measured, not assumed: tracing every file `next build` opens (`strace -f -e trace=openat`) finds no `dev: true` package file besides type declarations and `package.json`. A package the build loads (a PostCSS plugin, a Next plugin, a loader) goes in `dependencies` too; re-run that trace when adding one.
+- **`setup-web` installs with `--ignore-scripts`**, in CI and in the deploy build alike, so no package's lifecycle script can rewrite `node_modules` before the build. None of the installed packages needs one: on Linux only `unrs-resolver` declares one, a fallback for a missing prebuilt binary (`fsevents`' is macOS-only).
+- **The gate reads the lockfile, not the manifest.** A dev bump can also move a transitive package the build shares, such as `postcss` or `magic-string`, so `auto-merge.yml` merges only when every entry the PR adds or changes in `package-lock.json` is `dev: true`; anything else, `devOptional` included, waits for a human.
+
+The seven-day cooldown and the required checks still apply on top; neither would catch a patch that only injects code into the bundle.
+
 ## Why search uses trigram ILIKE instead of full-text search
 
 Early migrations added `tsvector` columns and GIN indexes. They were dropped because search is a substring match (`ILIKE '%query%'`) across title, description, place and tags, and full-text search was never used — extra storage and write cost for a feature that was not there. `pg_trgm` GIN indexes on each searched column are what `ILIKE '%…%'` needs to avoid a sequential scan.

@@ -9,7 +9,7 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Read-only by default: `pages: write` and `id-token: write` at the top would reach the jobs that run `npm ci` and its install scripts.
+# Read-only by default: `pages: write` and `id-token: write` at the top would reach the jobs that install and run npm packages.
 permissions:
   contents: read
 
