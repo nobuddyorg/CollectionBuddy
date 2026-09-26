@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import type { TranslationKey } from '../../i18n/I18nProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
+import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
 import { ImportCancelledError } from '../../data/importCancellation';
 import { importCategory, type ImportProgress } from '../../data/importCategory';
 import {
@@ -118,14 +119,7 @@ export function useImportCategory(existingCategoryNames: string[]) {
   };
 
   // Same beforeunload guard as useExportCategory.tsx, for the same reason.
-  useEffect(() => {
-    if (!progress) return;
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [progress]);
+  useBeforeUnloadGuard(progress !== null);
 
   return {
     progress,

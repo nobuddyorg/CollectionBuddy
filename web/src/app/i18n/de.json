@@ -94,7 +94,8 @@
     "share_revoke": "Entziehen",
     "share_revoke_confirm": "Freigabe für {email} aufheben? Diese Person kann die Sammlung danach nicht mehr sehen.",
     "share_revoke_success": "Freigabe aufgehoben.",
-    "share_revoke_error": "Freigabe konnte nicht aufgehoben werden. Bitte erneut versuchen."
+    "share_revoke_error": "Freigabe konnte nicht aufgehoben werden. Bitte erneut versuchen.",
+    "share_reinstate_error": "Freigabe konnte nicht wiederhergestellt werden. Bitte erneut teilen."
   },
   "item_create": {
     "new_entry": "Neuer Eintrag",

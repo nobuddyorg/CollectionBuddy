@@ -18,7 +18,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
     isLoading,
     isRevoking,
     isUpdatingRole,
-    deleteShare,
+    revokeShare,
     updateShareRole,
   } = shares;
   // Below sm the row has no room for "Can edit"; a pen icon opens the same checkbox in a modal.
@@ -63,12 +63,9 @@ export function ShareList({ shares }: { shares: UseShares }) {
         invitedEmail,
       );
       if (!(await confirm(message))) return;
-      deleteShare(shareId, {
-        successMessage: t('category_select.share_revoke_success'),
-        errorMessage: t('category_select.share_revoke_error'),
-      });
+      await revokeShare(shareId);
     },
-    [confirm, t, deleteShare],
+    [confirm, t, revokeShare],
   );
 
   return (

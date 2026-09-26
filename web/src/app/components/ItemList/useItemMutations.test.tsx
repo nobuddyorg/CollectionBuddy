@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
+import { ToastProvider, useToast } from '../Toast/ToastProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import { deleteItem, updateItem } from '../../data/items';
 import { useItemMutations } from './useItemMutations';
@@ -223,6 +223,44 @@ describe('useItemMutations removeItem', () => {
     expect(removeOrder).toBeLessThan(rowOrder);
     expect(collaborators.reload).toHaveBeenCalledWith({ silent: true });
   });
+  // Sign-out waits on this commit; a refetch still running after it would go out signed out.
+  it('counts the delete as committed only once its refetch has finished', async () => {
+    vi.mocked(deleteItem).mockResolvedValue({ error: null } as never);
+    let finishReload = () => {};
+    const collaborators = {
+      captureItemImagePaths: vi.fn().mockResolvedValue([]),
+      removeImageBytes: vi.fn().mockResolvedValue(undefined),
+      reload: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishReload = resolve;
+          }),
+      ),
+    };
+    const { result } = renderHook(
+      () => ({
+        ...useHarness({ initial: [item('a')], ...collaborators }),
+        toast: useToast(),
+      }),
+      { wrapper },
+    );
+
+    act(() => {
+      void result.current.removeItem('a');
+    });
+    await acceptDeleteConfirmation();
+    await screen.findByRole('status');
+    const committed = vi.fn();
+    act(() => {
+      void result.current.toast.commitPending().then(committed);
+    });
+
+    await waitFor(() => expect(collaborators.reload).toHaveBeenCalled());
+    expect(committed).not.toHaveBeenCalled();
+    act(() => finishReload());
+    await waitFor(() => expect(committed).toHaveBeenCalledTimes(1));
+  });
+
   it('calls whichever reload function is current after a re-render, not a stale one', async () => {
     vi.mocked(deleteItem).mockResolvedValue({ error: null } as never);
     const staleReload = vi.fn();

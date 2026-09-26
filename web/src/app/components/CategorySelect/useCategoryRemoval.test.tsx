@@ -47,7 +47,8 @@ function shares(overrides: Partial<UseShares> = {}): UseShares {
     isUpdatingRole: false,
     reload: vi.fn().mockResolvedValue([]),
     createShare: vi.fn(),
-    deleteShare: vi.fn(),
+    revokeShare: vi.fn(),
+    leaveShare: vi.fn().mockResolvedValue(true),
     updateShareRole: vi.fn(),
     ...overrides,
   };
@@ -273,26 +274,26 @@ describe('useCategoryRemoval leaving a category shared with you', () => {
   beforeEach(installEmptyCountMock);
 
   it('ends only this grant, and falls through to what is left', async () => {
-    const deleteShare = vi.fn<UseShares['deleteShare']>();
+    const leaveShare = vi.fn<UseShares['leaveShare']>().mockResolvedValue(true);
     const deleteCategory = vi.fn<UseCategories['deleteCategory']>();
     const { result, onSelect } = setUp({
       categoriesState: categories({ deleteCategory }),
-      sharesState: shares({ shares: [myGrant], deleteShare }),
+      sharesState: shares({ shares: [myGrant], leaveShare }),
     });
 
     void result.current.onLeave();
     await userEvent.click(await screen.findByTestId('confirm-accept'));
 
-    expect(deleteShare).toHaveBeenCalledWith('share-1', expect.anything());
+    expect(leaveShare).toHaveBeenCalledWith('share-1');
     expect(deleteCategory).not.toHaveBeenCalled();
     expect(onSelect).toHaveBeenCalledWith('b');
   });
 
   it('ends whichever grant is current after a re-render, not a stale one', async () => {
-    const deleteShare = vi.fn<UseShares['deleteShare']>();
+    const leaveShare = vi.fn<UseShares['leaveShare']>().mockResolvedValue(true);
     const { result, rerender } = setUp({
       categoriesState: categories(),
-      sharesState: shares({ shares: [myGrant], deleteShare }),
+      sharesState: shares({ shares: [myGrant], leaveShare }),
     });
 
     const otherGrant = { ...myGrant, id: 'share-2' };
@@ -300,43 +301,63 @@ describe('useCategoryRemoval leaving a category shared with you', () => {
       selectedCategoryId: 'b',
       selected: CATEGORIES[1],
       categoriesState: categories(),
-      sharesState: shares({ shares: [otherGrant], deleteShare }),
+      sharesState: shares({ shares: [otherGrant], leaveShare }),
     });
 
     void result.current.onLeave();
     await userEvent.click(await screen.findByTestId('confirm-accept'));
 
-    expect(deleteShare).toHaveBeenCalledWith('share-2', expect.anything());
+    expect(leaveShare).toHaveBeenCalledWith('share-2');
   });
 
   it('puts the category back and re-selects it when leaving fails', async () => {
     const restoreCategory = vi.fn();
-    const deleteShare = vi.fn<UseShares['deleteShare']>();
+    const leaveShare = vi
+      .fn<UseShares['leaveShare']>()
+      .mockResolvedValue(false);
     const { result, onSelect } = setUp({
       categoriesState: categories({
         optimisticRemove: vi.fn(() => restoreCategory),
       }),
-      sharesState: shares({ shares: [myGrant], deleteShare }),
+      sharesState: shares({ shares: [myGrant], leaveShare }),
     });
 
-    void result.current.onLeave();
+    const leaving = result.current.onLeave();
     await userEvent.click(await screen.findByTestId('confirm-accept'));
+    await leaving;
 
-    deleteShare.mock.calls[0]?.[1]?.onRestore?.();
     expect(restoreCategory).toHaveBeenCalled();
     expect(onSelect).toHaveBeenLastCalledWith('a');
   });
 
+  it('keeps the category hidden once leaving has succeeded', async () => {
+    const restoreCategory = vi.fn();
+    const leaveShare = vi.fn<UseShares['leaveShare']>().mockResolvedValue(true);
+    const { result, onSelect } = setUp({
+      categoriesState: categories({
+        optimisticRemove: vi.fn(() => restoreCategory),
+      }),
+      sharesState: shares({ shares: [myGrant], leaveShare }),
+    });
+
+    const leaving = result.current.onLeave();
+    await userEvent.click(await screen.findByTestId('confirm-accept'));
+    await leaving;
+
+    expect(restoreCategory).not.toHaveBeenCalled();
+    expect(onSelect).toHaveBeenLastCalledWith('b');
+  });
+
   // Without the one row RLS hands a grantee there is nothing to delete; the category is not the fallback.
   it('does nothing when no grant row has loaded yet', async () => {
-    const deleteShare = vi.fn<UseShares['deleteShare']>();
+    const leaveShare = vi.fn<UseShares['leaveShare']>().mockResolvedValue(true);
     const { result, onSelect } = setUp({
-      sharesState: shares({ deleteShare }),
+      sharesState: shares({ leaveShare }),
     });
 
     await result.current.onLeave();
 
-    expect(deleteShare).not.toHaveBeenCalled();
+    expect(leaveShare).not.toHaveBeenCalled();
     expect(onSelect).not.toHaveBeenCalled();
     expect(screen.queryByTestId('confirm-accept')).not.toBeInTheDocument();
   });
@@ -353,31 +374,31 @@ describe('useCategoryRemoval leaving a category shared with you', () => {
   });
 
   it('does not end the grant when the leave confirmation is declined', async () => {
-    const deleteShare = vi.fn<UseShares['deleteShare']>();
+    const leaveShare = vi.fn<UseShares['leaveShare']>().mockResolvedValue(true);
     const { result, onSelect } = setUp({
-      sharesState: shares({ shares: [myGrant], deleteShare }),
+      sharesState: shares({ shares: [myGrant], leaveShare }),
     });
 
     void result.current.onLeave();
     await userEvent.click(await screen.findByTestId('confirm-cancel'));
 
-    expect(deleteShare).not.toHaveBeenCalled();
+    expect(leaveShare).not.toHaveBeenCalled();
     expect(onSelect).not.toHaveBeenCalled();
   });
 
   // Already gone (another tab, a second click) leaves nothing to undo, so nothing to end either.
   it('does not end the grant when the category was already removed', async () => {
-    const deleteShare = vi.fn<UseShares['deleteShare']>();
+    const leaveShare = vi.fn<UseShares['leaveShare']>().mockResolvedValue(true);
     const { result } = setUp({
       categoriesState: categories({
         optimisticRemove: vi.fn(() => null),
       }),
-      sharesState: shares({ shares: [myGrant], deleteShare }),
+      sharesState: shares({ shares: [myGrant], leaveShare }),
     });
 
     void result.current.onLeave();
     await userEvent.click(await screen.findByTestId('confirm-accept'));
 
-    expect(deleteShare).not.toHaveBeenCalled();
+    expect(leaveShare).not.toHaveBeenCalled();
   });
 });

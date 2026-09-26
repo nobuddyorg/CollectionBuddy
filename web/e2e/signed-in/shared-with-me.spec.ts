@@ -101,8 +101,22 @@ test.describe('a collection shared with you', () => {
       );
       await app.categories.do.openPanel();
       await expect(app.categories.tab(SEED.grantedCategory)).toHaveCount(0);
+
+      // Sent at once, with no undo window: once confirmed, a reload straight away finds it still gone.
+      await expect(
+        app.toast().filter({ hasText: 'Left shared collection.' }),
+      ).toBeVisible();
+      await page.reload({ waitUntil: 'networkidle' });
+      await expect(app.categories.locators.selected).not.toBeEmpty();
+      await app.categories.do.openPanel();
+      await expect(app.categories.tab(SEED.grantedCategory)).toHaveCount(0);
+      const { data: left } = await apiAs(token)
+        .from('category_shares')
+        .select('id')
+        .eq('id', grant.id);
+      expect(left).toEqual([]);
     } finally {
-      // Leaving deletes the grant only after the undo window, or not at all.
+      // Cleanup for a run that failed before leaving.
       await apiAs(token).from('category_shares').delete().eq('id', grant.id);
     }
   });

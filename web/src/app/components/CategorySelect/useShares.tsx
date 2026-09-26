@@ -109,47 +109,78 @@ export function useShares(categoryId: string | null) {
     [isUpdatingRole, t, toast],
   );
 
-  // The delete is deferred to the toast's undo window, so the caller supplies its own copy.
-  const deleteShare = useCallback(
-    (
-      shareId: string,
-      options: {
-        successMessage: string;
-        errorMessage: string;
-        onRestore?: () => void;
-      },
-    ) => {
-      if (isRevoking) return;
-      const index = shares.findIndex((share) => share.id === shareId);
-      const snapshot = shares[index];
-      if (!snapshot) return;
-      setShares((previous) => previous.filter((share) => share.id !== shareId));
-
-      const restoreAndNotify = () => {
+  // Sent at once and not optimistic: the row goes when the grant has, never before.
+  const removeShare = useCallback(
+    async (shareId: string, errorMessage: string) => {
+      if (isRevoking || !shares.some((share) => share.id === shareId))
+        return false;
+      setIsRevoking(true);
+      try {
+        const { error } = await deleteShareRow(shareId);
+        if (error) throw error;
         setShares((previous) =>
-          restoreAt({ list: previous, index, item: snapshot }),
+          previous.filter((share) => share.id !== shareId),
         );
-        options.onRestore?.();
-      };
+        return true;
+      } catch (error) {
+        toast.reportError('delete share', error, errorMessage);
+        return false;
+      } finally {
+        setIsRevoking(false);
+      }
+    },
+    [isRevoking, shares, toast],
+  );
 
-      toast.success(options.successMessage, {
-        action: { label: t('common.undo'), onClick: restoreAndNotify },
-        onExpire: async () => {
-          setIsRevoking(true);
-          try {
-            const { error } = await deleteShareRow(shareId);
-            if (error) throw error;
-          } catch (error) {
-            console.error('delete share', error);
-            toast.error(options.errorMessage);
-            restoreAndNotify();
-          } finally {
-            setIsRevoking(false);
-          }
-        },
+  const revokeShare = useCallback(
+    async (shareId: string) => {
+      if (!categoryId) return;
+      const index = shares.findIndex((share) => share.id === shareId);
+      const revoked = shares[index];
+      const removed = await removeShare(
+        shareId,
+        t('category_select.share_revoke_error'),
+      );
+      if (!removed) return;
+
+      // The delete has already landed, so undo issues the same grant again as a new row.
+      const reinstate = async () => {
+        const { data, error } = await createShareRow({
+          categoryId,
+          invitedEmail: revoked.invited_email,
+          expiresAt: revoked.expires_at,
+          role: revoked.role,
+        });
+        if (error) {
+          toast.reportError(
+            'reinstate share',
+            error,
+            t('category_select.share_reinstate_error'),
+          );
+          return;
+        }
+        setShares((previous) =>
+          restoreAt({ list: previous, index, item: data }),
+        );
+      };
+      toast.success(t('category_select.share_revoke_success'), {
+        action: { label: t('common.undo'), onClick: () => void reinstate() },
       });
     },
-    [isRevoking, shares, t, toast],
+    [categoryId, removeShare, shares, t, toast],
+  );
+
+  // No undo: only the owner may issue a grant, so a grantee who left cannot re-create theirs.
+  const leaveShare = useCallback(
+    async (shareId: string) => {
+      const removed = await removeShare(
+        shareId,
+        t('category_select.leave_error'),
+      );
+      if (removed) toast.success(t('category_select.leave_success'));
+      return removed;
+    },
+    [removeShare, t, toast],
   );
 
   return {
@@ -160,7 +191,8 @@ export function useShares(categoryId: string | null) {
     isUpdatingRole,
     reload,
     createShare,
-    deleteShare,
+    revokeShare,
+    leaveShare,
     updateShareRole,
   };
 }

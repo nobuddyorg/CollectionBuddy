@@ -43,8 +43,11 @@ can be granted access, and it is read-only until you say otherwise.
   you, as does taking edit access away again.
 - **Expiry**: access ends at the end of the chosen day. Blank means no expiry.
 - **Revoke**: trash icon beside the email in the shared-with list, confirm.
+  Access ends at once. **Undo** in the confirmation shares it again with the
+  same role and expiry.
 - **Leave a category shared with you**: the delete control on a shared category
-  leaves it instead. The owner's copy is untouched.
+  leaves it instead, at once and with no undo: only the owner can share it with
+  you again. The owner's copy is untouched.
 
 ## Import and export a category
 
@@ -62,6 +65,12 @@ can be granted access, and it is read-only until you say otherwise.
   pencil icon.
 - **Delete**: trash icon on the action row, confirm. Photos are deleted first,
   then the item.
+
+Deleting an item, a photo or a category can be taken back: **Undo** in the
+confirmation that appears. The delete is sent when that confirmation closes,
+after a few seconds or with its close button. Signing out sends it first;
+reloading or closing the tab before then asks, because leaving would cancel
+the delete and keep the item.
 
 | Field | Notes |
 | --- | --- |

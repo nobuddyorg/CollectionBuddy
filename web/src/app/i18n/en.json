@@ -94,7 +94,8 @@
     "share_revoke": "Revoke",
     "share_revoke_confirm": "Stop sharing with {email}? They will no longer be able to see this collection.",
     "share_revoke_success": "Sharing revoked.",
-    "share_revoke_error": "Could not revoke this share. Please try again."
+    "share_revoke_error": "Could not revoke this share. Please try again.",
+    "share_reinstate_error": "Could not restore this share. Please share it again."
   },
   "item_create": {
     "new_entry": "New entry",

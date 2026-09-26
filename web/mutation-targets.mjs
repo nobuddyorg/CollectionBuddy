@@ -45,6 +45,7 @@ export const MUTATE_TARGETS = [
   'src/app/lib/useSyncedRef.ts',
   'src/app/lib/useDebouncedValue.ts',
   'src/app/lib/useGuardedModalClose.ts',
+  'src/app/lib/useBeforeUnloadGuard.ts',
   'src/app/useCatalogue.ts',
   'src/app/useServiceWorker.ts',
   'src/app/useSession.ts',

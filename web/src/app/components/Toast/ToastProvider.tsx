@@ -12,6 +12,7 @@ import {
 import ReactDOM from 'react-dom';
 
 import { useI18n } from '../../i18n/useI18n';
+import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
 import Icon, { IconType } from '../Icon';
 
 type ToastKind = 'error' | 'success';
@@ -38,6 +39,8 @@ type ToastApi = {
   announce: (message: string) => void;
   /** console.error(scope, error) plus toast.error(message). */
   reportError: (scope: string, error: unknown, message: string) => void;
+  /** Expires every toast now, running each onExpire, and resolves once all of them have finished. */
+  commitPending: () => Promise<void>;
 };
 
 const ToastContext = createContext<ToastApi | undefined>(undefined);
@@ -72,12 +75,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   // Auto-dismiss and the close button both commit; only the action button (undo) skips onExpire.
   const expire = useCallback(
-    (id: number) => {
-      void entriesRef.current.get(id)?.onExpire?.();
+    async (id: number) => {
+      const pending = entriesRef.current.get(id)?.onExpire?.();
       remove(id);
+      await pending;
     },
     [remove],
   );
+
+  const commitPending = useCallback(async () => {
+    await Promise.all([...entriesRef.current.keys()].map(expire));
+  }, [expire]);
+
+  // A deferred delete lives only in this tab: leaving inside its undo window would drop it unsent.
+  useBeforeUnloadGuard(toasts.some((entry) => entry.onExpire));
 
   const post = useCallback(
     (kind: ToastKind, message: string, options?: SuccessOptions) => {
@@ -91,7 +102,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       };
       entriesRef.current.set(id, entry);
       setToasts((previous) => [...previous, entry]);
-      setTimeout(() => expire(id), AUTO_DISMISS_MS);
+      setTimeout(() => void expire(id), AUTO_DISMISS_MS);
     },
     [expire],
   );
@@ -119,8 +130,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 
   const api = useMemo<ToastApi>(
-    () => ({ error, success, announce, reportError }),
-    [error, success, announce, reportError],
+    () => ({ error, success, announce, reportError, commitPending }),
+    [error, success, announce, reportError, commitPending],
   );
 
   return (
@@ -162,7 +173,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   data-testid="toast-close"
-                  onClick={() => expire(entry.id)}
+                  onClick={() => void expire(entry.id)}
                   className="shrink-0 -m-1 p-1"
                   aria-label={t('common.close')}
                 >

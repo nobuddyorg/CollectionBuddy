@@ -16,6 +16,12 @@ A public link means an anonymous reader. Every predicate here resolves an actual
 
 The `editor` role (#562) widened the grant without touching that argument: sharing is no longer read-only, but it is still _identified_. If public links are ever wanted, they are a separate, explicitly higher-risk piece of work.
 
+## Why deletes wait out an undo window, and ending a grant does not
+
+Deleting an entry, a photo or a collection hides it at once and sends the delete only when the toast's six-second undo window closes, on its own or through the close button; Undo puts it back because nothing was sent. Until then the delete exists only in the open tab, so `ToastProvider` guards it: `beforeunload` asks before a reload, close or navigation would drop it, and sign-out runs every pending delete through `commitPending()` before `signOut()`, since afterwards it would go out as `anon` and be refused. A tab closed anyway, or a mobile browser that skips `beforeunload`, drops the delete unsent: the item is still there next time, nothing is half-deleted.
+
+A grant cannot wait like that. A deferred revoke is access that continues after the owner was told it had ended, so revoking and leaving send the `category_shares` delete at once, and the row leaves the list only when the delete has succeeded (#737). The owner's Undo inserts the same grant again, email, role and expiry, as a new row; one already expired cannot be re-inserted (`expires_at` must be after `created_at`) and says so. Leaving has no Undo, because only the owner may insert a grant.
+
 ## Why the migrations were squashed
 
 Three times: on 2026-08-06 sixteen migrations became a seven-file baseline; in #580 those seven plus the seven that had accumulated since were folded back into `0001`–`0007`; on 2026-09-22 the eight that had followed (`0008`–`0015`, three of them security fixes to `0007`) were folded in again, so each file once more holds one concern. A third of the original statements existed only to undo an earlier file — a table created and dropped, full-text-search columns added and removed, a trigger written three times. Reading them told you the history but not the schema.

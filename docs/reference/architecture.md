@@ -72,7 +72,7 @@ Account-based, one category at a time, `viewer` or `editor`. No public links ([w
 - The owner invites by email. There is no accept step: both predicates compare `invited_email` with `public.caller_email()`, so a grant works the moment that email signs in, even for the first time.
 - `tg_category_shares_enforce()` derives `owner_user_id` from the category, rejects sharing a category the caller does not own or sharing with oneself, and lowercases the email.
 - One grant per `(category, email)`; re-sharing is a no-op, not a second row with a different expiry.
-- Ending a grant is a `delete` from either side — owner revoking and grantee leaving are the same operation on the same row.
+- Ending a grant is a `delete` from either side — owner revoking and grantee leaving are the same operation on the same row. The client sends it at once, not after an undo window; the owner's Undo inserts the grant again ([why](../explanation/design-decisions.md#why-deletes-wait-out-an-undo-window-and-ending-a-grant-does-not)).
 - `expires_at` is optional and only constrained to be after `created_at`. Both predicates re-check the clock on every read; `select`/`delete` on `category_shares` do not, so an expired grant stays visible for either side to clean up.
 
 ### Triggers and functions

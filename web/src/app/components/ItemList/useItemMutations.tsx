@@ -109,7 +109,8 @@ export function useItemMutations({
             restore();
             return;
           }
-          void reload({ silent: true });
+          // Awaited so sign-out, which waits on this commit, cannot clear the session under the refetch.
+          await reload({ silent: true });
         },
       });
     },
