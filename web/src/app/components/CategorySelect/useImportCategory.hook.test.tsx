@@ -30,6 +30,7 @@ function imported(overrides: Record<string, unknown> = {}) {
     itemCount: 1,
     photoCount: 1,
     skippedPhotoCount: 0,
+    photoQuotaReached: 'none' as const,
     ...overrides,
   };
 }
@@ -98,6 +99,25 @@ describe('useImportCategory', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       '1 of 3 photographs could not be imported.',
+    );
+  });
+
+  it('says the photo quota stopped the import, so the rest are not taken for errors', async () => {
+    vi.mocked(importCategory).mockResolvedValue(
+      imported({
+        photoCount: 5,
+        skippedPhotoCount: 15,
+        photoQuotaReached: 'owner',
+      }),
+    );
+    const { result } = renderHook(() => useImportCategory([]), { wrapper });
+
+    await act(async () => {
+      await result.current.runImport(FILE);
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '15 of 20 photographs were not imported: the limit of 256 MiB of photographs is reached.',
     );
   });
 

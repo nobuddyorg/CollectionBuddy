@@ -1,5 +1,6 @@
 import { createImageRow, imagePrefix, uploadImageObject } from './images';
 import { checkCancelled, ImportCancelledError } from './importCancellation';
+import { isQuotaExceeded } from './quota';
 import { attempts, backoffDelayMs } from '../lib/backoff';
 import { compressPhoto } from '../lib/imageCompression';
 import { extensionForType, typeForArchivePath } from './photoType';
@@ -17,7 +18,21 @@ export function realCompressThumb(photo: Blob): Promise<Blob> {
   );
 }
 
-/** Storage attaches no reliable status, so every failure here is retried as transient. */
+/** Only no response, a 429 or a 5xx can pass on a retry; Storage sends its own code as `statusCode`, often under an HTTP 400. */
+export function isTransientUploadError({
+  status,
+  statusCode,
+}: {
+  status?: number;
+  statusCode?: string;
+}): boolean {
+  if (status === undefined) return true;
+  return [status, Number(statusCode)].some(
+    (code) => code === 429 || code >= 500,
+  );
+}
+
+/** Retries only what `isTransientUploadError` says may pass; a 403, 409 or 413 is returned at once. */
 async function uploadWithRetry({
   path,
   blob,
@@ -41,7 +56,7 @@ async function uploadWithRetry({
       );
     }
     const { error } = await uploadImage(path, blob);
-    if (!error) return null;
+    if (!error || !isTransientUploadError(error)) return error;
     lastError = error;
   }
   return lastError;
@@ -55,7 +70,7 @@ export type PhotoImportCalls = {
   signal?: AbortSignal;
 };
 
-/** False for a photograph left out (missing, unreadable, or failing after retrying); only a cancel propagates. */
+/** False for a photograph left out (missing, unreadable, or failing after retrying); a cancel or a quota refusal propagates. */
 export async function importPhoto({
   task,
   readPhoto,
@@ -113,7 +128,10 @@ export async function importPhoto({
     }
     return true;
   } catch (error) {
-    if (error instanceof ImportCancelledError) throw error;
+    // A full quota refuses every later photograph too, so the caller stops the rest.
+    if (error instanceof ImportCancelledError || isQuotaExceeded(error)) {
+      throw error;
+    }
     console.error('Skipping photograph', task.archivePath, error);
     return false;
   }

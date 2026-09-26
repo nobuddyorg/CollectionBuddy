@@ -23,12 +23,12 @@ From `supabase/config.toml`: API `54321`, Postgres `54322`, Studio `54323`, Mail
 
 ## Photograph storage ceilings
 
-Sized to the hosted project's plan, Supabase Free, whose 1 GB of Storage is for the whole project (`storage.size` in Supabase's [`pricing.ts`](https://github.com/supabase/supabase/blob/master/packages/shared-data/pricing.ts)). They are constants in [`0025_photo_ceilings_fit_the_plan.sql`](../../supabase/migrations/0025_photo_ceilings_fit_the_plan.sql); on another plan, a new migration replaces `tg_images_quota()` and `photo_upload_has_room()` with other numbers, and `item_list.photo_quota_error` in both dictionaries names the new owner's share ([why](../explanation/design-decisions.md#why-quotas-are-counted-in-the-database)).
+Sized to the hosted project's plan, Supabase Free, whose 1 GB of Storage is for the whole project (`storage.size` in Supabase's [`pricing.ts`](https://github.com/supabase/supabase/blob/master/packages/shared-data/pricing.ts)). They are constants in [`0025_photo_ceilings_fit_the_plan.sql`](../../supabase/migrations/0025_photo_ceilings_fit_the_plan.sql); on another plan, a new migration replaces `tg_images_quota()` and `photo_upload_has_room()` with other numbers, and `item_list.photo_quota_error` and `category_select.import_partial_quota` in both dictionaries name the new owner's share ([why](../explanation/design-decisions.md#why-quotas-are-counted-in-the-database)).
 
 | Ceiling | Counted | Checked when | Refused with |
 | --- | --- | --- | --- |
-| 256 MiB per owner | the sizes the owner's `images` rows recorded, full size and thumbnail | recording a photograph | `PT507`; the app shows `photo_quota_error` |
-| 768 MiB | every object in `item-images` | recording a photograph | `PT507` with detail `project`; the app shows `photo_storage_full_error` |
+| 256 MiB per owner | the sizes the owner's `images` rows recorded, full size and thumbnail | recording a photograph | `PT507`; the app shows `photo_quota_error`, and an import stops its photographs and shows `import_partial_quota` |
+| 768 MiB | every object in `item-images` | recording a photograph | `PT507` with detail `project`; the app shows `photo_storage_full_error`, and an import stops its photographs and shows `import_partial_storage_full` |
 | 832 MiB | every object in `item-images` | uploading | Storage's policy refusal; the app shows `upload_error` |
 | 320 MiB per uploader | every object under the uploader's uid prefix | uploading | Storage's policy refusal; the app shows `upload_error` |
 

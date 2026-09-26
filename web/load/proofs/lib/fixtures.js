@@ -94,7 +94,7 @@ function uploadRequest({ session, path, bytes, contentType }) {
 }
 
 /** Uploads every path in parallel batches; throws on the first refusal, since a proof on a half-seeded account says nothing. */
-function uploadAll({ session, uploads, contentType = 'image/webp' }) {
+export function uploadAll({ session, uploads, contentType = 'image/webp' }) {
   for (let start = 0; start < uploads.length; start += UPLOAD_PARALLELISM) {
     const batch = uploads
       .slice(start, start + UPLOAD_PARALLELISM)

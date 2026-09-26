@@ -7,7 +7,11 @@ import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
 import { ImportCancelledError } from '../../data/importCancellation';
-import { importCategory, type ImportProgress } from '../../data/importCategory';
+import {
+  importCategory,
+  type ImportProgress,
+  type ImportResult,
+} from '../../data/importCategory';
 import { ImportFormatError } from '../../data/importFormat';
 import { uniqueCategoryName } from '../../data/categories';
 import { isQuotaExceeded } from '../../data/quota';
@@ -27,6 +31,33 @@ export function importProgressMessage(
     return t('category_select.import_reading');
   }
   return t('category_select.import_items');
+}
+
+function partialTemplate(
+  quota: ImportResult['photoQuotaReached'],
+  t: (key: TranslationKey) => string,
+): string {
+  if (quota === 'owner') return t('category_select.import_partial_quota');
+  if (quota === 'app') return t('category_select.import_partial_storage_full');
+  return t('category_select.import_partial');
+}
+
+/** The warning for photographs left out, naming the quota that stopped the rest; null when none was. */
+export function importPartialMessage(
+  {
+    photoCount,
+    skippedPhotoCount,
+    photoQuotaReached,
+  }: Pick<
+    ImportResult,
+    'photoCount' | 'skippedPhotoCount' | 'photoQuotaReached'
+  >,
+  t: (key: TranslationKey) => string,
+): string | null {
+  if (skippedPhotoCount === 0) return null;
+  return partialTemplate(photoQuotaReached, t)
+    .replace('{skipped}', String(skippedPhotoCount))
+    .replace('{total}', String(photoCount + skippedPhotoCount));
 }
 
 export function useImportCategory(existingCategoryNames: string[]) {
@@ -59,16 +90,8 @@ export function useImportCategory(existingCategoryNames: string[]) {
             result.category.name,
           ),
         );
-        if (result.skippedPhotoCount > 0) {
-          toast.error(
-            t('category_select.import_partial')
-              .replace('{skipped}', String(result.skippedPhotoCount))
-              .replace(
-                '{total}',
-                String(result.photoCount + result.skippedPhotoCount),
-              ),
-          );
-        }
+        const partial = importPartialMessage(result, t);
+        if (partial) toast.error(partial);
       } catch (error) {
         if (error instanceof ImportCancelledError) {
           // Confirmed, not a failure.
