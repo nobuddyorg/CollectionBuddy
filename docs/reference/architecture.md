@@ -8,6 +8,8 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 - `basePath` is `/CollectionBuddy` in production builds, matching GitHub Pages at `https://<org>.github.io/CollectionBuddy/`, and empty in local dev. Client code reads it as `NEXT_PUBLIC_BASE_PATH`.
 - The Supabase client ([`web/src/app/supabase.ts`](../../web/src/app/supabase.ts)) is created once at import time with `flowType: 'pkce'`, `persistSession`, `autoRefreshToken` and `detectSessionInUrl` on.
 - Authorization is Postgres Row Level Security, and nothing else.
+- **Service worker** ([`web/public/sw.js`](../../web/public/sw.js), registered by `useServiceWorker.ts`). Same-origin `GET`s only; Supabase is cross-origin and never touched. `_next/static/**` is cache-first (content-hashed, so immutable); navigations and `site.webmanifest` are network-first, with the cache as the offline fallback. Each build registers `sw.js?build=<NEXT_PUBLIC_BUILD_ID>` (a UUID `next.config.ts` draws per build), so a deploy installs a new worker whose cache is `collectionbuddy-<id>`, and its `activate` deletes every other `collectionbuddy-*` cache and nothing else on the shared `github.io` origin ([why](../explanation/design-decisions.md#why-the-service-worker-fetches-pages-network-first)).
+- **Error boundary** ([`web/src/app/error.tsx`](../../web/src/app/error.tsx)). A `ChunkLoadError` (a lazy chunk the server no longer has, in a tab still running an earlier build) reloads the page once; within 30 s of that reload (`sessionStorage`), or for any other error, it shows a translated screen with a reload button instead of Next's built-in English one.
 
 ## Database schema
 

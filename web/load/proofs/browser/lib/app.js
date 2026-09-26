@@ -1,5 +1,5 @@
 // The browser proofs' shared steps: the demo-mode static export and its anonymous session.
-const APP_URL = (
+export const APP_URL = (
   __ENV.PROOF_APP_URL || 'http://localhost:4173/CollectionBuddy/'
 ).replace(/\/?$/, '/');
 

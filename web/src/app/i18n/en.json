@@ -191,5 +191,10 @@
     "confirm": "Confirm",
     "cancel": "Cancel",
     "undo": "Undo"
+  },
+  "app_error": {
+    "title": "Something went wrong",
+    "body": "This page could not be shown. Reloading loads the current version of the app.",
+    "reload": "Reload"
   }
 }

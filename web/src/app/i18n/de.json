@@ -191,5 +191,10 @@
     "confirm": "Bestätigen",
     "cancel": "Abbrechen",
     "undo": "Rückgängig machen"
+  },
+  "app_error": {
+    "title": "Das hat nicht geklappt",
+    "body": "Diese Seite konnte nicht angezeigt werden. Neu laden holt die aktuelle Version der App.",
+    "reload": "Neu laden"
   }
 }

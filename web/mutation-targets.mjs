@@ -10,6 +10,7 @@ export const MUTATE_TARGETS = [
   'src/app/lib/backoff.ts',
   'src/app/lib/chunk.ts',
   'src/app/lib/pages.ts',
+  'src/app/lib/staleBuild.ts',
   'src/app/components/CategorySelect/useExportCategory.tsx',
   'src/app/components/ItemList/Pagination.tsx',
   'src/app/components/ItemList/imageEntries.ts',
