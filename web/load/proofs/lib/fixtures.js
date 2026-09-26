@@ -18,6 +18,9 @@ const SEED_BATCH = 10000;
 const UPLOAD_PARALLELISM = 25;
 // Storage's bulk delete refuses more than 1,000 prefixes per request.
 const REMOVE_BATCH = 1000;
+// A 1x1 WebP, as in lib/flows.js: seeds that need photo rows but not photo bytes.
+export const TINY_WEBP_BASE64 =
+  'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA';
 
 /** Per-probe timings, tagged so thresholds and the summary can split them. */
 const probeMs = new Trend('probe_ms', true);
@@ -161,6 +164,11 @@ export function seedOrClear(sessions, seed) {
     for (const session of sessions) clearAccount(session);
     throw error;
   }
+}
+
+/** PostgREST's `in.(...)` list for a set of ids. */
+export function inList(ids) {
+  return `in.(${ids.join(',')})`;
 }
 
 /** A GET/POST against the target with the caller's token, tagged by probe; returns the response. */

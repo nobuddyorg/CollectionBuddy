@@ -15,6 +15,9 @@ export function createSignedUrls(paths: string[], expiresInSeconds = 3600) {
     .createSignedUrls(paths, expiresInSeconds);
 }
 
+// Storage's sign route refuses more than 1,000 paths per request.
+export const SIGN_URLS_BATCH_SIZE = 1000;
+
 export function uploadImageObject(path: string, file: Blob) {
   return supabase.storage.from(ITEM_IMAGES_BUCKET).upload(path, file);
 }

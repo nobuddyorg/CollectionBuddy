@@ -26,6 +26,8 @@ import type { TranslationKey } from '../../i18n/I18nProvider';
 import {
   entryDataOf,
   groupImageRows,
+  itemsDueForResigning,
+  keepingShown,
   signAllEntries,
   signEntries,
   type ImageEntryData,
@@ -34,23 +36,16 @@ import { extensionForType } from '../../data/photoType';
 import { compressPhoto } from '../../lib/imageCompression';
 import { restoreAt } from '../../lib/optimistic';
 
-// Re-signs before Supabase's 1h server-side expiry, so a long-lived tab keeps its thumbnails.
+// Re-signs each shown photograph before its own 1h signature expires, so a long-lived tab keeps its thumbnails.
 function useSignedUrlRefresh(
-  lastSignedAtRef: RefObject<number>,
   imagesRef: RefObject<Record<string, ImageEntry[]>>,
   refreshAllImages: (itemIds: string[]) => Promise<void>,
 ) {
   useEffect(() => {
-    const SIGNED_URL_SERVER_TTL_MS = 3600_000;
-    const REFRESH_MARGIN_MS = 5 * 60_000;
     const maybeRefresh = () => {
-      if (
-        Date.now() - lastSignedAtRef.current <
-        SIGNED_URL_SERVER_TTL_MS - REFRESH_MARGIN_MS
-      )
-        return;
-      // Never-signed and empty coincide: nothing enters imagesRef without stamping lastSignedAtRef.
-      void refreshAllImages(Object.keys(imagesRef.current));
+      void refreshAllImages(
+        itemsDueForResigning(imagesRef.current, Date.now()),
+      );
     };
     const interval = setInterval(maybeRefresh, 60_000);
     document.addEventListener('visibilitychange', maybeRefresh);
@@ -58,7 +53,13 @@ function useSignedUrlRefresh(
       clearInterval(interval);
       document.removeEventListener('visibilitychange', maybeRefresh);
     };
-  }, [lastSignedAtRef, imagesRef, refreshAllImages]);
+  }, [imagesRef, refreshAllImages]);
+}
+
+function withoutItems(loading: Set<string>, itemIds: string[]): Set<string> {
+  const next = new Set(loading);
+  for (const itemId of itemIds) next.delete(itemId);
+  return next;
 }
 
 /** The app's storage before the owner's quota: deleting her own photographs may not free enough of it. */
@@ -83,7 +84,6 @@ export function useItemImages() {
   // Distinct from "has no images", so a card doesn't grow an image region once pictures arrive.
   const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
   const imagesRef = useRef(images);
-  const lastSignedAtRef = useRef(0);
 
   useEffect(() => {
     imagesRef.current = images;
@@ -99,7 +99,6 @@ export function useItemImages() {
     const grouped = groupImageRows(listed.data);
     const entryData = grouped.get(itemId) ?? new Map();
     const signed = await signEntries([[itemId, entryData]]);
-    lastSignedAtRef.current = Date.now();
     return signed[itemId];
   }, []);
 
@@ -115,12 +114,7 @@ export function useItemImages() {
 
       // signEntries sets every key it is given, so spreading it last replaces exactly these items.
       setImages((previous) => ({ ...previous, ...signed }));
-      setLoadingItems((previous) => {
-        const next = new Set(previous);
-        for (const itemId of itemIds) next.delete(itemId);
-        return next;
-      });
-      lastSignedAtRef.current = Date.now();
+      setLoadingItems((previous) => withoutItems(previous, itemIds));
     },
     [],
   );
@@ -131,13 +125,13 @@ export function useItemImages() {
       if (itemIds.length === 0) return;
       setLoadingItems((previous) => new Set([...previous, ...itemIds]));
       const listed = await listImagesForItems(itemIds);
-      const grouped =
-        listed.error !== null
-          ? new Map<string, Map<string, ImageEntryData>>()
-          : groupImageRows(listed.data);
-      if (listed.error !== null)
+      if (listed.error !== null) {
         console.error('Failed to list images', listed.error);
-      await applyGroupedImages(itemIds, grouped);
+        setImages((previous) => keepingShown(previous, itemIds));
+        setLoadingItems((previous) => withoutItems(previous, itemIds));
+        return;
+      }
+      await applyGroupedImages(itemIds, groupImageRows(listed.data));
     },
     [applyGroupedImages],
   );
@@ -158,7 +152,7 @@ export function useItemImages() {
     setImages((previous) => ({ ...previous, ...signed }));
   }, []);
 
-  useSignedUrlRefresh(lastSignedAtRef, imagesRef, refreshAllImages);
+  useSignedUrlRefresh(imagesRef, refreshAllImages);
 
   const uploadImage = useCallback(
     async (itemId: string, file: File) => {
