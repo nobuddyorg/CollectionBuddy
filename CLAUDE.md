@@ -21,7 +21,8 @@ tags, and is searchable. Features: [README.md](README.md). Full docs:
   creates, edits and deletes entries and photos inside a shared category, so
   sharing is **not read-only**.
 - **Deploy**: `pages-deploy.yml` migrates the production database, then builds
-  and publishes to GitHub Pages, on every merge to `main`. No staging.
+  and publishes to GitHub Pages, once CI has passed on the merge commit on
+  `main`. No staging.
 
 ## Read before you touch
 

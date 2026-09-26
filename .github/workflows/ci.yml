@@ -24,7 +24,7 @@ jobs:
         env:
           SKIP: no-commit-to-branch,prettier,eslint,tsc,depcruise,knip
 
-  # A push to main forces every job: it is the event that deploys, and a squash-merge may combine unrelated changes.
+  # A push to main forces every job: Deploy Pages waits for this whole run to pass, and a merge may combine unrelated changes.
   changes:
     runs-on: ubuntu-latest
     permissions:

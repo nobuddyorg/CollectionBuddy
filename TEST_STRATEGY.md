@@ -621,7 +621,8 @@ Three lessons for the query itself:
 2. **Path-filter heavy jobs on PRs.** A job skipped by its own condition
    reports as passing and never weakens branch protection.
 3. **Full, unconditional set on the branch that deploys**, whatever the push
-   touched.
+   touched, and the deploy starts only once that run has passed on the same
+   commit.
 4. **Deploy pipeline fails safe**: migrate, reload the PostgREST schema cache,
    build, deploy, smoke-test — each depending on the last, so a rejected
    migration leaves the previous bundle serving the previous schema.

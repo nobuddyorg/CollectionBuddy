@@ -1,29 +1,74 @@
 name: Deploy Pages
 
+# Only a commit that passed CI on main deploys; a push alone never reaches production.
 on:
-  push:
-    branches: [ main ]
+  # Runs main's copy of this file; it checks out a push to main that CI passed, never a pull request's code.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 # Read-only by default: `pages: write` and `id-token: write` at the top would reach the jobs that run `npm ci` and its install scripts.
 permissions:
   contents: read
 
+# Queued, never cancelled, so a migration is never interrupted; a run for a commit main has already moved past gets its own group so it cannot displace the queued deploy.
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: ${{ (github.event_name != 'workflow_run' || github.event.workflow_run.head_sha == github.sha) && 'pages' || format('pages-superseded-{0}', github.run_id) }}
+  cancel-in-progress: false
 
 jobs:
+  # CI finishes out of order and can be re-run, so only main's current tip deploys; a dispatch deploys it only if CI passed on it.
+  gate:
+    if: >-
+      github.ref == 'refs/heads/main' && (
+        github.event_name == 'workflow_dispatch' || (
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_repository.full_name == github.repository
+        )
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read # CI's runs of the commit, on a dispatch
+      contents: read # main's current tip
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - name: Pick the commit to deploy
+        id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$COMMIT" != "$tip" ]; then
+            echo "::notice::Skipped: $COMMIT is no longer main's tip ($tip), which deploys once CI passes on it."
+            exit 0
+          fi
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&event=push&status=success" --jq .total_count)
+            if [ "$passed" = 0 ]; then
+              echo "::error::CI has not passed on $COMMIT; nothing deploys."
+              exit 1
+            fi
+          fi
+          echo "sha=$COMMIT" >> "$GITHUB_OUTPUT"
+
   # Database first: a bundle referencing a column that does not exist yet is rejected by PostgREST, and a failed migration leaves the old bundle on the old schema.
-  # `cancel-in-progress` can interrupt this mid-push; each migration is its own transaction, so a prefix applies and the rest waits for the next run.
   # A dispatch may name any branch: only main's reviewed migrations reach production, whose secrets live in the main-only `production` environment.
   migrate:
-    if: github.ref == 'refs/heads/main'
+    needs: gate
+    if: github.ref == 'refs/heads/main' && needs.gate.outputs.sha != ''
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.gate.outputs.sha }}
           persist-credentials: false
 
       - uses: ./.github/actions/setup-supabase-cli
@@ -77,7 +122,7 @@ jobs:
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
 
   build:
-    needs: migrate
+    needs: [gate, migrate]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -88,6 +133,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.gate.outputs.sha }}
           persist-credentials: false
 
       - uses: ./.github/actions/setup-web
@@ -118,13 +164,14 @@ jobs:
   # The signed-out suite against the live origin: Node prerendering masks failures only the browser bundle shows, and signed-out keeps the run read-only.
   smoke_test:
     runs-on: ubuntu-latest
-    needs: deploy
+    needs: [gate, deploy]
     defaults:
       run:
         working-directory: web
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.gate.outputs.sha }}
           persist-credentials: false
 
       - uses: ./.github/actions/setup-web

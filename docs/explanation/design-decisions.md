@@ -65,7 +65,7 @@ Pinning segment 1 would have closed the hole and left a strict subset of `"updat
 
 ## Why production is backed up by a workflow
 
-The project runs on Supabase's Free plan, which keeps no database backup, and no plan's backup contains Storage objects. Production is migrated unattended on every merge and swept daily by an irreversible `service_role` delete, so one bad migration or sweep regression would be permanent. Moving to Pro would buy daily database backups and still leave the photographs uncovered, so `backup.yml` does both halves on the Free plan (#736).
+The project runs on Supabase's Free plan, which keeps no database backup, and no plan's backup contains Storage objects. Production is migrated unattended on every merge that passes CI and swept daily by an irreversible `service_role` delete, so one bad migration or sweep regression would be permanent. Moving to Pro would buy daily database backups and still leave the photographs uncovered, so `backup.yml` does both halves on the Free plan (#736).
 
 - **Encrypted on the runner, to a public key.** The repository is public and so are its Actions artifacts. age needs only the recipient in GitHub; the identity that decrypts stays off it, so a leaked backup key or bucket exposes ciphertext.
 - **An S3-compatible bucket, not a service integration.** Any provider works through the AWS CLI already on the runner; the owner picks it by setting three variables.
@@ -73,6 +73,14 @@ The project runs on Supabase's Free plan, which keeps no database backup, and no
 - **The listing and the key come from the Management API**, as in the sweep: no second long-lived Storage credential.
 - **Storage's tables are not in the dump.** A new project gets the bucket from `0007` and each object's row from its re-upload; restoring either from the dump would collide with both, and `postgres` may not write Storage's other tables at all (found rehearsing the restore).
 - **The pre-migration dump runs only when something is pending.** A deploy without migrations never depends on the backup bucket; one with migrations stops rather than migrate without a copy.
+
+## Why the deploy waits for CI on `main`
+
+CI and the deploy used to start side by side on every push, so production was migrated and published minutes before `main`'s CI finished, and a PR merged while behind `main` shipped a tree no CI run had passed (#735). `pages-deploy.yml` now starts from `workflow_run` when CI succeeds on a push to `main`, and deploys that commit, not whatever `main` holds by then.
+
+- **Only the tip.** CI runs finish out of order and can be re-run; deploying every green commit would let an older one publish over a newer bundle, and `db push` refuses a tree missing migrations production already has. A superseded run queues in a group of its own, so it cannot displace the tip's queued deploy.
+- **Queued, not cancelled.** Cancelling a run in progress could stop `migrate` between two migrations; a newer deploy waits instead.
+- **`workflow_run` is safe here** because it only acts on `push` events of this repository: `branches: [main]` alone also matches a fork's pull request from a branch named `main`, whose code must never reach the production secrets.
 
 ## Why search uses trigram ILIKE instead of full-text search
 

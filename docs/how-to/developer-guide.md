@@ -416,13 +416,27 @@ For a fork, or a new production project:
 
 ## Deploy to GitHub Pages
 
-[`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) runs on every
-push to `main`: `migrate` uploads an encrypted dump when the dry run lists a
-pending migration ([Back up production](#back-up-production)), applies them and
-reloads the PostgREST schema cache, `build` exports the site, `deploy` publishes it, `smoke_test`
-runs the signed-out suite against the live URL. Each job depends on the last,
-so a failed migration leaves the previous bundle serving the previous schema.
-Nothing deploys from a developer machine.
+[`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) runs when CI
+has passed on a push to `main` (`workflow_run`), and deploys exactly that
+commit: `gate` checks it is still `main`'s tip, `migrate` uploads an encrypted
+dump when the dry run lists a pending migration
+([Back up production](#back-up-production)), applies them and reloads the
+PostgREST schema cache, `build` exports the site, `deploy` publishes it,
+`smoke_test` runs the signed-out suite against the live URL. Each job depends
+on the last, so a failed migration leaves the previous bundle serving the
+previous schema. Nothing deploys from a developer machine.
+
+- **`main`'s CI run is the gate, not the PR's.** A PR merged while behind
+  `main` ships only if the merged tree passes; a red `main` deploys nothing
+  until a fix merges and passes.
+- **Only the tip deploys.** A CI run that finishes late, or is re-run, for a
+  commit `main` has moved past deploys nothing; the tip deploys once its own CI
+  passes. Deploys queue and never cancel each other, so a migration is never
+  interrupted.
+- **By hand:** Actions → *Deploy Pages* → *Run workflow* from `main`
+  redeploys `main`'s tip, and only if CI passed on it.
+- The workflow runs from `main`'s copy of `pages-deploy.yml`, so a change to
+  its trigger takes effect only once merged.
 
 One-time setup for a fork:
 
@@ -444,6 +458,14 @@ One-time setup for a fork:
    `keep-alive.yml` stays enabled on a free-tier project.
 7. The README's CodeQL badge relies on GitHub's default code-scanning setup
    (Settings → Code security), a per-repo setting that does not carry over.
+8. Settings → Branches (or Rules → Rulesets) → `main`: **Require status checks
+   to pass** with the CI jobs required (at least `prek`, `build_and_test`,
+   `e2e_local_stack`), and **Require branches to be up to date before
+   merging**. The deploy gate already keeps an untested merge out of
+   production; this keeps it off `main`, where a red run blocks every deploy
+   until fixed. A Dependabot PR that falls behind then merges only once
+   rebased (`@dependabot rebase`).
+   A merge queue would do the same, but `ci.yml` has no `merge_group` trigger.
 
 ## Back up production
 
@@ -494,9 +516,9 @@ to `backup.yml`, the dump, or the schema's shape.
    To it every photograph whose `images` row is gone is an orphan, and it
    deletes those once they are 48 h old.
 2. If a migration caused the loss, also disable *Deploy Pages* and merge
-   nothing to `main` until the restore is done: every merge migrates
-   production. Leave *Back up production* running; it never overwrites an
-   archive, and a photograph it no longer finds waits in
+   nothing to `main` until the restore is done: every merge that passes CI
+   migrates production. Leave *Back up production* running; it never
+   overwrites an archive, and a photograph it no longer finds waits in
    `photos-removed/<day>/` until the 30-day rule expires it.
 3. Fetch and decrypt the last archive from before the loss. With the backup
    key in `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL`,
