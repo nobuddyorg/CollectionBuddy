@@ -5,8 +5,14 @@ import type { NextConfig } from 'next';
 const isProduction = process.env.NODE_ENV === 'production';
 const repository = 'CollectionBuddy';
 
-/** GitHub Pages serves the site under the repository name, and `next build` bakes that into every asset URL. */
-export const EXPORT_BASE_PATH = `/${repository}`;
+// The deploy passes the Pages site's URL, which has no path on a custom domain; other builds mimic the project URL.
+const pagesUrl = process.env.PAGES_BASE_URL;
+
+/** Where the export is served, which `next build` bakes into every asset URL. */
+export const EXPORT_BASE_PATH =
+  pagesUrl === undefined
+    ? `/${repository}`
+    : new URL(pagesUrl).pathname.replace(/\/$/, '');
 
 const nextConfig: NextConfig = {
   output: 'export',

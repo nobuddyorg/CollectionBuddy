@@ -9,6 +9,7 @@
 | `NEXT_PUBLIC_SUPABASE_URL` | `http://127.0.0.1:54321` | The project's API URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase's well-known local anon key; the `npm run` scripts that read `supabase status` pass its publishable key | The project's publishable key (`sb_publishable_…`), or its legacy anon key until [migrated](../how-to/developer-guide.md#migrate-to-publishable-and-secret-keys) |
 | `NEXT_PUBLIC_DEMO_MODE` | `true` signs every visitor in anonymously; `npm run demo` sets it | unset |
+| `PAGES_BASE_URL` | unset: the export is served under `/CollectionBuddy` | Build only: `pages-deploy.yml` sets it to the Pages site URL (`actions/configure-pages`), whose path becomes `basePath`, empty on a custom domain |
 
 Place search uses the public [Photon](https://photon.komoot.io/) API unauthenticated; there is no key.
 
@@ -41,6 +42,7 @@ The hosted project's Auth configuration lives in its dashboard, so the values sh
 
 - **Redirect URLs stay empty.** Sign-in returns to the site's own URL, and GoTrue admits any redirect with the Site URL's scheme, host and port without an entry. A wildcard matching a host nobody here controls would let a sign-in hand its code to that host.
 - **One setting is recorded, not checked**: Data API → exposed schemas is `public` only, as in `config.toml`'s `[api]`. Reading it through the Management API also returns the project's JWT secret.
+- **Site URL follows the Pages URL.** A custom domain changes both in one PR ([Move to a custom domain](../how-to/developer-guide.md#move-to-a-custom-domain)).
 - **Changing a value** is a PR to the file, reviewed like a policy change, with the dashboard changed as it merges; the push to `main` re-runs the check. For a fork, `site_url` is its own Pages URL.
 
 ## GitHub Actions secrets

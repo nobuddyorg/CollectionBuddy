@@ -33,8 +33,10 @@ jobs:
     permissions:
       actions: read # CI's runs of the commit, on a dispatch
       contents: read # main's current tip
+      pages: read # the site's URL, custom domain included
     outputs:
       sha: ${{ steps.commit.outputs.sha }}
+      pages-url: ${{ steps.pages.outputs.base_url }}
     steps:
       - name: Pick the commit to deploy
         id: commit
@@ -59,6 +61,12 @@ jobs:
             fi
           fi
           echo "sha=$COMMIT" >> "$GITHUB_OUTPUT"
+
+      # The build's base path follows the Pages settings, so a custom domain needs no code change (docs/how-to/developer-guide.md#move-to-a-custom-domain).
+      - name: Read the Pages site URL
+        id: pages
+        if: steps.commit.outputs.sha != ''
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
   # Database first: a bundle referencing a column that does not exist yet is rejected by PostgREST, and a failed migration leaves the old bundle on the old schema.
   # A dispatch may name any branch: only main's reviewed migrations reach production, whose secrets live in the main-only `production` environment.
@@ -123,6 +131,7 @@ jobs:
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      PAGES_BASE_URL: ${{ needs.gate.outputs.pages-url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

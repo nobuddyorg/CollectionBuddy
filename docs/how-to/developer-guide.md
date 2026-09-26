@@ -30,7 +30,9 @@ Playwright starts and stops the server itself, serving `out/` **under the base
 path** (`/CollectionBuddy`) the way GitHub Pages does — `next build` bakes that
 path into every asset URL, so an export served at `/` 404s on nearly
 everything. `scripts/serve-export.mjs` builds the directory for that, reading
-the path from `next.config.ts`.
+the path from `next.config.ts`. With `PAGES_BASE_URL` set to a URL without a
+path, for both the build and the suite, the export is built for and served at
+`/`, as on a [custom domain](#move-to-a-custom-domain).
 
 ```bash
 npx playwright test --ui               # pick tests, watch, step through
@@ -428,7 +430,8 @@ For a fork, or a new production project:
 
 [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) runs when CI
 has passed on a push to `main` (`workflow_run`), and deploys exactly that
-commit: `gate` checks it is still `main`'s tip, `migrate` uploads an encrypted
+commit: `gate` checks it is still `main`'s tip and reads the Pages site URL,
+whose path the build uses as `basePath`, `migrate` uploads an encrypted
 dump when the dry run lists a pending migration
 ([Back up production](#back-up-production)), applies them and reloads the
 PostgREST schema cache, `build` exports the site, `deploy` publishes it,
@@ -462,8 +465,9 @@ One-time setup for a fork:
    [Configuration](../reference/configuration.md#github-actions-secrets). The
    two tokens are scoped to the project, with exactly the [permissions
    listed there](../reference/configuration.md#management-api-tokens).
-4. If the repository is not named `CollectionBuddy`, change `repo` in
-   `web/next.config.ts`; the production `basePath` derives from it.
+4. Nothing to change for another repository name or a custom domain: the
+   deploy takes `basePath` from the Pages site URL. A fork's own Site URL
+   still goes into `supabase/hosted-auth.json`.
 5. The backup bucket, key and age recipient:
    [Back up production](#back-up-production). Without them a deploy with a
    pending migration stops before applying it.
@@ -484,6 +488,58 @@ One-time setup for a fork:
    classic access token before it lands; `prek`'s gitleaks scan covers the
    legacy JWT and the database URL, which GitHub has no pattern for
    ([Configuration](../reference/configuration.md#github-actions-secrets)).
+
+## Move to a custom domain
+
+Gives the app an origin of its own, out of reach of the org's other Pages
+sites ([why](../explanation/design-decisions.md#why-the-origin-is-a-trust-boundary)).
+It must be a host only this repository serves, such as
+`collectionbuddy.nobuddy.org`; a path on the org's domain is the shared origin
+again. The code needs no change: `pages-deploy.yml` reads the site URL from
+the Pages settings (`actions/configure-pages` in `gate`) and passes it to the
+build as `PAGES_BASE_URL`, whose path, empty on a custom domain, becomes
+`basePath`. A workflow-deployed site ignores a `CNAME` file, so there is none.
+
+Every user signs in again afterwards (the new origin starts with empty
+storage, so theme, language and last collection reset too), and an installed
+app is installed again from the new address. The site is down from step 4 to
+the end of step 5, a few minutes: do it at a quiet time.
+
+1. **Rehearse locally.** From `web/`:
+   `PAGES_BASE_URL=https://collectionbuddy.example/ npm run build`, then the
+   same variable on `npx playwright test --project=chromium`, which serves
+   and tests the export at `/`. Run `npm run build` again afterwards.
+2. **Verify the domain for the org** (org Settings → Pages → Add a domain,
+   a `TXT` record GitHub names). Unverified, another GitHub account could
+   claim the subdomain, now or after Pages is switched off with the DNS
+   record left in place.
+3. **DNS:** a `CNAME` record `collectionbuddy.nobuddy.org` →
+   `nobuddyorg.github.io`, no wildcard. Prepare a PR that sets `site_url` in
+   `supabase/hosted-auth.json` to `https://collectionbuddy.nobuddy.org/` and
+   the Site URL row in [Configuration](../reference/configuration.md#hosted-auth-settings)
+   to match; `uri_allow_list` stays empty, since GoTrue admits a redirect to
+   the Site URL's own host. Get it reviewed, do not merge it yet.
+4. **Repo Settings → Pages → Custom domain:** `collectionbuddy.nobuddy.org`,
+   save, wait for the DNS check and the certificate, then tick **Enforce
+   HTTPS**. The live build still expects `/CollectionBuddy/` from here on.
+5. **Actions → Deploy Pages → Run workflow** from `main`. `gate` now reads
+   the new URL, the build is served at `/`, and `smoke_test` runs against
+   the new address. Then Supabase → Authentication → URL Configuration →
+   Site URL to the new address, and merge the PR; its push re-runs
+   `hosted-auth-check.yml`. Until the Site URL changes, sign-in on the new
+   address fails.
+6. **Revoke every session.** Tokens stay in the old origin's
+   `localStorage`, still readable by the sibling sites, and a refresh token
+   never used again stays valid. In the dashboard's SQL editor,
+   `delete from auth.sessions;` (their refresh tokens cascade) signs everyone
+   out; issued access tokens run out within the JWT expiry, an hour by default.
+7. **Links:** the Google OAuth consent screen's home page, privacy policy and
+   terms URLs, the repository's website field, and anything else pointing at
+   the old address. `curl -sI` on the old address should now answer with a
+   redirect to the new host.
+
+To undo: remove the custom domain, deploy again by hand, set the Site URL
+and `hosted-auth.json` back.
 
 ## Check the hosted Auth settings
 
