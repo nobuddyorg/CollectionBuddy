@@ -24,6 +24,27 @@ export async function readAllPages<T>(
   return { data: rows, error: null };
 }
 
+/** All rows, each page read strictly after the previous page's last row, so a row removed mid-walk moves none past a page boundary. */
+export async function readAllKeysetPages<T>(
+  pageSize: number,
+  // Given the last row read, or null for the first page; it must order by a unique key and filter past it.
+  readPage: (
+    after: T | null,
+  ) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<ReadResult<T>> {
+  const rows: T[] = [];
+  let after: T | null = null;
+  for (;;) {
+    const { data, error } = await readPage(after);
+    if (error) return { data: null, error };
+    if (!data?.length) break;
+    rows.push(...data);
+    if (data.length < pageSize) break;
+    after = data[data.length - 1]!;
+  }
+  return { data: rows, error: null };
+}
+
 // Bounded like the photo pools in exportCategory.ts and importCategory.ts.
 const CHUNK_READ_CONCURRENCY = 6;
 

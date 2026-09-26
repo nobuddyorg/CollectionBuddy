@@ -59,6 +59,8 @@
     "import_format_error": "Diese Datei ist kein CollectionBuddy-Exportarchiv.",
     "import_success": "Als \"{name}\" importiert.",
     "import_partial": "{skipped} von {total} Fotos konnten nicht importiert werden.",
+    "import_partial_quota": "{skipped} von {total} Fotos wurden nicht importiert: Das Limit von 256 MiB an Fotos ist erreicht. Lösche welche, um Platz zu schaffen.",
+    "import_partial_storage_full": "{skipped} von {total} Fotos wurden nicht importiert: Der Fotospeicher der App ist voll.",
     "load_error": "Sammlungen konnten nicht geladen werden. Bitte erneut versuchen.",
     "create_error": "Sammlung konnte nicht erstellt werden. Bitte erneut versuchen.",
     "create_quota_error": "Du hast das Limit von 1.000 Sammlungen erreicht.",

@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import { ITEM_FIELDS_SELECT, type ItemFields } from './items';
+import { rowsAfterFilter } from './keyset';
 
 export type ExportItemRow = ItemFields & { created_at: string };
 
@@ -18,10 +19,11 @@ type ExportLinkRow = {
   items: ExportItemRow;
 };
 
-// Quoted although both values come from the database: a timestamp carries `.` and `:`.
 export function exportCursorFilter(cursor: ExportCursor): string {
-  const linkedAt = `"${cursor.linkedAt}"`;
-  return `created_at.gt.${linkedAt},and(created_at.eq.${linkedAt},item_id.gt."${cursor.itemId}")`;
+  return rowsAfterFilter(
+    { column: 'created_at', value: cursor.linkedAt },
+    { column: 'item_id', value: cursor.itemId },
+  );
 }
 
 // Keyset-paged from item_categories, oldest-first, walking idx_item_categories_cat_created.

@@ -26,6 +26,7 @@ import {
 } from './importFormat';
 import { checkCancelled } from './importCancellation';
 import { importPhoto, realCompressThumb } from './importPhoto';
+import { isPhotoStorageFull, isQuotaExceeded } from './quota';
 import { openZip, type ZipEntryReader } from './zip';
 import { chunk } from '../lib/chunk';
 import { runPool } from '../lib/pool';
@@ -41,8 +42,10 @@ export type ImportResult = {
   itemCount: number;
   /** Photographs actually written to storage -- not photographs attempted. */
   photoCount: number;
-  /** Photographs missing from the archive or failing every upload retry: left out, not fatal. */
+  /** Photographs missing, failing, or never tried once a quota refused one: left out, not fatal. */
   skippedPhotoCount: number;
+  /** The quota that refused a photograph and stopped the rest: the owner's, the app's whole storage, or none. */
+  photoQuotaReached: 'none' | 'owner' | 'app';
 };
 
 class ImportError extends Error {
@@ -237,36 +240,42 @@ export async function importCategory({
     const total = photoTasks.length;
     let done = 0;
     let photoCount = 0;
-    let skippedPhotoCount = 0;
+    let photoQuotaReached: ImportResult['photoQuotaReached'] = 'none';
     onProgress?.({ phase: 'photos', done, total });
 
-    await runPool({
-      items: photoTasks,
-      concurrency: PHOTO_UPLOAD_CONCURRENCY,
-      worker: async (task) => {
-        checkCancelled(signal);
-        const imported = await importPhoto({
-          task,
-          readPhoto: entries.get(`${root}/${task.archivePath}`),
-          uid,
-          calls: {
-            uploadImage: recordingUpload,
-            createImage,
-            compressThumb,
-            signal,
-          },
-        });
-        if (imported) photoCount++;
-        else skippedPhotoCount++;
-        onProgress?.({ phase: 'photos', done: ++done, total });
-      },
-    });
+    try {
+      await runPool({
+        items: photoTasks,
+        concurrency: PHOTO_UPLOAD_CONCURRENCY,
+        worker: async (task) => {
+          checkCancelled(signal);
+          const imported = await importPhoto({
+            task,
+            readPhoto: entries.get(`${root}/${task.archivePath}`),
+            uid,
+            calls: {
+              uploadImage: recordingUpload,
+              createImage,
+              compressThumb,
+              signal,
+            },
+          });
+          if (imported) photoCount++;
+          onProgress?.({ phase: 'photos', done: ++done, total });
+        },
+      });
+    } catch (error) {
+      // runPool stopped handing out photographs; those already recorded stay, as a partial import.
+      if (!isQuotaExceeded(error)) throw error;
+      photoQuotaReached = isPhotoStorageFull(error) ? 'app' : 'owner';
+    }
 
     return {
       category,
       itemCount: manifestItems.length,
       photoCount,
-      skippedPhotoCount,
+      skippedPhotoCount: total - photoCount,
+      photoQuotaReached,
     };
   } catch (error) {
     // runPool settles in-flight uploads before rethrowing, so no object lands after this.
