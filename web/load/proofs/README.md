@@ -50,7 +50,7 @@ The browser proofs launch Chromium through k6: point `K6_BROWSER_EXECUTABLE_PATH
 
 Knobs:
 
-- **Seed sizes:** `PROOF_ENTRIES` (default 40,000, under the 50,000-entry quota), `PROOF_OTHER_ENTRIES`, `PROOF_PLACES`, `PROOF_PAGES`, `PROOF_PHOTOS`, `PROOF_FITTING`, `PROOF_ARCHIVE_MB` (at most 500).
+- **Seed sizes:** `PROOF_ENTRIES` (default 40,000, under the 50,000-entry quota), `PROOF_OTHER_ENTRIES`, `PROOF_PLACES`, `PROOF_PAGES`, `PROOF_PHOTOS`, `PROOF_FITTING`, `PROOF_ARCHIVE_MB` (default 100, also the most: the seeded photos and their imported copies share one owner's 256 MiB).
 - **Sampling and format:** `PROOF_SAMPLES`, `PROOF_SAFARI_FORMAT`.
 - **App URL:** `PROOF_APP_URL`.
 - **Separate report for a second run:** `PROOF_VARIANT` (for example a control run).

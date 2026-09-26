@@ -49,6 +49,18 @@ function archiveMissingOnePhoto(): Blob {
   return archiveWithOnePhoto('photos/001-seated-dime/1.webp', []);
 }
 
+// The same archive, but the photograph's directory record claims more bytes than the file holds.
+async function archiveWithUnreadablePhoto(photoPath: string): Promise<Blob> {
+  const archive = archiveWithOnePhoto(photoPath, [new Uint8Array([1])]);
+  const bytes = new Uint8Array(await archive.arrayBuffer());
+  const dataView = new DataView(bytes.buffer);
+  const directoryAt = dataView.getUint32(bytes.length - 22 + 16, true);
+  const photoRecordAt =
+    directoryAt + 46 + dataView.getUint16(directoryAt + 28, true);
+  dataView.setUint32(photoRecordAt + 24, 0xffffff, true);
+  return new Blob([bytes]);
+}
+
 describe('importCategory, recreating the photographs', () => {
   it('uploads each photograph and a regenerated thumbnail under the new item id', async () => {
     const archive = await buildArchive({
@@ -60,7 +72,7 @@ describe('importCategory, recreating the photographs', () => {
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const result = await importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage,
       compressThumb,
@@ -105,7 +117,7 @@ describe('importCategory, recreating the photographs', () => {
       file: archiveWithOnePhoto('photos/001-seated-dime/1.jpg', [
         new Uint8Array([4, 5]),
       ]),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage,
       createImage,
@@ -135,7 +147,7 @@ describe('importCategory, recreating the photographs', () => {
       file: archiveWithOnePhoto('photos/001-seated-dime/1.gif', [
         new Uint8Array([6]),
       ]),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage,
     });
@@ -161,7 +173,7 @@ describe('importCategory, recreating the photographs', () => {
 
     const result = await importCategory({
       file: archiveMissingOnePhoto(),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       onProgress: (step) => progress.push(step),
     });
@@ -181,6 +193,30 @@ describe('importCategory, recreating the photographs', () => {
     consoleError.mockRestore();
   });
 
+  it('skips a photograph whose bytes cannot be read out of the archive, uploading nothing', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const uploadImage = fakeUploadImage();
+
+    const result = await importCategory({
+      file: await archiveWithUnreadablePhoto('photos/001-seated-dime/1.webp'),
+      nameCategory: () => 'Coins',
+      ...baseFakes(),
+      uploadImage,
+    });
+
+    expect(result.itemCount).toBe(1);
+    expect(result.skippedPhotoCount).toBe(1);
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      'Skipping photograph',
+      'photos/001-seated-dime/1.webp',
+      expect.objectContaining({ name: 'ZipReadError' }),
+    );
+    consoleError.mockRestore();
+  });
+
   it('does not require an onProgress callback to skip a missing photograph', async () => {
     const consoleError = vi
       .spyOn(console, 'error')
@@ -188,7 +224,7 @@ describe('importCategory, recreating the photographs', () => {
 
     const result = await importCategory({
       file: archiveMissingOnePhoto(),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
     });
 
@@ -210,7 +246,7 @@ describe('importCategory, recreating the photographs', () => {
     try {
       const promise = importCategory({
         file: archive,
-        categoryName: 'Coins',
+        nameCategory: () => 'Coins',
         ...baseFakes(),
         createImage,
       });

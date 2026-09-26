@@ -26,7 +26,7 @@ import {
 } from './importFormat';
 import { checkCancelled } from './importCancellation';
 import { importPhoto, realCompressThumb } from './importPhoto';
-import { readZipEntries } from './zip';
+import { openZip, type ZipEntryReader } from './zip';
 import { chunk } from '../lib/chunk';
 import { runPool } from '../lib/pool';
 
@@ -114,14 +114,13 @@ async function createImportedItems(
   });
 }
 
-/** Imports an archive as a new category; `categoryName` is trusted as already unique. */
+/** Imports an archive as a new category; `nameCategory` turns the archived name into one trusted as unique. */
 export async function importCategory({
   file,
-  categoryName,
+  nameCategory,
   onProgress,
   signal,
   getUid = verifiedUserId,
-  readZip = readZipEntries,
   createCategoryRow = createCategory,
   deleteCategoryRow = deleteCategory,
   createItemRows = createItems,
@@ -135,12 +134,11 @@ export async function importCategory({
   compressThumb = realCompressThumb,
 }: {
   file: Blob;
-  categoryName: string;
+  nameCategory: (archivedName: string) => string;
   onProgress?: (progress: ImportProgress) => void;
   /** Checked between phases, between items and before every retry. */
   signal?: AbortSignal;
   getUid?: () => Promise<string | null>;
-  readZip?: typeof readZipEntries;
   createCategoryRow?: typeof createCategory;
   deleteCategoryRow?: typeof deleteCategory;
   createItemRows?: typeof createItems;
@@ -151,7 +149,7 @@ export async function importCategory({
   uploadImage?: typeof uploadImageObject;
   removeImages?: typeof removeImageObjects;
   createImage?: typeof createImageRow;
-  compressThumb?: (bytes: Uint8Array<ArrayBuffer>) => Promise<Blob>;
+  compressThumb?: (photo: Blob) => Promise<Blob>;
 }): Promise<ImportResult> {
   onProgress?.({ phase: 'reading', done: 0, total: 0 });
   checkCancelled(signal);
@@ -159,9 +157,9 @@ export async function importCategory({
   const uid = await getUid();
   if (!uid) throw new ImportError('No user session');
 
-  let entries: Map<string, Uint8Array<ArrayBuffer>>;
+  let entries: Map<string, ZipEntryReader>;
   try {
-    entries = await readZip(file);
+    entries = await openZip(file);
   } catch (error) {
     throw new ImportError('Could not read this file as a ZIP archive', {
       cause: error,
@@ -173,12 +171,15 @@ export async function importCategory({
     throw new ImportFormatError('Not a CollectionBuddy export archive');
   }
   // Non-null: findManifestPath only returns a key it read out of `entries` itself.
-  const manifestBytes = entries.get(manifestPath)!;
+  const readManifest = entries.get(manifestPath)!;
 
   let manifestItems: ManifestItem[];
+  let archivedName: string;
   try {
-    const json: unknown = JSON.parse(new TextDecoder().decode(manifestBytes));
-    manifestItems = parseManifest(json).items;
+    const json: unknown = JSON.parse(await (await readManifest()).text());
+    const manifest = parseManifest(json);
+    manifestItems = manifest.items;
+    archivedName = manifest.category.name;
   } catch (error) {
     if (error instanceof ImportFormatError) throw error;
     throw new ImportFormatError(
@@ -188,8 +189,9 @@ export async function importCategory({
 
   checkCancelled(signal);
   const root = rootFolderOf(manifestPath);
-  const { data: category, error: categoryError } =
-    await createCategoryRow(categoryName);
+  const { data: category, error: categoryError } = await createCategoryRow(
+    nameCategory(archivedName),
+  );
   if (categoryError || !category) {
     throw new ImportError('Could not create category', {
       cause: categoryError,
@@ -245,7 +247,7 @@ export async function importCategory({
         checkCancelled(signal);
         const imported = await importPhoto({
           task,
-          bytes: entries.get(`${root}/${task.archivePath}`),
+          readPhoto: entries.get(`${root}/${task.archivePath}`),
           uid,
           calls: {
             uploadImage: recordingUpload,

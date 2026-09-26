@@ -29,7 +29,7 @@ describe('importCategory, recreating the items', () => {
     const createCategoryRow = fakeCreateCategory('new-cat-1');
     const result = await importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       createItemRows,
@@ -88,7 +88,7 @@ describe('importCategory, recreating the items', () => {
     const createItemRows = fakeCreateItems();
     await importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       createItemRows,
     });
@@ -118,7 +118,7 @@ describe('importCategory, recreating the items', () => {
     const onProgress = vi.fn<(progress: ImportProgress) => void>();
     await importCategory({
       file: archive,
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       ...baseFakes(),
       createItemRows,
       linkItemRows,

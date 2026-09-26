@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ImportCancelledError } from '../../data/importCancellation';
 import { importCategory } from '../../data/importCategory';
 import { ImportFormatError } from '../../data/importFormat';
-import { readZipEntries } from '../../data/zip';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
 import { useImportCategory } from './useImportCategory';
@@ -16,29 +15,6 @@ vi.mock('../../data/importCategory', async () => {
   >('../../data/importCategory');
   return { ...actual, importCategory: vi.fn() };
 });
-
-vi.mock('../../data/zip', async () => {
-  const actual =
-    await vi.importActual<typeof import('../../data/zip')>('../../data/zip');
-  return { ...actual, readZipEntries: vi.fn() };
-});
-
-const MANIFEST = {
-  format: 'collectionbuddy-category-export',
-  version: 1,
-  category: { id: 'orig', name: 'Coins' },
-  exportedAt: '2026-08-06T00:00:00.000Z',
-  items: [],
-};
-
-function archiveHolding(manifest: unknown) {
-  return new Map([
-    [
-      'CollectionBuddy-coins/collection.json',
-      new TextEncoder().encode(JSON.stringify(manifest)),
-    ],
-  ]);
-}
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -60,11 +36,16 @@ function imported(overrides: Record<string, unknown> = {}) {
 
 const FILE = new File(['zip'], 'coins.zip');
 
-// A well-formed archive of one category that imports as one item with one photograph.
+// The name the hook would give the category importCategory reads out of the archive.
+function namedFromArchive(archivedName: string): string {
+  const [[{ nameCategory }]] = vi.mocked(importCategory).mock.calls;
+  return nameCategory(archivedName);
+}
+
+// An import of one item with one photograph.
 function installImportMocks() {
   vi.clearAllMocks();
   window.localStorage.setItem('lang', 'en');
-  vi.mocked(readZipEntries).mockResolvedValue(archiveHolding(MANIFEST));
   vi.mocked(importCategory).mockResolvedValue(imported());
 }
 
@@ -82,8 +63,9 @@ describe('useImportCategory', () => {
     });
 
     expect(importCategory).toHaveBeenCalledWith(
-      expect.objectContaining({ file: FILE, categoryName: 'Coins (2)' }),
+      expect.objectContaining({ file: FILE }),
     );
+    expect(namedFromArchive('Coins')).toBe('Coins (2)');
     expect(onImported).toHaveBeenCalledWith('cat-9');
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Imported as "Coins (2)".',
@@ -100,9 +82,7 @@ describe('useImportCategory', () => {
       await result.current.runImport(FILE);
     });
 
-    expect(importCategory).toHaveBeenCalledWith(
-      expect.objectContaining({ categoryName: 'Coins' }),
-    );
+    expect(namedFromArchive('Coins')).toBe('Coins');
   });
 
   // Export-then-delete is the canonical use, so a photograph left behind must never go unsaid.
@@ -146,31 +126,6 @@ describe('useImportCategory', () => {
     await act(async () => {
       release?.();
     });
-  });
-
-  it('rejects a file that is not one of this app archives', async () => {
-    const consoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-    vi.mocked(readZipEntries).mockResolvedValue(new Map() as never);
-    const { result } = renderHook(() => useImportCategory([]), { wrapper });
-
-    await act(async () => {
-      await result.current.runImport(FILE);
-    });
-
-    expect(consoleError).toHaveBeenCalledWith(
-      'import category',
-      expect.objectContaining({
-        message: 'Not a CollectionBuddy export archive',
-      }),
-    );
-    consoleError.mockRestore();
-    expect(importCategory).not.toHaveBeenCalled();
-    // The format complaint, not the generic one: the file was read, it just was not ours.
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "This file isn't a CollectionBuddy export archive.",
-    );
   });
 
   it('reports an archive whose manifest is not this app format', async () => {

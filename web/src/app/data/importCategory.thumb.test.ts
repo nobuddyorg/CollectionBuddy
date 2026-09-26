@@ -57,7 +57,7 @@ describe('importCategory with no thumbnailer injected', () => {
   it('makes the thumbnail with the app own compression settings', async () => {
     const result = await importCategory({
       file: await archiveWithOnePhoto(),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       getUid: async () => 'uid',
       createCategoryRow: (async () => ({
         data: { id: 'cat-1', name: 'Coins' },
@@ -87,7 +87,7 @@ describe('importCategory with no thumbnailer injected', () => {
     const before = Date.now();
     await importCategory({
       file: await archiveWithOnePhoto(),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       getUid: async () => 'uid',
       createCategoryRow: (async () => ({
         data: { id: 'cat-1', name: 'Coins' },
