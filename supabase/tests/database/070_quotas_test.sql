@@ -245,6 +245,16 @@ select throws_ok(
   '23514', null, 'tags longer together than 50 tags of 100 characters are refused'
 );
 select throws_ok(
+  format('insert into public.items (title, tags) values (''o'', %L)',
+    array['short', repeat('a', 101)]),
+  '23514', null, 'one tag past 100 characters is refused, however short the rest (0028)'
+);
+select ok(
+  not pg_temp.raises(format('insert into public.items (title, tags) values (''w'', %L)',
+    array['  ' || repeat('ä', 100) || '  '])),
+  'a tag is measured in characters after normalization, not bytes or padding'
+);
+select throws_ok(
   format('update public.categories set name = %L where name = ''Category 3''', repeat('n', 201)),
   '23514', null, 'a category name past 200 characters is refused, on rename too'
 );

@@ -42,7 +42,6 @@ function exported(overrides: Record<string, unknown> = {}) {
     filename: 'CollectionBuddy-coins.zip',
     photoCount: 2,
     skippedPhotoCount: 0,
-    skippedItemCount: 0,
     ...overrides,
   };
 }
@@ -200,21 +199,6 @@ describe('useExportCategory', () => {
     );
     // The archive is still worth having, so it is still downloaded.
     expect(downloadBlob).toHaveBeenCalled();
-  });
-
-  it('reports entries whose photographs could not even be listed', async () => {
-    vi.mocked(exportCategory).mockResolvedValue(
-      exported({ skippedItemCount: 4 }) as never,
-    );
-    const { result } = renderHook(() => useExportCategory(), { wrapper });
-
-    await act(async () => {
-      await result.current.runExport(CATEGORY);
-    });
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "4 entries' photographs could not be listed and are missing from the export.",
-    );
   });
 
   it('says an archive that cannot fit is too large, not that it should be retried', async () => {

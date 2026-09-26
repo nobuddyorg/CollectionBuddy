@@ -28,6 +28,7 @@ interface Toast {
     undoByKeyboard(): Promise<void>;
   };
   locators: {
+    alert: Locator;
     buttons: {
       action: Locator;
       close: Locator;
@@ -76,6 +77,8 @@ export function initToast(page: Page): Toast {
   // The newest toast that offers an action: a plain success toast may still be on screen beside the undo one.
   const pending = root.filter({ has: page.getByTestId('toast-action') }).last();
   const locators = {
+    // An error toast, the one kind that interrupts; a success toast may be on screen beside it.
+    alert: root.and(page.getByRole('alert')),
     buttons: {
       action: pending.getByTestId('toast-action'),
       close: pending.getByTestId('toast-close'),

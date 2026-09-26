@@ -5,7 +5,6 @@ import Icon, { IconType } from '../Icon';
 import { useFocusTrap } from './useFocusTrap';
 
 export function Dialog({
-  open,
   title,
   description,
   closeLabel,
@@ -15,11 +14,10 @@ export function Dialog({
   size = 'default',
   role = 'dialog',
 }: {
-  open: boolean;
   title: string;
   /** Rendered above `children` and wired to `aria-describedby`, e.g. a confirm's question. */
   description?: string;
-  closeLabel?: string;
+  closeLabel: string;
   onClose: () => void;
   children: React.ReactNode;
   initialFocusRef?: React.RefObject<HTMLElement | null>;
@@ -31,15 +29,16 @@ export function Dialog({
   const titleId = useId();
   const descriptionId = useId();
 
-  useFocusTrap({ open, containerRef: panelRef, initialFocusRef });
+  // Mounted only while open: CenteredModal renders nothing when closed.
+  useFocusTrap({ open: true, containerRef: panelRef, initialFocusRef });
 
   return (
     <div
-      className={`fixed inset-0 z-modal flex items-center justify-center transition-opacity duration-200 ease-out ${
+      className={`fixed inset-0 z-modal flex items-center justify-center ${
         size === 'full'
           ? 'p-0'
           : 'p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]'
-      } ${open ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+      }`}
     >
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- onClick only stops a click inside the panel from reaching the backdrop's close handler */}
       <div
@@ -48,11 +47,11 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
-        className={`bg-card text-card-foreground ring-1 ring-border shadow-2xl w-full flex flex-col overflow-hidden transition-[opacity,transform] duration-200 ease-out ${
+        className={`bg-card text-card-foreground ring-1 ring-border shadow-2xl w-full flex flex-col overflow-hidden ${
           size === 'full'
             ? 'h-[100dvh] max-w-none rounded-none pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
             : 'max-w-2xl max-h-[90dvh] rounded-sm'
-        } ${open ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+        }`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
@@ -63,7 +62,7 @@ export function Dialog({
             data-testid="dialog-close"
             className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-card-foreground/10"
             onClick={onClose}
-            aria-label={closeLabel ?? 'Close'}
+            aria-label={closeLabel}
           >
             <Icon icon={IconType.Close} className="w-5 h-5" />
           </button>

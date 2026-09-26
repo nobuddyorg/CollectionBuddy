@@ -3,7 +3,6 @@ type HeaderUser = { email: string };
 export type HeaderProps = {
   user: HeaderUser;
   onSignOut: () => Promise<void> | void;
-  className?: string;
 };
 
 export type MenuProps = {

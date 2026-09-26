@@ -85,6 +85,15 @@ select ok(
   'a photograph record whose thumbnail names its own item is accepted'
 );
 
+-- 0028 validated it, so no row written before 0019 still names another entry's photograph.
+select is(
+  (select array_agg(conname::text order by conname)
+   from pg_catalog.pg_constraint
+   where conrelid = 'public.images'::regclass and not convalidated),
+  null,
+  'every constraint on images holds for every row, not only for writes since it was added'
+);
+
 -- category_shares_category_email_unique: re-sharing the same (category,
 -- email) pair is refused outright, not a second grant with its own expiry
 -- (TEST_STRATEGY.md §8's idempotency table, "creating a grant/share that

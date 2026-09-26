@@ -35,6 +35,12 @@ select is(public.join_tags(array['b', 'a']), 'b a',
 select is(public.join_tags(null), '',
   'a NULL tag array joins to an empty string, not NULL');
 
+-- longest_tag_length: what items_tag_length checks (0028).
+select is(public.longest_tag_length(array['ab', 'äöüß', 'x']), 4,
+  'the longest tag, counted in characters');
+select is(public.longest_tag_length(array[]::text[]), 0, 'no tags measure 0, not NULL');
+select is(public.longest_tag_length(null), 0, 'a NULL array measures 0 too');
+
 -- storage_item_id: parses the item id out of a well-formed path, and
 -- answers NULL rather than raising on one that does not parse -- the same
 -- reasoning as images_path_full_matches_item (0012): a raised error inside
