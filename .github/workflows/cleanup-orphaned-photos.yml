@@ -34,8 +34,9 @@ jobs:
           QUERY="select * from public.orphan_sweep_plan($MAX_OBJECTS_PER_RUN);"
 
           payload=$(jq -n --arg q "$QUERY" '{query: $q}')
+          # The read-only endpoint runs as supabase_read_only_user (0024), so the token needs Database: Read, never Read-write.
           result=$(curl -sS --fail-with-body -X POST \
-            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query/read-only" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
             --data "$payload")

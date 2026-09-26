@@ -108,19 +108,11 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
-      # PostgREST caches the schema and this project cannot create the `pgrst_ddl_watch` event trigger (needs superuser); NOTIFY needs a session, which `db push` does not leave open.
+      # PostgREST caches the schema and this project cannot create the `pgrst_ddl_watch` event trigger (needs superuser); over the DB URL, so no Management API token reaches this job.
       - name: Reload the PostgREST schema cache
-        run: |
-          curl -sS --fail-with-body -X POST \
-            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data @- <<'JSON'
-          {"query": "notify pgrst, 'reload schema'"}
-          JSON
+        run: supabase db query --db-url "$SUPABASE_DB_URL" "notify pgrst, 'reload schema'"
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
   build:
     needs: [gate, migrate]

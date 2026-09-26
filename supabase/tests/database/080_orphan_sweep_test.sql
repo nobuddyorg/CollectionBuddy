@@ -156,10 +156,13 @@ select is(
   'images names its objects in path_full and path_thumb only -- a new path column goes into orphan_sweep_plan first'
 );
 
--- No API role reaches it: only the Management API, as its owner, runs the plan.
+-- No API role reaches it: only the Management API's read-only query endpoint, as supabase_read_only_user, runs the plan (0024).
 select function_privs_are('public', 'orphan_sweep_plan', array['integer'], r, array[]::text[],
   r || ' cannot execute orphan_sweep_plan')
 from unnest(array['anon', 'authenticated', 'service_role']) as r;
+
+select function_privs_are('public', 'orphan_sweep_plan', array['integer'], 'supabase_read_only_user', array['EXECUTE'],
+  'supabase_read_only_user, the sweep token''s query role, can execute orphan_sweep_plan');
 
 select ok(
   not (select prosecdef from pg_catalog.pg_proc where oid = 'public.orphan_sweep_plan(integer)'::regprocedure),
@@ -172,6 +175,10 @@ select ok(
   'a signed-in user cannot run the plan'
 );
 reset role;
+
+-- Last, as nothing after it may write: that endpoint's session is read-only.
+set local transaction_read_only = on;
+select lives_ok('select * from public.orphan_sweep_plan(10)', 'the plan runs in a read-only transaction');
 
 select * from finish();
 rollback;

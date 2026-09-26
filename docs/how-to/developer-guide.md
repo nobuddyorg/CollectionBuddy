@@ -156,7 +156,7 @@ supabase test db
 | `060`, `065` | The two read RPCs: who may call them, what they return |
 | `070_quotas_test.sql` | The per-owner photo-storage and entry quotas |
 | `075_query_plans_test.sql` | That every index-backed query can reach its index, and picks it at a realistic size |
-| `080_orphan_sweep_test.sql` | What the orphan sweep may delete: both path columns, no uuid cast, the 48 h grace, other buckets, the mass-deletion ceiling |
+| `080_orphan_sweep_test.sql` | What the orphan sweep may delete: both path columns, no uuid cast, the 48 h grace, other buckets, the mass-deletion ceiling; `supabase_read_only_user` and no API role runs it, in a read-only transaction |
 
 `_helpers.psql` holds the shared fixtures; it is `.psql` because
 `supabase test db` collects every `.sql` file as a test. pgTAP proves the
@@ -454,11 +454,14 @@ One-time setup for a fork:
 2. Settings → Environments: create `production` with deployment branches
    **Selected branches** → `main` only, and set the same rule on
    `github-pages`.
-3. Secrets: `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`
-   as **`production` environment** secrets; `NEXT_PUBLIC_SUPABASE_URL`,
+3. Secrets: `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`,
+   `SUPABASE_AUTH_CONFIG_TOKEN`, `SUPABASE_PROJECT_REF` as **`production`
+   environment** secrets; `NEXT_PUBLIC_SUPABASE_URL`,
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` as repository secrets — what each is and
    why the DB URL must be the session pooler:
-   [Configuration](../reference/configuration.md#github-actions-secrets).
+   [Configuration](../reference/configuration.md#github-actions-secrets). The
+   two tokens are scoped to the project, with exactly the [permissions
+   listed there](../reference/configuration.md#management-api-tokens).
 4. If the repository is not named `CollectionBuddy`, change `repo` in
    `web/next.config.ts`; the production `basePath` derives from it.
 5. The backup bucket, key and age recipient:
@@ -512,8 +515,9 @@ When it fails:
    [Management API reference](https://supabase.com/docs/reference/api/v1-get-auth-service-config)
    and rename it in the file.
 
-A 401 or 403 means the token was revoked or lacks **Auth Config: Read**
-([Configuration](../reference/configuration.md#github-actions-secrets)).
+A 401 or 403 means `SUPABASE_AUTH_CONFIG_TOKEN` expired, was revoked or
+lacks **Auth Config: Read**
+([Configuration](../reference/configuration.md#management-api-tokens)).
 
 ## Sweep orphaned photographs
 
@@ -733,6 +737,33 @@ reversible. Budget a quiet evening, well before December.
 Supabase's separate JWT signing-keys migration (the key that signs users'
 sessions) is independent of this one and has no deadline attached here.
 
+## Scope the Management API tokens
+
+The workflows once shared one access token, most likely a classic one, which
+reaches every project on its owner's account. This replaces it with the two
+scoped tokens in [Configuration](../reference/configuration.md#management-api-tokens).
+Every step keeps the jobs running; do it after the change that added `0024`
+has deployed.
+
+1. **The Auth check's token.** Supabase Dashboard → Account → Access Tokens
+   → **Generate new token**, named for its use. Expiry 90 days; resource
+   access this one project; **Auth Config**: Read, nothing else. Copy the
+   `sbp_fc…` value into a new `production` environment secret,
+   `SUPABASE_AUTH_CONFIG_TOKEN`. Run Actions → *Check hosted Auth settings*:
+   it must pass without the warning that it borrowed `SUPABASE_ACCESS_TOKEN`.
+2. **The sweep and backup token.** Generate a second one the same way with
+   **Database**: Read, **API Keys**: Read and **API Key Secrets**: Read, and
+   update `SUPABASE_ACCESS_TOKEN` with it.
+3. **Prove it.** Run *Clean up orphaned photographs* with the defaults (a dry
+   run: the read-only query). Add a photograph to any entry in production,
+   then run *Back up production*: `photographs` must copy its two objects
+   with `failed: 0`, which fetches the secret key.
+4. **Revoke the classic token** on the Access Tokens page, once nothing else
+   uses it. `supabase login` on a laptop stores its own token and is
+   unaffected.
+5. Put the expiry date a week early in a calendar: [Rotate a
+   credential](#rotate-a-credential).
+
 ## Rotate a credential
 
 Rotate after a suspected leak, when someone with access leaves, or when a
@@ -758,13 +789,17 @@ password, which Supabase replaces at once.
   password**; it can take a few minutes to apply. Build the new session
   pooler string with the password percent-encoded ([Configuration](../reference/configuration.md#github-actions-secrets)),
   update the secret, and run *Back up production*: `database` must pass.
-- **Management API token** (`SUPABASE_ACCESS_TOKEN`, `production`). A
-  personal access token that carries its owner's access to every project, so
-  give it an expiry and a calendar reminder. Account → Access Tokens →
-  generate a new one, update the secret, run *Clean up orphaned photographs*
-  (a dry run by default) and *Back up production*; both must pass. Then
-  revoke the old token on the same page. A fine-grained token needs the
-  `api_gateway_keys_read` permission for the key fetch, besides running SQL.
+- **Management API tokens** (`SUPABASE_ACCESS_TOKEN`,
+  `SUPABASE_AUTH_CONFIG_TOKEN`, `production`). Every 90 days, a week before
+  they expire, with a calendar reminder for the next time. Supabase Dashboard
+  → Account → Access Tokens → generate a scoped token with the same project,
+  permissions and 90-day expiry ([Configuration](../reference/configuration.md#management-api-tokens)),
+  and update its secret. Prove `SUPABASE_AUTH_CONFIG_TOKEN` with *Check hosted
+  Auth settings*, and `SUPABASE_ACCESS_TOKEN` with *Clean up orphaned
+  photographs* (a dry run by default) and *Back up production*; each must
+  pass. Then revoke the old token on the same page. A classic token still in
+  either secret: [Scope the Management API
+  tokens](#scope-the-management-api-tokens).
 - **Google OAuth client secret** (Supabase Dashboard → Authentication →
   Sign In / Providers → Google). Google Cloud Console → APIs & Services →
   Credentials → the OAuth client → **Add secret**; the old secret stays

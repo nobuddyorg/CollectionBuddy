@@ -45,8 +45,9 @@ The hosted project's Auth configuration lives in its dashboard, so the values sh
 
 ## GitHub Actions secrets
 
-`SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` are
-secrets of the `production` environment, not repository secrets: that
+`SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_AUTH_CONFIG_TOKEN`
+and `SUPABASE_PROJECT_REF` are secrets of the `production` environment, not
+repository secrets: that
 environment's deployment-branch policy allows only `main`, so a workflow run
 on any other branch cannot read them. `migrate`, `cleanup`, both
 `backup.yml` jobs and `hosted-auth-check.yml` reference it and also refuse
@@ -58,9 +59,10 @@ secrets are repository secrets.
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml`, `backup.yml`; `k6-load-test.yml` with `target=hosted` only | Required |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`; `k6-load-test.yml` with `target=hosted` only | Required. Either key format ([API keys](#api-keys)); `pages-deploy.yml`'s `build` calls `keepalive()` with it and publishes nothing if the project rejects it |
-| `SUPABASE_DB_URL` | `pages-deploy.yml` (`migrate`), `backup.yml` (`database`) | Required. The **session pooler** string (`aws-0-<region>.pooler.supabase.com`), password percent-encoded. The direct `db.<ref>.supabase.co` host is IPv6-only and unreachable from GitHub runners; `supabase link` reports success anyway and the push fails. |
-| `SUPABASE_ACCESS_TOKEN` | `pages-deploy.yml` (`migrate`), `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`), `hosted-auth-check.yml` | Required. Management-API token: reloads the PostgREST schema cache after a migration; in the cleanup job, runs the orphan query and fetches a fresh secret key ([API keys](#api-keys)); in `photographs`, lists the bucket and fetches that key; in `hosted-auth-check.yml`, reads the Auth config (a scoped token needs **Auth Config: Read**). Without it `migrate` returns 401 and the deploy stops. |
-| `SUPABASE_PROJECT_REF` | same four | Required |
+| `SUPABASE_DB_URL` | `pages-deploy.yml` (`migrate`), `backup.yml` (`database`) | Required. The **session pooler** string (`aws-0-<region>.pooler.supabase.com`), password percent-encoded. The direct `db.<ref>.supabase.co` host is IPv6-only and unreachable from GitHub runners; `supabase link` reports success anyway and the push fails. `migrate` also sends PostgREST's schema-cache reload through it. |
+| `SUPABASE_ACCESS_TOKEN` | `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`) | Required. Scoped Management API token: runs a read-only query and fetches a fresh secret key ([Management API tokens](#management-api-tokens)). |
+| `SUPABASE_AUTH_CONFIG_TOKEN` | `hosted-auth-check.yml` | Recommended. Scoped Management API token that reads the Auth config ([Management API tokens](#management-api-tokens)). Until it is set, the check borrows `SUPABASE_ACCESS_TOKEN` and warns on every run. |
+| `SUPABASE_PROJECT_REF` | `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`), `hosted-auth-check.yml` | Required |
 | `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test`) | Optional; without it Stryker writes a local HTML report only |
 
 None of these may appear in the repository. gitleaks
@@ -85,6 +87,40 @@ Only a reviewed false positive, or a leak already rotated on `main`, goes in
 allowlist for it. GitHub push protection also refuses a push carrying a secret
 key or a classic access token, but has no pattern for a legacy JWT or a
 connection string.
+
+### Management API tokens
+
+Each is a **scoped** personal access token (`sbp_fc…`) reaching this one
+project and nothing else, never a classic token
+([why](../explanation/design-decisions.md#why-the-management-api-tokens-are-scoped-per-job)).
+`migrate` holds none: it reloads the schema cache over `SUPABASE_DB_URL`.
+
+| Secret | Permissions, on this project only | Endpoints | Used by |
+| --- | --- | --- | --- |
+| `SUPABASE_ACCESS_TOKEN` | **Database**: Read; **API Keys**: Read; **API Key Secrets**: Read | `POST /v1/projects/{ref}/database/query/read-only`, `GET /v1/projects/{ref}/api-keys?reveal=true` | `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`) |
+| `SUPABASE_AUTH_CONFIG_TOKEN` | **Auth Config**: Read | `GET /v1/projects/{ref}/config/auth`, `GET /v1/projects/{ref}/config/auth/third-party-auth` | `hosted-auth-check.yml` |
+
+- **Names** are the dashboard's, from Supabase's [permission
+  table](https://supabase.com/docs/guides/platform/personal-access-tokens#permission-scopes);
+  the Management API spec calls them `database_read`,
+  `api_gateway_keys_read`, `api_gateway_keys_secret_read` and
+  `auth_config_read`. Grant nothing else: no Read-write, no organization or
+  account access.
+- **Database: Read, not Read-write.** The read-only endpoint runs as
+  `supabase_read_only_user`, which reads every table past RLS and writes
+  nothing; `0024` lets it execute `orphan_sweep_plan()`.
+- **Both key permissions.** `reveal=true` returns the secret key only with
+  API Keys and API Key Secrets together ([API keys](#api-keys)).
+- **Expiry: 90 days**, the longest preset (a custom date may reach a year).
+  Rotate both tokens on one day, a week before they expire: [Rotate a
+  credential](../how-to/developer-guide.md#rotate-a-credential). An expired
+  token fails its job with a 401; nothing retries.
+- **Scoped tokens are in public alpha.** If the token form offers no
+  permissions, the account has no access yet; Supabase support grants it.
+  Until then a classic token works in both secrets, with the shortest expiry
+  you will keep rotating.
+- **The creating account's role caps the token**, re-checked on every
+  request: both key permissions need at least the Developer role.
 
 ### API keys
 

@@ -33,6 +33,7 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | [`0021_item_writes_follow_the_grant.sql`](../../supabase/migrations/0021_item_writes_follow_the_grant.sql) | Adds `has_item_write_access()`. Writing an entry, its links, its `images` rows and the own-prefix objects under it needs write access to every category it is in, the entry's own owner included: revoking or demoting an editor ends their writes to the entries they filed ([why](../explanation/design-decisions.md#why-an-editors-filed-entries-follow-the-grant)). |
 | [`0022_orphan_sweep_plan.sql`](../../supabase/migrations/0022_orphan_sweep_plan.sql) | Adds `orphan_sweep_plan()`, the query `cleanup-orphaned-photos.yml` used to carry inline, plus the counts its mass-deletion ceiling needs; executable by no API role. |
 | [`0023_editor_photographs_follow_the_entry.sql`](../../supabase/migrations/0023_editor_photographs_follow_the_entry.sql) | An entry's owner reads the objects her own `images` rows name, so she signs and deletes a photograph an editor added to her entry. An own-prefix upload or delete needs an entry the caller sees and may write, so an ex-editor can no longer remove those bytes or fill a path a record names ([why](../explanation/design-decisions.md#why-a-photograph-an-editor-adds-to-your-entry-is-yours)). |
+| [`0024_orphan_sweep_plan_read_only.sql`](../../supabase/migrations/0024_orphan_sweep_plan_read_only.sql) | Lets `supabase_read_only_user` execute `orphan_sweep_plan()`, so the sweep's Management API token runs it through the read-only query endpoint and needs no write access to the database. |
 
 ### Tables
 
@@ -101,7 +102,7 @@ Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql
 - `tg_set_updated_at()` — on `categories` and `items`.
 - `storage_item_id()` — parses the item id out of a storage path, returning `NULL` rather than raising; it tests the segment with `pg_input_is_valid()` rather than catching the cast's error, so no call opens a subtransaction. See Storage.
 - `keepalive()` — no-op RPC, callable by `anon`, hit daily by `keep-alive.yml`.
-- `orphan_sweep_plan()` — what `cleanup-orphaned-photos.yml` deletes: the oldest unreferenced `item-images` objects past 48 h, with their count, bytes, the total orphaned and the mass-deletion ceiling. `SECURITY INVOKER`; no API role may execute it, only its owner through the Management API (`rls/orphan-sweep-rpc.spec.ts`).
+- `orphan_sweep_plan()` — what `cleanup-orphaned-photos.yml` deletes: the oldest unreferenced `item-images` objects past 48 h, with their count, bytes, the total orphaned and the mass-deletion ceiling. `SECURITY INVOKER`; no API role may execute it (`rls/orphan-sweep-rpc.spec.ts`), only `supabase_read_only_user`, as which the Management API's read-only query endpoint runs it (`0024`).
 - `list_category_places()` — the map's distinct places for a category, `SECURITY INVOKER`.
 - `search_category_items()` — the searched catalogue page, `SECURITY DEFINER`: re-implements the read-access check (owns the item, or holds an active read grant on the category) and then queries with RLS bypassed so the trigram indexes are usable ([why](../explanation/design-decisions.md#why-search-uses-trigram-ilike-instead-of-full-text-search)). An authorization boundary in its own right, with its own spec (`rls/search-rpc.spec.ts`).
 

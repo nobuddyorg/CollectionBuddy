@@ -65,8 +65,9 @@ jobs:
           work=$(mktemp -d)
 
           query="select coalesce(json_agg(o.name order by o.name), '[]'::json) as names from storage.objects o where o.bucket_id = 'item-images'"
+          # Read-only, as in cleanup-orphaned-photos.yml: that role bypasses RLS, so it sees every collector's objects.
           listing=$(curl -sS --fail-with-body -X POST \
-            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query/read-only" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
             --data "$(jq -n --arg q "$query" '{query: $q}')")

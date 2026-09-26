@@ -117,6 +117,15 @@ The project runs on Supabase's Free plan, which keeps no database backup, and no
 - **Storage's tables are not in the dump.** A new project gets the bucket from `0007` and each object's row from its re-upload; restoring either from the dump would collide with both, and `postgres` may not write Storage's other tables at all (found rehearsing the restore).
 - **The pre-migration dump runs only when something is pending.** A deploy without migrations never depends on the backup bucket; one with migrations stops rather than migrate without a copy.
 
+## Why the Management API tokens are scoped per job
+
+The sweep and the backup fetch the secret key per run so it is never stored, but the token they fetched it with was a classic one: every permission on every organization and project on the owner's account, including revealing every key, running any SQL and deleting projects, and it reached every deploy and an hourly job (#748). Now each job holds a token scoped to this project and to the endpoints it calls ([Configuration](../reference/configuration.md#management-api-tokens)).
+
+- **`migrate` needs none.** It already holds the database URL; `supabase db query` sends the `NOTIFY` over it, and PostgREST receives it when that statement commits.
+- **Database: Read, not Read-write.** Read-write runs any SQL as `postgres`, so a leaked token could plant a function, trigger or role that outlives every key rotation. The read-only endpoint runs as `supabase_read_only_user`; granting it `orphan_sweep_plan()` in `0024` adds nothing that role could not select itself.
+- **Two tokens, not one per workflow.** The hourly Auth check needs only Auth Config: Read, so it no longer carries a token that reveals keys. The sweep and the backup need the same three permissions; splitting them would narrow nothing and double the rotation.
+- **What remains.** The secret key that token reveals still reads and deletes every collector's data; that is the price of not storing it, and the 90-day expiry bounds how long an unnoticed leak stays useful.
+
 ## Why the deploy waits for CI on `main`
 
 CI and the deploy used to start side by side on every push, so production was migrated and published minutes before `main`'s CI finished, and a PR merged while behind `main` shipped a tree no CI run had passed (#735). `pages-deploy.yml` now starts from `workflow_run` when CI succeeds on a push to `main`, and deploys that commit, not whatever `main` holds by then.

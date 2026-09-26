@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { expect, test } from '../test';
 import { apiAs, context } from './helpers';
 
-// The sweep's plan lists every collector's unreferenced photographs; only the Management API, as its owner, may run it.
+// The sweep's plan lists every collector's unreferenced photographs; only the Management API's read-only query may run it.
 test.describe('orphan_sweep_plan (the orphan sweep query)', () => {
   const args = { max_objects: 10 };
 
