@@ -15,8 +15,10 @@ const ITEM_FIELDS = 'id,title,description,place,place_lat,place_lng,tags';
 const PAGE_SELECT = `items!inner(${ITEM_FIELDS},images(id,item_id,path_full,path_thumb))`;
 // components/ItemList/paging.ts PAGE_SIZE.
 const PAGE_SIZE = 9;
+// data/items.ts PLACE_PAGE_SIZE.
+const PLACE_PAGE_SIZE = 1000;
 
-function query(params) {
+export function query(params) {
   return Object.entries(params)
     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
     .join('&');
@@ -126,12 +128,13 @@ export function searchPage({ session, categoryId, term, page }) {
   });
 }
 
-/** data/items.ts rawListCategoryPlaces: the map's places, narrowed like the list. */
+/** data/items.ts rawListCategoryPlaces: the first page of the map's places, narrowed like the list. */
 export function listPlaces({ session, categoryId, term }) {
+  const page = { offset: 0, limit: PLACE_PAGE_SIZE };
   const params = query(
     term
-      ? { cat_id: categoryId, like_pattern: `%${term}%` }
-      : { cat_id: categoryId },
+      ? { cat_id: categoryId, like_pattern: `%${term}%`, ...page }
+      : { cat_id: categoryId, ...page },
   );
   return send({
     method: 'GET',

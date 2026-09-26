@@ -24,7 +24,9 @@ describe('the queries behind the list and the map', () => {
   const listQuery = (search: string) =>
     paramsOf(rawListItems({ categoryId: 'cat-1', search, from: 0, to: 8 }));
   const mapQuery = (search: string) =>
-    paramsOf(rawListCategoryPlaces({ categoryId: 'cat-1', search }));
+    paramsOf(
+      rawListCategoryPlaces({ categoryId: 'cat-1', search, from: 0, to: 999 }),
+    );
   const countBuilder = (search: string) =>
     rawCountItems({ categoryId: 'cat-1', search }) as unknown as {
       url: URL;
@@ -39,6 +41,8 @@ describe('the queries behind the list and the map', () => {
     const builder = rawListCategoryPlaces({
       categoryId: 'cat-1',
       search: 'coin',
+      from: 0,
+      to: 999,
     }) as unknown as {
       method: string;
       url: URL;
@@ -46,6 +50,20 @@ describe('the queries behind the list and the map', () => {
     expect(builder.method).toBe('GET');
     // Naming the wrong function is a 404 at runtime and nothing at compile time.
     expect(builder.url.pathname).toMatch(/\/rpc\/list_category_places$/);
+  });
+
+  // PostgREST truncates an unranged function result at max_rows without an error.
+  it('asks the grouped-places RPC for exactly the page it is given', () => {
+    const params = paramsOf(
+      rawListCategoryPlaces({
+        categoryId: 'cat-1',
+        search: '',
+        from: 1000,
+        to: 1999,
+      }),
+    );
+    expect(params.get('offset')).toBe('1000');
+    expect(params.get('limit')).toBe('1000');
   });
 
   it('carries an abort signal through to each cancellable query', () => {
@@ -98,6 +116,8 @@ describe('the queries behind the list and the map', () => {
         rawListCategoryPlaces({
           categoryId: 'cat-1',
           search: 'coin',
+          from: 0,
+          to: 999,
           signal: controller.signal,
         }),
       ),

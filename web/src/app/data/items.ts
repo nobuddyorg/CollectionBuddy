@@ -1,4 +1,5 @@
 import { chunk } from '../lib/chunk';
+import { readAllPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
 import type { ImageListRow } from './images';
@@ -294,28 +295,37 @@ export function deleteItems(ids: string[]) {
   return supabase.from('items').delete().in('id', ids);
 }
 
-/** Places grouped in Postgres (`list_category_places`, security invoker) under the list's search gate. */
+// PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.
+const PLACE_PAGE_SIZE = 1000;
+
+/** One page of places grouped in Postgres (`list_category_places`, security invoker, ordered by place) under the list's search gate. */
 export function rawListCategoryPlaces({
   categoryId,
   search,
+  from,
+  to,
   signal,
 }: {
   categoryId: string;
   search: string;
+  from: number;
+  to: number;
   signal?: AbortSignal;
 }) {
-  const query = supabase.rpc(
-    'list_category_places',
-    { cat_id: categoryId, like_pattern: likePatternFor(search) ?? undefined },
-    { get: true },
-  );
+  const query = supabase
+    .rpc(
+      'list_category_places',
+      { cat_id: categoryId, like_pattern: likePatternFor(search) ?? undefined },
+      { get: true },
+    )
+    .range(from, to);
   return withSignal(query, signal).overrideTypes<
     PlaceGroupRow[],
     { merge: false }
   >();
 }
 
-/** A plain, mockable await over `rawListCategoryPlaces`; `rawList` exists for its test. */
+/** Every place in the category, paged past the row cap; `rawList` exists for its test. */
 export async function listCategoryPlaces(
   {
     categoryId,
@@ -324,8 +334,9 @@ export async function listCategoryPlaces(
   }: { categoryId: string; search: string; signal?: AbortSignal },
   rawList: typeof rawListCategoryPlaces = rawListCategoryPlaces,
 ): Promise<{ data: PlaceGroupRow[] | null; error: unknown }> {
-  const { data, error } = await rawList({ categoryId, search, signal });
-  return { data: data ?? null, error };
+  return readAllPages<PlaceGroupRow>(PLACE_PAGE_SIZE, (from, to) =>
+    rawList({ categoryId, search, from, to, signal }),
+  );
 }
 
 // Ids per `.in()` filter; more risks a URL length limit before PostgREST's row cap.
