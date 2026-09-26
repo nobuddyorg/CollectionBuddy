@@ -297,8 +297,6 @@ export type ZipWriter = {
     bytes: Uint8Array<ArrayBuffer>;
     modified?: Date;
   }) => void;
-  /** Bytes written so far, which is what the archive would weigh today. */
-  size: () => number;
   finish: () => Blob;
 };
 
@@ -335,8 +333,6 @@ export function createZipWriter({
       offset += headerLength + bytes.length;
       entries.push(entry);
     },
-
-    size: () => offset,
 
     finish() {
       const directory = entries.map(centralDirectoryEntry);

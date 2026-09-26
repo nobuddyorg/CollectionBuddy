@@ -17,6 +17,7 @@ jobs:
   check:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     environment: production
     permissions:
       contents: read
@@ -35,12 +36,12 @@ jobs:
           fi
 
           # The response holds the Google client secret and every hook secret: compared below, never printed.
-          if ! config=$(curl -sS --fail-with-body "$api" -H "Authorization: Bearer $AUTH_CONFIG_TOKEN"); then
+          if ! config=$(curl -sS --fail-with-body --connect-timeout 10 --max-time 30 "$api" -H "Authorization: Bearer $AUTH_CONFIG_TOKEN"); then
             echo "::error::Could not read the Auth config: $config"
             exit 1
           fi
           # A third-party auth integration makes PostgREST accept another issuer's JWTs, and their email claim.
-          integrations=$(curl -sS --fail-with-body "$api/third-party-auth" -H "Authorization: Bearer $AUTH_CONFIG_TOKEN" | jq length)
+          integrations=$(curl -sS --fail-with-body --connect-timeout 10 --max-time 30 "$api/third-party-auth" -H "Authorization: Bearer $AUTH_CONFIG_TOKEN" | jq length)
 
           # A pinned field the API no longer returns reads as null, so a renamed field fails too; any sign-in provider not pinned must be off.
           drift=$(jq -r --slurpfile expected supabase/hosted-auth.json --argjson integrations "$integrations" '

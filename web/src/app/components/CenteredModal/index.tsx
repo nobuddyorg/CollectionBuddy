@@ -30,11 +30,9 @@ export default function CenteredModal({
   return (
     <Portal>
       <Backdrop
-        open={open}
         onClick={closeOnBackdrop ? () => onOpenChange(false) : undefined}
       />
       <Dialog
-        open={open}
         title={title}
         description={description}
         closeLabel={closeLabel}

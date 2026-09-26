@@ -28,7 +28,10 @@ function mockQueryBuilder() {
     'eq',
     'neq',
     'in',
-    'range',
+    'gte',
+    'or',
+    'order',
+    'limit',
     'single',
     'overrideTypes',
   ] as const;
@@ -47,6 +50,28 @@ function mockFrom() {
   const from = vi.fn().mockReturnValue(builder);
   vi.spyOn(supabase, 'from').mockImplementation(from);
   return { from, calls };
+}
+
+/** Like mockFrom, but each awaited query answers with the next of `pages`, so a later page's query can be read. */
+function mockFromPages(pages: unknown[][]) {
+  const { builder, calls } = mockQueryBuilder();
+  const answers = pages.values();
+  builder.then = (resolve) =>
+    (resolve as (value: unknown) => unknown)({
+      data: answers.next().value ?? [],
+      error: null,
+    });
+  const from = vi.fn().mockReturnValue(builder);
+  vi.spyOn(supabase, 'from').mockImplementation(from);
+  return { from, calls };
+}
+
+/** The calls of the query built after the first `select`, i.e. the second page's. */
+function secondPageCalls(calls: Call[]): Call[] {
+  const selects = calls.flatMap((call, index) =>
+    call.method === 'select' ? [index] : [],
+  );
+  return calls.slice(selects[1]);
 }
 
 describe('listCategories', () => {
@@ -93,25 +118,71 @@ describe('deleteCategory', () => {
   });
 });
 
+const link = (i: number) => ({
+  item_id: `id-${String(i).padStart(4, '0')}`,
+  created_at: '2026-01-01T00:00:00+00:00',
+});
+
 describe('listItemIdsForCategory', () => {
-  it('selects item ids for exactly the given category, ranged for the first page', async () => {
-    const { from, calls } = mockFrom();
+  it("reads the first page oldest-first by link, from the category's links alone", async () => {
+    const { from, calls } = mockFromPages([]);
     await listItemIdsForCategory('cat-1');
     expect(from).toHaveBeenCalledWith('item_categories');
-    expect(calls[0]).toEqual({ method: 'select', args: ['item_id'] });
-    expect(calls[1]).toEqual({
-      method: 'eq',
-      args: ['category_id', 'cat-1'],
-    });
-    expect(calls[2]).toEqual({ method: 'range', args: [0, 999] });
+    expect(calls).toEqual([
+      { method: 'select', args: ['item_id,created_at'] },
+      { method: 'eq', args: ['category_id', 'cat-1'] },
+      { method: 'order', args: ['created_at'] },
+      { method: 'order', args: ['item_id'] },
+      { method: 'limit', args: [1000] },
+    ]);
   });
 
-  // Regression: an unpaginated read undercounted past PostgREST's row cap, orphaning ids silently.
-  it('pages past a full page and concatenates the ids', async () => {
-    const fullPage = Array.from({ length: 1000 }, (_, i) => ({
-      item_id: `id-${i}`,
-    }));
-    const shortPage = [{ item_id: 'id-last' }];
+  it('starts the next page strictly after the last link read, with no offset', async () => {
+    const { calls } = mockFromPages([
+      Array.from({ length: 1000 }, (_, i) => link(i)),
+    ]);
+    await listItemIdsForCategory('cat-1');
+    const last = link(999);
+    expect(secondPageCalls(calls)).toEqual([
+      { method: 'select', args: ['item_id,created_at'] },
+      { method: 'eq', args: ['category_id', 'cat-1'] },
+      { method: 'gte', args: ['created_at', last.created_at] },
+      {
+        method: 'or',
+        args: [
+          `created_at.gt."${last.created_at}",and(created_at.eq."${last.created_at}",item_id.gt."${last.item_id}")`,
+        ],
+      },
+      { method: 'order', args: ['created_at'] },
+      { method: 'order', args: ['item_id'] },
+      { method: 'limit', args: [1000] },
+    ]);
+  });
+
+  // Regression (#766): offset pages shifted when a link went mid-walk, so an entry's photographs outlived its delete.
+  it('misses no link when an entry leaves the category between pages', async () => {
+    const table = Array.from({ length: 1001 }, (_, i) => link(i));
+    const listPage = vi
+      .fn()
+      .mockImplementation(
+        async ({ after }: { after: { item_id: string } | null }) => {
+          const page = table
+            .filter((row) => after === null || row.item_id > after.item_id)
+            .slice(0, 1000);
+          if (after === null) table.splice(0, 1);
+          return { data: page, error: null };
+        },
+      );
+
+    const { data } = await listItemIdsForCategory('cat-1', listPage);
+
+    expect(data).toHaveLength(1001);
+    expect(data!.at(-1)).toBe('id-1000');
+  });
+
+  it('pages past a full page, handing each read the last link, and joins the ids', async () => {
+    const fullPage = Array.from({ length: 1000 }, (_, i) => link(i));
+    const shortPage = [link(1000)];
     const listPage = vi
       .fn()
       .mockResolvedValueOnce({ data: fullPage, error: null })
@@ -120,20 +191,11 @@ describe('listItemIdsForCategory', () => {
     const { data, error } = await listItemIdsForCategory('cat-1', listPage);
 
     expect(error).toBeNull();
-    expect(data).toHaveLength(1001);
-    expect(data![0]).toBe('id-0');
-    expect(data![1000]).toBe('id-last');
-    expect(listPage).toHaveBeenCalledTimes(2);
-    expect(listPage).toHaveBeenNthCalledWith(1, {
-      categoryId: 'cat-1',
-      from: 0,
-      to: 999,
-    });
-    expect(listPage).toHaveBeenNthCalledWith(2, {
-      categoryId: 'cat-1',
-      from: 1000,
-      to: 1999,
-    });
+    expect(data).toEqual([...fullPage, ...shortPage].map((row) => row.item_id));
+    expect(listPage.mock.calls).toEqual([
+      [{ categoryId: 'cat-1', after: null }],
+      [{ categoryId: 'cat-1', after: link(999) }],
+    ]);
   });
 
   it('stops on the first page that errors, returning no partial data', async () => {
@@ -174,16 +236,40 @@ describe('listItemIdsLinkedElsewhere', () => {
       excludingCategoryId: 'cat-1',
     });
     expect(from).toHaveBeenCalledWith('item_categories');
-    expect(calls[0]).toEqual({ method: 'select', args: ['item_id'] });
-    expect(calls[1]).toEqual({
-      method: 'in',
-      args: ['item_id', ['item-1', 'item-2']],
+    expect(calls).toEqual([
+      { method: 'select', args: ['item_id,category_id'] },
+      { method: 'in', args: ['item_id', ['item-1', 'item-2']] },
+      { method: 'neq', args: ['category_id', 'cat-1'] },
+      { method: 'order', args: ['item_id'] },
+      { method: 'order', args: ['category_id'] },
+      { method: 'limit', args: [1000] },
+    ]);
+  });
+
+  it('starts the next page strictly after the last link read, on the primary key', async () => {
+    const last = { item_id: 'item-1', category_id: 'cat-9' };
+    const { calls } = mockFromPages([
+      Array.from({ length: 1000 }, () => ({ ...last })),
+    ]);
+    await listItemIdsLinkedElsewhere({
+      itemIds: ['item-1'],
+      excludingCategoryId: 'cat-1',
     });
-    expect(calls[2]).toEqual({
-      method: 'neq',
-      args: ['category_id', 'cat-1'],
-    });
-    expect(calls[3]).toEqual({ method: 'range', args: [0, 999] });
+    expect(secondPageCalls(calls)).toEqual([
+      { method: 'select', args: ['item_id,category_id'] },
+      { method: 'in', args: ['item_id', ['item-1']] },
+      { method: 'neq', args: ['category_id', 'cat-1'] },
+      { method: 'gte', args: ['item_id', 'item-1'] },
+      {
+        method: 'or',
+        args: [
+          'item_id.gt."item-1",and(item_id.eq."item-1",category_id.gt."cat-9")',
+        ],
+      },
+      { method: 'order', args: ['item_id'] },
+      { method: 'order', args: ['category_id'] },
+      { method: 'limit', args: [1000] },
+    ]);
   });
 
   it('carries the exact candidate values through to .in() when under the chunk size', async () => {
@@ -233,28 +319,26 @@ describe('listItemIdsLinkedElsewhere', () => {
     expect(listPage).toHaveBeenNthCalledWith(1, {
       itemIds: ids.slice(0, 100),
       excludingCategoryId: 'cat-1',
-      from: 0,
-      to: 999,
+      after: null,
     });
     expect(listPage).toHaveBeenNthCalledWith(2, {
       itemIds: ids.slice(100, 200),
       excludingCategoryId: 'cat-1',
-      from: 0,
-      to: 999,
+      after: null,
     });
     expect(listPage).toHaveBeenNthCalledWith(3, {
       itemIds: ids.slice(200, 250),
       excludingCategoryId: 'cat-1',
-      from: 0,
-      to: 999,
+      after: null,
     });
   });
 
-  it('pages within a single chunk past a full page and unions the results', async () => {
+  it('pages within a single chunk past a full page, after its last link, and unions the results', async () => {
     const fullPage = Array.from({ length: 1000 }, (_, i) => ({
       item_id: `linked-${i}`,
+      category_id: 'cat-2',
     }));
-    const shortPage = [{ item_id: 'linked-last' }];
+    const shortPage = [{ item_id: 'linked-last', category_id: 'cat-2' }];
     const listPage = vi
       .fn()
       .mockResolvedValueOnce({ data: fullPage, error: null })
@@ -266,19 +350,16 @@ describe('listItemIdsLinkedElsewhere', () => {
     );
 
     expect(data).toHaveLength(1001);
-    expect(listPage).toHaveBeenCalledTimes(2);
-    expect(listPage).toHaveBeenNthCalledWith(1, {
-      itemIds: ['item-1'],
-      excludingCategoryId: 'cat-1',
-      from: 0,
-      to: 999,
-    });
-    expect(listPage).toHaveBeenNthCalledWith(2, {
-      itemIds: ['item-1'],
-      excludingCategoryId: 'cat-1',
-      from: 1000,
-      to: 1999,
-    });
+    expect(listPage.mock.calls).toEqual([
+      [{ itemIds: ['item-1'], excludingCategoryId: 'cat-1', after: null }],
+      [
+        {
+          itemIds: ['item-1'],
+          excludingCategoryId: 'cat-1',
+          after: fullPage[999],
+        },
+      ],
+    ]);
   });
 
   it('stops on the first page that errors, returning no partial data', async () => {

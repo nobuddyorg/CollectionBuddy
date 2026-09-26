@@ -121,65 +121,87 @@ describe('deleteImageRow', () => {
   });
 });
 
-type Row = { item_id: string; n: number };
+type Row = { item_id: string; created_at: string; id: string };
 
-// Records each page's `.in()` chunk and `.range()` window, and scripts what each call resolves to.
+type PageCall = {
+  chunk: string[];
+  gte: unknown[];
+  or: unknown[];
+  limit: unknown;
+};
+
+// Records each page's `.in()` chunk and keyset bounds, and scripts what each call resolves to.
 function mockImagesQuery(
-  resolve: (
-    chunk: string[],
-    from: number,
-    to: number,
-  ) => {
+  resolve: (call: PageCall) => {
     data: Row[] | null;
     error: unknown;
   },
 ) {
-  const calls: { chunk: string[]; from: number; to: number }[] = [];
+  const calls: PageCall[] = [];
   const orders: unknown[][] = [];
   let columns = '';
-  let chunk: string[] = [];
-  let range: [number, number] = [0, 0];
+  let call: PageCall;
   const builder: Record<string, (...args: unknown[]) => unknown> = {};
   builder.select = (select: unknown) => {
     columns = select as string;
+    call = { chunk: [], gte: [], or: [], limit: undefined };
     return builder;
   };
   builder.in = (col: unknown, ids: unknown) => {
     orders.push(['in', col]);
-    chunk = ids as string[];
+    call.chunk = ids as string[];
+    return builder;
+  };
+  builder.gte = (...args: unknown[]) => {
+    call.gte = args;
+    return builder;
+  };
+  builder.or = (...args: unknown[]) => {
+    call.or = args;
     return builder;
   };
   builder.order = (...args: unknown[]) => {
     orders.push(args);
     return builder;
   };
-  builder.range = (from: unknown, to: unknown) => {
-    range = [from as number, to as number];
+  builder.limit = (limit: unknown) => {
+    call.limit = limit;
     return builder;
   };
   builder.overrideTypes = () => {
-    calls.push({ chunk, from: range[0], to: range[1] });
-    return Promise.resolve(resolve(chunk, range[0], range[1]));
+    calls.push(call);
+    return Promise.resolve(resolve(call));
   };
   const from = vi.fn().mockReturnValue(builder);
   vi.spyOn(supabase, 'from').mockImplementation(from);
   return { from, calls, orders, columns: () => columns };
 }
 
+const firstPage = (chunk: string[]) => ({
+  chunk,
+  gte: [],
+  or: [],
+  limit: 1000,
+});
+
+const photo = (itemId: string, n: number): Row => ({
+  item_id: itemId,
+  created_at: '2026-01-01T00:00:00+00:00',
+  id: `photo-${String(n).padStart(4, '0')}`,
+});
+
 describe('listImagesForItems', () => {
-  it('selects the listing columns for a single page, single chunk', async () => {
-    // Range-aware: a reader asking for a second page runs off the end instead of looping for ever.
-    const { from, calls, columns } = mockImagesQuery((chunk, rangeFrom) => ({
-      data:
-        rangeFrom === 0 ? chunk.map((id, i) => ({ item_id: id, n: i })) : [],
+  it('selects the listing columns, with the sort key, for a single page, single chunk', async () => {
+    const { from, calls, columns } = mockImagesQuery((call) => ({
+      data: call.or.length ? [] : [photo(call.chunk[0], 0)],
       error: null,
     }));
     const { data, error } = await listImagesForItems(['item-1']);
     expect(from).toHaveBeenCalledWith('images');
     expect(error).toBeNull();
-    expect(data).toEqual([{ item_id: 'item-1', n: 0 }]);
-    expect(calls).toEqual([{ chunk: ['item-1'], from: 0, to: 999 }]);
-    expect(columns()).toBe('id, item_id, path_full, path_thumb');
+    expect(data).toEqual([photo('item-1', 0)]);
+    expect(calls).toEqual([firstPage(['item-1'])]);
+    expect(columns()).toBe('item_id, path_full, path_thumb, created_at, id');
   });
 
   // Oldest first, id breaking a same-instant tie: this puts an item's first photograph in its hero slot.
@@ -237,22 +259,27 @@ describe('listImagesForItems', () => {
     expect(calls[1].chunk[0]).toBe('item-100');
   });
 
-  // Paged out of a fixed table, so a walk asking for one page too many runs off the end.
-  it('keeps paging a chunk while a page comes back full', async () => {
-    const all = Array.from({ length: 1001 }, (_, i) => ({
-      item_id: 'item-1',
-      n: i,
-    }));
-    const { calls } = mockImagesQuery((_chunk, from, to) => ({
-      data: all.slice(from, to + 1),
+  it('starts the next page strictly after the last photograph read, with no offset', async () => {
+    const full = Array.from({ length: 1000 }, (_, i) => photo('item-1', i));
+    const pages = [full, [photo('item-1', 1000)]].values();
+    const { calls } = mockImagesQuery(() => ({
+      data: pages.next().value ?? [],
       error: null,
     }));
     const { data, error } = await listImagesForItems(['item-1']);
     expect(error).toBeNull();
     expect(data).toHaveLength(1001);
-    expect(calls.map((call) => [call.from, call.to])).toEqual([
-      [0, 999],
-      [1000, 1999],
+    const last = full[999];
+    expect(calls).toEqual([
+      firstPage(['item-1']),
+      {
+        chunk: ['item-1'],
+        gte: ['created_at', last.created_at],
+        or: [
+          `created_at.gt."${last.created_at}",and(created_at.eq."${last.created_at}",id.gt."${last.id}")`,
+        ],
+        limit: 1000,
+      },
     ]);
   });
 });
@@ -264,8 +291,8 @@ describe('listImagePathsForItems', () => {
       error: null,
     }));
     await listImagePathsForItems(['item-1']);
-    expect(calls).toEqual([{ chunk: ['item-1'], from: 0, to: 999 }]);
-    expect(columns()).toBe('item_id, path_full, path_thumb');
+    expect(calls).toEqual([firstPage(['item-1'])]);
+    expect(columns()).toBe('item_id, path_full, path_thumb, created_at, id');
   });
 });
 
@@ -276,7 +303,7 @@ describe('listExportImagesForItems', () => {
       error: null,
     }));
     await listExportImagesForItems(['item-1']);
-    expect(calls).toEqual([{ chunk: ['item-1'], from: 0, to: 999 }]);
-    expect(columns()).toBe('item_id, path_full, size_bytes');
+    expect(calls).toEqual([firstPage(['item-1'])]);
+    expect(columns()).toBe('item_id, path_full, size_bytes, created_at, id');
   });
 });

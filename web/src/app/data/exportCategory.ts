@@ -35,8 +35,6 @@ export type ExportResult = {
   photoCount: number;
   /** Photographs that could not be fetched after retrying, and were left out. */
   skippedPhotoCount: number;
-  /** Always 0: the batched `images` query has no per-item listing failure to count. */
-  skippedItemCount: number;
 };
 
 /** PostgREST caps a response, so items are walked a page at a time until a short page ends it. */
@@ -330,6 +328,5 @@ export async function exportCategory({
     itemCount: items.length,
     photoCount: total - skipped,
     skippedPhotoCount: skipped,
-    skippedItemCount: 0,
   };
 }

@@ -4,7 +4,6 @@ export type HeaderProps = {
   user: HeaderUser;
   onSignOut: () => Promise<void> | void;
   onOpenHelp: () => void;
-  className?: string;
 };
 
 export type MenuProps = {

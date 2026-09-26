@@ -1,7 +1,8 @@
 import { chunk } from '../lib/chunk';
-import { readAllChunks, readAllPages } from '../lib/pages';
+import { readAllChunks, readAllKeysetPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
+import { rowsAfterFilter } from './keyset';
 
 export const ITEM_IMAGES_BUCKET = 'item-images';
 
@@ -84,6 +85,39 @@ const ROW_PAGE_SIZE = 1000;
 // Ids per `.in()` filter; a few thousand UUIDs would hit a URL length limit before the row cap.
 const ID_FILTER_CHUNK_SIZE = 100;
 
+type ImageKey = Pick<ImageRow, 'created_at' | 'id'>;
+
+// Keyset-paged oldest-first, so a photograph deleted mid-walk shifts none past a page; the key rides along on every row.
+function rawSelectImagesPage<T>({
+  itemIds,
+  select,
+  after,
+}: {
+  itemIds: string[];
+  select: string;
+  after: (T & ImageKey) | null;
+}) {
+  let query = supabase
+    .from('images')
+    .select(`${select}, created_at, id`)
+    .in('item_id', itemIds);
+  if (after) {
+    query = query
+      .gte('created_at', after.created_at)
+      .or(
+        rowsAfterFilter(
+          { column: 'created_at', value: after.created_at },
+          { column: 'id', value: after.id },
+        ),
+      );
+  }
+  return query
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+    .limit(ROW_PAGE_SIZE)
+    .overrideTypes<(T & ImageKey)[], { merge: false }>();
+}
+
 // Chunks the id list (URL length), pages each chunk (row cap), and reads a few chunks at once.
 function selectImagesForItems<T>(
   itemIds: string[],
@@ -92,15 +126,8 @@ function selectImagesForItems<T>(
   { data: T[]; error: null } | { data: null; error: NonNullable<unknown> }
 > {
   return readAllChunks(chunk(itemIds, ID_FILTER_CHUNK_SIZE), (ids) =>
-    readAllPages<T>(ROW_PAGE_SIZE, (from, to) =>
-      supabase
-        .from('images')
-        .select(select)
-        .in('item_id', ids)
-        .order('created_at', { ascending: true })
-        .order('id', { ascending: true })
-        .range(from, to)
-        .overrideTypes<T[], { merge: false }>(),
+    readAllKeysetPages<T & ImageKey>(ROW_PAGE_SIZE, (after) =>
+      rawSelectImagesPage<T>({ itemIds: ids, select, after }),
     ),
   );
 }
@@ -112,9 +139,10 @@ export function listImagesForItems(
   | { data: ImageListRow[]; error: null }
   | { data: null; error: NonNullable<unknown> }
 > {
+  // `id` arrives with the sort key.
   return selectImagesForItems<ImageListRow>(
     itemIds,
-    'id, item_id, path_full, path_thumb',
+    'item_id, path_full, path_thumb',
   );
 }
 

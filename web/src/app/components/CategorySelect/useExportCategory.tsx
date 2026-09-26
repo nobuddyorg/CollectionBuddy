@@ -68,14 +68,6 @@ export function useExportCategory() {
         });
         downloadBlob(result.blob, result.filename);
         // Export-then-delete is a canonical use, so a skipped photograph must never go unsaid.
-        if (result.skippedItemCount > 0) {
-          toast.error(
-            t('category_select.export_listing_partial').replace(
-              '{count}',
-              String(result.skippedItemCount),
-            ),
-          );
-        }
         if (result.skippedPhotoCount > 0) {
           toast.error(
             t('category_select.export_partial')

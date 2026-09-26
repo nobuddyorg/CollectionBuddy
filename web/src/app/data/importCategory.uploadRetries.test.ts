@@ -91,15 +91,22 @@ describe('importCategory, retrying a photograph upload', () => {
   });
 
   // A retry of the same path meets the object a failed attempt wrote: storage has no update policy.
-  it('skips a photograph whose retry meets the object the failed attempt already wrote', async () => {
+  it('skips a photograph whose retry meets the object the failed attempt already wrote, retrying no further', async () => {
     const written = new Set<string>();
     const uploadImage = vi.fn(async (path: string) => {
-      if (written.has(path)) return { error: new Error('Duplicate') };
+      if (written.has(path)) {
+        return {
+          error: { status: 400, statusCode: '409', message: 'Duplicate' },
+        };
+      }
       written.add(path);
       return { error: new Error('connection lost after the object landed') };
     }) as unknown as UploadImage;
     const createImage = fakeCreateImage();
     const archive = await buildArchive();
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
     vi.useFakeTimers();
     try {
       const promise = importCategory({
@@ -115,12 +122,68 @@ describe('importCategory, retrying a photograph upload', () => {
       expect(result.itemCount).toBe(1);
       expect(result.photoCount).toBe(0);
       expect(result.skippedPhotoCount).toBe(1);
-      // Three attempts at the full size and none at the thumbnail: the full size failing ends the photo.
-      expect(uploadImage).toHaveBeenCalledTimes(3);
+      // The lost response is retried; the duplicate it meets is not, and the full size failing ends the photo.
+      expect(uploadImage).toHaveBeenCalledTimes(2);
       expect([...written]).toEqual([
         expect.stringMatching(/^uid\/new-item-1\/[0-9a-f-]+\.webp$/),
       ]);
       expect(createImage).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      consoleError.mockRestore();
+    }
+  });
+
+  it('does not retry an upload Storage refuses for good, such as one over the size cap', async () => {
+    const refusal = {
+      status: 400,
+      statusCode: '413',
+      message: 'The object exceeded the maximum allowed size',
+    };
+    const uploadImage = vi.fn(async () => ({
+      error: refusal,
+    })) as unknown as UploadImage;
+    const archive = await buildArchive();
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    const result = await importCategory({
+      file: archive,
+      nameCategory: () => 'Coins',
+      ...baseFakes(),
+      uploadImage,
+    });
+
+    expect(uploadImage).toHaveBeenCalledTimes(1);
+    expect(result.skippedPhotoCount).toBe(1);
+    const loggedError = (consoleError.mock.calls[0] as unknown[])[2] as Error;
+    expect(loggedError.cause).toBe(refusal);
+    consoleError.mockRestore();
+  });
+
+  it('keeps retrying a server error Storage reports under an HTTP 400', async () => {
+    let calls = 0;
+    const uploadImage = vi.fn(async () => {
+      calls++;
+      return calls < 3
+        ? { error: { status: 400, statusCode: '500', message: 'internal' } }
+        : { error: null };
+    }) as unknown as UploadImage;
+    const archive = await buildArchive();
+    vi.useFakeTimers();
+    try {
+      const promise = importCategory({
+        file: archive,
+        nameCategory: () => 'Coins',
+        ...baseFakes(),
+        uploadImage,
+      });
+      await vi.advanceTimersByTimeAsync(10_000);
+      const result = await promise;
+      expect(result.photoCount).toBe(1);
+      // Two server errors and a success for the full size, then the thumbnail.
+      expect(calls).toBe(4);
     } finally {
       vi.useRealTimers();
     }

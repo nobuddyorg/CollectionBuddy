@@ -6,7 +6,7 @@ import {
   rawListItemsByIds,
   rawSearchCategoryItems,
 } from './itemPage';
-import { likePatternFor, searchFilterFor } from './itemSearch';
+import { likePatternFor } from './itemSearch';
 
 // A PostgREST builder holds its URL and only hits the network when awaited.
 describe('the queries behind the catalogue page', () => {
@@ -17,8 +17,7 @@ describe('the queries behind the catalogue page', () => {
   const idsQuery = (from = 0, to = 8) =>
     paramsOf(rawListItemIds({ categoryId: 'cat-1', from, to }));
   const byIdsRequest = () => requestOf(rawListItemsByIds({ ids: ['a', 'b'] }));
-  const countRequest = (search: string) =>
-    requestOf(rawCountItems({ categoryId: 'cat-1', search }));
+  const countRequest = () => requestOf(rawCountItems({ categoryId: 'cat-1' }));
 
   it('pages item_categories alone, asking only for the item ids', () => {
     const builder = requestOf(
@@ -69,12 +68,9 @@ describe('the queries behind the catalogue page', () => {
       signalOf(rawListItemIds({ categoryId: 'cat-1', from: 0, to: 8, signal })),
     ).toBe(signal);
     expect(signalOf(rawListItemsByIds({ ids: ['a'], signal }))).toBe(signal);
-    expect(
-      signalOf(rawCountItems({ categoryId: 'cat-1', search: '', signal })),
-    ).toBe(signal);
-    expect(
-      signalOf(rawCountItems({ categoryId: 'cat-1', search: 'coin', signal })),
-    ).toBe(signal);
+    expect(signalOf(rawCountItems({ categoryId: 'cat-1', signal }))).toBe(
+      signal,
+    );
     expect(
       signalOf(
         rawSearchCategoryItems({
@@ -125,36 +121,14 @@ describe('the queries behind the catalogue page', () => {
     expect(params.get('page_to')).toBe('8');
   });
 
-  it('counts item_categories alone, with no join to items, when there is no search filter', () => {
-    const request = countRequest('');
+  it('counts item_categories alone, with no join to items', () => {
+    const request = countRequest();
     expect(request.url.searchParams.get('select')).toBe('item_id');
     expect(request.method).toBe('HEAD');
     expect(request.headers.get('Prefer')).toContain('count=exact');
   });
 
   it('narrows the count query by category the same way the page query is', () => {
-    expect(countRequest('').url.searchParams.get('category_id')).toBe(
-      'eq.cat-1',
-    );
-    // Still so once the search filter brings the items join back: a whole-table count is someone else's.
-    expect(countRequest('coin').url.searchParams.get('category_id')).toBe(
-      'eq.cat-1',
-    );
-  });
-
-  it('brings the items join back into the count only once a search filter applies', () => {
-    const request = countRequest('coin');
-    expect(request.url.searchParams.get('select')).toBe(
-      'items!inner(id,title,description,place,place_lat,place_lng,tags)',
-    );
-    expect(request.method).toBe('HEAD');
-    expect(request.headers.get('Prefer')).toContain('count=exact');
-    expect(request.url.searchParams.get('items.or')).toBe(
-      `(${searchFilterFor('coin')})`,
-    );
-  });
-
-  it('leaves the count query unfiltered for a search term below the minimum length', () => {
-    expect(countRequest('ab').url.searchParams.get('select')).toBe('item_id');
+    expect(countRequest().url.searchParams.get('category_id')).toBe('eq.cat-1');
   });
 });

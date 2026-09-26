@@ -224,6 +224,7 @@ export type Database = {
           titles: string[];
         }[];
       };
+      longest_tag_length: { Args: { tags: string[] }; Returns: number };
       normalize_multiline_text: { Args: { txt: string }; Returns: string };
       normalize_text: { Args: { txt: string }; Returns: string };
       orphan_sweep_plan: {

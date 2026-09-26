@@ -161,7 +161,11 @@ test.describe('per-owner quotas', () => {
     const { error } = await apiAs(token)
       .from('items')
       .insert({ title: 'Text probe', description: 'd'.repeat(10_001) });
-
     expect(error?.code).toBe('23514');
+
+    const { error: tagError } = await apiAs(token)
+      .from('items')
+      .insert({ title: 'Tag probe', tags: ['short', 't'.repeat(101)] });
+    expect(tagError?.code).toBe('23514');
   });
 });
