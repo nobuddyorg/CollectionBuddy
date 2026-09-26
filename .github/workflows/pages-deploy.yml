@@ -2,7 +2,7 @@ name: Deploy Pages
 
 # Only a commit that passed CI on main deploys; a push alone never reaches production.
 on:
-  # Runs main's copy of this file; it checks out a push to main that CI passed, never a pull request's code.
+  # Runs main's copy of this file; it checks out a commit on main that CI passed, never a pull request's code.
   workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: [CI]
     types: [completed]
@@ -25,7 +25,7 @@ jobs:
       github.ref == 'refs/heads/main' && (
         github.event_name == 'workflow_dispatch' || (
           github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push' &&
+          (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') &&
           github.event.workflow_run.head_repository.full_name == github.repository
         )
       )
@@ -54,7 +54,8 @@ jobs:
             exit 0
           fi
           if [ "$EVENT_NAME" = workflow_dispatch ]; then
-            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&event=push&status=success" --jq .total_count)
+            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&status=success" \
+              --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")] | length')
             if [ "$passed" = 0 ]; then
               echo "::error::CI has not passed on $COMMIT; nothing deploys."
               exit 1

@@ -13,8 +13,8 @@ stack-dependent jobs — `e2e_local_stack`, `opengrep`, `lighthouse`,
 
 On a pull request, CI's `changes` job skips `build_and_test`, `mutation_test`,
 `lighthouse` and `zap_baseline` unless `web/**` changed, and `e2e_local_stack`
-and `opengrep` unless `web/**` or `supabase/**` changed; a push to `main` runs
-everything. A skipped job reports as passed. Every job writes its report to its
+and `opengrep` unless `web/**` or `supabase/**` changed; a push to `main` or
+a dispatch runs everything. A skipped job reports as passed. Every job writes its report to its
 own Actions summary rather than a PR comment — see
 [Configuration](../reference/configuration.md#ci-job-summaries).
 
@@ -473,8 +473,8 @@ For a fork, or a new production project:
 ## Deploy to GitHub Pages
 
 [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) runs when CI
-has passed on a push to `main` (`workflow_run`), and deploys exactly that
-commit: `gate` checks it is still `main`'s tip and reads the Pages site URL,
+has passed on `main`, run by a push or a dispatch (`workflow_run`), and
+deploys exactly that commit: `gate` checks it is still `main`'s tip and reads the Pages site URL,
 whose path the build uses as `basePath`, `migrate` uploads an encrypted
 dump when the dry run lists a pending migration
 ([Back up production](#back-up-production)), applies them and reloads the
@@ -490,6 +490,12 @@ previous schema. Nothing deploys from a developer machine.
   commit `main` has moved past deploys nothing; the tip deploys once its own CI
   passes. Deploys queue and never cancel each other, so a migration is never
   interrupted.
+- **An auto-merged Dependabot bump deploys on its own.** `auto-merge.yml`
+  merges with `GITHUB_TOKEN`, and a push made with it starts no workflow, so
+  its hourly `catch-up-ci` job dispatches CI on `main`'s tip when no push or
+  dispatch run exists for it; a green run deploys like a push. A human merge
+  landing before that hour is up still carries the bump untested on its own.
+  To run it sooner: Actions → *CI* → *Run workflow* from `main`.
 - **By hand:** Actions → *Deploy Pages* → *Run workflow* from `main`
   redeploys `main`'s tip, and only if CI passed on it. Nothing redeploys an
   older commit: going back is a new commit on `main`

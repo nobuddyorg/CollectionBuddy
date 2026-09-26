@@ -5,6 +5,8 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  # auto-merge.yml's catch-up dispatches it on main: a merge made with GITHUB_TOKEN starts no push run.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -38,7 +40,7 @@ jobs:
       # An edited, renamed or deleted migration makes every later `supabase db push` fail (docs/how-to/developer-guide.md#roll-back-a-bad-deploy).
       - name: Check the migration history only grows
         env:
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
         run: supabase/check-migration-history.sh "$BASE"
 
       - uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0
@@ -47,7 +49,7 @@ jobs:
         env:
           SKIP: no-commit-to-branch,gitleaks,prettier,eslint,tsc,depcruise,knip
 
-  # A push to main forces every job: Deploy Pages waits for this whole run to pass, and a merge may combine unrelated changes.
+  # A push to main or a dispatch forces every job: Deploy Pages waits for this whole run to pass, and a merge may combine unrelated changes.
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -57,9 +59,9 @@ jobs:
       web: ${{ steps.force.outputs.value == 'true' || steps.filter.outputs.web == 'true' }}
       sql: ${{ steps.force.outputs.value == 'true' || steps.filter.outputs.sql == 'true' }}
     steps:
-      - name: Force a full run on pushes to main
+      - name: Force a full run on pushes to main and on dispatches
         id: force
-        run: echo "value=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}" >> "$GITHUB_OUTPUT"
+        run: echo "value=${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

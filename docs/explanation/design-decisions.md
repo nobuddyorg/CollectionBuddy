@@ -154,11 +154,11 @@ The sweep and the backup fetch the secret key per run so it is never stored, but
 
 ## Why the deploy waits for CI on `main`
 
-CI and the deploy used to start side by side on every push, so production was migrated and published minutes before `main`'s CI finished, and a PR merged while behind `main` shipped a tree no CI run had passed (#735). `pages-deploy.yml` now starts from `workflow_run` when CI succeeds on a push to `main`, and deploys that commit, not whatever `main` holds by then.
+CI and the deploy used to start side by side on every push, so production was migrated and published minutes before `main`'s CI finished, and a PR merged while behind `main` shipped a tree no CI run had passed (#735). `pages-deploy.yml` now starts from `workflow_run` when CI succeeds on `main`, and deploys that commit, not whatever `main` holds by then.
 
 - **Only the tip.** CI runs finish out of order and can be re-run; deploying every green commit would let an older one publish over a newer bundle, and `db push` refuses a tree missing migrations production already has. A superseded run queues in a group of its own, so it cannot displace the tip's queued deploy.
 - **Queued, not cancelled.** Cancelling a run in progress could stop `migrate` between two migrations; a newer deploy waits instead.
-- **`workflow_run` is safe here** because it only acts on `push` events of this repository: `branches: [main]` alone also matches a fork's pull request from a branch named `main`, whose code must never reach the production secrets.
+- **`workflow_run` is safe here** because it only acts on `push` and `workflow_dispatch` runs of this repository, which only a collaborator with write access can start: `branches: [main]` alone also matches a fork's pull request from a branch named `main`, whose code must never reach the production secrets.
 
 ## Why Dependabot auto-merges only dev-only lockfile changes
 
@@ -169,6 +169,8 @@ CI and the deploy used to start side by side on every push, so production was mi
 - **The gate reads the lockfile, not the manifest.** A dev bump can also move a transitive package the build shares, such as `postcss` or `magic-string`, so `auto-merge.yml` merges only when every entry the PR adds or changes in `package-lock.json` is `dev: true`; anything else, `devOptional` included, waits for a human.
 
 The seven-day cooldown and the required checks still apply on top; neither would catch a patch that only injects code into the bundle.
+
+The merge itself runs with `GITHUB_TOKEN`, and a push made with it starts no workflow, so the bump used to get no CI run on `main` and no deploy of its own: it shipped inside the next human merge, whose deploy then looked responsible for any regression it brought (#769). `auto-merge.yml`'s hourly `catch-up-ci` job dispatches CI on `main`'s tip whenever no push or dispatch run exists for it; `workflow_dispatch` is the one event `GITHUB_TOKEN` may still start a run with, and a green dispatched run deploys like a push. It is a sweep rather than a step after the merge because `gh pr merge --auto` returns before GitHub merges, once the required checks finish. A GitHub App token would start the push run directly, at the cost of an App and its private key to own and rotate.
 
 ## Why search uses trigram ILIKE instead of full-text search
 
