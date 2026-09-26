@@ -73,6 +73,12 @@ Every squash was verified rather than asserted: the local stack was reset from t
 
 Since the third squash every function lives in `0002_functions.sql`. The `language sql` ones that read tables are created with `check_function_bodies` off, as `pg_dump` restores them, because Postgres would otherwise parse their bodies before `0003_tables.sql` exists; the pgTAP suite calls every one of them, so a broken body still fails CI.
 
+## Why migrations only roll forward
+
+Production records every migration it applied, and `supabase db push` refuses to run while that record names a file the checkout lacks. Reverting a PR that added a migration therefore does not undo it: it deletes the file, every later deploy stops at `migrate`, and the bundle that needed reverting stays live (#752). Undoing a migration takes a new one that compensates, which applies like any other and leaves the history as production has it. Editing an applied file changes nothing in production and makes every fresh database differ from it, so it is refused as well; the exceptions are a squash and a file production never applied, and the commit says so. The check runs in CI, not as a commit hook, because only the PR's base shows what is already history.
+
+The same order sets the compatibility rule. `migrate` runs before the bundle that needs it is built, because PostgREST rejects a request naming a column that does not exist yet; so the previous bundle meets the new schema, briefly during every deploy and for as long as a tab opened before it stays open. A migration that expands keeps it working. One that drops, renames or tightens breaks it, so that step waits for a later PR. Reverting only app code then always lands on a schema the older code can use. No job runs the previous bundle against the new schema: it would need a second build and the previous commit's signed-in suite on the same stack, for a rule review can hold.
+
 ## Why quotas are counted in the database
 
 Any signed-in collector could otherwise create rows and upload 5 MiB objects without end, and on a free-tier project that is the likeliest way to take the app down (#637). There is no server to rate-limit at, so the ceilings live in the database:

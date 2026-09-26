@@ -35,6 +35,12 @@ jobs:
         run: |
           "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --redact --no-banner --log-opts=HEAD .
 
+      # An edited, renamed or deleted migration makes every later `supabase db push` fail (docs/how-to/developer-guide.md#roll-back-a-bad-deploy).
+      - name: Check the migration history only grows
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: supabase/check-migration-history.sh "$BASE"
+
       - uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0
         with:
           extra-args: "--all-files"

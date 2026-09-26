@@ -88,6 +88,18 @@ several real RLS bugs. Every policy change is security-critical.
   job does that on merge.
 - A schema change is a new `supabase/migrations/NNNN_*.sql` file, never an edit
   to an existing one, plus a regenerated `web/src/app/data/database.types.ts`.
+- Roll forward only. Never edit, rename or delete a migration on `main`, not
+  even to revert a PR: revert the app code, keep the file, and undo it with a
+  compensating migration. `supabase/check-migration-history.sh` fails CI
+  otherwise; its `Rewrites-migrations:` trailer is only for a squash or a file
+  that failed in production and was never applied. `supabase migration repair`
+  against production is the owner's, by hand. Runbook: developer-guide.md,
+  "Roll back a bad deploy".
+- Expand, then contract: `migrate` runs before `build`/`deploy` and open tabs
+  keep the old bundle, so migration N must work with bundle N-1. A drop, a
+  rename, a changed RPC signature, or a constraint the old bundle's writes
+  could violate ships in a later PR, once the client that stops needing it is
+  live. A security fix may break the old bundle on the path it denies.
 - A new table ships, in the same migration, with `enable row level security`,
   its policies, `revoke all ... from anon`, and a grant to `authenticated` of
   exactly the DML those policies back. A new function pins
@@ -196,6 +208,8 @@ supabase test db          # repo root, needs `supabase start`; required alongsid
                           # e2e:local for RLS policies, grants, ownership triggers, schema
 supabase/splinter.sh      # repo root, needs `supabase start` and `psql`; same trigger as
                           # `supabase test db` -- the hosted dashboard's Advisors lints
+supabase/check-migration-history.sh origin/main
+                          # repo root; if you touched supabase/migrations/
 opengrep scan --config auto web/src web/scripts web/e2e supabase
                           # if you touched those paths; install: CONTRIBUTING.md
 npm run lighthouse        # needs `supabase start`

@@ -90,6 +90,7 @@ stack (`supabase start` from the repository root):
 
 | Command | Required when you touched | CI job |
 | --- | --- | --- |
+| `supabase/check-migration-history.sh origin/main` (repository root) | anything under `supabase/migrations/` | `prek` |
 | `npm run test:mutation` | code in a file listed in `web/mutation-targets.mjs` (comments produce no new mutants) | `mutation_test` |
 | `npm run e2e:local` | catalogue, search, map, entry forms, photos, sharing, export/import, or any RLS policy | `e2e_local_stack` |
 | `supabase test db` (repository root) | RLS policies, grants, triggers, functions, or the schema | `e2e_local_stack` |
@@ -111,6 +112,11 @@ whose paths did not change; the local list above is not conditional.
   to one was tested against a populated local database, and the PR says so —
   CI only proves it applies from scratch, production applies it to live rows
   with no staging in between. Recipe: [Change the database schema](docs/how-to/developer-guide.md#change-the-database-schema).
+- **A migration keeps the deployed bundle working:** it only expands; a drop,
+  rename or tighter constraint ships in a later PR, once the client that stops
+  needing it is live. A migration already on `main` is never edited, renamed
+  or deleted, not even by a revert
+  ([Roll back a bad deploy](docs/how-to/developer-guide.md#roll-back-a-bad-deploy)).
 - **A policy, grant, or ownership-trigger change** ships its case in
   `web/e2e/signed-in/rls/` in the same PR.
 - **A UI change** ships an end-to-end case for its journey; **a functional

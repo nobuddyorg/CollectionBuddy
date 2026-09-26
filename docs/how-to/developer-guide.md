@@ -351,7 +351,12 @@ names exists at the size it claims.
 ## Change the database schema
 
 1. Add `supabase/migrations/NNNN_description.sql`, numbered after the highest
-   existing file. Never edit an existing migration. A file that takes a lock
+   existing file. Never edit, rename or delete an existing migration, not even
+   to revert one ([Roll back a bad deploy](#roll-back-a-bad-deploy)); CI's
+   `prek` job runs `supabase/check-migration-history.sh` against the PR's
+   base, which fails on any of those, and on a new file not numbered after
+   the last one there. The migration keeps the bundle `main` serves working
+   ([Expand, then contract](#expand-then-contract)). A file that takes a lock
    starts with `set local lock_timeout` and `set local statement_timeout`
    after its `begin;`, so it fails fast instead of queueing every read behind
    it; the Squawk hook enforces that and the other lock and rewrite hazards.
@@ -384,6 +389,29 @@ Three things a from-scratch reset will not tell you:
   afterwards, or every write naming a new column fails with `PGRST204`. The
   `migrate` job sends it on every run.
 
+### Expand, then contract
+
+`migrate` applies the schema before `build` and `deploy` publish the bundle
+that needs it, so the previous bundle runs against the new schema until the
+deploy finishes, and in a tab opened before it until that tab reloads. Every
+migration therefore keeps the bundle currently serving working:
+
+- **Expand** in the same PR as the client change: a new table, function,
+  index or policy that admits more; a column that is nullable or has a
+  default.
+- **Contract** in a later PR, once the bundle that stopped using it is live:
+  dropping or renaming a column, table or function, changing an RPC's
+  parameters or result, a `not null` or check constraint the previous
+  bundle's writes could violate.
+- **A rename is both:** add the new name and keep the old one working in one
+  PR, drop the old one in the next.
+- **A security fix is the exception:** a policy that now denies what it must
+  breaks the old bundle on exactly that path, which is the point.
+
+Review holds this rule; no CI job checks it, since that would take a second
+build and the previous commit's signed-in suite, both from its own checkout,
+run against the new schema on the same stack.
+
 ### Squashing migrations again
 
 The chain has been squashed three times (most recently on 2026-09-22) into the
@@ -392,7 +420,9 @@ occasional act that folds the whole current set, never a side effect of
 another change. Do it the way the last one was verified: reset the local stack
 from the old files and introspect, reset from the new files and introspect
 again — column defaults, constraint expressions, index definitions, function
-bodies, trigger timing, policy predicates, grants — and diff the two. Then, in
+bodies, trigger timing, policy predicates, grants — and diff the two. A commit
+of the squash carries a `Rewrites-migrations: <why>` trailer, the history
+check's one override. Then, in
 the hosted project's SQL editor and right before merging, delete the rows of
 the files that no longer exist so `db push` stops looking for them:
 
@@ -447,7 +477,9 @@ previous schema. Nothing deploys from a developer machine.
   passes. Deploys queue and never cancel each other, so a migration is never
   interrupted.
 - **By hand:** Actions → *Deploy Pages* → *Run workflow* from `main`
-  redeploys `main`'s tip, and only if CI passed on it.
+  redeploys `main`'s tip, and only if CI passed on it. Nothing redeploys an
+  older commit: going back is a new commit on `main`
+  ([Roll back a bad deploy](#roll-back-a-bad-deploy)).
 - The workflow runs from `main`'s copy of `pages-deploy.yml`, so a change to
   its trigger takes effect only once merged.
 
@@ -488,6 +520,61 @@ One-time setup for a fork:
    classic access token before it lands; `prek`'s gitleaks scan covers the
    legacy JWT and the database URL, which GitHub has no pattern for
    ([Configuration](../reference/configuration.md#github-actions-secrets)).
+
+## Roll back a bad deploy
+
+Production only rolls forward
+([why](../explanation/design-decisions.md#why-migrations-only-roll-forward)).
+`supabase_migrations.schema_migrations` records every version applied, and
+`supabase db push` refuses to run while it names one the checkout has no file
+for: `Remote migration versions not found in local migrations directory`.
+GitHub's **Revert** on a PR that added a
+migration deletes the file: every later `migrate` then fails, nothing after it
+builds, and the bad bundle stays live. The history check in CI's `prek` job
+fails such a PR; ignore the CLI's advice to run `supabase db pull`, which
+writes a migration from production's schema.
+
+- **The bundle is broken, the schema is fine:** revert the app code and keep
+  the migration and the types generated from it. The previous bundle works on
+  the new schema ([Expand, then contract](#expand-then-contract)), so the
+  revert deploys with nothing pending. Drop `-m 1` for a squash merge:
+
+  ```bash
+  git revert --no-commit -m 1 <merge commit>
+  git checkout <merge commit> -- supabase/migrations web/src/app/data/database.types.ts
+  git commit
+  ```
+
+- **The schema is wrong:** add a compensating migration, numbered next, that
+  undoes or corrects the bad one — drop what it added, re-create a policy with
+  the predicate of the file that defined it before — and test it against a
+  populated database ([Change the database schema](#change-the-database-schema)).
+  It deploys like any other. If rows were lost,
+  [restore them](#restore-production-from-a-backup) from the
+  `…-pre-migration` archive `migrate` uploaded before applying the bad one.
+- **A migration failed in production:** it ran in one transaction, so none of
+  it was applied and no version recorded, but every deploy stops at `migrate`
+  until it passes. Check that the failed run's *Show pending migrations* step
+  lists the file, then fix or remove that file itself, with a
+  `Rewrites-migrations: <why>` trailer on the commit, since production never
+  applied it.
+- **The history already diverged** (`migrate` fails as above): bring the
+  deleted file back unchanged, with the trailer if a later file now exists,
+  then compensate as above:
+  `git checkout <commit that had it> -- supabase/migrations/<file>`. Only when
+  a file must stay gone, as after a squash, does the repository owner
+  reconcile the table by hand, after running *Back up production*
+  ([Back up production](#back-up-production)):
+
+  ```bash
+  supabase migration list --db-url "$SUPABASE_DB_URL"
+  supabase migration repair --status reverted <version> --db-url "$SUPABASE_DB_URL"
+  ```
+
+  `--status reverted` deletes the version's row and `--status applied`
+  inserts one; neither touches the schema, so the row must describe what
+  production really has. Afterwards `migration list` shows every local file
+  with a remote version and no remote version without one.
 
 ## Move to a custom domain
 

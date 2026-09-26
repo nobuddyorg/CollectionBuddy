@@ -68,7 +68,7 @@ jobs:
         if: steps.commit.outputs.sha != ''
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
-  # Database first: a bundle referencing a column that does not exist yet is rejected by PostgREST, and a failed migration leaves the old bundle on the old schema.
+  # Database first: PostgREST rejects a bundle naming a column not there yet, a failed migration leaves the old bundle on the old schema, and a passed one runs it on the new (expand/contract: docs/how-to/developer-guide.md#change-the-database-schema).
   # A dispatch may name any branch: only main's reviewed migrations reach production, whose secrets live in the main-only `production` environment.
   migrate:
     needs: gate
