@@ -7,7 +7,6 @@ import { useToast } from '../Toast/ToastProvider';
 import { listItems } from '../../data/itemPage';
 import { clampPage, pageCount, pageRange } from './paging';
 import { takePrefetchedFirstPage } from './firstPagePrefetch';
-import { useRequestSequence } from '../../lib/useRequestSequence';
 import type { PageImages } from './imageEntries';
 import type { ItemLite } from './types';
 
@@ -20,8 +19,7 @@ export function useItems(categoryId: string, query: string) {
   const [page, setPage] = useState(1);
   // Starts true: starting false gave one render that looked exactly like "No entries yet".
   const [loading, setLoading] = useState(true);
-  const { next, isCurrent } = useRequestSequence();
-  // Aborts a superseded request's own fetch, not just its effect, so the response stops downloading.
+  // Aborted when superseded or unmounted, so the response stops downloading and its answer is dropped.
   const abortRef = useRef<AbortController | null>(null);
   // Non-silent requests in flight: one superseded by a silent request used to leave `loading` stuck true.
   const pendingNonSilent = useRef(0);
@@ -45,7 +43,6 @@ export function useItems(categoryId: string, query: string) {
   // `silent` refetches without raising `loading`: a delete already removed its card up front.
   const load = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
-      const sequenceNumber = next();
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -71,7 +68,8 @@ export function useItems(categoryId: string, query: string) {
             signal: controller.signal,
           }));
 
-        if (!isCurrent(sequenceNumber)) return;
+        // postgrest-js resolves an aborted fetch with an AbortError `error`: not a failure worth a toast.
+        if (controller.signal.aborted) return;
         if (error) {
           toast.reportError('load items', error, t('item_list.search_error'));
           return;
@@ -102,7 +100,7 @@ export function useItems(categoryId: string, query: string) {
         }
       }
     },
-    [categoryId, currentPage, query, t, toast, next, isCurrent],
+    [categoryId, currentPage, query, t, toast],
   );
 
   // A filter change aborts the previous load itself; unmount never gets that chance otherwise.
