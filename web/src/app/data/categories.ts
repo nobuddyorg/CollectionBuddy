@@ -11,6 +11,17 @@ export type CategorySummary = Pick<CategoryRow, 'id' | 'name' | 'user_id'> & {
 };
 type CategoryCore = Pick<CategoryRow, 'id' | 'name' | 'user_id'>;
 
+/** UX only, RLS decides: the owner, or a grantee whose own share row says `editor`. */
+export function canEditCategory(
+  category: CategorySummary,
+  userId: string,
+): boolean {
+  if (category.user_id === userId) return true;
+  return (
+    category.category_shares?.some((share) => share.role === 'editor') ?? false
+  );
+}
+
 /** `base`, or `base (2)`, `base (3)`, ... past every name, case-insensitive like the unique index. */
 export function uniqueCategoryName(
   base: string,
