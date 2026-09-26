@@ -11,7 +11,7 @@ type Props = {
   onSelect: (id: string | null) => void;
   sortedCategories: CategoryTab[];
   isLoading: boolean;
-  setExpanded: (value: boolean) => void;
+  onCollapse: () => void;
   userId: string | null;
 };
 
@@ -26,7 +26,7 @@ export function CategorySelectDropdown({
   onSelect,
   sortedCategories,
   isLoading,
-  setExpanded,
+  onCollapse,
   userId,
 }: Props) {
   const { t } = useI18n();
@@ -57,7 +57,7 @@ export function CategorySelectDropdown({
       selectedCategoryId={selectedCategoryId}
       onSelect={onSelect}
       sortedCategories={sortedCategories}
-      setExpanded={setExpanded}
+      onCollapse={onCollapse}
       ariaLabel={t('category_select.select_placeholder')}
       userId={userId}
     />
@@ -68,17 +68,17 @@ type TablistProps = {
   selectedCategoryId: string | null;
   onSelect: (id: string | null) => void;
   sortedCategories: CategoryTab[];
-  setExpanded: (value: boolean) => void;
+  onCollapse: () => void;
   ariaLabel: string;
   userId: string | null;
 };
 
-// Roving tabindex: one Tab stop; arrows/Home/End move focus and selection, wrapping at the ends.
+// Manual activation: arrows/Home/End only move focus (wrapping); Enter/Space selects, as each selection loads.
 function CategoryTablist({
   selectedCategoryId,
   onSelect,
   sortedCategories,
-  setExpanded,
+  onCollapse,
   ariaLabel,
   userId,
 }: TablistProps) {
@@ -92,11 +92,9 @@ function CategoryTablist({
 
   const moveTo = useCallback(
     (index: number) => {
-      const target = sortedCategories[index];
-      onSelect(target.id);
-      tabRefs.current.get(target.id)?.focus();
+      tabRefs.current.get(sortedCategories[index].id)?.focus();
     },
-    [sortedCategories, onSelect],
+    [sortedCategories],
   );
 
   const onKeyDown = useCallback(
@@ -146,10 +144,11 @@ function CategoryTablist({
             id={categoryTabId(category.id)}
             aria-selected={active}
             aria-controls={CATEGORY_TABPANEL_ID}
+            // The Tab stop stays on the selected tab, so tabbing back in lands there, not where arrows left off.
             tabIndex={index === rovingIndex ? 0 : -1}
             onClick={() => {
               onSelect(category.id);
-              setExpanded(false);
+              onCollapse();
             }}
             onKeyDown={(event) => onKeyDown(event, index)}
             className={[

@@ -1,5 +1,6 @@
 import { expect, test } from './test';
 
+import { expectNoSeriousA11yViolations } from '../axe';
 import { removeCategoryNamed } from './cleanup';
 
 // A throwaway category, unique per run, so no other spec's collection is touched.
@@ -44,5 +45,49 @@ test.describe('managing categories', () => {
       await removeCategoryNamed(name);
       await removeCategoryNamed(renamed);
     }
+  });
+
+  // Arrows only move focus: each selection loads a collection, so only Enter picks one.
+  test('walks the strip by keyboard without closing it, then opens a collection with Enter', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const categories = on(page).categories;
+    await categories.do.open('Münzen');
+
+    await categories.locators.buttons.expand.focus();
+    await page.keyboard.press('Enter');
+    await expect(categories.locators.buttons.collapse).toBeFocused();
+
+    // The strip is one Tab stop, and it sits on the selected collection.
+    await page.keyboard.press('Tab');
+    await expect(categories.tab('Münzen')).toBeFocused();
+
+    // Read once the strip is open: the list is fixed until this page reloads it.
+    const names = await categories.locators.tabNames.allTextContents();
+    const next = names[(names.indexOf('Münzen') + 1) % names.length];
+
+    await page.keyboard.press('ArrowRight');
+    await expect(categories.tab(next)).toBeFocused();
+    await expect(categories.locators.selected).toHaveText('Münzen');
+
+    await page.keyboard.press('End');
+    await expect(categories.tab(names[names.length - 1])).toBeFocused();
+    await page.keyboard.press('Home');
+    await expect(categories.tab(names[0])).toBeFocused();
+    await expect(categories.locators.selected).toHaveText('Münzen');
+    // Cards fade in (.fade-up); axe samples contrast mid-fade as a false positive unless settled.
+    for (const card of await on(page).catalogue.locators.cards.all()) {
+      await expect(card).toHaveCSS('opacity', '1');
+    }
+    await expectNoSeriousA11yViolations(page, testInfo);
+
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await expect(categories.locators.selected).toHaveText(
+      names[names.length - 1],
+    );
+    await expect(categories.locators.tabs).toHaveCount(0);
+    await expect(categories.locators.buttons.expand).toBeFocused();
   });
 });

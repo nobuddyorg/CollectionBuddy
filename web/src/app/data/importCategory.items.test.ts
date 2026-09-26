@@ -76,7 +76,7 @@ describe('importCategory, recreating the items', () => {
         item({
           id: 'a',
           title: 'Dime',
-          description: 'Worn',
+          description: 'Worn\nat the rim',
           place: 'Berlin',
           place_lat: 52.5,
           place_lng: 13.4,
@@ -98,7 +98,7 @@ describe('importCategory, recreating the items', () => {
         id: 'new-item-1',
         created_at: NOW.toISOString(),
         title: 'Dime',
-        description: 'Worn',
+        description: 'Worn\nat the rim',
         place: 'Berlin',
         place_lat: 52.5,
         place_lng: 13.4,

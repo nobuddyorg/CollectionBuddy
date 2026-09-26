@@ -19,6 +19,16 @@ select is(public.normalize_text('   '), null,
   'a whitespace-only input normalizes to NULL, not an empty string');
 select is(public.normalize_text(null), null, 'NULL stays NULL');
 
+-- normalize_multiline_text: the description's normalizer keeps line breaks and indentation, unlike normalize_text (0027).
+select is(public.normalize_multiline_text(E'\n  Bought: 2019  \r\nCondition:\tVF\t\n\n  - boxed  \n '),
+  E'Bought: 2019\nCondition:\tVF\n\n  - boxed',
+  'line breaks and indentation survive; CR LF becomes LF, blanks before a break and at the ends go');
+select is(public.normalize_multiline_text(E'a\rb'), E'a\nb',
+  'a lone carriage return becomes a line feed');
+select is(public.normalize_multiline_text(E' \n\t\r\n '), null,
+  'a whitespace-only input normalizes to NULL, not an empty string');
+select is(public.normalize_multiline_text(null), null, 'NULL stays NULL here too');
+
 -- join_tags / tags_text: the generated column tag search relies on.
 select is(public.join_tags(array['b', 'a']), 'b a',
   'tags join in array order, space-separated');
@@ -55,6 +65,9 @@ select pg_temp.auth_as(:'owner_id'::uuid, 'functions-test@collectionbuddy.test')
 insert into public.items (title, description, tags)
 values ('  padded title  ', '   ', array['  b  ', 'a', 'a'])
 returning id as norm_item_id \gset
+insert into public.items (title, description)
+values (E'two\nline title', E'first line\nsecond line')
+returning id as multiline_item_id \gset
 
 select is(
   (select title from public.items where id = :'norm_item_id'::uuid),
@@ -65,6 +78,16 @@ select is(
   (select description from public.items where id = :'norm_item_id'::uuid),
   null,
   'a whitespace-only description is stored as NULL'
+);
+select is(
+  (select description from public.items where id = :'multiline_item_id'::uuid),
+  E'first line\nsecond line',
+  'a description keeps its line breaks'
+);
+select is(
+  (select title from public.items where id = :'multiline_item_id'::uuid),
+  'two line title',
+  'a title still collapses a line break to a space'
 );
 select is(
   (select tags from public.items where id = :'norm_item_id'::uuid),
