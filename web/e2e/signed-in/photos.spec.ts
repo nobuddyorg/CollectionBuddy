@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { expect, test } from './test';
 import { createClient } from '@supabase/supabase-js';
 
+import { removeEntriesTitled } from './cleanup';
 import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
 // Decode, resize, upload, list and sign all happen in the browser; rls/ covers what the policies allow.
 test.use({ locale: 'en-GB' });
@@ -111,8 +112,8 @@ test.describe('photographs', () => {
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
       await expect(card.locators.images).toHaveAttribute('src', /token=/);
     } finally {
-      // In finally: reseed() deletes rows, never storage objects, so a leaked entry orphans an upload.
-      await app.catalogue.do.removeEntry(title);
+      // In finally, objects and row both: a leaked entry would orphan its upload.
+      await removeEntriesTitled(title);
     }
   });
 
@@ -134,7 +135,7 @@ test.describe('photographs', () => {
         timeout: ARRIVES,
       });
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -164,7 +165,7 @@ test.describe('photographs', () => {
         expect(file.bytes).toBeLessThan(COMPRESSED_CEILING_BYTES);
       }
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -195,7 +196,7 @@ test.describe('photographs', () => {
         expect(file.bytes).toBeLessThan(COMPRESSED_CEILING_BYTES);
       }
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -215,7 +216,7 @@ test.describe('photographs', () => {
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toHaveCount(2, { timeout: ARRIVES });
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -238,7 +239,7 @@ test.describe('photographs', () => {
       await card.locators.buttons.deleteImage.click();
       await app.confirm.do.accept();
       await expect(card.locators.images).toHaveCount(0);
-      await app.toast.do.close();
+      await app.toast.do.commitDeletion('images');
 
       await app.categories.do.open(SEED.photoCategory);
       await expect(app.catalogue.card(title)()).toBeVisible();
@@ -249,7 +250,7 @@ test.describe('photographs', () => {
         })
         .toEqual([]);
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -262,24 +263,21 @@ test.describe('photographs', () => {
     const { token, userId } = context();
 
     const title = uniqueTitle('Mit Aufräumen');
-    let itemId: string | undefined;
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
-      itemId = await itemIdFor(token, title);
+      const itemId = await itemIdFor(token, title);
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
 
       const during = await storedObjects({ token, userId, itemId });
       expect(during.length).toBeGreaterThan(0);
-    } finally {
-      await app.catalogue.do.removeEntry(title);
-    }
 
-    await expect
-      .poll(() => storedObjects({ token, userId, itemId: itemId! }), {
-        timeout: 15_000,
-      })
-      .toEqual([]);
+      await app.catalogue.do.removeEntry(title);
+      await app.toast.do.commitDeletion('items');
+      expect(await storedObjects({ token, userId, itemId })).toEqual([]);
+    } finally {
+      await removeEntriesTitled(title);
+    }
   });
 });

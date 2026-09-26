@@ -44,8 +44,13 @@ export async function share(grant: {
   return data.id;
 }
 
+/** Throws, so a revoke that failed surfaces here, not as the next share()'s unique-constraint clash. */
 export async function unshare(token: string, shareId: string) {
-  await apiAs(token).from('category_shares').delete().eq('id', shareId);
+  const { error } = await apiAs(token)
+    .from('category_shares')
+    .delete()
+    .eq('id', shareId);
+  if (error) throw error;
 }
 
 export async function ownedCategoryId(owner: {
@@ -126,9 +131,17 @@ export async function removeFiledEntry(entry: {
   const shareId = await editorShare(entry.token, entry.categoryId);
   try {
     const grantee = apiAs(entry.otherToken);
-    if (entry.paths.length)
-      await grantee.storage.from('item-images').remove(entry.paths);
-    await grantee.from('items').delete().eq('id', entry.itemId);
+    if (entry.paths.length) {
+      const { error: removeError } = await grantee.storage
+        .from('item-images')
+        .remove(entry.paths);
+      if (removeError) throw removeError;
+    }
+    const { error } = await grantee
+      .from('items')
+      .delete()
+      .eq('id', entry.itemId);
+    if (error) throw error;
   } finally {
     await unshare(entry.token, shareId);
   }

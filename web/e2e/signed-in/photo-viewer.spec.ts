@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { expect, test } from './test';
 
+import { removeEntriesTitled } from './cleanup';
 import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
 // photos.spec.ts proves a photograph is stored; this opens it full size and walks the carousel.
 test.use({ locale: 'en-GB' });
@@ -81,7 +82,7 @@ test.describe('looking at a photograph full size', () => {
       await page.keyboard.press('Escape');
       await expect(app.viewer()).toHaveCount(0);
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -124,10 +125,8 @@ test.describe('looking at a photograph full size', () => {
         'src',
         /\/object\/sign\//,
       );
-
-      await page.keyboard.press('Escape');
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 });

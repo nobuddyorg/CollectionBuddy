@@ -1,5 +1,6 @@
 import { expect, test } from './test';
 
+import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
 import { expectTitles, visibleTitles } from './helpers';
 
@@ -24,7 +25,7 @@ test.describe('adding and removing entries', () => {
       expect(titles[0]).toBe(title);
     } finally {
       // In finally, so a failed assertion does not leave the entry behind for the next test to count.
-      await on(page).catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -37,7 +38,7 @@ test.describe('adding and removing entries', () => {
         on(page).catalogue.card(title).locators.description,
       ).toHaveText('Geprägt in Venedig.');
     } finally {
-      await on(page).catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -51,7 +52,7 @@ test.describe('adding and removing entries', () => {
 
       await on(page).catalogue.do.search('');
     } finally {
-      await on(page).catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -67,15 +68,13 @@ test.describe('adding and removing entries', () => {
       await on(page).confirm.do.cancel();
       await expect(on(page).catalogue.card(title)()).toBeVisible();
     } finally {
-      await on(page).catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
   test('edits an entry in place', async ({ on, page }) => {
     const title = uniqueTitle('Groschen');
     const renamed = `${title} (renamed)`;
-    // Cleanup deletes the right card whether the rename below ran or not.
-    let currentTitle = title;
     try {
       await on(page).catalogue.do.addEntry(title);
 
@@ -84,9 +83,10 @@ test.describe('adding and removing entries', () => {
       await on(page).form.do.submit();
 
       await expect(on(page).catalogue.card(renamed)()).toBeVisible();
-      currentTitle = renamed;
     } finally {
-      await on(page).catalogue.do.removeEntry(currentTitle);
+      // Both, whether the rename below ran or not.
+      await removeEntriesTitled(title);
+      await removeEntriesTitled(renamed);
     }
   });
 
@@ -100,7 +100,7 @@ test.describe('adding and removing entries', () => {
         title,
       );
     } finally {
-      await on(page).catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 });

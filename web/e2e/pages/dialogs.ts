@@ -1,4 +1,4 @@
-import { type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 interface Confirm {
   (): Locator;
@@ -15,10 +15,14 @@ interface Confirm {
   };
 }
 
+/** The table whose row a deferred delete removes last, after the objects. */
+type DeletedTable = 'items' | 'images' | 'categories';
+
 interface Toast {
   (): Locator;
   do: {
     close(): Promise<void>;
+    commitDeletion(table: DeletedTable): Promise<void>;
     undo(): Promise<void>;
   };
   locators: {
@@ -78,6 +82,16 @@ export function initToast(page: Page): Toast {
   const interactions = {
     close: async () => {
       await locators.buttons.close.click();
+    },
+    // Closing ends the undo window; waiting for the row's delete keeps a navigation from aborting it.
+    commitDeletion: async (table: DeletedTable) => {
+      const deleted = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'DELETE' &&
+          new URL(response.url()).pathname.endsWith(`/rest/v1/${table}`),
+      );
+      await locators.buttons.close.click();
+      expect((await deleted).ok()).toBe(true);
     },
     undo: async () => {
       await locators.buttons.action.click();

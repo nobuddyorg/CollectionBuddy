@@ -1,18 +1,11 @@
 import { expect, test } from './test';
 
+import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
-import type { PageTree } from '../pages';
 // The undo window is the one place the interface and the database deliberately disagree for a while.
 test.use({ locale: 'en-GB' });
 
 const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
-
-/** Cleanup, so it has to cope with the entry already being gone. */
-async function deleteIfPresent(app: PageTree, title: string) {
-  const card = app.catalogue.card(title);
-  if ((await card().count()) === 0) return;
-  await app.catalogue.do.removeEntry(title);
-}
 
 test.describe('taking a deletion back', () => {
   test.beforeEach(async ({ on, page }) => {
@@ -36,7 +29,7 @@ test.describe('taking a deletion back', () => {
       await app.categories.do.open(SEED.undoCategory);
       await expect(app.catalogue.card(title)()).toBeVisible();
     } finally {
-      await deleteIfPresent(app, title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -58,7 +51,7 @@ test.describe('taking a deletion back', () => {
       await expect(app.catalogue.card('Rückgängigstück')()).toBeVisible();
       await expect(app.catalogue.card(title)()).toHaveCount(0);
     } finally {
-      await deleteIfPresent(app, title);
+      await removeEntriesTitled(title);
     }
   });
 });

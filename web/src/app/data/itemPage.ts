@@ -138,6 +138,58 @@ function inIdOrder<T extends { id: string }>(
   return ids.flatMap((id) => byId.get(id) ?? []);
 }
 
+type PageRead = {
+  data: ItemFields[] | null;
+  error: unknown;
+  count: number | null;
+  imageRows: ImageListRow[] | null;
+};
+
+/** The searched page and its total, read off the first row whichever page that is. */
+async function searchedPage(
+  params: {
+    categoryId: string;
+    likePattern: string;
+    from: number;
+    to: number;
+    signal?: AbortSignal;
+  },
+  rawSearch: typeof rawSearchCategoryItems,
+): Promise<PageRead> {
+  const search = (from: number, to: number) =>
+    rawSearch({
+      categoryId: params.categoryId,
+      likePattern: params.likePattern,
+      from,
+      to,
+      signal: params.signal,
+    });
+  const { data, error } = await search(params.from, params.to);
+  if (error) return { data: null, error, count: null, imageRows: null };
+  const rows = data ?? [];
+  if (rows.length > 0 || params.from === 0) {
+    const count = rows.length > 0 ? rows[0].total_count : 0;
+    return {
+      data: rows.map(itemFieldsOf),
+      error: null,
+      count,
+      imageRows: null,
+    };
+  }
+
+  // Past the end no row carries total_count, and a 0 would clamp the grid to "No results".
+  const { data: first, error: firstError } = await search(0, 0);
+  if (firstError) {
+    return { data: null, error: firstError, count: null, imageRows: null };
+  }
+  return {
+    data: [],
+    error: null,
+    count: first?.[0]?.total_count ?? 0,
+    imageRows: null,
+  };
+}
+
 type ListItemsCalls = {
   rawIds?: typeof rawListItemIds;
   rawItems?: typeof rawListItemsByIds;
@@ -160,31 +212,9 @@ export async function listItems(
     rawCount = rawCountItems,
     rawSearch = rawSearchCategoryItems,
   }: ListItemsCalls = {},
-): Promise<{
-  data: ItemFields[] | null;
-  error: unknown;
-  count: number | null;
-  imageRows: ImageListRow[] | null;
-}> {
+): Promise<PageRead> {
   const likePattern = likePatternFor(params.search);
-  if (likePattern) {
-    const { data, error } = await rawSearch({
-      categoryId: params.categoryId,
-      likePattern,
-      from: params.from,
-      to: params.to,
-      signal: params.signal,
-    });
-    if (error) return { data: null, error, count: null, imageRows: null };
-    const rows = data ?? [];
-    const count = rows.length > 0 ? rows[0].total_count : 0;
-    return {
-      data: rows.map(itemFieldsOf),
-      error: null,
-      count,
-      imageRows: null,
-    };
-  }
+  if (likePattern) return searchedPage({ ...params, likePattern }, rawSearch);
 
   const [{ data: links, error }, { count, error: countError }] =
     await Promise.all([rawIds(params), rawCount(params)]);

@@ -232,11 +232,12 @@ test.describe('a category shared with another collector', () => {
         .select('id');
       expect(renamed).toEqual([]);
 
+      // By a seeded Münzen title: an unordered pick could land where another spec holds an editor grant.
       const { data: mine } = await apiAs(otherToken)
         .from('items')
         .select('id')
         .eq('user_id', userId)
-        .limit(1)
+        .eq('title', itemsIn('Münzen')[0].title)
         .single();
       const { data: updated } = await apiAs(otherToken)
         .from('items')

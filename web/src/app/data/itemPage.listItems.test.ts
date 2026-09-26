@@ -307,9 +307,97 @@ describe('listItems, once a search term earns a filter', () => {
       { rawSearch },
     );
 
+    // The first page carries its own total, so an empty one needs no second request.
+    expect(rawSearch).toHaveBeenCalledOnce();
     expect(error).toBeNull();
     expect(count).toBe(0);
     expect(data).toEqual([]);
+  });
+
+  it("reads a later page's total off its own first row, with no second request", async () => {
+    const rawSearch = vi
+      .fn()
+      .mockResolvedValue({ data: [searchRow('j', 10)], error: null });
+
+    const { count } = await listItems(
+      { categoryId: 'cat-1', search: 'coin', from: 9, to: 17 },
+      { rawSearch },
+    );
+
+    expect(rawSearch).toHaveBeenCalledOnce();
+    expect(count).toBe(10);
+  });
+
+  // A page past the end has no row to carry total_count; a count of 0 there flashed "No results".
+  it('asks the first row for the total when a later page comes back empty', async () => {
+    const rawSearch = vi
+      .fn()
+      .mockResolvedValueOnce({ data: [], error: null })
+      .mockResolvedValueOnce({ data: [searchRow('a', 12)], error: null });
+
+    const { data, error, count, imageRows } = await listItems(
+      { categoryId: 'cat-1', search: 'coin', from: 18, to: 26 },
+      { rawSearch },
+    );
+
+    expect(rawSearch).toHaveBeenCalledTimes(2);
+    expect(rawSearch).toHaveBeenLastCalledWith({
+      categoryId: 'cat-1',
+      likePattern: likePatternFor('coin'),
+      from: 0,
+      to: 0,
+      signal: undefined,
+    });
+    expect(error).toBeNull();
+    expect(count).toBe(12);
+    // Still the empty page it asked for, not the row that carried the total.
+    expect(data).toEqual([]);
+    expect(imageRows).toBeNull();
+  });
+
+  it('reports a count of zero when a later page is empty because nothing matches any more', async () => {
+    const rawSearch = vi.fn().mockResolvedValue({ data: [], error: null });
+
+    const { data, error, count } = await listItems(
+      { categoryId: 'cat-1', search: 'coin', from: 9, to: 17 },
+      { rawSearch },
+    );
+
+    expect(rawSearch).toHaveBeenCalledTimes(2);
+    expect(error).toBeNull();
+    expect(count).toBe(0);
+    expect(data).toEqual([]);
+  });
+
+  it('reports a count of zero when the request for the total carries no rows', async () => {
+    const rawSearch = vi
+      .fn()
+      .mockResolvedValueOnce({ data: [], error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+
+    const { error, count } = await listItems(
+      { categoryId: 'cat-1', search: 'coin', from: 9, to: 17 },
+      { rawSearch },
+    );
+
+    expect(error).toBeNull();
+    expect(count).toBe(0);
+  });
+
+  it('returns no data and a null count when the request for the total errors', async () => {
+    const rawSearch = vi
+      .fn()
+      .mockResolvedValueOnce({ data: [], error: null })
+      .mockResolvedValueOnce({ data: null, error: new Error('boom') });
+
+    const { data, error, count } = await listItems(
+      { categoryId: 'cat-1', search: 'coin', from: 9, to: 17 },
+      { rawSearch },
+    );
+
+    expect(data).toBeNull();
+    expect(error).toBeInstanceOf(Error);
+    expect(count).toBeNull();
   });
 
   it('flattens to an empty page rather than crashing when a successful response carries no rows', async () => {
