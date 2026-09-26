@@ -10,19 +10,36 @@ permissions:
   contents: read
 
 jobs:
-  # Unconditional: hygiene and secret scanning must see every changed file. The web hooks are skipped because build_and_test runs the same commands.
+  # Unconditional: hygiene must see every changed file, the secret scan every commit. The web hooks are skipped because build_and_test runs the same commands.
   prek:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      # The hook's own version (.pre-commit-config.yaml); the checksum is the release's gitleaks_<version>_checksums.txt entry.
+      - name: Install gitleaks
+        shell: bash
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/gitleaks.tar.gz" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+
+      # Every commit HEAD reaches, the PR's own included even if a later one removes the secret; the hook sees only staged changes, so it is skipped below.
+      - name: Scan the history for secrets
+        run: |
+          "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --redact --no-banner --log-opts=HEAD .
 
       - uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0
         with:
           extra-args: "--all-files"
         env:
-          SKIP: no-commit-to-branch,prettier,eslint,tsc,depcruise,knip
+          SKIP: no-commit-to-branch,gitleaks,prettier,eslint,tsc,depcruise,knip
 
   # A push to main forces every job: Deploy Pages waits for this whole run to pass, and a merge may combine unrelated changes.
   changes:

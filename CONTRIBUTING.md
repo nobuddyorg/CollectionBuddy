@@ -50,8 +50,9 @@ on every commit; `pre-commit` reads the same file:
 
 - file hygiene, `typos`, `markdownlint`;
 - gitleaks over the staged changes: secret (`sb_secret_…`) and legacy
-  `service_role` keys and database URLs block the commit, publishable and
-  legacy anon keys pass ([`.gitleaks.toml`](.gitleaks.toml));
+  `service_role` keys, access tokens (`sbp_…`) and database URLs block the
+  commit, publishable and legacy anon keys pass ([`.gitleaks.toml`](.gitleaks.toml));
+  CI rescans every commit, so a commit made without the hook fails there;
 - `zizmor` and `actionlint` over `.github/` — security, then syntax,
   expression types, job references, and ShellCheck on workflow `run:` blocks
   when `shellcheck` is on your `PATH` (CI's runner has it; composite actions'

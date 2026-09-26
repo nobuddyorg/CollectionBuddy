@@ -470,6 +470,11 @@ One-time setup for a fork:
    until fixed. A Dependabot PR that falls behind then merges only once
    rebased (`@dependabot rebase`).
    A merge queue would do the same, but `ci.yml` has no `merge_group` trigger.
+9. Settings → Code security: enable **Secret Protection** and its **Push
+   protection** (free on a public repository). It blocks a secret key or a
+   classic access token before it lands; `prek`'s gitleaks scan covers the
+   legacy JWT and the database URL, which GitHub has no pattern for
+   ([Configuration](../reference/configuration.md#github-actions-secrets)).
 
 ## Sweep orphaned photographs
 

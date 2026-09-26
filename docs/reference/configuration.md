@@ -39,14 +39,28 @@ secrets are repository secrets.
 | `SUPABASE_PROJECT_REF` | same three | Required |
 | `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test`) | Optional; without it Stryker writes a local HTML report only |
 
-None of these may appear in the repository. The gitleaks hook
-([`.gitleaks.toml`](../../.gitleaks.toml)) blocks a commit that stages a JWT,
-a secret key (`sb_secret_…`) or a password-bearing `*.supabase.co` /
-`*.pooler.supabase.com` connection string. JWTs whose payload carries
-`"role":"anon"` are allowlisted and no rule matches a publishable key,
-because both are public by design; a `service_role` key still fails. The hook
-sees only staged changes, so in CI it has nothing to scan; GitHub push
-protection is the server-side check.
+None of these may appear in the repository. gitleaks
+([`.gitleaks.toml`](../../.gitleaks.toml)) flags a JWT, a secret key
+(`sb_secret_…`), a Management API access token (`sbp_…`) or a
+password-bearing `*.supabase.co` / `*.pooler.supabase.com` connection string.
+JWTs whose payload carries `"role":"anon"` are allowlisted and no rule matches
+a publishable key, because both are public by design; a `service_role` key
+still fails. It runs twice:
+
+- **Commit hook**: the staged changes, before anything leaves the machine.
+- **`ci.yml`'s `prek` job**: every commit the checked-out `HEAD` reaches —
+  each commit of a pull request, even one whose secret a later commit
+  removes, and commits made without the hook. Findings are redacted in the
+  log. It runs after the push, so a secret it finds is already public:
+  [rotate it](../how-to/developer-guide.md#rotate-a-credential), then drop the
+  commit from the pull request's branch. The job pins the gitleaks release by
+  version and SHA-256; bump both with the hook's `rev`.
+
+Only a reviewed false positive, or a leak already rotated on `main`, goes in
+[`.gitleaksignore`](../../.gitleaksignore), by fingerprint; never widen an
+allowlist for it. GitHub push protection also refuses a push carrying a secret
+key or a classic access token, but has no pattern for a legacy JWT or a
+connection string.
 
 ### API keys
 

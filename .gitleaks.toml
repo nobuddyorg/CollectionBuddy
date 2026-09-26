@@ -1,4 +1,4 @@
-# gitleaks' default rules (their `jwt` catches legacy service_role keys) plus Supabase secret-key and database-URL rules; the legacy anon key is allowlisted by its claim, and a publishable key matches no rule: both are public by design.
+# gitleaks' default rules (their `jwt` catches legacy service_role keys) plus Supabase secret-key, access-token and database-URL rules; the legacy anon key is allowlisted by its claim, and a publishable key matches no rule: both are public by design.
 [extend]
 useDefault = true
 
@@ -7,6 +7,13 @@ id = "supabase-secret-key"
 description = "Supabase secret API key, which bypasses Row Level Security"
 regex = '''sb_secret_[A-Za-z0-9_-]{20,}'''
 keywords = ["sb_secret_"]
+
+# Classic (`sbp_` + 40 hex), OAuth and scoped variants; GitHub push protection covers only the classic one.
+[[rules]]
+id = "supabase-access-token"
+description = "Supabase Management API access token, which can read the project's secret keys"
+regex = '''sbp_[A-Za-z0-9_]{40,}'''
+keywords = ["sbp_"]
 
 [[rules]]
 id = "supabase-postgres-url"
