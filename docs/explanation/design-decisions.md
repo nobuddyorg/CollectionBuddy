@@ -16,6 +16,19 @@ A public link means an anonymous reader. Every predicate here resolves an actual
 
 The `editor` role (#562) widened the grant without touching that argument: sharing is no longer read-only, but it is still _identified_. If public links are ever wanted, they are a separate, explicitly higher-risk piece of work.
 
+## Why the hosted Auth settings are pinned
+
+Sharing authorizes on an address: `caller_email()` reads the access token's `email` claim, and a grant has no accept step, so whoever first holds a session carrying the invited address holds the grant. Whether that address was proven is decided by the hosted Auth configuration, not by anything in the repository, and a few dashboard toggles turn it into an invite takeover (#745). In GoTrue's source:
+
+- **Anonymous sign-ins with Confirm email off.** An anonymous session calls `updateUser({ email })` with the invitee's address and is confirmed on the spot (`user.IsAnonymous && config.Mailer.Autoconfirm`), with `is_anonymous` cleared and `email_confirmed_at` set. #634 ran it end to end against the local stack, reading and writing a collection at `editor`.
+- **The email provider with Confirm email off.** Sign up as the invitee, with any password.
+- **An unverified provider email.** An OAuth sign-in is confirmed when the provider says the email is verified _or_ Confirm email is off; with **Allow unverified email sign-ins** on it gets a session either way.
+- **Anything else that mints an email claim** this app never reviewed: another provider, SAML, a custom OAuth provider, a third-party auth issuer, a custom access token hook.
+
+No SQL check can tell such a caller apart. The access token has no `email_verified` claim (only GoTrue's OIDC ID token does), `user_metadata.email_verified` is whatever the user writes with `updateUser({ data })`, and the anonymous path sets the same `auth.users` columns a real sign-up does. Requiring an OAuth `amr` would hold in production, but every local and CI identity signs in with a password.
+
+So the settings are the control, and they are versioned: [`supabase/hosted-auth.json`](../../supabase/hosted-auth.json) holds the expected values ([Configuration](../reference/configuration.md#hosted-auth-settings)), and `hosted-auth-check.yml` compares the live config with it every hour and fails on drift. A check, not an enforcer: it cannot stop the toggle, only shorten the window, and it reads with the Management token rather than writing through it. The local stack deliberately differs, with anonymous sign-ins for demo mode and the email provider without confirmations for test accounts, so the takeover still reproduces there.
+
 ## Why deletes wait out an undo window, and ending a grant does not
 
 Deleting an entry, a photo or a collection hides it at once and sends the delete only when the toast's six-second undo window closes, on its own or through the close button; Undo puts it back because nothing was sent. Until then the delete exists only in the open tab, so `ToastProvider` guards it: `beforeunload` asks before a reload, close or navigation would drop it, and sign-out runs every pending delete through `commitPending()` before `signOut()`, since afterwards it would go out as `anon` and be refused. A tab closed anyway, or a mobile browser that skips `beforeunload`, drops the delete unsent: the item is still there next time, nothing is half-deleted.

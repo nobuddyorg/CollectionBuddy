@@ -411,7 +411,13 @@ For a fork, or a new production project:
    into the SQL editor also works but leaves `supabase_migrations.schema_migrations`
    untouched; `supabase migration repair --status applied <version>` reconciles it.
 3. Auth settings: enable **Google** with an OAuth client whose redirect URI is
-   `<project-url>/auth/v1/callback`.
+   `<project-url>/auth/v1/callback`. Then set every value in [Hosted Auth
+   settings](../reference/configuration.md#hosted-auth-settings), and Data
+   API → exposed schemas to `public` only. A new project starts with the
+   email provider on: turn it off, keep **Confirm email** on and anonymous
+   sign-ins off, because sharing trusts the signed-in email
+   ([why](../explanation/design-decisions.md#why-the-hosted-auth-settings-are-pinned)).
+   A fork sets `site_url` in `supabase/hosted-auth.json` to its own Pages URL.
 4. Note the API URL and the publishable key (Settings → API Keys; if the
    tab offers **Create new API keys**, create them first); they become
    `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Nothing
@@ -475,6 +481,39 @@ One-time setup for a fork:
    classic access token before it lands; `prek`'s gitleaks scan covers the
    legacy JWT and the database URL, which GitHub has no pattern for
    ([Configuration](../reference/configuration.md#github-actions-secrets)).
+
+## Check the hosted Auth settings
+
+[`hosted-auth-check.yml`](../../.github/workflows/hosted-auth-check.yml)
+reads the production Auth config through the Management API every hour (at
+:23), on a push to `main` that changes it or
+[`supabase/hosted-auth.json`](../../supabase/hosted-auth.json), and by hand
+from `main`. It fails when a pinned value differs, when any sign-in provider
+the file does not name is on, or when a third-party auth integration exists,
+and lists each difference in the job summary. It only reads; nothing it does
+changes the project, and the response, which carries the Google client secret,
+is never printed.
+
+When it fails:
+
+1. **Not deliberate, or anonymous sign-ins, the email provider, Confirm email
+   or unverified sign-ins moved:** set the dashboard back first (Authentication
+   → Sign In / Providers, URL Configuration). While any of those were open,
+   anyone could have claimed a pending invite
+   ([why](../explanation/design-decisions.md#why-the-hosted-auth-settings-are-pinned)).
+   In Authentication → Users, look for accounts created in that window that
+   are anonymous or have an email identity, and compare their addresses with
+   `category_shares.invited_email`; delete any that claimed a grant, and tell
+   the owner.
+2. **Deliberate:** change the file in a PR that says why, reviewed like a
+   policy change. The four settings above stay off (Confirm email on) unless
+   the sharing model changes first.
+3. **The API renamed a field** (a pinned field found `null`): check the
+   [Management API reference](https://supabase.com/docs/reference/api/v1-get-auth-service-config)
+   and rename it in the file.
+
+A 401 or 403 means the token was revoked or lacks **Auth Config: Read**
+([Configuration](../reference/configuration.md#github-actions-secrets)).
 
 ## Sweep orphaned photographs
 

@@ -18,15 +18,39 @@ Place search uses the public [Photon](https://photon.komoot.io/) API unauthentic
 
 ## Local Supabase stack
 
-From `supabase/config.toml`: API `54321`, Postgres `54322`, Studio `54323`, Mailpit `54324`. Anonymous sign-ins are enabled for demo mode. The project-level storage limit is 50 MiB; the `item-images` bucket is further restricted to 5 MiB per file and `image/webp`, `image/jpeg`, `image/png` ([Architecture](architecture.md#storage)).
+From `supabase/config.toml`: API `54321`, Postgres `54322`, Studio `54323`, Mailpit `54324`. Anonymous sign-ins are enabled for demo mode, and the email provider without confirmations for the password test accounts; production has neither ([Hosted Auth settings](#hosted-auth-settings)). The project-level storage limit is 50 MiB; the `item-images` bucket is further restricted to 5 MiB per file and `image/webp`, `image/jpeg`, `image/png` ([Architecture](architecture.md#storage)).
+
+## Hosted Auth settings
+
+The hosted project's Auth configuration lives in its dashboard, so the values sharing depends on are pinned in [`supabase/hosted-auth.json`](../../supabase/hosted-auth.json), keyed by their [Management API](https://supabase.com/docs/reference/api/v1-get-auth-service-config) field names. [`hosted-auth-check.yml`](../../.github/workflows/hosted-auth-check.yml) fails when production differs ([why](../explanation/design-decisions.md#why-the-hosted-auth-settings-are-pinned); [when it fails](../how-to/developer-guide.md#check-the-hosted-auth-settings)).
+
+| Dashboard setting | Field | Production | Local stack (`config.toml`) |
+| --- | --- | --- | --- |
+| Allow anonymous sign-ins | `external_anonymous_users_enabled` | off | on, for demo mode |
+| Email provider | `external_email_enabled` | off | on, for password test accounts |
+| Confirm email | `mailer_autoconfirm` (its inverse) | on (`false`) | off |
+| Allow unverified email sign-ins | `mailer_allow_unverified_email_sign_ins` | off | off |
+| Allow manual linking | `security_manual_linking_enabled` | off | off |
+| Google, and its nonce check | `external_google_enabled`, `external_google_skip_nonce_check` | on, nonce checked | same |
+| Every other provider: phone, Web3, other OAuth, SAML, custom OAuth | any other `external_*_enabled`, `saml_enabled`, `custom_oauth_enabled` | off | off |
+| Third-party auth | `/config/auth/third-party-auth` | none | none |
+| Customize access token hook | `hook_custom_access_token_enabled` | off | off |
+| Refresh token rotation, reuse interval | `refresh_token_rotation_enabled`, `security_refresh_token_reuse_interval` | on, 10 s | same |
+| Site URL | `site_url` | `https://nobuddyorg.github.io/CollectionBuddy/` | `http://localhost:3000` |
+| Redirect URLs | `uri_allow_list` | empty | the two local dev origins |
+
+- **Redirect URLs stay empty.** Sign-in returns to the site's own URL, and GoTrue admits any redirect with the Site URL's scheme, host and port without an entry. A wildcard matching a host nobody here controls would let a sign-in hand its code to that host.
+- **One setting is recorded, not checked**: Data API → exposed schemas is `public` only, as in `config.toml`'s `[api]`. Reading it through the Management API also returns the project's JWT secret.
+- **Changing a value** is a PR to the file, reviewed like a policy change, with the dashboard changed as it merges; the push to `main` re-runs the check. For a fork, `site_url` is its own Pages URL.
 
 ## GitHub Actions secrets
 
 `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` are
 secrets of the `production` environment, not repository secrets: that
 environment's deployment-branch policy allows only `main`, so a workflow run
-on any other branch cannot read them. `migrate`, `cleanup` and both
-`backup.yml` jobs reference it and also refuse any ref but `main`. The
+on any other branch cannot read them. `migrate`, `cleanup`, both
+`backup.yml` jobs and `hosted-auth-check.yml` reference it and also refuse
+any ref but `main`. The
 `github-pages` environment is restricted to `main` the same way. The other
 secrets are repository secrets.
 
@@ -35,8 +59,8 @@ secrets are repository secrets.
 | `NEXT_PUBLIC_SUPABASE_URL` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml`, `backup.yml`; `k6-load-test.yml` with `target=hosted` only | Required |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`; `k6-load-test.yml` with `target=hosted` only | Required. Either key format ([API keys](#api-keys)); `pages-deploy.yml`'s `build` calls `keepalive()` with it and publishes nothing if the project rejects it |
 | `SUPABASE_DB_URL` | `pages-deploy.yml` (`migrate`), `backup.yml` (`database`) | Required. The **session pooler** string (`aws-0-<region>.pooler.supabase.com`), password percent-encoded. The direct `db.<ref>.supabase.co` host is IPv6-only and unreachable from GitHub runners; `supabase link` reports success anyway and the push fails. |
-| `SUPABASE_ACCESS_TOKEN` | `pages-deploy.yml` (`migrate`), `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`) | Required. Management-API token: reloads the PostgREST schema cache after a migration; in the cleanup job, runs the orphan query and fetches a fresh secret key ([API keys](#api-keys)); in `photographs`, lists the bucket and fetches that key. Without it `migrate` returns 401 and the deploy stops. |
-| `SUPABASE_PROJECT_REF` | same three | Required |
+| `SUPABASE_ACCESS_TOKEN` | `pages-deploy.yml` (`migrate`), `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`), `hosted-auth-check.yml` | Required. Management-API token: reloads the PostgREST schema cache after a migration; in the cleanup job, runs the orphan query and fetches a fresh secret key ([API keys](#api-keys)); in `photographs`, lists the bucket and fetches that key; in `hosted-auth-check.yml`, reads the Auth config (a scoped token needs **Auth Config: Read**). Without it `migrate` returns 401 and the deploy stops. |
+| `SUPABASE_PROJECT_REF` | same four | Required |
 | `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test`) | Optional; without it Stryker writes a local HTML report only |
 
 None of these may appear in the repository. gitleaks
