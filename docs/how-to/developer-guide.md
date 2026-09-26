@@ -156,7 +156,7 @@ supabase test db
 | `040_storage_policy_surface_test.sql` | Bucket configuration; the storage verbs two security fixes removed |
 | `050`, `055` | The SQL functions and every branch of the write-path triggers |
 | `060`, `065` | The two read RPCs: who may call them, what they return |
-| `070_quotas_test.sql` | The per-owner photo-storage and entry quotas |
+| `070_quotas_test.sql` | The quotas: photographs and thumbnails per owner, the bucket's ceilings at record and upload time, and entries, categories, shares, links and text |
 | `075_query_plans_test.sql` | That every index-backed query can reach its index, and picks it at a realistic size |
 | `080_orphan_sweep_test.sql` | What the orphan sweep may delete: both path columns, no uuid cast, the 48 h grace, other buckets, the mass-deletion ceiling; `supabase_read_only_user` and no API role runs it, in a read-only transaction |
 

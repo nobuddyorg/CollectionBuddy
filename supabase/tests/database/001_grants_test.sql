@@ -96,6 +96,8 @@ select function_privs_are('public', 'join_tags', array['text[]'],
   'anon', array[]::text[], 'anon cannot execute join_tags');
 select function_privs_are('public', 'storage_item_id', array['text'],
   'anon', array[]::text[], 'anon cannot execute storage_item_id');
+select function_privs_are('public', 'photo_upload_has_room', array[]::text[],
+  'anon', array[]::text[], 'anon cannot execute photo_upload_has_room');
 
 -- ...and the same set from the other side: the application's own role can
 -- reach every function it actually calls. An EXECUTE quietly lost here is
@@ -111,6 +113,7 @@ from (values
   ('list_category_places', array['uuid', 'text']),
   ('search_category_items', array['uuid', 'text', 'int', 'int']),
   ('storage_item_id', array['text']),
+  ('photo_upload_has_room', array[]::text[]),
   ('normalize_text', array['text']),
   ('join_tags', array['text[]']),
   ('keepalive', array[]::text[])

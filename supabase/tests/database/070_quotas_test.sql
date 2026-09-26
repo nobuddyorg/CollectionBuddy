@@ -1,7 +1,8 @@
 -- Per-owner quotas (0009_user_quotas.sql, #637): photograph bytes as Storage
 -- recorded them, never as the client claimed, and a ceiling on entries.
 -- 0016_bound_row_volume.sql (#716): categories, shares, links per entry, text lengths.
--- web/e2e/signed-in/rls.spec.ts proves the same refusal through PostgREST.
+-- 0025_photo_ceilings_fit_the_plan.sql (#753): thumbnails counted, the bucket's own ceiling, the upload backstops.
+-- web/e2e/signed-in/rls/quotas.spec.ts proves the same refusals through PostgREST.
 begin;
 select no_plan();
 
@@ -39,13 +40,13 @@ returning size_bytes as absent_size \gset
 select is(:'absent_size'::bigint, 5242880::bigint,
   'with nothing stored yet, the row counts the bucket''s 5 MiB cap, so under-claiming buys nothing');
 
--- Fill to just under 1 GiB: 123456 + 204 x 5 MiB fits (1069670976 <= 1073741824); a 205th does not.
+-- Fill to just under 256 MiB: 123456 + 51 x 5 MiB fits (267510336 <= 268435456); a 52nd does not.
 select ok(
   not pg_temp.raises(format(
-    'insert into public.images (item_id, path_full) select %L, %L || ''/fill-'' || g || ''.webp'' from generate_series(1, 203) g',
+    'insert into public.images (item_id, path_full) select %L, %L || ''/fill-'' || g || ''.webp'' from generate_series(1, 50) g',
     :'item_id'::uuid, :'owner_id'::text || '/' || :'item_id'::text
   )),
-  'an owner under 1 GiB of photographs may add more'
+  'an owner under 256 MiB of photographs may add more'
 );
 
 select ok(
@@ -53,7 +54,7 @@ select ok(
     'insert into public.images (item_id, path_full) values (%L, %L)',
     :'item_id'::uuid, :'owner_id'::text || '/' || :'item_id'::text || '/over.webp'
   )),
-  'the photograph that would take the owner past 1 GiB is refused'
+  'the photograph that would take the owner past 256 MiB is refused'
 );
 
 select throws_ok(
@@ -62,7 +63,7 @@ select throws_ok(
     :'item_id'::uuid, :'owner_id'::text || '/' || :'item_id'::text || '/over-again.webp'
   ),
   'PT507',
-  'photo storage quota of 1 GiB reached',
+  'photo storage quota of 256 MiB reached',
   'and it is refused with a code the client can tell apart'
 );
 
@@ -76,6 +77,55 @@ select ok(
     :'item_id'::uuid, :'editor_id'::text || '/' || :'item_id'::text || '/editor.webp'
   )),
   'an editor cannot add a photograph past the owner''s quota either'
+);
+
+-- Thumbnails: sampled like the full size, and on the same 256 MiB (0025).
+select gen_random_uuid() as thumb_owner_id \gset
+select pg_temp.auth_as(:'thumb_owner_id'::uuid, 'quota-thumbs@collectionbuddy.test');
+insert into public.items (title) values ('Thumbnail entry')
+returning id as thumb_item_id \gset
+select :'thumb_owner_id'::text || '/' || :'thumb_item_id'::text as thumb_prefix \gset
+reset role;
+insert into storage.objects (bucket_id, name, metadata)
+values
+  ('item-images', :'thumb_prefix' || '/stored.webp', '{"size": 1000}'),
+  ('item-images', :'thumb_prefix' || '/stored.thumb.webp', '{"size": 2345}');
+select pg_temp.auth_as(:'thumb_owner_id'::uuid, 'quota-thumbs@collectionbuddy.test');
+
+insert into public.images (item_id, path_full, path_thumb)
+values (:'thumb_item_id'::uuid, :'thumb_prefix' || '/stored.webp', :'thumb_prefix' || '/stored.thumb.webp')
+returning thumb_size_bytes as stored_thumb_size \gset
+select is(:'stored_thumb_size'::bigint, 2345::bigint,
+  'a thumbnail''s recorded size is the stored object''s');
+
+insert into public.images (item_id, path_full, path_thumb)
+values (:'thumb_item_id'::uuid, :'thumb_prefix' || '/absent.webp', :'thumb_prefix' || '/absent.thumb.webp')
+returning thumb_size_bytes as absent_thumb_size \gset
+select is(:'absent_thumb_size'::bigint, 5242880::bigint,
+  'a thumbnail not stored yet counts the bucket''s 5 MiB cap too');
+
+insert into public.images (item_id, path_full)
+values (:'thumb_item_id'::uuid, :'thumb_prefix' || '/bare.webp')
+returning thumb_size_bytes as bare_thumb_size \gset
+select is(:'bare_thumb_size'::bigint, 0::bigint,
+  'a photograph without a thumbnail counts none');
+
+-- 3345 + 15 MiB so far; 24 more at 10 MiB each fit (267390225 <= 268435456), a 25th does not. Uncounted, thumbnails would leave it far inside.
+select ok(
+  not pg_temp.raises(format(
+    'insert into public.images (item_id, path_full, path_thumb) select %L, %L || ''/fill-'' || g || ''.webp'', %L || ''/fill-'' || g || ''.thumb.webp'' from generate_series(1, 24) g',
+    :'thumb_item_id'::uuid, :'thumb_prefix', :'thumb_prefix'
+  )),
+  'an owner may add photographs with thumbnails up to 256 MiB in all'
+);
+select throws_ok(
+  format(
+    'insert into public.images (item_id, path_full, path_thumb) values (%L, %L, %L)',
+    :'thumb_item_id'::uuid, :'thumb_prefix' || '/over.webp', :'thumb_prefix' || '/over.thumb.webp'
+  ),
+  'PT507',
+  'photo storage quota of 256 MiB reached',
+  'thumbnails count against the same quota as the photographs'
 );
 
 -- Entries: one statement up to the ceiling is fine, one row past it is not.
@@ -205,6 +255,110 @@ select throws_ok(
   ),
   '23514', null, 'an invited email past 320 characters is refused'
 );
+
+-- Storage itself (0025): what the upload policy and the photograph trigger see of the bucket, orphans included.
+-- storage.protect_delete() refuses a delete from SQL without this; the policies are what is under test.
+select set_config('storage.allow_delete_query', 'true', true);
+
+create function pg_temp.upload(p_path text)
+returns boolean
+language sql
+as $$
+  select not pg_temp.raises(format(
+    'insert into storage.objects (bucket_id, name) values (%L, %L)', 'item-images', p_path))
+$$;
+
+-- An object of p_size bytes under p_prefix, stored the way Storage records one, past every policy.
+create function pg_temp.store(p_prefix text, p_size bigint)
+returns void
+language sql
+as $$
+  insert into storage.objects (bucket_id, name, metadata)
+  values ('item-images', p_prefix || '/' || gen_random_uuid() || '.webp', jsonb_build_object('size', p_size))
+$$;
+
+create function pg_temp.bucket_bytes()
+returns bigint
+language sql
+as $$
+  select coalesce(sum((metadata ->> 'size')::bigint), 0) from storage.objects where bucket_id = 'item-images'
+$$;
+
+create function pg_temp.refusal_detail(p_sql text)
+returns text
+language plpgsql
+as $$
+declare
+  detail text;
+begin
+  execute p_sql;
+  return null;
+exception when others then
+  get stacked diagnostics detail = pg_exception_detail;
+  return detail;
+end
+$$;
+
+select gen_random_uuid() as uploader_id, gen_random_uuid() as neighbour_id \gset
+select pg_temp.auth_as(:'neighbour_id'::uuid, 'quota-neighbour@collectionbuddy.test');
+insert into public.items (title) values ('Neighbour entry')
+returning :'neighbour_id'::text || '/' || id::text as neighbour_prefix, id as neighbour_item_id \gset
+select pg_temp.auth_as(:'uploader_id'::uuid, 'quota-uploader@collectionbuddy.test');
+insert into public.items (title) values ('Uploader entry')
+returning :'uploader_id'::text || '/' || id::text as uploader_prefix, id as uploader_item_id \gset
+
+-- A recorded path takes no bytes once its size is sampled, not even after its object is removed.
+select ok(pg_temp.upload(:'uploader_prefix' || '/photo.webp'), 'a collector uploads a photograph');
+select ok(pg_temp.upload(:'uploader_prefix' || '/photo.thumb.webp'), 'and its thumbnail');
+insert into public.images (item_id, path_full, path_thumb)
+values (:'uploader_item_id'::uuid, :'uploader_prefix' || '/photo.webp', :'uploader_prefix' || '/photo.thumb.webp');
+delete from storage.objects
+where bucket_id = 'item-images' and name like :'uploader_prefix' || '/photo.%';
+select ok(not pg_temp.upload(:'uploader_prefix' || '/photo.webp'),
+  'removed, the path its record names as the photograph takes no new bytes');
+select ok(not pg_temp.upload(:'uploader_prefix' || '/photo.thumb.webp'),
+  'nor the path it names as the thumbnail');
+insert into public.images (item_id, path_full)
+values (:'uploader_item_id'::uuid, :'uploader_prefix' || '/pending.webp');
+select ok(not pg_temp.upload(:'uploader_prefix' || '/pending.webp'),
+  'nor the path of a record written before its bytes');
+
+-- 320 MiB under one uploader's prefix, recorded or not, and that uploader stores nothing more.
+reset role;
+select pg_temp.store(:'uploader_prefix', 335544320);
+select pg_temp.auth_as(:'uploader_id'::uuid, 'quota-uploader@collectionbuddy.test');
+select ok(not pg_temp.upload(:'uploader_prefix' || '/one-more.webp'),
+  'an uploader holding 320 MiB of objects, with or without records, uploads nothing more');
+select pg_temp.auth_as(:'neighbour_id'::uuid, 'quota-neighbour@collectionbuddy.test');
+select ok(pg_temp.upload(:'neighbour_prefix' || '/unaffected.webp'),
+  'while another collector still uploads');
+
+-- Past 768 MiB in the bucket, no photograph is recorded, with a detail the client tells apart from the owner's quota.
+reset role;
+select pg_temp.store(gen_random_uuid()::text, 805306368 + 1 - pg_temp.bucket_bytes());
+select pg_temp.auth_as(:'neighbour_id'::uuid, 'quota-neighbour@collectionbuddy.test');
+select throws_ok(
+  format('insert into public.images (item_id, path_full) values (%L, %L)',
+    :'neighbour_item_id'::uuid, :'neighbour_prefix' || '/unaffected.webp'),
+  'PT507',
+  'the photo storage of this app is full',
+  'past 768 MiB in the bucket, orphans included, no collector records a photograph'
+);
+select is(
+  pg_temp.refusal_detail(format('insert into public.images (item_id, path_full) values (%L, %L)',
+    :'neighbour_item_id'::uuid, :'neighbour_prefix' || '/unaffected.webp')),
+  'project',
+  'and the refusal names the project, not the owner'
+);
+select ok(pg_temp.upload(:'neighbour_prefix' || '/backstop.webp'),
+  'uploads still pass below the 832 MiB backstop, so the recorded refusal is what a collector meets');
+
+-- 832 MiB in the bucket, and nobody uploads.
+reset role;
+select pg_temp.store(gen_random_uuid()::text, 872415232 - pg_temp.bucket_bytes());
+select pg_temp.auth_as(:'neighbour_id'::uuid, 'quota-neighbour@collectionbuddy.test');
+select ok(not pg_temp.upload(:'neighbour_prefix' || '/too-much.webp'),
+  'at 832 MiB in the bucket nobody uploads, however little they hold');
 
 select * from finish();
 rollback;

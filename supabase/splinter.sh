@@ -11,10 +11,12 @@ EXCUSED=$(
   cat <<'EOF'
 unused_index
 authenticated_security_definer_function_executable_public_search_category_items_cat_id uuid, like_pattern text, page_from integer, page_to integer
+authenticated_security_definer_function_executable_public_photo_upload_has_room_
 EOF
 )
 # unused_index: reads runtime statistics, which a freshly reset database does not have.
 # search_category_items: SECURITY DEFINER on purpose, so the trigram indexes stay reachable under RLS (design-decisions.md).
+# photo_upload_has_room: SECURITY DEFINER on purpose, the upload policy's count of the whole bucket; it answers only yes or no.
 
 lints=$(mktemp)
 trap 'rm -f "$lints"' EXIT

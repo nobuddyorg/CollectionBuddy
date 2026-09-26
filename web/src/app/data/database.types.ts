@@ -88,6 +88,7 @@ export type Database = {
           path_full: string;
           path_thumb: string | null;
           size_bytes: number | null;
+          thumb_size_bytes: number;
           user_id: string;
         };
         Insert: {
@@ -97,6 +98,7 @@ export type Database = {
           path_full: string;
           path_thumb?: string | null;
           size_bytes?: number | null;
+          thumb_size_bytes?: number;
           user_id: string;
         };
         Update: {
@@ -106,6 +108,7 @@ export type Database = {
           path_full?: string;
           path_thumb?: string | null;
           size_bytes?: number | null;
+          thumb_size_bytes?: number;
           user_id?: string;
         };
         Relationships: [
@@ -232,6 +235,7 @@ export type Database = {
           total_bytes: number;
         }[];
       };
+      photo_upload_has_room: { Args: never; Returns: boolean };
       search_category_items: {
         Args: {
           cat_id: string;

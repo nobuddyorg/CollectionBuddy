@@ -17,11 +17,12 @@ import {
   type ImageListRow,
 } from '../../data/images';
 import { removeObjectsThenRows } from '../../data/imageRemoval';
-import { isQuotaExceeded } from '../../data/quota';
+import { isPhotoStorageFull, isQuotaExceeded } from '../../data/quota';
 import type { ImageEntry } from './types';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
 import { useI18n } from '../../i18n/useI18n';
+import type { TranslationKey } from '../../i18n/I18nProvider';
 import {
   entryDataOf,
   groupImageRows,
@@ -58,6 +59,16 @@ function useSignedUrlRefresh(
       document.removeEventListener('visibilitychange', maybeRefresh);
     };
   }, [lastSignedAtRef, imagesRef, refreshAllImages]);
+}
+
+/** The app's storage before the owner's quota: deleting her own photographs may not free enough of it. */
+function uploadErrorMessage(
+  error: unknown,
+  t: (key: TranslationKey) => string,
+): string {
+  if (isPhotoStorageFull(error)) return t('item_list.photo_storage_full_error');
+  if (isQuotaExceeded(error)) return t('item_list.photo_quota_error');
+  return t('item_list.upload_error');
 }
 
 export function useItemImages() {
@@ -193,13 +204,7 @@ export function useItemImages() {
         if (entries)
           setImages((previous) => ({ ...previous, [itemId]: entries }));
       } catch (error: unknown) {
-        toast.reportError(
-          'upload image',
-          error,
-          isQuotaExceeded(error)
-            ? t('item_list.photo_quota_error')
-            : t('item_list.upload_error'),
-        );
+        toast.reportError('upload image', error, uploadErrorMessage(error, t));
       } finally {
         setPendingUploads((previous) => {
           const remaining = previous[itemId] - 1;

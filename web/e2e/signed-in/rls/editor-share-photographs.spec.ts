@@ -189,6 +189,62 @@ test.describe('a category shared at the editor role', () => {
     }
   });
 
+  // The owner's quota counts the sizes sampled when the record was written; bytes stored at its paths later would outgrow it (#753).
+  test('an editor cannot store new bytes at the paths of a photograph it recorded on the owner’s entry', async () => {
+    const { token, userId, otherToken, otherUserId } = context();
+    const { categoryId, itemId } = await ownerEntryIn({
+      token,
+      userId,
+      category: SEED.editorPhotoCategory,
+      title: 'rls-editor-refill-probe',
+    });
+    const full = `${otherUserId}/${itemId}/rls-refill.webp`;
+    const thumb = `${otherUserId}/${itemId}/rls-refill.thumb.webp`;
+    const editor = apiAs(otherToken);
+    const bucket = editor.storage.from('item-images');
+    const shareId = await editorShare(token, categoryId);
+
+    try {
+      for (const path of [full, thumb]) {
+        const { error } = await bucket.upload(
+          path,
+          new Blob(['small'], { type: 'image/webp' }),
+        );
+        expect(error).toBeNull();
+      }
+      const { error: rowError } = await editor
+        .from('images')
+        .insert({ item_id: itemId, path_full: full, path_thumb: thumb });
+      expect(rowError).toBeNull();
+
+      // Still granted, so removing the bytes is allowed; storing others in their place is not.
+      const { data: removed } = await bucket.remove([full, thumb]);
+      expect(removed).toHaveLength(2);
+      for (const path of [full, thumb]) {
+        const { error } = await bucket.upload(
+          path,
+          new Blob([new Uint8Array(100_000)], { type: 'image/webp' }),
+        );
+        expect(error).not.toBeNull();
+      }
+
+      const { data: row } = await apiAs(token)
+        .from('images')
+        .select('user_id, size_bytes, thumb_size_bytes')
+        .eq('item_id', itemId)
+        .single();
+      expect(row).toEqual({
+        user_id: userId,
+        size_bytes: 5,
+        thumb_size_bytes: 5,
+      });
+    } finally {
+      await bucket.remove([full, thumb]);
+      await unshare(token, shareId);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
   // The positive side of the policies a viewer is refused: 'delete shared objects' reaches the owner's own prefix.
   test('an editor removes the owner’s photograph, its record and the entry’s link', async () => {
     const { token, userId, otherToken } = context();

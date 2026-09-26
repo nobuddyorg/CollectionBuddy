@@ -174,7 +174,7 @@ describe('useItemImages uploadImage', () => {
     vi.mocked(createImageRow).mockResolvedValue({
       error: {
         code: 'PT507',
-        message: 'photo storage quota of 1 GiB reached',
+        message: 'photo storage quota of 256 MiB reached',
       },
     } as never);
     const { result } = renderItemImages();
@@ -184,7 +184,26 @@ describe('useItemImages uploadImage', () => {
     });
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The limit of 1 GiB of photographs is reached. Delete some to add more.',
+      'The limit of 256 MiB of photographs is reached. Delete some to add more.',
+    );
+  });
+
+  it('says the app’s photo storage is full when the row is refused for the whole bucket', async () => {
+    vi.mocked(createImageRow).mockResolvedValue({
+      error: {
+        code: 'PT507',
+        details: 'project',
+        message: 'the photo storage of this app is full',
+      },
+    } as never);
+    const { result } = renderItemImages();
+
+    await act(async () => {
+      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "The app's photo storage is full, so no photograph can be added for now.",
     );
   });
 

@@ -102,6 +102,16 @@ select is(
   'the own-prefix upload and delete policies both require write access to the entry'
 );
 
+-- A recorded path's bytes were sampled for the quota, and the bucket has a ceiling of its own (0025, #753).
+select ok(
+  (select with_check like '%im.path_full = objects.name%'
+      and with_check like '%im.path_thumb = objects.name%'
+      and with_check like '%photo_upload_has_room()%'
+   from pg_catalog.pg_policies
+   where schemaname = 'storage' and tablename = 'objects' and policyname = 'upload own objects'),
+  'the own-prefix upload refuses a path a photograph record names, and a bucket or prefix past its backstop'
+);
+
 -- Splinter's auth_rls_initplan skips the storage schema, so this is its check here: auth.uid() only ever inside a scalar subquery (0012, #719).
 select is(
   (select array_agg(policyname::text order by policyname)
