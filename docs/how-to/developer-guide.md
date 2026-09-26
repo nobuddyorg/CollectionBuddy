@@ -270,10 +270,11 @@ FC_SEED=12345 npx vitest run property
 
 CI's `opengrep` job scans `web/src`, `web/scripts`, `web/e2e` and `supabase`
 with [Opengrep](https://opengrep.dev/) and uploads SARIF to the Security tab.
-It is a standalone binary, not an npm dependency:
+It is a standalone binary, not an npm dependency; CI downloads the same
+release and checks its hash ([Bump a pinned CI tool](#bump-a-pinned-ci-tool)):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash -s -- -v v1.30.0
+curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/v1.30.0/install.sh | bash -s -- -v v1.30.0
 "$HOME/.opengrep/cli/latest/opengrep" scan --config auto \
   web/src web/scripts web/e2e supabase
 ```
@@ -336,7 +337,7 @@ In a second terminal, from the repository root (Docker Desktop: replace
 
 ```bash
 docker run --rm -v "$(pwd):/zap/wrk/:rw" --network host \
-  ghcr.io/zaproxy/zaproxy:stable \
+  ghcr.io/zaproxy/zaproxy:2.17.0 \
   zap-baseline.py -t http://127.0.0.1:4173/ -c /zap/wrk/.zap/rules.tsv -I \
   -r /zap/wrk/zap-report-signed-out.html
 ```
@@ -348,6 +349,32 @@ For the signed-in pass: stop `serve`, `rm out/CollectionBuddy`, rebuild with
 
 Afterwards delete the two `zap-report-*.html` files and `out/CollectionBuddy`;
 `npm run e2e` serves the export differently and does not expect the symlink.
+
+## Bump a pinned CI tool
+
+Every third-party action is pinned by commit hash with its exact version in a
+comment, in the workflows and in `.github/actions/*/action.yml` alike;
+Dependabot's `github-actions` ecosystem scans both and moves those pins. It
+does not see what a job downloads at run time, so these pins move only by
+hand, in a reviewed PR:
+
+| Tool | Pinned in | Pin |
+| --- | --- | --- |
+| gitleaks | `ci.yml` (`prek`) | `GITLEAKS_VERSION`, `GITLEAKS_SHA256`: the `linux_x64` line of the release's `gitleaks_<version>_checksums.txt`. Keep it equal to the hook's `rev` in `.pre-commit-config.yaml`. |
+| Opengrep | `ci.yml` (`opengrep`) | `OPENGREP_VERSION`, `OPENGREP_SHA256`: `sha256sum` of the release's `opengrep_manylinux_x86` asset (the release publishes no checksum file), once `cosign verify-blob --cert <asset>.cert --signature <asset>.sig --certificate-identity-regexp 'https://github.com/opengrep/opengrep/.+' --certificate-oidc-issuer https://token.actions.githubusercontent.com <asset>` accepts it. Also the version in [Run Opengrep](#run-opengrep). |
+| prek | `ci.yml` (`prek`) | `prek-version` on `j178/prek-action`. |
+| ZAP | `ci.yml` (`zap_baseline`) | `ZAP_IMAGE`: a release tag plus its digest, from `docker buildx imagetools inspect ghcr.io/zaproxy/zaproxy:<tag>`. Also the tag in [Run the OWASP ZAP baseline scan](#run-the-owasp-zap-baseline-scan). |
+| Supabase CLI | `.github/actions/setup-supabase-cli` | `version`: the one CLI for CI's stack and production's `db push`. |
+| k6 | `k6-load-test.yml` | `k6-version`. |
+
+The hook revisions in `.pre-commit-config.yaml` are tags, which Dependabot's
+`pre-commit` ecosystem bumps but upstream could repoint.
+
+Every job carries a `timeout-minutes` of roughly three times its observed
+duration, and every `curl` a `--connect-timeout` and `--max-time`, so a hung
+stack, runner or endpoint fails the job instead of holding it (and, for
+`migrate`, the `pages` queue) for the six-hour default. When a job grows past
+its limit legitimately, raise the limit from the new measured duration.
 
 ## Regenerate the app icons
 

@@ -17,6 +17,7 @@ jobs:
   database:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: production
     permissions:
       contents: read
@@ -42,6 +43,8 @@ jobs:
   photographs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Generous: the first mirror of a full bucket copies every object in this one run, and uploads only at the end.
+    timeout-minutes: 180
     environment: production
     steps:
       - name: Install age
@@ -66,7 +69,7 @@ jobs:
 
           query="select coalesce(json_agg(o.name order by o.name), '[]'::json) as names from storage.objects o where o.bucket_id = 'item-images'"
           # Read-only, as in cleanup-orphaned-photos.yml: that role bypasses RLS, so it sees every collector's objects.
-          listing=$(curl -sS --fail-with-body -X POST \
+          listing=$(curl -sS --fail-with-body --connect-timeout 10 --max-time 120 -X POST \
             "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query/read-only" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
@@ -93,7 +96,7 @@ jobs:
           failed=0
           if [ -s "$work/new" ]; then
             # Only the service_role role reads every user's prefix; the key is chosen and sent as in cleanup-orphaned-photos.yml, fetched per run, never stored.
-            secret_key=$(curl -sS --fail-with-body \
+            secret_key=$(curl -sS --fail-with-body --connect-timeout 10 --max-time 60 \
               "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" \
               -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
               | jq -r '[(.[] | select(.type == "secret")), (.[] | select(.name == "service_role"))] | first | .api_key // empty')
@@ -110,7 +113,7 @@ jobs:
               encoded=$(jq -rn --arg name "$name" '$name | split("/") | map(@uri) | join("/")')
               mkdir -p "$work/staging/$(dirname "$name")"
               # One failure (e.g. deleted since the listing) must not cost the rest of the run; the next run retries it.
-              if curl -sS --fail --retry 3 --max-time 300 -o "$work/download" \
+              if curl -sS --fail --retry 3 --connect-timeout 10 --max-time 300 -o "$work/download" \
                 "$NEXT_PUBLIC_SUPABASE_URL/storage/v1/object/authenticated/item-images/$encoded" \
                 "${auth[@]}"; then
                 age -r "$BACKUP_AGE_RECIPIENT" -o "$work/staging/$name.age" "$work/download"

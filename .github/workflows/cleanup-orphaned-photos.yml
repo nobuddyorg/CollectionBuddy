@@ -22,6 +22,7 @@ jobs:
   cleanup:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: production
     steps:
       - name: Find and remove orphaned Storage objects
@@ -35,7 +36,7 @@ jobs:
 
           payload=$(jq -n --arg q "$QUERY" '{query: $q}')
           # The read-only endpoint runs as supabase_read_only_user (0024), so the token needs Database: Read, never Read-write.
-          result=$(curl -sS --fail-with-body -X POST \
+          result=$(curl -sS --fail-with-body --connect-timeout 10 --max-time 120 -X POST \
             "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query/read-only" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
@@ -86,7 +87,7 @@ jobs:
           fi
 
           # Only Storage deletes bytes, and only the service_role role reaches every prefix: a secret key if one exists, else the legacy service_role JWT, fetched per run, never stored.
-          secret_key=$(curl -sS --fail-with-body \
+          secret_key=$(curl -sS --fail-with-body --connect-timeout 10 --max-time 60 \
             "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             | jq -r '[(.[] | select(.type == "secret")), (.[] | select(.name == "service_role"))] | first | .api_key // empty')
@@ -103,11 +104,11 @@ jobs:
           auth=(-H "apikey: $secret_key")
           case "$secret_key" in sb_*) ;; *) auth+=(-H "Authorization: Bearer $secret_key") ;; esac
 
-          # Storage's bulk delete refuses more than 1,000 objects per request.
+          # Storage's bulk delete refuses more than 1,000 objects per request; a retried batch skips what the first attempt already removed.
           echo "$result" \
             | jq -c '.[0].paths | range(0; length; 1000) as $i | {prefixes: .[$i:$i + 1000]}' \
             | while IFS= read -r remove_payload; do
-                curl -sS --fail-with-body -X DELETE \
+                curl -sS --fail-with-body --connect-timeout 10 --max-time 120 --retry 3 -X DELETE \
                   "$NEXT_PUBLIC_SUPABASE_URL/storage/v1/object/item-images" \
                   "${auth[@]}" \
                   -H "Content-Type: application/json" \
