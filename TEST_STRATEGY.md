@@ -346,8 +346,17 @@ beyond a dedicated hook and the platform's own tooling.
 - **Build the bundle against the stack it tests.** The Supabase URL is baked in
   at build time; a bundle built against another project passes while testing
   the wrong backend.
-- **Clean up in `finally`.** Probe rows and objects must not survive a failed
-  assertion.
+- **Clean up in `finally`, through the API as the owner.** Probe rows and
+  objects must not survive a failed assertion. An interface that defers a
+  delete behind an undo window sends it after the test has ended, so cleanup
+  through it deletes nothing; where the committed delete is the journey, wait
+  for its response before navigating away, or the navigation aborts it.
+- **Assert on a known row, never a count or an unordered pick** of data that
+  parallel specs write — above all a second identity every authorization spec
+  shares.
+- **Give a session-ending test an identity of its own.** A global sign-out
+  revokes every session of its user, and every parallel spec signed in as that
+  user with it.
 - **Fail on an unexpected console or runtime error.** This catches a rejected
   background query hiding behind a passing assertion.
 - **Flush browser coverage before every full navigation.** V8 keeps counts

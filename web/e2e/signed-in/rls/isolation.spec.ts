@@ -8,6 +8,18 @@ import { apiAs, context } from './helpers';
 // A broken policy would look identical in the interface, so most cases here ask Postgres directly.
 test.use({ locale: 'en-GB' });
 
+/** The other collector's seeded entry, read as its owner; other specs never write it. */
+async function seededEntryOf(otherToken: string, otherUserId: string) {
+  const { data, error } = await apiAs(otherToken)
+    .from('items')
+    .select('id,title')
+    .eq('user_id', otherUserId)
+    .eq('title', SEED.other.item)
+    .single();
+  if (error) throw error;
+  return data as { id: string; title: string };
+}
+
 test.describe('one collection cannot reach another', () => {
   test('the interface shows nothing of the other collector', async ({
     on,
@@ -50,12 +62,7 @@ test.describe('one collection cannot reach another', () => {
   test('their entries cannot be edited', async () => {
     const { token, otherToken, otherUserId } = context();
 
-    const { data: theirs } = await apiAs(otherToken)
-      .from('items')
-      .select('id,title')
-      .eq('user_id', otherUserId);
-    expect(theirs!.length).toBeGreaterThan(0);
-    const target = theirs![0];
+    const target = await seededEntryOf(otherToken, otherUserId);
 
     const { data: updated } = await apiAs(token)
       .from('items')
@@ -75,11 +82,7 @@ test.describe('one collection cannot reach another', () => {
 
   test('their entries cannot be deleted', async () => {
     const { token, otherToken, otherUserId } = context();
-
-    const { data: before } = await apiAs(otherToken)
-      .from('items')
-      .select('id')
-      .eq('user_id', otherUserId);
+    const target = await seededEntryOf(otherToken, otherUserId);
 
     const { data: deleted } = await apiAs(token)
       .from('items')
@@ -88,11 +91,12 @@ test.describe('one collection cannot reach another', () => {
       .select('id');
     expect(deleted).toEqual([]);
 
+    // The seeded row, not a count: other specs add and remove the other collector's entries meanwhile.
     const { data: after } = await apiAs(otherToken)
       .from('items')
       .select('id')
-      .eq('user_id', otherUserId);
-    expect(after!.length).toBe(before!.length);
+      .eq('id', target.id);
+    expect(after).toEqual([{ id: target.id }]);
   });
 
   // Ignored rather than refused: enforce_user_id() is a BEFORE trigger that overwrites the claimed owner.

@@ -5,6 +5,7 @@ import { type Locator, type Page } from '@playwright/test';
 // Not './test': every case drives the app into toast.reportError, which logs to the console by design.
 import { expect, test } from '../fixture';
 
+import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
 import { apiAs, context, ownedCategoryId, share, unshare } from './rls/helpers';
 // Failures are injected at the network boundary, so the app's own code runs for real.
@@ -43,7 +44,7 @@ test.describe('when something outside the app fails', () => {
         'Entenhausen',
       );
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -69,7 +70,7 @@ test.describe('when something outside the app fails', () => {
       await expect(card.locators.images).toHaveCount(0);
     } finally {
       await page.unroute('**/storage/v1/object/**');
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -121,7 +122,7 @@ test.describe('when something outside the app fails', () => {
       expect(await storedFiles()).toBe(filesBefore);
     } finally {
       await page.unroute(bulkDelete);
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 

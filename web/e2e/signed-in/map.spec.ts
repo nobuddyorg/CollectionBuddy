@@ -1,5 +1,6 @@
 import { expect, test } from './test';
 
+import { removeCategoryNamed } from './cleanup';
 import { expectTitles } from './helpers';
 
 // Pin coordinates come from the seed data, so no run depends on a public geocoder being up.
@@ -113,9 +114,7 @@ test.describe('a map whose places are still being looked up', () => {
       await app.map.do.open();
       await expect(app.map.locators.pins).toHaveCount(3);
     } finally {
-      await page.keyboard.press('Escape');
-      await app.categories.do.delete();
-      await app.confirm.do.accept();
+      await removeCategoryNamed(name);
     }
   });
 });

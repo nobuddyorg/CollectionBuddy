@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 
 import { expect, test } from './test';
+import { removeCategoryNamed } from './cleanup';
 import { CONTEXT_PATH, type SeedContext } from './fixtures';
 
 // The other half of categories.spec.ts: a collection with contents, whose photographs only the client sweeps.
@@ -66,25 +67,27 @@ test.describe('deleting a collection that still holds things', () => {
     await page.goto('', { waitUntil: 'networkidle' });
     await expect(app.categories.locators.selected).not.toBeEmpty();
     await app.categories.do.create(name);
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      const itemId = await itemIdFor(token, title);
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+      expect(await storedObjects({ token, userId, itemId })).not.toEqual([]);
 
-    await app.catalogue.do.addEntry(title);
-    const card = app.catalogue.card(title);
-    const itemId = await itemIdFor(token, title);
-    await card.do.uploadPhoto(PHOTO);
-    await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
-    expect(await storedObjects({ token, userId, itemId })).not.toEqual([]);
+      await app.categories.do.delete();
+      // Named and counted, not a bare "are you sure".
+      await expect(app.confirm.locators.message).toContainText(
+        `Delete "${name}"? Its 1 entries`,
+      );
+      await app.confirm.do.accept();
 
-    await app.categories.do.delete();
-    // Named and counted, not a bare "are you sure".
-    await expect(app.confirm.locators.message).toContainText(
-      `Delete "${name}"? Its 1 entries`,
-    );
-    await app.confirm.do.accept();
-
-    await expect(app.categories.locators.selected).not.toHaveText(name);
-    await expect
-      .poll(() => storedObjects({ token, userId, itemId }), { timeout: 15_000 })
-      .toEqual([]);
+      await expect(app.categories.locators.selected).not.toHaveText(name);
+      await app.toast.do.commitDeletion('categories');
+      expect(await storedObjects({ token, userId, itemId })).toEqual([]);
+    } finally {
+      await removeCategoryNamed(name);
+    }
   });
 
   // The delete waits out the undo window; undo inside it puts the collection back, selected, with nothing lost.
@@ -96,9 +99,8 @@ test.describe('deleting a collection that still holds things', () => {
     await page.goto('', { waitUntil: 'networkidle' });
     await expect(app.categories.locators.selected).not.toBeEmpty();
     await app.categories.do.create(name);
-    await app.catalogue.do.addEntry(title);
-
     try {
+      await app.catalogue.do.addEntry(title);
       await app.categories.do.delete();
       await app.confirm.do.accept();
       await expect(app.categories.locators.selected).not.toHaveText(name);
@@ -111,11 +113,7 @@ test.describe('deleting a collection that still holds things', () => {
       await app.categories.do.open(name);
       await expect(app.catalogue.card(title)()).toBeVisible();
     } finally {
-      await app.categories.do.open(name);
-      await app.categories.do.delete();
-      await app.confirm.do.accept();
-      await app.toast.do.close();
-      await expect(app.categories.locators.selected).not.toHaveText(name);
+      await removeCategoryNamed(name);
     }
   });
 });

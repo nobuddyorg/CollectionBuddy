@@ -2,10 +2,10 @@ import { resolve } from 'node:path';
 
 import { expect, test } from './test';
 
+import { removeCategoryNamed, removeEntriesTitled } from './cleanup';
 import { SEED, itemsIn } from './fixtures';
 import { expectTitles } from './helpers';
 import { apiAs, context } from './rls/helpers';
-import type { PageTree } from '../pages';
 
 // The half fake I/O cannot reach: a real download, handed to a real input.
 test.use({ locale: 'en-GB' });
@@ -42,20 +42,6 @@ async function photographsOf(token: string, itemId: string) {
   return data as { size_bytes: number; path_full: string }[];
 }
 
-/** Removes a category through the panel, if it is still there to remove. */
-async function removeCategory(app: PageTree, name: string) {
-  await app.categories.do.openPanel();
-  const tab = app.categories.tab(name);
-  if ((await tab.count()) === 0) return;
-
-  await tab.click();
-  await app.categories.do.delete();
-  await app.confirm.do.accept();
-  await expect(app.categories.locators.selected).not.toHaveText(name);
-  // Ends the undo window now, so the next import numbers its copy from a clean slate.
-  await app.toast.do.close();
-}
-
 test.describe('importing an exported archive', () => {
   test('reads a collection back as a copy beside the original', async ({
     on,
@@ -90,8 +76,8 @@ test.describe('importing an exported archive', () => {
       await expect(card.locators.place).toHaveText('Bremen');
       await expect(card.locators.tags).toHaveText(['umzug']);
     } finally {
-      // In `finally`, so a failed assertion leaves no copy for the next run.
-      await removeCategory(app, copy);
+      // In `finally`, so a failed assertion leaves no copy for the next test to number past.
+      await removeCategoryNamed(copy);
     }
   });
 
@@ -124,9 +110,8 @@ test.describe('importing an exported archive', () => {
       await expect(imported.locators.images).toBeVisible({ timeout: ARRIVES });
       await expect(imported.locators.images).toHaveAttribute('src', /token=/);
     } finally {
-      await removeCategory(app, copy);
-      await app.categories.do.open(SEED.importCategory);
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
+      await removeCategoryNamed(copy);
     }
   });
 
@@ -201,9 +186,8 @@ test.describe('importing an exported archive', () => {
         .toContain(stem(photographs[0].path_full));
     } finally {
       await page.unroute(inserts);
-      await removeCategory(app, copy);
-      await app.categories.do.open(SEED.importCategory);
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
+      await removeCategoryNamed(copy);
     }
   });
 
@@ -275,9 +259,8 @@ test.describe('importing an exported archive', () => {
       await expect(app.categories.tab(copy)).toHaveCount(0);
     } finally {
       await page.unroute(uploads);
-      await removeCategory(app, copy);
-      await app.categories.do.open(SEED.importCategory);
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
+      await removeCategoryNamed(copy);
     }
   });
 });
