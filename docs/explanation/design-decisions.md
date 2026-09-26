@@ -63,6 +63,17 @@ Pinning segment 1 would have closed the hole and left a strict subset of `"updat
 
 `delete_item_if_orphan()` removes an item once it belongs to zero categories. The first version ran `FOR EACH ROW`, one `EXISTS` probe per deleted `item_categories` row — deleting a 500-item category meant ~500 sequential lookups. It now runs `FOR EACH STATEMENT` with a transition table, one set-based `DELETE ... WHERE id IN (...) AND NOT EXISTS (...)`. Same logic, one query instead of N.
 
+## Why production is backed up by a workflow
+
+The project runs on Supabase's Free plan, which keeps no database backup, and no plan's backup contains Storage objects. Production is migrated unattended on every merge and swept daily by an irreversible `service_role` delete, so one bad migration or sweep regression would be permanent. Moving to Pro would buy daily database backups and still leave the photographs uncovered, so `backup.yml` does both halves on the Free plan (#736).
+
+- **Encrypted on the runner, to a public key.** The repository is public and so are its Actions artifacts. age needs only the recipient in GitHub; the identity that decrypts stays off it, so a leaked backup key or bucket exposes ciphertext.
+- **An S3-compatible bucket, not a service integration.** Any provider works through the AWS CLI already on the runner; the owner picks it by setting three variables.
+- **Photographs are copied once.** An object's path never changes ([above](#why-a-storage-objects-path-can-never-change)), so a name already mirrored holds the same bytes and a daily run downloads only what is new, which keeps Free-plan egress small. A removed object moves to a dated prefix the bucket's lifecycle rule expires, rather than being kept forever or deleted at once: long enough to outlive the sweep's 48 h grace, not longer than a restore needs.
+- **The listing and the key come from the Management API**, as in the sweep: no second long-lived Storage credential.
+- **Storage's tables are not in the dump.** A new project gets the bucket from `0007` and each object's row from its re-upload; restoring either from the dump would collide with both, and `postgres` may not write Storage's other tables at all (found rehearsing the restore).
+- **The pre-migration dump runs only when something is pending.** A deploy without migrations never depends on the backup bucket; one with migrations stops rather than migrate without a copy.
+
 ## Why search uses trigram ILIKE instead of full-text search
 
 Early migrations added `tsvector` columns and GIN indexes. They were dropped because search is a substring match (`ILIKE '%query%'`) across title, description, place and tags, and full-text search was never used — extra storage and write cost for a feature that was not there. `pg_trgm` GIN indexes on each searched column are what `ILIKE '%…%'` needs to avoid a sequential scan.

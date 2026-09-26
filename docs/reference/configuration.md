@@ -25,17 +25,18 @@ From `supabase/config.toml`: API `54321`, Postgres `54322`, Studio `54323`, Mail
 `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` are
 secrets of the `production` environment, not repository secrets: that
 environment's deployment-branch policy allows only `main`, so a workflow run
-on any other branch cannot read them. `migrate` and `cleanup` reference it and
-also refuse any ref but `main`. The `github-pages` environment is restricted to
-`main` the same way. The other secrets are repository secrets.
+on any other branch cannot read them. `migrate`, `cleanup` and both
+`backup.yml` jobs reference it and also refuse any ref but `main`. The
+`github-pages` environment is restricted to `main` the same way. The other
+secrets are repository secrets.
 
 | Secret | Used by | Notes |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml`; `k6-load-test.yml` with `target=hosted` only | Required |
+| `NEXT_PUBLIC_SUPABASE_URL` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml`, `backup.yml`; `k6-load-test.yml` with `target=hosted` only | Required |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`; `k6-load-test.yml` with `target=hosted` only | Required |
-| `SUPABASE_DB_URL` | `pages-deploy.yml` (`migrate`) | Required. The **session pooler** string (`aws-0-<region>.pooler.supabase.com`), password percent-encoded. The direct `db.<ref>.supabase.co` host is IPv6-only and unreachable from GitHub runners; `supabase link` reports success anyway and the push fails. |
-| `SUPABASE_ACCESS_TOKEN` | `pages-deploy.yml` (`migrate`), `cleanup-orphaned-photos.yml` | Required. Management-API token: reloads the PostgREST schema cache after a migration; in the cleanup job, runs the orphan query and fetches a fresh `service_role` key. Without it `migrate` returns 401 and the deploy stops. |
-| `SUPABASE_PROJECT_REF` | same two | Required |
+| `SUPABASE_DB_URL` | `pages-deploy.yml` (`migrate`), `backup.yml` (`database`) | Required. The **session pooler** string (`aws-0-<region>.pooler.supabase.com`), password percent-encoded. The direct `db.<ref>.supabase.co` host is IPv6-only and unreachable from GitHub runners; `supabase link` reports success anyway and the push fails. |
+| `SUPABASE_ACCESS_TOKEN` | `pages-deploy.yml` (`migrate`), `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`) | Required. Management-API token: reloads the PostgREST schema cache after a migration; in the cleanup job, runs the orphan query and fetches a fresh `service_role` key; in `photographs`, lists the bucket and fetches that key. Without it `migrate` returns 401 and the deploy stops. |
+| `SUPABASE_PROJECT_REF` | same three | Required |
 | `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test`) | Optional; without it Stryker writes a local HTML report only |
 
 None of these may appear in the repository. The gitleaks hook
@@ -45,6 +46,23 @@ string. JWTs whose payload carries `"role":"anon"` are allowlisted, because
 the anon key is public by design; a `service_role` key still fails. The hook
 sees only staged changes, so in CI it has nothing to scan; GitHub push
 protection is the server-side check.
+
+### Backups
+
+[`backup.yml`](../../.github/workflows/backup.yml) and the pre-migration dump
+in `migrate` ([Back up production](../how-to/developer-guide.md#back-up-production))
+read six more values from the `production` environment. All are required: a
+missing one fails the job by name, so `backup.yml` fails every night and a
+deploy with a pending migration stops before applying it.
+
+| Name | Kind | Value |
+| --- | --- | --- |
+| `BACKUP_S3_ENDPOINT` | variable | The S3 API endpoint of the off-site store, e.g. `https://<account>.r2.cloudflarestorage.com` or `https://s3.<region>.backblazeb2.com` |
+| `BACKUP_S3_REGION` | variable | Its region for request signing, e.g. `auto` on R2 |
+| `BACKUP_S3_BUCKET` | variable | A private bucket used for nothing else |
+| `BACKUP_S3_ACCESS_KEY_ID` | secret | A key scoped to that one bucket, read and write |
+| `BACKUP_S3_SECRET_ACCESS_KEY` | secret | Its secret |
+| `BACKUP_AGE_RECIPIENT` | variable | The `age1…` public key everything is encrypted to. Public by design; its identity file never goes into GitHub |
 
 ## Coverage and mutation thresholds
 

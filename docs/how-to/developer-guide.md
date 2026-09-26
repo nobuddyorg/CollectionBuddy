@@ -417,8 +417,9 @@ For a fork, or a new production project:
 ## Deploy to GitHub Pages
 
 [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) runs on every
-push to `main`: `migrate` applies pending migrations and reloads the PostgREST
-schema cache, `build` exports the site, `deploy` publishes it, `smoke_test`
+push to `main`: `migrate` uploads an encrypted dump when the dry run lists a
+pending migration ([Back up production](#back-up-production)), applies them and
+reloads the PostgREST schema cache, `build` exports the site, `deploy` publishes it, `smoke_test`
 runs the signed-out suite against the live URL. Each job depends on the last,
 so a failed migration leaves the previous bundle serving the previous schema.
 Nothing deploys from a developer machine.
@@ -436,7 +437,157 @@ One-time setup for a fork:
    [Configuration](../reference/configuration.md#github-actions-secrets).
 4. If the repository is not named `CollectionBuddy`, change `repo` in
    `web/next.config.ts`; the production `basePath` derives from it.
-5. Optional: `STRYKER_DASHBOARD_API_KEY` to publish mutation reports;
+5. The backup bucket, key and age recipient:
+   [Back up production](#back-up-production). Without them a deploy with a
+   pending migration stops before applying it.
+6. Optional: `STRYKER_DASHBOARD_API_KEY` to publish mutation reports;
    `keep-alive.yml` stays enabled on a free-tier project.
-6. The README's CodeQL badge relies on GitHub's default code-scanning setup
+7. The README's CodeQL badge relies on GitHub's default code-scanning setup
    (Settings → Code security), a per-repo setting that does not carry over.
+
+## Back up production
+
+Supabase's Free plan keeps no database backup, and no plan's backup contains
+Storage objects ([why a workflow](../explanation/design-decisions.md#why-production-is-backed-up-by-a-workflow)).
+[`backup.yml`](../../.github/workflows/backup.yml) runs daily at 02:47 UTC,
+ahead of the 04:30 sweep, and by hand from `main`:
+
+- `database` dumps roles, schema and the `auth` and `public` data with
+  `supabase db dump` through the session pooler, adds `commit.txt` (the `main`
+  commit it ran on) and `migration.txt` (the last migration production had
+  applied), encrypts the tarball to
+  `BACKUP_AGE_RECIPIENT` on the runner and uploads
+  `database/<UTC time>-daily.tar.gz.age`. `migrate` uploads the same archive as
+  `…-pre-migration.tar.gz.age` whenever its dry run lists a pending migration;
+  if that upload fails, nothing is applied. Storage's tables are left out:
+  `0007` recreates the bucket, and re-uploading a photograph recreates its row.
+- `photographs` encrypts each `item-images` object not yet mirrored to
+  `photos/<path>.age`. Paths never change, so each object is copied once. An
+  object gone from the bucket moves to `photos-removed/<UTC day>/<path>.age`.
+
+Nothing leaves the runner unencrypted, and nothing is an Actions artifact: the
+repository is public.
+
+One-time setup:
+
+1. A private bucket on an S3-compatible store outside Supabase (Cloudflare R2,
+   Backblaze B2, AWS S3). Lifecycle rules expire `database/` and
+   `photos-removed/` after 30 days, and nothing under `photos/`. Anything
+   shorter than a week leaves too little time to notice a loss the sweep made
+   permanent 48 h after it happened.
+2. An access key scoped to that bucket, read and write.
+3. On a trusted machine, `age-keygen -o backup-identity.txt`. Keep that file
+   offline or in a password manager, never in GitHub or the repository;
+   without it no backup can be read. Its `Public key:` line is
+   `BACKUP_AGE_RECIPIENT`.
+4. The six values in the `production` environment
+   ([Configuration](../reference/configuration.md#backups)). Then run
+   **Back up production** by hand and check both jobs and the bucket.
+
+## Restore production from a backup
+
+Rehearse this on the local stack once after setup, and again after any change
+to `backup.yml`, the dump, or the schema's shape.
+
+1. **Disable the sweep first:** Actions → *Clean up orphaned photographs* →
+   ⋯ → *Disable workflow* (or `gh workflow disable cleanup-orphaned-photos.yml`).
+   To it every photograph whose `images` row is gone is an orphan, and it
+   deletes those once they are 48 h old.
+2. If a migration caused the loss, also disable *Deploy Pages* and merge
+   nothing to `main` until the restore is done: every merge migrates
+   production. Leave *Back up production* running; it never overwrites an
+   archive, and a photograph it no longer finds waits in
+   `photos-removed/<day>/` until the 30-day rule expires it.
+3. Fetch and decrypt the last archive from before the loss. With the backup
+   key in `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL`,
+   `AWS_REGION`, and `BUCKET` set:
+
+   ```bash
+   aws s3 ls "s3://$BUCKET/database/"
+   aws s3 cp "s3://$BUCKET/database/<archive>" .
+   age -d -i backup-identity.txt <archive> | tar -xz  # roles.sql schema.sql data.sql commit.txt migration.txt
+   aws s3 cp --recursive "s3://$BUCKET/photos/" encrypted/
+   aws s3 cp --recursive "s3://$BUCKET/photos-removed/<day>/" encrypted/  # each day since the loss
+   (cd encrypted && find . -name '*.age' -printf '%P\n') | while IFS= read -r f; do
+     mkdir -p "item-images/$(dirname "$f")"
+     age -d -i backup-identity.txt -o "item-images/${f%.age}" "encrypted/$f"
+   done
+   ```
+
+4. Load it into the local stack: `git checkout "$(cat commit.txt)"`,
+   `supabase db reset --version "$(cat migration.txt)"` (a pre-migration
+   commit already holds the migrations that were about to run), then, with
+   `DB_URL` the local database:
+
+   ```bash
+   psql --single-transaction --variable ON_ERROR_STOP=1 \
+     --file roles.sql \
+     --command 'set session_replication_role = replica' \
+     --file data.sql \
+     --dbname "$DB_URL"
+   ```
+
+   `supabase db dump --local -f restored.sql` and `diff -B schema.sql
+   restored.sql` should differ by nothing but `pgtap`, if you ever ran
+   `supabase test db`; anything else is schema production had and the
+   migrations lack. Upload the photographs (step 6) against the local API and
+   look at the result in `npm run dev`.
+5. Restore production, one of:
+   - **The project still exists** (a migration, a bug or the sweep lost rows
+     or photographs): copy back what is missing from the local stack of
+     step 4, with `LOCAL_DB_URL` the local database and `SUPABASE_DB_URL`
+     production's session pooler URL, then step 6. `on conflict do nothing`
+     leaves every row production still has alone; a row deleted on purpose
+     since the backup comes back too, so narrow the export with a `where`
+     when you know what the loss touched. Replica mode keeps the ownership
+     and quota triggers from judging a restore by the session's identity.
+
+     ```bash
+     echo 'set session_replication_role = replica;' > restore-rows.sql
+     for t in categories items item_categories images category_shares; do
+       cols=$(psql "$LOCAL_DB_URL" -Atc "select string_agg(quote_ident(attname), ', ' order by attnum) from pg_attribute where attrelid = 'public.$t'::regclass and attnum > 0 and not attisdropped and attgenerated = ''")
+       psql "$LOCAL_DB_URL" -c "\\copy public.$t ($cols) to '$t.csv' csv"
+       printf '%s\n' >> restore-rows.sql \
+         "create temp table restore_$t as select $cols from public.$t with no data;" \
+         "\\copy restore_$t from '$t.csv' csv" \
+         "insert into public.$t ($cols) select * from restore_$t on conflict do nothing;"
+     done
+     psql "$SUPABASE_DB_URL" --single-transaction --variable ON_ERROR_STOP=1 --file restore-rows.sql
+     ```
+
+   - **The project is gone:** create one ([Set up a new Supabase
+     environment](#set-up-a-new-supabase-environment)) and, from the
+     `commit.txt` checkout with every migration after `migration.txt`
+     deleted, `supabase db push --db-url "<its session pooler URL>"`: that
+     creates the schema, the bucket, the Storage policies and the migration
+     history. Run step 4's `psql` against the same URL, then step 6.
+     Point `SUPABASE_DB_URL`, `SUPABASE_PROJECT_REF`,
+     `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` at it, and
+     the Google OAuth client's redirect URI. Collectors sign in with Google as
+     before: `auth.identities` came back with their user ids.
+6. Upload the photographs with the target's `service_role` key (Project
+   Settings → API keys) and API URL:
+
+   ```bash
+   (cd item-images && find . -type f -printf '%P\n') | while IFS= read -r name; do
+     encoded=$(jq -rn --arg name "$name" '$name | split("/") | map(@uri) | join("/")')
+     curl -sS -o /dev/null -w "%{http_code} $name\n" -X POST \
+       "$SUPABASE_URL/storage/v1/object/item-images/$encoded" \
+       -H "apikey: $SERVICE_ROLE_KEY" -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+       -H "Content-Type: $(file --brief --mime-type "item-images/$name")" \
+       --data-binary "@item-images/$name"
+   done
+   ```
+
+   `200` restored the object; `400` with `Duplicate` means Storage still had
+   it, since an upload never overwrites. A photograph whose row stays deleted
+   is an orphan again, which the re-enabled sweep removes once it is 48 h old.
+7. Check that no `images` row lacks its objects, then enable the sweep and
+   *Deploy Pages* again:
+
+   ```sql
+   select count(*) from public.images im
+   where not exists (select 1 from storage.objects o where o.bucket_id = 'item-images' and o.name = im.path_full)
+      or (im.path_thumb is not null
+          and not exists (select 1 from storage.objects o where o.bucket_id = 'item-images' and o.name = im.path_thumb));
+   ```

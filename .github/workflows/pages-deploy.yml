@@ -30,9 +30,32 @@ jobs:
 
       # Not `supabase link` + `--linked`: that resolves db.<ref>.supabase.co, which has only an AAAA record, and runners have no IPv6. The URL is one secret so log masking covers it whole.
       - name: Show pending migrations
-        run: supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
+        id: pending
+        run: |
+          set -euo pipefail
+          result=$(supabase db push --db-url "$SUPABASE_DB_URL" --dry-run --output-format json)
+          echo "$result"
+          # Anything but an explicit "up to date" takes the backup below.
+          case "$(jq -r '.upToDate' <<<"$result")" in
+            true) echo "migrations=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "migrations=true" >> "$GITHUB_OUTPUT" ;;
+          esac
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+
+      # Only when something will be applied, so a deploy without migrations never waits on the backup bucket; a failed backup stops the migration.
+      - name: Back up before migrating
+        if: steps.pending.outputs.migrations == 'true'
+        uses: ./.github/actions/backup-database
+        with:
+          label: pre-migration
+          db-url: ${{ secrets.SUPABASE_DB_URL }}
+          s3-endpoint: ${{ vars.BACKUP_S3_ENDPOINT }}
+          s3-region: ${{ vars.BACKUP_S3_REGION }}
+          s3-bucket: ${{ vars.BACKUP_S3_BUCKET }}
+          s3-access-key-id: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          age-recipient: ${{ vars.BACKUP_AGE_RECIPIENT }}
 
       - name: Apply migrations
         run: supabase db push --db-url "$SUPABASE_DB_URL"

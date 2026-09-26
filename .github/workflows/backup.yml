@@ -1,0 +1,151 @@
+name: Back up production
+# The Free plan keeps no database backup and no plan backs up Storage objects; restore: docs/how-to/developer-guide.md#restore-production-from-a-backup.
+on:
+  schedule:
+    - cron: "47 2 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+# Two photograph copies at once would both retire the same removed objects.
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  # Main only: every job here reads the main-only `production` environment.
+  database:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-supabase-cli
+
+      - uses: ./.github/actions/backup-database
+        with:
+          label: daily
+          db-url: ${{ secrets.SUPABASE_DB_URL }}
+          s3-endpoint: ${{ vars.BACKUP_S3_ENDPOINT }}
+          s3-region: ${{ vars.BACKUP_S3_REGION }}
+          s3-bucket: ${{ vars.BACKUP_S3_BUCKET }}
+          s3-access-key-id: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          age-recipient: ${{ vars.BACKUP_AGE_RECIPIENT }}
+
+  # `photos/` mirrors the bucket; an object gone from it moves to `photos-removed/<day>/`, which the backup bucket's lifecycle rule expires.
+  photographs:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Install age
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+
+      - name: Copy new photographs, retire removed ones
+        run: |
+          set -euo pipefail
+
+          missing=0
+          for name in NEXT_PUBLIC_SUPABASE_URL SUPABASE_PROJECT_REF SUPABASE_ACCESS_TOKEN BACKUP_S3_ENDPOINT BACKUP_S3_REGION BACKUP_S3_BUCKET BACKUP_S3_ACCESS_KEY_ID BACKUP_S3_SECRET_ACCESS_KEY BACKUP_AGE_RECIPIENT; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set in the production environment (docs/reference/configuration.md#backups)."
+              missing=1
+            fi
+          done
+          [ "$missing" = 0 ] || exit 1
+
+          export AWS_ENDPOINT_URL="$BACKUP_S3_ENDPOINT" AWS_REGION="$BACKUP_S3_REGION"
+          export AWS_ACCESS_KEY_ID="$BACKUP_S3_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$BACKUP_S3_SECRET_ACCESS_KEY"
+          work=$(mktemp -d)
+
+          query="select coalesce(json_agg(o.name order by o.name), '[]'::json) as names from storage.objects o where o.bucket_id = 'item-images'"
+          listing=$(curl -sS --fail-with-body -X POST \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$(jq -n --arg q "$query" '{query: $q}')")
+
+          # An unexpected response shape must not read as an empty bucket and retire the whole mirror.
+          if ! jq -e '.[0].names | type == "array"' <<<"$listing" > /dev/null; then
+            echo "Unexpected listing result: $listing" >&2
+            exit 1
+          fi
+
+          # A name becomes a file path on the runner, so `..`, empty segments and control characters are refused, never skipped silently.
+          safe='def safe: (split("/") | all(. != "" and . != "." and . != "..")) and (explode | all(. >= 32 and . != 127));'
+          jq -r "$safe .[0].names[] | select(safe)" <<<"$listing" | LC_ALL=C sort > "$work/live"
+          jq -c "$safe [.[0].names[] | select(safe | not)]" <<<"$listing" > "$work/refused"
+
+          aws s3api list-objects-v2 --bucket "$BACKUP_S3_BUCKET" --prefix photos/ --query 'Contents[].Key' --output json \
+            | jq -r '.[]? | ltrimstr("photos/") | rtrimstr(".age")' | LC_ALL=C sort > "$work/mirrored"
+
+          # Paths never change (no UPDATE policy, no upsert), so a name already mirrored holds the same bytes.
+          LC_ALL=C comm -23 "$work/live" "$work/mirrored" > "$work/new"
+          LC_ALL=C comm -13 "$work/live" "$work/mirrored" > "$work/removed"
+
+          failed=0
+          if [ -s "$work/new" ]; then
+            # Only service_role reads every user's prefix; fetched per run, as cleanup-orphaned-photos.yml does, instead of a second long-lived secret.
+            service_role_key=$(curl -sS --fail-with-body \
+              "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" \
+              -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+              | jq -r '.[] | select(.name == "service_role") | .api_key')
+            echo "::add-mask::$service_role_key"
+            if [ -z "$service_role_key" ] || [ "$service_role_key" = "null" ]; then
+              echo "Could not read the service_role key; refusing to continue." >&2
+              exit 1
+            fi
+
+            mkdir "$work/staging"
+            while IFS= read -r name; do
+              encoded=$(jq -rn --arg name "$name" '$name | split("/") | map(@uri) | join("/")')
+              mkdir -p "$work/staging/$(dirname "$name")"
+              # One failure (e.g. deleted since the listing) must not cost the rest of the run; the next run retries it.
+              if curl -sS --fail --retry 3 --max-time 300 -o "$work/download" \
+                "$NEXT_PUBLIC_SUPABASE_URL/storage/v1/object/authenticated/item-images/$encoded" \
+                -H "apikey: $service_role_key" \
+                -H "Authorization: Bearer $service_role_key"; then
+                age -r "$BACKUP_AGE_RECIPIENT" -o "$work/staging/$name.age" "$work/download"
+              else
+                echo "::warning::Could not download $name."
+                failed=$((failed + 1))
+              fi
+            done < "$work/new"
+            aws s3 cp --recursive --only-show-errors "$work/staging/" "s3://$BACKUP_S3_BUCKET/photos/"
+          fi
+
+          day=$(date -u +%F)
+          while IFS= read -r name; do
+            aws s3 mv --only-show-errors "s3://$BACKUP_S3_BUCKET/photos/$name.age" "s3://$BACKUP_S3_BUCKET/photos-removed/$day/$name.age"
+          done < "$work/removed"
+
+          {
+            echo "Bucket: $(wc -l < "$work/live") object(s)."
+            echo "Copied: $(( $(wc -l < "$work/new") - failed )); failed: $failed."
+            echo "Moved to photos-removed/$day/: $(wc -l < "$work/removed")."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+          if [ "$(jq length "$work/refused")" != 0 ]; then
+            echo "::error::Refused to copy these names: $(cat "$work/refused")"
+            exit 1
+          fi
+          [ "$failed" = 0 ] || exit 1
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          BACKUP_S3_ENDPOINT: ${{ vars.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_REGION: ${{ vars.BACKUP_S3_REGION }}
+          BACKUP_S3_BUCKET: ${{ vars.BACKUP_S3_BUCKET }}
+          BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+          # Newer AWS CLIs send checksum headers that several S3-compatible stores reject.
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
