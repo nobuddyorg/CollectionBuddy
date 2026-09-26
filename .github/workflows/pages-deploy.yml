@@ -2,7 +2,7 @@ name: Deploy Pages
 
 # Only a commit that passed CI on main deploys; a push alone never reaches production.
 on:
-  # Runs main's copy of this file; it checks out a push to main that CI passed, never a pull request's code.
+  # Runs main's copy of this file; it checks out a commit on main that CI passed, never a pull request's code.
   workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: [CI]
     types: [completed]
@@ -25,11 +25,12 @@ jobs:
       github.ref == 'refs/heads/main' && (
         github.event_name == 'workflow_dispatch' || (
           github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push' &&
+          (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') &&
           github.event.workflow_run.head_repository.full_name == github.repository
         )
       )
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       actions: read # CI's runs of the commit, on a dispatch
       contents: read # main's current tip
@@ -54,7 +55,8 @@ jobs:
             exit 0
           fi
           if [ "$EVENT_NAME" = workflow_dispatch ]; then
-            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&event=push&status=success" --jq .total_count)
+            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&status=success" \
+              --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")] | length')
             if [ "$passed" = 0 ]; then
               echo "::error::CI has not passed on $COMMIT; nothing deploys."
               exit 1
@@ -74,6 +76,7 @@ jobs:
     needs: gate
     if: github.ref == 'refs/heads/main' && needs.gate.outputs.sha != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: production
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -125,6 +128,7 @@ jobs:
   build:
     needs: [gate, migrate]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: web
@@ -150,12 +154,13 @@ jobs:
           supabase-url: ${{ env.NEXT_PUBLIC_SUPABASE_URL }}
           anon-key: ${{ env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: web/out
 
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: build
     permissions:
       pages: write
@@ -167,11 +172,12 @@ jobs:
       page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   # The signed-out suite against the live origin: Node prerendering masks failures only the browser bundle shows, and signed-out keeps the run read-only.
   smoke_test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [gate, deploy]
     defaults:
       run:

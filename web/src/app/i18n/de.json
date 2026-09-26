@@ -46,7 +46,6 @@
     "export_too_large": "Diese Sammlung ist zu groß für ein einzelnes Archiv.",
     "export_large_confirm": "Dieser Export ist etwa {size} groß und damit groß genug, dass manche Smartphones den Tab vorher schließen und der Fortschritt verloren geht. Trotzdem fortfahren?",
     "export_partial": "{skipped} von {total} Fotos konnten nicht in den Export aufgenommen werden.",
-    "export_listing_partial": "Die Fotos von {count} Einträgen konnten nicht aufgelistet werden und fehlen im Export.",
     "import": "Importieren",
     "import_hint": "Ein von CollectionBuddy exportiertes .zip-Archiv.",
     "import_reading": "Archiv wird gelesen…",

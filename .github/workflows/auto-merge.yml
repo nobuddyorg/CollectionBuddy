@@ -5,20 +5,24 @@ on:
         types: [opened, synchronize, ready_for_review]
         branches:
             - main
+    schedule:
+        - cron: "41 * * * *"
 
-permissions:
-    pull-requests: write
-    contents: write
+permissions: {}
 
 jobs:
     auto-approve-merge:
         runs-on: ubuntu-latest
+        timeout-minutes: 5
         if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
+        permissions:
+            pull-requests: write
+            contents: write
 
         steps:
             - name: Fetch Dependabot metadata
               id: metadata
-              uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3
+              uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
               with:
                   github-token: "${{ secrets.GITHUB_TOKEN }}"
 
@@ -56,3 +60,27 @@ jobs:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch --auto --repo ${{ github.repository }}
+
+    # A merge made with GITHUB_TOKEN starts no push run, so without this the bump would first be tested and deployed inside the next human merge.
+    catch-up-ci:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        if: github.event_name == 'schedule'
+        permissions:
+            actions: write # dispatches ci.yml: workflow_dispatch is the event GITHUB_TOKEN may still start a run with
+            contents: read # main's tip
+        steps:
+            - name: Run CI on main's tip if nothing has
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+                  tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+                  runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$tip" \
+                    --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")] | length')
+                  if [ "$runs" != 0 ]; then
+                    echo "CI already ran on $tip."
+                    exit 0
+                  fi
+                  echo "::notice::No CI run on main's tip $tip; dispatching one, which deploys it once green."
+                  gh workflow run ci.yml --ref main --repo "$GITHUB_REPOSITORY"

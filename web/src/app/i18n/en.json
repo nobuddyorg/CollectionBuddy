@@ -46,7 +46,6 @@
     "export_too_large": "This collection is too large to export as one archive.",
     "export_large_confirm": "This export is about {size}, large enough that some phones may close the tab before it finishes and lose the progress. Continue anyway?",
     "export_partial": "{skipped} of {total} photographs could not be included in the export.",
-    "export_listing_partial": "{count} entries' photographs could not be listed and are missing from the export.",
     "import": "Import",
     "import_hint": "A .zip archive exported from CollectionBuddy.",
     "import_reading": "Reading archive…",

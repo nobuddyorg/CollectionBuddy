@@ -1,38 +1,21 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { Dialog } from './Dialog';
 
 describe('Dialog', () => {
-  it('is visible and full scale when open', () => {
+  it('closes through its close button, named by the label it is given', async () => {
+    const onClose = vi.fn();
     render(
-      <Dialog open title="Edit entry" onClose={vi.fn()}>
+      <Dialog title="Edit entry" closeLabel="Schließen" onClose={onClose}>
         content
       </Dialog>,
     );
-    const panel = screen.getByRole('dialog');
-    expect(panel.className).toContain('opacity-100');
-    expect(panel.className).toContain('scale-100');
-  });
 
-  it('is invisible and scaled down when not open', () => {
-    render(
-      <Dialog open={false} title="Edit entry" onClose={vi.fn()}>
-        content
-      </Dialog>,
-    );
-    const panel = screen.getByRole('dialog');
-    expect(panel.className).toContain('opacity-0');
-    expect(panel.className).toContain('scale-95');
-  });
+    await userEvent.click(screen.getByRole('button', { name: 'Schließen' }));
 
-  it('falls back to "Close" for the close button label when none is given', () => {
-    render(
-      <Dialog open title="Edit entry" onClose={vi.fn()}>
-        content
-      </Dialog>,
-    );
-    expect(screen.getByRole('button', { name: 'Close' })).toBeVisible();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

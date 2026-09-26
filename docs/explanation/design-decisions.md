@@ -92,7 +92,7 @@ Any signed-in collector could otherwise create rows and upload 5 MiB objects wit
 | 1,000 categories per owner | `tg_categories_quota()` (`0016`) |
 | 1,000 shares per owner, across all their categories | `tg_category_shares_quota()` (`0016`) |
 | One category per entry | `tg_item_categories_quota()` (`0016`, lowered from 10 by `0020`) |
-| Text: category name 200, title 300, description 10,000, place 500, invited email 320 characters; 50 tags of up to 100 characters | `check` constraints (`0016`) |
+| Text: category name 200, title 300, description 10,000, place 500, invited email 320 characters; 50 tags of up to 100 characters | `check` constraints (`0016`; one tag's length `0028`) |
 
 A photograph added by an editor lands on the owner's row, so it counts against the owner's quota; it is a photograph of her entry, which she reads and deletes like her own ([above](#why-a-photograph-an-editor-adds-to-your-entry-is-yours)). The link ceiling is per entry rather than per owner because the entry ceiling already bounds the entries; together they bound the links. The UI files an entry in one category, so no message covers the link ceiling; the form's `maxLength`s mirror the text ceilings, so typing stops before the database would refuse. The text checks are `not valid`: every write since `0016` is checked, but a row already past a limit was left in place rather than failing the unattended deploy, and editing such a row fails until the long field is shortened. Once production holds no row past a limit, a later migration can `validate constraint` each one.
 
@@ -112,7 +112,7 @@ A failed or cancelled import removes every path it attempted, not only those tha
 
 A `cleanup_item_images()` trigger used to back this up. It was removed because Supabase's `prevent-direct-deletes` migration guards `storage.objects` with a `BEFORE DELETE ... FOR EACH STATEMENT` trigger that raises `42501` for any session outside the Storage API — statement-level, so it fires even when the delete matches nothing, which is the normal case once the client has already removed the objects. Every item deletion failed. There is no SQL-side backstop available; [`cleanup-orphaned-photos.yml`](../../.github/workflows/cleanup-orphaned-photos.yml) sweeps unreferenced objects daily through the Storage API instead, past a 48 h grace period so nothing still uploading is mistaken for orphaned. It refuses to delete when more objects are orphaned than max(50, 5 % of the bucket) unless run by hand with an override: a bug, a bad migration or a restore that removes `images` rows in bulk looks exactly like mass orphaning, and the sweep would make that loss permanent.
 
-The client deletes whatever paths a row names, with the deleting user's token, so a row may only name paths under its own entry: `images_path_full_matches_item`, and since `0019` `images_path_thumb_matches_item`. Before `0019` an editor could file a record whose thumbnail named the owner's photograph in a collection the editor was never granted, and the owner's own delete of that entry removed it.
+The client deletes whatever paths a row names, with the deleting user's token, so a row may only name paths under its own entry: `images_path_full_matches_item`, and since `0019` `images_path_thumb_matches_item`. Before `0019` an editor could file a record whose thumbnail named the owner's photograph in a collection the editor was never granted, and the owner's own delete of that entry removed it. `0019` checked only writes from then on; `0028` clears a thumbnail path any older row still points at another entry, which the client never writes, and validates the constraint, so no planted row survives either.
 
 ## Why a storage object's path can never change
 
@@ -154,11 +154,11 @@ The sweep and the backup fetch the secret key per run so it is never stored, but
 
 ## Why the deploy waits for CI on `main`
 
-CI and the deploy used to start side by side on every push, so production was migrated and published minutes before `main`'s CI finished, and a PR merged while behind `main` shipped a tree no CI run had passed (#735). `pages-deploy.yml` now starts from `workflow_run` when CI succeeds on a push to `main`, and deploys that commit, not whatever `main` holds by then.
+CI and the deploy used to start side by side on every push, so production was migrated and published minutes before `main`'s CI finished, and a PR merged while behind `main` shipped a tree no CI run had passed (#735). `pages-deploy.yml` now starts from `workflow_run` when CI succeeds on `main`, and deploys that commit, not whatever `main` holds by then.
 
 - **Only the tip.** CI runs finish out of order and can be re-run; deploying every green commit would let an older one publish over a newer bundle, and `db push` refuses a tree missing migrations production already has. A superseded run queues in a group of its own, so it cannot displace the tip's queued deploy.
 - **Queued, not cancelled.** Cancelling a run in progress could stop `migrate` between two migrations; a newer deploy waits instead.
-- **`workflow_run` is safe here** because it only acts on `push` events of this repository: `branches: [main]` alone also matches a fork's pull request from a branch named `main`, whose code must never reach the production secrets.
+- **`workflow_run` is safe here** because it only acts on `push` and `workflow_dispatch` runs of this repository, which only a collaborator with write access can start: `branches: [main]` alone also matches a fork's pull request from a branch named `main`, whose code must never reach the production secrets.
 
 ## Why Dependabot auto-merges only dev-only lockfile changes
 
@@ -169,6 +169,8 @@ CI and the deploy used to start side by side on every push, so production was mi
 - **The gate reads the lockfile, not the manifest.** A dev bump can also move a transitive package the build shares, such as `postcss` or `magic-string`, so `auto-merge.yml` merges only when every entry the PR adds or changes in `package-lock.json` is `dev: true`; anything else, `devOptional` included, waits for a human.
 
 The seven-day cooldown and the required checks still apply on top; neither would catch a patch that only injects code into the bundle.
+
+The merge itself runs with `GITHUB_TOKEN`, and a push made with it starts no workflow, so the bump used to get no CI run on `main` and no deploy of its own: it shipped inside the next human merge, whose deploy then looked responsible for any regression it brought (#769). `auto-merge.yml`'s hourly `catch-up-ci` job dispatches CI on `main`'s tip whenever no push or dispatch run exists for it; `workflow_dispatch` is the one event `GITHUB_TOKEN` may still start a run with, and a green dispatched run deploys like a push. It is a sweep rather than a step after the merge because `gh pr merge --auto` returns before GitHub merges, once the required checks finish. A GitHub App token would start the push run directly, at the cost of an App and its private key to own and rotate.
 
 ## Why search uses trigram ILIKE instead of full-text search
 
@@ -182,7 +184,7 @@ The 3-character minimum before a search fires is not about the index: a one- or 
 
 ## Why mutation testing is scoped to a list of files
 
-Line coverage answers "did this run," not "would a real bug here have been caught." For presentational components and hooks that mostly orchestrate Supabase calls, the gap barely matters. It matters a lot for pure functions doing string and boundary construction — the PostgREST filter builder, pagination windows, ZIP date packing, CSV formula-injection guards, retry/backoff arithmetic — where a test can execute every line and assert nothing. The list is [`web/mutation-targets.mjs`](../../web/mutation-targets.mjs), shared with `vitest.config.mts`'s per-file coverage floors so the two cannot drift; each entry's own comment says what it guards.
+Line coverage answers "did this run," not "would a real bug here have been caught." For presentational components and hooks that mostly orchestrate Supabase calls, the gap barely matters. It matters a lot for pure functions doing string and boundary construction — the search term's ILIKE escaping, pagination windows, ZIP date packing, CSV formula-injection guards, retry/backoff arithmetic — where a test can execute every line and assert nothing. The list is [`web/mutation-targets.mjs`](../../web/mutation-targets.mjs), shared with `vitest.config.mts`'s per-file coverage floors so the two cannot drift; each entry's own comment says what it guards.
 
 Mutating the whole `src/app` tree would mean JSX and Tailwind class strings too: thousands of near-equivalent mutants, a multi-minute run, and a score that means nothing. A scoped run finishes in seconds and produces a number worth acting on, which is why CI runs it on every PR rather than only on `main` — learning after the merge that a test asserts nothing is learning it too late.
 
@@ -204,10 +206,10 @@ The other class is the **timeout**, which Stryker counts as a kill. Most were av
 
 ## Why four functions have property tests
 
-`buildSearchFilter`, `csvCell`, `dosDateTime` and `clampPage`/`pageRange` take
+`likePatternFor`, `csvCell`, `dosDateTime` and `clampPage`/`pageRange` take
 input that is adversarial or unbounded (any search term, any user text, any
 date, any page and total), and each has a property that is easy to state: the
-filter is always exactly four quoted conditions that match the term literally;
+ILIKE pattern always matches the term literally, with no wildcard but its own;
 a CSV cell always parses back to the text, apostrophe-guarded exactly when it
 would start a formula; a DOS timestamp always decodes to a valid date and
 clamps rather than wraps; a page range always holds an entry when there is
@@ -230,7 +232,7 @@ Pure-logic tests could not have caught the hydration mismatch fixed in `008d33b`
 
 ## Why read policies take the caller's grants as one set
 
-A grantee's read used to call `has_category_read_access(category_id)` on every row, and twice per entry, since the `items` policy reads `item_categories` under that table's own policy. The function pins `search_path`, and PostgreSQL never inlines a function with a `SET` clause, so each row paid a full call and an index probe into `category_shares`. The k6 `shared-viewer` run measured it: 300 shared entries browsed slower than the owner's 10,000, and at the `peak` profile p95 passed 9 s with 3.6% of requests failing. `0017` has every read policy ask `category_id = any(array(select granted_category_ids()))` instead: an initPlan, evaluated once per statement and only when the owner branch has not already decided, which inside the `EXISTS` becomes part of one primary-key probe. `granted_category_ids()` is plpgsql so its query is planned once per connection, and `has_category_read_access()` is defined on the same set, so what a grant is (email, expiry) is written once. Ownership stays outside the set for the same reason it stays outside the read predicate. `075_query_plans_test.sql` fails if a read plan calls `has_category_read_access()` again.
+A grantee's read used to call `has_category_read_access(category_id)` on every row, and twice per entry, since the `items` policy reads `item_categories` under that table's own policy. The function pins `search_path`, and PostgreSQL never inlines a function with a `SET` clause, so each row paid a full call and an index probe into `category_shares`. The k6 `shared-viewer` run measured it: 300 shared entries browsed slower than the owner's 10,000, and at the `peak` profile p95 passed 9 s with 3.6% of requests failing. `0017` has every read policy ask `category_id = any(array(select granted_category_ids()))` instead: an initPlan, evaluated once per statement and only when the owner branch has not already decided, which inside the `EXISTS` becomes part of one primary-key probe. `granted_category_ids()` is plpgsql so its query is planned once per connection, and `has_category_read_access()` is defined on the same set, so what a grant is (email, expiry) is written once. Since `0028` `has_category_write_access()` asks it too: the caller's own grant row has to say `editor`, and the category has to be in the set, so a grant the set stops yielding opens neither read nor write. The row stays bound to the caller's email because the filing trigger asks as its owner, past `category_shares`' RLS, where another address's editor grant would otherwise count. That costs an editor one call of the set per checked row: updating 1,000 entries in one statement on the local stack went from 1.5 s to 1.6 s for an editor holding one grant, and from 5.7 s to 7.3 s for one holding 60. Ownership stays outside the set for the same reason it stays outside the read predicate. `075_query_plans_test.sql` fails if a read plan calls `has_category_read_access()` again.
 
 ## Why the map and search RPCs are plpgsql
 

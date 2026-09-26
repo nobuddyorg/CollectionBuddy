@@ -319,6 +319,53 @@ test.describe('a category shared at the editor role', () => {
     }
   });
 
+  // Filing is checked by a trigger that reads every grant past RLS, so the role must be the caller's own (0028).
+  test('another address’s editor grant makes no editor of a viewer', async () => {
+    const { token, userId, otherToken } = context();
+    const { categoryId, itemId } = await ownerEntryIn({
+      token,
+      userId,
+      category: SEED.editorLimitsCategory,
+      title: 'rls-viewer-beside-editor-probe',
+    });
+    const viewerShareId = await share({
+      token,
+      categoryId,
+      invitedEmail: SEED.other.email,
+    });
+    const editorShareId = await share({
+      token,
+      categoryId,
+      invitedEmail: 'someone-else@collectionbuddy.test',
+      role: 'editor',
+    });
+    const { data: ownEntry, error: entryError } = await apiAs(otherToken)
+      .from('items')
+      .insert({ title: 'rls-viewer-own-entry' })
+      .select('id')
+      .single();
+    if (entryError) throw entryError;
+
+    try {
+      const { data: updated } = await apiAs(otherToken)
+        .from('items')
+        .update({ title: 'edited by a viewer' })
+        .eq('id', itemId)
+        .select('id');
+      expect(updated).toEqual([]);
+
+      const { error: filed } = await apiAs(otherToken)
+        .from('item_categories')
+        .insert({ item_id: ownEntry!.id, category_id: categoryId });
+      expect(filed?.message).toBe('cross-tenant assignment is not allowed');
+    } finally {
+      await unshare(token, viewerShareId);
+      await unshare(token, editorShareId);
+      await apiAs(otherToken).from('items').delete().eq('id', ownEntry!.id);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
   // Deliberate: "delete own or invited category_shares" lets the grantee leave, ending only its own access.
   test('an editor may leave the share, which ends its own access', async () => {
     const { token, userId, otherToken } = context();

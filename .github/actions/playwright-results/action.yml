@@ -22,7 +22,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: daun/playwright-report-summary@31ed947ec7a623d18a66cfd20ef546dc66ef8063 # v4
+    - uses: daun/playwright-report-summary@31ed947ec7a623d18a66cfd20ef546dc66ef8063 # v4.1.0
       with:
         report-file: web/playwright-results.json
         # report-tag only identifies a PR comment; comment-title is what shows as the summary heading.
