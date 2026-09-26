@@ -76,6 +76,10 @@ test.describe('managing categories', () => {
     await page.keyboard.press('Home');
     await expect(categories.tab(names[0])).toBeFocused();
     await expect(categories.locators.selected).toHaveText('Münzen');
+    // Cards fade in (.fade-up); axe samples contrast mid-fade as a false positive unless settled.
+    for (const card of await on(page).catalogue.locators.cards.all()) {
+      await expect(card).toHaveCSS('opacity', '1');
+    }
     await expectNoSeriousA11yViolations(page, testInfo);
 
     await page.keyboard.press('End');
