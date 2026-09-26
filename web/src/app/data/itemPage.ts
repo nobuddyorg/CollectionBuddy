@@ -1,12 +1,11 @@
 import { supabase } from '../supabase';
 import type { ImageListRow } from './images';
 import { ITEM_FIELDS_SELECT, withSignal, type ItemFields } from './items';
-import { likePatternFor, searchFilterFor } from './itemSearch';
+import { likePatternFor } from './itemSearch';
 
 /** One entry of a page read, with its photographs, before `listItems` splits them. */
 type ItemWithImages = ItemFields & { images: ImageListRow[] };
 
-const ITEM_CATEGORY_PAGE_SELECT = `items!inner(${ITEM_FIELDS_SELECT})`;
 const ITEM_WITH_IMAGES_SELECT = `${ITEM_FIELDS_SELECT},images(id,item_id,path_full,path_thumb)`;
 
 /** The page's item ids, newest first, walking idx_item_categories_cat_created. */
@@ -57,30 +56,18 @@ export function rawListItemsByIds({
   );
 }
 
-/** The exact total; the items join is ~15x dearer and only a search filter needs it back. */
+/** The unsearched page's exact total, off item_categories alone: an items join is ~15x dearer. */
 export function rawCountItems({
   categoryId,
-  search,
   signal,
 }: {
   categoryId: string;
-  search: string;
   signal?: AbortSignal;
 }) {
-  const filter = searchFilterFor(search);
-  if (!filter) {
-    const query = supabase
-      .from('item_categories')
-      .select('item_id', { count: 'exact', head: true })
-      .eq('category_id', categoryId);
-    return withSignal(query, signal);
-  }
-
   const query = supabase
     .from('item_categories')
-    .select(ITEM_CATEGORY_PAGE_SELECT, { count: 'exact', head: true })
-    .eq('category_id', categoryId)
-    .or(filter, { referencedTable: 'items' });
+    .select('item_id', { count: 'exact', head: true })
+    .eq('category_id', categoryId);
   return withSignal(query, signal);
 }
 

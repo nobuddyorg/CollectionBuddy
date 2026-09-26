@@ -237,19 +237,11 @@ describe('createZipWriter', () => {
     expect(uint32(bytes, firstData + 5)).toBe(0x04034b50);
   });
 
-  it('reports the running size, which is where the next entry begins', () => {
-    const writer = createZipWriter();
-    expect(writer.size()).toBe(0);
-    writer.add({ path: 'one.txt', bytes: encoder.encode('hello'), modified });
-    expect(writer.size()).toBe(30 + 'one.txt'.length + 5);
-    writer.add({ path: 'two.txt', bytes: encoder.encode('!'), modified });
-    expect(writer.size()).toBe(30 + 7 + 5 + 30 + 7 + 1);
-  });
-
   it('records each entry’s offset so the directory points at its header', async () => {
     const writer = createZipWriter();
     writer.add({ path: 'one.txt', bytes: encoder.encode('hello'), modified });
-    const secondOffset = writer.size();
+    // One 30-byte local header, the name and the five bytes of 'hello'.
+    const secondOffset = 30 + 'one.txt'.length + 5;
     writer.add({ path: 'two.txt', bytes: encoder.encode('!'), modified });
     const bytes = await bytesOf(writer.finish());
 

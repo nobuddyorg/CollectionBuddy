@@ -182,7 +182,7 @@ The 3-character minimum before a search fires is not about the index: a one- or 
 
 ## Why mutation testing is scoped to a list of files
 
-Line coverage answers "did this run," not "would a real bug here have been caught." For presentational components and hooks that mostly orchestrate Supabase calls, the gap barely matters. It matters a lot for pure functions doing string and boundary construction — the PostgREST filter builder, pagination windows, ZIP date packing, CSV formula-injection guards, retry/backoff arithmetic — where a test can execute every line and assert nothing. The list is [`web/mutation-targets.mjs`](../../web/mutation-targets.mjs), shared with `vitest.config.mts`'s per-file coverage floors so the two cannot drift; each entry's own comment says what it guards.
+Line coverage answers "did this run," not "would a real bug here have been caught." For presentational components and hooks that mostly orchestrate Supabase calls, the gap barely matters. It matters a lot for pure functions doing string and boundary construction — the search term's ILIKE escaping, pagination windows, ZIP date packing, CSV formula-injection guards, retry/backoff arithmetic — where a test can execute every line and assert nothing. The list is [`web/mutation-targets.mjs`](../../web/mutation-targets.mjs), shared with `vitest.config.mts`'s per-file coverage floors so the two cannot drift; each entry's own comment says what it guards.
 
 Mutating the whole `src/app` tree would mean JSX and Tailwind class strings too: thousands of near-equivalent mutants, a multi-minute run, and a score that means nothing. A scoped run finishes in seconds and produces a number worth acting on, which is why CI runs it on every PR rather than only on `main` — learning after the merge that a test asserts nothing is learning it too late.
 
@@ -204,10 +204,10 @@ The other class is the **timeout**, which Stryker counts as a kill. Most were av
 
 ## Why four functions have property tests
 
-`buildSearchFilter`, `csvCell`, `dosDateTime` and `clampPage`/`pageRange` take
+`likePatternFor`, `csvCell`, `dosDateTime` and `clampPage`/`pageRange` take
 input that is adversarial or unbounded (any search term, any user text, any
 date, any page and total), and each has a property that is easy to state: the
-filter is always exactly four quoted conditions that match the term literally;
+ILIKE pattern always matches the term literally, with no wildcard but its own;
 a CSV cell always parses back to the text, apostrophe-guarded exactly when it
 would start a formula; a DOS timestamp always decodes to a valid date and
 clamps rather than wraps; a page range always holds an entry when there is

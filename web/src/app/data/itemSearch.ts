@@ -4,13 +4,6 @@ function likePattern(needle: string): string {
   return `%${likeEscaped}%`;
 }
 
-// Quoted so PostgREST's or=() grammar reads one opaque string, not `, . ( )` as delimiters.
-export function buildSearchFilter(needle: string): string {
-  const like = likePattern(needle);
-  const quoted = like.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  return `title.ilike."${quoted}",description.ilike."${quoted}",place.ilike."${quoted}",tags_text.ilike."${quoted}"`;
-}
-
 // Below 3 characters no trigram can seed the index scan, so ILIKE would scan every row.
 export const SEARCH_MIN_LENGTH = 3;
 
@@ -26,14 +19,7 @@ export function searchMinLength(search: string): number {
     : SEARCH_MIN_LENGTH;
 }
 
-/** The or=() filter a term earns, or null when too short; the list and the map share this gate. */
-export function searchFilterFor(search: string): string | null {
-  return search.length >= searchMinLength(search)
-    ? buildSearchFilter(search)
-    : null;
-}
-
-/** The raw ILIKE pattern for `list_category_places`' `like_pattern`, gated like searchFilterFor. */
+/** The escaped ILIKE `like_pattern` the search and map RPCs take, or null when the term is too short. */
 export function likePatternFor(search: string): string | null {
   return search.length >= searchMinLength(search) ? likePattern(search) : null;
 }

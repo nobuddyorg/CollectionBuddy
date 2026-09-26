@@ -78,7 +78,6 @@ describe('exportCategory, a ZipLimitError from the writer', () => {
     });
     vi.spyOn(zipModule, 'createZipWriter').mockReturnValue({
       add: addSpy,
-      size: () => 0,
       finish: vi.fn(),
     });
     vi.stubGlobal(
@@ -112,7 +111,6 @@ describe('exportCategory, a ZipLimitError from the writer', () => {
     });
     vi.spyOn(zipModule, 'createZipWriter').mockReturnValue({
       add: addSpy,
-      size: () => 0,
       finish: vi.fn(),
     });
     let fetchCalls = 0;
@@ -152,7 +150,6 @@ describe('exportCategory, a ZipLimitError from the writer', () => {
     });
     vi.spyOn(zipModule, 'createZipWriter').mockReturnValue({
       add: addSpy,
-      size: () => 0,
       finish: vi.fn(),
     });
     vi.stubGlobal(
