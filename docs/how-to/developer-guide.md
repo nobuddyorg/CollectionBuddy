@@ -15,12 +15,13 @@ On a pull request, CI's `changes` job skips `build_and_test`, `mutation_test`,
 `lighthouse` and `zap_baseline` unless `web/**` or `.zap/rules.tsv` changed,
 and `e2e_local_stack` and `opengrep` unless one of those or
 `supabase/migrations/**`, `supabase/tests/database/**`,
-`supabase/splinter.sh`, `.sqlfluff` or `cleanup-orphaned-photos.yml`
-changed; a change to `ci.yml` runs everything. Nothing else runs them on a
-PR: not `.github/actions/**`, `supabase/config.toml` or `.semgrepignore`, so
-run the matching checks locally for those. A push to `main` or a dispatch
-runs everything, and the deploy waits for that run. A skipped job reports as
-passed. Every job writes its report to its own Actions summary rather than a
+`supabase/splinter.sh`, `.sqlfluff`, `.semgrepignore` or
+`cleanup-orphaned-photos.yml` changed; a change to `ci.yml`, a composite
+action in `.github/actions/` or `supabase/config.toml` runs everything, since
+every job runs on them. Any other path — another workflow, say — runs only
+`prek` on a PR, so run the matching checks locally for it. A push to `main`
+or a dispatch runs everything, and the deploy waits for that run. A skipped
+job reports as passed. Every job writes its report to its own Actions summary rather than a
 PR comment — see [Configuration](../reference/configuration.md#ci-job-summaries).
 
 ## Run the end-to-end suite
@@ -403,9 +404,10 @@ names exists at the size it claims.
    existing file. Never edit, rename or delete an existing migration, not even
    to revert one ([Roll back a bad deploy](#roll-back-a-bad-deploy)); CI's
    `prek` job runs `supabase/check-migration-history.sh` against the PR's
-   base, which fails on any of those, and on a new file not numbered after
-   the last one there; on `main` the base is the previous tip, so of two PRs
-   that picked the same number the second merge fails CI and deploys nothing.
+   base, which fails on any of those, on a new file not numbered after the
+   last one there, and on two new files sharing a number; on `main` the base
+   is the previous tip, so of two PRs that picked the same number the second
+   merge fails CI and deploys nothing.
    The migration keeps the bundle `main` serves working
    ([Expand, then contract](#expand-then-contract)). A file that takes a lock
    starts with `set local lock_timeout` and `set local statement_timeout`
