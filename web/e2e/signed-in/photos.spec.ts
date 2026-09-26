@@ -89,6 +89,25 @@ function emulateSafariCanvas() {
   Object.defineProperty(window, 'Worker', { value: undefined });
 }
 
+type WorkerAnswers = { files: number; errors: number };
+
+// browser-image-compression's worker posts back the compressed file, or {error} when it cannot import the library.
+function countCompressionWorkerAnswers() {
+  const answers: WorkerAnswers = { files: 0, errors: 0 };
+  Object.assign(window, { compressionWorkerAnswers: answers });
+  const NativeWorker = window.Worker;
+  window.Worker = class extends NativeWorker {
+    constructor(...args: ConstructorParameters<typeof Worker>) {
+      super(...args);
+      this.addEventListener('message', ({ data }) => {
+        if (data?.file) answers.files++;
+        if (data?.error) answers.errors++;
+      });
+      this.addEventListener('error', () => answers.errors++);
+    }
+  };
+}
+
 const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
 
 test.describe('photographs', () => {
@@ -164,6 +183,34 @@ test.describe('photographs', () => {
         expect(file.type).toBe('image/webp');
         expect(file.bytes).toBeLessThan(COMPRESSED_CEILING_BYTES);
       }
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
+  // A worker whose import the CSP refuses fails quietly and the library compresses on the main thread instead.
+  test('it is compressed off the main thread, in a worker that loads its library from the app', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await page.addInitScript(countCompressionWorkerAnswers);
+    await app.categories.do.open(SEED.photoCategory);
+
+    const title = uniqueTitle('Im Worker');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+
+      const answers = await page.evaluate(
+        () =>
+          (window as unknown as { compressionWorkerAnswers: WorkerAnswers })
+            .compressionWorkerAnswers,
+      );
+      // One worker for the full size, one for the thumbnail.
+      expect(answers).toEqual({ files: 2, errors: 0 });
     } finally {
       await removeEntriesTitled(title);
     }

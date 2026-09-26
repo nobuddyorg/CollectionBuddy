@@ -56,3 +56,18 @@ export async function reloadCatalogue(page) {
     .getByTestId('new-entry')
     .waitFor({ state: 'visible', timeout: 30000 });
 }
+
+/** Starts recording main-thread long tasks; read them back with longTasks(). */
+export async function watchLongTasks(page) {
+  await page.evaluate(() => {
+    window.__proofLongTasks = [];
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries())
+        window.__proofLongTasks.push(entry.duration);
+    }).observe({ type: 'longtask' });
+  });
+}
+
+export function longTasks(page) {
+  return page.evaluate(() => window.__proofLongTasks ?? []);
+}
