@@ -18,11 +18,13 @@ const MapView = dynamic(() => import('../Map'), { ssr: false });
 export function MapModal({
   categoryId,
   search,
+  canEdit,
   open,
   onOpenChange,
 }: {
   categoryId: string;
   search: string;
+  canEdit: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -33,7 +35,13 @@ export function MapModal({
     places,
     loading: loadingPlaces,
     error: placesError,
-  } = usePlaces({ categoryId, search, enabled: open, locale: language });
+  } = usePlaces({
+    categoryId,
+    search,
+    enabled: open,
+    canEdit,
+    locale: language,
+  });
 
   // Starts empty; the map frames pins as they stream in on its own.
   const {
