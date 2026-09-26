@@ -58,7 +58,7 @@ menu, and — in `rls/` — the row-level security boundary itself. Those specs
 bypass the interface almost entirely: they ask Postgres, with a real token, the
 questions the app never would, one file per boundary (`isolation`,
 `viewer-share`, `editor-share`, each with a `-photographs` half for Storage,
-plus `search-rpc` and `quotas`; shared helpers in `rls/helpers.ts`). Change a
+plus `search-rpc`, `orphan-sweep-rpc` and `quotas`; shared helpers in `rls/helpers.ts`). Change a
 policy and these files say whether it holds.
 
 ```bash
@@ -156,6 +156,7 @@ supabase test db
 | `060`, `065` | The two read RPCs: who may call them, what they return |
 | `070_quotas_test.sql` | The per-owner photo-storage and entry quotas |
 | `075_query_plans_test.sql` | That every index-backed query can reach its index, and picks it at a realistic size |
+| `080_orphan_sweep_test.sql` | What the orphan sweep may delete: both path columns, no uuid cast, the 48 h grace, other buckets, the mass-deletion ceiling |
 
 `_helpers.psql` holds the shared fixtures; it is `.psql` because
 `supabase test db` collects every `.sql` file as a test. pgTAP proves the
@@ -470,6 +471,36 @@ One-time setup for a fork:
    rebased (`@dependabot rebase`).
    A merge queue would do the same, but `ci.yml` has no `merge_group` trigger.
 
+## Sweep orphaned photographs
+
+[`cleanup-orphaned-photos.yml`](../../.github/workflows/cleanup-orphaned-photos.yml)
+runs daily at 04:30 UTC, from `main` only, and deletes what
+`orphan_sweep_plan()` (migration `0022`) lists: `item-images` objects older
+than 48 h that no `images` row names as `path_full` or `path_thumb`, the oldest
+10,000 per run. A run by hand is a dry run unless `dry_run` is unticked: it
+lists what a real run would delete and never fetches the secret key.
+
+**If rows or photographs may have been lost, disable the sweep first**, before
+anything else: Actions → *Clean up orphaned photographs* → ⋯ → *Disable
+workflow* (or `gh workflow disable cleanup-orphaned-photos.yml`). To it, every
+photograph whose `images` row is gone is an orphan, deleted for good once it is
+48 h old. Then find the cause, and [restore](#restore-production-from-a-backup)
+if rows are gone.
+
+**When a run refuses.** It fails and deletes nothing when more objects are
+orphaned than max(50, 5 % of the bucket), because lost `images` rows look
+exactly like mass orphaning. Disable it as above. A disabled workflow cannot be
+run by hand, so to see the list, enable it, run it with the defaults (a dry
+run), and disable it again. Only if every listed object is truly orphaned (no
+row was ever meant to name it), run it by hand with `dry_run` off and
+`allow_mass_delete` on. Each such run deletes at most 10,000 objects, and the
+schedule keeps refusing while more than the ceiling remain, so repeat until the
+dry run is under it, then enable the workflow again.
+
+A change to the plan, its migration or the workflow runs CI's pgTAP job
+(`080_orphan_sweep_test.sql`); after it merges, run the default dry run once
+before the next 04:30 run.
+
 ## Back up production
 
 Supabase's Free plan keeps no database backup, and no plan's backup contains
@@ -517,7 +548,9 @@ to `backup.yml`, the dump, or the schema's shape.
 1. **Disable the sweep first:** Actions → *Clean up orphaned photographs* →
    ⋯ → *Disable workflow* (or `gh workflow disable cleanup-orphaned-photos.yml`).
    To it every photograph whose `images` row is gone is an orphan, and it
-   deletes those once they are 48 h old.
+   deletes those once they are 48 h old. Its mass-deletion ceiling
+   ([Sweep orphaned photographs](#sweep-orphaned-photographs)) stops only a
+   loss larger than max(50, 5 % of the bucket).
 2. If a migration caused the loss, also disable *Deploy Pages* and merge
    nothing to `main` until the restore is done: every merge that passes CI
    migrates production. Leave *Back up production* running; it never

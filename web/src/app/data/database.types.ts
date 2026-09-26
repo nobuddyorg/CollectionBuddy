@@ -222,6 +222,16 @@ export type Database = {
         }[];
       };
       normalize_text: { Args: { txt: string }; Returns: string };
+      orphan_sweep_plan: {
+        Args: { max_objects: number };
+        Returns: {
+          deletion_ceiling: number;
+          object_count: number;
+          orphan_count: number;
+          paths: Json;
+          total_bytes: number;
+        }[];
+      };
       search_category_items: {
         Args: {
           cat_id: string;

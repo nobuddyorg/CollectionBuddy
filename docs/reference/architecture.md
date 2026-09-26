@@ -29,6 +29,7 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | [`0019_images_path_thumb_matches_item.sql`](../../supabase/migrations/0019_images_path_thumb_matches_item.sql) | `images.path_thumb` must name its own entry, as `path_full` must: the owner's client deletes both paths, so a planted thumbnail took another entry's photo with it. `not valid`: checked on every write from now on. |
 | [`0020_one_collection_per_entry.sql`](../../supabase/migrations/0020_one_collection_per_entry.sql) | `tg_item_categories_quota()` refuses an entry's second category link (was: an 11th), with `PT507`. Existing rows untouched. |
 | [`0021_item_writes_follow_the_grant.sql`](../../supabase/migrations/0021_item_writes_follow_the_grant.sql) | Adds `has_item_write_access()`. Writing an entry, its links, its `images` rows and the own-prefix objects under it needs write access to every category it is in, the entry's own owner included: revoking or demoting an editor ends their writes to the entries they filed ([why](../explanation/design-decisions.md#why-an-editors-filed-entries-follow-the-grant)). |
+| [`0022_orphan_sweep_plan.sql`](../../supabase/migrations/0022_orphan_sweep_plan.sql) | Adds `orphan_sweep_plan()`, the query `cleanup-orphaned-photos.yml` used to carry inline, plus the counts its mass-deletion ceiling needs; executable by no API role. |
 
 ### Tables
 
@@ -63,7 +64,7 @@ No `update` policy means no row matches, so the omission is the denial. Category
 
 Grants are the second denial: `anon` has `revoke all` on every table, and `authenticated` holds exactly the DML each table's policies back — no `UPDATE` on `item_categories`/`images`, no `TRUNCATE`/`REFERENCES`/`TRIGGER` anywhere. `TRUNCATE` is the one RLS does not filter. `0007` raises at migration time if RLS is ever found disabled on `storage.objects`.
 
-[`web/e2e/signed-in/rls/`](../../web/e2e/signed-in/rls/) is the executable version of this section, one spec per boundary (`isolation`, `viewer-share`, `editor-share`, each with a `-photographs` half for Storage, plus `search-rpc` and `quotas`), with real tokens against a local stack; `supabase/tests/database/` covers the same logic directly in pgTAP.
+[`web/e2e/signed-in/rls/`](../../web/e2e/signed-in/rls/) is the executable version of this section, one spec per boundary (`isolation`, `viewer-share`, `editor-share`, each with a `-photographs` half for Storage, plus `search-rpc`, `orphan-sweep-rpc` and `quotas`), with real tokens against a local stack; `supabase/tests/database/` covers the same logic directly in pgTAP.
 
 ### Sharing
 
@@ -96,6 +97,7 @@ Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql
 - `tg_set_updated_at()` — on `categories` and `items`.
 - `storage_item_id()` — parses the item id out of a storage path, returning `NULL` rather than raising; it tests the segment with `pg_input_is_valid()` rather than catching the cast's error, so no call opens a subtransaction. See Storage.
 - `keepalive()` — no-op RPC, callable by `anon`, hit daily by `keep-alive.yml`.
+- `orphan_sweep_plan()` — what `cleanup-orphaned-photos.yml` deletes: the oldest unreferenced `item-images` objects past 48 h, with their count, bytes, the total orphaned and the mass-deletion ceiling. `SECURITY INVOKER`; no API role may execute it, only its owner through the Management API (`rls/orphan-sweep-rpc.spec.ts`).
 - `list_category_places()` — the map's distinct places for a category, `SECURITY INVOKER`.
 - `search_category_items()` — the searched catalogue page, `SECURITY DEFINER`: re-implements the read-access check (owns the item, or holds an active read grant on the category) and then queries with RLS bypassed so the trigram indexes are usable ([why](../explanation/design-decisions.md#why-search-uses-trigram-ilike-instead-of-full-text-search)). An authorization boundary in its own right, with its own spec (`rls/search-rpc.spec.ts`).
 
@@ -158,7 +160,7 @@ Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (N
 | `ci.yml` (`zap_baseline`) | `web` changed | OWASP ZAP passive scan against the export, signed out and in demo mode, served on the runner. |
 | `pages-deploy.yml` (`gate` → `migrate` → `build` → `deploy` → `smoke_test`) | `ci.yml` passed on a push to `main` (`workflow_run`), manual from `main` | Only `main`'s tip, only once CI passed on it. When migrations are pending, upload an encrypted dump first; apply them and reload the PostgREST cache; export, and call `keepalive()` with the URL and key just baked in, so a rejected key never publishes; publish to Pages; run the signed-out suite against the live site. |
 | `keep-alive.yml` | daily, manual | Calls `keepalive()` so a free-tier project does not pause. |
-| `cleanup-orphaned-photos.yml` | daily (`30 4 * * *`), manual | Deletes Storage objects no `images` row references as `path_full` or `path_thumb`, older than 48 h — at most 10,000 per run, in requests of 1,000 (Storage's bulk-delete cap). Manual runs are dry runs unless opted out. |
+| `cleanup-orphaned-photos.yml` | daily (`30 4 * * *`), manual | Deletes Storage objects no `images` row references as `path_full` or `path_thumb`, older than 48 h, as `orphan_sweep_plan()` selects them — at most 10,000 per run, in requests of 1,000 (Storage's bulk-delete cap). Refuses to delete when more objects are orphaned than max(50, 5 % of the bucket), unless run by hand with `allow_mass_delete` ([Sweep orphaned photographs](../how-to/developer-guide.md#sweep-orphaned-photographs)). Manual runs are dry runs unless opted out. |
 | `backup.yml` (`database`, `photographs`) | daily (`47 2 * * *`), manual | Encrypted off-site copies: a dump of roles, schema and `auth`/`public` data, and each new `item-images` object; objects gone from the bucket move to a prefix the backup bucket expires ([Back up production](../how-to/developer-guide.md#back-up-production)). |
 | `k6-load-test.yml` | manual only | k6 against a Supabase stack started in the run, or the hosted project behind an explicit opt-in; reports, never gates ([Load testing](../how-to/load-testing.md)). |
 | `auto-merge.yml` | PR events | Auto-merges Dependabot patch-level devDependency bumps once checks pass; does not approve. |

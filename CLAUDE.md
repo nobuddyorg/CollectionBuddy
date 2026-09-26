@@ -99,11 +99,15 @@ several real RLS bugs. Every policy change is security-critical.
   PR description as security-relevant, with one line on what it now allows or
   denies.
 - `.github/workflows/cleanup-orphaned-photos.yml` counts as a database change:
-  `service_role`, bulk Storage delete, daily cron, irreversible. Its query has
-  three load-bearing invariants — it matches **both `path_full` and
-  `path_thumb`**, casts **no path to `uuid`**, and keeps a **48h grace
-  period**. Never drop, narrow or shorten them; verify any change with the
-  default dry run (`workflow_dispatch`) first. Why: TEST_STRATEGY.md §12.
+  `service_role`, bulk Storage delete, daily cron, irreversible. Its query,
+  `public.orphan_sweep_plan()` (migration `0022`), has three load-bearing
+  invariants — it matches **both `path_full` and `path_thumb`**, casts **no
+  path to `uuid`**, and keeps a **48h grace period** — plus a mass-deletion
+  ceiling the workflow will not pass without its `allow_mass_delete` input.
+  Never drop, narrow or shorten them; `080_orphan_sweep_test.sql` asserts
+  each, and fails when `images` gains a path column the plan does not match.
+  Verify any change with the default dry run (`workflow_dispatch`) first.
+  Why: TEST_STRATEGY.md §12.
 
 ## How to work here
 

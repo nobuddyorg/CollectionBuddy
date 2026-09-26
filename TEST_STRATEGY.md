@@ -596,7 +596,12 @@ like a schema change**; **a dry-run mode that lists what it would delete and
 exits before fetching any elevated credential**, defaulted on for manual runs;
 and **a grace period** between "looks orphaned" and "eligible" long enough that
 a slow or partial write can never fall inside it — the invariant a future edit
-is most likely to shrink while "simplifying."
+is most likely to shrink while "simplifying." Two more, once the job is worth
+keeping: **keep its query where the database suite runs it**, against seeded
+objects, rather than inline in the job's script; and **a proportionality
+ceiling** — refuse to delete more than a small share of what exists without an
+explicit override, because a bulk loss of the referencing records looks
+exactly like mass orphaning, and the sweep would make that loss permanent.
 
 Three lessons for the query itself:
 
