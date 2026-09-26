@@ -101,7 +101,7 @@ select is(
 -- "search stopped finding things by place" -- a shape no authorization
 -- test would ever notice.
 insert into public.items (title, description, place, tags) values
-  ('Branch entry', 'Eine Beschreibung mit Silberglanz', 'Kölnisch Wasser', array['Reichsmark', 'silber'])
+  ('Branch entry', E'Eine Beschreibung\nmit Silberglanz', 'Kölnisch Wasser', array['Reichsmark', 'silber'])
 returning id as branch_item \gset
 insert into public.item_categories (item_id, category_id)
 values (:'branch_item'::uuid, :'category_id'::uuid);
@@ -114,7 +114,7 @@ select is(
 select is(
   pg_temp.search_page(:'category_id'::uuid, 'Silberglanz', 0, 9),
   array['Branch entry'],
-  'and against the description'
+  'and against the description, on a line after its first (0027)'
 );
 select is(
   pg_temp.search_page(:'category_id'::uuid, 'Kölnisch', 0, 9),

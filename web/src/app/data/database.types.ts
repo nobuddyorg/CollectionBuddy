@@ -224,6 +224,7 @@ export type Database = {
           titles: string[];
         }[];
       };
+      normalize_multiline_text: { Args: { txt: string }; Returns: string };
       normalize_text: { Args: { txt: string }; Returns: string };
       orphan_sweep_plan: {
         Args: { max_objects: number };

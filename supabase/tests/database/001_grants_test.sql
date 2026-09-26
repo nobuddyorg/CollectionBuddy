@@ -94,6 +94,8 @@ select function_privs_are('public', 'normalize_text', array['text'],
   'anon', array[]::text[], 'anon cannot execute normalize_text');
 select function_privs_are('public', 'join_tags', array['text[]'],
   'anon', array[]::text[], 'anon cannot execute join_tags');
+select function_privs_are('public', 'normalize_multiline_text', array['text'],
+  'authenticated', array[]::text[], 'only its trigger calls normalize_multiline_text, so authenticated cannot either');
 select function_privs_are('public', 'storage_item_id', array['text'],
   'anon', array[]::text[], 'anon cannot execute storage_item_id');
 select function_privs_are('public', 'photo_upload_has_room', array[]::text[],

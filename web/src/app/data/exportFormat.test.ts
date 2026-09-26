@@ -298,7 +298,7 @@ describe('buildManifest', () => {
       [
         item({
           id: 'a',
-          description: 'A note',
+          description: 'A note\nover two lines',
           place: 'Cologne',
           place_lat: 50.9,
           place_lng: 6.9,
@@ -313,6 +313,7 @@ describe('buildManifest', () => {
       exportedAt,
     }).items;
 
+    expect(row.description).toBe('A note\nover two lines');
     expect(row.place_lat).toBe(50.9);
     expect(row.tags).toEqual(['silver', 'us']);
     expect(row.id).toBe('a');

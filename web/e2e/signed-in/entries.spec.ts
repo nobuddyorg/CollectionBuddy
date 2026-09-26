@@ -42,6 +42,34 @@ test.describe('adding and removing entries', () => {
     }
   });
 
+  test('keeps the line breaks in a description', async ({ on, page }) => {
+    const title = uniqueTitle('Heller');
+    const secondLine = `Condition: VF ${Date.now()}`;
+    const description = `Bought: flea market 2019\n${secondLine}`;
+    try {
+      await on(page).catalogue.do.addEntry(title, description);
+      await page.reload();
+
+      const card = on(page).catalogue.card(title);
+      // innerText is the rendered text, so it keeps the break only if the card shows one.
+      await expect(card.locators.description).toHaveJSProperty(
+        'innerText',
+        description,
+      );
+
+      await card.do.edit();
+      await expect(on(page).form.locators.inputs.description).toHaveValue(
+        description,
+      );
+      await on(page).form.do.cancel();
+
+      await on(page).catalogue.do.search(secondLine);
+      await expectTitles(page, [title]);
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
   test('finds a new entry by searching for it', async ({ on, page }) => {
     const title = uniqueTitle('Dublone');
     try {

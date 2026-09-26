@@ -89,7 +89,8 @@ the delete and keep the item.
 | Tags | Optional. Enter or comma adds a chip; Backspace on an empty tag field removes the last one. Duplicates are ignored. |
 
 On save, whitespace is trimmed, blank fields become empty, and tags are
-deduplicated and sorted.
+deduplicated and sorted. The description keeps its line breaks; in the other
+fields a line break becomes a space.
 
 ## Photos
 

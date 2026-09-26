@@ -37,6 +37,7 @@ What CollectionBuddy is made of. For _why_, see [Design decisions](../explanatio
 | [`0024_orphan_sweep_plan_read_only.sql`](../../supabase/migrations/0024_orphan_sweep_plan_read_only.sql) | Lets `supabase_read_only_user` execute `orphan_sweep_plan()`, so the sweep's Management API token runs it through the read-only query endpoint and needs no write access to the database. |
 | [`0025_photo_ceilings_fit_the_plan.sql`](../../supabase/migrations/0025_photo_ceilings_fit_the_plan.sql) | Photograph ceilings sized to the Free plan's 1 GB: 256 MiB per owner with thumbnails counted (`images.thumb_size_bytes`, backfilled), 768 MiB in the bucket when a photograph is recorded, and `photo_upload_has_room()` in the upload policy: 832 MiB in the bucket, 320 MiB per uploader. The upload policy also refuses a path an `images` row names ([why](../explanation/design-decisions.md#why-quotas-are-counted-in-the-database)). |
 | [`0026_places_in_stable_order.sql`](../../supabase/migrations/0026_places_in_stable_order.sql) | `list_category_places()` returns its places ordered by place, so the map can page them past PostgREST's `max_rows` (1,000), which truncated a larger category's places without an error. |
+| [`0027_description_keeps_line_breaks.sql`](../../supabase/migrations/0027_description_keeps_line_breaks.sql) | `tg_items_normalize()` keeps the line breaks in an item's description through `normalize_multiline_text()`; `normalize_text()` had collapsed them to spaces. Title, place and tags stay single-line. Descriptions stored before it stay flattened. |
 
 ### Tables
 
@@ -92,10 +93,11 @@ Account-based, one category at a time, `viewer` or `editor`. No public links ([w
 Functions in [`0002_functions.sql`](../../supabase/migrations/0002_functions.sql), triggers in [`0004_triggers.sql`](../../supabase/migrations/0004_triggers.sql). The `language sql` functions that read tables — the two access predicates and the two RPCs — are created with `check_function_bodies` off, the way `pg_dump` restores functions, because Postgres would otherwise parse their bodies before `0003` creates the tables.
 
 - `normalize_text()` — trims, collapses whitespace, returns `NULL` for blank.
+- `normalize_multiline_text()` — for the description: turns CR LF and CR into LF, drops blanks before a line break, trims the ends, returns `NULL` for blank; line breaks and indentation stay ([`0027`](../../supabase/migrations/0027_description_keeps_line_breaks.sql)).
 - `join_tags()` — backs the `tags_text` generated column.
 - `caller_email()` — the caller's JWT email, trimmed and lowercased.
 - `enforce_user_id()` — sets `user_id = auth.uid()` on insert; on update restores the old owner rather than raising.
-- `tg_categories_normalize()` / `tg_items_normalize()` — apply `normalize_text()`; items also dedupe and sort `tags`.
+- `tg_categories_normalize()` / `tg_items_normalize()` — apply `normalize_text()`, and `normalize_multiline_text()` to an item's description; items also dedupe and sort `tags`.
 - `tg_item_categories_enforce()` — verifies both rows exist, requires write access to the category, sets `user_id` from the item's owner, and rejects the row if that owner is not the caller.
 - `tg_category_shares_enforce()` — see Sharing.
 - `tg_images_enforce()` — derives `images.user_id` from the item's owner; rejects an insert without `has_item_write_access()` to the item.
