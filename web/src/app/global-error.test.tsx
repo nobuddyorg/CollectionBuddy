@@ -45,7 +45,7 @@ describe('GlobalError', () => {
 
     const html = renderToString(<GlobalError />);
 
-    expect(html).toContain('<html lang="de">');
+    expect(html).toContain('<html lang="de" data-theme="light">');
     expect(html).toContain('Das hat nicht geklappt');
   });
 
@@ -58,6 +58,26 @@ describe('GlobalError', () => {
     render(<GlobalError />);
 
     expect(screen.getByRole('button', { name: 'Reload' })).toBeVisible();
+  });
+
+  it('takes the theme the visitor chose, as the root layout would', () => {
+    window.localStorage.setItem('theme', 'dark');
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+
+    render(<GlobalError />);
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+  });
+
+  it("follows the system's dark scheme when storage throws", () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+
+    render(<GlobalError />);
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
   });
 
   it('reloads when asked to', async () => {
