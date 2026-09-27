@@ -8,7 +8,6 @@ import {
 import {
   item,
   paginatedListItems,
-  fakeListImages,
   fakeSignUrls,
   okResponse,
 } from './exportCategory.test-support';
@@ -23,8 +22,9 @@ describe('exportCategory, timeout and cancellation', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
+          'item-1': ['1.webp'],
+        }),
         signUrls: fakeSignUrls(),
       });
       expect(timeoutSpy).toHaveBeenCalledWith(PHOTO_FETCH_TIMEOUT_MS);
@@ -48,8 +48,9 @@ describe('exportCategory, timeout and cancellation', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
+          'item-1': ['1.webp'],
+        }),
         signUrls: fakeSignUrls(),
         signal: controller.signal,
       });
@@ -78,8 +79,9 @@ describe('exportCategory, timeout and cancellation', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
+          'item-1': ['1.webp'],
+        }),
         signUrls: fakeSignUrls(),
       });
       await vi.advanceTimersByTimeAsync(10_000);
@@ -99,7 +101,6 @@ describe('exportCategory, timeout and cancellation', () => {
     const failure = exportCategory({
       category: { id: 'cat', name: 'Coins' },
       listItems,
-      listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
       signal: controller.signal,
     });
@@ -127,13 +128,12 @@ describe('exportCategory, timeout and cancellation', () => {
       const items = Array.from({ length: 10 }, (_, i) =>
         item({ id: `item-${i}` }),
       );
-      const listImages = fakeListImages(
-        Object.fromEntries(items.map((entry) => [entry.id, ['1.webp']])),
+      const photos = Object.fromEntries(
+        items.map((entry) => [entry.id, ['1.webp']]),
       );
       const failure = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems(items),
-        listImages,
+        listItems: paginatedListItems(items, photos),
         signUrls: fakeSignUrls(),
         signal: controller.signal,
       });
@@ -160,8 +160,9 @@ describe('exportCategory, timeout and cancellation', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
+          'item-1': ['1.webp'],
+        }),
         signUrls: fakeSignUrls(),
         signal: controller.signal,
       });

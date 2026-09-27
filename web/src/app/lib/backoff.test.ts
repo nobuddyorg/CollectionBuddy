@@ -9,13 +9,19 @@ import {
 
 describe('backoffDelayMs', () => {
   it('waits the base delay before the first retry', () => {
-    expect(backoffDelayMs(100, 0)).toBe(100);
+    expect(backoffDelayMs(100, 0, 1)).toBe(100);
   });
 
   it('doubles for each further attempt', () => {
-    expect(backoffDelayMs(100, 1)).toBe(200);
-    expect(backoffDelayMs(100, 2)).toBe(400);
-    expect(backoffDelayMs(100, 3)).toBe(800);
+    expect(backoffDelayMs(100, 1, 1)).toBe(200);
+    expect(backoffDelayMs(100, 2, 1)).toBe(400);
+    expect(backoffDelayMs(100, 3, 1)).toBe(800);
+  });
+
+  it('scales the whole backoff by its share, so a draw of zero waits not at all', () => {
+    expect(backoffDelayMs(100, 2, 0.25)).toBe(100);
+    expect(backoffDelayMs(100, 0, 0.5)).toBe(50);
+    expect(backoffDelayMs(100, 3, 0)).toBe(0);
   });
 });
 
@@ -88,6 +94,28 @@ describe('retryWithBackoff', () => {
     await vi.advanceTimersByTimeAsync(1);
 
     expect(result).toEqual({ value: 'third', at: 1500 });
+  });
+
+  it('waits only the drawn share of each backoff, drawing afresh before every retry', async () => {
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({ value: 'first', retry: true })
+      .mockResolvedValueOnce({ value: 'second', retry: true })
+      .mockResolvedValueOnce({ value: 'third', retry: false });
+    const jitter = vi.fn().mockReturnValueOnce(0.5).mockReturnValueOnce(0.25);
+
+    const result = settledAt(
+      retryWithBackoff({ maxAttempts: 3, baseMs: 500, run, jitter }),
+    );
+    await vi.advanceTimersByTimeAsync(249);
+    expect(run).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(run).toHaveBeenCalledTimes(2);
+
+    // 0.25 of the second backoff's 1000ms.
+    await vi.advanceTimersByTimeAsync(250);
+    expect(result).toEqual({ value: 'third', at: 500 });
+    expect(jitter).toHaveBeenCalledTimes(2);
   });
 
   // Waiting after the final attempt only delays the caller learning it failed.

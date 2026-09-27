@@ -23,7 +23,7 @@ vi.mock('../../data/categories', () => ({
 
 // Two paths per removal, so IMAGE_ROWS' three paths span two batches.
 vi.mock('../../data/images', () => ({
-  listImagePathsForItems: vi.fn(),
+  listImagePathsForCategory: vi.fn(),
   removeImageObjects: vi.fn(),
   REMOVE_OBJECTS_BATCH_SIZE: 2,
 }));

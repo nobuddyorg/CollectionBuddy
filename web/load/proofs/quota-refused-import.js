@@ -146,7 +146,7 @@ function upload({ session, path, bytes, probe = 'upload' }) {
   });
 }
 
-/** importPhoto.ts isTransientUploadError: no response, a 429 or a 5xx, by HTTP status or by Storage's own `statusCode`. */
+/** images.ts isTransientStorageError: no response, a 429 or a 5xx, by HTTP status or by Storage's own `statusCode`. */
 function isTransient(response) {
   if (response.status === 0) return true;
   let statusCode;

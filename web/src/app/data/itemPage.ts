@@ -71,7 +71,7 @@ export function rawCountItems({
   return withSignal(query, signal);
 }
 
-/** The searched page and its total in one `search_category_items` call, an RLS-bypassing ILIKE. */
+/** The searched page, its total and its photographs in one `search_category_items` call, an RLS-bypassing ILIKE. */
 export function rawSearchCategoryItems({
   categoryId,
   likePattern,
@@ -101,7 +101,10 @@ export function rawSearchCategoryItems({
   >();
 }
 
-type SearchItemRow = ItemFields & { total_count: number };
+type SearchItemRow = ItemFields & {
+  total_count: number;
+  images: ImageListRow[];
+};
 
 /** Just the item's own fields, dropping whatever a read carried alongside. */
 function itemFieldsOf({
@@ -132,7 +135,7 @@ type PageRead = {
   imageRows: ImageListRow[] | null;
 };
 
-/** The searched page and its total, read off the first row whichever page that is. */
+/** The searched page, its photographs, and its total, read off the first row whichever page that is. */
 async function searchedPage(
   params: {
     categoryId: string;
@@ -160,7 +163,7 @@ async function searchedPage(
       data: rows.map(itemFieldsOf),
       error: null,
       count,
-      imageRows: null,
+      imageRows: rows.flatMap((row) => row.images),
     };
   }
 
@@ -173,7 +176,7 @@ async function searchedPage(
     data: [],
     error: null,
     count: first?.[0]?.total_count ?? 0,
-    imageRows: null,
+    imageRows: [],
   };
 }
 
@@ -184,7 +187,7 @@ type ListItemsCalls = {
   rawSearch?: typeof rawSearchCategoryItems;
 };
 
-/** The catalogue page, newest first; `imageRows` is null on the searched path, which has none. */
+/** The catalogue page, newest first, with its photograph rows on both paths; `imageRows` is null only with an error. */
 export async function listItems(
   params: {
     categoryId: string;

@@ -4,7 +4,6 @@ import { exportCategory } from './exportCategory';
 import {
   item,
   paginatedListItems,
-  fakeListImages,
   fakeSignUrls,
   okResponse,
   statusResponse,
@@ -27,8 +26,9 @@ describe('exportCategory, retrying a photograph fetch', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
+          'item-1': ['1.webp'],
+        }),
         signUrls: fakeSignUrls(),
       });
       // Two backoff waits stand between the first attempt and the third.
@@ -56,8 +56,9 @@ describe('exportCategory, retrying a photograph fetch', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
+          'item-1': ['1.webp'],
+        }),
         signUrls: fakeSignUrls(),
       });
       await vi.advanceTimersByTimeAsync(10_000);
@@ -86,8 +87,9 @@ describe('exportCategory, retrying a photograph fetch', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
+          'item-1': ['1.webp'],
+        }),
         signUrls: fakeSignUrls(),
       });
       await vi.advanceTimersByTimeAsync(10_000);
@@ -120,8 +122,9 @@ describe('exportCategory, retrying a photograph fetch', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
+          'item-1': ['1.webp'],
+        }),
         signUrls: fakeSignUrls(),
       });
       await vi.advanceTimersByTimeAsync(10_000);
@@ -151,8 +154,9 @@ describe('exportCategory, retrying a photograph fetch', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
+          'item-1': ['1.webp'],
+        }),
         signUrls: fakeSignUrls(),
       });
       await vi.advanceTimersByTimeAsync(10_000);
@@ -179,16 +183,18 @@ describe('exportCategory, retrying a photograph fetch', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
+          'item-1': ['1.webp'],
+        }),
         signUrls: fakeSignUrls(),
+        jitter: () => 1,
       });
 
       // The first attempt is immediate.
       await vi.advanceTimersByTimeAsync(0);
       expect(calls).toBe(1);
 
-      // The second waits PHOTO_RETRY_BASE_MS (500ms) -- not less, not more.
+      // The second waits RETRY_BASE_MS (500ms) -- not less, not more.
       await vi.advanceTimersByTimeAsync(499);
       expect(calls).toBe(1);
       await vi.advanceTimersByTimeAsync(1);
@@ -202,6 +208,37 @@ describe('exportCategory, retrying a photograph fetch', () => {
 
       const result = await promise;
       expect(result.skippedPhotoCount).toBe(0);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  // Six downloads failing together would otherwise all come back at the same instant.
+  it("waits only the jitter's share of each backoff", async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls++;
+        return calls < 2 ? statusResponse(503) : okResponse([1]);
+      }),
+    );
+    try {
+      const promise = exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
+          'item-1': ['1.webp'],
+        }),
+        signUrls: fakeSignUrls(),
+        jitter: () => 0.5,
+      });
+      await vi.advanceTimersByTimeAsync(249);
+      expect(calls).toBe(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(calls).toBe(2);
+      expect((await promise).skippedPhotoCount).toBe(0);
     } finally {
       vi.useRealTimers();
       vi.unstubAllGlobals();
@@ -224,8 +261,9 @@ describe('exportCategory, retrying a photograph fetch', () => {
       try {
         const promise = exportCategory({
           category: { id: 'cat', name: 'Coins' },
-          listItems: paginatedListItems([item({ id: 'item-1' })]),
-          listImages: fakeListImages({ 'item-1': ['1.webp'] }),
+          listItems: paginatedListItems([item({ id: 'item-1' })], {
+            'item-1': ['1.webp'],
+          }),
           signUrls: fakeSignUrls(),
         });
         await vi.advanceTimersByTimeAsync(10_000);

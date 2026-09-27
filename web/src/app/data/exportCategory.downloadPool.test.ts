@@ -5,7 +5,6 @@ import * as zipModule from './zip';
 import {
   item,
   paginatedListItems,
-  fakeListImages,
   fakeSignUrls,
   okResponse,
   readZipEntries,
@@ -35,8 +34,7 @@ describe('exportCategory, downloading through the pool', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
           'item-1': Array.from({ length: photoCount }, (_, i) => `${i}.webp`),
         }),
         signUrls: fakeSignUrls(),
@@ -85,8 +83,9 @@ describe('exportCategory, a ZipLimitError from the writer', () => {
     try {
       const failure = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
+          'item-1': ['1.webp'],
+        }),
         signUrls: fakeSignUrls(),
       });
       await expect(failure).rejects.toBeInstanceOf(zipModule.ZipLimitError);
@@ -123,8 +122,7 @@ describe('exportCategory, a ZipLimitError from the writer', () => {
       const photoCount = PHOTO_DOWNLOAD_CONCURRENCY + 4;
       const failure = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
           'item-1': Array.from({ length: photoCount }, (_, i) => `${i}.webp`),
         }),
         signUrls: fakeSignUrls(),
@@ -155,8 +153,9 @@ describe('exportCategory, a ZipLimitError from the writer', () => {
     try {
       const failure = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })]),
-        listImages: fakeListImages({ 'item-1': ['0.webp', '1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'item-1' })], {
+          'item-1': ['0.webp', '1.webp'],
+        }),
         signUrls: fakeSignUrls(),
       });
       await expect(failure).rejects.toHaveProperty('message', 'limit-1');
