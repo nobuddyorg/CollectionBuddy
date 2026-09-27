@@ -50,7 +50,7 @@ npx playwright show-report             # after a failed run
 The same suite runs against the deployed site after every release:
 
 ```bash
-E2E_BASE_URL="https://nobuddyorg.github.io/CollectionBuddy/" npm run e2e
+E2E_BASE_URL="https://nobuddy.org/CollectionBuddy/" npm run e2e
 ```
 
 With `E2E_BASE_URL` set it starts no server. That run catches what only

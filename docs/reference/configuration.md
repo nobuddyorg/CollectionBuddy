@@ -48,7 +48,7 @@ The hosted project's Auth configuration lives in its dashboard, so the values sh
 | Third-party auth | `/config/auth/third-party-auth` | none | none |
 | Customize access token hook | `hook_custom_access_token_enabled` | off | off |
 | Refresh token rotation, reuse interval | `refresh_token_rotation_enabled`, `security_refresh_token_reuse_interval` | on, 10 s | same |
-| Site URL | `site_url` | `https://nobuddyorg.github.io/CollectionBuddy/` | `http://localhost:3000` |
+| Site URL | `site_url` | `https://nobuddy.org/CollectionBuddy/` | `http://localhost:3000` |
 | Redirect URLs | `uri_allow_list` | empty | the two local dev origins |
 
 - **Redirect URLs stay empty.** Sign-in returns to the site's own URL, and GoTrue admits any redirect with the Site URL's scheme, host and port without an entry. A wildcard matching a host nobody here controls would let a sign-in hand its code to that host.
