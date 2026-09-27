@@ -1,6 +1,7 @@
 // Every script's setup() and teardown(): three fresh identities and a production-shaped collection, all written through RLS.
 import {
   deleteOwnRows,
+  entrySliceEnd,
   insertReturning,
   insertRows,
   listImagePaths,
@@ -31,6 +32,8 @@ export const SEARCH_TERMS = ['Denar', 'Wien', 'silber', 'Dukat 42', 'zzqx'];
 
 // Two paths per row, so one page stays within Storage's 1,000 prefixes per delete.
 const PHOTO_PAGE = 500;
+// Entries deleted per statement; one category cascade unfiling 40,000 ran 70 s, past the 8 s statement timeout.
+const ENTRY_SLICE = 1000;
 
 /** `count` items newest-first, a minute apart, filed into one category; nine in ten carry their place's coordinates. */
 function itemRows({ count, categoryId, now, nouns }) {
@@ -145,7 +148,7 @@ export function setup() {
   };
 }
 
-// Storage objects before rows, never after; categories go first, as their cascade drops filed items set-based, not per-row checked.
+// Storage objects before rows, never after; big accounts' entries go a slice at a time, then categories, whose cascade drops the rest set-based.
 export function clearAccount(session) {
   for (let offset = 0; ; offset += PHOTO_PAGE) {
     const rows = listImagePaths({ session, offset, limit: PHOTO_PAGE });
@@ -156,6 +159,13 @@ export function clearAccount(session) {
         row.path_thumb ? [row.path_full, row.path_thumb] : [row.path_full],
       ),
     );
+  }
+  for (
+    let last = entrySliceEnd(session, ENTRY_SLICE);
+    last;
+    last = entrySliceEnd(session, ENTRY_SLICE)
+  ) {
+    deleteOwnRows(session, 'items', { id: `lte.${last}` });
   }
   deleteOwnRows(session, 'categories');
   deleteOwnRows(session, 'items');

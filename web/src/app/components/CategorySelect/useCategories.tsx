@@ -15,7 +15,7 @@ import {
   listItemIdsLinkedElsewhere,
   renameCategory as renameCategoryRow,
 } from '../../data/categories';
-import { listImagePathsForItems } from '../../data/images';
+import { listImagePathsForCategory } from '../../data/images';
 import { objectPathsOf, removeObjectsThenRows } from '../../data/imageRemoval';
 import type { CategorySummary } from '../../data/categories';
 
@@ -170,7 +170,7 @@ export function useCategories() {
             // Read before the row delete: the cascade would drop these rows and the paths with them.
             let orphanedPaths: string[] = [];
             if (orphanedItemIds.length) {
-              const listed = await listImagePathsForItems(orphanedItemIds);
+              const listed = await listImagePathsForCategory(id);
               if (listed.error !== null) {
                 throw new Error('Could not read images for orphaned items', {
                   cause: listed.error,

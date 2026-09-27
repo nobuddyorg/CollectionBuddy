@@ -260,11 +260,34 @@ export function removeObjects(session, paths) {
   );
 }
 
-export function deleteOwnRows(session, table) {
+/** The id that closes the caller's first `size` entries in id order, or null when fewer are left. */
+export function entrySliceEnd(session, size) {
+  const params = query({
+    select: 'id',
+    user_id: `eq.${session.userId}`,
+    order: 'id',
+    offset: size - 1,
+    limit: 1,
+  });
+  const [last] = expectOk(
+    send({
+      method: 'GET',
+      path: `/rest/v1/items?${params}`,
+      session,
+      name: 'teardown items',
+    }),
+    'listing entries',
+  ).json();
+  return last ? last.id : null;
+}
+
+/** `filters` narrows the delete further, as PostgREST filter params (`{ id: 'lte.<uuid>' }`). */
+export function deleteOwnRows(session, table, filters = {}) {
+  const params = query({ user_id: `eq.${session.userId}`, ...filters });
   return expectOk(
     send({
       method: 'DELETE',
-      path: `/rest/v1/${table}?user_id=eq.${session.userId}`,
+      path: `/rest/v1/${table}?${params}`,
       session,
       name: `teardown ${table}`,
     }),

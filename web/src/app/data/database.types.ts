@@ -252,6 +252,7 @@ export type Database = {
         Returns: {
           description: string;
           id: string;
+          images: Json;
           place: string;
           place_lat: number;
           place_lng: number;
