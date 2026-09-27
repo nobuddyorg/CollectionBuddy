@@ -67,6 +67,8 @@
     "import_error": "Could not import this archive. Please try again.",
     "import_quota_error": "Importing this archive would pass the limit of 50,000 entries.",
     "import_format_error": "This file isn't a CollectionBuddy export archive.",
+    "import_unreadable_error": "This archive is damaged, or uses a ZIP feature the import cannot read, such as encryption. Import the .zip the export downloaded.",
+    "import_too_large_error": "This archive unpacks to more than an import accepts, so nothing was imported.",
     "import_success": "Imported as \"{name}\".",
     "import_partial": "{skipped} of {total} photographs could not be imported.",
     "import_partial_quota": "{skipped} of {total} photographs were not imported: the limit of 256 MiB of photographs is reached. Delete some to make room.",

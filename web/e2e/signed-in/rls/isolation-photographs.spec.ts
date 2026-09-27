@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { expect, test } from '../test';
 import { SEED, itemsIn } from '../fixtures';
-import { apiAs, context } from './helpers';
+import { OBJECT_HIDDEN, UPLOAD_REFUSED, apiAs, context } from './helpers';
 
 // A photograph is two surfaces, the images row and the object's bytes; neither of another collector's is reachable.
 test.describe('one collection cannot reach another', () => {
@@ -10,19 +10,43 @@ test.describe('one collection cannot reach another', () => {
   test('their photographs cannot be listed', async () => {
     const { token, otherUserId } = context();
 
-    const { data } = await apiAs(token)
+    const { data, error } = await apiAs(token)
       .storage.from('item-images')
       .list(otherUserId);
-    expect(data ?? []).toEqual([]);
+    expect(error).toBeNull();
+    expect(data).toEqual([]);
   });
 
+  // A typed upload under an entry of your own, so the first path segment is all that is left to refuse it.
   test('nothing can be written under their prefix', async () => {
-    const { token, otherUserId } = context();
+    const { token, userId, otherToken, otherUserId } = context();
+    const { data: item, error: itemError } = await apiAs(token)
+      .from('items')
+      .insert({ title: 'rls-prefix-probe' })
+      .select('id')
+      .single();
+    expect(itemError).toBeNull();
+    const own = `${userId}/${item!.id}/rls-prefix-probe.webp`;
+    const theirs = `${otherUserId}/${item!.id}/rls-prefix-probe.webp`;
+    const storage = apiAs(token).storage.from('item-images');
+    const photo = () => new Blob(['x'], { type: 'image/webp' });
 
-    const { error } = await apiAs(token)
-      .storage.from('item-images')
-      .upload(`${otherUserId}/planted.webp`, new Blob(['x']));
-    expect(error).not.toBeNull();
+    try {
+      expect((await storage.upload(own, photo())).error).toBeNull();
+
+      const { error } = await storage.upload(theirs, photo());
+      expect(error).toMatchObject(UPLOAD_REFUSED);
+
+      // Their own prefix, so listable to them: empty is the refused upload, not a hidden object.
+      const { data: listed, error: listError } = await apiAs(otherToken)
+        .storage.from('item-images')
+        .list(`${otherUserId}/${item!.id}`);
+      expect(listError).toBeNull();
+      expect(listed).toEqual([]);
+    } finally {
+      await storage.remove([own]);
+      await apiAs(token).from('items').delete().eq('id', item!.id);
+    }
   });
 
   // An entry in no category, so no grant reaches it and no shared policy can match: only the owner-only ones apply.
@@ -52,17 +76,21 @@ test.describe('one collection cannot reach another', () => {
       const { error: ownSignError } = await owner.createSignedUrl(path, 60);
       expect(ownSignError).toBeNull();
 
-      const { data: theirList } = await other.list(folder);
-      expect(theirList ?? []).toEqual([]);
+      const { data: theirList, error: theirListError } =
+        await other.list(folder);
+      expect(theirListError).toBeNull();
+      expect(theirList).toEqual([]);
       const { error: theirSignError } = await other.createSignedUrl(path, 60);
-      expect(theirSignError).not.toBeNull();
-      const { data: theirRemoved } = await other.remove([path]);
-      expect(theirRemoved ?? []).toEqual([]);
+      expect(theirSignError).toMatchObject(OBJECT_HIDDEN);
+      const { data: theirRemoved, error: theirRemoveError } =
+        await other.remove([path]);
+      expect(theirRemoveError).toBeNull();
+      expect(theirRemoved).toEqual([]);
       const { error: theirUploadError } = await other.upload(
         `${folder}/planted.webp`,
         new Blob(['x'], { type: 'image/webp' }),
       );
-      expect(theirUploadError).not.toBeNull();
+      expect(theirUploadError).toMatchObject(UPLOAD_REFUSED);
 
       const { data: ownRemoved } = await owner.remove([path]);
       expect(ownRemoved?.map((object) => object.name)).toEqual([path]);
@@ -88,11 +116,14 @@ test.describe('one collection cannot reach another', () => {
         planted,
         new Blob(['x'], { type: 'image/webp' }),
       );
-      expect(error).not.toBeNull();
+      expect(error).toMatchObject(UPLOAD_REFUSED);
 
       // Own prefix, so listable: empty is the refused upload, not a hidden object.
-      const { data } = await storage.list(`${userId}/${theirItem!.id}`);
-      expect(data ?? []).toEqual([]);
+      const { data, error: listError } = await storage.list(
+        `${userId}/${theirItem!.id}`,
+      );
+      expect(listError).toBeNull();
+      expect(data).toEqual([]);
     } finally {
       await storage.remove([planted]);
     }
@@ -140,15 +171,22 @@ test.describe('one collection cannot reach another', () => {
       .single();
 
     // A conforming path (item id as second segment), so the trigger is the only thing left to refuse this.
+    const plantedPath = `planted/${theirItem!.id}/planted.webp`;
     const { data, error } = await apiAs(token)
       .from('images')
-      .insert({
-        item_id: theirItem!.id,
-        path_full: `planted/${theirItem!.id}/planted.webp`,
-      })
+      .insert({ item_id: theirItem!.id, path_full: plantedPath })
       .select('id');
     expect(data).toBeNull();
-    expect(error).not.toBeNull();
+    expect(error).toMatchObject({
+      code: 'P0001',
+      message: 'ownership mismatch',
+    });
+
+    const { data: after } = await apiAs(otherToken)
+      .from('images')
+      .select('id')
+      .eq('path_full', plantedPath);
+    expect(after).toEqual([]);
   });
 
   // A record steers the owner's deletes, so it may only name paths whose item-id segment is its own item.
@@ -178,7 +216,11 @@ test.describe('one collection cannot reach another', () => {
         })
         .select('id');
       expect(data).toBeNull();
-      expect(error).not.toBeNull();
+      expect(error).toMatchObject({
+        code: '23514',
+        message:
+          'new row for relation "images" violates check constraint "images_path_full_matches_item"',
+      });
     });
 
     test(`a photograph record cannot claim a thumbnail ${shape}`, async () => {
@@ -200,7 +242,11 @@ test.describe('one collection cannot reach another', () => {
         })
         .select('id');
       expect(data).toBeNull();
-      expect(error).not.toBeNull();
+      expect(error).toMatchObject({
+        code: '23514',
+        message:
+          'new row for relation "images" violates check constraint "images_path_thumb_matches_item"',
+      });
     });
   }
 
@@ -233,8 +279,11 @@ test.describe('one collection cannot reach another', () => {
       { auth: { persistSession: false } },
     );
 
-    const { data } = await anon.storage.from('item-images').list(otherUserId);
-    expect(data ?? []).toEqual([]);
+    const { data, error } = await anon.storage
+      .from('item-images')
+      .list(otherUserId);
+    expect(error).toBeNull();
+    expect(data).toEqual([]);
   });
 
   // item_categories and images carry no update policy and no update grant, so 42501, not an empty result.
@@ -291,7 +340,7 @@ test.describe('one collection cannot reach another', () => {
         .storage.from('item-images')
         .createSignedUrl(path, 60);
       expect(data).toBeNull();
-      expect(error).not.toBeNull();
+      expect(error).toMatchObject(OBJECT_HIDDEN);
     } finally {
       await apiAs(otherToken).storage.from('item-images').remove([path]);
     }

@@ -64,7 +64,10 @@ test.describe('deleting one’s own account', () => {
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
     const { error } = await anon.rpc('delete_own_account');
-    expect(error).not.toBeNull();
+    expect(error).toMatchObject({
+      code: '42501',
+      message: 'permission denied for function delete_own_account',
+    });
   });
 
   test('removes the caller’s account and rows once its photographs are gone, and nothing of another’s', async ({}, testInfo) => {
@@ -119,7 +122,7 @@ test.describe('deleting one’s own account', () => {
 
       // The refresh token went with the Auth user.
       const { error: refreshError } = await leaver.client.auth.refreshSession();
-      expect(refreshError).not.toBeNull();
+      expect(refreshError).toMatchObject({ code: 'refresh_token_not_found' });
       await expect(
         mintSession(leaver.email, SEED.accountDeletion.password),
       ).rejects.toThrow();

@@ -8,6 +8,11 @@ import {
   type ExportItem,
 } from './exportFormat';
 import { createZipWriter } from './zip';
+import {
+  craftZip,
+  INFO_ZIP_EXTRA,
+  type CraftedEntry,
+} from './zipReader.test-support';
 
 type ImportParams = Parameters<typeof importCategory>[0];
 type GetUid = ImportParams['getUid'];
@@ -71,6 +76,47 @@ export async function buildArchive({
     }
   }
   return writer.finish();
+}
+
+const PACKED_ROOT = 'CollectionBuddy-coins-2026-08-06';
+
+/** One item and its photograph as a zip tool packs an unzipped export again, `change` applied to each entry. */
+export function buildRepackedArchive({
+  photo = new Uint8Array([9, 8, 7, 6]),
+  change = (entry) => entry,
+}: {
+  photo?: Uint8Array;
+  change?: (entry: CraftedEntry) => CraftedEntry;
+} = {}): Blob {
+  const entries = exportEntries(
+    [item()],
+    new Map([['orig-item-1', ['a.jpg']]]),
+  );
+  const manifest = buildManifest({
+    category: { id: 'orig-cat-1', name: 'Coins' },
+    entries,
+    exportedAt: new Date('2026-08-06T00:00:00.000Z'),
+  });
+  const packed: CraftedEntry[] = (
+    [
+      { name: `${PACKED_ROOT}/`, data: new Uint8Array(), method: 'store' },
+      {
+        name: `${PACKED_ROOT}/${MANIFEST_NAME}`,
+        data: new TextEncoder().encode(JSON.stringify(manifest)),
+      },
+      {
+        name: `${PACKED_ROOT}/${entries[0].photos[0].archivePath}`,
+        data: photo,
+      },
+    ] satisfies CraftedEntry[]
+  ).map((entry) => ({
+    ...entry,
+    extra: INFO_ZIP_EXTRA,
+    dataDescriptor: true,
+  }));
+  return new Blob([
+    craftZip({ entries: packed.map(change), comment: 're-packed' }),
+  ]);
 }
 
 export function fakeGetUid(uid: string | null): GetUid {

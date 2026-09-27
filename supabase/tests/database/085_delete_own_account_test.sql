@@ -72,7 +72,7 @@ insert into public.items (title) values ('Filed by the keeper') returning id as 
 insert into public.item_categories (item_id, category_id) values (:'keeper_filed_id'::uuid, :'left_id'::uuid);
 
 select pg_temp.auth_as_anon();
-select ok(pg_temp.raises('select public.delete_own_account()'),
+select throws_ok('select public.delete_own_account()', '42501', 'permission denied for function delete_own_account',
   'a visitor with no session cannot call it');
 
 select pg_temp.auth_as(:'leaver_id'::uuid, 'leaver@collectionbuddy.test');

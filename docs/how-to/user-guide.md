@@ -92,8 +92,13 @@ can be granted access, and it is read-only until you say otherwise.
   shared with you, **Export** is disabled.
 - **Import**: click **Import**, pick a `.zip` exported from CollectionBuddy. It
   becomes a new category. A taken name gets a suffix (`Coins (2)`) rather than
-  overwriting or failing. Each item keeps its photos in their order, so its
-  cover photo stays the same.
+  overwriting or failing; a name at the 200-character limit is shortened to
+  make room for it. Each item keeps its photos in their order, so its cover
+  photo stays the same. An export you unzipped and zipped again with your
+  system's own tool imports too, as long as it keeps the export's folder and
+  is not encrypted. A damaged archive, or one that unpacks to more than an
+  import accepts, is refused with a message saying which, and nothing of it
+  is kept.
 
 ## Items
 

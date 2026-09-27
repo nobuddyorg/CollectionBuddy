@@ -192,6 +192,14 @@ the Storage API and the bytes behind a `storage.objects` row are exercised. A
 policy, grant, or ownership-trigger change needs its `rls/` case
 regardless of pgTAP coverage.
 
+Assert a refusal by what refused it, never by "some error came back": a quota,
+a unique key or a MIME check would pass that too. In pgTAP that is
+`throws_ok(sql, sqlstate, message, description)`, and `lives_ok()` for the
+write that must pass; in `rls/` it is PostgREST's `code` and `message`, or
+Storage's `statusCode` and `message` (`UPLOAD_REFUSED`, `OBJECT_HIDDEN` in
+`rls/helpers.ts`). Check every setup step too, so a failed fixture cannot pass
+as a refusal.
+
 A new query that names its index (CLAUDE.md, "measure, don't assume") also gets
 a plan case in `075_query_plans_test.sql`, at both levels the file runs.
 **Reachability** plans the query on fixture rows with every cheaper path

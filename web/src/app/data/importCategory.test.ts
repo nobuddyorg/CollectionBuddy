@@ -25,20 +25,6 @@ describe('importCategory', () => {
     await expect(failure).rejects.toHaveProperty('name', 'ImportError');
   });
 
-  it('rejects a file that is not a ZIP archive at all', async () => {
-    const failure = importCategory({
-      file: new Blob(['not a zip']),
-      nameCategory: () => 'Coins',
-      ...baseFakes(),
-    });
-    await expect(failure).rejects.toHaveProperty('name', 'ImportError');
-    await expect(failure).rejects.toHaveProperty(
-      'message',
-      'Could not read this file as a ZIP archive',
-    );
-    await expect(failure).rejects.toHaveProperty('cause');
-  });
-
   it('rejects an archive with no collection.json', async () => {
     const writer = createZipWriter();
     writer.add({ path: 'root/photos/1.webp', bytes: new Uint8Array([1]) });

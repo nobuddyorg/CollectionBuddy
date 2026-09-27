@@ -12,7 +12,10 @@ import { useToast } from '../Toast/ToastProvider';
 import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
 import { ImportCancelledError } from '../../data/importCancellation';
 import type { ImportProgress, ImportResult } from '../../data/importCategory';
-import { ImportFormatError } from '../../data/importFormat';
+import {
+  ImportFormatError,
+  type ImportFormatReason,
+} from '../../data/importFormat';
 import { uniqueCategoryName } from '../../data/categories';
 import { isQuotaExceeded } from '../../data/quota';
 
@@ -32,6 +35,20 @@ export function importProgressMessage(
     return t('category_select.import_reading');
   }
   return t('category_select.import_items');
+}
+
+/** What each kind of unimportable archive says instead of "try again", which never helps. */
+function formatErrorMessage(
+  reason: ImportFormatReason,
+  t: (key: TranslationKey) => string,
+): string {
+  if (reason === 'unreadable') {
+    return t('category_select.import_unreadable_error');
+  }
+  if (reason === 'too_large') {
+    return t('category_select.import_too_large_error');
+  }
+  return t('category_select.import_format_error');
 }
 
 function partialTemplate(
@@ -101,7 +118,7 @@ export function useImportCategory(existingCategoryNames: string[]) {
           toast.reportError(
             'import category',
             error,
-            t('category_select.import_format_error'),
+            formatErrorMessage(error.reason, t),
           );
         } else {
           toast.reportError(

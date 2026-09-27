@@ -5,6 +5,7 @@ import { type Locator, type Page } from '@playwright/test';
 // Not './test': every case drives the app into toast.reportError, which logs to the console by design.
 import { expect, test } from '../fixture';
 
+import { writeArchiveClaiming } from './archives';
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
 import { apiAs, context, ownedCategoryId, share, unshare } from './rls/helpers';
@@ -326,5 +327,31 @@ test.describe('when a list fails to load', () => {
 
     await expect(app.entriesLoadError()).toBeHidden();
     await expect(app.catalogue.locators.cards.first()).toBeVisible();
+  });
+});
+
+// #787: a crafted archive is refused before anything is created, and says why rather than "try again".
+test.describe('when an archive is not what the export wrote', () => {
+  test('one claiming to unpack past the limit is refused, and no collection appears', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const app = on(page);
+    await app.categories.do.open(SEED.failureCategory);
+    const category = uniqueTitle('Riesenarchiv');
+    const crafted = testInfo.outputPath('crafted.zip');
+    writeArchiveClaiming(
+      { category, declaredSize: 200 * 1024 * 1024 },
+      crafted,
+    );
+
+    await app.categories.do.importArchive(crafted);
+
+    await expect(app.toast()).toContainText(
+      'This archive unpacks to more than an import accepts, so nothing was imported.',
+    );
+    await expect(app.categories.locators.buttons.cancelImport).toBeHidden();
+    await app.categories.do.openPanel();
+    await expect(app.categories.tab(category)).toHaveCount(0);
   });
 });

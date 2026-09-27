@@ -10,7 +10,8 @@ import { retryWithBackoff } from '../lib/backoff';
 import { compressPhoto } from '../lib/imageCompression';
 import { extensionForType, typeForArchivePath } from './photoType';
 import type { PhotoTask } from './importFormat';
-import type { ZipEntryReader } from './zip';
+import { ZipReadError } from './zip';
+import type { ZipEntryReader } from './zipReader';
 
 const PHOTO_UPLOAD_ATTEMPTS = 3;
 const PHOTO_UPLOAD_RETRY_BASE_MS = 500;
@@ -57,7 +58,7 @@ export type PhotoImportCalls = {
   signal?: AbortSignal;
 };
 
-/** False for a photograph left out (missing, unreadable, or failing after retrying); a cancel or a quota refusal propagates. */
+/** False for a photograph left out (missing, or failing after retrying); a cancel, a quota refusal or a damaged archive propagates. */
 export async function importPhoto({
   task,
   readPhoto,
@@ -115,8 +116,12 @@ export async function importPhoto({
     }
     return true;
   } catch (error) {
-    // A full quota refuses every later photograph too, so the caller stops the rest.
-    if (error instanceof ImportCancelledError || isQuotaExceeded(error)) {
+    // A full quota refuses every later photograph too; an archive that lies about one entry is trusted for none.
+    if (
+      error instanceof ImportCancelledError ||
+      error instanceof ZipReadError ||
+      isQuotaExceeded(error)
+    ) {
       throw error;
     }
     console.error('Skipping photograph', task.archivePath, error);

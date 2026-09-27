@@ -1,6 +1,8 @@
 import { expect, test } from '../test';
 import { SEED, itemsIn } from '../fixtures';
 import {
+  OBJECT_HIDDEN,
+  UPLOAD_REFUSED,
   apiAs,
   context,
   editorShare,
@@ -40,7 +42,11 @@ test.describe('a category shared at the editor role', () => {
         })
         .select('id');
       expect(data).toBeNull();
-      expect(error).not.toBeNull();
+      expect(error).toMatchObject({
+        code: '23514',
+        message:
+          'new row for relation "images" violates check constraint "images_path_thumb_matches_item"',
+      });
     } finally {
       await unshare(token, shareId);
       await apiAs(token).from('items').delete().eq('id', itemId);
@@ -128,7 +134,7 @@ test.describe('a category shared at the editor role', () => {
         unrecorded,
         60,
       );
-      expect(unrecordedError).not.toBeNull();
+      expect(unrecordedError).toMatchObject(OBJECT_HIDDEN);
 
       const { data: removed } = await owner.remove([path]);
       expect(removed?.map((object) => object.name)).toEqual([path]);
@@ -169,14 +175,15 @@ test.describe('a category shared at the editor role', () => {
 
       await unshare(token, shareId);
 
-      const { data: removed } = await editor.storage
+      const { data: removed, error: removeError } = await editor.storage
         .from('item-images')
         .remove([path]);
-      expect(removed ?? []).toEqual([]);
+      expect(removeError).toBeNull();
+      expect(removed).toEqual([]);
       const { error: fillError } = await editor.storage
         .from('item-images')
         .upload(pending, new Blob(['swapped'], { type: 'image/webp' }));
-      expect(fillError).not.toBeNull();
+      expect(fillError).toMatchObject(UPLOAD_REFUSED);
 
       // Signing proves the bytes are still there; the owner's record names them.
       const { error: signError } = await owner.createSignedUrl(path, 60);
@@ -225,7 +232,7 @@ test.describe('a category shared at the editor role', () => {
           path,
           new Blob([new Uint8Array(100_000)], { type: 'image/webp' }),
         );
-        expect(error).not.toBeNull();
+        expect(error).toMatchObject(UPLOAD_REFUSED);
       }
 
       const { data: row } = await apiAs(token)
@@ -287,10 +294,11 @@ test.describe('a category shared at the editor role', () => {
       expect(unlinked).toHaveLength(1);
 
       // Read back as the owner: the bytes are gone, and the unlinked entry with them.
-      const { data: listed } = await owner.storage
+      const { data: listed, error: listError } = await owner.storage
         .from('item-images')
         .list(`${userId}/${itemId}`);
-      expect(listed ?? []).toEqual([]);
+      expect(listError).toBeNull();
+      expect(listed).toEqual([]);
       const { data: entry } = await owner
         .from('items')
         .select('id')
@@ -338,7 +346,7 @@ test.describe('a category shared at the editor role', () => {
       const { error: replaceError } = await editor.storage
         .from('item-images')
         .upload(replacement, new Blob(['swapped'], { type: 'image/webp' }));
-      expect(replaceError).not.toBeNull();
+      expect(replaceError).toMatchObject(UPLOAD_REFUSED);
 
       const { data: removedRow } = await editor
         .from('images')
@@ -350,13 +358,17 @@ test.describe('a category shared at the editor role', () => {
       const { error: addError } = await editor
         .from('images')
         .insert({ item_id: itemId, path_full: replacement });
-      expect(addError).not.toBeNull();
+      expect(addError).toMatchObject({
+        code: 'P0001',
+        message: 'ownership mismatch',
+      });
 
       // Its own prefix, so still listable to it: the object left in place is the refused remove, not a hidden one.
-      const { data: listed } = await editor.storage
+      const { data: listed, error: listError } = await editor.storage
         .from('item-images')
         .list(`${otherUserId}/${itemId}`);
-      expect((listed ?? []).map((object) => object.name)).toEqual([
+      expect(listError).toBeNull();
+      expect(listed!.map((object) => object.name)).toEqual([
         'rls-filed-probe.webp',
       ]);
     } finally {
@@ -393,13 +405,14 @@ test.describe('a category shared at the editor role', () => {
       const { error: moveError } = await apiAs(otherToken)
         .storage.from('item-images')
         .move(path, stolen);
-      expect(moveError).not.toBeNull();
+      expect(moveError).toMatchObject(OBJECT_HIDDEN);
 
       // Copying stays allowed; what matters is that the owner's own object is still where it was.
-      const { data: stillThere } = await apiAs(token)
+      const { data: stillThere, error: listError } = await apiAs(token)
         .storage.from('item-images')
         .list(`${userId}/${itemId}`);
-      expect((stillThere ?? []).map((object) => object.name)).toContain(
+      expect(listError).toBeNull();
+      expect(stillThere!.map((object) => object.name)).toContain(
         'rls-editor-move-probe.webp',
       );
 
@@ -432,13 +445,14 @@ test.describe('a category shared at the editor role', () => {
       const { error: plantError } = await apiAs(otherToken)
         .storage.from('item-images')
         .upload(planted, new Blob(['hostile'], { type: 'image/webp' }));
-      expect(plantError).not.toBeNull();
+      expect(plantError).toMatchObject(UPLOAD_REFUSED);
 
       // Satisfiable read: the owner sees her own prefix, so an empty listing is the write refused, not hidden.
-      const { data: mine } = await apiAs(token)
+      const { data: mine, error: listError } = await apiAs(token)
         .storage.from('item-images')
         .list(`${userId}/${itemId}`);
-      expect(mine ?? []).toEqual([]);
+      expect(listError).toBeNull();
+      expect(mine).toEqual([]);
     } finally {
       await apiAs(otherToken).storage.from('item-images').remove([planted]);
       await apiAs(token).storage.from('item-images').remove([planted]);
@@ -468,7 +482,7 @@ test.describe('a category shared at the editor role', () => {
       const { error: moveError } = await apiAs(token)
         .storage.from('item-images')
         .move(path, moved);
-      expect(moveError).not.toBeNull();
+      expect(moveError).toMatchObject(OBJECT_HIDDEN);
 
       // Uploading, signing and removing, all the app does, are untouched by the missing UPDATE.
       const { error: signError } = await apiAs(token)

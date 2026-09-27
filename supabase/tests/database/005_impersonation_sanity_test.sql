@@ -20,15 +20,17 @@ select no_plan();
 -- As postgres -- the role pg_prove actually connects as -- RLS and grants
 -- are both bypassed, which is exactly what every other file in this suite
 -- has to work around before it can assert anything meaningful.
-select ok(
-  not pg_temp.raises('select 1 from public.categories limit 1'),
+select lives_ok(
+  'select 1 from public.categories limit 1',
   'as the postgres role, reading categories raises nothing (RLS and grants both bypassed, as expected of a superuser)'
 );
 
 -- Switching to anon: the identical query is refused outright, since anon holds no grant on the table (0006_policies.sql).
 select pg_temp.auth_as_anon();
-select ok(
-  pg_temp.raises('select 1 from public.categories limit 1'),
+select throws_ok(
+  'select 1 from public.categories limit 1',
+  '42501',
+  'permission denied for table categories',
   'as anon, the identical read is refused -- the grant is doing the work, not a coincidence of empty data'
 );
 
@@ -36,8 +38,8 @@ select ok(
 -- succeeds again, because authenticated holds the grant and the policy
 -- now has an auth.uid() to evaluate.
 select pg_temp.auth_as(gen_random_uuid());
-select ok(
-  not pg_temp.raises('select 1 from public.categories limit 1'),
+select lives_ok(
+  'select 1 from public.categories limit 1',
   'as authenticated with a claim, the identical read is permitted again'
 );
 

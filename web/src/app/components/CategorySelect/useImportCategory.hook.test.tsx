@@ -153,7 +153,10 @@ describe('useImportCategory', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
     vi.mocked(importCategory).mockRejectedValue(
-      new ImportFormatError('Not a CollectionBuddy export archive'),
+      new ImportFormatError(
+        'not_export',
+        'Not a CollectionBuddy export archive',
+      ),
     );
     const { result } = renderHook(() => useImportCategory([]), { wrapper });
 
@@ -171,6 +174,37 @@ describe('useImportCategory', () => {
     expect(result.current.isImporting).toBe(false);
     consoleError.mockRestore();
   });
+
+  // #787: a damaged or oversized archive fails the same way every time, so the message says why instead of "try again".
+  it.each([
+    [
+      'unreadable',
+      'This archive is damaged, or uses a ZIP feature the import cannot read, such as encryption. Import the .zip the export downloaded.',
+    ],
+    [
+      'too_large',
+      'This archive unpacks to more than an import accepts, so nothing was imported.',
+    ],
+  ] as const)(
+    'says why an archive that is %s cannot be imported',
+    async (reason, message) => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      vi.mocked(importCategory).mockRejectedValue(
+        new ImportFormatError(reason, 'refused'),
+      );
+      const { result } = renderHook(() => useImportCategory([]), { wrapper });
+
+      await act(async () => {
+        await result.current.runImport(FILE);
+      });
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(message);
+      expect(result.current.isImporting).toBe(false);
+      consoleError.mockRestore();
+    },
+  );
 
   it('says the entry limit would be passed when the import is refused for its quota', async () => {
     const consoleError = vi
