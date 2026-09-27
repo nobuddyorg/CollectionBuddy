@@ -43,7 +43,7 @@ export function removeImageObjects(paths: string[]) {
   return supabase.storage.from(ITEM_IMAGES_BUCKET).remove(paths);
 }
 
-export type ImageRow = Database['public']['Tables']['images']['Row'];
+type ImageRow = Database['public']['Tables']['images']['Row'];
 
 /** Carries the row's own `id`, so a single photograph can be deleted by it. */
 export type ImageListRow = Pick<
@@ -82,14 +82,30 @@ export function createImageRow(row: NewImageRow | ImportedImageRow) {
     .single<ImageListRow>();
 }
 
-// `.single()` makes a delete that matched no row, hidden by RLS or already gone, an error.
-export function deleteImageRow(id: string) {
-  return supabase
+/** A delete that matched no row, hidden by RLS or already gone, fails, unless its entry is gone and its cascade took the row. */
+export async function deleteImageRow({
+  id,
+  itemId,
+}: {
+  id: string;
+  itemId: string;
+}): Promise<{ error: Error | null }> {
+  // No `.single()`: its 406 on no row is a console error in every browser, and a gone entry is no failure.
+  const deleted = await supabase
     .from('images')
     .delete()
     .eq('id', id)
+    .select('id');
+  if (deleted.error !== null) return deleted;
+  if (deleted.data.length > 0) return { error: null };
+  const item = await supabase
+    .from('items')
     .select('id')
-    .single<Pick<ImageRow, 'id'>>();
+    .eq('id', itemId)
+    .maybeSingle();
+  if (item.error !== null) return item;
+  if (item.data === null) return { error: null };
+  return { error: new Error(`Photograph ${id} was not deleted`) };
 }
 
 // PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.

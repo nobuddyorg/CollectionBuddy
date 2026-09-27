@@ -111,14 +111,81 @@ describe('createImageRow', () => {
 });
 
 describe('deleteImageRow', () => {
-  it('deletes exactly the given row, as one row, so a delete that matched none fails', () => {
-    const { from, calls } = mockTableFrom();
-    deleteImageRow('image-1');
-    expect(from).toHaveBeenCalledWith('images');
-    expect(calls[0].method).toBe('delete');
-    expect(calls[1]).toEqual({ method: 'eq', args: ['id', 'image-1'] });
-    expect(calls[2]).toEqual({ method: 'select', args: ['id'] });
-    expect(calls[3].method).toBe('single');
+  // Scripts the image delete's answer and, when asked, whether its entry is still there.
+  function answers(deleted: unknown, item?: unknown) {
+    const calls: Record<string, Call[]> = { images: [], items: [] };
+    vi.spyOn(supabase, 'from').mockImplementation(((table: string) => {
+      const record =
+        (method: string, answer?: unknown) =>
+        (...args: unknown[]) => {
+          calls[table].push({ method, args });
+          return answer ?? builder;
+        };
+      const builder: Record<string, unknown> = {
+        delete: record('delete'),
+        eq: record('eq'),
+        select: record('select', table === 'images' ? deleted : undefined),
+        maybeSingle: record('maybeSingle', item),
+      };
+      return builder;
+    }) as never);
+    return calls;
+  }
+
+  const gone = { data: [], error: null };
+
+  it('deletes exactly the given row and reads back what it deleted', async () => {
+    const calls = answers({ data: [{ id: 'image-1' }], error: null });
+
+    await expect(
+      deleteImageRow({ id: 'image-1', itemId: 'item-1' }),
+    ).resolves.toEqual({ error: null });
+    expect(calls.images).toEqual([
+      { method: 'delete', args: [] },
+      { method: 'eq', args: ['id', 'image-1'] },
+      { method: 'select', args: ['id'] },
+    ]);
+    expect(calls.items).toEqual([]);
+  });
+
+  it('passes a refused delete on without asking after the entry', async () => {
+    const refused = { data: null, error: new Error('rls') };
+    const calls = answers(refused);
+
+    await expect(
+      deleteImageRow({ id: 'image-1', itemId: 'item-1' }),
+    ).resolves.toBe(refused);
+    expect(calls.items).toEqual([]);
+  });
+
+  it("counts a row its entry's delete already took as deleted", async () => {
+    const calls = answers(gone, { data: null, error: null });
+
+    await expect(
+      deleteImageRow({ id: 'image-1', itemId: 'item-1' }),
+    ).resolves.toEqual({ error: null });
+    expect(calls.items).toEqual([
+      { method: 'select', args: ['id'] },
+      { method: 'eq', args: ['id', 'item-1'] },
+      { method: 'maybeSingle', args: [] },
+    ]);
+  });
+
+  it('fails when no row was deleted while its entry is still there', async () => {
+    answers(gone, { data: { id: 'item-1' }, error: null });
+
+    const { error } = await deleteImageRow({ id: 'image-1', itemId: 'item-1' });
+
+    expect(error).toEqual(new Error('Photograph image-1 was not deleted'));
+  });
+
+  it('fails when no row was deleted and the entry cannot be looked up', async () => {
+    const lookup = { data: null, error: new Error('offline') };
+    answers(gone, lookup);
+
+    await expect(
+      deleteImageRow({ id: 'image-1', itemId: 'item-1' }),
+    ).resolves.toBe(lookup);
   });
 });
 

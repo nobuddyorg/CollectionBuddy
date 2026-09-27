@@ -73,7 +73,10 @@ describe('useItemImages deleteImage', () => {
     expect(result.current.images['item-1']).toEqual([]);
 
     await commitDeferredDelete();
-    expect(deleteImageRow).toHaveBeenCalledWith('img-1');
+    expect(deleteImageRow).toHaveBeenCalledWith({
+      id: 'img-1',
+      itemId: 'item-1',
+    });
   });
 
   it('tolerates undo for an item with no tracked images yet', async () => {
@@ -134,7 +137,10 @@ describe('useItemImages deleteImage', () => {
       'uid/item-1/img-1.webp',
       'uid/item-1/img-1.thumb.webp',
     ]);
-    expect(deleteImageRow).toHaveBeenCalledWith('img-1');
+    expect(deleteImageRow).toHaveBeenCalledWith({
+      id: 'img-1',
+      itemId: 'item-1',
+    });
     expect(
       vi.mocked(removeImageObjects).mock.invocationCallOrder[0],
     ).toBeLessThan(vi.mocked(deleteImageRow).mock.invocationCallOrder[0]);
