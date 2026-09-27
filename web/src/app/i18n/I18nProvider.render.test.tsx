@@ -206,6 +206,22 @@ describe('I18nProvider', () => {
     );
   });
 
+  it('fills a placeholder with user text verbatim, $ sequences and all', () => {
+    localStorage.setItem('lang', 'en');
+    const { result } = renderHook(() => useI18n(), { wrapper: I18nProvider });
+
+    expect(
+      result.current.t('item_create.remove_tag', { tag: "US$$ $& $'" }),
+    ).toBe("Remove tag US$$ $& $'");
+  });
+
+  it('leaves a template as it is when given no values', () => {
+    localStorage.setItem('lang', 'en');
+    const { result } = renderHook(() => useI18n(), { wrapper: I18nProvider });
+
+    expect(result.current.t('item_create.remove_tag')).toBe('Remove tag {tag}');
+  });
+
   it('reads the language that is current when called, not the one active when the closure was captured', async () => {
     localStorage.setItem('lang', 'en');
     const { result } = renderHook(() => useI18n(), {

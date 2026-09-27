@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveTranslationKey } from './I18nProvider';
+import { interpolate, resolveTranslationKey } from './I18nProvider';
 
 describe('resolveTranslationKey', () => {
   const dictionary = {
@@ -53,5 +53,35 @@ describe('resolveTranslationKey', () => {
     // Without an immediate return on miss, 'b' would be re-checked against the original dictionary and resolve.
     const flatDictionary = { b: 'real-value' };
     expect(resolveTranslationKey(flatDictionary, 'missing.b')).toBeUndefined();
+  });
+});
+
+describe('interpolate', () => {
+  it('fills each named placeholder with its value', () => {
+    expect(interpolate('{n} of {total}', { n: 2, total: 7 })).toBe('2 of 7');
+  });
+
+  it('fills a placeholder every time it appears', () => {
+    expect(interpolate('{name} and {name}', { name: 'Coins' })).toBe(
+      'Coins and Coins',
+    );
+  });
+
+  // String.replace would read these as "the match", "after the match" and "$".
+  it('inserts a value exactly as given, $ sequences and all', () => {
+    const value = "US$$ coins $& $' $` $1 $<x>";
+    expect(interpolate('Delete "{name}"?', { name: value })).toBe(
+      `Delete "${value}"?`,
+    );
+  });
+
+  it('leaves a placeholder it has no value for untouched', () => {
+    expect(interpolate('{name}: {count}', { name: 'Coins' })).toBe(
+      'Coins: {count}',
+    );
+  });
+
+  it('ignores an inherited property that happens to share a name', () => {
+    expect(interpolate('{toString}', {})).toBe('{toString}');
   });
 });

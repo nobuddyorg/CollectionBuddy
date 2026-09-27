@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom';
 
 import { useI18n } from '../../i18n/useI18n';
-import { useEscapeToClose } from '../CenteredModal/useEscapeToClose';
 import { useFocusTrap } from '../CenteredModal/useFocusTrap';
 import { useInertBackground } from '../CenteredModal/useInertBackground';
 import { useLockBodyScroll } from '../CenteredModal/useLockBodyScroll';
+import { useTopmostKeydown } from '../CenteredModal/useTopmostKeydown';
 import Icon, { IconType } from '../Icon';
 import type { ImageEntry } from './types';
 import { Spinner } from '../ui/Spinner';
@@ -90,27 +90,23 @@ export function ModalImage({
   );
 
   useLockBodyScroll(open);
-  useEscapeToClose(open, onClose);
   useFocusTrap({ open, containerRef: panelRef });
   useInertBackground(open);
 
-  useEffect(() => {
-    if (!open || count < 2) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return;
-      if (event.key === 'ArrowLeft') goTo(clampedIndex - 1);
-      else if (event.key === 'ArrowRight') goTo(clampedIndex + 1);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, count, clampedIndex, goTo]);
+  // One layer for Escape and the arrows alike, so a confirm raised on top takes all three.
+  useTopmostKeydown(open, (event) => {
+    if (event.key === 'Escape') onClose();
+    else if (count > 1 && event.key === 'ArrowLeft') goTo(clampedIndex! - 1);
+    else if (count > 1 && event.key === 'ArrowRight') goTo(clampedIndex! + 1);
+  });
 
   if (!current || clampedIndex === null || typeof document === 'undefined')
     return null;
 
-  const alt = t('item_list.image_alt')
-    .replace('{title}', itemTitle)
-    .replace('{idx}', String(clampedIndex + 1));
+  const alt = t('item_list.image_alt', {
+    title: itemTitle,
+    idx: clampedIndex + 1,
+  });
 
   return ReactDOM.createPortal(
     <div
@@ -168,9 +164,10 @@ export function ModalImage({
             data-testid="image-position"
             className="font-label text-xs text-muted-foreground"
           >
-            {t('item_list.image_position')
-              .replace('{current}', String(clampedIndex + 1))
-              .replace('{total}', String(count))}
+            {t('item_list.image_position', {
+              current: clampedIndex + 1,
+              total: count,
+            })}
           </span>
 
           <button

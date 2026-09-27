@@ -25,6 +25,8 @@ function UploadInput({
       disabled={busy}
       onChange={(event) => {
         const file = event.target.files?.[0];
+        // Emptied, or picking the same file again after a failed upload fires no change at all.
+        event.target.value = '';
         if (file) onUpload(file);
       }}
     />

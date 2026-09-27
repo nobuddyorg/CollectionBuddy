@@ -29,6 +29,7 @@ export const MUTATE_TARGETS = [
   'src/app/components/Coin/size.ts',
   'src/app/components/CenteredModal/getFocusable.ts',
   'src/app/components/CenteredModal/useEscapeToClose.tsx',
+  'src/app/components/CenteredModal/useTopmostKeydown.ts',
   'src/app/useTheme.ts',
   'src/app/components/ItemForm/usePhoton.tsx',
   'src/app/i18n/I18nProvider.tsx',

@@ -221,4 +221,4 @@ Each job writes its report to its own Actions summary (`$GITHUB_STEP_SUMMARY`); 
 
 ## i18n
 
-German (`de`, default) and English (`en`): [`web/src/app/i18n/de.json`](../../web/src/app/i18n/de.json), `en.json`, keys grouped by area (`brand`, `page`, `header`, `category_select`, `item_create`, `item_list`, `google_sign_in_button`, `login_page`, `common`). `web/src/app/i18n/parity.test.ts` scans every `t('…')` call site and fails on a key missing from either file or on the two files declaring different key sets.
+German (`de`, default) and English (`en`): [`web/src/app/i18n/de.json`](../../web/src/app/i18n/de.json), `en.json`, keys grouped by area (`brand`, `page`, `header`, `category_select`, `item_create`, `item_list`, `google_sign_in_button`, `login_page`, `common`). A `{name}` placeholder is filled through `t(key, { name })`, never `String.replace`, so user text such as `US$$` lands verbatim. `web/src/app/i18n/parity.test.ts` scans every `t('…')` call site and fails on a key missing from either file or on the two files declaring different key sets.

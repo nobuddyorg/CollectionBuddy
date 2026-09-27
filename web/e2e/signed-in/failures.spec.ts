@@ -74,6 +74,37 @@ test.describe('when something outside the app fails', () => {
     }
   });
 
+  // #785: the input still held the file, so picking it again for a retry fired no change and did nothing.
+  test('the same photograph can be picked again once its upload failed', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const title = uniqueTitle('Nochmal');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      // The first through the empty frame, so the next ones go through the card's own + control, which stays mounted.
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toHaveCount(1, { timeout: 45_000 });
+
+      await page.route('**/storage/v1/object/**', (route) =>
+        route.request().method() === 'POST'
+          ? route.fulfill({ status: 500, json: { message: 'nope' } })
+          : route.fallback(),
+      );
+      await card.do.uploadPhoto(PHOTO);
+      await expect(app.toast()).toContainText('Could not upload this');
+      await page.unroute('**/storage/v1/object/**');
+
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toHaveCount(2, { timeout: 45_000 });
+    } finally {
+      await page.unroute('**/storage/v1/object/**');
+      await removeEntriesTitled(title);
+    }
+  });
+
   // Objects go before the row: a refused Storage delete must leave the row, so no file is left unnamed.
   test('a photograph Storage will not remove stays, row and files', async ({
     on,

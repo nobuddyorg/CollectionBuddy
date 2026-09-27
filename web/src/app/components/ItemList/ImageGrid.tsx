@@ -157,9 +157,7 @@ export function ImageGrid({
   if (!total) return null;
 
   const altFor = (index: number) =>
-    t('item_list.image_alt')
-      .replace('{title}', itemTitle)
-      .replace('{idx}', String(index + 1));
+    t('item_list.image_alt', { title: itemTitle, idx: index + 1 });
 
   // Not a trash icon, which means the whole entry: this reads as "take this one off".
   const deleteButton = ({
@@ -231,7 +229,7 @@ export function ImageGrid({
       );
 
     const alt = overflowCount
-      ? t('item_list.more_images').replace('{count}', String(overflowCount))
+      ? t('item_list.more_images', { count: overflowCount })
       : altFor(index);
 
     return (

@@ -190,6 +190,16 @@ describe('useCategoryRemoval deleting a category you own', () => {
     ).toBeInTheDocument();
   });
 
+  // String.replace read "$$" as "$" and "$'" as the rest of the sentence, misstating what goes.
+  it('names a category whose name holds $ sequences exactly as it is spelled', async () => {
+    const name = "US$$ coins $'";
+    const { result } = setUp({ selected: { ...CATEGORIES[0], name } });
+
+    void result.current.onDelete();
+
+    expect(await screen.findByText(`Delete "${name}"?`)).toBeInTheDocument();
+  });
+
   it('deletes nothing when the warning is declined', async () => {
     const deleteCategory = vi.fn<UseCategories['deleteCategory']>();
     const { result, onSelect } = setUp({

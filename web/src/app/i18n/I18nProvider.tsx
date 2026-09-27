@@ -46,10 +46,28 @@ export function resolveTranslationKey(
   return typeof value === 'string' ? value : undefined;
 }
 
+export type TranslationValues = Record<string, string | number>;
+
+// A replacer function, never a replacement string: user text such as "US$$" or "$'" must land verbatim.
+export function interpolate(
+  template: string,
+  values: TranslationValues,
+): string {
+  return template.replace(/\{(\w+)\}/g, (placeholder, name: string) =>
+    Object.hasOwn(values, name) ? String(values[name]) : placeholder,
+  );
+}
+
+/** Fills each `{name}` placeholder the template holds from `values`. */
+export type Translate = (
+  key: TranslationKey,
+  values?: TranslationValues,
+) => string;
+
 type I18nContextType = {
   language: Language;
   setLanguage: (language: Language) => void;
-  t: (key: TranslationKey) => string;
+  t: Translate;
   /** Picks `${baseKey}_one` by the locale's plural rule (German and English disagree), else `baseKey`. */
   tCount: (baseKey: TranslationKey, count: number) => string;
 };
@@ -101,8 +119,11 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   }, [language]);
 
   const t = useCallback(
-    (key: TranslationKey) =>
-      resolveTranslationKey(translations[languageRef.current], key) ?? key,
+    (key: TranslationKey, values: TranslationValues = {}) =>
+      interpolate(
+        resolveTranslationKey(translations[languageRef.current], key) ?? key,
+        values,
+      ),
     [],
   );
 
@@ -115,7 +136,7 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
         : undefined) ??
       resolveTranslationKey(dictionary, baseKey) ??
       baseKey;
-    return template.replace('{count}', String(count));
+    return interpolate(template, { count });
   }, []);
 
   const value = useMemo(

@@ -163,7 +163,9 @@ Two independent settings in the user menu:
 ## Accessibility
 
 The app works with a keyboard and a screen reader: dialogs trap focus and close
-on Escape, confirmation dialogs focus **Cancel** rather than the destructive
+on Escape, only the topmost one at a time (Escape on a confirmation raised in
+the photo viewer leaves the viewer open, and its arrow keys wait for the
+answer), confirmation dialogs focus **Cancel** rather than the destructive
 action, and result counts for search and place suggestions are announced,
 since their dropdowns render outside normal reading order. In the collection
 strip, the arrow keys, Home and End move between collections without opening
