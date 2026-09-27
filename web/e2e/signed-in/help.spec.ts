@@ -37,4 +37,18 @@ test.describe('help', () => {
     await app.help.do.close();
     await expect(app.help()).toBeHidden();
   });
+
+  test('links the privacy notice, which leads back to the catalogue', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await app.help.do.openByKeyboard();
+    await app.help.locators.privacyLink.click();
+    await expect(app.help()).toBeHidden();
+    await expect(app.privacy.locators.title).toHaveText('Privacy notice');
+
+    await app.privacy.locators.back.click();
+    await expect(app.categories.locators.selected).not.toBeEmpty();
+  });
 });

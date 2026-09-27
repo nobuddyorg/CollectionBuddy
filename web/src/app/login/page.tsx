@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, type CSSProperties } from 'react';
+import Link from 'next/link';
 
 import Coin from '../components/Coin';
 import { coinSizeCss } from '../components/Coin/size';
@@ -102,6 +103,14 @@ export default function LoginPage() {
       <p className="mt-8 sm:mt-10 text-sm sm:text-base text-muted-foreground text-center max-w-sm text-balance">
         {t('login_page.subtitle')}
       </p>
+
+      <Link
+        href="/privacy"
+        data-testid="login-privacy-link"
+        className="mt-4 inline-flex items-center min-h-11 px-2 text-sm text-muted-foreground underline underline-offset-2 hover:text-accent"
+      >
+        {t('privacy.link')}
+      </Link>
     </main>
   );
 }

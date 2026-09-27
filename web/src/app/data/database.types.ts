@@ -205,6 +205,10 @@ export type Database = {
     };
     Functions: {
       caller_email: { Args: never; Returns: string };
+      create_items_in_category: {
+        Args: { entries: Json; target_category_id: string };
+        Returns: undefined;
+      };
       granted_category_ids: { Args: never; Returns: string[] };
       has_category_read_access: { Args: { cat_id: string }; Returns: boolean };
       has_category_write_access: { Args: { cat_id: string }; Returns: boolean };

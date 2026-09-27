@@ -18,7 +18,7 @@ import {
 } from './exportFormat';
 import { createZipWriter, ZipLimitError } from './zip';
 import { runPool } from '../lib/pool';
-import { attempts, backoffDelayMs } from '../lib/backoff';
+import { isRetryableStatus, retryWithBackoff } from '../lib/backoff';
 
 /** How far an export has got. `total` is 0 until items and photos are counted. */
 export type ExportProgress = {
@@ -102,10 +102,6 @@ async function fetchAllItems({
   return items;
 }
 
-function isRetryableStatus(status: number): boolean {
-  return status === 429 || status >= 500;
-}
-
 /** Every item's full-size paths and total bytes from one `images` query, which fails as a whole. */
 async function fetchPhotoPaths({
   items,
@@ -146,9 +142,6 @@ export const PHOTO_DOWNLOAD_CONCURRENCY = 6;
 /** Browser `fetch` has no response timeout of its own, so a stalled response would hang forever. */
 export const PHOTO_FETCH_TIMEOUT_MS = 30_000;
 
-/** A response retrying cannot fix: a 404 is a 404 three times over. */
-class PermanentFetchError extends Error {}
-
 /** The caller's cancellation OR'd with a fresh per-attempt timeout. */
 function fetchSignal(signal?: AbortSignal): AbortSignal {
   const timeout = AbortSignal.timeout(PHOTO_FETCH_TIMEOUT_MS);
@@ -159,29 +152,31 @@ async function fetchPhotoBytes(
   url: string,
   signal?: AbortSignal,
 ): Promise<Uint8Array<ArrayBuffer>> {
-  let lastError: unknown;
-  for (const attempt of attempts(PHOTO_FETCH_ATTEMPTS)) {
-    checkCancelled(signal);
-    if (attempt > 0) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, backoffDelayMs(PHOTO_RETRY_BASE_MS, attempt - 1)),
-      );
-    }
-    try {
-      const response = await fetch(url, { signal: fetchSignal(signal) });
-      if (response.ok) return new Uint8Array(await response.arrayBuffer());
-      if (!isRetryableStatus(response.status)) {
-        throw new PermanentFetchError(`HTTP ${response.status}`);
-      }
-      lastError = new Error(`HTTP ${response.status}`);
-    } catch (error) {
-      if (error instanceof PermanentFetchError) throw error;
-      // A cancel and a per-attempt timeout both abort the fetch; only the caller's signal stops.
+  const outcome = await retryWithBackoff<
+    { bytes: Uint8Array<ArrayBuffer> } | { error: unknown }
+  >({
+    maxAttempts: PHOTO_FETCH_ATTEMPTS,
+    baseMs: PHOTO_RETRY_BASE_MS,
+    run: async () => {
       checkCancelled(signal);
-      lastError = error;
-    }
-  }
-  throw lastError;
+      try {
+        const response = await fetch(url, { signal: fetchSignal(signal) });
+        if (response.ok) {
+          const bytes = new Uint8Array(await response.arrayBuffer());
+          return { value: { bytes }, retry: false };
+        }
+        // A 404 is a 404 three times over.
+        const error = new Error(`HTTP ${response.status}`);
+        return { value: { error }, retry: isRetryableStatus(response.status) };
+      } catch (error) {
+        // A cancel and a per-attempt timeout both abort the fetch; only the caller's signal stops.
+        checkCancelled(signal);
+        return { value: { error }, retry: true };
+      }
+    },
+  });
+  if ('error' in outcome) throw outcome.error;
+  return outcome.bytes;
 }
 
 /** A row Storage could not sign leaves no entry behind at all. */

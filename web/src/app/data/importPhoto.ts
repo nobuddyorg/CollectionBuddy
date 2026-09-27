@@ -1,7 +1,7 @@
 import { createImageRow, imagePrefix, uploadImageObject } from './images';
 import { checkCancelled, ImportCancelledError } from './importCancellation';
 import { isQuotaExceeded } from './quota';
-import { attempts, backoffDelayMs } from '../lib/backoff';
+import { isRetryableStatus, retryWithBackoff } from '../lib/backoff';
 import { compressPhoto } from '../lib/imageCompression';
 import { extensionForType, typeForArchivePath } from './photoType';
 import type { PhotoTask } from './importFormat';
@@ -27,9 +27,7 @@ export function isTransientUploadError({
   statusCode?: string;
 }): boolean {
   if (status === undefined) return true;
-  return [status, Number(statusCode)].some(
-    (code) => code === 429 || code >= 500,
-  );
+  return [status, Number(statusCode)].some(isRetryableStatus);
 }
 
 /** Retries only what `isTransientUploadError` says may pass; a 403, 409 or 413 is returned at once. */
@@ -44,22 +42,18 @@ async function uploadWithRetry({
   uploadImage: typeof uploadImageObject;
   signal?: AbortSignal;
 }): Promise<unknown> {
-  let lastError: unknown;
-  for (const attempt of attempts(PHOTO_UPLOAD_ATTEMPTS)) {
-    checkCancelled(signal);
-    if (attempt > 0) {
-      await new Promise((resolve) =>
-        setTimeout(
-          resolve,
-          backoffDelayMs(PHOTO_UPLOAD_RETRY_BASE_MS, attempt - 1),
-        ),
-      );
-    }
-    const { error } = await uploadImage(path, blob);
-    if (!error || !isTransientUploadError(error)) return error;
-    lastError = error;
-  }
-  return lastError;
+  return retryWithBackoff({
+    maxAttempts: PHOTO_UPLOAD_ATTEMPTS,
+    baseMs: PHOTO_UPLOAD_RETRY_BASE_MS,
+    run: async () => {
+      checkCancelled(signal);
+      const { error } = await uploadImage(path, blob);
+      return {
+        value: error,
+        retry: error !== null && isTransientUploadError(error),
+      };
+    },
+  });
 }
 
 /** The raw calls one photograph's round trip makes, threaded through from `importCategory`. */

@@ -312,6 +312,7 @@ export default function ItemList({
       <MapModal
         categoryId={categoryId}
         search={debouncedQuery}
+        canEdit={canEdit}
         open={mapOpen}
         onOpenChange={setMapOpen}
       />

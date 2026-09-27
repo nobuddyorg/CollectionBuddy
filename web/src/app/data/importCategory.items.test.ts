@@ -10,13 +10,12 @@ import {
   buildArchive,
   fakeCreateCategory,
   fakeCreateItems,
-  fakeLinkItems,
   NOW,
   baseFakes,
 } from './importCategory.test-support';
 
 describe('importCategory, recreating the items', () => {
-  it('creates every manifest entry in one insert, and links them all in one more', async () => {
+  it('creates every manifest entry and its link to the new category in one request', async () => {
     const archive = await buildArchive({
       items: [
         item({ id: 'a', title: 'Dime' }),
@@ -25,7 +24,6 @@ describe('importCategory, recreating the items', () => {
       photosByItemId: {},
     });
     const createItemRows = fakeCreateItems();
-    const linkItemRows = fakeLinkItems();
     const createCategoryRow = fakeCreateCategory('new-cat-1');
     const result = await importCategory({
       file: archive,
@@ -33,11 +31,10 @@ describe('importCategory, recreating the items', () => {
       ...baseFakes(),
       createCategoryRow,
       createItemRows,
-      linkItemRows,
     });
 
     expect(createItemRows).toHaveBeenCalledOnce();
-    expect(createItemRows).toHaveBeenCalledWith([
+    expect(createItemRows).toHaveBeenCalledWith('new-cat-1', [
       {
         id: 'new-item-1',
         created_at: '2026-08-07T11:59:59.999Z',
@@ -53,19 +50,6 @@ describe('importCategory, recreating the items', () => {
         created_at: '2026-08-07T12:00:00.000Z',
         title: 'Nickel',
       }),
-    ]);
-    expect(linkItemRows).toHaveBeenCalledOnce();
-    expect(linkItemRows).toHaveBeenCalledWith([
-      {
-        item_id: 'new-item-1',
-        category_id: 'new-cat-1',
-        created_at: '2026-08-07T11:59:59.999Z',
-      },
-      {
-        item_id: 'new-item-2',
-        category_id: 'new-cat-1',
-        created_at: '2026-08-07T12:00:00.000Z',
-      },
     ]);
     expect(result.itemCount).toBe(2);
   });
@@ -93,7 +77,7 @@ describe('importCategory, recreating the items', () => {
       createItemRows,
     });
 
-    expect(createItemRows).toHaveBeenCalledWith([
+    expect(createItemRows).toHaveBeenCalledWith('new-cat-1', [
       {
         id: 'new-item-1',
         created_at: NOW.toISOString(),
@@ -114,23 +98,20 @@ describe('importCategory, recreating the items', () => {
       photosByItemId: {},
     });
     const createItemRows = fakeCreateItems();
-    const linkItemRows = fakeLinkItems();
     const onProgress = vi.fn<(progress: ImportProgress) => void>();
     await importCategory({
       file: archive,
       nameCategory: () => 'Coins',
       ...baseFakes(),
       createItemRows,
-      linkItemRows,
       onProgress,
     });
 
     const sizes = (mock: unknown) =>
       (mock as ReturnType<typeof vi.fn>).mock.calls.map(
-        ([rows]) => (rows as unknown[]).length,
+        ([, rows]) => (rows as unknown[]).length,
       );
     expect(sizes(createItemRows)).toEqual([ITEM_INSERT_BATCH_SIZE, 1]);
-    expect(sizes(linkItemRows)).toEqual([ITEM_INSERT_BATCH_SIZE, 1]);
     expect(
       onProgress.mock.calls
         .map(([progress]) => progress)

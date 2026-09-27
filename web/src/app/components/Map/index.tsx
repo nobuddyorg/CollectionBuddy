@@ -13,7 +13,7 @@ import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { popupContent } from './popup';
-import { afterZoomAnimation } from './afterZoomAnimation';
+import { afterZoomAnimation, removeMidZoom } from './afterZoomAnimation';
 import { diffMarkers } from './markerDiff';
 import {
   type CopyRange,
@@ -148,6 +148,7 @@ const MapView: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
 
   useEffect(() => {
     let cancelled = false;
+    let sizeFrame = 0;
     void (async () => {
       if (!mapRef.current || mapInstance.current) return;
       if (typeof window === 'undefined') return;
@@ -183,11 +184,12 @@ const MapView: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       currentLocationLayerRef.current = L.layerGroup().addTo(map);
 
       setReady(true);
-      requestAnimationFrame(() => map.invalidateSize());
+      sizeFrame = requestAnimationFrame(() => map.invalidateSize());
     })();
     return () => {
       cancelled = true;
-      mapInstance.current?.remove();
+      cancelAnimationFrame(sizeFrame);
+      if (mapInstance.current) removeMidZoom(mapInstance.current);
       mapInstance.current = null;
       layersRef.current = null;
       currentLocationLayerRef.current = null;

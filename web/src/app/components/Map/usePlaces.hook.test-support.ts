@@ -18,6 +18,11 @@ export function restoreGlobalsAndTimers() {
 
 export function renderUsePlaces() {
   return renderHook(() =>
-    usePlaces({ categoryId: 'cat-1', search: '', enabled: true }),
+    usePlaces({
+      categoryId: 'cat-1',
+      search: '',
+      enabled: true,
+      canEdit: true,
+    }),
   );
 }

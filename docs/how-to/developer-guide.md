@@ -66,8 +66,8 @@ menu, and — in `rls/` — the row-level security boundary itself. Those specs
 bypass the interface almost entirely: they ask Postgres, with a real token, the
 questions the app never would, one file per boundary (`isolation`,
 `viewer-share`, `editor-share`, each with a `-photographs` half for Storage,
-and `editor-share` a `-limits` one, plus `search-rpc`, `orphan-sweep-rpc` and
-`quotas`; shared helpers in `rls/helpers.ts`). Change a
+and `editor-share` a `-limits` one, plus `search-rpc`, `create-rpc`,
+`orphan-sweep-rpc` and `quotas`; shared helpers in `rls/helpers.ts`). Change a
 policy and these files say whether it holds.
 
 ```bash
@@ -689,8 +689,9 @@ the end of step 5, a few minutes: do it at a quiet time.
    never used again stays valid. In the dashboard's SQL editor,
    `delete from auth.sessions;` (their refresh tokens cascade) signs everyone
    out; issued access tokens run out within the JWT expiry, an hour by default.
-7. **Links:** the Google OAuth consent screen's home page, privacy policy and
-   terms URLs, the repository's website field, and anything else pointing at
+7. **Links:** the Google OAuth consent screen's home page, privacy policy
+   (the `privacy/` page) and terms URLs, the address in
+   `web/public/privacy-policy.txt`, the repository's website field, and anything else pointing at
    the old address. `curl -sI` on the old address should now answer with a
    redirect to the new host.
 

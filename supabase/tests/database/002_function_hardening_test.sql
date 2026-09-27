@@ -84,10 +84,14 @@ select is(
   'the API roles can execute exactly two security definer functions, both signed in only'
 );
 
--- Two must stay `security invoker`. list_category_places checks nothing itself; as a definer it would be an unsound second boundary.
+-- These must stay `security invoker`. list_category_places and create_items_in_category check nothing themselves; as definers they would be unsound second boundaries.
 select ok(
   not (select prosecdef from pg_catalog.pg_proc where oid = 'public.list_category_places(uuid, text)'::regprocedure),
   'list_category_places runs as its caller, so ordinary RLS still applies to it'
+);
+select ok(
+  not (select prosecdef from pg_catalog.pg_proc where oid = 'public.create_items_in_category(uuid, jsonb)'::regprocedure),
+  'create_items_in_category runs as its caller, so the items policies and the link trigger decide as for two inserts'
 );
 
 -- has_category_read_access, has_category_write_access and
