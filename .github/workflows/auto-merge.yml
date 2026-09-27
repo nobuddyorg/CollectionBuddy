@@ -84,19 +84,3 @@ jobs:
                   fi
                   echo "::notice::No CI run on main's tip $tip; dispatching one, which deploys it once green."
                   gh workflow run ci.yml --ref main --repo "$GITHUB_REPOSITORY"
-
-    # A failed catch-up leaves an auto-merged bump undeployed, so it comments on the production-health issue (docs/how-to/developer-guide.md#watch-production-health).
-    report-failure:
-        needs: catch-up-ci
-        if: failure() && github.ref == 'refs/heads/main'
-        runs-on: ubuntu-latest
-        timeout-minutes: 5
-        permissions:
-            contents: read # the checkout that provides the local action
-            issues: write # comments on, reopens or opens the production-health issue
-        steps:
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-              with:
-                  persist-credentials: false
-
-            - uses: ./.github/actions/report-production-failure
