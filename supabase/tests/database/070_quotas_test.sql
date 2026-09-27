@@ -128,18 +128,66 @@ select throws_ok(
   'thumbnails count against the same quota as the photographs'
 );
 
--- Entries: one statement up to the ceiling is fine, one row past it is not.
+-- Entries: up to the ceiling is fine, one row past it is not, inserted directly or through create_items_in_category, as the form and the import call it (0032).
 select gen_random_uuid() as collector_id \gset
 select pg_temp.auth_as(:'collector_id'::uuid, 'quota-collector@collectionbuddy.test');
+insert into public.categories (name) values ('Collector (pgTAP)')
+returning id as collector_category_id \gset
 select ok(
-  not pg_temp.raises('insert into public.items (title) select ''bulk '' || g from generate_series(1, 50000) g'),
-  'a collector may hold 50,000 entries'
+  not pg_temp.raises('insert into public.items (title) select ''bulk '' || g from generate_series(1, 49900) g'),
+  'a collector may hold 49,900 entries'
+);
+select throws_ok(
+  format('select public.create_items_in_category(%L, %L)', :'collector_category_id',
+    (select jsonb_agg(jsonb_build_object('title', 'batch ' || g)) from generate_series(1, 101) g)),
+  'PT507',
+  'entry quota of 50000 reached',
+  'an import batch that would pass 50,000 is refused'
+);
+select is(
+  (select count(*) from public.items where user_id = :'collector_id'::uuid),
+  49900::bigint,
+  'whole: none of its entries is kept'
+);
+select ok(
+  not pg_temp.raises(format('select public.create_items_in_category(%L, %L)', :'collector_category_id',
+    (select jsonb_agg(jsonb_build_object('title', 'batch ' || g)) from generate_series(1, 100) g))),
+  'a batch of 100 up to exactly 50,000 is imported'
+);
+select throws_ok(
+  format('select public.create_items_in_category(%L, %L)', :'collector_category_id', '[{"title": "one too many"}]'),
+  'PT507',
+  'entry quota of 50000 reached',
+  'the 50,001st entry is refused from the form'
 );
 select throws_ok(
   'insert into public.items (title) values (''one too many'')',
   'PT507',
   'entry quota of 50000 reached',
-  'the 50,001st entry is refused'
+  'and inserted directly'
+);
+
+-- An entry an editor creates is the editor's row (0021), so it counts on the editor's ceiling, never the owner's.
+select gen_random_uuid() as sharer_id \gset
+select pg_temp.auth_as(:'sharer_id'::uuid, 'quota-sharer@collectionbuddy.test');
+insert into public.categories (name) values ('Shared with a full collector (pgTAP)')
+returning id as sharer_category_id \gset
+insert into public.category_shares (category_id, invited_email, role)
+values (:'sharer_category_id'::uuid, 'quota-collector@collectionbuddy.test', 'editor');
+select pg_temp.auth_as(:'collector_id'::uuid, 'quota-collector@collectionbuddy.test');
+select throws_ok(
+  format('select public.create_items_in_category(%L, %L)', :'sharer_category_id', '[{"title": "not on the sharer"}]'),
+  'PT507',
+  'entry quota of 50000 reached',
+  'a collector at the ceiling adds no entry to a collection shared with it either'
+);
+insert into public.category_shares (category_id, invited_email, role)
+values (:'collector_category_id'::uuid, 'quota-editor@collectionbuddy.test', 'editor');
+select pg_temp.auth_as(:'editor_id'::uuid, 'quota-editor@collectionbuddy.test');
+select ok(
+  not pg_temp.raises(format('select public.create_items_in_category(%L, %L)', :'collector_category_id',
+    (select jsonb_agg(jsonb_build_object('title', 'editor batch ' || g)) from generate_series(1, 100) g))),
+  'while its editor still adds a batch to its full collection'
 );
 
 -- A different collector is unaffected by someone else's ceiling.
@@ -211,6 +259,21 @@ select throws_ok(
   'PT507',
   'an entry belongs to one collection',
   'so is filing a new entry into two collections in one statement'
+);
+insert into public.items (title) select 'Filed together ' || g from generate_series(1, 3) g;
+select throws_ok(
+  format(
+    'insert into public.item_categories (item_id, category_id) select i.id, c.id from public.items i, public.categories c where (i.title like ''Filed together %%'' or i.id = %L) and c.name = ''Category 5''',
+    :'linked_item_id'::uuid
+  ),
+  'PT507',
+  'an entry belongs to one collection',
+  'a batch filing new entries beside one already filed is refused'
+);
+select is(
+  (select count(*) from public.item_categories ic join public.items i on i.id = ic.item_id where i.title like 'Filed together %'),
+  0::bigint,
+  'whole: none of its entries is filed'
 );
 
 -- Text: each column's ceiling holds, and the value one past it is refused.

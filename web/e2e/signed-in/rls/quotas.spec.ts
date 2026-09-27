@@ -1,6 +1,12 @@
 import { expect, test } from '../test';
 import { SEED } from '../fixtures';
-import { apiAs, context, ownedCategoryId } from './helpers';
+import {
+  apiAs,
+  context,
+  editorShare,
+  ownedCategoryId,
+  unshare,
+} from './helpers';
 
 // Each over-the-limit write is one statement refused whole, so nothing persists for parallel specs to see.
 test.describe('per-owner quotas', () => {
@@ -13,6 +19,58 @@ test.describe('per-owner quotas', () => {
 
     expect(error?.code).toBe('PT507');
     expect(error?.message).toBe('entry quota of 50000 reached');
+  });
+
+  // The form and the import create entries through create_items_in_category; each entry is the caller's own row, so the caller's ceiling applies.
+  test('entries created in a shared collection meet the caller’s own ceiling, owner and editor alike', async () => {
+    const { token, otherToken, otherUserId } = context();
+    const { data: category, error: categoryError } = await apiAs(token)
+      .from('categories')
+      .insert({ name: `quota-rpc-probe-${crypto.randomUUID()}` })
+      .select('id')
+      .single();
+    if (categoryError) throw categoryError;
+    const shareId = await editorShare(token, category.id);
+    const create = (callerToken: string, titles: string[]) =>
+      apiAs(callerToken).rpc('create_items_in_category', {
+        target_category_id: category.id,
+        entries: titles.map((title) => ({ title })),
+      });
+    const titled = (title: string, count: number) =>
+      Array.from({ length: count }, (_, i) => `${title} ${i}`);
+
+    try {
+      for (const callerToken of [token, otherToken]) {
+        const { error } = await create(
+          callerToken,
+          titled('quota-rpc-past', 50_001),
+        );
+        expect(error?.code).toBe('PT507');
+        expect(error?.message).toBe('entry quota of 50000 reached');
+      }
+
+      const { error } = await create(
+        otherToken,
+        titled('quota-rpc-editor', 100),
+      );
+      expect(error).toBeNull();
+      const { data: created } = await apiAs(otherToken)
+        .from('items')
+        .select('user_id')
+        .like('title', 'quota-rpc-editor %');
+      expect(created).toHaveLength(100);
+      expect(new Set(created!.map((item) => item.user_id))).toEqual(
+        new Set([otherUserId]),
+      );
+    } finally {
+      // Removed while the grant still gives the editor write access to them.
+      await apiAs(otherToken)
+        .from('items')
+        .delete()
+        .like('title', 'quota-rpc-editor %');
+      await unshare(token, shareId);
+      await apiAs(token).from('categories').delete().eq('id', category.id);
+    }
   });
 
   test('photographs that would pass 256 MiB are refused, however small the client says they are', async () => {

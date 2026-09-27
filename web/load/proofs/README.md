@@ -25,6 +25,7 @@ Some proofs replay the client's own request sequence, the way `lib/api.js` mirro
 | `round-trips.js` (#780)          | `exportCategory.ts`, `images.ts`, `categories.ts`/`useCategories.tsx` delete reads, search path | Embedded export read; one keyset-paged images read for delete; search returning image rows |
 | `gate-blind-spots.js` (#781)     | `lib/flows.js` `browse`                                                                         | Name the new requests `catalogue last page` and `sign urls`                                |
 | `orphan-delete.js` (no issue)    | `data/categories.ts` `deleteCategory`                                                           | How a category is deleted                                                                  |
+| `quota-insert.js` (no issue)     | `data/importCategory.ts` `ITEM_INSERT_BATCH_SIZE`, `data/items.ts` `createItemsInCategory`      | How an import creates its entries                                                          |
 
 The browser proofs drive the real app, so they need no mirror.
 
@@ -38,7 +39,7 @@ load/proofs/browser/serve-demo.sh &
 BROWSER=1 load/proofs/run-all.sh             # sw-deploy builds its own pair on :4174
 ```
 
-`run-all.sh` runs #779 and its control first, on the freshly reset stack, then vacuums the emptied `items` and `item_categories` for `orphan-delete.js` (it needs `psql`), then the rest. A proof whose script is not in the tree yet is listed as skipped. It sorts each run into one of four groups:
+`run-all.sh` runs #779 and its control first, on the freshly reset stack, then vacuums the emptied `items` and `item_categories` for `orphan-delete.js` (it needs `psql`), and again for `quota-insert.js`, which also gets a fresh PostgREST pool (a schema reload) and autovacuum held off both tables while it runs, then the rest. A proof whose script is not in the tree yet is listed as skipped. It sorts each run into one of four groups:
 
 - **Red:** exit 99 and a conclusive report.
 - **Green:** exit 0.
@@ -51,7 +52,7 @@ The browser proofs launch Chromium through k6: point `K6_BROWSER_EXECUTABLE_PATH
 
 Knobs:
 
-- **Seed sizes:** `PROOF_ENTRIES` (default 40,000, under the 50,000-entry quota), `PROOF_OTHER_ENTRIES`, `PROOF_PLACES`, `PROOF_PAGES`, `PROOF_PHOTOS`, `PROOF_FITTING`, `PROOF_ARCHIVE_MB` (default 100, also the most: the seeded photos and their imported copies share one owner's 256 MiB).
+- **Seed sizes:** `PROOF_ENTRIES` (default 40,000, under the 50,000-entry quota), `PROOF_IMPORT_ENTRIES` (default 20,000), `PROOF_OTHER_ENTRIES`, `PROOF_PLACES`, `PROOF_PAGES`, `PROOF_PHOTOS`, `PROOF_FITTING`, `PROOF_ARCHIVE_MB` (default 100, also the most: the seeded photos and their imported copies share one owner's 256 MiB).
 - **Sampling and format:** `PROOF_SAMPLES`, `PROOF_SAFARI_FORMAT`.
 - **App URL:** `PROOF_APP_URL`.
 - **Replay a pre-fix client:** `PROOF_CLIENT_PAGE_SIZE=0` reads the map unranged, as before #756.
@@ -71,6 +72,7 @@ A failed setup is cleaned up. A setup killed by its 5-minute timeout can leave r
 | #780 round trips           | `round-trips.js`                                               | PERF-14: the export metadata phase sends more requests than the embedded read needs (521 vs 121 at 40,000 entries), and category delete's reads send ~841 against a budget of 446 (measured read-only; nothing is deleted). PERF-13: a search page needs 3 sequential steps to reach its photos. |
 | #781 blind gate            | `gate-blind-spots.js`                                          | The stock `browse` flow sends no last-page and no sign request. The deep and photo scenarios' p95 rows are the evidence.                                                                                                                                                                         |
 | Orphan delete (no issue)   | `orphan-delete.js`                                             | Deleting a category of 40,000 entries takes 4 s or more (or hits the 8 s statement timeout), or costs more per entry than a quarter-size one. The pooled connections first plan `delete_item_if_orphan()` on empty, vacuumed tables, which `run-all.sh` prepares with `psql`.                    |
+| Quota insert (no issue)    | `quota-insert.js`                                              | Importing 20,000 entries into a new project, the last tenth of its batches of 100 takes ≥ 100 ms (p95), or 1.5× the first tenth. The pool first plans the insert triggers on empty, vacuumed tables; `run-all.sh` holds autovacuum off them.                                                     |
 | #738 Safari PNG            | `browser/safari-webp.js`                                       | With Safari's canvas emulated in Chromium, the app stores PNG objects. `png-vs-webp.js` only records the cost and has no verdict.                                                                                                                                                                |
 | #771 worker CSP            | `browser/worker-csp.js`                                        | Compression workers report failure (2 today: full size and thumbnail).                                                                                                                                                                                                                           |
 | #778 Photon                | `browser/photon-geocoding.js`                                  | About 2 s pass between the last failed attempt and the end of loading. In-flight requests complete after the map closes. More than 3 requests start per second after the first burst. A viewer's map sends write-backs.                                                                          |

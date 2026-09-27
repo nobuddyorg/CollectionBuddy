@@ -70,6 +70,15 @@ if [[ $(psql "$db" -Atc 'select count(*) from public.items') == 0 ]] && psql "$d
 else
   broken+=('orphan-delete (entries left over, or psql missing: it needs empty, vacuumed tables)')
 fi
+# quota-insert needs them too, a pool that has inserted nothing yet (a schema reload replaces it), and autovacuum held off both tables for the run.
+if [[ $(psql "$db" -Atc 'select count(*) from public.items') == 0 ]] && psql "$db" -q -c 'vacuum analyze public.items, public.item_categories' \
+  -c 'alter table public.items set (autovacuum_enabled = off)' -c 'alter table public.item_categories set (autovacuum_enabled = off)' \
+  -c "notify pgrst, 'reload schema'"; then
+  run quota-insert k6 run "$here/quota-insert.js"
+  psql "$db" -q -c 'alter table public.items reset (autovacuum_enabled)' -c 'alter table public.item_categories reset (autovacuum_enabled)'
+else
+  broken+=('quota-insert (entries left over, or psql missing: it needs empty, vacuumed tables)')
+fi
 for proof in deep-offset map-places-cap sign-many quota-refused-import round-trips gate-blind-spots; do
   run "$proof" k6 run "$here/$proof.js"
 done
