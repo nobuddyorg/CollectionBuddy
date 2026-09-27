@@ -625,9 +625,6 @@ One-time setup for a fork:
    classic access token before it lands; `prek`'s gitleaks scan covers the
    legacy JWT and the database URL, which GitHub has no pattern for
    ([Configuration](../reference/configuration.md#github-actions-secrets)).
-9. Create and pin the *Production health* issue, labelled
-   `production-health`, so failures notify you
-   ([Watch production health](#watch-production-health)).
 
 ## Roll back a bad deploy
 
@@ -853,42 +850,25 @@ Users deleted in the dashboard before `0034` left their rows behind; `0034`
 deleted those rows when it deployed, so their photographs reach the sweep 48 h
 later, possibly past the ceiling in the same way.
 
-## Watch production health
+## Notice a failed production run
 
-Monitoring stays inside GitHub
-([why](../explanation/design-decisions.md#why-production-monitoring-stays-inside-github)).
-Every workflow that deploys or runs on a schedule ends in a `report-failure`
-job: `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml`, and
-`auto-merge.yml`, for its `catch-up-ci`, which brings auto-merged bumps to
-production. When a run on `main` fails, that job
-([`report-production-failure`](../../.github/actions/report-production-failure/action.yml))
-comments the workflow, commit and run link on the newest issue labelled
-`production-health`, reopening it if it is closed, and opens one, creating
-the label, if none exists. Close the issue once production is healthy again;
-the next failure reopens it. Only that job holds `issues: write`.
+Nothing reports a failure beyond GitHub's own email
+([why](../explanation/design-decisions.md#why-production-has-no-alerting)):
+it goes to the account that triggered the run, and for a scheduled run to
+whoever last changed its `cron` line, if their notification settings send
+Actions email. So after merging, check that *Deploy Pages* went green, and
+look at the Actions tab now and then for `keep-alive.yml` and
+`cleanup-orphaned-photos.yml`. A render error in a visitor's browser shows a
+translated screen with a reload button (`error.tsx`, and `global-error.tsx`
+when the root layout itself throws) and reaches only that browser's console.
 
-**Who is told.** A comment notifies whoever is subscribed to the issue, and a
-new or reopened issue also everyone watching the repository with *All
-Activity*. The action posts as `github-actions[bot]`, so nobody is subscribed
-by default. Once, as the owner: create the issue yourself (title *Production
-health*, label `production-health`), pin it, and stay subscribed as its
-author; or subscribe on the issue the first failure opens. Apart from that,
-GitHub emails a failed run only to the account that triggered it, and for a
-scheduled run to whoever last changed its `cron` line, if their notification
-settings send Actions email.
-
-**What it cannot see.** A run that never happens: a disabled workflow (below)
-leaves no failed run to report. Errors in a visitor's browser: `error.tsx`
-and, when the root layout itself throws, `global-error.tsx` show a translated
-screen with a reload button, and the error reaches only that browser's
-console.
-
-### Keep the schedules alive
+## Keep the schedules alive
 
 In a public repository, GitHub disables a workflow with a `schedule` trigger
 once the repository has had no activity for 60 days; commits count, the
 workflows' own runs do not. It disables the whole workflow, not only its
-schedule, and all four above have one: a disabled `pages-deploy.yml` also
+schedule, and `pages-deploy.yml`, `keep-alive.yml`,
+`cleanup-orphaned-photos.yml` and `auto-merge.yml` all have one: a disabled `pages-deploy.yml` also
 ignores CI's `workflow_run`, so the first merge after a quiet spell deploys
 nothing. GitHub emails a warning some days before. With `keep-alive.yml`
 disabled, Supabase pauses the Free project after 7 days of low activity, with
