@@ -16,6 +16,10 @@ A public link means an anonymous reader. Every predicate here resolves an actual
 
 The `editor` role (#562) widened the grant without touching that argument: sharing is no longer read-only, but it is still _identified_. If public links are ever wanted, they are a separate, explicitly higher-risk piece of work.
 
+## Why only the owner can export a category
+
+Export is owners-only, a product choice rather than a technical limit (#777). RLS already lets a viewer or editor read every row of a category shared with them and sign its photographs, so a grantee's export would work. It stays off because a share grants access to a collection, not a copy of it: a full archive outlives a revocation, and who gets one is the owner's decision. For a shared category the Export button is disabled; this is UX only, since the data a grantee could export is exactly what it can already see.
+
 ## Why the hosted Auth settings are pinned
 
 Sharing authorizes on an address: `caller_email()` reads the access token's `email` claim, and a grant has no accept step, so whoever first holds a session carrying the invited address holds the grant. Whether that address was proven is decided by the hosted Auth configuration, not by anything in the repository, and a few dashboard toggles turn it into an invite takeover (#745). In GoTrue's source:
@@ -192,7 +196,7 @@ On their own those indexes only work under `BYPASSRLS`. `texticlike` is not leak
 
 The planner picks between three paths per call (0018 plans each call with its real arguments): the trigram indexes for a term rare across the whole table, the category's own links for a small collection, or a sequential scan of `items` when the term is common across everyone. Postgres costs an `ILIKE` evaluation far below what it takes, so that last path wins until `items` is several times larger than the collection searched. The `population` load test measured it at 33,600 entries over 28 collectors: 8.7 ms by sequential scan against 3.6 ms from the collection's links. That grows with every user's entries, not just the searcher's, and stays in the tens of milliseconds at this app's scale. Forcing the collection-first path would give up the trigram path, which answers a rare term in a 40,000-entry collection in 1.5 ms instead of about 200, so the choice stays with the planner.
 
-The 3-character minimum before a search fires is not about the index: a one- or two-character query matches nearly every row, so firing one per keystroke would cost a full scan for no narrowing. The debounce does the same job for typing speed.
+The 3-character minimum before a search fires, in every script, is about the index. `pg_trgm` extracts no trigram from a two-character substring pattern such as `%Öl%`, so the planner can only read every collector's entries: when a two-character term with a non-ASCII letter was still sent (#779), `Öl` took 4.5 times as long as `Öllampe`, which finds the same 200 entries, once 150,000 other entries existed. A few longer terms carry no trigram either, such as `...`; nobody searches for those, so the floor counts characters rather than copying `pg_trgm`'s word rules. The RPCs do not refuse a shorter pattern: a direct caller gains nothing a common term does not already cost. Below the floor the list stays unfiltered, and the debounce spares a request per keystroke.
 
 ## Why mutation testing is scoped to a list of files
 
@@ -206,7 +210,7 @@ Stryker's incremental mode (#714) reuses a mutant's previous result when neither
 
 ### No suppressions
 
-There is no `Stryker disable` or `/* v8 ignore */` in `src/`. There used to be — around the Supabase query builders, the whole of `useExportCategory`, and a handful of lines carrying mutants nobody could kill. What they hid is now tested: a PostgREST builder composes its request eagerly and only sends it when awaited, so `items.test.ts` reads back the table, filter, method, headers and body each call produced, without a server; the one real call per module (`getSession`, `compressThumb`) has a small test that mocks the module underneath and drives the default. Three suppressed lines turned out to guard code that did not need to exist — a guard for a value the callee accepted anyway, an option that spelled out the library's default, a wrapper every caller unwrapped — which is the ending [TEST_STRATEGY.md](../../TEST_STRATEGY.md) §11 calls the one that pays for the exercise.
+There is no `Stryker disable` or `/* v8 ignore */` in `src/`. There used to be — around the Supabase query builders, the whole of `useExportCategory`, and a handful of lines carrying mutants nobody could kill. What they hid is now tested: a PostgREST builder composes its request eagerly and only sends it when awaited, so `items.test.ts` reads back the table, filter, method, headers and body each call produced, without a server; the one real call per module (`compressThumb`) has a small test that mocks the module underneath and drives the default. Three suppressed lines turned out to guard code that did not need to exist — a guard for a value the callee accepted anyway, an option that spelled out the library's default, a wrapper every caller unwrapped — which is the ending [TEST_STRATEGY.md](../../TEST_STRATEGY.md) §11 calls the one that pays for the exercise.
 
 ### What still survives, and why no test can kill it
 

@@ -75,8 +75,8 @@ describe('CategorySelect with a shared category', () => {
     ).not.toBeInTheDocument();
   });
 
-  // exportCategory() builds storage paths from the caller's uid, which is wrong for a grantee.
-  it('disables export rather than offering a broken one', async () => {
+  // Owners-only by product decision: a full copy of a collection is the owner's to hand out.
+  it('keeps export to the owner', async () => {
     renderSelect({ categories: categories({ categories: sharedCategories }) });
     await openPanel();
     expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();

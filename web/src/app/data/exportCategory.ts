@@ -1,5 +1,4 @@
 import { chunk } from '../lib/chunk';
-import { supabase } from '../supabase';
 import {
   createSignedUrls,
   listExportImagesForItems,
@@ -69,10 +68,6 @@ export class ExportCancelledError extends Error {
 
 function checkCancelled(signal?: AbortSignal): void {
   if (signal?.aborted) throw new ExportCancelledError();
-}
-
-function realGetSession() {
-  return supabase.auth.getSession();
 }
 
 /** Walks every page of a category's items, reporting the running count. */
@@ -215,7 +210,6 @@ export async function exportCategory({
   onProgress,
   now = () => new Date(),
   signal,
-  getSession = realGetSession,
   listItems = listItemsForExport,
   listImages = listExportImagesForItems,
   signUrls = createSignedUrls,
@@ -226,16 +220,12 @@ export async function exportCategory({
   now?: () => Date;
   /** Checked between phases, between batches and before every retry. */
   signal?: AbortSignal;
-  getSession?: () => ReturnType<typeof supabase.auth.getSession>;
   listItems?: typeof listItemsForExport;
   listImages?: typeof listExportImagesForItems;
   signUrls?: typeof createSignedUrls;
   /** Asked only past `LARGE_EXPORT_WARN_BYTES`; declining cancels, omitting it skips the prompt. */
   confirmLargeExport?: (totalBytes: number) => Promise<boolean> | boolean;
 }): Promise<ExportResult> {
-  const { data: sessionData } = await getSession();
-  if (!sessionData.session?.user.id) throw new ExportError('No user session');
-
   onProgress?.({ phase: 'items', done: 0, total: 0 });
   const items = await fetchAllItems({
     categoryId: category.id,

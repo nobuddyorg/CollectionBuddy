@@ -1,6 +1,7 @@
+# Hook revs are commit SHAs (a tag can be repointed); Dependabot bumps both the SHA and its `# frozen:` tag.
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # frozen: v6.0.0
     hooks:
       - id: check-json
       - id: check-yaml
@@ -16,7 +17,7 @@ repos:
         args: ["--branch", "main"]
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.50.0
+    rev: 4d9c206a77c041268485162b8e2579ad7a5cb9a3 # frozen: v1.50.0
     hooks:
       - id: typos
         # German prose reads as misspelled English near word-for-word; the lockfile is a wall of hashes.
@@ -30,18 +31,18 @@ repos:
 
   # Staged changes on commit; CI's prek job scans the history instead. Rules and the anon-key allowlist in .gitleaks.toml.
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.30.1
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # frozen: v8.30.1
     hooks:
       - id: gitleaks
 
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.29.0
+    rev: 451b56af716f9f0d0c2b816503a3fd0cf8b036fa # frozen: v1.29.0
     hooks:
       - id: zizmor
 
   # zizmor covers security; actionlint covers syntax, expression types, job references and ShellCheck on run: blocks.
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.12
+    rev: 914e7df21a07ef503a81201c76d2b11c789d3fca # frozen: v1.7.12
     hooks:
       - id: actionlint
         # Every workflow at once, so an edited composite action re-checks the workflows that call it.
@@ -49,19 +50,19 @@ repos:
         pass_filenames: false
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.23.2
+    rev: b82a6c8896e491b9cb377a99ff3412131920681b # frozen: v0.23.2
     hooks:
       - id: markdownlint-cli2
 
   # Lint only, never `sqlfluff-fix`: migrations are applied history, not reformattable source.
   - repo: https://github.com/sqlfluff/sqlfluff
-    rev: 4.3.0
+    rev: 8108cc202d2aa2732b21d48507152c95ee244030 # frozen: 4.3.0
     hooks:
       - id: sqlfluff-lint
 
   # Lock and rewrite hazards sqlfluff cannot see; rules in .squawk.toml.
   - repo: https://github.com/sbdchd/squawk
-    rev: v2.65.0
+    rev: 0feae0d2ea3407c18f984623a23adff5103e996c # frozen: v2.65.0
     hooks:
       - id: squawk
         files: ^supabase/migrations/.*\.sql$

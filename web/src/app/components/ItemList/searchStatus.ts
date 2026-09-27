@@ -1,4 +1,4 @@
-import { searchMinLength } from '../../data/itemSearch';
+import { SEARCH_MIN_LENGTH } from '../../data/itemSearch';
 
 /** Nothing typed; too short to filter (total is the whole category); or filtered, with a match count. */
 export type SearchStatus =
@@ -11,7 +11,7 @@ export function searchStatusFor(
   total: number,
 ): SearchStatus {
   if (!debouncedQuery) return { kind: 'inactive' };
-  return debouncedQuery.length < searchMinLength(debouncedQuery)
+  return debouncedQuery.length < SEARCH_MIN_LENGTH
     ? { kind: 'tooShort' }
     : { kind: 'active', total };
 }

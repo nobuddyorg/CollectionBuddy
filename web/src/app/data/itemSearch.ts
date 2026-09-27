@@ -4,22 +4,10 @@ function likePattern(needle: string): string {
   return `%${likeEscaped}%`;
 }
 
-// Below 3 characters no trigram can seed the index scan, so ILIKE would scan every row.
+// `%xy%` holds no trigram in any script, so a shorter term makes Postgres read every collector's entries.
 export const SEARCH_MIN_LENGTH = 3;
-
-// A non-ASCII character carries more meaning per character, so the floor is lower.
-export const SEARCH_MIN_LENGTH_NON_ASCII = 2;
-
-const NON_ASCII_PATTERN = /[^\x00-\x7F]/;
-
-/** The minimum length `search` needs before it earns a filter. */
-export function searchMinLength(search: string): number {
-  return NON_ASCII_PATTERN.test(search)
-    ? SEARCH_MIN_LENGTH_NON_ASCII
-    : SEARCH_MIN_LENGTH;
-}
 
 /** The escaped ILIKE `like_pattern` the search and map RPCs take, or null when the term is too short. */
 export function likePatternFor(search: string): string | null {
-  return search.length >= searchMinLength(search) ? likePattern(search) : null;
+  return search.length >= SEARCH_MIN_LENGTH ? likePattern(search) : null;
 }
