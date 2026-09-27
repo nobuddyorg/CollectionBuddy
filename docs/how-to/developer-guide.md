@@ -802,47 +802,38 @@ assistant's.
 
 1. **Find the user.** Dashboard → Authentication → Users, search the email,
    copy the user's UID.
-2. **Remove the photographs from Storage.** In the dashboard's SQL editor,
-   list every object the user's photograph records name, 1,000 paths a row,
-   which is what one Storage bulk delete takes:
+2. **Remove the photographs from Storage.** Either way needs no secret key;
+   never paste one into a shell or a chat (CLAUDE.md keeps service-role-level
+   keys in CI only).
+   - **Now:** list the user's photograph paths in the dashboard's SQL editor
+     and delete them in the Storage browser (bucket `item-images`):
 
-   ```sql
-   select json_build_object('prefixes', json_agg(path)) as payload
-   from (
-     select path, (row_number() over (order by path) - 1) / 1000 as batch
+     ```sql
+     select path
      from public.images as im
      cross join lateral unnest(array[im.path_full, im.path_thumb]) as path
      where im.user_id = '<uid>' and path is not null
-   ) as paths
-   group by batch;
-   ```
+     order by path;
+     ```
 
-   Delete each payload through Storage, the only thing that deletes bytes,
-   with the secret key (Settings → API Keys), typed into your own shell,
-   never saved:
+     Do not delete the whole `<uid>/` folder: a photograph the user added as
+     an editor to someone else's entry lies there and belongs to that entry.
+     This must then return 0:
 
-   ```bash
-   read -rs SECRET_KEY
-   curl -sS --fail-with-body -X DELETE \
-     "https://<project-ref>.supabase.co/storage/v1/object/item-images" \
-     -H "apikey: $SECRET_KEY" -H "Content-Type: application/json" \
-     --data '<payload>'
-   ```
+     ```sql
+     select count(*)
+     from public.images as im
+     join storage.objects as o
+       on o.bucket_id = 'item-images' and o.name in (im.path_full, im.path_thumb)
+     where im.user_id = '<uid>';
+     ```
 
-   A legacy `service_role` key also needs `-H "Authorization: Bearer
-   $SECRET_KEY"`. For a handful of photographs, deleting those paths in
-   the dashboard's Storage browser does the same. Do not delete the whole
-   `<uid>/` folder: a photograph the user added as an editor to someone
-   else's entry lies there and belongs to that entry. The query below must
-   then return 0:
-
-   ```sql
-   select count(*)
-   from public.images as im
-   join storage.objects as o
-     on o.bucket_id = 'item-images' and o.name in (im.path_full, im.path_thumb)
-   where im.user_id = '<uid>';
-   ```
+   - **Or let the sweep do it:** skip to step 3. Deleting the user removes
+     their photograph records (`0034`), and the daily orphan sweep deletes the
+     objects once they are 48 hours old, so within about three days. If that
+     is more than max(50, 5% of the bucket) objects, the scheduled run
+     refuses: review its dry run and run it with `allow_mass_delete`
+     ([above](#sweep-orphaned-photographs)).
 
 3. **Delete the grants made to the email**, which nothing ties to the user,
    so no cascade reaches them:
