@@ -72,12 +72,12 @@ test.describe('searching a collection', () => {
     await expectTitles(page, allCoins);
   });
 
-  // A percent sign is a LIKE wildcard; unescaped it would match everything rather than nothing.
+  // A percent sign is a LIKE wildcard: unescaped, this term would find Silberdenar.
   test('treats a percent sign as text rather than a wildcard', async ({
     on,
     page,
   }) => {
-    await on(page).catalogue.do.search('100%');
+    await on(page).catalogue.do.search('Silber%nar');
     await expectTitles(page, []);
   });
 

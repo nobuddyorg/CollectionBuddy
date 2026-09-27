@@ -12,12 +12,26 @@ on a device without network. Signing out also makes the browser forget the
 collection you last had open and the places the map looked up; your theme and
 language stay.
 
+## Delete your account
+
+**Delete account**, at the bottom of the user menu, deletes your account for
+good after one confirmation: every collection you own with its entries and
+photos, every share you made and every share made to you, and your sign-in.
+There is no undo, so export the collections you want to keep first. Anyone who
+shared a collection of yours loses it; signing in again with the same Google
+account starts a new, empty account.
+
+If someone let you edit their collection, the entries you created there go
+with your account. Photos you added to _their_ entries are theirs and stay.
+
 ## Help
 
 **Help** in the user menu opens a short guide to each feature, in the
 language the app is set to. **Ctrl+/** (**Cmd+/** on a Mac) opens it from
 anywhere, even inside a text field. With no categories yet, the empty page has
 a **How it works** button that opens the same guide.
+If your categories or entries fail to load, the page says so and offers
+**Try again** instead of showing them as empty.
 
 The **Privacy notice** (`/privacy`) says what CollectionBuddy stores, who
 receives it and for how long. It opens without signing in: the sign-in page,
@@ -78,8 +92,13 @@ can be granted access, and it is read-only until you say otherwise.
   shared with you, **Export** is disabled.
 - **Import**: click **Import**, pick a `.zip` exported from CollectionBuddy. It
   becomes a new category. A taken name gets a suffix (`Coins (2)`) rather than
-  overwriting or failing. Each item keeps its photos in their order, so its
-  cover photo stays the same.
+  overwriting or failing; a name at the 200-character limit is shortened to
+  make room for it. Each item keeps its photos in their order, so its cover
+  photo stays the same. An export you unzipped and zipped again with your
+  system's own tool imports too, as long as it keeps the export's folder and
+  is not encrypted. A damaged archive, or one that unpacks to more than an
+  import accepts, is refused with a message saying which, and nothing of it
+  is kept.
 
 ## Items
 
@@ -100,7 +119,7 @@ cancel the delete and keep the item.
 | --- | --- |
 | Title | Required. |
 | Description | Optional. |
-| Place | Optional. Suggestions appear from the third character, from the [Photon](https://photon.komoot.io/) geocoder. Pick a suggestion if you want the item on the map; free text is kept but not pinned. |
+| Place | Optional. Suggestions appear from the third character, from the [Photon](https://photon.komoot.io/) geocoder. Pick a suggestion to pin the item exactly there. Free text is kept too: the map looks it up when it opens, pins it where Photon finds it, and, if you may edit the collection, saves that position to the items naming that place. |
 | Tags | Optional. Enter or comma adds a chip; Backspace on an empty tag field removes the last one. Duplicates are ignored. |
 
 On save, whitespace is trimmed, blank fields become empty, and tags are
@@ -143,14 +162,17 @@ buttons to zoom to it and to frame all pins.
 Two independent settings in the user menu:
 
 - **Language** (_Sprache_): Deutsch / English. Detected from your browser on
-  first visit, then remembered.
+  first visit, German if it is set to neither, then remembered. Dates and
+  sizes are written the way the chosen language writes them.
 - **Appearance** (_Darstellung_): System / Light / Dark. System follows your
   OS setting live. Light or Dark overrides it until you switch back.
 
 ## Accessibility
 
 The app works with a keyboard and a screen reader: dialogs trap focus and close
-on Escape, confirmation dialogs focus **Cancel** rather than the destructive
+on Escape, only the topmost one at a time (Escape on a confirmation raised in
+the photo viewer leaves the viewer open, and its arrow keys wait for the
+answer), confirmation dialogs focus **Cancel** rather than the destructive
 action, and result counts for search and place suggestions are announced,
 since their dropdowns render outside normal reading order. In the collection
 strip, the arrow keys, Home and End move between collections without opening

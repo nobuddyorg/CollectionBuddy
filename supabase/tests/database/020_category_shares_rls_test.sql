@@ -101,11 +101,13 @@ select is(
   0::bigint,
   'nor to deleting its photograph record'
 );
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.images (item_id, path_full) values (%L, %L)',
     :'item_id'::uuid, :'grantee_id'::text || '/' || :'item_id'::text || '/planted.webp'
-  )),
+  ),
+  'P0001',
+  'ownership mismatch',
   'nor to adding a photograph record to it'
 );
 
@@ -201,11 +203,13 @@ select is(
 
 -- A category cannot be shared with its own owner (tg_category_shares_enforce).
 select pg_temp.auth_as(:'owner_id'::uuid, 'share-owner@collectionbuddy.test');
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.category_shares (category_id, invited_email) values (%L, %L)',
     :'category_id'::uuid, 'share-owner@collectionbuddy.test'
-  )),
+  ),
+  'P0001',
+  'cannot share a category with yourself',
   'a category cannot be shared with its own owner'
 );
 

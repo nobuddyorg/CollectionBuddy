@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
@@ -37,9 +37,33 @@ function renderSection(shares: UseShares) {
   );
 }
 
+/** A German app language on an American browser, so a date written the browser's way would give itself away. */
+function germanAppOnAmericanBrowser() {
+  window.localStorage.setItem('lang', 'de');
+  vi.stubGlobal('navigator', {
+    ...navigator,
+    language: 'en-US',
+    languages: ['en-US'],
+  });
+}
+
 describe('SharingSection invite', () => {
   beforeEach(() => {
     window.localStorage.setItem('lang', 'en');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('writes the picked date the way the app language does, not the browser', () => {
+    germanAppOnAmericanBrowser();
+    renderSection(sharesState());
+    fireEvent.change(screen.getByLabelText('Läuft ab (optional)'), {
+      target: { value: '2099-12-31' },
+    });
+
+    expect(screen.getByText('Bis 31.12.2099')).toBeVisible();
   });
 
   it('says nothing is shared yet when the list is empty', () => {
@@ -203,8 +227,8 @@ describe('SharingSection invite', () => {
       target: { value: '2026-08-20' },
     });
 
-    const expected = `Expires ${new Date('2026-08-20T00:00:00').toLocaleDateString()}`;
-    expect(screen.getByText(expected)).toBeVisible();
+    // jsdom's browser is en-US, the regional form of English it formats in.
+    expect(screen.getByText('Expires 8/20/2026')).toBeVisible();
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Clear expiry date' }),
@@ -218,6 +242,31 @@ describe('SharingSection invite', () => {
 describe('SharingSection list', () => {
   beforeEach(() => {
     window.localStorage.setItem('lang', 'en');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('dates a grant the way the app language does, not the browser', () => {
+    germanAppOnAmericanBrowser();
+    renderSection(
+      sharesState({
+        shares: [
+          {
+            id: 'share-1',
+            invited_email: 'grantee@example.com',
+            // Midday, so every timezone the suite may run in reads the same day.
+            expires_at: '2099-12-31T12:00:00.000Z',
+            owner_user_id: 'owner-1',
+            role: 'viewer',
+          },
+        ],
+      }),
+    );
+
+    const row = screen.getByText('grantee@example.com').closest('li')!;
+    expect(row).toHaveTextContent('Läuft ab am 31.12.2099');
   });
 
   it('lists an existing grant with its expiry', () => {
@@ -238,7 +287,7 @@ describe('SharingSection list', () => {
     // The expiry sits in a nested span, so aggregate text is read rather than one node's.
     const row = screen.getByText('grantee@example.com').closest('li')!;
     expect(row).toHaveTextContent(
-      `Expires ${new Date(expiresAt).toLocaleDateString()}`,
+      `Expires ${new Date(expiresAt).toLocaleDateString('en-US')}`,
     );
   });
 
@@ -259,7 +308,7 @@ describe('SharingSection list', () => {
     );
     const row = screen.getByText('grantee@example.com').closest('li')!;
     expect(row).toHaveTextContent(
-      `Expired ${new Date(expiresAt).toLocaleDateString()}`,
+      `Expired ${new Date(expiresAt).toLocaleDateString('en-US')}`,
     );
     const expirySpan = row.querySelector('.text-destructive');
     expect(expirySpan).not.toBeNull();

@@ -1,6 +1,7 @@
 import { expect, test } from '../test';
 import { SEED } from '../fixtures';
 import {
+  OBJECT_HIDDEN,
   apiAs,
   context,
   editorShare,
@@ -101,17 +102,20 @@ test.describe('a category shared at the editor role', () => {
     });
     const shareId = await editorShare(token, categoryId);
 
-    const { data: mine } = await apiAs(otherToken)
+    const { data: mine, error: insertError } = await apiAs(otherToken)
       .from('items')
       .insert({ user_id: otherUserId, title: 'rls-editor-invisible-entry' })
       .select('id')
       .single();
+    expect(insertError).toBeNull();
     const photo = `${otherUserId}/${mine!.id}/rls-editor-invisible.webp`;
 
     try {
-      await apiAs(otherToken)
+      // Checked, or a refused link would leave the entry unfiled and the owner's empty reads below would prove nothing.
+      const { error: linkError } = await apiAs(otherToken)
         .from('item_categories')
         .insert({ item_id: mine!.id, category_id: categoryId });
+      expect(linkError).toBeNull();
 
       // Satisfiable filter: the row exists and is linked here, so only the policy makes this empty.
       const { data: seen } = await apiAs(token)
@@ -145,7 +149,7 @@ test.describe('a category shared at the editor role', () => {
         .storage.from('item-images')
         .createSignedUrl(photo, 60);
       expect(signed).toBeNull();
-      expect(signError).not.toBeNull();
+      expect(signError).toMatchObject(OBJECT_HIDDEN);
     } finally {
       await apiAs(otherToken).storage.from('item-images').remove([photo]);
       await unshare(token, shareId);

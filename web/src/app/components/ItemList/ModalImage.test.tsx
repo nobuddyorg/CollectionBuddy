@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
+import { useEscapeToClose } from '../CenteredModal/useEscapeToClose';
 import { ModalImage } from './ModalImage';
 import type { ImageEntry } from './types';
 
@@ -106,6 +107,12 @@ describe('ModalImage', () => {
   });
 
   // A near-miss on Previous/Next used to fall through to a backdrop click and close the modal.
+  it('closes on Escape', async () => {
+    const { onClose } = renderModal();
+    await userEvent.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it('does not close on a backdrop click away from the image', async () => {
     const { onClose } = renderModal();
     await userEvent.click(screen.getByRole('dialog'));
@@ -316,6 +323,33 @@ describe('ModalImage', () => {
       expect(screen.getByRole('img')).toHaveAccessibleName(
         'Blue Mauritius, image 6',
       );
+    });
+
+    // A confirm raised from the viewer (Delete) owns the keyboard until it closes.
+    describe('beneath a dialog stacked above it', () => {
+      function DialogAbove({ onClose }: { onClose: () => void }) {
+        useEscapeToClose(true, onClose);
+        return null;
+      }
+
+      it('leaves Escape to that dialog and stays open', async () => {
+        const { onClose } = renderModal({ images, index: 0 });
+        const onCloseAbove = vi.fn();
+        render(<DialogAbove onClose={onCloseAbove} />);
+
+        await userEvent.keyboard('{Escape}');
+        expect(onCloseAbove).toHaveBeenCalledOnce();
+        expect(onClose).not.toHaveBeenCalled();
+      });
+
+      it('does not page on the arrow keys', async () => {
+        const { onIndexChange } = renderModal({ images, index: 0 });
+        render(<DialogAbove onClose={vi.fn()} />);
+
+        await userEvent.keyboard('{ArrowRight}');
+        await userEvent.keyboard('{ArrowLeft}');
+        expect(onIndexChange).not.toHaveBeenCalled();
+      });
     });
 
     // The touch equivalent of Previous/Next, which cover content on a narrow phone screen.

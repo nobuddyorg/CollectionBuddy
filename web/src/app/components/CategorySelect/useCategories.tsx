@@ -15,7 +15,7 @@ import {
   listItemIdsLinkedElsewhere,
   renameCategory as renameCategoryRow,
 } from '../../data/categories';
-import { listImagePathsForItems } from '../../data/images';
+import { listImagePathsForCategory } from '../../data/images';
 import { objectPathsOf, removeObjectsThenRows } from '../../data/imageRemoval';
 import type { CategorySummary } from '../../data/categories';
 
@@ -28,6 +28,8 @@ export function useCategories() {
   const [categories, setCategories] = useState<CategorySummary[]>([]);
   // Starts true: an initial false flashed the "no categories" state before the first fetch.
   const [isLoading, setIsLoading] = useState(true);
+  // Kept apart from an empty list: a failed load must not read as a collector who has no collections.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -41,12 +43,18 @@ export function useCategories() {
       const { data, error } = await listCategories();
       if (error) throw error;
       const list = data ?? [];
-      if (isCurrent(mySequence)) setCategories(list);
+      if (isCurrent(mySequence)) {
+        setCategories(list);
+        setLoadFailed(false);
+      }
       return list;
     } catch (error) {
       // Logged even for a superseded request; only the toast is gated.
       console.error(error);
-      if (isCurrent(mySequence)) toast.error(t('category_select.load_error'));
+      if (isCurrent(mySequence)) {
+        setLoadFailed(true);
+        toast.error(t('category_select.load_error'));
+      }
       return [];
     } finally {
       if (isCurrent(mySequence)) setIsLoading(false);
@@ -170,7 +178,7 @@ export function useCategories() {
             // Read before the row delete: the cascade would drop these rows and the paths with them.
             let orphanedPaths: string[] = [];
             if (orphanedItemIds.length) {
-              const listed = await listImagePathsForItems(orphanedItemIds);
+              const listed = await listImagePathsForCategory(id);
               if (listed.error !== null) {
                 throw new Error('Could not read images for orphaned items', {
                   cause: listed.error,
@@ -207,6 +215,7 @@ export function useCategories() {
   return {
     categories,
     isLoading,
+    loadFailed,
     isCreating,
     isDeleting,
     isRenaming,

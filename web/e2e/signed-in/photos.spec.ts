@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { removeEntriesTitled } from './cleanup';
 import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
+import type { PageTree } from '../pages';
 // Decode, resize, upload, list and sign all happen in the browser; rls/ covers what the policies allow.
 test.use({ locale: 'en-GB' });
 
@@ -130,6 +131,11 @@ test.describe('photographs', () => {
       // Waits for the real picture, not the placeholder that stood in for it.
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
       await expect(card.locators.images).toHaveAttribute('src', /token=/);
+      // Both sizes signed and offered, so a plate that needs no more than 600px fetches the thumbnail.
+      await expect(card.locators.images).toHaveAttribute(
+        'srcset',
+        /\.thumb\.\w+\?token=\S+ 600w, \S+\?token=\S+ 1000w$/,
+      );
     } finally {
       // In finally, objects and row both: a leaked entry would orphan its upload.
       await removeEntriesTitled(title);
@@ -326,5 +332,74 @@ test.describe('photographs', () => {
     } finally {
       await removeEntriesTitled(title);
     }
+  });
+
+  // #784: the entry's delete can commit inside its photograph's own undo window and take the photograph along.
+  test.describe('taken off just before its entry is deleted', () => {
+    async function photographThenEntryDeleted(
+      app: PageTree,
+      title: string,
+    ): Promise<string> {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      const itemId = await itemIdFor(context().token, title);
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+
+      await card.locators.buttons.deleteImage.click();
+      await app.confirm.do.accept();
+      await app.catalogue.do.removeEntry(title);
+      await app.toast.do.commitDeletion('items');
+      // The photograph's toast is the one still waiting; without it this test would prove nothing.
+      await expect(app.toast.locators.buttons.action).toBeVisible();
+      return itemId;
+    }
+
+    test('its undo has nothing to bring back, and the app carries on', async ({
+      on,
+      page,
+    }) => {
+      const app = on(page);
+      const title = uniqueTitle('Mit Eintrag weg');
+      try {
+        await photographThenEntryDeleted(app, title);
+
+        await app.toast.do.undo();
+
+        await expect(app.toast.locators.buttons.action).toHaveCount(0);
+        await expect(app.appError()).toHaveCount(0);
+        await expect(app.catalogue.card(title)()).toHaveCount(0);
+        await expect(app.catalogue.locators.buttons.newEntry).toBeVisible();
+      } finally {
+        await removeEntriesTitled(title);
+      }
+    });
+
+    test('its own delete counts as done, not as failed', async ({
+      on,
+      page,
+    }) => {
+      const app = on(page);
+      const title = uniqueTitle('Schon mitgenommen');
+      try {
+        const itemId = await photographThenEntryDeleted(app, title);
+        // After the row delete finds nothing, the app asks whether the entry went too.
+        const entryLookedUp = page.waitForResponse(
+          (response) =>
+            response.request().method() === 'GET' &&
+            new URL(response.url()).pathname.endsWith('/rest/v1/items') &&
+            new URL(response.url()).searchParams.get('id') === `eq.${itemId}`,
+        );
+
+        await app.toast.do.close();
+        await entryLookedUp;
+
+        await expect(app.toast.locators.alert).toHaveCount(0);
+        await expect(app.appError()).toHaveCount(0);
+        await expect(app.catalogue.card(title)()).toHaveCount(0);
+      } finally {
+        await removeEntriesTitled(title);
+      }
+    });
   });
 });

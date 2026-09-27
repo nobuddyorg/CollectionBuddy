@@ -7,6 +7,7 @@ import {
   defaultImagesState,
   item,
   itemsState,
+  listTree,
   renderList,
   resetHookMocks,
 } from './index.test-support';
@@ -86,6 +87,31 @@ describe('ItemList image carousel', () => {
     );
 
     await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  // Hidden is not closed: Undo or a new upload would otherwise pop the viewer back open unasked.
+  it('stays closed once the last photograph shown in it is gone, even when one comes back', async () => {
+    const [onlyPhoto] = imagesFor('1')['1'];
+    const withPhoto = {
+      ...defaultImagesState(),
+      images: { '1': [onlyPhoto] },
+    };
+    useItemImagesMock.mockReturnValue(withPhoto);
+    const user = userEvent.setup();
+    const view = renderList();
+    await user.click(screen.getByAltText('Item 1, image 1'));
+    expect(screen.getByRole('dialog')).toBeVisible();
+
+    useItemImagesMock.mockReturnValue({
+      ...defaultImagesState(),
+      images: { '1': [] },
+    });
+    view.rerender(listTree());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    useItemImagesMock.mockReturnValue(withPhoto);
+    view.rerender(listTree());
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

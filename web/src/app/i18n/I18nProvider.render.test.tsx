@@ -7,10 +7,11 @@ import { useI18n } from './useI18n';
 import realEn from './en.json';
 
 function Probe() {
-  const { language, setLanguage, t, tCount } = useI18n();
+  const { language, locale, setLanguage, t, tCount } = useI18n();
   return (
     <div>
       <span data-testid="lang">{language}</span>
+      <span data-testid="locale">{locale}</span>
       <span data-testid="close">{t('common.close')}</span>
       <span data-testid="missing">
         {t('nope.not.a.real.key' as TranslationKey)}
@@ -59,57 +60,70 @@ describe('I18nProvider', () => {
   it('detects a language stored from a previous visit', () => {
     localStorage.setItem('lang', 'en');
     // The other supported language, so 'en' below can only have come from storage.
-    vi.stubGlobal('navigator', { ...navigator, language: 'de-DE' });
+    vi.stubGlobal('navigator', { language: 'de-DE', languages: ['de-DE'] });
     renderProbe();
 
     expect(screen.getByTestId('lang')).toHaveTextContent('en');
   });
 
   it('falls back to the browser language when nothing is stored', () => {
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      language: 'de-DE',
-    });
+    vi.stubGlobal('navigator', { language: 'de-DE', languages: ['de-DE'] });
     renderProbe();
 
     expect(screen.getByTestId('lang')).toHaveTextContent('de');
   });
 
-  it('falls back to English when neither storage nor the browser names a supported language', () => {
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      language: 'fr-FR',
-    });
+  it('falls back to German, the default, when neither storage nor the browser names a supported language', () => {
+    vi.stubGlobal('navigator', { language: 'fr-FR', languages: ['fr-FR'] });
     renderProbe();
 
-    expect(screen.getByTestId('lang')).toHaveTextContent('en');
+    expect(screen.getByTestId('lang')).toHaveTextContent('de');
+    expect(document.documentElement.lang).toBe('de');
   });
 
   it('ignores a stored value that is not one of the supported languages', () => {
     localStorage.setItem('lang', 'fr');
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      language: 'de-DE',
-    });
+    vi.stubGlobal('navigator', { language: 'de-DE', languages: ['de-DE'] });
     renderProbe();
 
     expect(screen.getByTestId('lang')).toHaveTextContent('de');
   });
 
-  it('falls back to English when reading the stored language throws', () => {
+  it('still follows the browser when reading the stored language throws', () => {
+    localStorage.setItem('lang', 'de');
     const getItem = vi
       .spyOn(Storage.prototype, 'getItem')
       .mockImplementation(() => {
         throw new Error('storage disabled');
       });
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      language: 'fr-FR',
-    });
+    vi.stubGlobal('navigator', { language: 'en-GB', languages: ['en-GB'] });
     renderProbe();
 
     expect(screen.getByTestId('lang')).toHaveTextContent('en');
     getItem.mockRestore();
+  });
+
+  it("formats in the browser's regional form of the app language", () => {
+    localStorage.setItem('lang', 'en');
+    vi.stubGlobal('navigator', {
+      language: 'de-DE',
+      languages: ['de-DE', 'en-GB'],
+    });
+    renderProbe();
+
+    expect(screen.getByTestId('locale').textContent).toBe('en-GB');
+  });
+
+  it('formats in the bare app language once the browser does not speak it', async () => {
+    localStorage.setItem('lang', 'en');
+    vi.stubGlobal('navigator', { language: 'en-GB', languages: ['en-GB'] });
+    renderProbe();
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Deutsch' }).click();
+    });
+
+    expect(screen.getByTestId('locale').textContent).toBe('de');
   });
 
   it('persists a chosen language and reflects it immediately', async () => {
@@ -204,6 +218,22 @@ describe('I18nProvider', () => {
     expect(screen.getByTestId('no-key-at-all')).toHaveTextContent(
       'nope.not.real',
     );
+  });
+
+  it('fills a placeholder with user text verbatim, $ sequences and all', () => {
+    localStorage.setItem('lang', 'en');
+    const { result } = renderHook(() => useI18n(), { wrapper: I18nProvider });
+
+    expect(
+      result.current.t('item_create.remove_tag', { tag: "US$$ $& $'" }),
+    ).toBe("Remove tag US$$ $& $'");
+  });
+
+  it('leaves a template as it is when given no values', () => {
+    localStorage.setItem('lang', 'en');
+    const { result } = renderHook(() => useI18n(), { wrapper: I18nProvider });
+
+    expect(result.current.t('item_create.remove_tag')).toBe('Remove tag {tag}');
   });
 
   it('reads the language that is current when called, not the one active when the closure was captured', async () => {

@@ -401,6 +401,55 @@ describe('uniqueCategoryName', () => {
       'Coins (2)',
     );
   });
+
+  // QA-28: a 200-character name plus " (2)" used to fail the database's length check on every re-import.
+  describe('at the 200-character limit', () => {
+    const longest = 'x'.repeat(200);
+
+    it('shortens a taken name so that its suffix still fits', () => {
+      const name = uniqueCategoryName(longest, [longest]);
+      expect(name).toBe(`${'x'.repeat(196)} (2)`);
+      expect(name).toHaveLength(200);
+    });
+
+    it('shortens by as much as a longer suffix needs', () => {
+      const taken = [
+        longest,
+        ...Array.from({ length: 8 }, (_, i) => `${'x'.repeat(196)} (${i + 2})`),
+      ];
+      expect(uniqueCategoryName(longest, taken)).toBe(
+        `${'x'.repeat(195)} (10)`,
+      );
+    });
+
+    it('keeps a name that leaves room for its suffix as it is', () => {
+      const short = 'x'.repeat(196);
+      expect(uniqueCategoryName(short, [short])).toBe(`${short} (2)`);
+    });
+
+    it('keeps an untaken name at the limit whole', () => {
+      expect(uniqueCategoryName(longest, [])).toBe(longest);
+    });
+
+    it('cuts a name past the limit to the limit, as an archive can carry one', () => {
+      expect(uniqueCategoryName('x'.repeat(250), [])).toBe(longest);
+    });
+
+    it('counts characters as the database does, not UTF-16 units', () => {
+      const coins = '🪙'.repeat(200);
+      expect(Array.from(uniqueCategoryName(coins, [coins]))).toHaveLength(200);
+      expect(uniqueCategoryName(coins, [coins])).toBe(
+        `${'🪙'.repeat(196)} (2)`,
+      );
+    });
+
+    it('drops a space the cut leaves before the suffix, as the database would', () => {
+      const spaced = `${'x'.repeat(195)} ${'y'.repeat(4)}`;
+      expect(uniqueCategoryName(spaced, [spaced])).toBe(
+        `${'x'.repeat(195)} (2)`,
+      );
+    });
+  });
 });
 
 describe('canEditCategory', () => {

@@ -56,12 +56,14 @@ select is(
 );
 
 -- One bad entry takes the whole batch with it: nothing is left in no category.
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'select public.create_items_in_category(%L, %L)',
     :'category_id',
     '[{"title": "Batch survivor?"}, {"title": "   "}]'
-  )),
+  ),
+  '23502',
+  'null value in column "title" of relation "items" violates not-null constraint',
   'a batch with one blank title is refused'
 );
 select is(
@@ -72,11 +74,13 @@ select is(
 
 -- Refused links: the entry the same call wrote is rolled back with them.
 select pg_temp.auth_as(:'stranger_id'::uuid, 'create-stranger@collectionbuddy.test');
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'select public.create_items_in_category(%L, %L)',
     :'category_id', '[{"title": "Stranger entry"}]'
-  )),
+  ),
+  'P0001',
+  'cross-tenant assignment is not allowed',
   'a caller with no grant cannot create an entry in someone else''s category'
 );
 select is(
@@ -86,11 +90,13 @@ select is(
 );
 
 select pg_temp.auth_as(:'viewer_id'::uuid, 'create-viewer@collectionbuddy.test');
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'select public.create_items_in_category(%L, %L)',
     :'category_id', '[{"title": "Viewer entry"}]'
-  )),
+  ),
+  'P0001',
+  'cross-tenant assignment is not allowed',
   'a viewer cannot create an entry in the shared category'
 );
 select is(

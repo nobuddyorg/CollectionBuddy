@@ -2,35 +2,53 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-import type { TranslationKey } from '../../i18n/I18nProvider';
+import {
+  interpolate,
+  type Translate,
+  type TranslationKey,
+} from '../../i18n/I18nProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
 import { ImportCancelledError } from '../../data/importCancellation';
+import type { ImportProgress, ImportResult } from '../../data/importCategory';
 import {
-  importCategory,
-  type ImportProgress,
-  type ImportResult,
-} from '../../data/importCategory';
-import { ImportFormatError } from '../../data/importFormat';
+  ImportFormatError,
+  type ImportFormatReason,
+} from '../../data/importFormat';
 import { uniqueCategoryName } from '../../data/categories';
 import { isQuotaExceeded } from '../../data/quota';
 
 /** What to say while an import runs. Same shape as exportProgressMessage. */
 export function importProgressMessage(
   progress: ImportProgress | null,
-  t: (key: TranslationKey) => string,
+  t: Translate,
 ): string | null {
   if (!progress) return null;
   if (progress.phase === 'photos' && progress.total > 0) {
-    return t('category_select.import_photos')
-      .replace('{done}', String(progress.done))
-      .replace('{total}', String(progress.total));
+    return t('category_select.import_photos', {
+      done: progress.done,
+      total: progress.total,
+    });
   }
   if (progress.phase === 'reading') {
     return t('category_select.import_reading');
   }
   return t('category_select.import_items');
+}
+
+/** What each kind of unimportable archive says instead of "try again", which never helps. */
+function formatErrorMessage(
+  reason: ImportFormatReason,
+  t: (key: TranslationKey) => string,
+): string {
+  if (reason === 'unreadable') {
+    return t('category_select.import_unreadable_error');
+  }
+  if (reason === 'too_large') {
+    return t('category_select.import_too_large_error');
+  }
+  return t('category_select.import_format_error');
 }
 
 function partialTemplate(
@@ -55,9 +73,10 @@ export function importPartialMessage(
   t: (key: TranslationKey) => string,
 ): string | null {
   if (skippedPhotoCount === 0) return null;
-  return partialTemplate(photoQuotaReached, t)
-    .replace('{skipped}', String(skippedPhotoCount))
-    .replace('{total}', String(photoCount + skippedPhotoCount));
+  return interpolate(partialTemplate(photoQuotaReached, t), {
+    skipped: skippedPhotoCount,
+    total: photoCount + skippedPhotoCount,
+  });
 }
 
 export function useImportCategory(existingCategoryNames: string[]) {
@@ -75,6 +94,8 @@ export function useImportCategory(existingCategoryNames: string[]) {
       controllerRef.current = controller;
       setProgress({ phase: 'reading', done: 0, total: 0 });
       try {
+        // On demand: the import and ZIP code is dead weight on every page load that never imports.
+        const { importCategory } = await import('../../data/importCategory');
         const result = await importCategory({
           file,
           // "Coins (2)" if taken, named from the one read of the archive importCategory makes.
@@ -85,10 +106,7 @@ export function useImportCategory(existingCategoryNames: string[]) {
         });
         onImported?.(result.category.id);
         toast.success(
-          t('category_select.import_success').replace(
-            '{name}',
-            result.category.name,
-          ),
+          t('category_select.import_success', { name: result.category.name }),
         );
         const partial = importPartialMessage(result, t);
         if (partial) toast.error(partial);
@@ -100,7 +118,7 @@ export function useImportCategory(existingCategoryNames: string[]) {
           toast.reportError(
             'import category',
             error,
-            t('category_select.import_format_error'),
+            formatErrorMessage(error.reason, t),
           );
         } else {
           toast.reportError(

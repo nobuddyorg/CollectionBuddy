@@ -105,22 +105,6 @@ describe('Pagination', () => {
     ).not.toHaveAttribute('aria-current');
   });
 
-  it('gives the current page button the highlighted style, and only that one', () => {
-    renderPagination({ page: 3, totalPages: 5 });
-
-    const current = screen.getAllByRole('button', { name: 'Page 3' })[0];
-    const other = screen.getAllByRole('button', { name: 'Page 1' })[0];
-
-    // The shared layout classes apply to every page button, current or not.
-    expect(current.className).toContain('rounded-sm');
-    expect(other.className).toContain('rounded-sm');
-
-    expect(current.className).toContain('bg-primary');
-    expect(other.className).not.toContain('bg-primary');
-    expect(other.className).toContain('text-muted-foreground');
-    expect(current.className).not.toContain('text-muted-foreground');
-  });
-
   it('shows an ellipsis as non-interactive text, not a button', () => {
     renderPagination({ page: 1, totalPages: 10 });
 

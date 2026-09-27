@@ -1,6 +1,13 @@
 import { expect, test } from '../test';
 import { SEED, itemsIn } from '../fixtures';
-import { apiAs, context, ownedCategoryId, share, unshare } from './helpers';
+import {
+  apiAs,
+  context,
+  ownedCategoryId,
+  ownerEntryIn,
+  share,
+  unshare,
+} from './helpers';
 
 // SECURITY DEFINER bypasses RLS, so the RPC's own read-access check is what any cat_id meets.
 const [seeded] = itemsIn(SEED.searchCategory);
@@ -174,6 +181,70 @@ test.describe('search_category_items (the search RPC)', () => {
       term: seeded.title,
     });
     expect(stillThere.titles).toContain(seeded.title);
+  });
+
+  // The photographs ride along with RLS bypassed, so each identity must get exactly what the images policy lets it read.
+  test("a searched entry carries exactly the photograph records the caller may read directly, the grantee's included", async () => {
+    const { token, userId, otherToken } = context();
+    const title = 'rls-search-photographed-entry';
+    const { categoryId, itemId } = await ownerEntryIn({
+      token,
+      userId,
+      category: SEED.searchCategory,
+      title,
+    });
+    const { error: photoError } = await apiAs(token)
+      .from('images')
+      .insert(
+        [1, 2].map((n) => ({
+          item_id: itemId,
+          path_full: `${userId}/${itemId}/rls-search-${n}.webp`,
+        })),
+      );
+    expect(photoError).toBeNull();
+    const shareId = await share({
+      token,
+      categoryId,
+      invitedEmail: SEED.other.email,
+    });
+
+    // The RPC's own rows next to what a plain, RLS-scoped read hands the same identity.
+    const carriedAndDirect = async (caller: string) => {
+      const { data, error } = await apiAs(caller).rpc('search_category_items', {
+        cat_id: categoryId,
+        like_pattern: `%${title}%`,
+        page_from: 0,
+        page_to: 9,
+      });
+      expect(error).toBeNull();
+      const { data: direct } = await apiAs(caller)
+        .from('images')
+        .select('id, item_id, path_full, path_thumb')
+        .eq('item_id', itemId)
+        .order('created_at')
+        .order('id');
+      return {
+        carried: (data ?? []).flatMap(
+          (row: { images: unknown[] }) => row.images,
+        ),
+        direct: direct ?? [],
+      };
+    };
+
+    try {
+      for (const caller of [token, otherToken]) {
+        const { carried, direct } = await carriedAndDirect(caller);
+        expect(direct).toHaveLength(2);
+        expect(carried).toEqual(direct);
+      }
+
+      await unshare(token, shareId);
+      const revoked = await carriedAndDirect(otherToken);
+      expect(revoked).toEqual({ carried: [], direct: [] });
+    } finally {
+      await unshare(token, shareId);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
   });
 
   // The asymmetry editor-share.spec.ts asserts; the RPC must reproduce it despite bypassing RLS.

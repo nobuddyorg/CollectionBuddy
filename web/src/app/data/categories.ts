@@ -1,4 +1,5 @@
 import { chunk } from '../lib/chunk';
+import { MAX_CATEGORY_NAME_LENGTH } from '../lib/textLimits';
 import { readAllChunks, readAllKeysetPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
@@ -23,17 +24,25 @@ export function canEditCategory(
   );
 }
 
-/** `base`, or `base (2)`, `base (3)`, ... past every name, case-insensitive like the unique index. */
+/** `base` cut so that `suffix` still fits the name limit, counted in code points as `char_length` counts. */
+function fitName(base: string, suffix: string): string {
+  const room = MAX_CATEGORY_NAME_LENGTH - suffix.length;
+  // Trimmed, as the normalising trigger would, so the name checked is the name stored.
+  const fitted = Array.from(base).slice(0, room).join('').trimEnd();
+  return `${fitted}${suffix}`;
+}
+
+/** `base`, or `base (2)`, `base (3)`, ... past every name, case-insensitive like the unique index, within the length limit. */
 export function uniqueCategoryName(
   base: string,
   existingNames: string[],
 ): string {
   const taken = new Set(existingNames.map((name) => name.toLowerCase()));
-  if (!taken.has(base.toLowerCase())) return base;
-  // `base` is itself taken, so at most `taken.size - 1` candidates can be: one is always free.
-  return Array.from(
-    { length: taken.size },
-    (_, i) => `${base} (${i + 2})`,
+  const name = fitName(base, '');
+  if (!taken.has(name.toLowerCase())) return name;
+  // `name` is itself taken, so at most `taken.size - 1` candidates can be: one is always free.
+  return Array.from({ length: taken.size }, (_, i) =>
+    fitName(base, ` (${i + 2})`),
   ).find((candidate) => !taken.has(candidate.toLowerCase()))!;
 }
 

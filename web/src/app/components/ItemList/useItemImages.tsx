@@ -228,10 +228,14 @@ export function useItemImages() {
       }));
 
       const restore = () => {
-        setImages((previous) => ({
-          ...previous,
-          [itemId]: restoreAt({ list: previous[itemId], index, item: image }),
-        }));
+        setImages((previous) => {
+          // Forgotten once its entry's delete committed, which took this photograph with it.
+          if (!Object.hasOwn(previous, itemId)) return previous;
+          return {
+            ...previous,
+            [itemId]: restoreAt({ list: previous[itemId], index, item: image }),
+          };
+        });
       };
 
       toast.success(t('item_list.delete_image_success'), {
@@ -242,7 +246,7 @@ export function useItemImages() {
               image.pathFull,
               ...(image.pathThumb ? [image.pathThumb] : []),
             ],
-            deleteRows: () => deleteImageRow(image.id),
+            deleteRows: () => deleteImageRow({ id: image.id, itemId }),
           });
           if (!error) return;
           // Back even when only the row delete failed: the row still exists, and deleting it again works.

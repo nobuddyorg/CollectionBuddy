@@ -209,6 +209,7 @@ export type Database = {
         Args: { entries: Json; target_category_id: string };
         Returns: undefined;
       };
+      delete_own_account: { Args: never; Returns: undefined };
       granted_category_ids: { Args: never; Returns: string[] };
       has_category_read_access: { Args: { cat_id: string }; Returns: boolean };
       has_category_write_access: { Args: { cat_id: string }; Returns: boolean };
@@ -252,6 +253,7 @@ export type Database = {
         Returns: {
           description: string;
           id: string;
+          images: Json;
           place: string;
           place_lat: number;
           place_lng: number;

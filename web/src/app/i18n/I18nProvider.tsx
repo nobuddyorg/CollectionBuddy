@@ -46,10 +46,30 @@ export function resolveTranslationKey(
   return typeof value === 'string' ? value : undefined;
 }
 
+export type TranslationValues = Record<string, string | number>;
+
+// A replacer function, never a replacement string: user text such as "US$$" or "$'" must land verbatim.
+export function interpolate(
+  template: string,
+  values: TranslationValues,
+): string {
+  return template.replace(/\{(\w+)\}/g, (placeholder, name: string) =>
+    Object.hasOwn(values, name) ? String(values[name]) : placeholder,
+  );
+}
+
+/** Fills each `{name}` placeholder the template holds from `values`. */
+export type Translate = (
+  key: TranslationKey,
+  values?: TranslationValues,
+) => string;
+
 type I18nContextType = {
   language: Language;
+  /** What dates and numbers are formatted in: the app language, in the browser's own regional form of it when it has one. */
+  locale: string;
   setLanguage: (language: Language) => void;
-  t: (key: TranslationKey) => string;
+  t: Translate;
   /** Picks `${baseKey}_one` by the locale's plural rule (German and English disagree), else `baseKey`. */
   tCount: (baseKey: TranslationKey, count: number) => string;
 };
@@ -60,16 +80,39 @@ export const I18nContext = createContext<I18nContextType | undefined>(
 
 const LANGUAGE_STORAGE_KEY = 'lang';
 
-function detectLanguage(): Language {
+function isLanguage(value: string | null): value is Language {
+  return value === 'de' || value === 'en';
+}
+
+/** A stored choice, else the browser's language, else German; `LANG_INIT_SCRIPT` in layout.tsx decides the same way. */
+export function pickLanguage(
+  stored: string | null,
+  browserLocale: string,
+): Language {
+  if (isLanguage(stored)) return stored;
+  const browserLanguage = browserLocale.split('-')[0];
+  return isLanguage(browserLanguage) ? browserLanguage : 'de';
+}
+
+/** The first browser locale in `language` (en-GB keeps 31/12/2099), else the bare language. */
+export function formattingLocale(
+  language: Language,
+  browserLocales: readonly string[],
+): string {
+  return (
+    browserLocales.find((locale) => locale.split('-')[0] === language) ??
+    language
+  );
+}
+
+export function detectLanguage(): Language {
+  let stored: string | null = null;
   try {
-    const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    if (stored && stored in translations) return stored as Language;
-    const browserLanguage = navigator.language.split('-')[0];
-    if (browserLanguage in translations) return browserLanguage as Language;
+    stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
   } catch {
-    // localStorage can throw (private browsing); falls through to the 'en' default.
+    // localStorage can throw (private browsing); the browser language still decides.
   }
-  return 'en';
+  return pickLanguage(stored, navigator.language);
 }
 
 export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
@@ -101,8 +144,11 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   }, [language]);
 
   const t = useCallback(
-    (key: TranslationKey) =>
-      resolveTranslationKey(translations[languageRef.current], key) ?? key,
+    (key: TranslationKey, values: TranslationValues = {}) =>
+      interpolate(
+        resolveTranslationKey(translations[languageRef.current], key) ?? key,
+        values,
+      ),
     [],
   );
 
@@ -115,12 +161,18 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
         : undefined) ??
       resolveTranslationKey(dictionary, baseKey) ??
       baseKey;
-    return template.replace('{count}', String(count));
+    return interpolate(template, { count });
   }, []);
 
+  // Never rendered into prerendered markup, so the build machine's navigator cannot cause a hydration mismatch.
+  const locale = useMemo(
+    () => formattingLocale(language, navigator.languages),
+    [language],
+  );
+
   const value = useMemo(
-    () => ({ language, setLanguage: setLanguageAndPersist, t, tCount }),
-    [language, setLanguageAndPersist, t, tCount],
+    () => ({ language, locale, setLanguage: setLanguageAndPersist, t, tCount }),
+    [language, locale, setLanguageAndPersist, t, tCount],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

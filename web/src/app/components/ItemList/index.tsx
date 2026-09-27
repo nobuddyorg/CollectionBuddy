@@ -16,20 +16,14 @@ import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { useSyncedRef } from '../../lib/useSyncedRef';
 import { useGuardedModalClose } from '../../lib/useGuardedModalClose';
 import { EditItemModal } from './EditItemModal';
-import { MapModal } from './MapModal';
+import { MapModal, prefetchMap } from './MapModal';
 import CenteredModal from '../CenteredModal';
+import LoadError from '../LoadError';
+import { listViewFor } from './listView';
 import Icon, { IconType } from '../Icon';
 import type { ItemFormValues } from '../ItemForm';
+import { prefetchItemForm } from '../ItemForm/load';
 import type { ImageEntry, ItemLite } from './types';
-
-// Warmed on intent, not page load; a failed prefetch is retried by dynamic() on the actual open.
-const prefetchMap = () => {
-  void import('../Map').catch(() => {});
-};
-
-const prefetchItemForm = () => {
-  void import('../ItemForm').catch(() => {});
-};
 
 // Stable identity: a fresh [] per render would defeat ItemCard's reference-equality memo.
 const EMPTY_IMAGES: ImageEntry[] = [];
@@ -65,6 +59,7 @@ export default function ItemList({
     pageImages,
     total,
     loading,
+    loadFailed,
     page,
     setPage,
     totalPages,
@@ -123,6 +118,8 @@ export default function ItemList({
     index: number;
   } | null>(null);
   const modalImages = modalState ? images[modalState.itemId] : [];
+  // Its last photograph deleted: closed for good, or an Undo or a new upload would pop the viewer back open.
+  if (modalState && modalImages.length === 0) setModalState(null);
   const modalItemId = modalState?.itemId;
   const modalNeedsSigning = modalImages.some((image) => !image.urlFull);
   useEffect(() => {
@@ -148,10 +145,12 @@ export default function ItemList({
     [editingItem, saveEdit, setEditOpen, setEditingItem],
   );
 
-  // Empty `items` with `total > 0` is a page correction in flight, not an empty collection.
-  const isEmpty = items.length === 0;
-  const showSkeleton = isEmpty && (loading || total > 0);
-  const showEmptyState = isEmpty && !showSkeleton;
+  const view = listViewFor({
+    itemCount: items.length,
+    total,
+    loading,
+    loadFailed,
+  });
   // A viewer's New entry button is disabled, so their hint must not point at it.
   const noItemsHint = canEdit
     ? t('item_list.no_items_hint')
@@ -215,9 +214,18 @@ export default function ItemList({
         {searchAnnouncement}
       </span>
 
-      {showSkeleton && <GridSkeleton />}
+      {view === 'skeleton' && <GridSkeleton />}
 
-      {showEmptyState && (
+      {view === 'loadError' && (
+        <LoadError
+          testId="entries-load-error"
+          title={t('item_list.load_error_title')}
+          busy={loading}
+          onRetry={() => void reload()}
+        />
+      )}
+
+      {view === 'empty' && (
         <section className="py-16 grid place-items-center text-center">
           <div className="flex flex-col items-center gap-4 max-w-xs">
             <div className="h-16 w-16 bg-card ring-1 ring-border grid place-items-center text-3xl">
@@ -229,10 +237,7 @@ export default function ItemList({
                 className="font-display text-lg text-foreground"
               >
                 {searchStatus.kind === 'active'
-                  ? t('item_list.no_results_title').replace(
-                      '{q}',
-                      debouncedQuery,
-                    )
+                  ? t('item_list.no_results_title', { q: debouncedQuery })
                   : t('item_list.no_items_title')}
               </h3>
               <p className="text-sm text-muted-foreground">
@@ -255,7 +260,7 @@ export default function ItemList({
         </section>
       )}
 
-      {!isEmpty && (
+      {view === 'grid' && (
         <ul
           aria-busy={loading}
           aria-labelledby="entries-heading"

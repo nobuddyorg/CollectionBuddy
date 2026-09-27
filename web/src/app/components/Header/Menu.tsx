@@ -47,6 +47,7 @@ export default function Menu({
   user,
   open,
   onSignOut,
+  onDeleteAccount,
   onClose,
   onOpenHelp,
   labelSignOut,
@@ -128,6 +129,17 @@ export default function Menu({
         className="w-full text-left px-3 min-h-11 flex items-center rounded-sm hover:bg-muted text-sm transition-colors"
       >
         {labelSignOut}
+      </button>
+
+      <div className="my-1 border-t" />
+
+      <button
+        type="button"
+        data-testid="delete-account"
+        onClick={onDeleteAccount}
+        className="w-full text-left px-3 min-h-11 flex items-center rounded-sm hover:bg-destructive/10 text-sm text-destructive transition-colors"
+      >
+        {t('header.delete_account')}
       </button>
     </div>
   );

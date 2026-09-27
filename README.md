@@ -51,6 +51,7 @@ It is designed for keeping a structured personal record of collected items rathe
 - **Tags and search** across title, description, place, and tags at once.
 - **Import/export** a category you own as a portable archive.
 - **Bilingual, themeable**: German/English and light/dark/system, both remembered per visitor.
+- **Your data, your call**: export any collection, or delete your account and everything in it from the account menu.
 - **Built-in help**: a short guide to every feature under **Help** in the account menu, or Ctrl+/ (Cmd+/) from anywhere.
 - Built to work with a keyboard and a screen reader, not just a mouse.
 - **Local demo mode**: run a local Supabase stack in Docker and try the app with no Google account or sign-in screen — see [CONTRIBUTING.md](CONTRIBUTING.md#try-the-local-demo).

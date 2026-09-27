@@ -7,7 +7,8 @@ import {
   createSignedUrls,
   deleteImageRow,
   imagePrefix,
-  listExportImagesForItems,
+  isTransientStorageError,
+  listImagePathsForCategory,
   listImagePathsForItems,
   listImagesForItems,
   removeImageObjects,
@@ -110,14 +111,81 @@ describe('createImageRow', () => {
 });
 
 describe('deleteImageRow', () => {
-  it('deletes exactly the given row, as one row, so a delete that matched none fails', () => {
-    const { from, calls } = mockTableFrom();
-    deleteImageRow('image-1');
-    expect(from).toHaveBeenCalledWith('images');
-    expect(calls[0].method).toBe('delete');
-    expect(calls[1]).toEqual({ method: 'eq', args: ['id', 'image-1'] });
-    expect(calls[2]).toEqual({ method: 'select', args: ['id'] });
-    expect(calls[3].method).toBe('single');
+  // Scripts the image delete's answer and, when asked, whether its entry is still there.
+  function answers(deleted: unknown, item?: unknown) {
+    const calls: Record<string, Call[]> = { images: [], items: [] };
+    vi.spyOn(supabase, 'from').mockImplementation(((table: string) => {
+      const record =
+        (method: string, answer?: unknown) =>
+        (...args: unknown[]) => {
+          calls[table].push({ method, args });
+          return answer ?? builder;
+        };
+      const builder: Record<string, unknown> = {
+        delete: record('delete'),
+        eq: record('eq'),
+        select: record('select', table === 'images' ? deleted : undefined),
+        maybeSingle: record('maybeSingle', item),
+      };
+      return builder;
+    }) as never);
+    return calls;
+  }
+
+  const gone = { data: [], error: null };
+
+  it('deletes exactly the given row and reads back what it deleted', async () => {
+    const calls = answers({ data: [{ id: 'image-1' }], error: null });
+
+    await expect(
+      deleteImageRow({ id: 'image-1', itemId: 'item-1' }),
+    ).resolves.toEqual({ error: null });
+    expect(calls.images).toEqual([
+      { method: 'delete', args: [] },
+      { method: 'eq', args: ['id', 'image-1'] },
+      { method: 'select', args: ['id'] },
+    ]);
+    expect(calls.items).toEqual([]);
+  });
+
+  it('passes a refused delete on without asking after the entry', async () => {
+    const refused = { data: null, error: new Error('rls') };
+    const calls = answers(refused);
+
+    await expect(
+      deleteImageRow({ id: 'image-1', itemId: 'item-1' }),
+    ).resolves.toBe(refused);
+    expect(calls.items).toEqual([]);
+  });
+
+  it("counts a row its entry's delete already took as deleted", async () => {
+    const calls = answers(gone, { data: null, error: null });
+
+    await expect(
+      deleteImageRow({ id: 'image-1', itemId: 'item-1' }),
+    ).resolves.toEqual({ error: null });
+    expect(calls.items).toEqual([
+      { method: 'select', args: ['id'] },
+      { method: 'eq', args: ['id', 'item-1'] },
+      { method: 'maybeSingle', args: [] },
+    ]);
+  });
+
+  it('fails when no row was deleted while its entry is still there', async () => {
+    answers(gone, { data: { id: 'item-1' }, error: null });
+
+    const { error } = await deleteImageRow({ id: 'image-1', itemId: 'item-1' });
+
+    expect(error).toEqual(new Error('Photograph image-1 was not deleted'));
+  });
+
+  it('fails when no row was deleted and the entry cannot be looked up', async () => {
+    const lookup = { data: null, error: new Error('offline') };
+    answers(gone, lookup);
+
+    await expect(
+      deleteImageRow({ id: 'image-1', itemId: 'item-1' }),
+    ).resolves.toBe(lookup);
   });
 });
 
@@ -296,14 +364,155 @@ describe('listImagePathsForItems', () => {
   });
 });
 
-describe('listExportImagesForItems', () => {
-  it('selects export columns without path_thumb', async () => {
-    const { calls, columns } = mockImagesQuery(() => ({
-      data: [],
+type CategoryPageCall = { args: [string, unknown][]; limit: unknown };
+
+// Records each page's filter chain, and scripts what each page resolves to.
+function mockCategoryImagesQuery(
+  resolve: (page: number) => { data: unknown[] | null; error: unknown },
+) {
+  const pages: CategoryPageCall[] = [];
+  const builder: Record<string, (...args: unknown[]) => unknown> = {};
+  let page: CategoryPageCall;
+  const record =
+    (method: string) =>
+    (...args: unknown[]) => {
+      page.args.push([method, args]);
+      return builder;
+    };
+  builder.select = (...args: unknown[]) => {
+    page = { args: [['select', args]], limit: undefined };
+    return builder;
+  };
+  builder.eq = record('eq');
+  builder.gt = record('gt');
+  builder.order = record('order');
+  builder.limit = (limit: unknown) => {
+    page.limit = limit;
+    return builder;
+  };
+  builder.overrideTypes = () => {
+    pages.push(page);
+    return Promise.resolve(resolve(pages.length - 1));
+  };
+  const from = vi.fn().mockReturnValue(builder);
+  vi.spyOn(supabase, 'from').mockImplementation(from);
+  return { from, pages };
+}
+
+const categoryPhoto = (n: number) => ({
+  id: `photo-${String(n).padStart(4, '0')}`,
+  item_id: `item-${n}`,
+  path_full: `uid/item-${n}/full.webp`,
+  path_thumb: `uid/item-${n}/thumb.webp`,
+});
+
+describe('listImagePathsForCategory', () => {
+  it("reads both paths of the category's photographs through the entry's link, in id order", async () => {
+    const { from, pages } = mockCategoryImagesQuery(() => ({
+      data: [categoryPhoto(1)],
       error: null,
     }));
-    await listExportImagesForItems(['item-1']);
-    expect(calls).toEqual([firstPage(['item-1'])]);
-    expect(columns()).toBe('item_id, path_full, size_bytes, created_at, id');
+    const { data, error } = await listImagePathsForCategory('cat-1');
+    expect(from).toHaveBeenCalledWith('images');
+    expect(error).toBeNull();
+    expect(data).toEqual([categoryPhoto(1)]);
+    expect(pages).toEqual([
+      {
+        args: [
+          [
+            'select',
+            [
+              'id, item_id, path_full, path_thumb, items!inner(item_categories!inner())',
+            ],
+          ],
+          ['eq', ['items.item_categories.category_id', 'cat-1']],
+          ['order', ['id']],
+        ],
+        limit: 1000,
+      },
+    ]);
+  });
+
+  it('starts the next page strictly after the last photograph read, with no offset', async () => {
+    const full = Array.from({ length: 1000 }, (_, i) => categoryPhoto(i));
+    const { pages } = mockCategoryImagesQuery((page) => ({
+      data: page === 0 ? full : [categoryPhoto(1000)],
+      error: null,
+    }));
+    const { data } = await listImagePathsForCategory('cat-1');
+    expect(data).toHaveLength(1001);
+    expect(pages).toHaveLength(2);
+    expect(pages[1].args).toContainEqual(['gt', ['id', full[999].id]]);
+    expect(pages[1].args.map(([method]) => method)).toEqual([
+      'select',
+      'eq',
+      'gt',
+      'order',
+    ]);
+  });
+
+  // A partial list would read as "these are all its photographs", and the rest would outlive the delete.
+  it('returns the error and no rows as soon as a page fails', async () => {
+    const boom = new Error('boom');
+    const { pages } = mockCategoryImagesQuery((page) =>
+      page === 0
+        ? {
+            data: Array.from({ length: 1000 }, (_, i) => categoryPhoto(i)),
+            error: null,
+          }
+        : { data: null, error: boom },
+    );
+    const { data, error } = await listImagePathsForCategory('cat-1');
+    expect(data).toBeNull();
+    expect(error).toBe(boom);
+    expect(pages).toHaveLength(2);
+  });
+});
+
+describe('isTransientStorageError', () => {
+  // storage-js reports a request that never got an answer without any status.
+  it('retries a failure that got no response at all', () => {
+    expect(isTransientStorageError({})).toBe(true);
+  });
+
+  it('retries a rate limit and a server error, by HTTP status or by Storage code', () => {
+    expect(isTransientStorageError({ status: 429, statusCode: '429' })).toBe(
+      true,
+    );
+    expect(isTransientStorageError({ status: 500, statusCode: '500' })).toBe(
+      true,
+    );
+    expect(
+      isTransientStorageError({ status: 502, statusCode: 'Bad Gateway' }),
+    ).toBe(true);
+    expect(isTransientStorageError({ status: 400, statusCode: '503' })).toBe(
+      true,
+    );
+  });
+
+  // Storage answers a duplicate, an oversize file or a policy refusal with HTTP 400 and the real code in the body.
+  it('gives up at once on a refusal no retry can change', () => {
+    for (const statusCode of ['400', '403', '409', '413', '415']) {
+      expect(isTransientStorageError({ status: 400, statusCode })).toBe(false);
+    }
+    expect(isTransientStorageError({ status: 403, statusCode: '403' })).toBe(
+      false,
+    );
+    expect(
+      isTransientStorageError({ status: 400, statusCode: 'InvalidRequest' }),
+    ).toBe(false);
+    expect(isTransientStorageError({ status: 400 })).toBe(false);
+  });
+
+  it('draws the line at 500, and counts only 429 among the 4xx', () => {
+    expect(isTransientStorageError({ status: 499, statusCode: '499' })).toBe(
+      false,
+    );
+    expect(isTransientStorageError({ status: 428, statusCode: '428' })).toBe(
+      false,
+    );
+    expect(isTransientStorageError({ status: 430, statusCode: '430' })).toBe(
+      false,
+    );
   });
 });

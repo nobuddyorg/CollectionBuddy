@@ -1,4 +1,5 @@
 import type { ExportItemRow } from './exportItemPages';
+import { localDateStamp } from '../lib/localDate';
 
 /** The item fields an export carries, plus when it was catalogued. */
 export type ExportItem = ExportItemRow;
@@ -165,15 +166,14 @@ export function buildCsv(entries: ExportEntry[]): string {
   return `﻿${[csvRow(CSV_COLUMNS.map(plainCell)), ...rows].join('\r\n')}\r\n`;
 }
 
-/** A byte count as a rounded gigabyte figure -- "about 1.6 GB". */
-export function formatExportBytes(bytes: number): string {
-  return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-}
-
-/** `2026-08-06`, in the exporter's own timezone rather than UTC. */
-export function localDateStamp(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+/** A byte count as a rounded gigabyte figure in `locale` -- "1.6 GB", "1,6 GB". */
+export function formatExportBytes(bytes: number, locale: string): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'unit',
+    unit: 'gigabyte',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(bytes / 1024 ** 3);
 }
 
 /** The download's name and its one root directory, so a non-wrapping extractor keeps it apart. */

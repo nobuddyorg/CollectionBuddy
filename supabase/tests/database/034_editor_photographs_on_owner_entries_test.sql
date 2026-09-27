@@ -7,14 +7,6 @@ select no_plan();
 -- storage.protect_delete() refuses a delete from SQL without this; the policies are what is under test.
 select set_config('storage.allow_delete_query', 'true', true);
 
-create function pg_temp.upload(p_path text)
-returns boolean
-language sql
-as $$
-  select not pg_temp.raises(format(
-    'insert into storage.objects (bucket_id, name) values (%L, %L)', 'item-images', p_path))
-$$;
-
 create function pg_temp.readable(p_path text)
 returns bigint
 language sql
@@ -48,16 +40,17 @@ select
   :'editor_id'::text || '/' || :'item_id'::text || '/unrecorded.webp' as unrecorded,
   :'editor_id'::text || '/' || :'item_id'::text || '/pending.webp' as pending \gset
 
-select ok(pg_temp.upload(:'owner_id'::text || '/' || :'item_id'::text || '/own.webp'),
+select lives_ok(pg_temp.upload_statement(:'owner_id'::text || '/' || :'item_id'::text || '/own.webp'),
   'the owner uploads under its own entry');
-select ok(not pg_temp.upload(:'owner_id'::text || '/' || gen_random_uuid()::text || '/loose.webp'),
+select throws_ok(pg_temp.upload_statement(:'owner_id'::text || '/' || gen_random_uuid()::text || '/loose.webp'), '42501',
+  'new row violates row-level security policy for table "objects"',
   'but not under an id that names no entry: an object needs an entry its uploader may write');
 
 -- The editor photographs the owner's entry: bytes under its own prefix, the record filed under the owner (tg_images_enforce).
 select pg_temp.auth_as(:'editor_id'::uuid, 'photo-editor@collectionbuddy.test');
-select ok(pg_temp.upload(:'added'), 'an editor uploads under the owner''s entry, to its own prefix');
+select lives_ok(pg_temp.upload_statement(:'added'), 'an editor uploads under the owner''s entry, to its own prefix');
 insert into public.images (item_id, path_full) values (:'item_id'::uuid, :'added');
-select ok(pg_temp.upload(:'unrecorded'), 'and an object no photograph record names');
+select lives_ok(pg_temp.upload_statement(:'unrecorded'), 'and an object no photograph record names');
 -- A record whose bytes are not stored yet: nothing may land at its path once the grant ends.
 insert into public.images (item_id, path_full) values (:'item_id'::uuid, :'pending');
 
@@ -70,7 +63,8 @@ select is(pg_temp.readable(:'unrecorded'), 0::bigint,
   'but not an object under the entry that no photograph record of its own names');
 
 select pg_temp.auth_as(:'stranger_id'::uuid, 'photo-stranger@collectionbuddy.test');
-select ok(not pg_temp.upload(:'stranger_id'::text || '/' || :'item_id'::text || '/planted.webp'),
+select throws_ok(pg_temp.upload_statement(:'stranger_id'::text || '/' || :'item_id'::text || '/planted.webp'), '42501',
+  'new row violates row-level security policy for table "objects"',
   'a stranger cannot upload under the owner''s entry, not even to its own prefix');
 
 -- Revoked.
@@ -80,9 +74,11 @@ delete from public.category_shares where id = :'share_id'::uuid;
 select pg_temp.auth_as(:'editor_id'::uuid, 'photo-editor@collectionbuddy.test');
 select is(pg_temp.removable(:'added'), 0::bigint,
   'revoked, the editor can no longer delete the bytes it added to the owner''s entry');
-select ok(not pg_temp.upload(:'pending'),
+select throws_ok(pg_temp.upload_statement(:'pending'), '42501',
+  'new row violates row-level security policy for table "objects"',
   'nor store bytes at the path of a record it filed while it could');
-select ok(not pg_temp.upload(:'editor_id'::text || '/' || :'item_id'::text || '/new.webp'),
+select throws_ok(pg_temp.upload_statement(:'editor_id'::text || '/' || :'item_id'::text || '/new.webp'), '42501',
+  'new row violates row-level security policy for table "objects"',
   'nor upload anything else under the owner''s entry');
 select is(pg_temp.readable(:'added'), 1::bigint,
   'it still reads the bytes it uploaded itself, under its own prefix');

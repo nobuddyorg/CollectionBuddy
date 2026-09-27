@@ -73,7 +73,7 @@ const SHARED_GUARD =
   /^(checks|http_req_failed|proof_measured)(\{scenario:[^}]+\})?$/;
 
 /** Why the numbers cannot be read as a verdict: an iteration stopped early, a guard failed, or a verdict metric has no sample. */
-function inconclusiveReasons(data, verdictMetrics, guards = []) {
+export function inconclusiveReasons(data, verdictMetrics, guards = []) {
   const reasons = [];
   const finished = data.metrics.proof_measured?.values.count ?? 0;
   const iterations = data.metrics.iterations?.values.count ?? 0;
@@ -115,7 +115,7 @@ function inconclusiveReasons(data, verdictMetrics, guards = []) {
   return reasons;
 }
 
-/** `claim` is the issue's sentence under test; `notes` are the seed and environment facts a reader needs to weigh the numbers. */
+/** `claim` is the issue's sentence under test (`issue` is left out for a defect filed without one); `notes` are the seed and environment facts a reader needs to weigh the numbers. */
 /** `purpose: 'record'` marks a run with no verdict (an impact measurement or a control), so the report does not promise one. */
 export function proofSummary({
   proof,
@@ -132,7 +132,7 @@ export function proofSummary({
   const name = __ENV.PROOF_VARIANT ? `${proof}-${__ENV.PROOF_VARIANT}` : proof;
   const inconclusive = inconclusiveReasons(data, extra, guards);
   const markdown = [
-    `## k6 proof \`${name}\` for #${issue}`,
+    `## k6 proof \`${name}\`${issue ? ` for #${issue}` : ''}`,
     '',
     ...(inconclusive.length
       ? [

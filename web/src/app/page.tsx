@@ -13,11 +13,14 @@ import HelpDialog from './components/Help';
 import { useHelp } from './components/Help/useHelp';
 import ItemList from './components/ItemList';
 import { ItemListSkeleton } from './components/ItemList/Skeleton';
+import LoadError from './components/LoadError';
 import LoadingOverlay from './components/LoadingOverlay';
 import { labelClasses } from './components/ui/labelClasses';
+import { catalogueViewFor } from './catalogueView';
 import { canEditCategory } from './data/categories';
 import { useI18n } from './i18n/useI18n';
 import { useCatalogue } from './useCatalogue';
+import { useDeleteAccount } from './useDeleteAccount';
 import { useSession } from './useSession';
 import { useSignOut } from './useSignOut';
 
@@ -34,16 +37,26 @@ export default function Page() {
 
   // The id, not `user`: a fresh user object arrives on every onAuthStateChange event.
   const userId = user?.id;
-  const { categories, selectedCategoryId, selectCategory, catalogueReady } =
-    useCatalogue(loading, userId);
+  const {
+    categories,
+    selectedCategoryId,
+    selectCategory,
+    catalogueReady,
+    retryLoad,
+  } = useCatalogue(loading, userId);
   const signOut = useSignOut();
+  const accountDeletion = useDeleteAccount(userId ?? '');
   const help = useHelp();
 
   if (loading)
     return <LoadingOverlay label={t('item_list.loading')} theme="auto" />;
   if (!user) return null;
 
-  const hasCategory = !!selectedCategoryId;
+  const view = catalogueViewFor({
+    ready: catalogueReady,
+    hasCategory: !!selectedCategoryId,
+    loadFailed: categories.loadFailed,
+  });
   const headerUser = { ...user, email: user.email ?? '' };
 
   const selectedCategory =
@@ -62,8 +75,16 @@ export default function Page() {
         {t('page.skip_to_content')}
       </a>
 
-      <Header user={headerUser} onSignOut={signOut} onOpenHelp={help.show} />
+      <Header
+        user={headerUser}
+        onSignOut={signOut}
+        onDeleteAccount={accountDeletion.deleteAccount}
+        onOpenHelp={help.show}
+      />
       <HelpDialog open={help.open} onOpenChange={help.setOpen} />
+      {accountDeletion.deleting && (
+        <LoadingOverlay label={t('account.deleting')} />
+      )}
 
       {/* No wrapper panels: cards nested in bordered trays ate the width on a 390px screen. */}
       <main
@@ -80,17 +101,17 @@ export default function Page() {
           ready={catalogueReady}
         />
 
-        {!catalogueReady && (
+        {view === 'skeleton' && (
           // Holds the shape of the entries about to appear, so the page fills in rather than assembling in steps.
           <ItemListSkeleton />
         )}
 
-        {catalogueReady && hasCategory && (
+        {view === 'entries' && (
           <section
             role="tabpanel"
             id={CATEGORY_TABPANEL_ID}
             // The tab id only resolves while the strip is expanded; the heading id names the panel either way.
-            aria-labelledby={`entries-heading ${categoryTabId(selectedCategoryId)}`}
+            aria-labelledby={`entries-heading ${categoryTabId(selectedCategoryId!)}`}
             className="relative z-50 space-y-4"
           >
             <h2 id="entries-heading" className="sr-only">
@@ -98,13 +119,22 @@ export default function Page() {
             </h2>
             <ItemList
               key={selectedCategoryId}
-              categoryId={selectedCategoryId}
+              categoryId={selectedCategoryId!}
               canEdit={canEditSelected}
             />
           </section>
         )}
 
-        {catalogueReady && !hasCategory && (
+        {view === 'loadError' && (
+          <LoadError
+            testId="catalogue-load-error"
+            title={t('page.load_error_title')}
+            busy={categories.isLoading}
+            onRetry={() => void retryLoad()}
+          />
+        )}
+
+        {view === 'empty' && (
           // Only reachable for a collection with no categories at all.
           <section className="py-16 grid place-items-center text-center">
             <div className="flex flex-col items-center gap-4 max-w-xs">

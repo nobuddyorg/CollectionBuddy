@@ -8,6 +8,7 @@
     "no_categories": "No collections yet",
     "name_first_category": "Type a name under New collection above and press +. Coins, stamps, whatever you keep.",
     "open_help": "How it works",
+    "load_error_title": "Your collections could not be loaded",
     "footer": "Collect • Organize • Keep",
     "skip_to_content": "Skip to content"
   },
@@ -22,7 +23,14 @@
     "theme": "Appearance",
     "theme_system": "System",
     "theme_light": "Light",
-    "theme_dark": "Dark"
+    "theme_dark": "Dark",
+    "delete_account": "Delete account"
+  },
+  "account": {
+    "confirm_delete": "Delete your account? All your collections, entries and photographs are permanently deleted, along with the shares you made and the shares made to you. Export the collections you want to keep first. This cannot be undone.",
+    "deleting": "Deleting your account…",
+    "delete_error": "Your account could not be deleted, though some of its photographs may already be gone. Please try again.",
+    "delete_success": "Your account has been deleted."
   },
   "category_select": {
     "title": "Collection",
@@ -59,6 +67,8 @@
     "import_error": "Could not import this archive. Please try again.",
     "import_quota_error": "Importing this archive would pass the limit of 50,000 entries.",
     "import_format_error": "This file isn't a CollectionBuddy export archive.",
+    "import_unreadable_error": "This archive is damaged, or uses a ZIP feature the import cannot read, such as encryption. Import the .zip the export downloaded.",
+    "import_too_large_error": "This archive unpacks to more than an import accepts, so nothing was imported.",
     "import_success": "Imported as \"{name}\".",
     "import_partial": "{skipped} of {total} photographs could not be imported.",
     "import_partial_quota": "{skipped} of {total} photographs were not imported: the limit of 256 MiB of photographs is reached. Delete some to make room.",
@@ -153,6 +163,8 @@
     "zoom_to_current_location": "Zoom to current location",
     "frame_all_pins": "Show all locations",
     "search_error": "Search failed. Please try again.",
+    "load_error": "Could not load entries. Please try again.",
+    "load_error_title": "The entries could not be loaded",
     "save_error": "Could not save changes. Please try again.",
     "changes_saved": "Changes saved.",
     "delete_error": "Could not delete this entry. Please try again.",
@@ -212,7 +224,9 @@
     "cancel": "Cancel",
     "undo": "Undo",
     "undo_shortcut": "Ctrl+Z",
-    "undo_shortcut_hint": "Ctrl+Z undoes it."
+    "undo_shortcut_hint": "Ctrl+Z undoes it.",
+    "retry": "Try again",
+    "load_error_hint": "Nothing is lost, only the loading failed. Check your connection, then try again."
   },
   "app_error": {
     "title": "Something went wrong",
@@ -245,16 +259,16 @@
     "purpose_heading": "Why, and on which legal basis",
     "purpose_service": "To provide the service you signed up for: your account, storing your collections and photos, showing them to you and to the people you share them with, place search, the map, export and import (Art. 6(1)(b) GDPR, performance of a contract).",
     "purpose_sharing": "To store the email address of someone you share a collection with, so that they get access when they sign in (Art. 6(1)(f) GDPR, our and your legitimate interest in sharing a collection).",
-    "purpose_security": "To keep the service secure and available, for example against abuse, and to restore it after data loss from backups (Art. 6(1)(f) GDPR, legitimate interests).",
+    "purpose_security": "To keep the service secure and available, for example against abuse (Art. 6(1)(f) GDPR, legitimate interests).",
     "purpose_required": "You need a Google account to sign in; without one, CollectionBuddy cannot be used.",
     "purpose_none": "CollectionBuddy shows no advertising, uses no tracking and no analytics, does not sell your data or use it for anything else, and makes no automated decisions about you.",
     "recipients_heading": "Who receives data",
     "recipients_supabase_label": "Supabase",
-    "recipients_supabase": "(Supabase, Inc.) runs the database, the photo storage and the sign-in for us, in Amazon Web Services' Frankfurt region (Germany), and processes all the data above on our behalf. The encrypted backups are stored with Supabase too.",
+    "recipients_supabase": "(Supabase, Inc.) runs the database, the photo storage and the sign-in for us, in Amazon Web Services' Frankfurt region (Germany), and processes all the data above on our behalf.",
     "recipients_google_label": "Google",
     "recipients_google": "(Google Ireland Limited) handles the sign-in. Google learns that you sign in to CollectionBuddy; Google's own privacy policy applies to your Google account.",
     "recipients_github_label": "GitHub",
-    "recipients_github": "(GitHub, Inc., a Microsoft company) hosts this website on GitHub Pages and sees your IP address when your browser loads it. The daily backup runs as an automated job on GitHub Actions, which encrypts the data before it is stored.",
+    "recipients_github": "(GitHub, Inc., a Microsoft company) hosts this website on GitHub Pages and sees your IP address when your browser loads it.",
     "recipients_photon_label": "Komoot",
     "recipients_photon": "runs Photon (photon.komoot.io), which turns place names into coordinates. When you type a place, or open the map for places typed without picking a suggestion, your browser sends the place name, the language and your IP address to Photon. No account data is sent.",
     "recipients_osm_label": "The OpenStreetMap Foundation",
@@ -265,17 +279,16 @@
     "retention_heading": "How long data is kept",
     "retention_until_deleted": "Your collections, entries and photos are kept until you delete them. After you delete something, the app lets you undo it for a few seconds; then it is removed from the database and the photo storage. There is no recycle bin.",
     "retention_orphans": "Photo files left behind by an interrupted upload or deletion are removed automatically after 48 hours.",
-    "retention_account": "Your account is kept until you ask for it to be deleted. Write to the contact above, and your account and all its data are deleted.",
+    "retention_account": "Your account is kept until you delete it: \"Delete account\" in the account menu deletes it with all your collections, entries and photos, the shares you made and the shares made to you. You can also write to the contact above. Photos you added, as an editor of a shared collection, to its owner's entries belong to those entries and stay with them.",
     "retention_sharing": "An invitation is kept until the owner or the invited person removes it, or the collection is deleted, even after its expiry date has passed.",
-    "retention_backups": "Backups hold deleted data a little longer: the daily encrypted database backups are kept for 30 days, and the backup copy of a photo for 30 days after the photo is deleted.",
     "retention_logs": "Supabase keeps its technical logs, with IP addresses, for one day and its sign-in logs for one hour. Records of your sign-ins can also be kept with your account while it exists. GitHub, Google, Komoot and the OpenStreetMap Foundation keep their own logs under their own policies.",
     "browser_heading": "What is stored in your browser",
     "browser_storage": "CollectionBuddy keeps your sign-in session, your language, your colour theme, the collection you last opened and the coordinates the map has looked up for place names in your browser's local storage, so they survive a reload. It also notes which account the last collection and the coordinates belong to, and removes both when a different account signs in on the same browser. For the open tab, it records when it last reloaded itself after an update.",
     "browser_cache": "A service worker keeps a copy of the app's own files so that it starts faster and opens offline; it keeps none of your collections or photos.",
     "browser_no_cookies": "CollectionBuddy sets no cookies and uses no tracking. What it stores is needed for the service you asked for (Section 25(2) no. 2 TDDDG).",
     "rights_heading": "Your rights",
-    "rights_in_app": "You can see, correct and delete your collections, entries and photos in the app at any time, and export each collection as a ZIP archive.",
-    "rights_list": "You have the right of access (Art. 15 GDPR), rectification (Art. 16), erasure (Art. 17), restriction of processing (Art. 18) and data portability (Art. 20), and the right to object to processing based on legitimate interests (Art. 21). To delete your account or to exercise any of these rights, write to the contact above.",
+    "rights_in_app": "You can see, correct and delete your collections, entries and photos in the app at any time, export each collection as a ZIP archive, and delete your account.",
+    "rights_list": "You have the right of access (Art. 15 GDPR), rectification (Art. 16), erasure (Art. 17), restriction of processing (Art. 18) and data portability (Art. 20), and the right to object to processing based on legitimate interests (Art. 21). To exercise any of these rights, write to the contact above.",
     "rights_complaint": "You also have the right to lodge a complaint with a data protection supervisory authority, in particular in the EU member state where you live or work or where you believe the infringement took place (Art. 77 GDPR)."
   }
 }

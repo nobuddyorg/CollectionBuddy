@@ -7,6 +7,7 @@ repo=${REPO:-$(git rev-parse --show-toplevel)}
 status=$(cd "$repo" && supabase status -o json) || { echo 'supabase start first' >&2; exit 1; }
 url=$(node -e 'console.log(JSON.parse(process.argv[1]).API_URL ?? "")' "$status")
 key=$(node -e 'console.log(JSON.parse(process.argv[1]).ANON_KEY ?? "")' "$status")
+db=$(node -e 'console.log(JSON.parse(process.argv[1]).DB_URL ?? "")' "$status")
 [[ $url == http* && -n $key && $key != undefined ]] || { echo 'cannot read API_URL/ANON_KEY from supabase status' >&2; exit 1; }
 export LOAD_SUPABASE_URL=$url LOAD_SUPABASE_ANON_KEY=$key LOAD_TARGET=local-stack LOAD_PROFILE=${LOAD_PROFILE:-normal} K6_WEB_DASHBOARD=false
 mkdir -p load-results
@@ -63,6 +64,21 @@ rm -f load-results/proof-*.md
 # #779 first, on the freshly reset stack: other proofs' deleted rows would add dead tuples to its GIN scans. The control expects no gap.
 record short-search-control env PROOF_VARIANT=control PROOF_OTHER_ENTRIES=0 k6 run "$here/short-search.js"
 run short-search k6 run "$here/short-search.js"
+# The orphan-delete defect needs empty, vacuumed tables, as a new project has; every proof so far has cleared its accounts.
+if [[ $(psql "$db" -Atc 'select count(*) from public.items') == 0 ]] && psql "$db" -qc 'vacuum analyze public.items, public.item_categories'; then
+  run orphan-delete k6 run "$here/orphan-delete.js"
+else
+  broken+=('orphan-delete (entries left over, or psql missing: it needs empty, vacuumed tables)')
+fi
+# quota-insert needs them too, a pool that has inserted nothing yet (a schema reload replaces it), and autovacuum held off both tables for the run.
+if [[ $(psql "$db" -Atc 'select count(*) from public.items') == 0 ]] && psql "$db" -q -c 'vacuum analyze public.items, public.item_categories' \
+  -c 'alter table public.items set (autovacuum_enabled = off)' -c 'alter table public.item_categories set (autovacuum_enabled = off)' \
+  -c "notify pgrst, 'reload schema'"; then
+  run quota-insert k6 run "$here/quota-insert.js"
+  psql "$db" -q -c 'alter table public.items reset (autovacuum_enabled)' -c 'alter table public.item_categories reset (autovacuum_enabled)'
+else
+  broken+=('quota-insert (entries left over, or psql missing: it needs empty, vacuumed tables)')
+fi
 for proof in deep-offset map-places-cap sign-many quota-refused-import round-trips gate-blind-spots; do
   run "$proof" k6 run "$here/$proof.js"
 done

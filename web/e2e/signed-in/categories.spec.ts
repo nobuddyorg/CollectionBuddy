@@ -47,6 +47,29 @@ test.describe('managing categories', () => {
     }
   });
 
+  // #785: String.replace read "$$" as "$" and "$'" as the rest of the sentence, misnaming what goes.
+  test('names a collection spelled with $ sequences exactly in its delete confirmation', async ({
+    on,
+    page,
+  }) => {
+    const name = `E2E US$$ $' $& ${Date.now()}`;
+    const app = on(page);
+
+    await page.goto('', { waitUntil: 'networkidle' });
+    await expect(app.categories.locators.selected).not.toBeEmpty();
+    await app.categories.do.create(name);
+    try {
+      await app.categories.do.delete();
+      await expect(app.confirm.locators.message).toHaveText(
+        `Delete "${name}"?`,
+      );
+      await app.confirm.do.cancel();
+      await expect(app.categories.locators.selected).toHaveText(name);
+    } finally {
+      await removeCategoryNamed(name);
+    }
+  });
+
   // Arrows only move focus: each selection loads a collection, so only Enter picks one.
   test('walks the strip by keyboard without closing it, then opens a collection with Enter', async ({
     on,

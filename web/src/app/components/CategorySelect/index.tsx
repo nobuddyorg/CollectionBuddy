@@ -31,7 +31,7 @@ type Props = {
   onSelect: (id: string | null) => void;
   categories: UseCategories;
   userId: string | null;
-  /** False until the page's initial load resolves; stops a one-render "None selected" flash. */
+  /** False until the page's initial load resolves: the header holds a placeholder and the panel stays shut. */
   ready?: boolean;
 };
 
@@ -195,7 +195,8 @@ export default function CategorySelect({
           ))}
       </div>
 
-      {expanded && (
+      {/* Not before ready: nothing is selected yet, so the panel would open on create/import, then snap shut. */}
+      {expanded && ready && (
         <>
           <CategorySelectDropdown
             selectedCategoryId={selectedCategoryId}

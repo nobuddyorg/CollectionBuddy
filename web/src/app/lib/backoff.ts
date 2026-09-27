@@ -1,6 +1,10 @@
-/** Delay before retry `attempt` (0-indexed): `baseMs`, then 2x, 4x, and so on. */
-export function backoffDelayMs(baseMs: number, attempt: number): number {
-  return baseMs * 2 ** attempt;
+/** Delay before retry `attempt` (0-indexed): `baseMs`, then 2x, 4x, and so on, scaled by `share` (full jitter draws it from [0, 1)). */
+export function backoffDelayMs(
+  baseMs: number,
+  attempt: number,
+  share: number,
+): number {
+  return baseMs * 2 ** attempt * share;
 }
 
 /** Whether asking again could give a different answer: 429 or 5xx; anything else only spends quota. */
@@ -19,14 +23,17 @@ export async function retryWithBackoff<T>({
   maxAttempts,
   baseMs,
   run,
+  jitter = () => 1,
 }: {
   maxAttempts: number;
   baseMs: number;
   run: () => Promise<AttemptOutcome<T>>;
+  /** Each delay's share of its full backoff; `Math.random` keeps a pool's failed workers from retrying in lockstep. */
+  jitter?: () => number;
 }): Promise<T> {
   let outcome = await run();
   for (let retry = 0; outcome.retry && retry < maxAttempts - 1; retry += 1) {
-    await sleep(backoffDelayMs(baseMs, retry));
+    await sleep(backoffDelayMs(baseMs, retry, jitter()));
     outcome = await run();
   }
   return outcome.value;
