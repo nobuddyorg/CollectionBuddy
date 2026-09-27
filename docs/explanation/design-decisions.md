@@ -261,11 +261,11 @@ What would regress under load is gated deterministically instead: `075_query_pla
 
 ## Why the privacy notice is a page of its own
 
-[`web/src/app/privacy/page.tsx`](../../web/src/app/privacy/page.tsx) is the Art. 13 GDPR notice: the controller, the data and where it comes from, purposes and legal bases, recipients and transfers outside the EU, retention (backups and logs included), what the browser stores, and the user's rights. Anyone with a Google account can sign in, and sharing stores other people's email addresses, so the app is not single-user.
+[`web/src/app/privacy/page.tsx`](../../web/src/app/privacy/page.tsx) is the Art. 13 GDPR notice: the controller, the data and where it comes from, purposes and legal bases, recipients and transfers outside the EU, retention (logs included), what the browser stores, and the user's rights. Anyone with a Google account can sign in, and sharing stores other people's email addresses, so the app is not single-user.
 
 - **A route, not a dialog.** It needs no session, so it opens before sign-in, a sign-up flow or the Google consent screen can link it, and the service worker keeps it for offline. The sign-in page, the account menu and the help link it.
 - **Through the app's i18n.** Every sentence is a `privacy.*` key in both dictionaries, so `parity.test.ts` catches a missing translation. The controller's name and address are not translated and sit in the page itself.
-- **Derived from the code, not copied.** Each claim traces to something in this repository or its hosted configuration: Google sign-in and the metadata Auth keeps, the uploader's canvas re-encode dropping EXIF (an import stores archive bytes as they are), Photon and OpenStreetMap tiles in the CSP, the 48 h sweep, `backup.yml`'s 30-day expiry, the Free plan's log retention, and the `localStorage` keys. The Supabase region and where the backups live came from the owner.
+- **Derived from the code, not copied.** Each claim traces to something in this repository or its hosted configuration: Google sign-in and the metadata Auth keeps, the uploader's canvas re-encode dropping EXIF (an import stores archive bytes as they are), Photon and OpenStreetMap tiles in the CSP, the 48 h sweep, the Free plan's log retention, and the `localStorage` keys. The Supabase region came from the owner.
 - **Kept in sync in the same change.** A change to what the app collects, whom it sends data to (a new origin in the CSP is the usual sign), how long it keeps it, or what it stores in the browser updates the notice and its "Last updated" line in the same PR. `web/public/privacy-policy.txt`, the address the Google consent screen once named, only points here.
 
 ## npm audit: what's overridden and what's accepted risk
