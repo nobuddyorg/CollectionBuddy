@@ -136,24 +136,17 @@ WebKit's canvas has no WebP encoder: `toBlob`, `toDataURL` and `OffscreenCanvas.
 
 `delete_item_if_orphan()` removes an item once it belongs to zero categories. The first version ran `FOR EACH ROW`, one `EXISTS` probe per deleted `item_categories` row — deleting a 500-item category meant ~500 sequential lookups. It now runs `FOR EACH STATEMENT` with a transition table, one set-based `DELETE ... WHERE id IN (...) AND NOT EXISTS (...)`. Same logic, one query instead of N.
 
-## Why production is backed up by a workflow
+## Why production has no off-site backup
 
-The project runs on Supabase's Free plan, which keeps no database backup, and no plan's backup contains Storage objects. Production is migrated unattended on every merge that passes CI and swept daily by an irreversible `service_role` delete, so one bad migration or sweep regression would be permanent. Moving to Pro would buy daily database backups and still leave the photographs uncovered, so `backup.yml` does both halves on the Free plan (#736).
-
-- **Encrypted on the runner, to a public key.** The repository is public and so are its Actions artifacts. age needs only the recipient in GitHub; the identity that decrypts stays off it, so a leaked backup key or bucket exposes ciphertext.
-- **An S3-compatible bucket, not a service integration.** Any provider works through the AWS CLI already on the runner; the owner picks it by setting three variables.
-- **Photographs are copied once.** An object's path never changes ([above](#why-a-storage-objects-path-can-never-change)), so a name already mirrored holds the same bytes and a daily run downloads only what is new, which keeps Free-plan egress small. A removed object moves to a dated prefix the bucket's lifecycle rule expires, rather than being kept forever or deleted at once: long enough to outlive the sweep's 48 h grace, not longer than a restore needs.
-- **The listing and the key come from the Management API**, as in the sweep: no second long-lived Storage credential.
-- **Storage's tables are not in the dump.** A new project gets the bucket from `0007` and each object's row from its re-upload; restoring either from the dump would collide with both, and `postgres` may not write Storage's other tables at all (found rehearsing the restore).
-- **The pre-migration dump runs only when something is pending.** A deploy without migrations never depends on the backup bucket; one with migrations stops rather than migrate without a copy.
+The project runs on Supabase's Free plan, which keeps no database backup, and no plan's backup contains Storage objects. A workflow once dumped the database and mirrored the photographs, encrypted, to an S3-compatible bucket, and `migrate` refused to apply a migration without a fresh dump (#736). It needed a bucket, its keys and an age recipient in the `production` environment that the owner could not provide, so every deploy with a pending migration stopped and nothing reached production; it was removed. A bad migration or a sweep regression is therefore permanent. What guards against them is upstream: expand-then-contract migrations tested against a populated database, pgTAP and RLS e2e cases, and the sweep's 48 h grace, dry runs and mass-deletion ceiling ([Sweep orphaned photographs](../how-to/developer-guide.md#sweep-orphaned-photographs)). Bringing the backup back means restoring that workflow and its configuration together.
 
 ## Why the Management API tokens are scoped per job
 
-The sweep and the backup fetch the secret key per run so it is never stored, but the token they fetched it with was a classic one: every permission on every organization and project on the owner's account, including revealing every key, running any SQL and deleting projects, and it reached every deploy and an hourly job (#748). Now each job holds a token scoped to this project and to the endpoints it calls ([Configuration](../reference/configuration.md#management-api-tokens)).
+The sweep fetches the secret key per run so it is never stored, but the token it fetched it with was a classic one: every permission on every organization and project on the owner's account, including revealing every key, running any SQL and deleting projects, and it reached every deploy and an hourly job (#748). Now each job holds a token scoped to this project and to the endpoints it calls ([Configuration](../reference/configuration.md#management-api-tokens)).
 
 - **`migrate` needs none.** It already holds the database URL; `supabase db query` sends the `NOTIFY` over it, and PostgREST receives it when that statement commits.
 - **Database: Read, not Read-write.** Read-write runs any SQL as `postgres`, so a leaked token could plant a function, trigger or role that outlives every key rotation. The read-only endpoint runs as `supabase_read_only_user`; granting it `orphan_sweep_plan()` in `0024` adds nothing that role could not select itself.
-- **Two tokens, not one per workflow.** The hourly Auth check needs only Auth Config: Read, so it no longer carries a token that reveals keys. The sweep and the backup need the same three permissions; splitting them would narrow nothing and double the rotation.
+- **Two tokens, not one per workflow.** The hourly Auth check needs only Auth Config: Read, so it no longer carries a token that reveals keys. The sweep needs the other three permissions.
 - **What remains.** The secret key that token reveals still reads and deletes every collector's data; that is the price of not storing it, and the 90-day expiry bounds how long an unnoticed leak stays useful.
 
 ## Why the deploy waits for CI on `main`
