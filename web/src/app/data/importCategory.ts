@@ -18,11 +18,14 @@ import {
   importTimestamps,
   parseManifest,
   rootFolderOf,
+  type ImportManifest,
+  type ManifestItem,
 } from './importFormat';
 import { checkCancelled } from './importCancellation';
 import { importPhoto, realCompressThumb } from './importPhoto';
 import { isPhotoStorageFull, isQuotaExceeded } from './quota';
-import { openZip, type ZipEntryReader } from './zip';
+import { ZipLimitError, ZipReadError } from './zip';
+import { openZip, type ZipEntryReader } from './zipReader';
 import { chunk } from '../lib/chunk';
 import { runPool } from '../lib/pool';
 
@@ -56,16 +59,6 @@ export const PHOTO_UPLOAD_CONCURRENCY = 6;
 /** Entries per create request, each request one transaction. */
 export const ITEM_INSERT_BATCH_SIZE = 100;
 
-type ManifestItem = {
-  title: string;
-  description: string | null;
-  place: string | null;
-  place_lat: number | null;
-  place_lng: number | null;
-  tags: string[];
-  photos: string[];
-};
-
 type ItemToCreate = { item: ManifestItem; id: string; createdAt: string };
 
 type ItemBatchCalls = {
@@ -90,6 +83,36 @@ async function createImportedItems(
   }));
   const { error } = await createItemRows(categoryId, rows);
   if (error) throw new ImportError('Could not create items', { cause: error });
+}
+
+/** A ZIP the reader refuses is the archive's fault: a format error, never "try again". */
+function asFormatError(error: unknown): unknown {
+  if (error instanceof ZipLimitError) {
+    return new ImportFormatError('too_large', error.message, { cause: error });
+  }
+  if (error instanceof ZipReadError) {
+    return new ImportFormatError('unreadable', error.message, { cause: error });
+  }
+  return error;
+}
+
+async function readManifest(read: ZipEntryReader): Promise<ImportManifest> {
+  let text: string;
+  try {
+    text = await (await read()).text();
+  } catch (error) {
+    throw asFormatError(error);
+  }
+  try {
+    return parseManifest(JSON.parse(text));
+  } catch (error) {
+    if (error instanceof ImportFormatError) throw error;
+    throw new ImportFormatError(
+      'not_export',
+      'Could not read collection.json in this archive',
+      { cause: error },
+    );
+  }
 }
 
 /** Imports an archive as a new category; `nameCategory` turns the archived name into one trusted as unique. */
@@ -135,31 +158,20 @@ export async function importCategory({
   try {
     entries = await openZip(file);
   } catch (error) {
-    throw new ImportError('Could not read this file as a ZIP archive', {
-      cause: error,
-    });
+    throw asFormatError(error);
   }
 
   const manifestPath = findManifestPath(entries.keys());
   if (!manifestPath) {
-    throw new ImportFormatError('Not a CollectionBuddy export archive');
-  }
-  // Non-null: findManifestPath only returns a key it read out of `entries` itself.
-  const readManifest = entries.get(manifestPath)!;
-
-  let manifestItems: ManifestItem[];
-  let archivedName: string;
-  try {
-    const json: unknown = JSON.parse(await (await readManifest()).text());
-    const manifest = parseManifest(json);
-    manifestItems = manifest.items;
-    archivedName = manifest.category.name;
-  } catch (error) {
-    if (error instanceof ImportFormatError) throw error;
     throw new ImportFormatError(
-      'Could not read collection.json in this archive',
+      'not_export',
+      'Not a CollectionBuddy export archive',
     );
   }
+  // Non-null: findManifestPath only returns a key it read out of `entries` itself.
+  const manifest = await readManifest(entries.get(manifestPath)!);
+  const manifestItems = manifest.items;
+  const archivedName = manifest.category.name;
 
   checkCancelled(signal);
   const root = rootFolderOf(manifestPath);
@@ -257,6 +269,6 @@ export async function importCategory({
         cleanupError,
       );
     }
-    throw error;
+    throw asFormatError(error);
   }
 }

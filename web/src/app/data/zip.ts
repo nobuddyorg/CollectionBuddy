@@ -1,12 +1,12 @@
-// Store-only and no Zip64: the 4 GiB / 65535-entry ceilings are refused, never rolled over.
+// The writer: store-only and no Zip64, so the 4 GiB / 65535-entry ceilings are refused, never rolled over.
 
-const LOCAL_HEADER_SIGNATURE = 0x04034b50;
-const CENTRAL_HEADER_SIGNATURE = 0x02014b50;
-const END_OF_CENTRAL_DIR_SIGNATURE = 0x06054b50;
+export const LOCAL_HEADER_SIGNATURE = 0x04034b50;
+export const CENTRAL_HEADER_SIGNATURE = 0x02014b50;
+export const END_OF_CENTRAL_DIR_SIGNATURE = 0x06054b50;
 
-const LOCAL_HEADER_BYTES = 30;
-const CENTRAL_HEADER_BYTES = 46;
-const END_OF_CENTRAL_DIR_BYTES = 22;
+export const LOCAL_HEADER_BYTES = 30;
+export const CENTRAL_HEADER_BYTES = 46;
+export const END_OF_CENTRAL_DIR_BYTES = 22;
 
 /** 2.0: what a stored entry with no extras needs, and nothing beyond it. */
 const VERSION = 20;
@@ -15,7 +15,7 @@ const VERSION = 20;
 const FLAG_UTF8 = 0x0800;
 
 /** Compression method 0 -- the bytes are stored verbatim. */
-const METHOD_STORE = 0;
+export const METHOD_STORE = 0;
 
 /** Past these the 32-bit header fields cannot describe the archive without Zip64. */
 export const MAX_ZIP_BYTES = 0xffffffff;
@@ -164,104 +164,12 @@ export function endOfCentralDirectory({
   return bytes;
 }
 
+/** A file that is not a ZIP, is damaged, contradicts itself, or needs a feature the reader lacks. */
 export class ZipReadError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'ZipReadError';
   }
-}
-
-/** Reads an entry's bytes out of the archive; until called, nothing past the directory is loaded. */
-export type ZipEntryReader = () => Promise<Blob>;
-
-async function readRange(blob: Blob, start: number, end: number) {
-  return new Uint8Array(await blob.slice(start, end).arrayBuffer());
-}
-
-function dataViewOf(bytes: Uint8Array<ArrayBuffer>): DataView {
-  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-}
-
-/** A slice of the archive, not a copy: the local header is read only to find where the bytes start. */
-function entryReader({
-  archive,
-  name,
-  size,
-  localOffset,
-}: {
-  archive: Blob;
-  name: string;
-  size: number;
-  localOffset: number;
-}): ZipEntryReader {
-  return async () => {
-    const header = await readRange(
-      archive,
-      localOffset,
-      localOffset + LOCAL_HEADER_BYTES,
-    );
-    if (header.length < LOCAL_HEADER_BYTES) {
-      throw new ZipReadError(`Corrupt archive: "${name}" runs past the file`);
-    }
-    const localNameLength = dataViewOf(header).getUint16(26, true);
-    const dataStart = localOffset + LOCAL_HEADER_BYTES + localNameLength;
-    if (dataStart + size > archive.size) {
-      throw new ZipReadError(`Corrupt archive: "${name}" runs past the file`);
-    }
-    return archive.slice(dataStart, dataStart + size);
-  };
-}
-
-/** Opens an archive `createZipWriter` produced by its trailer and central directory, the only parts read up front. */
-export async function openZip(
-  archive: Blob,
-): Promise<Map<string, ZipEntryReader>> {
-  if (archive.size < END_OF_CENTRAL_DIR_BYTES) {
-    throw new ZipReadError('Not a ZIP archive: file is too small');
-  }
-  const trailerAt = archive.size - END_OF_CENTRAL_DIR_BYTES;
-  const trailer = dataViewOf(await readRange(archive, trailerAt, archive.size));
-  if (trailer.getUint32(0, true) !== END_OF_CENTRAL_DIR_SIGNATURE) {
-    // No backward scan for an archive comment: `createZipWriter` never writes one.
-    throw new ZipReadError(
-      'Not a ZIP archive: no end-of-central-directory record',
-    );
-  }
-
-  const entryCount = trailer.getUint16(8, true);
-  const directoryOffset = trailer.getUint32(16, true);
-  // Up to the end of the file, not the trailer: a directory the trailer misplaces is judged by the bytes found there.
-  const directory = await readRange(archive, directoryOffset, archive.size);
-  const dataView = dataViewOf(directory);
-
-  const entries = new Map<string, ZipEntryReader>();
-  const decoder = new TextDecoder();
-  let directoryAt = 0;
-  for (let i = 0; i < entryCount; i++) {
-    if (directoryAt + CENTRAL_HEADER_BYTES > directory.length) {
-      throw new ZipReadError(
-        'Corrupt archive: central directory runs past the file',
-      );
-    }
-    if (dataView.getUint32(directoryAt, true) !== CENTRAL_HEADER_SIGNATURE) {
-      throw new ZipReadError(
-        'Corrupt archive: malformed central directory entry',
-      );
-    }
-    const size = dataView.getUint32(directoryAt + 24, true);
-    const nameLength = dataView.getUint16(directoryAt + 28, true);
-    const localOffset = dataView.getUint32(directoryAt + 42, true);
-    const name = decoder.decode(
-      directory.subarray(
-        directoryAt + CENTRAL_HEADER_BYTES,
-        directoryAt + CENTRAL_HEADER_BYTES + nameLength,
-      ),
-    );
-    entries.set(name, entryReader({ archive, name, size, localOffset }));
-
-    directoryAt += CENTRAL_HEADER_BYTES + nameLength;
-  }
-  return entries;
 }
 
 export class ZipLimitError extends Error {

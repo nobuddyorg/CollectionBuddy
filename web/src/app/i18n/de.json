@@ -67,6 +67,8 @@
     "import_error": "Dieses Archiv konnte nicht importiert werden. Bitte erneut versuchen.",
     "import_quota_error": "Dieser Import würde das Limit von 50.000 Einträgen überschreiten.",
     "import_format_error": "Diese Datei ist kein CollectionBuddy-Exportarchiv.",
+    "import_unreadable_error": "Dieses Archiv ist beschädigt oder nutzt eine ZIP-Funktion, die der Import nicht lesen kann, etwa Verschlüsselung. Importiere die .zip, die der Export heruntergeladen hat.",
+    "import_too_large_error": "Dieses Archiv entpackt sich zu mehr, als ein Import annimmt, daher wurde nichts importiert.",
     "import_success": "Als \"{name}\" importiert.",
     "import_partial": "{skipped} von {total} Fotos konnten nicht importiert werden.",
     "import_partial_quota": "{skipped} von {total} Fotos wurden nicht importiert: Das Limit von 256 MiB an Fotos ist erreicht. Lösche welche, um Platz zu schaffen.",

@@ -3,6 +3,8 @@ export const MUTATE_TARGETS = [
   'src/app/data/items.ts',
   'src/app/data/itemPage.ts',
   'src/app/data/zip.ts',
+  'src/app/data/zipDirectory.ts',
+  'src/app/data/zipReader.ts',
   'src/app/data/exportFormat.ts',
   'src/app/data/exportCategory.ts',
   'src/app/data/importCategory.ts',
