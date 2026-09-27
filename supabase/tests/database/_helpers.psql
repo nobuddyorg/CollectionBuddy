@@ -12,6 +12,15 @@
 -- connection pg_prove opens per file -- nothing here leaks between files,
 -- and nothing persists after the run.
 
+-- A real token's sub names an Auth user, and every owner column references one (0034); SET ROLE is refused inside a definer, hence two functions.
+create or replace function pg_temp.ensure_auth_user(p_user_id uuid, p_email text)
+returns void
+language sql
+security definer
+as $$
+  insert into auth.users (id, email) values (p_user_id, p_email) on conflict do nothing
+$$;
+
 -- Impersonate a signed-in caller the way PostgREST does: assume the
 -- `authenticated` role, and set the claims a real JWT would carry. Passing
 -- NULL for p_email models a token with no email claim, which is what makes
@@ -27,6 +36,7 @@ returns void
 language plpgsql
 as $$
 begin
+  perform pg_temp.ensure_auth_user(p_user_id, p_email);
   set local role authenticated;
   perform set_config(
     'request.jwt.claims',

@@ -183,9 +183,12 @@ supabase test db
 | `075_query_plans_test.sql` | That every index-backed query can reach its index, and picks it at a realistic size |
 | `080_orphan_sweep_test.sql` | What the orphan sweep may delete: both path columns, no uuid cast, the 48 h grace, other buckets, the mass-deletion ceiling; `supabase_read_only_user` and no API role runs it, in a read-only transaction |
 | `085_delete_own_account_test.sql` | Deleting one's own account: the objects-first guard, what goes (rows, grants to its email, the Auth user) and what another account keeps |
+| `090_owned_rows_follow_the_auth_user_test.sql` | Deleting the Auth user as the dashboard does: every owner key cascades and is validated, what goes and what another account keeps, what the sweep may then take, and a leftover token's refused write |
 
 `_helpers.psql` holds the shared fixtures; it is `.psql` because
-`supabase test db` collects every `.sql` file as a test. pgTAP proves the
+`supabase test db` collects every `.sql` file as a test. Its `auth_as()` also
+creates the `auth.users` row it names, if missing, since every owner column
+references one (`0034`). pgTAP proves the
 policy, trigger and constraint logic fast; `e2e/signed-in/rls/` proves the same
 properties through the real PostgREST-and-JWT pipeline and is the only place
 the Storage API and the bytes behind a `storage.objects` row are exercised. A
@@ -782,6 +785,82 @@ dry run is under it, then enable the workflow again.
 A change to the plan, its migration or the workflow runs CI's pgTAP job
 (`080_orphan_sweep_test.sql`); after it merges, run the default dry run once
 before the next 04:30 run.
+
+## Honour an account deletion request
+
+The collector's own **Delete account**, at the bottom of the account menu
+([user guide](user-guide.md#delete-your-account)), is the way to go: it
+removes the photographs first, then `delete_own_account()` (`0033`) deletes
+the rows, the grants made to the collector's email and the Auth user. Reply to
+a request by email with that, and delete by hand only when the collector
+cannot sign in any more. Make sure the request comes from the account's own
+address.
+
+By hand, it is the same order: objects, grants to the email, then the user.
+Every step runs against production, so it is the owner's, never an
+assistant's.
+
+1. **Find the user.** Dashboard → Authentication → Users, search the email,
+   copy the user's UID.
+2. **Remove the photographs from Storage.** In the dashboard's SQL editor,
+   list every object the user's photograph records name, 1,000 paths a row,
+   which is what one Storage bulk delete takes:
+
+   ```sql
+   select json_build_object('prefixes', json_agg(path)) as payload
+   from (
+     select path, (row_number() over (order by path) - 1) / 1000 as batch
+     from public.images as im
+     cross join lateral unnest(array[im.path_full, im.path_thumb]) as path
+     where im.user_id = '<uid>' and path is not null
+   ) as paths
+   group by batch;
+   ```
+
+   Delete each payload through Storage, the only thing that deletes bytes,
+   with the secret key (Settings → API Keys), typed into your own shell,
+   never saved:
+
+   ```bash
+   read -rs SECRET_KEY
+   curl -sS --fail-with-body -X DELETE \
+     "https://<project-ref>.supabase.co/storage/v1/object/item-images" \
+     -H "apikey: $SECRET_KEY" -H "Content-Type: application/json" \
+     --data '<payload>'
+   ```
+
+   A legacy `service_role` key also needs `-H "Authorization: Bearer
+   $SECRET_KEY"`. For a handful of photographs, deleting those paths in
+   the dashboard's Storage browser does the same. Do not delete the whole
+   `<uid>/` folder: a photograph the user added as an editor to someone
+   else's entry lies there and belongs to that entry. The query below must
+   then return 0:
+
+   ```sql
+   select count(*)
+   from public.images as im
+   join storage.objects as o
+     on o.bucket_id = 'item-images' and o.name in (im.path_full, im.path_thumb)
+   where im.user_id = '<uid>';
+   ```
+
+3. **Delete the grants made to the email**, which nothing ties to the user,
+   so no cascade reaches them:
+   `delete from public.category_shares where invited_email = lower('<email>');`
+4. **Delete the user**: Authentication → Users → ⋯ → *Delete user*. Since
+   `0034` every row it owns cascades: collections with their shares and
+   links, entries, including the ones it filed in other people's collections,
+   and photograph records. Entries editors filed in its collections go with
+   them, as a collection delete takes them.
+5. **Leave the rest to the sweep.** The objects of those editors' entries, and
+   anything step 2 missed, are unnamed now; the [sweep](#sweep-orphaned-photographs)
+   deletes them 48 h later. A large account can push that over its
+   mass-deletion ceiling, and the scheduled run then refuses: handle it as
+   [When a run refuses](#sweep-orphaned-photographs) says.
+
+Users deleted in the dashboard before `0034` left their rows behind; `0034`
+deleted those rows when it deployed, so their photographs reach the sweep 48 h
+later, possibly past the ceiling in the same way.
 
 ## Watch production health
 
