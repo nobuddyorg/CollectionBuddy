@@ -1,12 +1,12 @@
 import { readAllKeysetPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import { objectPathsOf, removeObjectsThenRows } from './imageRemoval';
-import type { ImagePathRow, ImageRow } from './images';
+import type { ImageListRow } from './images';
 
 // PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.
 const ROW_PAGE_SIZE = 1000;
 
-type OwnImagePathRow = Omit<ImagePathRow, 'item_id'> & Pick<ImageRow, 'id'>;
+type OwnImagePathRow = Omit<ImageListRow, 'item_id'>;
 
 // Keyset-paged down images_pkey; the user_id filter keeps out the rows a grant shows, which are another owner's.
 function rawListOwnImagePaths({
