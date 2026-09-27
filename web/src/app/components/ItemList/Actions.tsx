@@ -4,11 +4,7 @@ import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 import { IconButton, iconButtonClasses } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
-
-// Warms the edit modal's lazy ItemForm chunk before the click that opens it.
-const prefetchItemForm = () => {
-  void import('../ItemForm').catch(() => {});
-};
+import { prefetchItemForm } from '../ItemForm/load';
 
 function UploadInput({
   onUpload,

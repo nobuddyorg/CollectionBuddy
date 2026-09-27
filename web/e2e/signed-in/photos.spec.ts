@@ -130,6 +130,11 @@ test.describe('photographs', () => {
       // Waits for the real picture, not the placeholder that stood in for it.
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
       await expect(card.locators.images).toHaveAttribute('src', /token=/);
+      // Both sizes signed and offered, so a plate that needs no more than 600px fetches the thumbnail.
+      await expect(card.locators.images).toHaveAttribute(
+        'srcset',
+        /\.thumb\.\w+\?token=\S+ 600w, \S+\?token=\S+ 1000w$/,
+      );
     } finally {
       // In finally, objects and row both: a leaked entry would orphan its upload.
       await removeEntriesTitled(title);

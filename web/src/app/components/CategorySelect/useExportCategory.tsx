@@ -6,15 +6,14 @@ import type { TranslationKey } from '../../i18n/I18nProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
-import {
-  ExportCancelledError,
-  exportCategory,
-  type ExportProgress,
-} from '../../data/exportCategory';
+import type { ExportProgress } from '../../data/exportCategory';
 import { formatExportBytes } from '../../data/exportFormat';
 import { downloadBlob } from './downloadBlob';
 import { useConfirm } from '../Confirm/ConfirmProvider';
-import { ZipLimitError } from '../../data/zip';
+
+// Checked by name: importing the classes would pull the on-demand export and ZIP code into the page.
+const isNamed = (error: unknown, name: string): boolean =>
+  error instanceof Error && error.name === name;
 
 /** Reading counts up per page, photos count against their total, and "0 of 0" falls back to packing. */
 export function exportProgressMessage(
@@ -53,6 +52,7 @@ export function useExportCategory() {
       controllerRef.current = controller;
       setProgress({ phase: 'items', done: 0, total: 0 });
       try {
+        const { exportCategory } = await import('../../data/exportCategory');
         const result = await exportCategory({
           category,
           onProgress: setProgress,
@@ -79,10 +79,10 @@ export function useExportCategory() {
           );
         }
       } catch (error) {
-        if (error instanceof ExportCancelledError) {
+        if (isNamed(error, 'ExportCancelledError')) {
           // Confirmed, not a failure.
           toast.announce(t('category_select.export_cancelled'));
-        } else if (error instanceof ZipLimitError) {
+        } else if (isNamed(error, 'ZipLimitError')) {
           // Retrying produces the same refusal, so this isn't "try again".
           toast.error(t('category_select.export_too_large'));
         } else {

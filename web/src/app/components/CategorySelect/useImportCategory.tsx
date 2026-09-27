@@ -7,11 +7,7 @@ import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
 import { ImportCancelledError } from '../../data/importCancellation';
-import {
-  importCategory,
-  type ImportProgress,
-  type ImportResult,
-} from '../../data/importCategory';
+import type { ImportProgress, ImportResult } from '../../data/importCategory';
 import { ImportFormatError } from '../../data/importFormat';
 import { uniqueCategoryName } from '../../data/categories';
 import { isQuotaExceeded } from '../../data/quota';
@@ -75,6 +71,8 @@ export function useImportCategory(existingCategoryNames: string[]) {
       controllerRef.current = controller;
       setProgress({ phase: 'reading', done: 0, total: 0 });
       try {
+        // On demand: the import and ZIP code is dead weight on every page load that never imports.
+        const { importCategory } = await import('../../data/importCategory');
         const result = await importCategory({
           file,
           // "Coins (2)" if taken, named from the one read of the archive importCategory makes.
