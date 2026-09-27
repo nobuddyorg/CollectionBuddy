@@ -310,7 +310,13 @@ select throws_ok(
   '23514', 'new row for relation "items" violates check constraint "items_tags_bounded"',
   'a 51st tag is refused'
 );
--- items_tags_bounded's length half cannot refuse since 0028: 50 tags of 100 characters join to 5049 at most (design-decisions.md).
+-- 0036 dropped items_tags_bounded's length half, which 0028's per-tag limit had made unreachable (design-decisions.md).
+select is(
+  (select pg_get_constraintdef(oid) from pg_constraint
+    where conrelid = 'public.items'::regclass and conname = 'items_tags_bounded'),
+  'CHECK ((cardinality(tags) <= 50)) NOT VALID',
+  'items_tags_bounded counts tags and nothing else'
+);
 select throws_ok(
   format('insert into public.items (title, tags) values (''l'', %L)',
     array[repeat('a', 5050)]),
