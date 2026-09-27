@@ -29,6 +29,8 @@ account.
 language the app is set to. **Ctrl+/** (**Cmd+/** on a Mac) opens it from
 anywhere, even inside a text field. With no categories yet, the empty page has
 a **How it works** button that opens the same guide.
+If your categories or entries fail to load, the page says so and offers
+**Try again** instead of showing them as empty.
 
 The **Privacy notice** (`/privacy`) says what CollectionBuddy stores, who
 receives it and for how long. It opens without signing in: the sign-in page,

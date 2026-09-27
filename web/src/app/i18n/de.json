@@ -8,6 +8,7 @@
     "no_categories": "Noch keine Sammlungen",
     "name_first_category": "Gib oben unter Neue Sammlung einen Namen ein und drücke auf +. Münzen, Briefmarken, was du sammelst.",
     "open_help": "So funktioniert's",
+    "load_error_title": "Deine Sammlungen konnten nicht geladen werden",
     "footer": "Sammeln • Ordnen • Behalten",
     "skip_to_content": "Zum Inhalt springen"
   },
@@ -160,6 +161,8 @@
     "zoom_to_current_location": "Zum aktuellen Standort zoomen",
     "frame_all_pins": "Alle Orte anzeigen",
     "search_error": "Suche fehlgeschlagen. Bitte erneut versuchen.",
+    "load_error": "Einträge konnten nicht geladen werden. Bitte erneut versuchen.",
+    "load_error_title": "Die Einträge konnten nicht geladen werden",
     "save_error": "Änderungen konnten nicht gespeichert werden. Bitte erneut versuchen.",
     "changes_saved": "Änderungen gespeichert.",
     "delete_error": "Eintrag konnte nicht gelöscht werden. Bitte erneut versuchen.",
@@ -219,7 +222,9 @@
     "cancel": "Abbrechen",
     "undo": "Rückgängig machen",
     "undo_shortcut": "Strg+Z",
-    "undo_shortcut_hint": "Strg+Z macht es rückgängig."
+    "undo_shortcut_hint": "Strg+Z macht es rückgängig.",
+    "retry": "Erneut versuchen",
+    "load_error_hint": "Es ist nichts verloren, nur das Laden ist fehlgeschlagen. Prüfe deine Verbindung und versuche es dann erneut."
   },
   "app_error": {
     "title": "Das hat nicht geklappt",

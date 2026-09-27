@@ -234,3 +234,66 @@ test.describe('when something outside the app fails', () => {
     });
   });
 });
+
+// A failed load must not read as an empty collection, or a collector may rebuild what is still there.
+test.describe('when a list fails to load', () => {
+  /** Fails every read of `table` with a 500 until the returned switch is turned off. */
+  async function failReads(page: Page, table: string) {
+    const outage = { on: true };
+    await page.route(
+      (url) => url.pathname.endsWith(`/rest/v1/${table}`),
+      (route) =>
+        outage.on && route.request().method() === 'GET'
+          ? route.fulfill({ status: 500, json: { message: 'nope' } })
+          : route.fallback(),
+    );
+    return outage;
+  }
+
+  test('the collections say they failed, not that there are none, and a retry loads them', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const outage = await failReads(page, 'categories');
+
+    await page.goto('');
+
+    await expect(app.collectionsLoadError.locators.title).toHaveText(
+      'Your collections could not be loaded',
+    );
+    await expect(app.toast()).toContainText('Could not load collections');
+    await expect(app.help.locators.buttons.emptyState).toBeHidden();
+
+    outage.on = false;
+    await app.collectionsLoadError.do.retry();
+
+    await expect(app.collectionsLoadError()).toBeHidden();
+    await expect(app.categories.locators.selected).not.toBeEmpty();
+    await expect(app.catalogue.locators.buttons.newEntry).toBeVisible();
+  });
+
+  test('the entries say they failed, not that there are none, and a retry loads them', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await app.categories.do.open(SEED.failureCategory);
+    const outage = await failReads(page, 'item_categories');
+
+    await page.reload();
+
+    await expect(app.entriesLoadError.locators.title).toHaveText(
+      'The entries could not be loaded',
+    );
+    await expect(app.toast()).toContainText('Could not load entries');
+    await expect(app.catalogue.locators.texts.emptyTitle).toBeHidden();
+
+    outage.on = false;
+    await app.entriesLoadError.locators.buttons.retry.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(app.entriesLoadError()).toBeHidden();
+    await expect(app.catalogue.locators.cards.first()).toBeVisible();
+  });
+});

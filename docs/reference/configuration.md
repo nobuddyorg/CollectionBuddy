@@ -34,7 +34,7 @@ Sized to the hosted project's plan, Supabase Free, whose 1 GB of Storage is for 
 
 ## Hosted Auth settings
 
-The hosted project's Auth configuration lives in its dashboard, so the values sharing depends on are pinned in [`supabase/hosted-auth.json`](../../supabase/hosted-auth.json), keyed by their [Management API](https://supabase.com/docs/reference/api/v1-get-auth-service-config) field names. [`hosted-auth-check.yml`](../../.github/workflows/hosted-auth-check.yml) fails when production differs ([why](../explanation/design-decisions.md#why-the-hosted-auth-settings-are-pinned); [when it fails](../how-to/developer-guide.md#check-the-hosted-auth-settings)).
+The hosted project's Auth configuration lives in its dashboard, so the values sharing depends on are pinned in [`supabase/hosted-auth.json`](../../supabase/hosted-auth.json), keyed by their [Management API](https://supabase.com/docs/reference/api/v1-get-auth-service-config) field names, and compared with the dashboard by hand ([why](../explanation/design-decisions.md#why-the-hosted-auth-settings-are-pinned); [how](../how-to/developer-guide.md#check-the-hosted-auth-settings)).
 
 | Dashboard setting | Field | Production | Local stack (`config.toml`) |
 | --- | --- | --- | --- |
@@ -54,16 +54,16 @@ The hosted project's Auth configuration lives in its dashboard, so the values sh
 - **Redirect URLs stay empty.** Sign-in returns to the site's own URL, and GoTrue admits any redirect with the Site URL's scheme, host and port without an entry. A wildcard matching a host nobody here controls would let a sign-in hand its code to that host.
 - **One setting is recorded, not checked**: Data API → exposed schemas is `public` only, as in `config.toml`'s `[api]`. Reading it through the Management API also returns the project's JWT secret.
 - **Site URL follows the Pages URL.** A custom domain changes both in one PR ([Move to a custom domain](../how-to/developer-guide.md#move-to-a-custom-domain)).
-- **Changing a value** is a PR to the file, reviewed like a policy change, with the dashboard changed as it merges; the push to `main` re-runs the check. For a fork, `site_url` is its own Pages URL.
+- **Changing a value** is a PR to the file, reviewed like a policy change, with the dashboard changed as it merges. For a fork, `site_url` is its own Pages URL.
 
 ## GitHub Actions secrets
 
-`SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_AUTH_CONFIG_TOKEN`
-and `SUPABASE_PROJECT_REF` are secrets of the `production` environment, not
+`SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` are
+secrets of the `production` environment, not
 repository secrets: that
 environment's deployment-branch policy allows only `main`, so a workflow run
-on any other branch cannot read them. `migrate`, `cleanup` and
-`hosted-auth-check.yml` reference it and also refuse
+on any other branch cannot read them. `migrate` and `cleanup` reference it
+and also refuse
 any ref but `main`. The
 `github-pages` environment is restricted to `main` the same way. The other
 secrets are repository secrets. A run Dependabot starts reads Dependabot
@@ -77,8 +77,7 @@ and `CODECOV_TOKEN` are set there too, or every Dependabot PR fails
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`; `k6-load-test.yml` with `target=hosted` only | Required. Either key format ([API keys](#api-keys)); `pages-deploy.yml`'s `build` calls `keepalive()` with it and publishes nothing if the project rejects it |
 | `SUPABASE_DB_URL` | `pages-deploy.yml` (`migrate`) | Required. The **session pooler** string (`aws-0-<region>.pooler.supabase.com`), password percent-encoded. The direct `db.<ref>.supabase.co` host is IPv6-only and unreachable from GitHub runners; `supabase link` reports success anyway and the push fails. `migrate` also sends PostgREST's schema-cache reload through it. |
 | `SUPABASE_ACCESS_TOKEN` | `cleanup-orphaned-photos.yml` | Required. Scoped Management API token: runs a read-only query and fetches a fresh secret key ([Management API tokens](#management-api-tokens)). |
-| `SUPABASE_AUTH_CONFIG_TOKEN` | `hosted-auth-check.yml` | Recommended. Scoped Management API token that reads the Auth config ([Management API tokens](#management-api-tokens)). Until it is set, the check borrows `SUPABASE_ACCESS_TOKEN` and warns on every run. |
-| `SUPABASE_PROJECT_REF` | `cleanup-orphaned-photos.yml`, `hosted-auth-check.yml` | Required |
+| `SUPABASE_PROJECT_REF` | `cleanup-orphaned-photos.yml` | Required |
 | `CODECOV_TOKEN` | `ci.yml` (`build_and_test`) | Required: the repository's upload token from codecov.io; a refused upload fails the job (`fail_ci_if_error`) |
 | `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test`, on `main` only) | Optional; without it Stryker writes a local HTML report only |
 
@@ -115,13 +114,11 @@ project and nothing else, never a classic token
 | Secret | Permissions, on this project only | Endpoints | Used by |
 | --- | --- | --- | --- |
 | `SUPABASE_ACCESS_TOKEN` | **Database**: Read; **API Keys**: Read; **API Key Secrets**: Read | `POST /v1/projects/{ref}/database/query/read-only`, `GET /v1/projects/{ref}/api-keys?reveal=true` | `cleanup-orphaned-photos.yml` |
-| `SUPABASE_AUTH_CONFIG_TOKEN` | **Auth Config**: Read | `GET /v1/projects/{ref}/config/auth`, `GET /v1/projects/{ref}/config/auth/third-party-auth` | `hosted-auth-check.yml` |
 
 - **Names** are the dashboard's, from Supabase's [permission
   table](https://supabase.com/docs/guides/platform/personal-access-tokens#permission-scopes);
   the Management API spec calls them `database_read`,
-  `api_gateway_keys_read`, `api_gateway_keys_secret_read` and
-  `auth_config_read`. Grant nothing else: no Read-write, no organization or
+  `api_gateway_keys_read` and `api_gateway_keys_secret_read`. Grant nothing else: no Read-write, no organization or
   account access.
 - **Database: Read, not Read-write.** The read-only endpoint runs as
   `supabase_read_only_user`, which reads every table past RLS and writes

@@ -26,6 +26,7 @@ export function defaultItemsState() {
     pageImages: null as ReturnType<typeof useItems>['pageImages'],
     total: 0,
     loading: false,
+    loadFailed: false,
     page: 1,
     setPage: vi.fn(),
     totalPages: 1,

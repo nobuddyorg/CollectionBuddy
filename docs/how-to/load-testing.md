@@ -211,7 +211,7 @@ anon key is the only credential involved; no script ever holds
   which the hosted project does not offer: it signs in through Google only,
   and the email provider staying off is itself a security control
   ([why](../explanation/design-decisions.md#why-the-hosted-auth-settings-are-pinned),
-  #634); `hosted-auth-check.yml` fails while it is on. A hosted run
+  #634). A hosted run
   therefore fails at sign-up with the Auth server's own error. Until there is
   an answer that does not reopen that, the load test stays local.
 - **The Free tier is shared with real users.** A sustained run spends the
