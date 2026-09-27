@@ -170,7 +170,7 @@ async function ownerMap() {
     const timing = await page.evaluate(() => {
       const photon = performance
         .getEntriesByType('resource')
-        .filter((entry) => entry.name.includes('photon.komoot.io'));
+        .filter((entry) => new URL(entry.name).hostname === 'photon.komoot.io');
       return {
         gone: window.__proofBadgeGone.at(-1),
         lastEnd: Math.max(...photon.map((entry) => entry.responseEnd)),
@@ -232,7 +232,7 @@ async function ownerMap() {
         .getEntriesByType('resource')
         .filter(
           (entry) =>
-            entry.name.includes('photon.komoot.io') &&
+            new URL(entry.name).hostname === 'photon.komoot.io' &&
             entry.startTime >= window.__proofOpenedAt,
         )
         .map((entry) => entry.startTime)
