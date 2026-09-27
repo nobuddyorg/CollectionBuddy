@@ -20,8 +20,8 @@ anywhere, even inside a text field. With no categories yet, the empty page has
 a **How it works** button that opens the same guide.
 
 The **Privacy notice** (`/privacy`) says what CollectionBuddy stores, who
-receives it and for how long. It opens without signing in: the sign-in page and
-the user menu link it.
+receives it and for how long. It opens without signing in: the sign-in page,
+the user menu and the help link it.
 
 ## Categories
 

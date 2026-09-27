@@ -93,15 +93,6 @@ export default function Menu({
 
       <div className="my-1 border-t" />
 
-      <Link
-        href="/privacy"
-        data-testid="menu-privacy-link"
-        onClick={onClose}
-        className="w-full px-3 min-h-11 flex items-center rounded-sm hover:bg-muted text-sm transition-colors"
-      >
-        {t('privacy.link')}
-      </Link>
-
       <button
         type="button"
         data-testid="open-help"
@@ -115,6 +106,15 @@ export default function Menu({
           {t('header.help_shortcut')}
         </kbd>
       </button>
+
+      <Link
+        href="/privacy"
+        data-testid="menu-privacy-link"
+        onClick={onClose}
+        className="w-full px-3 min-h-11 flex items-center rounded-sm hover:bg-muted text-sm transition-colors"
+      >
+        {t('privacy.link')}
+      </Link>
 
       <button
         type="button"

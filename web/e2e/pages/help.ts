@@ -16,6 +16,7 @@ interface Help {
       close: Locator;
       emptyState: Locator;
     };
+    privacyLink: Locator;
     topic(topic: HelpTopic): Locator;
   };
 }
@@ -28,6 +29,7 @@ export function initHelp(page: Page): Help {
       close: page.getByTestId('dialog-close'),
       emptyState: page.getByTestId('empty-open-help'),
     },
+    privacyLink: page.getByTestId('help-privacy-link'),
     topic,
   };
   const interactions = {

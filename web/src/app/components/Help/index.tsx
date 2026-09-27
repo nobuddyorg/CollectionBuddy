@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { useI18n } from '../../i18n/useI18n';
 import CenteredModal from '../CenteredModal';
 
@@ -73,6 +75,16 @@ export default function HelpDialog({
           </details>
         ))}
       </div>
+      <p className="pt-3 text-sm">
+        <Link
+          href="/privacy"
+          data-testid="help-privacy-link"
+          onClick={() => onOpenChange(false)}
+          className="underline underline-offset-2 hover:text-accent"
+        >
+          {t('privacy.link')}
+        </Link>
+      </p>
     </CenteredModal>
   );
 }

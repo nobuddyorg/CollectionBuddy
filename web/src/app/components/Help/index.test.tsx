@@ -43,6 +43,18 @@ describe('HelpDialog', () => {
     }
   });
 
+  it('links the privacy notice, closing the help on the way', async () => {
+    const user = userEvent.setup();
+    const { onOpenChange } = renderHelp();
+    const link = screen.getByRole('link', { name: 'Privacy notice' });
+    // next.config.ts's trailingSlash adds the slash in a build.
+    expect(link).toHaveAttribute('href', '/privacy');
+    // jsdom cannot navigate; cancelled, the click still reaches the dialog's handler.
+    link.addEventListener('click', (event) => event.preventDefault());
+    await user.click(link);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it('shows a topic once its title is clicked', async () => {
     const user = userEvent.setup();
     renderHelp();
