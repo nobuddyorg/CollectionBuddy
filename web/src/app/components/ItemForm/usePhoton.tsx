@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { searchMinLength } from '../../data/itemSearch';
+import { SEARCH_MIN_LENGTH } from '../../data/itemSearch';
 import {
   coordsFromFeature,
   photonLang,
@@ -58,10 +58,9 @@ export function dedupePhotonFeatures(
   return deduped;
 }
 
-// Must match the threshold the PostgREST search filter uses, including the lower floor for non-ASCII.
+// Must match the threshold the PostgREST search filter uses.
 export function isQueryLongEnough(query: string): boolean {
-  const trimmed = query.trim();
-  return trimmed.length >= searchMinLength(trimmed);
+  return query.trim().length >= SEARCH_MIN_LENGTH;
 }
 
 export function usePhotonSearch(locale?: string) {

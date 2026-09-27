@@ -38,12 +38,21 @@ test.describe('searching a collection', () => {
     await expectTitles(page, ['Silberdenar']);
   });
 
-  // Below three characters the app skips filtering, to limit how often a filtered category scan runs.
+  // Below three characters the pattern holds no trigram, so the app skips filtering rather than scan every collector's entries.
   test('leaves the list alone for a term of two characters', async ({
     on,
     page,
   }) => {
     await on(page).catalogue.do.search('si');
+    await expectTitles(page, allCoins);
+  });
+
+  // A non-ASCII letter earns no lower floor: `%Rö%` holds no trigram either.
+  test('leaves the list alone for two characters with an umlaut', async ({
+    on,
+    page,
+  }) => {
+    await on(page).catalogue.do.search('Rö');
     await expectTitles(page, allCoins);
   });
 

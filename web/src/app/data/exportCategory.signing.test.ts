@@ -9,7 +9,6 @@ import {
 import {
   type SignUrls,
   item,
-  fakeGetSession,
   paginatedListItems,
   fakeListImages,
   okResponse,
@@ -23,7 +22,6 @@ describe('exportCategory, signing the photograph URLs', () => {
     })) as unknown as SignUrls;
     const result = await exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
       listItems: paginatedListItems([item({ id: 'a' })]),
       listImages: fakeListImages({ a: ['1.webp'] }),
       signUrls,
@@ -46,7 +44,6 @@ describe('exportCategory, signing the photograph URLs', () => {
     try {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImages({ a: ['1.webp'] }),
         signUrls,
@@ -86,7 +83,6 @@ describe('exportCategory, signing the photograph URLs', () => {
     })) as unknown as SignUrls;
     const failure = exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
       listItems: paginatedListItems([item({ id: 'a' })]),
       listImages: fakeListImages({ a: ['1.webp'] }),
       signUrls,
@@ -111,7 +107,6 @@ describe('exportCategory, signing the photograph URLs', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImages({
           a: paths.map((path) => path.split('/').at(-1)!),
@@ -144,7 +139,6 @@ describe('exportCategory, signing the photograph URLs', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImages({ a: paths }),
         signUrls: signUrls as unknown as SignUrls,

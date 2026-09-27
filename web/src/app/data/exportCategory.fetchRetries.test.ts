@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { exportCategory } from './exportCategory';
 import {
   item,
-  fakeGetSession,
   paginatedListItems,
   fakeListImages,
   fakeSignUrls,
@@ -28,7 +27,6 @@ describe('exportCategory, retrying a photograph fetch', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
@@ -58,7 +56,6 @@ describe('exportCategory, retrying a photograph fetch', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
@@ -89,7 +86,6 @@ describe('exportCategory, retrying a photograph fetch', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
@@ -124,7 +120,6 @@ describe('exportCategory, retrying a photograph fetch', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
@@ -156,7 +151,6 @@ describe('exportCategory, retrying a photograph fetch', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
@@ -185,7 +179,6 @@ describe('exportCategory, retrying a photograph fetch', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
@@ -231,7 +224,6 @@ describe('exportCategory, retrying a photograph fetch', () => {
       try {
         const promise = exportCategory({
           category: { id: 'cat', name: 'Coins' },
-          getSession: fakeGetSession('uid'),
           listItems: paginatedListItems([item({ id: 'item-1' })]),
           listImages: fakeListImages({ 'item-1': ['1.webp'] }),
           signUrls: fakeSignUrls(),

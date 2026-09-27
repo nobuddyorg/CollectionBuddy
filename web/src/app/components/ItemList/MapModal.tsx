@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
-import { searchMinLength } from '../../data/itemSearch';
+import { SEARCH_MIN_LENGTH } from '../../data/itemSearch';
 import CenteredModal from '../CenteredModal';
 import Icon, { IconType } from '../Icon';
 import { Spinner } from '../ui/Spinner';
@@ -119,7 +119,7 @@ export function MapModal({
           className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70"
         >
           {t(
-            search.length >= searchMinLength(search)
+            search.length >= SEARCH_MIN_LENGTH
               ? 'item_list.map_empty_filtered'
               : 'item_list.map_empty',
           )}

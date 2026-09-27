@@ -74,7 +74,7 @@ export function ImportRow({
   );
 }
 
-/** Disabled for a shared category: exportCategory() builds storage paths from the caller's uid, not the owner's. */
+/** Disabled for a shared category: export is owners-only by product decision, not an RLS limit. */
 export function ExportRow({
   isExporting,
   isShared,

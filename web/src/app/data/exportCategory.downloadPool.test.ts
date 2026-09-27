@@ -4,7 +4,6 @@ import { exportCategory, PHOTO_DOWNLOAD_CONCURRENCY } from './exportCategory';
 import * as zipModule from './zip';
 import {
   item,
-  fakeGetSession,
   paginatedListItems,
   fakeListImages,
   fakeSignUrls,
@@ -36,7 +35,6 @@ describe('exportCategory, downloading through the pool', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({
           'item-1': Array.from({ length: photoCount }, (_, i) => `${i}.webp`),
@@ -87,7 +85,6 @@ describe('exportCategory, a ZipLimitError from the writer', () => {
     try {
       const failure = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
@@ -126,7 +123,6 @@ describe('exportCategory, a ZipLimitError from the writer', () => {
       const photoCount = PHOTO_DOWNLOAD_CONCURRENCY + 4;
       const failure = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({
           'item-1': Array.from({ length: photoCount }, (_, i) => `${i}.webp`),
@@ -159,7 +155,6 @@ describe('exportCategory, a ZipLimitError from the writer', () => {
     try {
       const failure = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['0.webp', '1.webp'] }),
         signUrls: fakeSignUrls(),

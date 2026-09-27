@@ -7,7 +7,6 @@ import {
 } from './exportCategory';
 import {
   item,
-  fakeGetSession,
   paginatedListItems,
   fakeListImages,
   fakeSignUrls,
@@ -18,7 +17,6 @@ describe('exportCategory, paging through the items', () => {
     const listItems = paginatedListItems([]);
     const result = await exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
       listItems,
       listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
@@ -32,7 +30,6 @@ describe('exportCategory, paging through the items', () => {
     const listItems = paginatedListItems(items);
     const result = await exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
       listItems,
       listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
@@ -48,7 +45,6 @@ describe('exportCategory, paging through the items', () => {
     const listItems = paginatedListItems(items);
     const result = await exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
       listItems,
       listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
@@ -65,7 +61,6 @@ describe('exportCategory, paging through the items', () => {
     const listItems = paginatedListItems(items);
     const result = await exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
       listItems,
       listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
@@ -81,7 +76,6 @@ describe('exportCategory, paging through the items', () => {
     const listItems = paginatedListItems(items);
     await exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
       listItems,
       listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
@@ -103,7 +97,6 @@ describe('exportCategory, paging through the items', () => {
     await exportCategory({
       category: { id: 'cat', name: 'Coins' },
       onProgress,
-      getSession: fakeGetSession('uid'),
       listItems: paginatedListItems(
         Array.from({ length: ITEM_PAGE_SIZE + 1 }, (_, i) =>
           item({ id: `item-${i}` }),
