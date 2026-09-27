@@ -55,7 +55,7 @@ describe('Menu', () => {
   it('marks the active language as pressed', async () => {
     await openMenu();
     const menu = document.getElementById('user-menu') as HTMLElement;
-    // jsdom's navigator.language is 'en-US', so detectLang() lands on 'en'.
+    // jsdom's navigator.language is 'en-US', so pickLanguage() lands on 'en'.
     expect(
       within(menu).getByRole('button', { name: 'English' }),
     ).toHaveAttribute('aria-pressed', 'true');

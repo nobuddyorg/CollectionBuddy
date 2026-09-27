@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { interpolate, resolveTranslationKey } from './I18nProvider';
+import {
+  formattingLocale,
+  interpolate,
+  pickLanguage,
+  resolveTranslationKey,
+} from './I18nProvider';
 
 describe('resolveTranslationKey', () => {
   const dictionary = {
@@ -83,5 +88,53 @@ describe('interpolate', () => {
 
   it('ignores an inherited property that happens to share a name', () => {
     expect(interpolate('{toString}', {})).toBe('{toString}');
+  });
+});
+
+describe('pickLanguage', () => {
+  it('keeps a stored choice over the browser language', () => {
+    expect(pickLanguage('en', 'de-DE')).toBe('en');
+    expect(pickLanguage('de', 'en-GB')).toBe('de');
+  });
+
+  it('follows the browser language when nothing is stored', () => {
+    expect(pickLanguage(null, 'en-GB')).toBe('en');
+    expect(pickLanguage(null, 'de-AT')).toBe('de');
+    expect(pickLanguage(null, 'en')).toBe('en');
+  });
+
+  it('falls back to German, the default, for a browser language the app does not speak', () => {
+    expect(pickLanguage(null, 'fr-FR')).toBe('de');
+    expect(pickLanguage(null, '')).toBe('de');
+  });
+
+  it('ignores a stored value that is not a supported language, inherited names included', () => {
+    expect(pickLanguage('fr', 'en-US')).toBe('en');
+    expect(pickLanguage('toString', 'en-US')).toBe('en');
+    expect(pickLanguage('constructor', 'fr-FR')).toBe('de');
+  });
+
+  it('reads only the primary subtag, so a region named like a language does not count', () => {
+    expect(pickLanguage(null, 'fr-DE')).toBe('de');
+  });
+});
+
+describe('formattingLocale', () => {
+  it("keeps the browser's regional form when it speaks the app language", () => {
+    expect(formattingLocale('en', ['en-GB', 'de-DE'])).toBe('en-GB');
+    expect(formattingLocale('de', ['en-US', 'de-CH'])).toBe('de-CH');
+  });
+
+  it('takes the first browser locale in that language', () => {
+    expect(formattingLocale('en', ['fr-FR', 'en-AU', 'en-US'])).toBe('en-AU');
+  });
+
+  it('uses the bare app language when the browser does not speak it', () => {
+    expect(formattingLocale('de', ['en-US'])).toBe('de');
+    expect(formattingLocale('en', [])).toBe('en');
+  });
+
+  it('matches the primary subtag, not a region that shares its letters', () => {
+    expect(formattingLocale('de', ['en-DE'])).toBe('de');
   });
 });

@@ -11,7 +11,7 @@ import type { UseShares } from './useShares';
 import { labelClasses } from '../ui/labelClasses';
 
 export function ShareList({ shares }: { shares: UseShares }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const confirm = useConfirm();
   // Every row action is off while a reload is in flight: the rows may be about to change under the click.
   const {
@@ -86,7 +86,9 @@ export function ShareList({ shares }: { shares: UseShares }) {
               new Date(share.expires_at).getTime() <= new Date().getTime();
             let expiryLabel = t('category_select.share_no_expiry');
             if (share.expires_at) {
-              const date = new Date(share.expires_at).toLocaleDateString();
+              const date = new Date(share.expires_at).toLocaleDateString(
+                locale,
+              );
               expiryLabel = isExpired
                 ? t('category_select.share_expired_on', { date })
                 : t('category_select.share_expires_on', { date });
