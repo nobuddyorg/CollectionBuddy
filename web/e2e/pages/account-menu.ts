@@ -6,11 +6,13 @@ interface AccountMenu {
     chooseLanguage(language: 'de' | 'en'): Promise<void>;
     chooseTheme(theme: 'system' | 'light' | 'dark'): Promise<void>;
     open(): Promise<void>;
+    openHelp(): Promise<void>;
     signOut(): Promise<void>;
   };
   locators: {
     buttons: {
       open: Locator;
+      help: Locator;
       signOut: Locator;
     };
     languages: { de: Locator; en: Locator };
@@ -24,6 +26,7 @@ export function initAccountMenu(page: Page): AccountMenu {
   const locators = {
     buttons: {
       open: page.getByTestId('account-menu'),
+      help: page.getByTestId('open-help'),
       signOut: page.getByTestId('sign-out'),
     },
     languages: {
@@ -46,6 +49,9 @@ export function initAccountMenu(page: Page): AccountMenu {
     },
     open: async () => {
       await locators.buttons.open.click();
+    },
+    openHelp: async () => {
+      await locators.buttons.help.click();
     },
     signOut: async () => {
       await locators.buttons.signOut.click();

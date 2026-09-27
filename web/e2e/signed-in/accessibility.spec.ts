@@ -80,4 +80,17 @@ test.describe('accessibility -- signed in', () => {
     await expect(app.categories.locators.inputs.newName).toBeVisible();
     await expectNoSeriousA11yViolations(page, testInfo);
   });
+
+  test('the help dialog has no serious or critical violations', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const app = on(page);
+    await app.categories.do.open('Münzen');
+    await waitForCardsSettled(app);
+    await app.help.do.openByKeyboard();
+    await app.help.do.openTopic('entries');
+    await expect(app.help.locators.topic('entries')).toHaveAttribute('open');
+    await expectNoSeriousA11yViolations(page, testInfo);
+  });
 });

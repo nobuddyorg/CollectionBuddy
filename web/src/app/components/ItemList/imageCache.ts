@@ -50,7 +50,7 @@ export function unsignedPaths(
   return Array.from(missing);
 }
 
-/** Test seam. */
+/** Every signature belongs to the signed-in account, so sign-out drops them all. */
 export function clearImageCache(): void {
   signedUrls.clear();
 }

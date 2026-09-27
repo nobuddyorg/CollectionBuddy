@@ -14,6 +14,7 @@ fi
 
 last=$(git ls-tree --name-only "$base" "$dir/" | sed -En 's|^.*/([0-9]+)_[^/]*\.sql$|\1|p' | sort | tail -n 1)
 failed=0
+added=''
 while IFS=$'\t' read -r status path; do
   name=${path##*/}
   version=${name%%_*}
@@ -26,8 +27,16 @@ while IFS=$'\t' read -r status path; do
   elif [[ ! "$version" > "$last" ]]; then
     echo "::error file=$path::$path is not numbered after $last, the last migration at the base, so db push would refuse it: renumber it."
     failed=1
+  else
+    added+="$version"$'\n'
   fi
 done < <(git diff --no-renames --name-status "$base" HEAD -- "$dir/")
+
+# One range can add two files with one number (a push carrying two merges, a branch merged into another); db push would run both, then fail.
+for version in $(sort <<<"$added" | uniq -d); do
+  echo "::error::Two new migrations share the number $version, so db push would fail on the second one's history row: renumber one."
+  failed=1
+done
 
 [ "$failed" = 0 ] && echo "Migration history only grows since $base."
 exit "$failed"

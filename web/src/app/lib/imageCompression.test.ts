@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const imageCompression = vi.fn(
-  async (file: File, options: { fileType: string }) =>
+  async (file: File, options: { fileType: string; libURL: string }) =>
     new File([file], file.name, { type: options.fileType }),
 );
 vi.mock('browser-image-compression', () => ({ default: imageCompression }));
@@ -38,13 +38,30 @@ describe('compressPhoto', () => {
 
     const output = await compressPhoto(input, 1000);
 
-    expect(imageCompression).toHaveBeenCalledWith(input, {
-      maxWidthOrHeight: 1000,
-      initialQuality: 0.8,
-      fileType: 'image/webp',
-      useWebWorker: true,
-    });
+    expect(imageCompression).toHaveBeenCalledWith(
+      input,
+      expect.objectContaining({
+        maxWidthOrHeight: 1000,
+        initialQuality: 0.8,
+        fileType: 'image/webp',
+        useWebWorker: true,
+      }),
+    );
     expect(output.type).toBe('image/webp');
+  });
+
+  // The library's default is a CDN the CSP refuses, which silently sent every compression back to the main thread.
+  it("hands the worker an absolute URL to the app's own copy of the library", async () => {
+    canvasEncodes('image/webp');
+    const compressPhoto = await freshCompressPhoto();
+
+    await compressPhoto(photo(), 1000);
+
+    const { libURL } = imageCompression.mock.calls[0][1];
+    expect(new URL(libURL).href).toBe(libURL);
+    expect(libURL).toMatch(
+      /\/browser-image-compression\/dist\/browser-image-compression\.js$/,
+    );
   });
 
   // Safari and every iOS browser: a WebP request silently comes back as PNG.

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { supabase } from './supabase';
 import { SessionUser } from './types';
+import { claimUserData, forgetUserData } from './userData';
 import type { User } from '@supabase/supabase-js';
 
 type SessionState = { user: SessionUser | null; loading: boolean };
@@ -24,16 +25,23 @@ export function useSession(): SessionState {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Before the user is set, so nothing reads what another account left in this browser.
+    const adopt = (user: User | undefined) => {
+      const sessionUser = sessionUserFrom(user);
+      if (sessionUser) claimUserData(sessionUser.id);
+      else forgetUserData();
+      setUser(sessionUser);
+    };
     const load = async () => {
       // getSession() reads the persisted session locally; getUser() would revalidate and block first paint.
       const { data } = await supabase.auth.getSession();
-      setUser(sessionUserFrom(data.session?.user));
+      adopt(data.session?.user);
       setLoading(false);
     };
     void load();
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setUser(sessionUserFrom(session?.user));
+        adopt(session?.user);
       },
     );
     return () => {

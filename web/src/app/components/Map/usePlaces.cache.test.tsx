@@ -92,6 +92,43 @@ describe('usePlaces geocode cache', () => {
     setItemSpy.mockRestore();
   });
 
+  it('writes nothing back when the account signed out while a lookup was in flight', async () => {
+    localStorage.setItem('collectionbuddy.storageOwner', 'user-a');
+    localStorage.setItem(
+      'cb_geocode_cache_v1',
+      JSON.stringify({ Berlin: { name: 'Berlin', lat: 52.52, lng: 13.4 } }),
+    );
+    vi.mocked(listCategoryPlaces).mockResolvedValue({
+      data: [group('Cologne', null, null)],
+      error: null,
+    });
+    let resolveFetch!: (value: unknown) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            resolveFetch = resolve;
+          }),
+      ),
+    );
+
+    renderUsePlaces();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    localStorage.clear();
+    await act(async () => {
+      resolveFetch(photonOk([6.96, 50.94]));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(localStorage.getItem('cb_geocode_cache_v1')).toBeNull();
+  });
+
   it('never touches the geocode cache on disk when nothing needed a fresh lookup', async () => {
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
     vi.mocked(listCategoryPlaces).mockResolvedValue({

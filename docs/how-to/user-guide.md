@@ -8,7 +8,16 @@ Recipes for specific tasks. New to the app? Start with
 Google is the only sign-in (`/login`). **Sign out** is in the user menu (click
 your email in the header). If the sign-out request fails — you are offline,
 say — the session is cleared locally anyway, so you are never stuck signed in
-on a device without network.
+on a device without network. Signing out also makes the browser forget the
+collection you last had open and the places the map looked up; your theme and
+language stay.
+
+## Help
+
+**Help** in the user menu opens a short guide to each feature, in the
+language the app is set to. **Ctrl+/** (**Cmd+/** on a Mac) opens it from
+anywhere, even inside a text field. With no categories yet, the empty page has
+a **How it works** button that opens the same guide.
 
 The **Privacy notice** (`/privacy`) says what CollectionBuddy stores, who
 receives it and for how long. It opens without signing in: the sign-in page and
@@ -25,7 +34,7 @@ You always browse one category at a time.
   pick from the list.
 - **Rename**: select the category, edit the name in the text field, confirm.
   Same rules as creation. Whitespace is trimmed and collapsed on save.
-- **Delete**: select the category, clear the text field, click delete, confirm.
+- **Delete**: select the category, click **Delete** beside its name, confirm.
   Its items are deleted with it: every item belongs to exactly one category.
 
 The picker opens collapsed on the category you had selected last.
@@ -74,10 +83,9 @@ can be granted access, and it is read-only until you say otherwise.
 ## Items
 
 - **Add**: **+** above the item grid.
-- **Edit**: hover a card (tap **⋯** on touch) for its action row, then the
-  pencil icon.
-- **Delete**: trash icon on the action row, confirm. Photos are deleted first,
-  then the item.
+- **Edit**: the pencil icon at the bottom of the card.
+- **Delete**: the trash icon at the bottom of the card, confirm. Photos are
+  deleted first, then the item.
 
 Deleting an item, a photo or a category can be taken back: **Undo** in the
 confirmation that appears, or **Ctrl+Z** (**Cmd+Z** on a Mac) from anywhere
@@ -100,9 +108,10 @@ fields a line break becomes a space.
 
 ## Photos
 
-- **Upload**: action row → upload icon → any image your browser can read. It
-  is compressed to WebP (JPEG in Safari and on iOS) with a thumbnail before
-  upload, so there is no size to worry about.
+- **Upload**: **+** at the bottom of the card (or the empty photo frame of an
+  item that has none) → any image your browser can read. It is compressed to
+  WebP (JPEG in Safari and on iOS) with a thumbnail before upload, so there is
+  no size to worry about.
 - **View full size**: click a thumbnail. Escape or the backdrop closes it.
 - **Delete**: from the full-size view or the per-photo control, confirm.
 
@@ -147,4 +156,5 @@ strip, the arrow keys, Home and End move between collections without opening
 them; Enter or Space opens the one in focus, and focus returns to the button
 that reopens the strip. After a delete, Ctrl+Z (Cmd+Z) undoes it without
 tabbing to the confirmation at the bottom of the page, and a screen reader
-reads the confirmation out together with that shortcut.
+reads the confirmation out together with that shortcut. **Ctrl+/** (Cmd+/)
+opens the help from anywhere.

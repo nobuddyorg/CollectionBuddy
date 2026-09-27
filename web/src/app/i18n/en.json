@@ -6,7 +6,8 @@
   "page": {
     "entries": "Entries",
     "no_categories": "No collections yet",
-    "name_first_category": "Name your first collection above. Coins, stamps, whatever you keep.",
+    "name_first_category": "Type a name under New collection above and press +. Coins, stamps, whatever you keep.",
+    "open_help": "How it works",
     "footer": "Collect • Organize • Keep",
     "skip_to_content": "Skip to content"
   },
@@ -14,6 +15,8 @@
     "title": "CollectionBuddy",
     "account_menu": "Account menu",
     "sign_out": "Sign out",
+    "help": "Help",
+    "help_shortcut": "Ctrl+/",
     "sign_out_error": "Sign-out didn't fully complete, but you've been signed out on this device. Please try again.",
     "language": "Language",
     "theme": "Appearance",
@@ -162,7 +165,8 @@
     "no_results_title": "No results for \"{q}\"",
     "no_results_hint": "Try a different search term.",
     "no_items_title": "No entries yet",
-    "no_items_hint": "Add your first entry to this collection to see it here.",
+    "no_items_hint": "Add your first entry with New entry above. The buttons on each entry add photographs, edit it or delete it.",
+    "no_items_hint_read_only": "Nothing has been added to this collection yet.",
     "map_error": "Couldn't load map locations. Please try again.",
     "map_empty": "No locations to show yet.",
     "map_empty_filtered": "No locations match your search.",
@@ -183,6 +187,21 @@
     "circle_text": "CollectionBuddy • Collect • Organize • Keep • Your treasures at a glance • ",
     "subtitle": "Your digital scrapbook for coins, stuffed animals, stamps and everything you love.",
     "sign_in_error": "Sign-in failed. Please check your connection and try again."
+  },
+  "help": {
+    "title": "Help",
+    "collections_title": "Collections",
+    "collections_body": "Your entries live in collections, and you look at one at a time. The button next to the collection's name opens its panel: type a name under New collection and press + to create one, or pick another from the list. Rename or delete the open collection there too; deleting it deletes its entries and photographs.",
+    "entries_title": "Entries and photographs",
+    "entries_body": "New entry adds an entry to the open collection: a title and, if you like, a description, a place and tags. The buttons at the bottom of each entry add a photograph, edit the entry or delete it. Click a photograph to see it full size.",
+    "search_title": "Search and map",
+    "search_body": "The search field looks through titles, descriptions, places and tags once you have typed three characters. The map button shows every entry whose place you picked from the suggestions.",
+    "sharing_title": "Sharing",
+    "sharing_body": "In the collection's panel, under Sharing, enter someone's email to give their Google account access to the open collection; there are no public links. They can look at it, and with Can edit they can also add, change and delete entries and photographs. Renaming, deleting and sharing the collection stay with you.",
+    "transfer_title": "Import and export",
+    "transfer_body": "In the collection's panel, Export saves the open collection as a .zip archive with all its photographs. Import turns such an archive into a new collection.",
+    "undo_title": "Undo and keyboard",
+    "undo_body": "Deleted an entry, a photograph or a collection by mistake? For a few seconds, Undo in the message at the bottom of the screen, or Ctrl+Z, brings it back. Ctrl+/ opens this help and Escape closes it. On a Mac, use Cmd instead of Ctrl."
   },
   "common": {
     "loading": "Loading…",

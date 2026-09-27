@@ -1,5 +1,11 @@
 import { encodingFor } from '../data/photoType';
 
+// The bundler emits this as a hashed same-origin file; the library's default, a CDN, is refused by the CSP.
+const LIBRARY_URL = new URL(
+  'browser-image-compression/dist/browser-image-compression.js',
+  import.meta.url,
+).href;
+
 let probedEncoding: Promise<string> | undefined;
 
 // WebKit's canvas has no WebP encoder and answers a WebP request with PNG, ~10x the bytes (MDN browser-compat-data).
@@ -27,5 +33,7 @@ export async function compressPhoto(
     initialQuality: 0.8,
     fileType: encodingFor(probed),
     useWebWorker: true,
+    // Absolute: the worker runs from a blob: URL, against which no path resolves.
+    libURL: new URL(LIBRARY_URL, document.baseURI).href,
   });
 }

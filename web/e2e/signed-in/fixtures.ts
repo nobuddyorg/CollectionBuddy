@@ -142,6 +142,10 @@ export const SEED = {
     category: 'Garderobe',
     item: 'Garderobenstück',
   },
+  /** For help.spec.ts's first run, as a collector of its own per parallel slot who owns nothing. */
+  firstRun: {
+    password: 'first-run-password-not-a-secret',
+  },
   /** For import-quota.spec.ts, as a collector of its own per parallel slot: it fills that collector's photo quota. */
   photoQuota: {
     password: 'photo-quota-password-not-a-secret',

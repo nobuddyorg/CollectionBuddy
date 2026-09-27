@@ -1,6 +1,6 @@
 -- Schema-level pgTAP tests: the orphan-sweep trigger stays statement-level
--- (CLAUDE.md's guardrail against reverting delete_item_if_orphan to FOR
--- EACH ROW), and every constraint keeping the data model honest actually
+-- (design-decisions.md: delete_item_if_orphan must not go back to FOR EACH
+-- ROW), and every constraint keeping the data model honest actually
 -- rejects what it is supposed to -- asserted by attempting the write, not
 -- by reading the constraint back out of the catalog.
 --
@@ -9,7 +9,7 @@
 -- table is asserted there too, across the whole schema rather than table
 -- by table.
 --
--- Complements web/e2e/signed-in/rls.spec.ts rather than duplicating it:
+-- Complements web/e2e/signed-in/rls/ rather than duplicating it:
 -- this file runs directly against Postgres, inside a transaction that
 -- rolls back, and is fast enough to run on every schema change. The
 -- Playwright suite is what proves the same policies hold through a real
@@ -20,10 +20,10 @@ select no_plan();
 
 \ir _helpers.psql
 
--- delete_item_if_orphan (CLAUDE.md: "deliberately FOR EACH STATEMENT, not
--- FOR EACH ROW -- the row-level version was a real O(n) performance bug
--- at category-deletion scale; don't revert it for 'simplicity'"). tgtype's
--- bit 0 (value 1) marks a trigger ROW-level; unset means STATEMENT.
+-- delete_item_if_orphan is deliberately FOR EACH STATEMENT: the row-level
+-- version was a real O(n) performance bug at category-deletion scale
+-- (design-decisions.md, "Why the orphan-cleanup trigger is statement-level").
+-- tgtype's bit 0 (value 1) marks a trigger ROW-level; unset means STATEMENT.
 select ok(
   (select (tgtype::int & 1) = 0
    from pg_catalog.pg_trigger
@@ -32,7 +32,7 @@ select ok(
   'the orphan-sweep trigger stays statement-level, not per-row'
 );
 
--- images_path_full_matches_item (0012): a row may not claim a path naming
+-- images_path_full_matches_item (0003): a row may not claim a path naming
 -- a different item, or one that does not parse as <uid>/<itemId>/<file>
 -- at all -- both collapse to the same "is not distinct from" comparison
 -- against NULL, since storage_item_id() answers NULL rather than raising

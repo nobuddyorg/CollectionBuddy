@@ -5,7 +5,7 @@ import type { Database } from './data/database.types';
 function requireEnv(name: string, value: string | undefined): string {
   if (!value) {
     throw new Error(
-      `Missing ${name} -- copy web/.env.example to web/.env.local and fill it in (see README's "Local development" section).`,
+      `Missing ${name} -- copy web/.env.example to web/.env.local and fill it in (see CONTRIBUTING.md's "Local development" section).`,
     );
   }
   return value;

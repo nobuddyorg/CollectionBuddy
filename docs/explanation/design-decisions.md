@@ -51,6 +51,10 @@ Deleting an entry, a photo or a collection hides it at once and sends the delete
 
 A grant cannot wait like that. A deferred revoke is access that continues after the owner was told it had ended, so revoking and leaving send the `category_shares` delete at once, and the row leaves the list only when the delete has succeeded (#737). The owner's Undo inserts the same grant again, email, role and expiry, as a new row; one already expired cannot be re-inserted (`expires_at` must be after `created_at`) and says so. Leaving has no Undo, because only the owner may insert a grant.
 
+## Why help lives in the app, and opens with Ctrl+/
+
+**Help** in the account menu, the first-run page's **How it works**, and Ctrl+/ (Cmd+/) open a short dialog in the app's own language rather than linking to this documentation: the docs are English-only and partly written for developers, and leaving the app strands an installed PWA that is offline. The dialog says what each feature is and where to find it; the edge cases stay in the [user guide](../how-to/user-guide.md), which leaves the two less to drift on. The shortcut carries a modifier because a bare `?`, the web's usual help key, is a single-character shortcut, which WCAG 2.1.4 allows only when it can be turned off or remapped, a setting nobody needs. Ctrl+/ types nothing, so it works from inside a text field too.
+
 ## Why an editor's filed entries follow the grant
 
 An entry an editor files into someone else's category stays the editor's row: `user_id` is the editor, which keeps it on the editor's quota and outside the owner's read predicate. Every write policy used to carry an owner branch that ignored grants, so revoking or demoting the editor only stopped new filings. The ex-editor kept editing, re-photographing and deleting what it had filed, inside a collection the owner goes on sharing with others (#739). Since `0021`, each of those writes needs `has_item_write_access()`: write access to every category the entry is in. Ownership alone still covers an entry in no category (one being created) and entries in the editor's own categories.
@@ -67,11 +71,11 @@ Two costs, accepted. An uploader can no longer delete its own object once the en
 
 ## Why the migrations were squashed
 
-Three times: on 2026-08-06 sixteen migrations became a seven-file baseline; in #580 those seven plus the seven that had accumulated since were folded back into `0001`–`0007`; on 2026-09-22 the eight that had followed (`0008`–`0015`, three of them security fixes to `0007`) were folded in again, so each file once more holds one concern. A third of the original statements existed only to undo an earlier file — a table created and dropped, full-text-search columns added and removed, a trigger written three times. Reading them told you the history but not the schema.
+Three times: on 2026-08-06 sixteen migrations became a seven-file baseline; in #580 those seven plus the seven that had accumulated since were folded back into `0001`–`0007`; on 2026-09-22 the eight that had followed (the `0008`–`0015` of the time, three of them security fixes to `0007`; the files since reuse those numbers) were folded in again, so each file once more holds one concern. A third of the original statements existed only to undo an earlier file — a table created and dropped, full-text-search columns added and removed, a trigger written three times. Reading them told you the history but not the schema.
 
 Every squash was verified rather than asserted: the local stack was reset from the new files, both databases introspected down to column defaults, constraint expressions, index definitions, function bodies, trigger timing, policy predicates and grants, and diffed. The only differences were local-stack platform defaults no migration sets. Doing it again: [Developer guide](../how-to/developer-guide.md#squashing-migrations-again).
 
-Since the third squash every function lives in `0002_functions.sql`. The `language sql` ones that read tables are created with `check_function_bodies` off, as `pg_dump` restores them, because Postgres would otherwise parse their bodies before `0003_tables.sql` exists; the pgTAP suite calls every one of them, so a broken body still fails CI.
+The third squash put every function in `0002_functions.sql`; the files since add more and redefine several ([Architecture](../reference/architecture.md#triggers-and-functions)), and the latest `create or replace` is the live body. In `0002`, the `language sql` ones that read tables are created with `check_function_bodies` off, as `pg_dump` restores them, because Postgres would otherwise parse their bodies before `0003_tables.sql` exists; the pgTAP suite calls every one of them, so a broken body still fails CI.
 
 ## Why migrations only roll forward
 
@@ -236,7 +240,7 @@ A grantee's read used to call `has_category_read_access(category_id)` on every r
 
 ## Why the map and search RPCs are plpgsql
 
-Postgres 17 plans a SQL function's body without its argument values, so `category_id = cat_id` was costed on an average category. In the load test's `peak` run a 1,000-entry shared category was read by scanning all 26,000 links, 10,936 times. `0018` makes both RPCs plpgsql with `plan_cache_mode = force_custom_plan`: each call is planned with the category it names, as the SQL functions were already re-planned on every call, so planning costs nothing extra. The query text is unchanged, and `075_query_plans_test.sql` plans that same text with literal arguments, which is now also what runs.
+Postgres 17 plans a SQL function's body without its argument values, so `category_id = cat_id` was costed on an average category. In the load test's `peak` run a 1,000-entry shared category was read by scanning all 26,000 links, 10,936 times. `0018` makes both RPCs plpgsql with `plan_cache_mode = force_custom_plan`: each call is planned with the category it names, as the SQL functions were already re-planned on every call, so planning costs nothing extra. `075_query_plans_test.sql` reads each live body from `pg_proc` and plans its query with literal arguments, which is now also what runs.
 
 ## Why the service worker fetches pages network-first
 

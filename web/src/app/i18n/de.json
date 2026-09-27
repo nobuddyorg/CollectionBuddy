@@ -6,7 +6,8 @@
   "page": {
     "entries": "Einträge",
     "no_categories": "Noch keine Sammlungen",
-    "name_first_category": "Lege oben deine erste Sammlung an. Münzen, Briefmarken, was du sammelst.",
+    "name_first_category": "Gib oben unter Neue Sammlung einen Namen ein und drücke auf +. Münzen, Briefmarken, was du sammelst.",
+    "open_help": "So funktioniert's",
     "footer": "Sammeln • Ordnen • Behalten",
     "skip_to_content": "Zum Inhalt springen"
   },
@@ -14,6 +15,8 @@
     "title": "CollectionBuddy",
     "account_menu": "Kontomenü",
     "sign_out": "Abmelden",
+    "help": "Hilfe",
+    "help_shortcut": "Strg+/",
     "sign_out_error": "Abmeldung nicht vollständig abgeschlossen, du wurdest aber auf diesem Gerät abgemeldet. Bitte erneut versuchen.",
     "language": "Sprache",
     "theme": "Darstellung",
@@ -162,7 +165,8 @@
     "no_results_title": "Keine Treffer für \"{q}\"",
     "no_results_hint": "Versuche einen anderen Suchbegriff.",
     "no_items_title": "Noch keine Einträge",
-    "no_items_hint": "Füge deinen ersten Eintrag in dieser Sammlung hinzu, um ihn hier zu sehen.",
+    "no_items_hint": "Füge oben mit Neuer Eintrag deinen ersten Eintrag hinzu. Mit den Schaltflächen an jedem Eintrag fügst du Fotos hinzu, bearbeitest oder löschst ihn.",
+    "no_items_hint_read_only": "In dieser Sammlung ist noch nichts eingetragen.",
     "map_error": "Kartenstandorte konnten nicht geladen werden. Bitte erneut versuchen.",
     "map_empty": "Noch keine Standorte vorhanden.",
     "map_empty_filtered": "Keine Standorte passen zur Suche.",
@@ -183,6 +187,21 @@
     "circle_text": "CollectionBuddy • Sammeln • Ordnen • Behalten • Deine Schätze im Blick • ",
     "subtitle": "Dein digitales Sammelalbum für Münzen, Plüschtiere, Briefmarken und alles, was dir am Herzen liegt.",
     "sign_in_error": "Anmeldung fehlgeschlagen. Bitte Verbindung prüfen und erneut versuchen."
+  },
+  "help": {
+    "title": "Hilfe",
+    "collections_title": "Sammlungen",
+    "collections_body": "Deine Einträge liegen in Sammlungen, und du siehst immer eine davon. Die Schaltfläche neben dem Namen der Sammlung klappt ihren Bereich auf: Gib unter Neue Sammlung einen Namen ein und drücke auf +, um eine anzulegen, oder wähle eine andere aus der Liste. Dort kannst du die offene Sammlung auch umbenennen oder löschen; mit ihr werden ihre Einträge und Fotos gelöscht.",
+    "entries_title": "Einträge und Fotos",
+    "entries_body": "Neuer Eintrag fügt der offenen Sammlung einen Eintrag hinzu: einen Titel und nach Wunsch eine Beschreibung, einen Ort und Tags. Mit den Schaltflächen unten an jedem Eintrag fügst du ein Foto hinzu, bearbeitest oder löschst ihn. Ein Klick auf ein Foto zeigt es in voller Größe.",
+    "search_title": "Suche und Karte",
+    "search_body": "Das Suchfeld durchsucht Titel, Beschreibungen, Orte und Tags, sobald du drei Zeichen eingegeben hast. Die Kartenschaltfläche zeigt alle Einträge, deren Ort du aus den Vorschlägen gewählt hast.",
+    "sharing_title": "Teilen",
+    "sharing_body": "Gib im Bereich der Sammlung unter Teilen die E-Mail-Adresse einer Person ein, um ihrem Google-Konto Zugriff auf die offene Sammlung zu geben; öffentliche Links gibt es nicht. Sie kann die Sammlung ansehen und mit Darf bearbeiten auch Einträge und Fotos hinzufügen, ändern und löschen. Umbenennen, Löschen und Teilen der Sammlung bleiben bei dir.",
+    "transfer_title": "Import und Export",
+    "transfer_body": "Im Bereich der Sammlung speichert Exportieren die offene Sammlung als .zip-Archiv mit allen Fotos. Importieren macht aus so einem Archiv eine neue Sammlung.",
+    "undo_title": "Rückgängig und Tastatur",
+    "undo_body": "Versehentlich einen Eintrag, ein Foto oder eine Sammlung gelöscht? Ein paar Sekunden lang holt Rückgängig machen in der Meldung unten am Bildschirm, oder Strg+Z, es zurück. Strg+/ öffnet diese Hilfe, Escape schließt sie. Auf dem Mac nimmst du Cmd statt Strg."
   },
   "common": {
     "loading": "Wird geladen…",

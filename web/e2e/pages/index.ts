@@ -6,6 +6,7 @@ import { initCatalogue } from './catalogue';
 import { initCategoryPanel } from './category-panel';
 import { initConfirm, initImageViewer, initToast } from './dialogs';
 import { initEntryForm } from './entry-form';
+import { initHelp } from './help';
 import { initLoginPage } from './login';
 import { initMap } from './map';
 import { initPrivacyPage } from './privacy';
@@ -33,6 +34,9 @@ export function createPageTree(page: Page) {
     },
     get form() {
       return initEntryForm(page);
+    },
+    get help() {
+      return initHelp(page);
     },
     get login() {
       return initLoginPage(page);
