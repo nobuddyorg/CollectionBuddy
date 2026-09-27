@@ -88,7 +88,7 @@ describe('useItems', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.items).toEqual([]);
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Search failed. Please try again.',
+      'Could not load entries. Please try again.',
     );
     expect(consoleError).toHaveBeenCalledWith('load items', listError);
     consoleError.mockRestore();

@@ -18,6 +18,8 @@ import { useGuardedModalClose } from '../../lib/useGuardedModalClose';
 import { EditItemModal } from './EditItemModal';
 import { MapModal, prefetchMap } from './MapModal';
 import CenteredModal from '../CenteredModal';
+import LoadError from '../LoadError';
+import { listViewFor } from './listView';
 import Icon, { IconType } from '../Icon';
 import type { ItemFormValues } from '../ItemForm';
 import { prefetchItemForm } from '../ItemForm/load';
@@ -57,6 +59,7 @@ export default function ItemList({
     pageImages,
     total,
     loading,
+    loadFailed,
     page,
     setPage,
     totalPages,
@@ -140,10 +143,12 @@ export default function ItemList({
     [editingItem, saveEdit, setEditOpen, setEditingItem],
   );
 
-  // Empty `items` with `total > 0` is a page correction in flight, not an empty collection.
-  const isEmpty = items.length === 0;
-  const showSkeleton = isEmpty && (loading || total > 0);
-  const showEmptyState = isEmpty && !showSkeleton;
+  const view = listViewFor({
+    itemCount: items.length,
+    total,
+    loading,
+    loadFailed,
+  });
   // A viewer's New entry button is disabled, so their hint must not point at it.
   const noItemsHint = canEdit
     ? t('item_list.no_items_hint')
@@ -207,9 +212,18 @@ export default function ItemList({
         {searchAnnouncement}
       </span>
 
-      {showSkeleton && <GridSkeleton />}
+      {view === 'skeleton' && <GridSkeleton />}
 
-      {showEmptyState && (
+      {view === 'loadError' && (
+        <LoadError
+          testId="entries-load-error"
+          title={t('item_list.load_error_title')}
+          busy={loading}
+          onRetry={() => void reload()}
+        />
+      )}
+
+      {view === 'empty' && (
         <section className="py-16 grid place-items-center text-center">
           <div className="flex flex-col items-center gap-4 max-w-xs">
             <div className="h-16 w-16 bg-card ring-1 ring-border grid place-items-center text-3xl">
@@ -247,7 +261,7 @@ export default function ItemList({
         </section>
       )}
 
-      {!isEmpty && (
+      {view === 'grid' && (
         <ul
           aria-busy={loading}
           aria-labelledby="entries-heading"

@@ -8,6 +8,7 @@
     "no_categories": "No collections yet",
     "name_first_category": "Type a name under New collection above and press +. Coins, stamps, whatever you keep.",
     "open_help": "How it works",
+    "load_error_title": "Your collections could not be loaded",
     "footer": "Collect • Organize • Keep",
     "skip_to_content": "Skip to content"
   },
@@ -153,6 +154,8 @@
     "zoom_to_current_location": "Zoom to current location",
     "frame_all_pins": "Show all locations",
     "search_error": "Search failed. Please try again.",
+    "load_error": "Could not load entries. Please try again.",
+    "load_error_title": "The entries could not be loaded",
     "save_error": "Could not save changes. Please try again.",
     "changes_saved": "Changes saved.",
     "delete_error": "Could not delete this entry. Please try again.",
@@ -212,7 +215,9 @@
     "cancel": "Cancel",
     "undo": "Undo",
     "undo_shortcut": "Ctrl+Z",
-    "undo_shortcut_hint": "Ctrl+Z undoes it."
+    "undo_shortcut_hint": "Ctrl+Z undoes it.",
+    "retry": "Try again",
+    "load_error_hint": "Nothing is lost, only the loading failed. Check your connection, then try again."
   },
   "app_error": {
     "title": "Something went wrong",

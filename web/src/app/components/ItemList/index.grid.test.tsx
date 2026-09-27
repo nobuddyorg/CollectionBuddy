@@ -85,6 +85,21 @@ describe('ItemList empty state', () => {
     expect(screen.getByRole('status')).toBeVisible();
   });
 
+  it('shows a failed load with a retry, never as "No entries yet"', async () => {
+    const reload = vi.fn();
+    useItemsMock.mockReturnValue(
+      itemsState({ items: [], total: 0, loadFailed: true, reload }),
+    );
+    renderList();
+
+    expect(
+      screen.getByRole('region', { name: 'The entries could not be loaded' }),
+    ).toBeVisible();
+    expect(screen.queryByText('No entries yet')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the corrected page once its own fetch resolves', () => {
     useItemsMock.mockReturnValue(
       itemsState({
