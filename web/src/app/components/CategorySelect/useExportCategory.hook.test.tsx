@@ -237,6 +237,23 @@ describe('useExportCategory', () => {
     expect(result.current.isExporting).toBe(false);
     consoleError.mockRestore();
   });
+
+  it('reports a rejection that carries no error at all', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    vi.mocked(exportCategory).mockRejectedValue(undefined);
+    const { result } = renderHook(() => useExportCategory(), { wrapper });
+
+    await act(async () => {
+      await result.current.runExport(CATEGORY);
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not export this collection. Please try again.',
+    );
+    consoleError.mockRestore();
+  });
 });
 
 describe('useExportCategory cancel and in-flight guards', () => {

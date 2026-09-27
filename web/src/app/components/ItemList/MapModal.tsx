@@ -13,7 +13,14 @@ import { usePlaces } from '../Map/usePlaces';
 import { useCurrentLocation } from '../Map/useCurrentLocation';
 import { useMapFraming } from '../Map/useMapFraming';
 
-const MapView = dynamic(() => import('../Map'), { ssr: false });
+// The map's only import() site, shared with the prefetch: Turbopack emits a separate chunk per site.
+const loadMap = () => import('../Map');
+const MapView = dynamic(loadMap, { ssr: false });
+
+/** Warms the map's chunk and Leaflet's on intent; a failed prefetch is retried on the actual open. */
+export function prefetchMap(): void {
+  void Promise.all([loadMap(), import('leaflet')]).catch(() => {});
+}
 
 export function MapModal({
   categoryId,

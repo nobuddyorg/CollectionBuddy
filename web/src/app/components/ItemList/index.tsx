@@ -16,20 +16,12 @@ import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { useSyncedRef } from '../../lib/useSyncedRef';
 import { useGuardedModalClose } from '../../lib/useGuardedModalClose';
 import { EditItemModal } from './EditItemModal';
-import { MapModal } from './MapModal';
+import { MapModal, prefetchMap } from './MapModal';
 import CenteredModal from '../CenteredModal';
 import Icon, { IconType } from '../Icon';
 import type { ItemFormValues } from '../ItemForm';
+import { prefetchItemForm } from '../ItemForm/load';
 import type { ImageEntry, ItemLite } from './types';
-
-// Warmed on intent, not page load; a failed prefetch is retried by dynamic() on the actual open.
-const prefetchMap = () => {
-  void import('../Map').catch(() => {});
-};
-
-const prefetchItemForm = () => {
-  void import('../ItemForm').catch(() => {});
-};
 
 // Stable identity: a fresh [] per render would defeat ItemCard's reference-equality memo.
 const EMPTY_IMAGES: ImageEntry[] = [];

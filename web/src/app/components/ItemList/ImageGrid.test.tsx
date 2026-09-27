@@ -248,6 +248,45 @@ describe('ImageGrid', () => {
     );
   });
 
+  it('offers the hero thumbnail and full size, sized to the grid column, for the browser to choose', () => {
+    renderGrid([photo('a'), photo('b'), photo('c')]);
+    const [hero, strip] = screen.getAllByRole('img');
+    expect(hero).toHaveAttribute(
+      'srcset',
+      'https://example.test/a.thumb.webp 600w, https://example.test/a.webp 1000w',
+    );
+    expect(hero).toHaveAttribute(
+      'sizes',
+      '(min-width: 1024px) 363px, (min-width: 640px) 50vw, 100vw',
+    );
+    expect(strip).not.toHaveAttribute('srcset');
+    expect(strip).not.toHaveAttribute('sizes');
+  });
+
+  it('offers a single photograph the same choice', () => {
+    renderGrid([photo('a')]);
+    expect(screen.getByRole('img')).toHaveAttribute(
+      'srcset',
+      'https://example.test/a.thumb.webp 600w, https://example.test/a.webp 1000w',
+    );
+  });
+
+  it('gives a pair, already on its thumbnail, no choice', () => {
+    renderGrid([photo('a'), photo('b')]);
+    for (const image of screen.getAllByRole('img')) {
+      expect(image).not.toHaveAttribute('srcset');
+      expect(image).not.toHaveAttribute('sizes');
+    }
+  });
+
+  it('keeps a hero with no thumbnail on its full size alone', () => {
+    renderGrid([{ ...photo('a'), pathThumb: undefined, urlThumb: undefined }]);
+    const hero = screen.getByRole('img');
+    expect(hero).toHaveAttribute('src', 'https://example.test/a.webp');
+    expect(hero).not.toHaveAttribute('srcset');
+    expect(hero).not.toHaveAttribute('sizes');
+  });
+
   // Only the covered half: jsdom never dispatches a real image load; uncovering was checked in a browser.
   it('keeps a plate covered until its image loads', () => {
     const { container } = renderGrid([photo('a')]);
