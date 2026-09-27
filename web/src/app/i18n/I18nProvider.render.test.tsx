@@ -204,6 +204,30 @@ describe('I18nProvider', () => {
     expect(screen.getByTestId('tags-2').textContent).toBe('2 tags');
   });
 
+  it("writes a count's thousands in the formatting locale, and follows a language switch", async () => {
+    localStorage.setItem('lang', 'en');
+    vi.stubGlobal('navigator', {
+      language: 'en-GB',
+      languages: ['en-GB', 'de-CH'],
+    });
+    const { result } = renderHook(() => useI18n(), { wrapper: I18nProvider });
+
+    expect(result.current.tCount('item_list.results_count', 1000)).toBe(
+      '1,000 results',
+    );
+    expect(
+      result.current.t('item_list.page_of', { n: 1000, total: 2000 }),
+    ).toBe('1,000 / 2,000');
+
+    await act(async () => {
+      result.current.setLanguage('de');
+    });
+
+    expect(result.current.tCount('item_list.results_count', 1000)).toBe(
+      "1'000 Treffer",
+    );
+  });
+
   it('falls back to the base key when a key has no _one plural variant', () => {
     localStorage.setItem('lang', 'en');
     renderProbe();

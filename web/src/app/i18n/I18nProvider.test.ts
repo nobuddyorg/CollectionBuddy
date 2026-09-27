@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatNumbers,
   formattingLocale,
   interpolate,
   pickLanguage,
@@ -88,6 +89,39 @@ describe('interpolate', () => {
 
   it('ignores an inherited property that happens to share a name', () => {
     expect(interpolate('{toString}', {})).toBe('{toString}');
+  });
+});
+
+describe('formatNumbers', () => {
+  const inLocale = (locale: string) => new Intl.NumberFormat(locale);
+
+  it("groups a count's thousands the way the locale writes them", () => {
+    expect(formatNumbers({ count: 1000 }, inLocale('de'))).toEqual({
+      count: '1.000',
+    });
+    expect(formatNumbers({ count: 1000 }, inLocale('en-GB'))).toEqual({
+      count: '1,000',
+    });
+    expect(formatNumbers({ count: 1234567 }, inLocale('de-CH'))).toEqual({
+      count: "1'234'567",
+    });
+  });
+
+  it('formats every number it is given, and a small one as it is', () => {
+    expect(formatNumbers({ done: 12000, total: 7 }, inLocale('en'))).toEqual({
+      done: '12,000',
+      total: '7',
+    });
+  });
+
+  it('leaves text exactly as given, digits and all', () => {
+    expect(
+      formatNumbers({ name: '10000 Coins', count: 2 }, inLocale('de')),
+    ).toEqual({ name: '10000 Coins', count: '2' });
+  });
+
+  it('gives back nothing for nothing', () => {
+    expect(formatNumbers({}, inLocale('de'))).toEqual({});
   });
 });
 
