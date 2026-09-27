@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { expect, test } from './test';
 import { removeCategoryNamed } from './cleanup';
 import { CONTEXT_PATH, type SeedContext } from './fixtures';
+import { ownedCategoryId } from './rls/helpers';
 
 // The other half of categories.spec.ts: a collection with contents, whose photographs only the client sweeps.
 test.use({ locale: 'en-GB' });
@@ -85,6 +86,39 @@ test.describe('deleting a collection that still holds things', () => {
       await expect(app.categories.locators.selected).not.toHaveText(name);
       await app.toast.do.commitDeletion('categories');
       expect(await storedObjects({ token, userId, itemId })).toEqual([]);
+    } finally {
+      await removeCategoryNamed(name);
+    }
+  });
+
+  test('writes a count of a thousand the way the locale does', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const { token, userId } = context();
+    const name = `E2E Tausend ${Date.now()}`;
+
+    await page.goto('', { waitUntil: 'networkidle' });
+    await expect(app.categories.locators.selected).not.toBeEmpty();
+    await app.categories.do.create(name);
+    try {
+      const categoryId = await ownedCategoryId({ token, userId, name });
+      const { error } = await apiAs(token).rpc('create_items_in_category', {
+        target_category_id: categoryId,
+        entries: Array.from({ length: 1000 }, (_, index) => ({
+          title: `Eintrag ${index}`,
+        })),
+      });
+      if (error) throw error;
+
+      await app.categories.do.delete();
+      // en-GB groups thousands with a comma; "1000" would mean the raw number reached the screen.
+      await expect(app.confirm.locators.message).toContainText(
+        `Delete "${name}"? Its 1,000 entries`,
+      );
+      await app.confirm.do.accept();
+      await app.toast.do.commitDeletion('categories');
     } finally {
       await removeCategoryNamed(name);
     }

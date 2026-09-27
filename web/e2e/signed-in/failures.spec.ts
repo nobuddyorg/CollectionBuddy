@@ -355,3 +355,45 @@ test.describe('when an archive is not what the export wrote', () => {
     await expect(app.categories.tab(category)).toHaveCount(0);
   });
 });
+
+// auth-js answers an expired token it cannot refresh (offline) with an error, and keeps the session unless the app removes it.
+test.describe('when sign-out cannot reach the auth server', () => {
+  test('the session still ends on this device, and stays ended once back online', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await app.categories.do.open(SEED.failureCategory);
+    // Blocked before the token expires, so neither a refresh nor the revoke reaches the session every spec shares.
+    await page.route('**/auth/v1/**', (route) =>
+      route.abort('internetdisconnected'),
+    );
+    await page.evaluate(() => {
+      const key = Object.keys(window.localStorage).find(
+        (name) => name.startsWith('sb-') && name.endsWith('-auth-token'),
+      );
+      if (!key) throw new Error('no stored session');
+      const session = JSON.parse(window.localStorage.getItem(key)!);
+      session.expires_at = Math.floor(Date.now() / 1000) - 60;
+      window.localStorage.setItem(key, JSON.stringify(session));
+    });
+
+    await app.account.do.open();
+    await app.account.do.signOut();
+
+    // auth-js retries the refresh for up to its 30 s tick before it gives up.
+    await expect(page).toHaveURL(/\/login\/?$/, { timeout: 45_000 });
+    await expect(app.toast()).toContainText("Sign-out didn't fully complete");
+    const sessionKeys = await page.evaluate(() =>
+      Object.keys(window.localStorage).filter(
+        (name) => name.startsWith('sb-') && name.endsWith('-auth-token'),
+      ),
+    );
+    expect(sessionKeys).toEqual([]);
+
+    // A session left in storage would refresh here and sign straight back in.
+    await page.unroute('**/auth/v1/**');
+    await page.reload({ waitUntil: 'networkidle' });
+    await expect(page).toHaveURL(/\/login\/?$/);
+  });
+});

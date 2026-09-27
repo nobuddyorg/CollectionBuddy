@@ -6,6 +6,7 @@ import { buttonClasses } from './components/ui/buttonClasses';
 import de from './i18n/de.json';
 import en from './i18n/en.json';
 import { detectLanguage } from './i18n/I18nProvider';
+import { detectTheme } from './useTheme';
 
 // No globals.css: this renders only in the browser, after the root layout's stylesheet loaded, and React keeps that in <head>.
 const messages = { de: de.app_error, en: en.app_error };
@@ -22,10 +23,17 @@ export default function GlobalError() {
     () => 'de' as const,
   );
 
+  // Light on the build machine, as the root layout before its pre-paint script; the visitor's theme in the browser.
+  const theme = useSyncExternalStore(
+    subscribeToNothing,
+    detectTheme,
+    () => 'light' as const,
+  );
+
   const text = messages[language];
 
   return (
-    <html lang={language}>
+    <html lang={language} data-theme={theme}>
       <body className="antialiased">
         <main
           role="alert"

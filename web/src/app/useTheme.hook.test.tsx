@@ -3,7 +3,12 @@ import { act, renderHook } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { THEME_MEDIA_QUERY, THEME_STORAGE_KEY, useTheme } from './useTheme';
+import {
+  THEME_MEDIA_QUERY,
+  THEME_STORAGE_KEY,
+  detectTheme,
+  useTheme,
+} from './useTheme';
 
 function Probe() {
   const { preference, resolved } = useTheme();
@@ -166,5 +171,57 @@ describe('useTheme', () => {
     }
     addSpy.mockRestore();
     removeSpy.mockRestore();
+  });
+});
+
+describe('detectTheme', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('keeps a stored choice over the OS', () => {
+    mockMatchMedia(true);
+    localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    expect(detectTheme()).toBe('light');
+
+    mockMatchMedia(false);
+    localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+    expect(detectTheme()).toBe('dark');
+  });
+
+  it('follows the OS when nothing is stored', () => {
+    mockMatchMedia(true);
+    expect(detectTheme()).toBe('dark');
+
+    mockMatchMedia(false);
+    expect(detectTheme()).toBe('light');
+  });
+
+  it('asks the OS the dark-scheme question', () => {
+    const matchMedia = vi.fn().mockReturnValue({ matches: false });
+    vi.stubGlobal('matchMedia', matchMedia);
+    detectTheme();
+    expect(matchMedia).toHaveBeenCalledWith(THEME_MEDIA_QUERY);
+  });
+
+  it('still follows the OS when reading storage throws', () => {
+    mockMatchMedia(true);
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+
+    expect(detectTheme()).toBe('dark');
+  });
+
+  it('reads the key the hook writes', () => {
+    mockMatchMedia(false);
+    const getItem = vi.spyOn(Storage.prototype, 'getItem');
+    detectTheme();
+    expect(getItem).toHaveBeenCalledWith(THEME_STORAGE_KEY);
   });
 });

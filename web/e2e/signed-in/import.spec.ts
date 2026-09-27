@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 
 import { expect, test } from './test';
 
-import { repackLikeZipTool } from './archives';
+import { repackContentsLikeZipTool, repackLikeZipTool } from './archives';
 import { removeCategoryNamed, removeEntriesTitled } from './cleanup';
 import { SEED, itemsIn } from './fixtures';
 import { expectTitles } from './helpers';
@@ -83,42 +83,50 @@ test.describe('importing an exported archive', () => {
   });
 
   // #787: unzipped to browse the photographs, zipped again by the OS; it used to fail as "try again" every time.
-  test('reads an export a zip tool packed again', async ({
-    on,
-    page,
-  }, testInfo) => {
-    const app = on(page);
-    await app.categories.do.open(SEED.importCategory);
+  for (const { packed, repack } of [
+    { packed: 'a zip tool packed again', repack: repackLikeZipTool },
+    // Selecting the unzipped folder's files and zipping them leaves collection.json at the root.
+    {
+      packed: 'whose contents were zipped without their folder',
+      repack: repackContentsLikeZipTool,
+    },
+  ]) {
+    test(`reads an export ${packed}`, async ({ on, page }, testInfo) => {
+      const app = on(page);
+      await app.categories.do.open(SEED.importCategory);
 
-    const title = `Neu gepackt ${Date.now()}`;
-    await app.catalogue.do.addEntry(title);
-    const original = app.catalogue.card(title);
-    await original.do.uploadPhoto(PHOTO);
-    await expect(original.locators.images).toBeVisible({ timeout: ARRIVES });
+      const title = `Neu gepackt ${Date.now()}`;
+      await app.catalogue.do.addEntry(title);
+      const original = app.catalogue.card(title);
+      await original.do.uploadPhoto(PHOTO);
+      await expect(original.locators.images).toBeVisible({ timeout: ARRIVES });
 
-    const copy = `${SEED.importCategory} (2)`;
-    try {
-      const [download] = await Promise.all([
-        page.waitForEvent('download'),
-        app.categories.do.exportCollection(),
-      ]);
-      const archive = await download.path();
-      if (!archive) throw new Error('the export did not save a file to disk');
-      const repacked = testInfo.outputPath('repacked.zip');
-      repackLikeZipTool(archive, repacked);
+      const copy = `${SEED.importCategory} (2)`;
+      try {
+        const [download] = await Promise.all([
+          page.waitForEvent('download'),
+          app.categories.do.exportCollection(),
+        ]);
+        const archive = await download.path();
+        if (!archive) throw new Error('the export did not save a file to disk');
+        const repacked = testInfo.outputPath('repacked.zip');
+        repack(archive, repacked);
 
-      await app.categories.do.importArchive(repacked);
-      await expect(app.categories.locators.selected).toHaveText(copy, {
-        timeout: 60_000,
-      });
-      const imported = app.catalogue.card(title);
-      await expect(imported.locators.images).toBeVisible({ timeout: ARRIVES });
-      await expect(imported.locators.images).toHaveAttribute('src', /token=/);
-    } finally {
-      await removeEntriesTitled(title);
-      await removeCategoryNamed(copy);
-    }
-  });
+        await app.categories.do.importArchive(repacked);
+        await expect(app.categories.locators.selected).toHaveText(copy, {
+          timeout: 60_000,
+        });
+        const imported = app.catalogue.card(title);
+        await expect(imported.locators.images).toBeVisible({
+          timeout: ARRIVES,
+        });
+        await expect(imported.locators.images).toHaveAttribute('src', /token=/);
+      } finally {
+        await removeEntriesTitled(title);
+        await removeCategoryNamed(copy);
+      }
+    });
+  }
 
   // The archive carries only the full-size file; the import compresses a thumbnail and uploads both.
   test('brings a photograph back with its entry', async ({ on, page }) => {

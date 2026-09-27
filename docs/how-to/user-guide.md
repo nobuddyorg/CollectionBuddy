@@ -95,10 +95,10 @@ can be granted access, and it is read-only until you say otherwise.
   overwriting or failing; a name at the 200-character limit is shortened to
   make room for it. Each item keeps its photos in their order, so its cover
   photo stays the same. An export you unzipped and zipped again with your
-  system's own tool imports too, as long as it keeps the export's folder and
-  is not encrypted. A damaged archive, or one that unpacks to more than an
-  import accepts, is refused with a message saying which, and nothing of it
-  is kept.
+  system's own tool imports too, whether you zipped the export's folder or
+  only the files inside it, as long as it is not encrypted and holds one
+  export only. A damaged archive, or one that unpacks to more than an import
+  accepts, is refused with a message saying which, and nothing of it is kept.
 
 ## Items
 

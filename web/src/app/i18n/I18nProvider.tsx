@@ -58,7 +58,20 @@ export function interpolate(
   );
 }
 
-/** Fills each `{name}` placeholder the template holds from `values`. */
+/** Each number in the format's digit grouping (1.000 in German, 1,000 in English); text as given. */
+export function formatNumbers(
+  values: TranslationValues,
+  numberFormat: Intl.NumberFormat,
+): TranslationValues {
+  return Object.fromEntries(
+    Object.entries(values).map(([name, value]) => [
+      name,
+      typeof value === 'number' ? numberFormat.format(value) : value,
+    ]),
+  );
+}
+
+/** Fills each `{name}` placeholder the template holds from `values`, numbers in the formatting locale. */
 export type Translate = (
   key: TranslationKey,
   values?: TranslationValues,
@@ -123,6 +136,17 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   // eslint-disable-next-line react-hooks/refs -- written during render so t never reads a stale language in this render
   languageRef.current = language;
 
+  // Prerendered markup holds no date and no number past 999, so the build machine's navigator cannot cause a hydration mismatch.
+  const locale = useMemo(
+    () => formattingLocale(language, navigator.languages),
+    [language],
+  );
+  // Built once per language: t runs on every render, and building a format costs more than using one.
+  const numberFormat = useMemo(() => new Intl.NumberFormat(locale), [locale]);
+  const numberFormatRef = useRef(numberFormat);
+  // eslint-disable-next-line react-hooks/refs -- written during render, as languageRef, so t formats numbers for this render's language
+  numberFormatRef.current = numberFormat;
+
   useLayoutEffect(() => {
     setLanguage(detectLanguage());
   }, []);
@@ -147,7 +171,7 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
     (key: TranslationKey, values: TranslationValues = {}) =>
       interpolate(
         resolveTranslationKey(translations[languageRef.current], key) ?? key,
-        values,
+        formatNumbers(values, numberFormatRef.current),
       ),
     [],
   );
@@ -161,14 +185,11 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
         : undefined) ??
       resolveTranslationKey(dictionary, baseKey) ??
       baseKey;
-    return interpolate(template, { count });
+    return interpolate(
+      template,
+      formatNumbers({ count }, numberFormatRef.current),
+    );
   }, []);
-
-  // Never rendered into prerendered markup, so the build machine's navigator cannot cause a hydration mismatch.
-  const locale = useMemo(
-    () => formattingLocale(language, navigator.languages),
-    [language],
-  );
 
   const value = useMemo(
     () => ({ language, locale, setLanguage: setLanguageAndPersist, t, tCount }),

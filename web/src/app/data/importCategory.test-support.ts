@@ -80,12 +80,14 @@ export async function buildArchive({
 
 const PACKED_ROOT = 'CollectionBuddy-coins-2026-08-06';
 
-/** One item and its photograph as a zip tool packs an unzipped export again, `change` applied to each entry. */
+/** One item and its photograph as a zip tool packs an unzipped export again, under `prefix` ('' for its contents alone), `change` applied to each entry. */
 export function buildRepackedArchive({
   photo = new Uint8Array([9, 8, 7, 6]),
+  prefix = `${PACKED_ROOT}/`,
   change = (entry) => entry,
 }: {
   photo?: Uint8Array;
+  prefix?: string;
   change?: (entry: CraftedEntry) => CraftedEntry;
 } = {}): Blob {
   const entries = exportEntries(
@@ -97,15 +99,19 @@ export function buildRepackedArchive({
     entries,
     exportedAt: new Date('2026-08-06T00:00:00.000Z'),
   });
+  // A folder is packed as its own entry first; the contents alone have none.
+  const folder: CraftedEntry[] = prefix
+    ? [{ name: prefix, data: new Uint8Array(), method: 'store' }]
+    : [];
   const packed: CraftedEntry[] = (
     [
-      { name: `${PACKED_ROOT}/`, data: new Uint8Array(), method: 'store' },
+      ...folder,
       {
-        name: `${PACKED_ROOT}/${MANIFEST_NAME}`,
+        name: `${prefix}${MANIFEST_NAME}`,
         data: new TextEncoder().encode(JSON.stringify(manifest)),
       },
       {
-        name: `${PACKED_ROOT}/${entries[0].photos[0].archivePath}`,
+        name: `${prefix}${entries[0].photos[0].archivePath}`,
         data: photo,
       },
     ] satisfies CraftedEntry[]

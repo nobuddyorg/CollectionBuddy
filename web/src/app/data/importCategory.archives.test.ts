@@ -40,6 +40,33 @@ describe('importCategory, on an export packed again by a zip tool', () => {
   });
 });
 
+// Zipping the unzipped folder's contents rather than the folder leaves collection.json at the root.
+describe('importCategory, on an export whose contents were zipped without their folder', () => {
+  it('imports every entry and photograph, byte for byte', async () => {
+    const photo = new Uint8Array(4096).map((_, i) => i % 7);
+    const createCategoryRow = fakeCreateCategory();
+    const uploadImage = fakeUploadImage();
+
+    const result = await importCategory({
+      file: buildRepackedArchive({ photo, prefix: '' }),
+      nameCategory: (name) => name,
+      ...baseFakes(),
+      createCategoryRow,
+      uploadImage,
+    });
+
+    expect(result).toMatchObject({
+      itemCount: 1,
+      photoCount: 1,
+      skippedPhotoCount: 0,
+    });
+    expect(createCategoryRow).toHaveBeenCalledWith('Coins');
+    const [[, uploaded]] = (uploadImage as ReturnType<typeof vi.fn>).mock
+      .calls as [string, Blob][];
+    expect(new Uint8Array(await uploaded.arrayBuffer())).toEqual(photo);
+  });
+});
+
 describe('importCategory, refusing an archive before it creates anything', () => {
   async function refusal(file: Blob) {
     const createCategoryRow = fakeCreateCategory();
@@ -132,6 +159,36 @@ describe('importCategory, refusing an archive before it creates anything', () =>
       'Could not read collection.json in this archive',
     );
     expect(error.cause).toBeInstanceOf(SyntaxError);
+  });
+
+  it('checks a manifest at the archive root against its checksum too', async () => {
+    const error = await refusal(
+      buildRepackedArchive({
+        prefix: '',
+        change: (entry) =>
+          entry.name === 'collection.json'
+            ? { ...entry, central: { crc: 1 } }
+            : entry,
+      }),
+    );
+    expect(error.reason).toBe('unreadable');
+    expect(error.message).toMatch(/checksum/);
+  });
+
+  it('calls an archive holding the export both in its folder and at its root not an export', async () => {
+    const manifest = new TextEncoder().encode('{}');
+    const error = await refusal(
+      new Blob([
+        craftZip({
+          entries: [
+            { name: 'collection.json', data: manifest },
+            { name: 'root/collection.json', data: manifest },
+          ],
+        }),
+      ]),
+    );
+    expect(error.reason).toBe('not_export');
+    expect(error.message).toBe('More than one collection.json in this archive');
   });
 
   it('calls an archive with no manifest not an export', async () => {

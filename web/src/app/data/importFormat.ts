@@ -88,17 +88,25 @@ export function parseManifest(data: unknown): ImportManifest {
 
 const MANIFEST_SUFFIX = `/${MANIFEST_NAME}`;
 
-/** The entry ending in `/collection.json`; the importer cannot recompute the root folder's name. */
-export function findManifestPath(entryNames: Iterable<string>): string | null {
-  for (const name of entryNames) {
-    if (name.endsWith(MANIFEST_SUFFIX)) return name;
+const isManifestPath = (name: string) =>
+  name === MANIFEST_NAME || name.endsWith(MANIFEST_SUFFIX);
+
+/** The one `collection.json`: in the export's folder, whose name the importer cannot recompute, or at the root of an archive of its contents. */
+export function findManifestPath(entryNames: Iterable<string>): string {
+  const manifests = Array.from(entryNames).filter(isManifestPath);
+  if (manifests.length === 0) {
+    throw notAnExport('Not a CollectionBuddy export archive');
   }
-  return null;
+  // Two would leave it to guesswork which photographs belong to which.
+  if (manifests.length > 1) {
+    throw notAnExport('More than one collection.json in this archive');
+  }
+  return manifests[0];
 }
 
-/** The archive's root folder, given the path `findManifestPath` returned. */
-export function rootFolderOf(manifestPath: string): string {
-  return manifestPath.slice(0, -MANIFEST_SUFFIX.length);
+/** What the manifest's photo paths are relative to: its folder with the trailing slash, or nothing at the archive root. */
+export function archivePrefixOf(manifestPath: string): string {
+  return manifestPath.slice(0, -MANIFEST_NAME.length);
 }
 
 /** One `created_at` per row, 1 ms apart, ending at `now`, so any insert order keeps the archive order. */

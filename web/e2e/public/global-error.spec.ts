@@ -5,11 +5,12 @@ test.use({ locale: 'en-GB' });
 const HEALED_KEY = 'e2e-root-layout-healed';
 
 // Nothing a visitor does makes the root layout throw, so this breaks what I18nProvider reads while it renders.
-test('a root layout that throws still gets a translated error screen, and its reload recovers', async ({
+test('a root layout that throws still gets a translated, themed error screen, and its reload recovers', async ({
   on,
   page,
 }) => {
   const app = on(page);
+  await page.emulateMedia({ colorScheme: 'dark' });
   await page.addInitScript((healedKey) => {
     if (sessionStorage.getItem(healedKey)) return;
     Object.defineProperty(Navigator.prototype, 'languages', {
@@ -21,6 +22,8 @@ test('a root layout that throws still gets a translated error screen, and its re
 
   await expect(app.appError()).toContainText('Something went wrong');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  // Nothing is stored, so the dark system scheme decides, as the pre-paint script would.
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(app.login.locators.buttons.signIn).toBeHidden();
 
   await page.evaluate((healedKey) => {

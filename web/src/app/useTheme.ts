@@ -53,6 +53,17 @@ function readSystemPrefersDark(): boolean {
   return window.matchMedia(THEME_MEDIA_QUERY).matches;
 }
 
+/** What THEME_INIT_SCRIPT writes, for a screen that renders without it; storage that throws leaves the system deciding. */
+export function detectTheme(): ResolvedTheme {
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(THEME_STORAGE_KEY);
+  } catch {
+    // localStorage can throw (private browsing); the system's scheme still decides.
+  }
+  return resolveTheme(normalizePreference(stored), readSystemPrefersDark());
+}
+
 // Read as an external store, not copied into state, so two mounted controls can never disagree.
 export function useTheme() {
   const preference = useSyncExternalStore<ThemePreference>(
