@@ -31,7 +31,7 @@ Sharing authorizes on an address: `caller_email()` reads the access token's `ema
 
 No SQL check can tell such a caller apart. The access token has no `email_verified` claim (only GoTrue's OIDC ID token does), `user_metadata.email_verified` is whatever the user writes with `updateUser({ data })`, and the anonymous path sets the same `auth.users` columns a real sign-up does. Requiring an OAuth `amr` would hold in production, but every local and CI identity signs in with a password.
 
-So the settings are the control, and they are versioned: [`supabase/hosted-auth.json`](../../supabase/hosted-auth.json) holds the expected values ([Configuration](../reference/configuration.md#hosted-auth-settings)), and `hosted-auth-check.yml` compares the live config with it every hour and fails on drift. A check, not an enforcer: it cannot stop the toggle, only shorten the window, and it reads with the Management token rather than writing through it. The local stack deliberately differs, with anonymous sign-ins for demo mode and the email provider without confirmations for test accounts, so the takeover still reproduces there.
+So the settings are the control, and they are versioned: [`supabase/hosted-auth.json`](../../supabase/hosted-auth.json) holds the expected values ([Configuration](../reference/configuration.md#hosted-auth-settings)), and the dashboard is compared with it by hand ([Check the hosted Auth settings](../how-to/developer-guide.md#check-the-hosted-auth-settings)). An hourly workflow once did that through the Management API; on its first run it found the email provider on (Supabase's default for a new project) and Google's nonce check skipped, both fixed in the dashboard. The owner removed it once they matched: nobody changes these settings, and it needed a Management token of its own. Nothing now notices a toggle that moves, so a Supabase change that could touch Auth is a reason to check again. The local stack deliberately differs, with anonymous sign-ins for demo mode and the email provider without confirmations for test accounts, so the takeover still reproduces there.
 
 ## Why the origin is a trust boundary
 
@@ -158,11 +158,10 @@ The project runs on Supabase's Free plan, which keeps no database backup, and no
 
 ## Why the Management API tokens are scoped per job
 
-The sweep fetches the secret key per run so it is never stored, but the token it fetched it with was a classic one: every permission on every organization and project on the owner's account, including revealing every key, running any SQL and deleting projects, and it reached every deploy and an hourly job (#748). Now each job holds a token scoped to this project and to the endpoints it calls ([Configuration](../reference/configuration.md#management-api-tokens)).
+The sweep fetches the secret key per run so it is never stored, but the token it fetched it with was a classic one: every permission on every organization and project on the owner's account, including revealing every key, running any SQL and deleting projects, and it reached every deploy and an hourly job (#748). Now the one job that needs a token holds one scoped to this project and to the endpoints it calls ([Configuration](../reference/configuration.md#management-api-tokens)).
 
 - **`migrate` needs none.** It already holds the database URL; `supabase db query` sends the `NOTIFY` over it, and PostgREST receives it when that statement commits.
 - **Database: Read, not Read-write.** Read-write runs any SQL as `postgres`, so a leaked token could plant a function, trigger or role that outlives every key rotation. The read-only endpoint runs as `supabase_read_only_user`; granting it `orphan_sweep_plan()` in `0024` adds nothing that role could not select itself.
-- **Two tokens, not one per workflow.** The hourly Auth check needs only Auth Config: Read, so it no longer carries a token that reveals keys. The sweep needs the other three permissions.
 - **What remains.** The secret key that token reveals still reads and deletes every collector's data; that is the price of not storing it, and the 90-day expiry bounds how long an unnoticed leak stays useful.
 
 ## Why the deploy waits for CI on `main`

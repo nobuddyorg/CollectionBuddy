@@ -45,7 +45,7 @@ design-decisions.md, not here.
 - No public/anonymous share links.
 - Sharing trusts the JWT email, so the hosted project keeps anonymous sign-ins,
   the email provider and unverified email sign-ins off and Confirm email on
-  (`supabase/hosted-auth.json`, checked hourly). Never relax that file or
+  (`supabase/hosted-auth.json`, checked by hand). Never relax that file or
   suggest those toggles, not even for a demo or a hosted load test.
 - Search stays trigram `ILIKE`; no `tsvector`/full-text search.
 - A storage object's path never changes: no `UPDATE` policy on
