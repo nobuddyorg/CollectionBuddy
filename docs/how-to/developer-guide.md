@@ -582,7 +582,7 @@ One-time setup for a fork:
    **Selected branches** → `main` only, and set the same rule on
    `github-pages`.
 3. Secrets: `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`,
-   `SUPABASE_AUTH_CONFIG_TOKEN`, `SUPABASE_PROJECT_REF` as **`production`
+   `SUPABASE_PROJECT_REF` as **`production`
    environment** secrets; `NEXT_PUBLIC_SUPABASE_URL`,
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `CODECOV_TOKEN` as repository secrets,
    and those three again as **Dependabot** secrets, since a Dependabot PR's
@@ -701,9 +701,8 @@ the end of step 5, a few minutes: do it at a quiet time.
 5. **Actions → Deploy Pages → Run workflow** from `main`. `gate` now reads
    the new URL, the build is served at `/`, and `smoke_test` runs against
    the new address. Then Supabase → Authentication → URL Configuration →
-   Site URL to the new address, and merge the PR; its push re-runs
-   `hosted-auth-check.yml`. Until the Site URL changes, sign-in on the new
-   address fails.
+   Site URL to the new address, and merge the PR. Until the Site URL
+   changes, sign-in on the new address fails.
 6. **Revoke every session.** Tokens stay in the old origin's
    `localStorage`, still readable by the sibling sites, and a refresh token
    never used again stays valid. In the dashboard's SQL editor,
@@ -720,17 +719,14 @@ and `hosted-auth.json` back.
 
 ## Check the hosted Auth settings
 
-[`hosted-auth-check.yml`](../../.github/workflows/hosted-auth-check.yml)
-reads the production Auth config through the Management API every hour (at
-:23), on a push to `main` that changes it or
-[`supabase/hosted-auth.json`](../../supabase/hosted-auth.json), and by hand
-from `main`. It fails when a pinned value differs, when any sign-in provider
-the file does not name is on, or when a third-party auth integration exists,
-and lists each difference in the job summary. It only reads; nothing it does
-changes the project, and the response, which carries the Google client secret,
-is never printed.
+Nothing checks these automatically. Compare the dashboard (Authentication →
+Sign In / Providers, and URL Configuration) with
+[`supabase/hosted-auth.json`](../../supabase/hosted-auth.json) whenever
+Supabase announces an Auth change, after a project restore, and before
+relying on sharing with someone new. Every provider the file does not name
+must be off, and Authentication → Third-party Auth must be empty.
 
-When it fails:
+When something differs:
 
 1. **Not deliberate, or anonymous sign-ins, the email provider, Confirm email
    or unverified sign-ins moved:** set the dashboard back first (Authentication
@@ -744,13 +740,6 @@ When it fails:
 2. **Deliberate:** change the file in a PR that says why, reviewed like a
    policy change. The four settings above stay off (Confirm email on) unless
    the sharing model changes first.
-3. **The API renamed a field** (a pinned field found `null`): check the
-   [Management API reference](https://supabase.com/docs/reference/api/v1-get-auth-service-config)
-   and rename it in the file.
-
-A 401 or 403 means `SUPABASE_AUTH_CONFIG_TOKEN` expired, was revoked or
-lacks **Auth Config: Read**
-([Configuration](../reference/configuration.md#management-api-tokens)).
 
 ## Sweep orphaned photographs
 
@@ -819,26 +808,21 @@ sessions) is independent of this one and has no deadline attached here.
 ## Scope the Management API tokens
 
 The workflows once shared one access token, most likely a classic one, which
-reaches every project on its owner's account. This replaces it with the two
-scoped tokens in [Configuration](../reference/configuration.md#management-api-tokens).
+reaches every project on its owner's account. This replaces it with the
+scoped token in [Configuration](../reference/configuration.md#management-api-tokens).
 Every step keeps the jobs running; do it after the change that added `0024`
 has deployed.
 
-1. **The Auth check's token.** Supabase Dashboard → Account → Access Tokens
-   → **Generate new token**, named for its use. Expiry 90 days; resource
-   access this one project; **Auth Config**: Read, nothing else. Copy the
-   `sbp_fc…` value into a new `production` environment secret,
-   `SUPABASE_AUTH_CONFIG_TOKEN`. Run Actions → *Check hosted Auth settings*:
-   it must pass without the warning that it borrowed `SUPABASE_ACCESS_TOKEN`.
-2. **The sweep token.** Generate a second one the same way with
-   **Database**: Read, **API Keys**: Read and **API Key Secrets**: Read, and
-   update `SUPABASE_ACCESS_TOKEN` with it.
-3. **Prove it.** Run *Clean up orphaned photographs* with the defaults (a dry
+1. **The sweep token.** Supabase Dashboard → Account → Access Tokens →
+   **Generate new token**, named for its use, expiry 90 days, resource
+   access this one project, with **Database**: Read, **API Keys**: Read and
+   **API Key Secrets**: Read, and update `SUPABASE_ACCESS_TOKEN` with it.
+2. **Prove it.** Run *Clean up orphaned photographs* with the defaults (a dry
    run: the read-only query); the next scheduled run fetches the secret key.
-4. **Revoke the classic token** on the Access Tokens page, once nothing else
+3. **Revoke the classic token** on the Access Tokens page, once nothing else
    uses it. `supabase login` on a laptop stores its own token and is
    unaffected.
-5. Put the expiry date a week early in a calendar: [Rotate a
+4. Put the expiry date a week early in a calendar: [Rotate a
    credential](#rotate-a-credential).
 
 ## Rotate a credential
@@ -866,16 +850,14 @@ password, which Supabase replaces at once.
   password**; it can take a few minutes to apply. Build the new session
   pooler string with the password percent-encoded ([Configuration](../reference/configuration.md#github-actions-secrets)),
   update the secret, and run *Deploy Pages*: `migrate` must pass.
-- **Management API tokens** (`SUPABASE_ACCESS_TOKEN`,
-  `SUPABASE_AUTH_CONFIG_TOKEN`, `production`). Every 90 days, a week before
-  they expire, with a calendar reminder for the next time. Supabase Dashboard
+- **Management API token** (`SUPABASE_ACCESS_TOKEN`, `production`). Every
+  90 days, a week before it expires, with a calendar reminder for the next time. Supabase Dashboard
   → Account → Access Tokens → generate a scoped token with the same project,
   permissions and 90-day expiry ([Configuration](../reference/configuration.md#management-api-tokens)),
-  and update its secret. Prove `SUPABASE_AUTH_CONFIG_TOKEN` with *Check hosted
-  Auth settings*, and `SUPABASE_ACCESS_TOKEN` with *Clean up orphaned
-  photographs* (a dry run by default); each must
+  and update its secret. Prove it with *Clean up orphaned
+  photographs* (a dry run by default); it must
   pass. Then revoke the old token on the same page. A classic token still in
-  either secret: [Scope the Management API
+  the secret: [Scope the Management API
   tokens](#scope-the-management-api-tokens).
 - **Google OAuth client secret** (Supabase Dashboard → Authentication →
   Sign In / Providers → Google). Google Cloud Console → APIs & Services →
