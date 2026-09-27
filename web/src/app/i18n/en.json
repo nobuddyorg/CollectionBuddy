@@ -27,7 +27,7 @@
     "delete_account": "Delete account"
   },
   "account": {
-    "confirm_delete": "Delete your account? All your collections, entries and photographs are permanently deleted, along with every share you made and every share made to you. Photographs you added to other people's entries stay with those entries. Export the collections you want to keep first. This cannot be undone.",
+    "confirm_delete": "Delete your account? All your collections, entries and photographs are permanently deleted, along with the shares you made and the shares made to you. Export the collections you want to keep first. This cannot be undone.",
     "deleting": "Deleting your account…",
     "delete_error": "Your account could not be deleted, though some of its photographs may already be gone. Please try again.",
     "delete_success": "Your account has been deleted."
@@ -277,7 +277,7 @@
     "retention_heading": "How long data is kept",
     "retention_until_deleted": "Your collections, entries and photos are kept until you delete them. After you delete something, the app lets you undo it for a few seconds; then it is removed from the database and the photo storage. There is no recycle bin.",
     "retention_orphans": "Photo files left behind by an interrupted upload or deletion are removed automatically after 48 hours.",
-    "retention_account": "Your account is kept until you delete it: \"Delete account\" in the account menu deletes it with all its collections, entries and photos, every share you made and every share made to you. You can also write to the contact above. Photos you added to someone else's entry belong to that entry and stay with it.",
+    "retention_account": "Your account is kept until you delete it: \"Delete account\" in the account menu deletes it with all your collections, entries and photos, the shares you made and the shares made to you. You can also write to the contact above. Photos you added, as an editor of a shared collection, to its owner's entries belong to those entries and stay with them.",
     "retention_sharing": "An invitation is kept until the owner or the invited person removes it, or the collection is deleted, even after its expiry date has passed.",
     "retention_logs": "Supabase keeps its technical logs, with IP addresses, for one day and its sign-in logs for one hour. Records of your sign-ins can also be kept with your account while it exists. GitHub, Google, Komoot and the OpenStreetMap Foundation keep their own logs under their own policies.",
     "browser_heading": "What is stored in your browser",
