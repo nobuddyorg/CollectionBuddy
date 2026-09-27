@@ -15,7 +15,7 @@ supabase-js. Change one, change the other.
 | Script | Scenarios | Normal load | Exercises |
 | --- | --- | --- | --- |
 | `smoke.js` | every journey below | 1 VU, 1 iteration each, whatever the profile | That the scripts and the target work, before a heavier run |
-| `catalogue.js` | `browse`, `search` | 10 + 5 VUs | The owner paging the catalogue (list, exact count, map) and searching it through `search_category_items` |
+| `catalogue.js` | `browse`, `search`, `export` | 10 + 5 + 1 VUs | The owner paging the catalogue as the app does (a page's ids and exact count side by side, then its entries with their photographs, then one sign call for the cards; pages 1 to 3, then the last page, then every page of the map), searching it through `search_category_items` (each page's photographs signed), and exporting all of it (keyset pages, sign calls of 100 paths six at a time, every photograph downloaded) |
 | `shared-viewer.js` | `shared_browse`, `shared_search` | 10 + 5 VUs | A second identity reading a category it holds a `viewer` grant on: the `has_category_read_access()` path (#619) |
 | `write.js` | `write` | 5 VUs | Creating an entry, filing it, uploading a photograph and its thumbnail, writing its `images` row |
 | `population.js` | `own_browse`, `own_search`, `lent_browse`, `write` | 10 + 5 + 5 + 3 VUs | Many collectors at once, each VU one of them: tables and trigram indexes shared by everyone, a grant per collector, quota triggers per owner. Searches are mostly another collector's word, common across the table and absent from the searcher's own collection |
@@ -54,6 +54,13 @@ Every script shares one `setup()` (`web/load/lib/seed.js`):
 
 Nine seeded entries in ten carry their place's coordinates, as picking a
 suggestion stores them, so the map returns the shape real collections get.
+The places are 1,200 districts of six cities, more than the map's page of
+1,000, so the map pages as a large collection's does. Descriptions run from
+one line to about 1,600 characters, so search sorts wide rows. Every tenth
+entry has a photograph: a full size and a thumbnail, both real (1×1 WebP)
+objects uploaded through Storage before the `images` row. So a page carries
+the images embed and a sign call, and Storage's policies have objects to
+check.
 
 `population.js` has its own `setup()` (`web/load/lib/population.js`): the
 profile's number of collectors, each with a collection titled with one word
@@ -80,7 +87,7 @@ npm run load -- smoke          # then: catalogue, shared-viewer, write, populati
 npm run load -- catalogue --profile peak
 ```
 
-`scripts/load-test.mjs` reads the URL and anon key from `supabase status`,
+`scripts/load-test.mjs` reads the URL and publishable key from `supabase status`,
 the same way `npm run e2e:local` does, and runs
 `k6 run --out web-dashboard load/<flow>.js`. Results land in
 `web/load-results/`:
@@ -139,6 +146,13 @@ runner, three times the worse p95, at least 100 ms, rounded up to 50.
 | `write` | 9.9, 12.9 ms (`population`: 12.3, 15.0 ms) | 100 ms |
 | `own_browse`, `lent_browse`, `own_search` | at most 7.8 ms | 100 ms |
 
+These baselines predate #781, which added the sign calls, the last page, the
+map's second page and the photographed seed to `browse` and `search`, and the
+`export` scenario, which has correctness thresholds only until it has a
+baseline of its own. A local `normal` run after #781 stayed inside every
+threshold (`browse` p95 45 ms, `search` 125 ms); recalibrate on a runner
+before relying on the margins.
+
 The margin is wide on purpose: the same script on the same runner type has
 varied by 2× between runs, and the floor keeps a 5 ms scenario from turning
 red on a noisy neighbour. They hold for `normal`; `peak` and `stress` are
@@ -169,7 +183,7 @@ workflow appends to the job summary under the k6 table:
 | --- | --- |
 | Most time in total | Where the database's time went: statement, calls, mean and max ms, rows, share of the total, buffer cache hit rate, and the role that ran it (`authenticated` for PostgREST, `supabase_storage_admin` for Storage, `supabase_auth_admin` for sign-up) |
 | Most calls | Something called far more often than the journeys explain: a per-row trigger lookup, an N+1 from the client |
-| Table access | Sequential scans and the rows they read against index scans, per table. A table the app filters that shows sequential scans reading many rows is the first thing to check against [`075_query_plans_test.sql`](../../supabase/tests/database/075_query_plans_test.sql) |
+| Table access | Sequential scans and the rows they read against index scans, per table, `storage` included: every sign call and upload checks `storage.objects`' policies. A table the app filters that shows sequential scans reading many rows is the first thing to check against [`075_query_plans_test.sql`](../../supabase/tests/database/075_query_plans_test.sql) |
 | Index use | Scans per index, and the indexes this run never touched. An index no journey uses is a candidate to drop (as #629 did), or a sign that its query plans around it |
 
 Three things to keep in mind:
@@ -195,8 +209,9 @@ anon key is the only credential involved; no script ever holds
 
 - **Sign-in is unresolved.** `setup()` signs up with email and password,
   which the hosted project does not offer: it signs in through Google only,
-  and the email provider staying off is itself a security control (the
-  anonymous sign-in note in `supabase/config.toml`, #634). A hosted run
+  and the email provider staying off is itself a security control
+  ([why](../explanation/design-decisions.md#why-the-hosted-auth-settings-are-pinned),
+  #634). A hosted run
   therefore fails at sign-up with the Auth server's own error. Until there is
   an answer that does not reopen that, the load test stays local.
 - **The Free tier is shared with real users.** A sustained run spends the

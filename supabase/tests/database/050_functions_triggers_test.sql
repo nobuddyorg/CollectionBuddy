@@ -1,6 +1,6 @@
 -- Direct, fast tests of the pure and near-pure SQL functions and triggers
 -- underneath the RLS layer -- normalization, path parsing, and the
--- set-based orphan sweep CLAUDE.md calls out by name. Most of this needs
+-- set-based orphan cleanup trigger (delete_item_if_orphan). Most of this needs
 -- no identity at all; the parts that do use the same impersonation as the
 -- rest of this suite (see 005_impersonation_sanity_test.sql).
 begin;
@@ -19,15 +19,31 @@ select is(public.normalize_text('   '), null,
   'a whitespace-only input normalizes to NULL, not an empty string');
 select is(public.normalize_text(null), null, 'NULL stays NULL');
 
+-- normalize_multiline_text: the description's normalizer keeps line breaks and indentation, unlike normalize_text (0027).
+select is(public.normalize_multiline_text(E'\n  Bought: 2019  \r\nCondition:\tVF\t\n\n  - boxed  \n '),
+  E'Bought: 2019\nCondition:\tVF\n\n  - boxed',
+  'line breaks and indentation survive; CR LF becomes LF, blanks before a break and at the ends go');
+select is(public.normalize_multiline_text(E'a\rb'), E'a\nb',
+  'a lone carriage return becomes a line feed');
+select is(public.normalize_multiline_text(E' \n\t\r\n '), null,
+  'a whitespace-only input normalizes to NULL, not an empty string');
+select is(public.normalize_multiline_text(null), null, 'NULL stays NULL here too');
+
 -- join_tags / tags_text: the generated column tag search relies on.
 select is(public.join_tags(array['b', 'a']), 'b a',
   'tags join in array order, space-separated');
 select is(public.join_tags(null), '',
   'a NULL tag array joins to an empty string, not NULL');
 
+-- longest_tag_length: what items_tag_length checks (0028).
+select is(public.longest_tag_length(array['ab', 'äöüß', 'x']), 4,
+  'the longest tag, counted in characters');
+select is(public.longest_tag_length(array[]::text[]), 0, 'no tags measure 0, not NULL');
+select is(public.longest_tag_length(null), 0, 'a NULL array measures 0 too');
+
 -- storage_item_id: parses the item id out of a well-formed path, and
 -- answers NULL rather than raising on one that does not parse -- the same
--- reasoning as images_path_full_matches_item (0012): a raised error inside
+-- reasoning as images_path_full_matches_item (0003): a raised error inside
 -- an RLS predicate would abort the whole query, not just fail to match one
 -- row.
 select gen_random_uuid() as probe_item_id \gset
@@ -55,6 +71,9 @@ select pg_temp.auth_as(:'owner_id'::uuid, 'functions-test@collectionbuddy.test')
 insert into public.items (title, description, tags)
 values ('  padded title  ', '   ', array['  b  ', 'a', 'a'])
 returning id as norm_item_id \gset
+insert into public.items (title, description)
+values (E'two\nline title', E'first line\nsecond line')
+returning id as multiline_item_id \gset
 
 select is(
   (select title from public.items where id = :'norm_item_id'::uuid),
@@ -65,6 +84,16 @@ select is(
   (select description from public.items where id = :'norm_item_id'::uuid),
   null,
   'a whitespace-only description is stored as NULL'
+);
+select is(
+  (select description from public.items where id = :'multiline_item_id'::uuid),
+  E'first line\nsecond line',
+  'a description keeps its line breaks'
+);
+select is(
+  (select title from public.items where id = :'multiline_item_id'::uuid),
+  'two line title',
+  'a title still collapses a line break to a space'
 );
 select is(
   (select tags from public.items where id = :'norm_item_id'::uuid),
@@ -199,6 +228,24 @@ select is(
     from public.list_category_places(:'places_category'::uuid, '%Newest%')),
   array['Cologne'],
   'a like_pattern narrows to the places matching it, the same as the searched list'
+);
+
+-- 0026: places come back ordered by place, so PostgREST's offset and limit page past max_rows (1,000) with no gap or repeat.
+insert into public.categories (name) values ('Many places test')
+returning id as many_places_category \gset
+with inserted as (
+  insert into public.items (title, place)
+  select 'Many places ' || n as title, 'Fundort ' || n as place from generate_series(1, 1001) as n
+  returning id
+)
+insert into public.item_categories (item_id, category_id)
+select id, :'many_places_category'::uuid from inserted;
+
+select is(
+  array(select place from public.list_category_places(:'many_places_category'::uuid, null) limit 1000)
+    || array(select place from public.list_category_places(:'many_places_category'::uuid, null) limit 1000 offset 1000),
+  array(select 'Fundort ' || n from generate_series(1, 1001) as n order by 1),
+  'two pages of 1,000 read back all 1,001 places, each once, in place order'
 );
 
 -- SECURITY INVOKER: a bystander gets nothing back, not an error, the same

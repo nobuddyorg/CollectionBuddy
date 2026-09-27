@@ -1,8 +1,10 @@
 version: 2
 updates:
-  # Actions are pinned by commit hash, so a repointed tag never moves them; these bumps are the only thing that does.
+  # Actions are pinned by commit hash, in the workflows and the composite actions alike; tools a job downloads are not covered here (developer-guide.md, Bump a pinned CI tool).
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "/"
+      - "/.github/actions/*"
     schedule:
       interval: "weekly"
     cooldown:
@@ -12,7 +14,7 @@ updates:
         patterns:
           - "*"
 
-  # .pre-commit-config.yaml pins its hook revisions the same way.
+  # .pre-commit-config.yaml pins each hook to a commit SHA; Dependabot resolves the next tag and rewrites its `# frozen:` comment.
   - package-ecosystem: "pre-commit"
     directory: "/"
     schedule:

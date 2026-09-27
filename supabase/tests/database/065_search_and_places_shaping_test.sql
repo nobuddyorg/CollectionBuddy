@@ -16,7 +16,7 @@ language sql
 as $$
   select coalesce(array_agg(x.title order by x.ord), array[]::text[])
   from public.search_category_items(p_category_id, '%' || p_term || '%', p_from, p_to)
-    with ordinality as x(id, title, description, place, place_lat, place_lng, tags, total_count, ord)
+    with ordinality as x(id, title, description, place, place_lat, place_lng, tags, total_count, images, ord)
 $$;
 
 create or replace function pg_temp.search_total(
@@ -27,6 +27,16 @@ language sql
 as $$
   select max(total_count)
   from public.search_category_items(p_category_id, '%' || p_term || '%', p_from, p_to)
+$$;
+
+-- The first match's photograph paths, in the order the function carries them.
+create or replace function pg_temp.search_photos(p_category_id uuid, p_term text)
+returns text[]
+language sql
+as $$
+  select coalesce(array_agg(p.photo ->> 'path_full' order by p.ord), array[]::text[])
+  from public.search_category_items(p_category_id, '%' || p_term || '%', 0, 0) s,
+    jsonb_array_elements(s.images) with ordinality as p(photo, ord)
 $$;
 
 select gen_random_uuid() as owner_id, gen_random_uuid() as grantee_id \gset
@@ -87,6 +97,41 @@ select is(
   'total_count counts every match in the collection, not the rows in the page'
 );
 
+-- Each row carries its own entry's photographs, oldest first, as the
+-- unsearched page's embed does (0030); inserted newest first, so the order
+-- comes from the function rather than from insertion.
+select i.id as five_id from public.items i where i.title = 'Probe five' \gset
+select i.id as four_id from public.items i where i.title = 'Probe four' \gset
+insert into public.images (item_id, path_full, created_at) values
+  (:'five_id'::uuid, :'owner_id' || '/' || :'five_id' || '/second.webp', now() - interval '1 minute'),
+  (:'five_id'::uuid, :'owner_id' || '/' || :'five_id' || '/first.webp', now() - interval '2 minutes'),
+  (:'four_id'::uuid, :'owner_id' || '/' || :'four_id' || '/other.webp', now());
+
+select is(
+  pg_temp.search_photos(:'category_id'::uuid, 'Probe five'),
+  array[
+    :'owner_id' || '/' || :'five_id' || '/first.webp',
+    :'owner_id' || '/' || :'five_id' || '/second.webp'
+  ],
+  'a row carries its own entry''s photographs, oldest first, and no other entry''s'
+);
+
+select is(
+  (select s.images
+   from public.search_category_items(:'category_id'::uuid, '%Probe three%', 0, 0) s),
+  '[]'::jsonb,
+  'an entry without photographs carries an empty list, not null'
+);
+
+select is(
+  (select array_agg(key order by key)
+   from public.search_category_items(:'category_id'::uuid, '%Probe four%', 0, 0) s,
+     jsonb_array_elements(s.images) photo,
+     jsonb_object_keys(photo) key),
+  array['id', 'item_id', 'path_full', 'path_thumb'],
+  'a carried photograph names its row and paths, and nothing else of the row'
+);
+
 -- Scoping, restated against a satisfiable filter: an entry with a matching
 -- title in another of the caller's own collections is still not in this
 -- collection's results (TEST_STRATEGY.md §7 rule 4).
@@ -101,7 +146,7 @@ select is(
 -- "search stopped finding things by place" -- a shape no authorization
 -- test would ever notice.
 insert into public.items (title, description, place, tags) values
-  ('Branch entry', 'Eine Beschreibung mit Silberglanz', 'Kölnisch Wasser', array['Reichsmark', 'silber'])
+  ('Branch entry', E'Eine Beschreibung\nmit Silberglanz', 'Kölnisch Wasser', array['Reichsmark', 'silber'])
 returning id as branch_item \gset
 insert into public.item_categories (item_id, category_id)
 values (:'branch_item'::uuid, :'category_id'::uuid);
@@ -114,7 +159,7 @@ select is(
 select is(
   pg_temp.search_page(:'category_id'::uuid, 'Silberglanz', 0, 9),
   array['Branch entry'],
-  'and against the description'
+  'and against the description, on a line after its first (0027)'
 );
 select is(
   pg_temp.search_page(:'category_id'::uuid, 'Kölnisch', 0, 9),

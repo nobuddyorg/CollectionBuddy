@@ -32,7 +32,7 @@ select is(
   'every function in schema public pins search_path to the empty string'
 );
 
--- Every security-definer function, in full: fourteen trigger functions plus search_category_items, a deliberate boundary. A sixteenth must be added here on purpose.
+-- Every security-definer function, in full: fourteen trigger functions, search_category_items, photo_upload_has_room and delete_own_account, deliberate boundaries. An eighteenth must be added here on purpose.
 select is(
   (select array_agg(p.proname::text order by p.proname)
    from pg_catalog.pg_proc p
@@ -44,14 +44,14 @@ select is(
        where d.objid = p.oid and d.deptype = 'e'
      )),
   array[
-    'delete_item_if_orphan', 'enforce_user_id', 'search_category_items',
+    'delete_item_if_orphan', 'delete_own_account', 'enforce_user_id', 'photo_upload_has_room', 'search_category_items',
     'tg_categories_normalize', 'tg_categories_quota', 'tg_category_shares_enforce',
     'tg_category_shares_quota', 'tg_images_enforce',
     'tg_images_quota', 'tg_images_size_from_storage',
     'tg_item_categories_enforce', 'tg_item_categories_quota',
     'tg_items_normalize', 'tg_items_quota', 'tg_set_updated_at'
   ],
-  'exactly fifteen functions run as their owner, and search_category_items is the only non-trigger one'
+  'exactly seventeen functions run as their owner, and search_category_items, photo_upload_has_room and delete_own_account are the only non-trigger ones'
 );
 
 -- A `security definer` function runs as whoever owns it, so the owner is
@@ -71,7 +71,7 @@ select is(
   'every security definer function is owned by postgres, not by a lesser role'
 );
 
--- A trigger fires without EXECUTE, so the API roles hold it on one definer only: the deliberate RPC (0010, Splinter 0028/0029).
+-- A trigger fires without EXECUTE, so the API roles hold it on three definers only: the search RPC, the upload policy's bucket count and the account deletion (0010, 0025, 0033, Splinter 0028/0029).
 select is(
   (select array_agg(p.proname::text || ' to ' || r.rolname order by p.proname, r.rolname)
    from pg_catalog.pg_proc p
@@ -80,14 +80,18 @@ select is(
    where n.nspname = 'public'
      and p.prosecdef
      and has_function_privilege(r.rolname, p.oid, 'EXECUTE')),
-  array['search_category_items to authenticated'],
-  'the API roles can execute exactly one security definer function: search_category_items, signed in'
+  array['delete_own_account to authenticated', 'photo_upload_has_room to authenticated', 'search_category_items to authenticated'],
+  'the API roles can execute exactly three security definer functions, all signed in only'
 );
 
--- Two must stay `security invoker`. list_category_places checks nothing itself; as a definer it would be an unsound second boundary.
+-- These must stay `security invoker`. list_category_places and create_items_in_category check nothing themselves; as definers they would be unsound second boundaries.
 select ok(
   not (select prosecdef from pg_catalog.pg_proc where oid = 'public.list_category_places(uuid, text)'::regprocedure),
   'list_category_places runs as its caller, so ordinary RLS still applies to it'
+);
+select ok(
+  not (select prosecdef from pg_catalog.pg_proc where oid = 'public.create_items_in_category(uuid, jsonb)'::regprocedure),
+  'create_items_in_category runs as its caller, so the items policies and the link trigger decide as for two inserts'
 );
 
 -- has_category_read_access, has_category_write_access and
@@ -107,23 +111,26 @@ select ok(
   not (select prosecdef from pg_catalog.pg_proc where oid = 'public.granted_category_ids()'::regprocedure),
   'granted_category_ids runs as its caller'
 );
-
--- 001_grants_test.sql leaves the trigger functions out of anon's reachable
--- surface on the grounds that a trigger function cannot be called
--- directly. That is a property of PostgreSQL rather than of this schema,
--- but the exclusion rests on it, so it is asserted rather than assumed.
-set local role anon;
 select ok(
-  pg_temp.raises('select public.enforce_user_id()'),
-  'a trigger function cannot be invoked directly, which is what keeps it off anon''s reachable surface'
+  not (select prosecdef from pg_catalog.pg_proc where oid = 'public.has_item_write_access(uuid, uuid)'::regprocedure),
+  'has_item_write_access runs as its caller'
+);
+
+-- 001_grants_test.sql keeps trigger functions off anon's surface as PostgreSQL refuses a direct call; asserted as postgres, who holds EXECUTE.
+select throws_ok(
+  'select public.enforce_user_id()',
+  '0A000',
+  'trigger functions can only be called as triggers',
+  'a trigger function cannot be invoked directly, even with EXECUTE, which is what keeps it off anon''s reachable surface'
 );
 
 -- keepalive() is the one thing anon is meant to do: pinged on a schedule
 -- so the free-tier project does not auto-pause
 -- (.github/workflows/keep-alive.yml). A workflow that starts failing
 -- against a 42501 would be noticed late and cost the app its availability.
-select ok(
-  not pg_temp.raises('select public.keepalive()'),
+set local role anon;
+select lives_ok(
+  'select public.keepalive()',
   'anon can call keepalive() -- the one function the keep-alive schedule depends on'
 );
 reset role;

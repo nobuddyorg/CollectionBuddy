@@ -8,6 +8,18 @@ import { apiAs, context } from './helpers';
 // A broken policy would look identical in the interface, so most cases here ask Postgres directly.
 test.use({ locale: 'en-GB' });
 
+/** The other collector's seeded entry, read as its owner; other specs never write it. */
+async function seededEntryOf(otherToken: string, otherUserId: string) {
+  const { data, error } = await apiAs(otherToken)
+    .from('items')
+    .select('id,title')
+    .eq('user_id', otherUserId)
+    .eq('title', SEED.other.item)
+    .single();
+  if (error) throw error;
+  return data as { id: string; title: string };
+}
+
 test.describe('one collection cannot reach another', () => {
   test('the interface shows nothing of the other collector', async ({
     on,
@@ -50,12 +62,7 @@ test.describe('one collection cannot reach another', () => {
   test('their entries cannot be edited', async () => {
     const { token, otherToken, otherUserId } = context();
 
-    const { data: theirs } = await apiAs(otherToken)
-      .from('items')
-      .select('id,title')
-      .eq('user_id', otherUserId);
-    expect(theirs!.length).toBeGreaterThan(0);
-    const target = theirs![0];
+    const target = await seededEntryOf(otherToken, otherUserId);
 
     const { data: updated } = await apiAs(token)
       .from('items')
@@ -75,11 +82,7 @@ test.describe('one collection cannot reach another', () => {
 
   test('their entries cannot be deleted', async () => {
     const { token, otherToken, otherUserId } = context();
-
-    const { data: before } = await apiAs(otherToken)
-      .from('items')
-      .select('id')
-      .eq('user_id', otherUserId);
+    const target = await seededEntryOf(otherToken, otherUserId);
 
     const { data: deleted } = await apiAs(token)
       .from('items')
@@ -88,11 +91,12 @@ test.describe('one collection cannot reach another', () => {
       .select('id');
     expect(deleted).toEqual([]);
 
+    // The seeded row, not a count: other specs add and remove the other collector's entries meanwhile.
     const { data: after } = await apiAs(otherToken)
       .from('items')
       .select('id')
-      .eq('user_id', otherUserId);
-    expect(after!.length).toBe(before!.length);
+      .eq('id', target.id);
+    expect(after).toEqual([{ id: target.id }]);
   });
 
   // Ignored rather than refused: enforce_user_id() is a BEFORE trigger that overwrites the claimed owner.
@@ -161,25 +165,38 @@ test.describe('one collection cannot reach another', () => {
     });
   }
 
-  // Guarded by a trigger, not RLS: the insert policy checks a column the same trigger sets.
+  // Guarded by a trigger, not RLS; a fresh entry, so the one-collection quota cannot be what refuses it.
   test('an item cannot be filed into their category', async () => {
     const { token, otherToken } = context();
 
-    const { data: mine } = await apiAs(token)
+    const { data: mine, error: insertError } = await apiAs(token)
       .from('items')
+      .insert({ title: 'rls-stranger-filing-probe' })
       .select('id')
-      .eq('title', SEED.items[0].title)
       .single();
+    expect(insertError).toBeNull();
     const { data: theirs } = await apiAs(otherToken)
       .from('categories')
       .select('id')
       .eq('name', SEED.other.category)
       .single();
 
-    const { error } = await apiAs(token)
-      .from('item_categories')
-      .insert({ item_id: mine!.id, category_id: theirs!.id });
-    expect(error).not.toBeNull();
+    try {
+      const { error } = await apiAs(token)
+        .from('item_categories')
+        .insert({ item_id: mine!.id, category_id: theirs!.id });
+      expect(error?.message).toBe('cross-tenant assignment is not allowed');
+
+      // A link would be filed under the entry's owner, the one reader who sees it (not the category's owner).
+      const { data: after } = await apiAs(token)
+        .from('items')
+        .select('item_categories(category_id)')
+        .eq('id', mine!.id)
+        .single();
+      expect(after!.item_categories).toEqual([]);
+    } finally {
+      await apiAs(token).from('items').delete().eq('id', mine!.id);
+    }
   });
 
   test('a mapping cannot be updated, not even your own', async () => {

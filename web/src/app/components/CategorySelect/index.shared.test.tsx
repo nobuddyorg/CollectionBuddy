@@ -75,16 +75,16 @@ describe('CategorySelect with a shared category', () => {
     ).not.toBeInTheDocument();
   });
 
-  // exportCategory() builds storage paths from the caller's uid, which is wrong for a grantee.
-  it('disables export rather than offering a broken one', async () => {
+  // Owners-only by product decision: a full copy of a collection is the owner's to hand out.
+  it('keeps export to the owner', async () => {
     renderSelect({ categories: categories({ categories: sharedCategories }) });
     await openPanel();
     expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
   });
 
-  // Delete stays in the same slot but ends only the viewer's own access, via deleteShare.
+  // Delete stays in the same slot but ends only the viewer's own access, via leaveShare.
   it('leaves instead of deleting, with different confirm copy, and falls through to what is left', async () => {
-    const deleteShare = vi.fn<UseShares['deleteShare']>();
+    const leaveShare = vi.fn<UseShares['leaveShare']>().mockResolvedValue(true);
     const deleteCategory = vi.fn<UseCategories['deleteCategory']>();
     vi.mocked(useShares).mockReturnValue(
       sharesState({
@@ -97,7 +97,7 @@ describe('CategorySelect with a shared category', () => {
             role: 'viewer',
           },
         ],
-        deleteShare,
+        leaveShare,
       }),
     );
     const { onSelect } = renderSelect({
@@ -114,13 +114,7 @@ describe('CategorySelect with a shared category', () => {
 
     await userEvent.click(screen.getByTestId('confirm-accept'));
 
-    expect(deleteShare).toHaveBeenCalledWith(
-      'share-1',
-      expect.objectContaining({
-        successMessage: 'Left shared collection.',
-        errorMessage: 'Could not leave this collection. Please try again.',
-      }),
-    );
+    expect(leaveShare).toHaveBeenCalledWith('share-1');
     expect(deleteCategory).not.toHaveBeenCalled();
     expect(onSelect).toHaveBeenCalledWith('b');
   });

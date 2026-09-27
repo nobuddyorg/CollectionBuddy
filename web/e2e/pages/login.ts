@@ -12,6 +12,7 @@ interface LoginPage {
     };
     coin: Locator;
     collectibles: Locator;
+    privacyLink: Locator;
     tagline: Locator;
     wordmark: Locator;
     wordmarkParts: Locator;
@@ -26,6 +27,7 @@ export function initLoginPage(page: Page): LoginPage {
     },
     coin: root.getByTestId('coin'),
     collectibles: root.getByTestId('collectible'),
+    privacyLink: root.getByTestId('login-privacy-link'),
     tagline: root.getByTestId('tagline'),
     wordmark: root.getByTestId('wordmark'),
     wordmarkParts: root.getByTestId('wordmark-part'),

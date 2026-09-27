@@ -9,6 +9,8 @@ import {
   SEED,
   type SeedContext,
 } from './fixtures';
+import { removeCategoryNamed } from './cleanup';
+import { share } from './rls/helpers';
 
 // The grantee's side, in their own session; rls/viewer-share.spec.ts has what it reaches.
 test.use({ storageState: OTHER_AUTH_STATE_PATH, locale: 'en-GB' });
@@ -83,7 +85,7 @@ test.describe('a collection shared with you', () => {
       await expect(app.catalogue.locators.buttons.newEntry).toBeDisabled();
 
       await app.categories.do.openPanel();
-      // Both would be refused: the rename by RLS, the export by the prefix.
+      // Rename is refused by RLS; export is owners-only by product decision.
       await expect(app.categories.locators.buttons.rename).toBeDisabled();
       await expect(app.categories.locators.buttons.export).toBeDisabled();
       // Who else a collection is shared with is the owner's business.
@@ -101,9 +103,107 @@ test.describe('a collection shared with you', () => {
       );
       await app.categories.do.openPanel();
       await expect(app.categories.tab(SEED.grantedCategory)).toHaveCount(0);
+
+      // Sent at once, with no undo window: once confirmed, a reload straight away finds it still gone.
+      await expect(
+        app.toast().filter({ hasText: 'Left shared collection.' }),
+      ).toBeVisible();
+      await page.reload({ waitUntil: 'networkidle' });
+      await expect(app.categories.locators.selected).not.toBeEmpty();
+      await app.categories.do.openPanel();
+      await expect(app.categories.tab(SEED.grantedCategory)).toHaveCount(0);
+      const { data: left } = await apiAs(token)
+        .from('category_shares')
+        .select('id')
+        .eq('id', grant.id);
+      expect(left).toEqual([]);
     } finally {
-      // Leaving deletes the grant only after the undo window, or not at all.
+      // Cleanup for a run that failed before leaving.
       await apiAs(token).from('category_shares').delete().eq('id', grant.id);
+    }
+  });
+});
+
+const BLANK_TILE = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'base64',
+);
+
+test.describe('the map of a collection shared with you', () => {
+  // RLS answers a viewer's write-back with zero rows, so sending one only spends a request.
+  test('looks up a hand-typed place without writing its coordinates back', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const { token, userId } = context();
+    const name = `E2E Geteilte Karte ${Date.now()}`;
+    const owner = apiAs(token);
+    const { data: category, error } = await owner
+      .from('categories')
+      .insert({ user_id: userId, name })
+      .select('id')
+      .single();
+    if (error) throw error;
+
+    try {
+      const { data: item, error: itemError } = await owner
+        .from('items')
+        .insert({ user_id: userId, title: 'Kartenstück', place: 'Aachen' })
+        .select('id')
+        .single();
+      if (itemError) throw itemError;
+      const { error: linkError } = await owner
+        .from('item_categories')
+        .insert({ item_id: item.id, category_id: category.id });
+      if (linkError) throw linkError;
+      await share({
+        token,
+        categoryId: category.id,
+        invitedEmail: SEED.other.email,
+      });
+      await page.route('https://photon.komoot.io/**', (route) =>
+        route.fulfill({
+          json: {
+            features: [
+              {
+                properties: { name: 'Aachen' },
+                geometry: { type: 'Point', coordinates: [6.0839, 50.7753] },
+              },
+            ],
+          },
+        }),
+      );
+
+      // The map stays open for the whole listening window, so its tiles come from here, not the network.
+      await page.route('https://*.tile.openstreetmap.org/**', (route) =>
+        route.fulfill({ contentType: 'image/png', body: BLANK_TILE }),
+      );
+
+      await page.goto('', { waitUntil: 'networkidle' });
+      await expect(app.categories.locators.selected).not.toBeEmpty();
+      await app.categories.do.openPanel();
+      await app.categories.tab(name).click();
+      await expect(app.catalogue.card('Kartenstück')()).toBeVisible();
+
+      // Listening from before the map opens: an owner's write-back leaves within milliseconds of its pin.
+      const wroteBack = page
+        .waitForRequest(
+          (request) =>
+            request.method() === 'PATCH' &&
+            request.url().includes('/rest/v1/items'),
+          { timeout: 5_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        );
+      await app.map.do.open();
+      await expect(app.map.locators.pins).toHaveCount(1);
+
+      expect(await wroteBack).toBe(false);
+    } finally {
+      await removeCategoryNamed(name);
     }
   });
 });

@@ -10,7 +10,7 @@ import {
   useCurrentLocation,
   type LocationResult,
 } from '../Map/useCurrentLocation';
-import { MapModal } from './MapModal';
+import { MapModal, prefetchMap } from './MapModal';
 import type { MapCommand } from '../Map/types';
 
 vi.mock('../Map/usePlaces', () => ({ usePlaces: vi.fn() }));
@@ -24,6 +24,13 @@ vi.mock('../Map', () => ({
     return <div data-testid="map" />;
   },
 }));
+
+// Counts evaluations, so a test can tell whether anything asked for Leaflet's chunk.
+const leafletLoaded = vi.hoisted(() => vi.fn());
+vi.mock('leaflet', () => {
+  leafletLoaded();
+  return { default: {} };
+});
 
 function place(name: string, titles: string[]) {
   return { name, lat: 50, lng: 7, titles };
@@ -58,6 +65,7 @@ function renderModal(props: Partial<Parameters<typeof MapModal>[0]> = {}) {
         <MapModal
           categoryId="cat-1"
           search=""
+          canEdit
           open
           onOpenChange={vi.fn()}
           {...props}
@@ -74,6 +82,15 @@ describe('MapModal', () => {
     window.localStorage.setItem('lang', 'en');
     placesState();
     locationState();
+  });
+
+  // A viewer's map must not write coordinates RLS would refuse anyway.
+  it("hands the category's write access to the places it loads", () => {
+    renderModal({ canEdit: false });
+
+    expect(usePlaces).toHaveBeenCalledWith(
+      expect.objectContaining({ categoryId: 'cat-1', canEdit: false }),
+    );
   });
 
   it('reports that the map itself is broken rather than showing an empty one', () => {
@@ -228,5 +245,11 @@ describe('MapModal', () => {
     expect(
       screen.getByRole('button', { name: 'Zoom to current location' }),
     ).toBeDisabled();
+  });
+
+  // Leaflet is the map's heaviest chunk; left to the map's mount, it would load only after the click.
+  it('warms Leaflet along with the map on intent', async () => {
+    prefetchMap();
+    await waitFor(() => expect(leafletLoaded).toHaveBeenCalledOnce());
   });
 });

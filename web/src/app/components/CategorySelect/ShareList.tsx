@@ -11,14 +11,15 @@ import type { UseShares } from './useShares';
 import { labelClasses } from '../ui/labelClasses';
 
 export function ShareList({ shares }: { shares: UseShares }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const confirm = useConfirm();
+  // Every row action is off while a reload is in flight: the rows may be about to change under the click.
   const {
     shares: list,
     isLoading,
     isRevoking,
     isUpdatingRole,
-    deleteShare,
+    revokeShare,
     updateShareRole,
   } = shares;
   // Below sm the row has no room for "Can edit"; a pen icon opens the same checkbox in a modal.
@@ -28,10 +29,9 @@ export function ShareList({ shares }: { shares: UseShares }) {
     async (share: CategoryShareSummary, role: ShareRole) => {
       // Only granting needs confirmation; taking edit access away is the safe direction.
       if (role === 'editor') {
-        const message = t('category_select.share_editor_confirm').replace(
-          '{email}',
-          share.invited_email,
-        );
+        const message = t('category_select.share_editor_confirm', {
+          email: share.invited_email,
+        });
         if (!(await confirm(message))) return;
       }
       await updateShareRole(share.id, role);
@@ -49,7 +49,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
         onChange={(event) =>
           void onToggleRole(share, event.target.checked ? 'editor' : 'viewer')
         }
-        disabled={isUpdatingRole}
+        disabled={isUpdatingRole || isLoading}
         className="h-4 w-4 rounded-sm ring-1 ring-inset ring-control-border accent-foreground"
       />
       {t('category_select.share_can_edit')}
@@ -58,17 +58,13 @@ export function ShareList({ shares }: { shares: UseShares }) {
 
   const onRevoke = useCallback(
     async (shareId: string, invitedEmail: string) => {
-      const message = t('category_select.share_revoke_confirm').replace(
-        '{email}',
-        invitedEmail,
-      );
-      if (!(await confirm(message))) return;
-      deleteShare(shareId, {
-        successMessage: t('category_select.share_revoke_success'),
-        errorMessage: t('category_select.share_revoke_error'),
+      const message = t('category_select.share_revoke_confirm', {
+        email: invitedEmail,
       });
+      if (!(await confirm(message))) return;
+      await revokeShare(shareId);
     },
-    [confirm, t, deleteShare],
+    [confirm, t, revokeShare],
   );
 
   return (
@@ -90,10 +86,12 @@ export function ShareList({ shares }: { shares: UseShares }) {
               new Date(share.expires_at).getTime() <= new Date().getTime();
             let expiryLabel = t('category_select.share_no_expiry');
             if (share.expires_at) {
-              const date = new Date(share.expires_at).toLocaleDateString();
+              const date = new Date(share.expires_at).toLocaleDateString(
+                locale,
+              );
               expiryLabel = isExpired
-                ? t('category_select.share_expired_on').replace('{date}', date)
-                : t('category_select.share_expires_on').replace('{date}', date);
+                ? t('category_select.share_expired_on', { date })
+                : t('category_select.share_expires_on', { date });
             }
             return (
               <li
@@ -132,9 +130,10 @@ export function ShareList({ shares }: { shares: UseShares }) {
                     <button
                       type="button"
                       onClick={() => setRoleModalShareId(share.id)}
+                      disabled={isLoading}
                       aria-label={t('category_select.share_edit_access')}
                       title={t('category_select.share_edit_access')}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:hidden sm:h-9 sm:w-9"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40 sm:hidden sm:h-9 sm:w-9"
                     >
                       <Icon
                         icon={IconType.Edit}
@@ -148,7 +147,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
                       onClick={() =>
                         void onRevoke(share.id, share.invited_email)
                       }
-                      disabled={isRevoking}
+                      disabled={isRevoking || isLoading}
                       aria-label={t('category_select.share_revoke')}
                       title={t('category_select.share_revoke')}
                       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-40 sm:h-9 sm:w-9"

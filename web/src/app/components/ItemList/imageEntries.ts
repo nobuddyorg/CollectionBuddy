@@ -1,7 +1,14 @@
-import { createSignedUrls, type ImageListRow } from '../../data/images';
+import {
+  createSignedUrls,
+  SIGN_URLS_BATCH_SIZE,
+  type ImageListRow,
+} from '../../data/images';
+import { chunk } from '../../lib/chunk';
 import {
   cacheSignedUrls,
+  forgetSignedUrls,
   getCachedSignedUrl,
+  lastSignedUrl,
   unsignedPaths,
 } from './imageCache';
 import type { ImageEntry } from './types';
@@ -73,7 +80,28 @@ function pathsOf(entries: Iterable<ImageEntryData>): string[] {
   );
 }
 
-// On a signing failure, falls back to whatever is already cached: a stale photograph beats none.
+// A path Storage answers without a URL is forgotten; a failed call leaves every signature as it was.
+async function signBatch(
+  batch: string[],
+  signUrls: typeof createSignedUrls,
+): Promise<void> {
+  const { data: signatures, error: signError } = await signUrls(batch);
+  if (signError) {
+    console.error('Failed to create signed URLs', signError);
+    return;
+  }
+  const signed = signatures
+    .filter((signature) => signature.path && signature.signedUrl)
+    .map(
+      (signature) =>
+        [signature.path as string, signature.signedUrl as string] as const,
+    );
+  cacheSignedUrls(signed);
+  const signedPaths = new Set(signed.map(([path]) => path));
+  forgetSignedUrls(batch.filter((path) => !signedPaths.has(path)));
+}
+
+// A wanted path whose signing failed keeps its last signature: a stale photograph beats none.
 async function signItems(
   perItem: ReadonlyArray<readonly [string, Map<string, ImageEntryData>]>,
   { signUrls, limit }: { signUrls: typeof createSignedUrls; limit: number },
@@ -81,31 +109,26 @@ async function signItems(
   const wanted = perItem.flatMap(([, entryData]) =>
     pathsOf([...entryData.values()].slice(0, limit)),
   );
-  const toSign = unsignedPaths(wanted);
-  if (toSign.length > 0) {
-    const { data: signedUrls, error: signError } = await signUrls(toSign);
-    if (signError) {
-      console.error('Failed to create signed URLs', signError);
-    } else {
-      cacheSignedUrls(
-        signedUrls
-          .filter((signature) => signature.path && signature.signedUrl)
-          .map(
-            (signature) =>
-              [
-                signature.path as string,
-                signature.signedUrl as string,
-              ] as const,
-          ),
-      );
-    }
-  }
+  await Promise.all(
+    chunk(unsignedPaths(wanted), SIGN_URLS_BATCH_SIZE).map((batch) =>
+      signBatch(batch, signUrls),
+    ),
+  );
+  const wantedPaths = new Set(wanted);
 
   const allPaths = perItem.flatMap(([, entryData]) =>
     pathsOf(entryData.values()),
   );
   const signedUrlMap = new Map(
-    allPaths.map((path) => [path, getCachedSignedUrl(path)] as const),
+    allPaths.map(
+      (path) =>
+        [
+          path,
+          wantedPaths.has(path)
+            ? lastSignedUrl(path)
+            : getCachedSignedUrl(path),
+        ] as const,
+    ),
   );
 
   const result: Record<string, ImageEntry[]> = {};
@@ -141,4 +164,33 @@ export function entryDataOf(
       { id: entry.id, pathFull: entry.pathFull, pathThumb: entry.pathThumb },
     ]),
   );
+}
+
+function shownPaths(entries: ImageEntry[]): string[] {
+  return entries.flatMap(({ pathFull, urlFull, pathThumb, urlThumb }) =>
+    [urlFull && pathFull, urlThumb && pathThumb].filter(
+      (path): path is string => Boolean(path),
+    ),
+  );
+}
+
+/** Items showing a signature that is aged out or near it: the only ones a refresh re-signs. */
+export function itemsDueForResigning(
+  images: Readonly<Record<string, ImageEntry[]>>,
+  now: number,
+): string[] {
+  return Object.entries(images)
+    .filter(([, entries]) => unsignedPaths(shownPaths(entries), now).length > 0)
+    .map(([itemId]) => itemId);
+}
+
+/** A failed listing blanks nothing already shown; an item never shown settles as having none. */
+export function keepingShown(
+  previous: Readonly<Record<string, ImageEntry[]>>,
+  itemIds: string[],
+): Record<string, ImageEntry[]> {
+  return {
+    ...Object.fromEntries(itemIds.map((itemId) => [itemId, []])),
+    ...previous,
+  };
 }

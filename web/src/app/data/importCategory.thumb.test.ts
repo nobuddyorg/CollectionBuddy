@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { importCategory } from './importCategory';
-import { WEBP_COMPRESSION_OPTIONS } from '../lib/imageCompression';
 import {
   buildManifest,
   exportEntries,
@@ -11,9 +10,9 @@ import {
 import { createZipWriter } from './zip';
 
 // Every other importCategory test injects a thumbnailer; this file exercises the real default alone.
-const compress = vi.fn(async () => new Blob(['thumb']));
-vi.mock('browser-image-compression', () => ({
-  default: (...args: unknown[]) => compress(...(args as [])),
+const compress = vi.fn(async () => new Blob(['thumb'], { type: 'image/webp' }));
+vi.mock('../lib/imageCompression', () => ({
+  compressPhoto: (...args: unknown[]) => compress(...(args as [])),
 }));
 
 const PHOTO = new Uint8Array([1, 2, 3]);
@@ -58,7 +57,7 @@ describe('importCategory with no thumbnailer injected', () => {
   it('makes the thumbnail with the app own compression settings', async () => {
     const result = await importCategory({
       file: await archiveWithOnePhoto(),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       getUid: async () => 'uid',
       createCategoryRow: (async () => ({
         data: { id: 'cat-1', name: 'Coins' },
@@ -66,7 +65,6 @@ describe('importCategory with no thumbnailer injected', () => {
       })) as never,
       deleteCategoryRow: (async () => ({ error: null })) as never,
       createItemRows: (async () => ({ error: null })) as never,
-      linkItemRows: (async () => ({ error: null })) as never,
       uploadImage: (async () => ({ error: null })) as never,
       createImage: (async () => ({
         data: { id: 'img-1' },
@@ -75,13 +73,7 @@ describe('importCategory with no thumbnailer injected', () => {
     });
 
     expect(result.photoCount).toBe(1);
-    expect(compress).toHaveBeenCalledWith(
-      expect.any(File),
-      expect.objectContaining({
-        maxWidthOrHeight: 600,
-        ...WEBP_COMPRESSION_OPTIONS,
-      }),
-    );
+    expect(compress).toHaveBeenCalledWith(expect.any(File), 600);
     // The archive only carries the full size, so the thumbnail comes from the bytes in it.
     const [file] = compress.mock.calls[0] as unknown as [File];
     expect(file.type).toBe('image/webp');
@@ -94,7 +86,7 @@ describe('importCategory with no thumbnailer injected', () => {
     const before = Date.now();
     await importCategory({
       file: await archiveWithOnePhoto(),
-      categoryName: 'Coins',
+      nameCategory: () => 'Coins',
       getUid: async () => 'uid',
       createCategoryRow: (async () => ({
         data: { id: 'cat-1', name: 'Coins' },
@@ -102,7 +94,6 @@ describe('importCategory with no thumbnailer injected', () => {
       })) as never,
       deleteCategoryRow: (async () => ({ error: null })) as never,
       createItemRows: createItemRows as never,
-      linkItemRows: (async () => ({ error: null })) as never,
       uploadImage: (async () => ({ error: null })) as never,
       createImage: (async () => ({
         data: { id: 'img-1' },
@@ -110,8 +101,8 @@ describe('importCategory with no thumbnailer injected', () => {
       })) as never,
     });
 
-    const [[rows]] = createItemRows.mock.calls as unknown as [
-      [{ id: string; created_at: string }[]],
+    const [[, rows]] = createItemRows.mock.calls as unknown as [
+      [string, { id: string; created_at: string }[]],
     ];
     expect(rows[0].id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,

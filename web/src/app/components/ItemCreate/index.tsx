@@ -5,11 +5,12 @@ import dynamic from 'next/dynamic';
 
 import { useI18n } from '../../i18n/useI18n';
 import { EMPTY_ITEM_FORM_VALUES, ItemFormValues } from '../ItemForm/types';
+import { loadItemForm } from '../ItemForm/load';
 import { useCreateItem } from './useCreateItem';
 import { Props } from './types';
 
 // Loaded lazily: PlaceAutocomplete's geocoder is dead weight on pages that never open this form.
-const ItemForm = dynamic(() => import('../ItemForm'), { ssr: false });
+const ItemForm = dynamic(loadItemForm, { ssr: false });
 
 export default function ItemCreate({
   categoryId,

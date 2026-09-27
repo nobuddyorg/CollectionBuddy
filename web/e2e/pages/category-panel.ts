@@ -3,6 +3,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 interface CategoryPanel {
   (): Locator;
   do: {
+    cancelImport(): Promise<void>;
     create(name: string): Promise<void>;
     delete(): Promise<void>;
     exportCollection(): Promise<void>;
@@ -14,6 +15,8 @@ interface CategoryPanel {
   locators: {
     buttons: {
       add: Locator;
+      cancelImport: Locator;
+      collapse: Locator;
       delete: Locator;
       expand: Locator;
       export: Locator;
@@ -27,6 +30,7 @@ interface CategoryPanel {
     selected: Locator;
     sharedMarker: Locator;
     tabs: Locator;
+    tabNames: Locator;
     texts: {
       label: Locator;
     };
@@ -42,6 +46,8 @@ export function initCategoryPanel(page: Page): CategoryPanel {
   const locators = {
     buttons: {
       add: root.getByTestId('add-category'),
+      cancelImport: root.getByTestId('cancel-import'),
+      collapse: root.getByTestId('collapse-categories'),
       delete: root.getByTestId('delete-category'),
       expand: root.getByTestId('expand-categories'),
       export: root.getByTestId('export-category'),
@@ -55,6 +61,7 @@ export function initCategoryPanel(page: Page): CategoryPanel {
     selected: root.getByTestId('selected-category'),
     sharedMarker: root.getByTestId('shared-marker'),
     tabs: root.getByTestId('category-tab'),
+    tabNames: root.getByTestId('category-tab-name'),
     texts: {
       label: root.getByTestId('category-label'),
     },
@@ -75,6 +82,9 @@ export function initCategoryPanel(page: Page): CategoryPanel {
   };
 
   const interactions = {
+    cancelImport: async () => {
+      await locators.buttons.cancelImport.click();
+    },
     create: async (name: string) => {
       await openPanel();
       await locators.inputs.newName.fill(name);

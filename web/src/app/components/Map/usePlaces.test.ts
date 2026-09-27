@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   partitionByCache,
   partitionByStoredCoords,
-  placeFromPhotonResponse,
   withTitles,
 } from './usePlaces';
 import { group } from './usePlaces.test-support';
@@ -11,10 +10,6 @@ import type { PlaceCoords } from './types';
 
 const cologne: PlaceCoords = { name: 'Cologne', lat: 50.94, lng: 6.96 };
 const berlin: PlaceCoords = { name: 'Berlin', lat: 52.52, lng: 13.4 };
-
-function photon(coordinates: unknown) {
-  return { features: [{ geometry: { coordinates } }] };
-}
 
 describe('partitionByStoredCoords', () => {
   it('draws a place with a stored coordinate pair, and lists the rest as unlocated', () => {
@@ -160,54 +155,5 @@ describe('partitionByCache', () => {
       cached: [],
       pending: [],
     });
-  });
-});
-
-describe('placeFromPhotonResponse', () => {
-  it('reads GeoJSON lng-first coordinates into lat/lng', () => {
-    expect(placeFromPhotonResponse('Cologne', photon([6.96, 50.94]))).toEqual({
-      name: 'Cologne',
-      lat: 50.94,
-      lng: 6.96,
-    });
-  });
-
-  it('keeps the requested name rather than anything from the response', () => {
-    expect(placeFromPhotonResponse('My Attic', photon([1, 2]))?.name).toBe(
-      'My Attic',
-    );
-  });
-
-  it('returns null when the query matched nothing', () => {
-    expect(placeFromPhotonResponse('Nowhere', { features: [] })).toBeNull();
-  });
-
-  it('returns null for a response with no features at all', () => {
-    expect(placeFromPhotonResponse('Nowhere', {})).toBeNull();
-    expect(placeFromPhotonResponse('Nowhere', null)).toBeNull();
-  });
-
-  it('returns null for a malformed geometry instead of producing NaN pins', () => {
-    expect(placeFromPhotonResponse('Broken', photon([6.96]))).toBeNull();
-    expect(placeFromPhotonResponse('Broken', photon(undefined))).toBeNull();
-    expect(placeFromPhotonResponse('Broken', photon(['6.96', '50.94']))).toBe(
-      null,
-    );
-  });
-
-  // A pair with one usable side is the dangerous shape: a check needing both wrong would pin at NaN.
-  it('returns null when only one of the two coordinates is a number', () => {
-    expect(placeFromPhotonResponse('Half', photon([6.96, '50.94']))).toBeNull();
-    expect(placeFromPhotonResponse('Half', photon(['6.96', 50.94]))).toBeNull();
-    expect(placeFromPhotonResponse('Half', photon([6.96, null]))).toBeNull();
-  });
-
-  // A GeoJSON feature need not carry a geometry; reaching through one would throw inside a worker.
-  it('returns null for a feature with nothing to read', () => {
-    expect(placeFromPhotonResponse('Odd', { features: [null] })).toBeNull();
-    expect(placeFromPhotonResponse('Odd', { features: [{}] })).toBeNull();
-    expect(
-      placeFromPhotonResponse('Odd', { features: [{ geometry: {} }] }),
-    ).toBeNull();
   });
 });

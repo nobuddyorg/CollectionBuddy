@@ -36,24 +36,16 @@ export function useCategoryRemoval({
     const myShareId = shares.shares[0]?.id;
     if (!myShareId) return;
 
-    const message = t('category_select.confirm_leave').replace(
-      '{name}',
-      selected.name,
-    );
+    const message = t('category_select.confirm_leave', { name: selected.name });
     if (!(await confirm(message))) return;
 
     const restoreCategory = optimisticRemove(selectedCategoryId);
     if (!restoreCategory) return;
     onSelect(nextAfterRemoving(sortedCategories, selectedCategoryId));
 
-    shares.deleteShare(myShareId, {
-      successMessage: t('category_select.leave_success'),
-      errorMessage: t('category_select.leave_error'),
-      onRestore: () => {
-        restoreCategory();
-        onSelect(selectedCategoryId);
-      },
-    });
+    if (await shares.leaveShare(myShareId)) return;
+    restoreCategory();
+    onSelect(selectedCategoryId);
   }, [
     selectedCategoryId,
     selected,
@@ -74,19 +66,18 @@ export function useCategoryRemoval({
     if (countError) console.error(countError);
     let message;
     if (countError || count == null) {
-      message = t('category_select.confirm_delete_generic').replace(
-        '{name}',
-        categoryName,
-      );
+      message = t('category_select.confirm_delete_generic', {
+        name: categoryName,
+      });
     } else if (count > 0) {
-      message = t('category_select.confirm_delete_with_entries')
-        .replace('{name}', categoryName)
-        .replace('{count}', String(count));
+      message = t('category_select.confirm_delete_with_entries', {
+        name: categoryName,
+        count,
+      });
     } else {
-      message = t('category_select.confirm_delete_empty').replace(
-        '{name}',
-        categoryName,
-      );
+      message = t('category_select.confirm_delete_empty', {
+        name: categoryName,
+      });
     }
 
     if (!(await confirm(message))) return;

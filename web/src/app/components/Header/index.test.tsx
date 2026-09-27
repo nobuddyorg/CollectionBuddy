@@ -8,7 +8,12 @@ import Header from './index';
 function renderHeader() {
   return render(
     <I18nProvider>
-      <Header user={{ email: 'collector@example.com' }} onSignOut={vi.fn()} />
+      <Header
+        user={{ email: 'collector@example.com' }}
+        onSignOut={vi.fn()}
+        onDeleteAccount={vi.fn()}
+        onOpenHelp={vi.fn()}
+      />
     </I18nProvider>,
   );
 }
@@ -56,7 +61,12 @@ describe('Header', () => {
   it('falls back to the app name for the title when there is no email to show', () => {
     render(
       <I18nProvider>
-        <Header user={{ email: '' }} onSignOut={vi.fn()} />
+        <Header
+          user={{ email: '' }}
+          onSignOut={vi.fn()}
+          onDeleteAccount={vi.fn()}
+          onOpenHelp={vi.fn()}
+        />
       </I18nProvider>,
     );
     expect(

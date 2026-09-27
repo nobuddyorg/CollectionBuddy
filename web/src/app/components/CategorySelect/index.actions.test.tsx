@@ -24,7 +24,8 @@ vi.mock('./useShares', () => ({
     isUpdatingRole: false,
     reload: vi.fn().mockResolvedValue([]),
     createShare: vi.fn(),
-    deleteShare: vi.fn(),
+    revokeShare: vi.fn(),
+    leaveShare: vi.fn(),
     updateShareRole: vi.fn(),
   }),
 }));
@@ -117,6 +118,9 @@ describe('the category panel', () => {
       expect(createCategory).toHaveBeenCalledWith('Cameras');
       expect(onSelect).toHaveBeenCalledWith('c');
       expect(screen.queryByLabelText('New collection')).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Open collection' }),
+      ).toHaveFocus();
     });
 
     it('keeps the panel open when the category could not be created', async () => {
@@ -206,7 +210,7 @@ describe('the category panel', () => {
     expect(screen.queryByLabelText('Rename')).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Open collection' }),
-    ).toBeVisible();
+    ).toHaveFocus();
   });
 
   it('follows a selection that changes underneath it', async () => {
@@ -229,5 +233,9 @@ describe('the category panel', () => {
     );
 
     expect(screen.queryByLabelText('New collection')).not.toBeInTheDocument();
+    // Nobody pressed anything inside the panel, so focus stays where it was.
+    expect(
+      screen.getByRole('button', { name: 'Open collection' }),
+    ).not.toHaveFocus();
   });
 });

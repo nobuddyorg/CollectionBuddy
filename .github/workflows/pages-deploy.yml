@@ -1,23 +1,99 @@
 name: Deploy Pages
 
+# Only a commit that passed CI on main deploys; a push alone never reaches production.
 on:
-  push:
-    branches: [ main ]
+  # Runs main's copy of this file; it checks out a commit on main that CI passed, never a pull request's code.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
+  # A CI run auto-merge.yml's catch-up dispatches starts no workflow_run (GITHUB_TOKEN), so its green tip would wait for the next merge.
+  schedule:
+    - cron: '41 * * * *'
 
-# Read-only by default: `pages: write` and `id-token: write` at the top would reach the jobs that run `npm ci` and its install scripts.
+# Read-only by default: `pages: write` and `id-token: write` at the top would reach the jobs that install and run npm packages.
 permissions:
   contents: read
 
+# Queued, never cancelled, so a migration is never interrupted; a run for a commit main has already moved past gets its own group so it cannot displace the queued deploy.
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: ${{ (github.event_name != 'workflow_run' || github.event.workflow_run.head_sha == github.sha) && 'pages' || format('pages-superseded-{0}', github.run_id) }}
+  cancel-in-progress: false
 
 jobs:
-  # Database first: a bundle referencing a column that does not exist yet is rejected by PostgREST, and a failed migration leaves the old bundle on the old schema.
-  # `cancel-in-progress` can interrupt this mid-push; each migration is its own transaction, so a prefix applies and the rest waits for the next run.
-  migrate:
+  # CI finishes out of order and can be re-run, so only main's current tip deploys; a dispatch or the schedule deploys it only if CI passed on it.
+  gate:
+    if: >-
+      github.ref == 'refs/heads/main' && (
+        github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (
+          github.event.workflow_run.conclusion == 'success' &&
+          (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') &&
+          github.event.workflow_run.head_repository.full_name == github.repository
+        )
+      )
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read # CI's runs of the commit, on a dispatch or the schedule
+      deployments: read # whether a run already deployed the commit, on the schedule
+      contents: read # main's current tip
+      pages: read # the site's URL, custom domain included
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+      pages-url: ${{ steps.pages.outputs.base_url }}
+    steps:
+      - name: Pick the commit to deploy
+        id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          # The jobs below check out github.sha (main when this run started), so CI's commit must be exactly that one.
+          COMMIT: ${{ github.sha }}
+          CI_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$CI_COMMIT" != "$COMMIT" ] || [ "$COMMIT" != "$tip" ]; then
+            echo "::notice::Skipped: $CI_COMMIT is no longer main's tip ($tip), which deploys once CI passes on it."
+            exit 0
+          fi
+          if [ "$EVENT_NAME" != workflow_run ]; then
+            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&status=success" \
+              --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")] | length')
+            if [ "$passed" = 0 ] && [ "$EVENT_NAME" = schedule ]; then
+              echo "Skipped: CI has not passed on $COMMIT yet."
+              exit 0
+            fi
+            if [ "$passed" = 0 ]; then
+              echo "::error::CI has not passed on $COMMIT; nothing deploys."
+              exit 1
+            fi
+          fi
+          # Any earlier run that reached migrate left a production deployment; a failed one is a human's to look at, not an hourly retry.
+          if [ "$EVENT_NAME" = schedule ]; then
+            tried=$(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=production&sha=$COMMIT" --jq length)
+            if [ "$tried" != 0 ]; then
+              echo "Skipped: a run already tried to deploy $COMMIT."
+              exit 0
+            fi
+          fi
+          echo "sha=$COMMIT" >> "$GITHUB_OUTPUT"
+
+      # The build's base path follows the Pages settings, so a custom domain needs no code change (docs/how-to/developer-guide.md#move-to-a-custom-domain).
+      - name: Read the Pages site URL
+        id: pages
+        if: steps.commit.outputs.sha != ''
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+  # Database first: PostgREST rejects a bundle naming a column not there yet, a failed migration leaves the old bundle on the old schema, and a passed one runs it on the new (expand/contract: docs/how-to/developer-guide.md#change-the-database-schema).
+  # A dispatch may name any branch: only main's reviewed migrations reach production, whose secrets live in the main-only `production` environment.
+  migrate:
+    needs: gate
+    if: github.ref == 'refs/heads/main' && needs.gate.outputs.sha != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -36,29 +112,23 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
-      # PostgREST caches the schema and this project cannot create the `pgrst_ddl_watch` event trigger (needs superuser); NOTIFY needs a session, which `db push` does not leave open.
+      # PostgREST caches the schema and this project cannot create the `pgrst_ddl_watch` event trigger (needs superuser); over the DB URL, so no Management API token reaches this job.
       - name: Reload the PostgREST schema cache
-        run: |
-          curl -sS --fail-with-body -X POST \
-            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data @- <<'JSON'
-          {"query": "notify pgrst, 'reload schema'"}
-          JSON
+        run: supabase db query --db-url "$SUPABASE_DB_URL" "notify pgrst, 'reload schema'"
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
   build:
-    needs: migrate
+    needs: [gate, migrate]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: web
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      PAGES_BASE_URL: ${{ needs.gate.outputs.pages-url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -70,12 +140,20 @@ jobs:
       - run: test -d out && test -f out/index.html
       - run: touch out/.nojekyll
 
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+      # Before publishing, so a mistyped, stale or revoked key leaves the working bundle live; the smoke test runs signed out and never authenticates.
+      - name: Check the baked-in URL and key reach the project
+        uses: ./.github/actions/call-keepalive
+        with:
+          supabase-url: ${{ env.NEXT_PUBLIC_SUPABASE_URL }}
+          anon-key: ${{ env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: web/out
 
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: build
     permissions:
       pages: write
@@ -87,12 +165,13 @@ jobs:
       page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   # The signed-out suite against the live origin: Node prerendering masks failures only the browser bundle shows, and signed-out keeps the run read-only.
   smoke_test:
     runs-on: ubuntu-latest
-    needs: deploy
+    timeout-minutes: 20
+    needs: [gate, deploy]
     defaults:
       run:
         working-directory: web

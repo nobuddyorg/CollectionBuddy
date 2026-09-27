@@ -1,12 +1,16 @@
 import { type Page } from '@playwright/test';
 
 import { initAccountMenu } from './account-menu';
+import { initAppError } from './app-error';
 import { initCatalogue } from './catalogue';
 import { initCategoryPanel } from './category-panel';
 import { initConfirm, initImageViewer, initToast } from './dialogs';
 import { initEntryForm } from './entry-form';
+import { initHelp } from './help';
+import { initLoadError } from './load-error';
 import { initLoginPage } from './login';
 import { initMap } from './map';
+import { initPrivacyPage } from './privacy';
 import { initSharingPanel } from './sharing';
 
 /** Getters, so a spec that wants one screen builds only that screen's locators. */
@@ -16,6 +20,9 @@ export function createPageTree(page: Page) {
   return {
     get account() {
       return initAccountMenu(page);
+    },
+    get appError() {
+      return initAppError(page);
     },
     get catalogue() {
       return initCatalogue(page);
@@ -29,11 +36,23 @@ export function createPageTree(page: Page) {
     get form() {
       return initEntryForm(page);
     },
+    get help() {
+      return initHelp(page);
+    },
+    get collectionsLoadError() {
+      return initLoadError(page, 'collections');
+    },
+    get entriesLoadError() {
+      return initLoadError(page, 'entries');
+    },
     get login() {
       return initLoginPage(page);
     },
     get map() {
       return initMap(page);
+    },
+    get privacy() {
+      return initPrivacyPage(page);
     },
     get sharing() {
       return initSharingPanel(page);

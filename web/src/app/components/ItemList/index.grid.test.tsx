@@ -43,6 +43,21 @@ describe('ItemList empty state', () => {
     );
     renderList();
     expect(screen.getByText('No entries yet')).toBeVisible();
+    expect(
+      screen.getByText(/Add your first entry with New entry above/),
+    ).toBeVisible();
+  });
+
+  // A viewer's New entry button is disabled, so the hint must not send them to it.
+  it('does not point a viewer at New entry', () => {
+    useItemsMock.mockReturnValue(
+      itemsState({ items: [], total: 0, loading: false }),
+    );
+    renderList({ canEdit: false });
+    expect(
+      screen.getByText('Nothing has been added to this collection yet.'),
+    ).toBeVisible();
+    expect(screen.queryByText(/New entry above/)).toBeNull();
   });
 
   // Deleting page 2's only card reloads it as items: [] with total: 9; the basket must not paint over that.
@@ -68,6 +83,21 @@ describe('ItemList empty state', () => {
     renderList();
     expect(screen.queryByText('No entries yet')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toBeVisible();
+  });
+
+  it('shows a failed load with a retry, never as "No entries yet"', async () => {
+    const reload = vi.fn();
+    useItemsMock.mockReturnValue(
+      itemsState({ items: [], total: 0, loadFailed: true, reload }),
+    );
+    renderList();
+
+    expect(
+      screen.getByRole('region', { name: 'The entries could not be loaded' }),
+    ).toBeVisible();
+    expect(screen.queryByText('No entries yet')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it('renders the corrected page once its own fetch resolves', () => {

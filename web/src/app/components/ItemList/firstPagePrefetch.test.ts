@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { listItems } from '../../data/items';
+import type { listItems } from '../../data/itemPage';
 import {
+  forgetPrefetchedFirstPage,
   prefetchFirstPage,
   takePrefetchedFirstPage,
 } from './firstPagePrefetch';
@@ -58,6 +59,15 @@ describe('prefetchFirstPage', () => {
   });
 
   it('has nothing to hand out before anything was started', () => {
+    expect(takePrefetchedFirstPage('cat-1')).toBeNull();
+  });
+
+  it('hands out nothing once forgotten', () => {
+    const { read } = fakeRead();
+    prefetchFirstPage('cat-1', read);
+
+    forgetPrefetchedFirstPage();
+
     expect(takePrefetchedFirstPage('cat-1')).toBeNull();
   });
 });

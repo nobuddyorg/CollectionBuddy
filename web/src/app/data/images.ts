@@ -1,7 +1,9 @@
+import { isRetryableStatus } from '../lib/backoff';
 import { chunk } from '../lib/chunk';
-import { readAllChunks, readAllPages } from '../lib/pages';
+import { readAllChunks, readAllKeysetPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
+import { rowsAfterFilter } from './keyset';
 
 export const ITEM_IMAGES_BUCKET = 'item-images';
 
@@ -15,8 +17,23 @@ export function createSignedUrls(paths: string[], expiresInSeconds = 3600) {
     .createSignedUrls(paths, expiresInSeconds);
 }
 
+// Storage's sign route refuses more than 1,000 paths per request.
+export const SIGN_URLS_BATCH_SIZE = 1000;
+
 export function uploadImageObject(path: string, file: Blob) {
   return supabase.storage.from(ITEM_IMAGES_BUCKET).upload(path, file);
+}
+
+/** Only no response, a 429 or a 5xx can pass on a retry; Storage sends its own code as `statusCode`, often under an HTTP 400. */
+export function isTransientStorageError({
+  status,
+  statusCode,
+}: {
+  status?: number;
+  statusCode?: string;
+}): boolean {
+  if (status === undefined) return true;
+  return [status, Number(statusCode)].some(isRetryableStatus);
 }
 
 // Storage's bulk delete refuses more than 1,000 objects per request.
@@ -26,7 +43,7 @@ export function removeImageObjects(paths: string[]) {
   return supabase.storage.from(ITEM_IMAGES_BUCKET).remove(paths);
 }
 
-export type ImageRow = Database['public']['Tables']['images']['Row'];
+type ImageRow = Database['public']['Tables']['images']['Row'];
 
 /** Carries the row's own `id`, so a single photograph can be deleted by it. */
 export type ImageListRow = Pick<
@@ -46,13 +63,18 @@ export type ExportImageRow = Pick<
   'item_id' | 'path_full' | 'size_bytes'
 >;
 
-// user_id is never sent: tg_images_enforce derives it from the item's owner and rejects the rest.
-export function createImageRow(row: {
+type NewImageRow = {
   item_id: string;
   path_full: string;
   path_thumb: string | null;
   size_bytes: number;
-}) {
+};
+
+/** An import stamps `created_at` in archive order; an upload leaves it to the column default. */
+type ImportedImageRow = NewImageRow & { created_at: string };
+
+// user_id is never sent: tg_images_enforce derives it from the item's owner and rejects the rest.
+export function createImageRow(row: NewImageRow | ImportedImageRow) {
   return supabase
     .from('images')
     .insert(row as Database['public']['Tables']['images']['Insert'])
@@ -60,14 +82,30 @@ export function createImageRow(row: {
     .single<ImageListRow>();
 }
 
-// The row itself is removed, not a cascade's side effect, so delete-and-capture in one call is safe.
-export function deleteImageRow(id: string) {
-  return supabase
+/** A delete that matched no row, hidden by RLS or already gone, fails, unless its entry is gone and its cascade took the row. */
+export async function deleteImageRow({
+  id,
+  itemId,
+}: {
+  id: string;
+  itemId: string;
+}): Promise<{ error: Error | null }> {
+  // No `.single()`: its 406 on no row is a console error in every browser, and a gone entry is no failure.
+  const deleted = await supabase
     .from('images')
     .delete()
     .eq('id', id)
-    .select('path_full, path_thumb')
-    .single<Pick<ImageRow, 'path_full' | 'path_thumb'>>();
+    .select('id');
+  if (deleted.error !== null) return deleted;
+  if (deleted.data.length > 0) return { error: null };
+  const item = await supabase
+    .from('items')
+    .select('id')
+    .eq('id', itemId)
+    .maybeSingle();
+  if (item.error !== null) return item;
+  if (item.data === null) return { error: null };
+  return { error: new Error(`Photograph ${id} was not deleted`) };
 }
 
 // PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.
@@ -75,6 +113,39 @@ const ROW_PAGE_SIZE = 1000;
 
 // Ids per `.in()` filter; a few thousand UUIDs would hit a URL length limit before the row cap.
 const ID_FILTER_CHUNK_SIZE = 100;
+
+type ImageKey = Pick<ImageRow, 'created_at' | 'id'>;
+
+// Keyset-paged oldest-first, so a photograph deleted mid-walk shifts none past a page; the key rides along on every row.
+function rawSelectImagesPage<T>({
+  itemIds,
+  select,
+  after,
+}: {
+  itemIds: string[];
+  select: string;
+  after: (T & ImageKey) | null;
+}) {
+  let query = supabase
+    .from('images')
+    .select(`${select}, created_at, id`)
+    .in('item_id', itemIds);
+  if (after) {
+    query = query
+      .gte('created_at', after.created_at)
+      .or(
+        rowsAfterFilter(
+          { column: 'created_at', value: after.created_at },
+          { column: 'id', value: after.id },
+        ),
+      );
+  }
+  return query
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+    .limit(ROW_PAGE_SIZE)
+    .overrideTypes<(T & ImageKey)[], { merge: false }>();
+}
 
 // Chunks the id list (URL length), pages each chunk (row cap), and reads a few chunks at once.
 function selectImagesForItems<T>(
@@ -84,15 +155,8 @@ function selectImagesForItems<T>(
   { data: T[]; error: null } | { data: null; error: NonNullable<unknown> }
 > {
   return readAllChunks(chunk(itemIds, ID_FILTER_CHUNK_SIZE), (ids) =>
-    readAllPages<T>(ROW_PAGE_SIZE, (from, to) =>
-      supabase
-        .from('images')
-        .select(select)
-        .in('item_id', ids)
-        .order('created_at', { ascending: true })
-        .order('id', { ascending: true })
-        .range(from, to)
-        .overrideTypes<T[], { merge: false }>(),
+    readAllKeysetPages<T & ImageKey>(ROW_PAGE_SIZE, (after) =>
+      rawSelectImagesPage<T>({ itemIds: ids, select, after }),
     ),
   );
 }
@@ -104,9 +168,10 @@ export function listImagesForItems(
   | { data: ImageListRow[]; error: null }
   | { data: null; error: NonNullable<unknown> }
 > {
+  // `id` arrives with the sort key.
   return selectImagesForItems<ImageListRow>(
     itemIds,
-    'id, item_id, path_full, path_thumb',
+    'item_id, path_full, path_thumb',
   );
 }
 
@@ -123,12 +188,37 @@ export function listImagePathsForItems(
   );
 }
 
-// Never selects path_thumb; an export never wants thumbnails.
-export function listExportImagesForItems(
-  itemIds: string[],
-): Promise<{ data: ExportImageRow[] | null; error: unknown }> {
-  return selectImagesForItems<ExportImageRow>(
-    itemIds,
-    'item_id, path_full, size_bytes',
+type CategoryImagePathRow = ImagePathRow & Pick<ImageRow, 'id'>;
+
+// Keyset-paged down images_pkey, each row kept via items_pkey and item_categories_pkey; the empty embeds only filter.
+function rawListImagePathsForCategory({
+  categoryId,
+  after,
+}: {
+  categoryId: string;
+  after: CategoryImagePathRow | null;
+}) {
+  let query = supabase
+    .from('images')
+    .select(
+      'id, item_id, path_full, path_thumb, items!inner(item_categories!inner())',
+    )
+    .eq('items.item_categories.category_id', categoryId);
+  if (after) query = query.gt('id', after.id);
+  return query
+    .order('id')
+    .limit(ROW_PAGE_SIZE)
+    .overrideTypes<CategoryImagePathRow[], { merge: false }>();
+}
+
+/** Every photograph of every entry filed in the category, walked a page at a time; runs before the category delete, never after. */
+export function listImagePathsForCategory(
+  categoryId: string,
+): Promise<
+  | { data: CategoryImagePathRow[]; error: null }
+  | { data: null; error: NonNullable<unknown> }
+> {
+  return readAllKeysetPages<CategoryImagePathRow>(ROW_PAGE_SIZE, (after) =>
+    rawListImagePathsForCategory({ categoryId, after }),
   );
 }

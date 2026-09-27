@@ -1,9 +1,8 @@
 -- Sharing at the default 'viewer' role: an active grant opens exactly the
 -- shared category, its items, their links, and their photograph records --
 -- read-only, scoped to that one category, and closed again the moment it
--- expires or is revoked. Complements web/e2e/signed-in/rls.spec.ts's
--- "a category shared with another collector" describe block the same way
--- 010_ownership_rls_test.sql complements its stranger-access cases: same
+-- expires or is revoked. Complements web/e2e/signed-in/rls/viewer-share.spec.ts
+-- the same way 010_ownership_rls_test.sql complements isolation.spec.ts: same
 -- properties, proven at the SQL surface instead of through PostgREST.
 begin;
 select no_plan();
@@ -91,6 +90,40 @@ with attempt as (
 select is((select count(*) from attempt), 0::bigint,
   'a viewer grant does not extend to editing an item inside it');
 
+-- Nor to removing: the viewer reads each row above, so only a delete policy can refuse it. An unlink would also sweep the entry.
+select is(
+  pg_temp.rows_written(format('delete from public.item_categories where item_id = %L returning item_id', :'item_id')),
+  0::bigint,
+  'a viewer grant does not extend to unlinking the owner''s entry'
+);
+select is(
+  pg_temp.rows_written(format('delete from public.images where id = %L returning id', :'image_id')),
+  0::bigint,
+  'nor to deleting its photograph record'
+);
+select throws_ok(
+  format(
+    'insert into public.images (item_id, path_full) values (%L, %L)',
+    :'item_id'::uuid, :'grantee_id'::text || '/' || :'item_id'::text || '/planted.webp'
+  ),
+  'P0001',
+  'ownership mismatch',
+  'nor to adding a photograph record to it'
+);
+
+-- A fresh entry of the viewer's own, so the one-collection quota and the ownership check both pass: only the write check is left.
+insert into public.items (title) values ('Viewer''s unfiled item')
+returning id as viewer_item_id \gset
+select throws_ok(
+  format(
+    'insert into public.item_categories (item_id, category_id) values (%L, %L)',
+    :'viewer_item_id'::uuid, :'category_id'::uuid
+  ),
+  'P0001',
+  'cross-tenant assignment is not allowed',
+  'nor to filing an entry of its own into the collection'
+);
+
 -- Revoke, then it is gone -- with the row still there, so this is the
 -- revocation itself being tested, not a row that stopped existing.
 select pg_temp.auth_as(:'owner_id'::uuid, 'share-owner@collectionbuddy.test');
@@ -170,11 +203,13 @@ select is(
 
 -- A category cannot be shared with its own owner (tg_category_shares_enforce).
 select pg_temp.auth_as(:'owner_id'::uuid, 'share-owner@collectionbuddy.test');
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.category_shares (category_id, invited_email) values (%L, %L)',
     :'category_id'::uuid, 'share-owner@collectionbuddy.test'
-  )),
+  ),
+  'P0001',
+  'cannot share a category with yourself',
   'a category cannot be shared with its own owner'
 );
 

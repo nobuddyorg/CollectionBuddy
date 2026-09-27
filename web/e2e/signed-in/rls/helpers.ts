@@ -7,6 +7,15 @@ import { CONTEXT_PATH, SEED, type SeedContext } from '../fixtures';
 export const context = () =>
   JSON.parse(readFileSync(CONTEXT_PATH, 'utf8')) as SeedContext;
 
+/** Storage's answer when the storage.objects insert policy refuses an upload. */
+export const UPLOAD_REFUSED = {
+  statusCode: '403',
+  message: 'new row violates row-level security policy',
+};
+
+/** Storage's answer for an object no policy lets the caller sign or move; only a stored-object control tells it from absence. */
+export const OBJECT_HIDDEN = { statusCode: '404', message: 'Object not found' };
+
 /** A PostgREST client carrying one user's access token, and nothing more. */
 export function apiAs(token: string) {
   return createClient(
@@ -44,8 +53,13 @@ export async function share(grant: {
   return data.id;
 }
 
+/** Throws, so a revoke that failed surfaces here, not as the next share()'s unique-constraint clash. */
 export async function unshare(token: string, shareId: string) {
-  await apiAs(token).from('category_shares').delete().eq('id', shareId);
+  const { error } = await apiAs(token)
+    .from('category_shares')
+    .delete()
+    .eq('id', shareId);
+  if (error) throw error;
 }
 
 export async function ownedCategoryId(owner: {
@@ -94,4 +108,50 @@ export async function editorShare(token: string, categoryId: string) {
     invitedEmail: SEED.other.email,
     role: 'editor',
   });
+}
+
+/** An entry the grantee creates and files into the owner's category, so its `user_id` is the grantee's. */
+export async function entryFiledBy(
+  grantee: { token: string; categoryId: string },
+  title: string,
+): Promise<string> {
+  const { data: item, error: itemError } = await apiAs(grantee.token)
+    .from('items')
+    .insert({ title })
+    .select('id')
+    .single();
+  if (itemError) throw itemError;
+
+  const { error: linkError } = await apiAs(grantee.token)
+    .from('item_categories')
+    .insert({ item_id: item!.id, category_id: grantee.categoryId });
+  if (linkError) throw linkError;
+  return item!.id;
+}
+
+/** Grants edit access again for as long as the grantee takes to remove its entry and photographs. */
+export async function removeFiledEntry(entry: {
+  token: string;
+  otherToken: string;
+  categoryId: string;
+  itemId: string;
+  paths: string[];
+}) {
+  const shareId = await editorShare(entry.token, entry.categoryId);
+  try {
+    const grantee = apiAs(entry.otherToken);
+    if (entry.paths.length) {
+      const { error: removeError } = await grantee.storage
+        .from('item-images')
+        .remove(entry.paths);
+      if (removeError) throw removeError;
+    }
+    const { error } = await grantee
+      .from('items')
+      .delete()
+      .eq('id', entry.itemId);
+    if (error) throw error;
+  } finally {
+    await unshare(entry.token, shareId);
+  }
 }

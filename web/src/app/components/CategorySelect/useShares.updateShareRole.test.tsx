@@ -105,4 +105,17 @@ describe('useShares updateShareRole', () => {
     expect(consoleError).toHaveBeenCalledWith('update share role', updateError);
     consoleError.mockRestore();
   });
+
+  it('does nothing for a grant that is not in the list', async () => {
+    listSharesReturns([grant]);
+    const { result } = await renderLoadedShares();
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.updateShareRole('share-elsewhere', 'editor');
+    });
+
+    expect(ok).toBe(false);
+    expect(updateShareRoleRow).not.toHaveBeenCalled();
+  });
 });

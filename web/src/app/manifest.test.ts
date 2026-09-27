@@ -26,27 +26,32 @@ function pngSize(file: string): { width: number; height: number } {
   return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
 }
 
-const localName = (src: string) => src.replace(manifest.scope, '');
 const edge = (icon: ManifestIcon) => Number(icon.sizes.split('x')[0]);
 
 describe('site.webmanifest', () => {
-  it('serves every icon from the deployed scope', () => {
-    // Paths are literal in the static file, so they must stay in step with the scope by hand.
-    for (const icon of manifest.icons) {
-      expect(icon.src.startsWith(manifest.scope)).toBe(true);
+  // A static file cannot interpolate the base path; URLs relative to the manifest follow it to any origin.
+  it('names every URL relative to the manifest, so it follows the base path', () => {
+    const urls = [
+      manifest.scope,
+      manifest.start_url,
+      ...manifest.icons.map((icon) => icon.src),
+    ];
+    for (const url of urls) {
+      expect(url.startsWith('/') || url.includes(':')).toBe(false);
     }
+    expect(manifest.scope).toBe('./');
     expect(manifest.start_url).toBe(manifest.scope);
   });
 
   it('points every icon at a file that is actually there', () => {
     for (const icon of manifest.icons) {
-      expect(() => pngSize(localName(icon.src))).not.toThrow();
+      expect(() => pngSize(icon.src)).not.toThrow();
     }
   });
 
   it('declares each icon at the size it really is', () => {
     for (const icon of manifest.icons) {
-      const { width, height } = pngSize(localName(icon.src));
+      const { width, height } = pngSize(icon.src);
       expect(`${width}x${height}`).toBe(icon.sizes);
     }
   });

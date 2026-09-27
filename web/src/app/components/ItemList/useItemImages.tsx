@@ -13,42 +13,39 @@ import {
   imagePrefix,
   listImagePathsForItems,
   listImagesForItems,
-  removeImageObjects,
   uploadImageObject,
   type ImageListRow,
 } from '../../data/images';
-import { isQuotaExceeded } from '../../data/quota';
+import { removeObjectsThenRows } from '../../data/imageRemoval';
+import { isPhotoStorageFull, isQuotaExceeded } from '../../data/quota';
 import type { ImageEntry } from './types';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
 import { useI18n } from '../../i18n/useI18n';
+import type { TranslationKey } from '../../i18n/I18nProvider';
 import {
   entryDataOf,
   groupImageRows,
+  itemsDueForResigning,
+  keepingShown,
   signAllEntries,
   signEntries,
   type ImageEntryData,
 } from './imageEntries';
-import { WEBP_COMPRESSION_OPTIONS } from '../../lib/imageCompression';
+import { extensionForType } from '../../data/photoType';
+import { compressPhoto } from '../../lib/imageCompression';
 import { restoreAt } from '../../lib/optimistic';
 
-// Re-signs before Supabase's 1h server-side expiry, so a long-lived tab keeps its thumbnails.
+// Re-signs each shown photograph before its own 1h signature expires, so a long-lived tab keeps its thumbnails.
 function useSignedUrlRefresh(
-  lastSignedAtRef: RefObject<number>,
   imagesRef: RefObject<Record<string, ImageEntry[]>>,
   refreshAllImages: (itemIds: string[]) => Promise<void>,
 ) {
   useEffect(() => {
-    const SIGNED_URL_SERVER_TTL_MS = 3600_000;
-    const REFRESH_MARGIN_MS = 5 * 60_000;
     const maybeRefresh = () => {
-      if (
-        Date.now() - lastSignedAtRef.current <
-        SIGNED_URL_SERVER_TTL_MS - REFRESH_MARGIN_MS
-      )
-        return;
-      // Never-signed and empty coincide: nothing enters imagesRef without stamping lastSignedAtRef.
-      void refreshAllImages(Object.keys(imagesRef.current));
+      void refreshAllImages(
+        itemsDueForResigning(imagesRef.current, Date.now()),
+      );
     };
     const interval = setInterval(maybeRefresh, 60_000);
     document.addEventListener('visibilitychange', maybeRefresh);
@@ -56,7 +53,23 @@ function useSignedUrlRefresh(
       clearInterval(interval);
       document.removeEventListener('visibilitychange', maybeRefresh);
     };
-  }, [lastSignedAtRef, imagesRef, refreshAllImages]);
+  }, [imagesRef, refreshAllImages]);
+}
+
+function withoutItems(loading: Set<string>, itemIds: string[]): Set<string> {
+  const next = new Set(loading);
+  for (const itemId of itemIds) next.delete(itemId);
+  return next;
+}
+
+/** The app's storage before the owner's quota: deleting her own photographs may not free enough of it. */
+function uploadErrorMessage(
+  error: unknown,
+  t: (key: TranslationKey) => string,
+): string {
+  if (isPhotoStorageFull(error)) return t('item_list.photo_storage_full_error');
+  if (isQuotaExceeded(error)) return t('item_list.photo_quota_error');
+  return t('item_list.upload_error');
 }
 
 export function useItemImages() {
@@ -71,7 +84,6 @@ export function useItemImages() {
   // Distinct from "has no images", so a card doesn't grow an image region once pictures arrive.
   const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
   const imagesRef = useRef(images);
-  const lastSignedAtRef = useRef(0);
 
   useEffect(() => {
     imagesRef.current = images;
@@ -87,7 +99,6 @@ export function useItemImages() {
     const grouped = groupImageRows(listed.data);
     const entryData = grouped.get(itemId) ?? new Map();
     const signed = await signEntries([[itemId, entryData]]);
-    lastSignedAtRef.current = Date.now();
     return signed[itemId];
   }, []);
 
@@ -103,12 +114,7 @@ export function useItemImages() {
 
       // signEntries sets every key it is given, so spreading it last replaces exactly these items.
       setImages((previous) => ({ ...previous, ...signed }));
-      setLoadingItems((previous) => {
-        const next = new Set(previous);
-        for (const itemId of itemIds) next.delete(itemId);
-        return next;
-      });
-      lastSignedAtRef.current = Date.now();
+      setLoadingItems((previous) => withoutItems(previous, itemIds));
     },
     [],
   );
@@ -119,13 +125,13 @@ export function useItemImages() {
       if (itemIds.length === 0) return;
       setLoadingItems((previous) => new Set([...previous, ...itemIds]));
       const listed = await listImagesForItems(itemIds);
-      const grouped =
-        listed.error !== null
-          ? new Map<string, Map<string, ImageEntryData>>()
-          : groupImageRows(listed.data);
-      if (listed.error !== null)
+      if (listed.error !== null) {
         console.error('Failed to list images', listed.error);
-      await applyGroupedImages(itemIds, grouped);
+        setImages((previous) => keepingShown(previous, itemIds));
+        setLoadingItems((previous) => withoutItems(previous, itemIds));
+        return;
+      }
+      await applyGroupedImages(itemIds, groupImageRows(listed.data));
     },
     [applyGroupedImages],
   );
@@ -146,7 +152,7 @@ export function useItemImages() {
     setImages((previous) => ({ ...previous, ...signed }));
   }, []);
 
-  useSignedUrlRefresh(lastSignedAtRef, imagesRef, refreshAllImages);
+  useSignedUrlRefresh(imagesRef, refreshAllImages);
 
   const uploadImage = useCallback(
     async (itemId: string, file: File) => {
@@ -158,22 +164,14 @@ export function useItemImages() {
         const userId = await verifiedUserId();
         if (!userId) throw new Error(t('item_list.no_user_session'));
 
-        const { default: imageCompression } =
-          await import('browser-image-compression');
-        const fullFile = await imageCompression(file, {
-          maxWidthOrHeight: 1000,
-          ...WEBP_COMPRESSION_OPTIONS,
-        });
+        const fullFile = await compressPhoto(file, 1000);
         // From the already-downscaled full size; 600px covers strip cells and pair halves at 3x density.
-        const thumbnailFile = await imageCompression(fullFile, {
-          maxWidthOrHeight: 600,
-          ...WEBP_COMPRESSION_OPTIONS,
-        });
+        const thumbnailFile = await compressPhoto(fullFile, 600);
 
         const base = crypto.randomUUID();
         const pathBase = `${imagePrefix(userId, itemId)}/${base}`;
-        const pathFull = `${pathBase}.webp`;
-        const pathThumb = `${pathBase}.thumb.webp`;
+        const pathFull = `${pathBase}${extensionForType(fullFile.type)}`;
+        const pathThumb = `${pathBase}.thumb${extensionForType(thumbnailFile.type)}`;
 
         const fullUpload = await uploadImageObject(pathFull, fullFile);
         if (fullUpload.error) throw fullUpload.error;
@@ -200,13 +198,7 @@ export function useItemImages() {
         if (entries)
           setImages((previous) => ({ ...previous, [itemId]: entries }));
       } catch (error: unknown) {
-        toast.reportError(
-          'upload image',
-          error,
-          isQuotaExceeded(error)
-            ? t('item_list.photo_quota_error')
-            : t('item_list.upload_error'),
-        );
+        toast.reportError('upload image', error, uploadErrorMessage(error, t));
       } finally {
         setPendingUploads((previous) => {
           const remaining = previous[itemId] - 1;
@@ -220,7 +212,7 @@ export function useItemImages() {
     [fetchItemImages, t, toast],
   );
 
-  // The thumbnail goes on confirm; the row and its bytes go once the toast's undo window closes.
+  // The thumbnail goes on confirm; its bytes, then its row, go once the toast's undo window closes.
   const deleteImage = useCallback(
     async (itemId: string, image: ImageEntry) => {
       if (!(await confirm(t('item_list.confirm_delete_image')))) return;
@@ -236,39 +228,34 @@ export function useItemImages() {
       }));
 
       const restore = () => {
-        setImages((previous) => ({
-          ...previous,
-          [itemId]: restoreAt({ list: previous[itemId], index, item: image }),
-        }));
+        setImages((previous) => {
+          // Forgotten once its entry's delete committed, which took this photograph with it.
+          if (!Object.hasOwn(previous, itemId)) return previous;
+          return {
+            ...previous,
+            [itemId]: restoreAt({ list: previous[itemId], index, item: image }),
+          };
+        });
       };
 
       toast.success(t('item_list.delete_image_success'), {
         action: { label: t('common.undo'), onClick: restore },
         onExpire: async () => {
-          const { data, error } = await deleteImageRow(image.id);
-          if (error) {
-            toast.reportError(
-              'delete image',
-              error,
-              t('item_list.delete_image_error'),
-            );
-            restore();
-            return;
-          }
-
-          // Row already gone: a failure below is a storage leak, not data loss.
-          const paths = [
-            data.path_full,
-            ...(data.path_thumb ? [data.path_thumb] : []),
-          ];
-          const { error: removeError } = await removeImageObjects(paths);
-          if (removeError) {
-            toast.reportError(
-              'remove image bytes',
-              removeError,
-              t('item_list.delete_image_cleanup_error'),
-            );
-          }
+          const { error } = await removeObjectsThenRows({
+            paths: [
+              image.pathFull,
+              ...(image.pathThumb ? [image.pathThumb] : []),
+            ],
+            deleteRows: () => deleteImageRow({ id: image.id, itemId }),
+          });
+          if (!error) return;
+          // Back even when only the row delete failed: the row still exists, and deleting it again works.
+          toast.reportError(
+            'delete image',
+            error,
+            t('item_list.delete_image_error'),
+          );
+          restore();
         },
       });
     },
@@ -286,26 +273,13 @@ export function useItemImages() {
     return listed.data;
   }, []);
 
-  const removeImageBytes = useCallback(
-    async (
-      itemId: string,
-      paths: { path_full: string; path_thumb: string | null }[],
-    ) => {
-      const flat = paths.flatMap((row) =>
-        row.path_thumb ? [row.path_full, row.path_thumb] : [row.path_full],
-      );
-      if (flat.length) {
-        const { error } = await removeImageObjects(flat);
-        if (error) throw error;
-      }
-      setImages((previous) => {
-        const next = { ...previous };
-        delete next[itemId];
-        return next;
-      });
-    },
-    [],
-  );
+  const forgetItemImages = useCallback((itemId: string) => {
+    setImages((previous) => {
+      const next = { ...previous };
+      delete next[itemId];
+      return next;
+    });
+  }, []);
 
   return {
     images,
@@ -316,7 +290,7 @@ export function useItemImages() {
     uploadImage,
     deleteImage,
     captureItemImagePaths,
-    removeImageBytes,
+    forgetItemImages,
     pendingUploads,
   };
 }

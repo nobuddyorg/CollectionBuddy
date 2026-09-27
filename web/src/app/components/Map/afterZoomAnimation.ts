@@ -14,3 +14,9 @@ export function afterZoomAnimation(
   else framing();
   return () => map.off('zoomend', framing);
 }
+
+/** Removes `map`; cleared first, Leaflet 1.9's pending zoom-end timer would read the removed panes and throw. */
+export function removeMidZoom(map: ZoomingMap & { remove(): unknown }): void {
+  map._animatingZoom = false;
+  map.remove();
+}

@@ -29,11 +29,14 @@ vi.mock('../../data/images', async () => {
   };
 });
 
-// The real one needs a Worker.
-vi.mock('browser-image-compression', () => ({
-  default: vi.fn(async (file: Blob, options: { maxWidthOrHeight: number }) => {
-    return new Blob([`compressed-${options.maxWidthOrHeight}`]);
-  }),
+// The real one probes a canvas and needs a Worker.
+vi.mock('../../lib/imageCompression', () => ({
+  compressPhoto: vi.fn(
+    async (file: File, maxWidthOrHeight: number) =>
+      new File([`compressed-${maxWidthOrHeight}`], file.name, {
+        type: 'image/webp',
+      }),
+  ),
 }));
 
 describe('useItemImages pending upload count', () => {

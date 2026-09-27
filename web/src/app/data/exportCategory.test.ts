@@ -1,19 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  ExportError,
-  exportCategory,
-  type ExportProgress,
-} from './exportCategory';
+import { exportCategory, type ExportProgress } from './exportCategory';
 import { CSV_NAME, MANIFEST_NAME } from './exportFormat';
 import {
   type ListItems,
-  type ListImages,
   type SignUrls,
   item,
-  fakeGetSession,
   paginatedListItems,
-  fakeListImages,
   fakeSignUrls,
   okResponse,
   readZipEntries,
@@ -21,18 +14,6 @@ import {
 } from './exportCategory.test-support';
 
 describe('exportCategory', () => {
-  it('throws a named ExportError rather than exporting when there is no session', async () => {
-    const failure = exportCategory({
-      category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession(null),
-      listItems: paginatedListItems([]),
-      listImages: fakeListImages({}),
-      signUrls: fakeSignUrls(),
-    });
-    await expect(failure).rejects.toThrow('No user session');
-    await expect(failure).rejects.toHaveProperty('name', 'ExportError');
-  });
-
   it('throws when the item listing fails, rather than exporting an incomplete collection', async () => {
     const readError = { message: 'read failed' };
     const listItems = (async () => ({
@@ -41,47 +22,12 @@ describe('exportCategory', () => {
     })) as unknown as ListItems;
     const failure = exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
       listItems,
-      listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
     });
     await expect(failure).rejects.toThrow('Could not read items');
     await expect(failure).rejects.toHaveProperty('cause', readError);
-  });
-
-  it('throws when the photograph listing fails, rather than exporting an incomplete collection', async () => {
-    const listingError = { message: 'read failed' };
-    const listImages = (async () => ({
-      data: null,
-      error: listingError,
-    })) as unknown as ListImages;
-    const failure = exportCategory({
-      category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
-      listItems: paginatedListItems([item({ id: 'a' })]),
-      listImages,
-      signUrls: fakeSignUrls(),
-    });
-    await expect(failure).rejects.toThrow('Could not list photographs');
-    await expect(failure).rejects.toHaveProperty('cause', listingError);
-  });
-
-  // No rows is `[]`; a null answer would ship an archive that looks like a collection without photos.
-  it('fails the export rather than shipping an archive a null photograph listing emptied', async () => {
-    const listImages = (async () => ({
-      data: null,
-      error: null,
-    })) as unknown as ListImages;
-    await expect(
-      exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages,
-        signUrls: fakeSignUrls(),
-      }),
-    ).rejects.toThrow(ExportError);
+    await expect(failure).rejects.toHaveProperty('name', 'ExportError');
   });
 
   it('signs and fetches in batches larger than one page of items, and assembles a readable archive', async () => {
@@ -98,9 +44,7 @@ describe('exportCategory', () => {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
         now,
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems(items),
-        listImages: fakeListImages({
+        listItems: paginatedListItems(items, {
           a: ['1.webp'],
           b: ['1.webp'],
         }),
@@ -132,9 +76,7 @@ describe('exportCategory', () => {
     try {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImages({ a: ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'a' })], { a: ['1.webp'] }),
         signUrls: fakeSignUrls(),
       });
       const entries = await readZipEntries(result.blob);
@@ -158,9 +100,7 @@ describe('exportCategory', () => {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
         onProgress,
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems([item({ id: 'a' }), item({ id: 'b' })]),
-        listImages: fakeListImages({
+        listItems: paginatedListItems([item({ id: 'a' }), item({ id: 'b' })], {
           a: ['1.webp'],
           b: ['1.webp'],
         }),
@@ -193,9 +133,7 @@ describe('exportCategory', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImages({ a: ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'a' })], { a: ['1.webp'] }),
         signUrls: signUrls as unknown as SignUrls,
       });
       expect(signUrls).toHaveBeenCalledWith(expect.any(Array), 6 * 3600);

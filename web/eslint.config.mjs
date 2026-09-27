@@ -75,18 +75,24 @@ const eslintConfig = [
       'sonarjs/cognitive-complexity': ['warn', 20],
     },
   },
-  // Scoped to components/: the top-level auth/session surface has nowhere else to live.
+  // Mirrors depcruise's supabase-behind-data-layer for static imports, in the editor; depcruise also sees import().
   {
-    files: ['src/app/components/**/*.{ts,tsx}'],
+    files: ['src/app/**/*.{ts,tsx}'],
+    ignores: [
+      'src/app/data/**',
+      'src/app/login/**',
+      'src/app/{supabase,useSession,useSignOut}{,.test}.ts',
+      'src/app/SupabaseWarmup{,.test}.tsx',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
             {
-              group: ['**/supabase', '**/supabase.ts'],
+              group: ['**/supabase', '**/supabase.ts', '@supabase/*'],
               message:
-                "Components don't talk to Supabase directly -- add what you need to data/ (or data/auth.ts for the current user) and import that instead.",
+                'Only data/, login/ and the session files talk to Supabase -- add what you need to data/ (or data/auth.ts for the current user) and import that instead.',
             },
           ],
         },

@@ -36,12 +36,16 @@ test.describe('the language a page arrives in', () => {
     await context.close();
   });
 
-  test('falls back rather than showing translation keys', async ({
+  test('falls back to German for a language it does not speak', async ({
     browser,
   }) => {
     const context = await browser.newContext({ locale: 'ja-JP' });
     const page = await context.newPage();
     await page.goto('login/', { waitUntil: 'networkidle' });
+    await expect(page.locator('html')).toHaveAttribute('lang', 'de');
+    await expect(createPageTree(page).login.locators.tagline).toHaveText(
+      'Sammeln • Ordnen • Behalten',
+    );
     await expect(page.locator('body')).not.toContainText('login.');
     await expect(page.locator('body')).not.toContainText('page.footer');
     await context.close();

@@ -1,36 +1,82 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
-import type { TranslationKey } from '../../i18n/I18nProvider';
+import {
+  interpolate,
+  type Translate,
+  type TranslationKey,
+} from '../../i18n/I18nProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
+import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
 import { ImportCancelledError } from '../../data/importCancellation';
-import { importCategory, type ImportProgress } from '../../data/importCategory';
+import type { ImportProgress, ImportResult } from '../../data/importCategory';
 import {
-  findManifestPath,
   ImportFormatError,
-  parseManifest,
+  type ImportFormatReason,
 } from '../../data/importFormat';
 import { uniqueCategoryName } from '../../data/categories';
-import { readZipEntries } from '../../data/zip';
 import { isQuotaExceeded } from '../../data/quota';
 
 /** What to say while an import runs. Same shape as exportProgressMessage. */
 export function importProgressMessage(
   progress: ImportProgress | null,
-  t: (key: TranslationKey) => string,
+  t: Translate,
 ): string | null {
   if (!progress) return null;
   if (progress.phase === 'photos' && progress.total > 0) {
-    return t('category_select.import_photos')
-      .replace('{done}', String(progress.done))
-      .replace('{total}', String(progress.total));
+    return t('category_select.import_photos', {
+      done: progress.done,
+      total: progress.total,
+    });
   }
   if (progress.phase === 'reading') {
     return t('category_select.import_reading');
   }
   return t('category_select.import_items');
+}
+
+/** What each kind of unimportable archive says instead of "try again", which never helps. */
+function formatErrorMessage(
+  reason: ImportFormatReason,
+  t: (key: TranslationKey) => string,
+): string {
+  if (reason === 'unreadable') {
+    return t('category_select.import_unreadable_error');
+  }
+  if (reason === 'too_large') {
+    return t('category_select.import_too_large_error');
+  }
+  return t('category_select.import_format_error');
+}
+
+function partialTemplate(
+  quota: ImportResult['photoQuotaReached'],
+  t: (key: TranslationKey) => string,
+): string {
+  if (quota === 'owner') return t('category_select.import_partial_quota');
+  if (quota === 'app') return t('category_select.import_partial_storage_full');
+  return t('category_select.import_partial');
+}
+
+/** The warning for photographs left out, naming the quota that stopped the rest; null when none was. */
+export function importPartialMessage(
+  {
+    photoCount,
+    skippedPhotoCount,
+    photoQuotaReached,
+  }: Pick<
+    ImportResult,
+    'photoCount' | 'skippedPhotoCount' | 'photoQuotaReached'
+  >,
+  t: (key: TranslationKey) => string,
+): string | null {
+  if (skippedPhotoCount === 0) return null;
+  return interpolate(partialTemplate(photoQuotaReached, t), {
+    skipped: skippedPhotoCount,
+    total: photoCount + skippedPhotoCount,
+  });
 }
 
 export function useImportCategory(existingCategoryNames: string[]) {
@@ -48,43 +94,22 @@ export function useImportCategory(existingCategoryNames: string[]) {
       controllerRef.current = controller;
       setProgress({ phase: 'reading', done: 0, total: 0 });
       try {
-        // Peeked ahead of the real read only to name the category first ("Coins (2)" if taken).
-        const entries = await readZipEntries(file);
-        const manifestPath = findManifestPath(entries.keys());
-        if (!manifestPath) {
-          throw new ImportFormatError('Not a CollectionBuddy export archive');
-        }
-        const manifest = parseManifest(
-          JSON.parse(new TextDecoder().decode(entries.get(manifestPath))),
-        );
-        const categoryName = uniqueCategoryName(
-          manifest.category.name,
-          existingCategoryNames,
-        );
-
+        // On demand: the import and ZIP code is dead weight on every page load that never imports.
+        const { importCategory } = await import('../../data/importCategory');
         const result = await importCategory({
           file,
-          categoryName,
+          // "Coins (2)" if taken, named from the one read of the archive importCategory makes.
+          nameCategory: (archivedName) =>
+            uniqueCategoryName(archivedName, existingCategoryNames),
           onProgress: setProgress,
           signal: controller.signal,
         });
         onImported?.(result.category.id);
         toast.success(
-          t('category_select.import_success').replace(
-            '{name}',
-            result.category.name,
-          ),
+          t('category_select.import_success', { name: result.category.name }),
         );
-        if (result.skippedPhotoCount > 0) {
-          toast.error(
-            t('category_select.import_partial')
-              .replace('{skipped}', String(result.skippedPhotoCount))
-              .replace(
-                '{total}',
-                String(result.photoCount + result.skippedPhotoCount),
-              ),
-          );
-        }
+        const partial = importPartialMessage(result, t);
+        if (partial) toast.error(partial);
       } catch (error) {
         if (error instanceof ImportCancelledError) {
           // Confirmed, not a failure.
@@ -93,7 +118,7 @@ export function useImportCategory(existingCategoryNames: string[]) {
           toast.reportError(
             'import category',
             error,
-            t('category_select.import_format_error'),
+            formatErrorMessage(error.reason, t),
           );
         } else {
           toast.reportError(
@@ -118,14 +143,7 @@ export function useImportCategory(existingCategoryNames: string[]) {
   };
 
   // Same beforeunload guard as useExportCategory.tsx, for the same reason.
-  useEffect(() => {
-    if (!progress) return;
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [progress]);
+  useBeforeUnloadGuard(progress !== null);
 
   return {
     progress,

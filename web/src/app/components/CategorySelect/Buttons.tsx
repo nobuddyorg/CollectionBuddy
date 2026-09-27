@@ -1,5 +1,7 @@
 'use client';
 
+import type { Ref } from 'react';
+
 import Icon, { IconType } from '../Icon';
 import { IconButton } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
@@ -98,6 +100,7 @@ function RoundIconButton({
   iconClassName,
   boxClassName,
   strokeLinecap,
+  ref,
 }: {
   testId: string;
   onClick: () => void;
@@ -106,9 +109,11 @@ function RoundIconButton({
   iconClassName: string;
   boxClassName: string;
   strokeLinecap?: 'round';
+  ref?: Ref<HTMLButtonElement>;
 }) {
   return (
     <button
+      ref={ref}
       type="button"
       data-testid={testId}
       onClick={onClick}
@@ -134,12 +139,15 @@ const HEADER_TOGGLE_BOX = 'w-11 h-11 sm:w-9 sm:h-9';
 export function CollapseButton({
   onClick,
   label,
+  ref,
 }: {
   onClick: () => void;
   label: string;
+  ref?: Ref<HTMLButtonElement>;
 }) {
   return (
     <RoundIconButton
+      ref={ref}
       testId="collapse-categories"
       onClick={onClick}
       label={label}
@@ -155,12 +163,15 @@ export function CollapseButton({
 export function ExpandButton({
   onClick,
   label,
+  ref,
 }: {
   onClick: () => void;
   label: string;
+  ref?: Ref<HTMLButtonElement>;
 }) {
   return (
     <RoundIconButton
+      ref={ref}
       testId="expand-categories"
       onClick={onClick}
       label={label}

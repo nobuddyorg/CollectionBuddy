@@ -3,27 +3,7 @@
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 import { useMemo } from 'react';
-
-export const getPaginationItems = (page: number, totalPages: number) => {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
-  }
-  if (page < 5) {
-    return [1, 2, 3, 4, 5, '...', totalPages];
-  }
-  if (page > totalPages - 4) {
-    return [
-      1,
-      '...',
-      totalPages - 4,
-      totalPages - 3,
-      totalPages - 2,
-      totalPages - 1,
-      totalPages,
-    ];
-  }
-  return [1, '...', page - 1, page, page + 1, '...', totalPages];
-};
+import { getPaginationItems } from './paging';
 
 export function Pagination({
   page,
@@ -99,7 +79,7 @@ export function Pagination({
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted')
               }
-              aria-label={t('item_list.page').replace('{n}', String(item))}
+              aria-label={t('item_list.page', { n: item })}
               aria-current={item === page ? 'page' : undefined}
             >
               {item}
@@ -117,9 +97,7 @@ export function Pagination({
       >
         {previousButton}
         <span className="font-label text-xs text-muted-foreground">
-          {t('item_list.page_of')
-            .replace('{n}', String(page))
-            .replace('{total}', String(totalPages))}
+          {t('item_list.page_of', { n: page, total: totalPages })}
         </span>
         {nextButton}
       </nav>

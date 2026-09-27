@@ -5,16 +5,10 @@ import {
   updateItemsPlace,
   type PlaceGroupRow,
 } from '../../data/items';
-import {
-  coordsFromFeature,
-  isRetryableStatus,
-  photonLang,
-  photonSearchUrl,
-} from '../../data/photon';
-import { attempts, backoffDelayMs } from '../../lib/backoff';
+import { geocodePlace, photonLang } from '../../data/photon';
+import { startSpacer } from '../../lib/backoff';
+import { GEOCODE_CACHE_KEY, storageOwner } from '../../userDataKeys';
 import { Place, PlaceCoords } from './types';
-
-const GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
 
 function readGeocodeCache(): Record<string, PlaceCoords> {
   try {
@@ -83,24 +77,9 @@ export function partitionByCache(
   return { cached, pending };
 }
 
-/** Reads a Place out of a Photon response via the same coordinate validator the form's autocomplete uses. */
-export function placeFromPhotonResponse(
-  name: string,
-  data: unknown,
-): PlaceCoords | null {
-  const features = (data as { features?: unknown })?.features;
-  if (!Array.isArray(features)) return null;
-  const coords = coordsFromFeature(features[0]);
-  return coords ? { name, ...coords } : null;
-}
-
-// Photon is a free service that sheds load with 429s, so lookups go a few at a time and retry on refusal.
+// Photon asks to be used fairly: a few lookups at a time, and together no more than three starts a second.
 const GEOCODE_CONCURRENCY = 3;
-const GEOCODE_ATTEMPTS = 3;
-const RETRY_BASE_MS = 500;
-
-const delay = (milliseconds: number) =>
-  new Promise((resolve) => setTimeout(resolve, milliseconds));
+const GEOCODE_START_GAP_MS = Math.ceil(1000 / 3);
 
 const appendPlace = (place: Place) => (previous: Place[]) => [
   ...previous,
@@ -112,11 +91,13 @@ export function usePlaces({
   categoryId,
   search,
   enabled,
+  canEdit,
   locale,
 }: {
   categoryId: string;
   search: string;
   enabled: boolean;
+  canEdit: boolean;
   locale?: string;
 }) {
   const [places, setPlaces] = useState<Place[]>([]);
@@ -148,6 +129,7 @@ export function usePlaces({
           rows ?? [],
         );
         const cache = readGeocodeCache();
+        const owner = storageOwner();
         let cacheDirty = false;
 
         const { cached, pending } = partitionByCache(unlocated, cache);
@@ -160,43 +142,34 @@ export function usePlaces({
         const placeCount = located.length + unlocated.length;
         let resolvedCount = known.length;
 
-        const geocode = async (place: string): Promise<PlaceCoords | null> => {
-          for (const attempt of attempts(GEOCODE_ATTEMPTS)) {
-            if (cancelled) return null;
-            try {
-              const url = photonSearchUrl(place, { limit: 1, lang });
-              const response = await fetch(url);
-              // A place the gazetteer does not know will not be known on the third try.
-              if (response.ok)
-                return placeFromPhotonResponse(place, await response.json());
-              if (!isRetryableStatus(response.status)) return null;
-            } catch {
-              // A network error is worth another go, same as a refusal.
-            }
-            await delay(backoffDelayMs(RETRY_BASE_MS, attempt));
-          }
-          return null;
-        };
+        const awaitTurn = startSpacer(GEOCODE_START_GAP_MS);
+        const { signal } = controller;
 
         // Drained by a few workers rather than let loose at once; pins still appear as each lookup lands.
         const queue = [...pending];
         const worker = async () => {
-          // Drained in the loop header: the walk ends when the queue does, whatever the body did.
+          // Drained in the loop header: the walk ends when the queue does or the map closes.
           for (
             let place = queue.shift();
-            place !== undefined;
+            place !== undefined && !cancelled;
             place = queue.shift()
           ) {
-            // No cancellation check of its own: `geocode` fails closed on `cancelled` before the network.
-            const entry = await geocode(place);
-            if (!entry) continue;
+            const coords = await geocodePlace(place, {
+              lang,
+              signal,
+              awaitTurn,
+            });
+            if (!coords) continue;
 
+            const entry = { name: place, ...coords };
             cache[place] = entry;
             cacheDirty = true;
             resolvedCount += 1;
             if (!cancelled) setPlaces(appendPlace(withTitles(entry, titles)));
 
-            // Fire-and-forget write-back; `ids` came from the same rows as `unlocated`, so the key exists.
+            // A viewer's write-back is a no-op under RLS; the local cache still spares its next lookup.
+            if (!canEdit) continue;
+            // Fire-and-forget; `ids` came from the same rows as `unlocated`, so the key exists.
             void updateItemsPlace({
               ids: ids.get(place)!,
               payload: { place_lat: entry.lat, place_lng: entry.lng },
@@ -211,7 +184,8 @@ export function usePlaces({
           ),
         );
 
-        if (cacheDirty) writeGeocodeCache(cache);
+        // A sign-out mid-lookup forgot this cache; writing it back would hand it to the next account.
+        if (cacheDirty && storageOwner() === owner) writeGeocodeCache(cache);
         // Every place failed, not "nothing to geocode": tells a broken geocoder from nothing to show.
         if (!cancelled && placeCount > 0 && resolvedCount === 0) {
           setError(true);
@@ -233,7 +207,7 @@ export function usePlaces({
       cancelled = true;
       controller.abort();
     };
-  }, [categoryId, search, enabled, lang]);
+  }, [categoryId, search, enabled, canEdit, lang]);
 
   return { places, loading, error };
 }

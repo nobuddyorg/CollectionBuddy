@@ -34,12 +34,15 @@ vi.mock('../../data/images', async () => {
   };
 });
 
-// The real one needs a Worker; this stand-in also records the sizes it was asked for.
+// The real one probes a canvas and needs a Worker; this stand-in records the sizes asked for and encodes each as `encodedAs` says.
 const compressions: number[] = [];
-vi.mock('browser-image-compression', () => ({
-  default: vi.fn(async (file: Blob, options: { maxWidthOrHeight: number }) => {
-    compressions.push(options.maxWidthOrHeight);
-    return new Blob([`compressed-${options.maxWidthOrHeight}`]);
+let encodedAs: Record<number, string> = {};
+vi.mock('../../lib/imageCompression', () => ({
+  compressPhoto: vi.fn(async (file: File, maxWidthOrHeight: number) => {
+    compressions.push(maxWidthOrHeight);
+    return new File([`compressed-${maxWidthOrHeight}`], file.name, {
+      type: encodedAs[maxWidthOrHeight],
+    });
   }),
 }));
 
@@ -47,6 +50,7 @@ describe('useItemImages uploadImage', () => {
   beforeEach(() => {
     installDefaultImageMocks();
     compressions.length = 0;
+    encodedAs = { 1000: 'image/webp', 600: 'image/webp' };
     acceptsUploads();
   });
 
@@ -76,6 +80,43 @@ describe('useItemImages uploadImage', () => {
     expect(result.current.pendingUploads['item-1']).toBeUndefined();
     // The post-upload refresh lists exactly this item, not every item on the page or none at all.
     expect(listImagesForItems).toHaveBeenCalledWith(['item-1']);
+  });
+
+  // WebKit cannot encode WebP, so there the files are JPEG and named so: never a PNG under a .webp name.
+  it('names each file after the type it was actually encoded as', async () => {
+    encodedAs = { 1000: 'image/jpeg', 600: 'image/png' };
+    const { result } = renderItemImages();
+
+    await act(async () => {
+      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+    });
+
+    const [[pathFull, full], [pathThumb, thumbnail]] = vi.mocked(
+      uploadImageObject,
+    ).mock.calls as [string, File][];
+    expect(pathFull).toMatch(/^uid\/item-1\/[0-9a-f-]+\.jpg$/);
+    expect(full.type).toBe('image/jpeg');
+    expect(pathThumb).toBe(pathFull.replace('.jpg', '.thumb.png'));
+    expect(thumbnail.type).toBe('image/png');
+  });
+
+  it('uploads nothing encoded as a type the bucket refuses', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    encodedAs = { 1000: 'image/gif', 600: 'image/gif' };
+    const { result } = renderItemImages();
+
+    await act(async () => {
+      await result.current.uploadImage('item-1', new File(['x'], 'p.gif'));
+    });
+
+    expect(uploadImageObject).not.toHaveBeenCalled();
+    expect(createImageRow).not.toHaveBeenCalled();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not upload this image. Please try again.',
+    );
+    consoleError.mockRestore();
   });
 
   it('keeps the photograph when only the thumbnail upload fails', async () => {
@@ -133,7 +174,7 @@ describe('useItemImages uploadImage', () => {
     vi.mocked(createImageRow).mockResolvedValue({
       error: {
         code: 'PT507',
-        message: 'photo storage quota of 1 GiB reached',
+        message: 'photo storage quota of 256 MiB reached',
       },
     } as never);
     const { result } = renderItemImages();
@@ -143,7 +184,26 @@ describe('useItemImages uploadImage', () => {
     });
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The limit of 1 GiB of photographs is reached. Delete some to add more.',
+      'The limit of 256 MiB of photographs is reached. Delete some to add more.',
+    );
+  });
+
+  it('says the app’s photo storage is full when the row is refused for the whole bucket', async () => {
+    vi.mocked(createImageRow).mockResolvedValue({
+      error: {
+        code: 'PT507',
+        details: 'project',
+        message: 'the photo storage of this app is full',
+      },
+    } as never);
+    const { result } = renderItemImages();
+
+    await act(async () => {
+      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "The app's photo storage is full, so no photograph can be added for now.",
     );
   });
 

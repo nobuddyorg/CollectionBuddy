@@ -6,38 +6,18 @@ import {
   LARGE_EXPORT_WARN_BYTES,
 } from './exportCategory';
 import {
-  type ListImages,
   item,
-  fakeGetSession,
   paginatedListItems,
   fakeSignUrls,
   okResponse,
 } from './exportCategory.test-support';
-
-// Same shape, but each name carries the byte size the total-size check reads out of `size_bytes`.
-function fakeListImagesWithSizes(
-  byItemId: Record<string, { name: string; size: number }[]>,
-): ListImages {
-  return async (itemIds: string[]) => ({
-    data: itemIds.flatMap((itemId) =>
-      (byItemId[itemId] ?? []).map(({ name, size }) => ({
-        item_id: itemId,
-        path_full: `uid/${itemId}/${name}`,
-        size_bytes: size,
-      })),
-    ),
-    error: null,
-  });
-}
 
 describe('confirmLargeExport', () => {
   it('does not ask when the total stays under the threshold', async () => {
     const confirmLargeExport = vi.fn().mockResolvedValue(true);
     await exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
-      listItems: paginatedListItems([item({ id: 'a' })]),
-      listImages: fakeListImagesWithSizes({
+      listItems: paginatedListItems([item({ id: 'a' })], {
         a: [{ name: '1.webp', size: 1024 }],
       }),
       signUrls: fakeSignUrls(),
@@ -56,9 +36,7 @@ describe('confirmLargeExport', () => {
     try {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImagesWithSizes({
+        listItems: paginatedListItems([item({ id: 'a' })], {
           a: [{ name: '1.webp', size: LARGE_EXPORT_WARN_BYTES }],
         }),
         signUrls: fakeSignUrls(),
@@ -81,9 +59,7 @@ describe('confirmLargeExport', () => {
     try {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImagesWithSizes({
+        listItems: paginatedListItems([item({ id: 'a' })], {
           a: [{ name: '1.webp', size: bigSize }],
         }),
         signUrls: fakeSignUrls(),
@@ -104,9 +80,7 @@ describe('confirmLargeExport', () => {
     try {
       const failure = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImagesWithSizes({
+        listItems: paginatedListItems([item({ id: 'a' })], {
           a: [{ name: '1.webp', size: bigSize }],
         }),
         signUrls: fakeSignUrls(),
@@ -128,9 +102,7 @@ describe('confirmLargeExport', () => {
     try {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImagesWithSizes({
+        listItems: paginatedListItems([item({ id: 'a' })], {
           a: [{ name: '1.webp', size: bigSize }],
         }),
         signUrls: fakeSignUrls(),
@@ -151,9 +123,7 @@ describe('confirmLargeExport', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems([item({ id: 'a' }), item({ id: 'b' })]),
-        listImages: fakeListImagesWithSizes({
+        listItems: paginatedListItems([item({ id: 'a' }), item({ id: 'b' })], {
           a: [{ name: '1.webp', size: half }],
           b: [{ name: '1.webp', size: half }],
         }),

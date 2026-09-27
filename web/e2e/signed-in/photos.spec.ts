@@ -4,7 +4,9 @@ import { resolve } from 'node:path';
 import { expect, test } from './test';
 import { createClient } from '@supabase/supabase-js';
 
+import { removeEntriesTitled } from './cleanup';
 import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
+import type { PageTree } from '../pages';
 // Decode, resize, upload, list and sign all happen in the browser; rls/ covers what the policies allow.
 test.use({ locale: 'en-GB' });
 
@@ -45,16 +47,66 @@ async function itemIdFor(token: string, title: string) {
   return data.id as string;
 }
 
+type StoredItem = { token: string; userId: string; itemId: string };
+
 /** Scoped to the item, not the account: other specs write under the same owner concurrently. */
-async function storedObjects(item: {
-  token: string;
-  userId: string;
-  itemId: string;
-}) {
+async function storedFiles(item: StoredItem) {
   const { data } = await storageAs(item.token).list(
     `${item.userId}/${item.itemId}`,
   );
-  return (data ?? []).map((object) => object.name);
+  return (data ?? []).map((object) => ({
+    name: object.name,
+    type: (object.metadata?.mimetype ?? '') as string,
+    bytes: (object.metadata?.size ?? 0) as number,
+  }));
+}
+
+async function storedObjects(item: StoredItem) {
+  return (await storedFiles(item)).map((file) => file.name);
+}
+
+// The logo's 414x341 PNG is ~210 KB; WebP or JPEG at 80% comes in far below, a PNG re-encode does not.
+const COMPRESSED_CEILING_BYTES = 100_000;
+
+// Safari's canvas cannot encode WebP and answers with PNG (MDN browser-compat-data); no Worker keeps the patch on the encoder's thread.
+function emulateSafariCanvas() {
+  const asSafari = (type?: string) =>
+    type === 'image/webp' ? 'image/png' : type;
+  const toBlob = HTMLCanvasElement.prototype.toBlob;
+  HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
+    toBlob.call(this, callback, asSafari(type), quality);
+  };
+  const toDataURL = HTMLCanvasElement.prototype.toDataURL;
+  HTMLCanvasElement.prototype.toDataURL = function (type, quality) {
+    return toDataURL.call(this, asSafari(type), quality);
+  };
+  const convertToBlob = OffscreenCanvas.prototype.convertToBlob;
+  OffscreenCanvas.prototype.convertToBlob = function (options) {
+    return convertToBlob.call(this, {
+      ...options,
+      type: asSafari(options?.type),
+    });
+  };
+  Object.defineProperty(window, 'Worker', { value: undefined });
+}
+
+type WorkerAnswers = { files: number; errors: number };
+
+// browser-image-compression's worker posts back the compressed file, or {error} when it cannot import the library.
+function countCompressionWorkerAnswers() {
+  const answers: WorkerAnswers = { files: 0, errors: 0 };
+  Object.assign(window, { compressionWorkerAnswers: answers });
+  const NativeWorker = window.Worker;
+  window.Worker = class extends NativeWorker {
+    constructor(...args: ConstructorParameters<typeof Worker>) {
+      super(...args);
+      this.addEventListener('message', ({ data }) => {
+        if (data?.file) answers.files++;
+        if (data?.error) answers.errors++;
+      });
+      this.addEventListener('error', () => answers.errors++);
+    }
+  };
 }
 
 const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
@@ -79,9 +131,14 @@ test.describe('photographs', () => {
       // Waits for the real picture, not the placeholder that stood in for it.
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
       await expect(card.locators.images).toHaveAttribute('src', /token=/);
+      // Both sizes signed and offered, so a plate that needs no more than 600px fetches the thumbnail.
+      await expect(card.locators.images).toHaveAttribute(
+        'srcset',
+        /\.thumb\.\w+\?token=\S+ 600w, \S+\?token=\S+ 1000w$/,
+      );
     } finally {
-      // In finally: reseed() deletes rows, never storage objects, so a leaked entry orphans an upload.
-      await app.catalogue.do.removeEntry(title);
+      // In finally, objects and row both: a leaked entry would orphan its upload.
+      await removeEntriesTitled(title);
     }
   });
 
@@ -103,7 +160,7 @@ test.describe('photographs', () => {
         timeout: ARRIVES,
       });
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -120,18 +177,79 @@ test.describe('photographs', () => {
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
 
-      const stored = await storedObjects({ token, userId, itemId });
+      const stored = await storedFiles({ token, userId, itemId });
       expect(stored).toHaveLength(2);
-      expect(
-        stored.filter((name) => name.endsWith('.thumb.webp')),
-      ).toHaveLength(1);
-      expect(
-        stored.filter(
-          (name) => name.endsWith('.webp') && !name.includes('.thumb'),
-        ),
-      ).toHaveLength(1);
+      const thumbnails = stored.filter(({ name }) => name.includes('.thumb.'));
+      expect(thumbnails.map(({ name }) => name)).toEqual([
+        expect.stringMatching(/\.thumb\.webp$/),
+      ]);
+      // The bytes are what the name says, and compressed: never a PNG under a .webp name.
+      for (const file of stored) {
+        expect(file.name).toMatch(/\.webp$/);
+        expect(file.type).toBe('image/webp');
+        expect(file.bytes).toBeLessThan(COMPRESSED_CEILING_BYTES);
+      }
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
+    }
+  });
+
+  // A worker whose import the CSP refuses fails quietly and the library compresses on the main thread instead.
+  test('it is compressed off the main thread, in a worker that loads its library from the app', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await page.addInitScript(countCompressionWorkerAnswers);
+    await app.categories.do.open(SEED.photoCategory);
+
+    const title = uniqueTitle('Im Worker');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+
+      const answers = await page.evaluate(
+        () =>
+          (window as unknown as { compressionWorkerAnswers: WorkerAnswers })
+            .compressionWorkerAnswers,
+      );
+      // One worker for the full size, one for the thumbnail.
+      expect(answers).toEqual({ files: 2, errors: 0 });
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
+  test('where the browser cannot encode WebP, it is stored as JPEG and named so', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const { token, userId } = context();
+    await page.addInitScript(emulateSafariCanvas);
+    await app.categories.do.open(SEED.photoCategory);
+
+    const title = uniqueTitle('Safari');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      const itemId = await itemIdFor(token, title);
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+
+      const stored = await storedFiles({ token, userId, itemId });
+      expect(stored.map(({ name }) => name).sort()).toEqual([
+        expect.stringMatching(/^[0-9a-f-]+\.jpg$/),
+        expect.stringMatching(/^[0-9a-f-]+\.thumb\.jpg$/),
+      ]);
+      for (const file of stored) {
+        expect(file.type).toBe('image/jpeg');
+        expect(file.bytes).toBeLessThan(COMPRESSED_CEILING_BYTES);
+      }
+    } finally {
+      await removeEntriesTitled(title);
     }
   });
 
@@ -151,7 +269,7 @@ test.describe('photographs', () => {
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toHaveCount(2, { timeout: ARRIVES });
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -174,7 +292,7 @@ test.describe('photographs', () => {
       await card.locators.buttons.deleteImage.click();
       await app.confirm.do.accept();
       await expect(card.locators.images).toHaveCount(0);
-      await app.toast.do.close();
+      await app.toast.do.commitDeletion('images');
 
       await app.categories.do.open(SEED.photoCategory);
       await expect(app.catalogue.card(title)()).toBeVisible();
@@ -185,7 +303,7 @@ test.describe('photographs', () => {
         })
         .toEqual([]);
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 
@@ -198,24 +316,90 @@ test.describe('photographs', () => {
     const { token, userId } = context();
 
     const title = uniqueTitle('Mit Aufräumen');
-    let itemId: string | undefined;
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
-      itemId = await itemIdFor(token, title);
+      const itemId = await itemIdFor(token, title);
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
 
       const during = await storedObjects({ token, userId, itemId });
       expect(during.length).toBeGreaterThan(0);
-    } finally {
+
       await app.catalogue.do.removeEntry(title);
+      await app.toast.do.commitDeletion('items');
+      expect(await storedObjects({ token, userId, itemId })).toEqual([]);
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
+  // #784: the entry's delete can commit inside its photograph's own undo window and take the photograph along.
+  test.describe('taken off just before its entry is deleted', () => {
+    async function photographThenEntryDeleted(
+      app: PageTree,
+      title: string,
+    ): Promise<string> {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      const itemId = await itemIdFor(context().token, title);
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+
+      await card.locators.buttons.deleteImage.click();
+      await app.confirm.do.accept();
+      await app.catalogue.do.removeEntry(title);
+      await app.toast.do.commitDeletion('items');
+      // The photograph's toast is the one still waiting; without it this test would prove nothing.
+      await expect(app.toast.locators.buttons.action).toBeVisible();
+      return itemId;
     }
 
-    await expect
-      .poll(() => storedObjects({ token, userId, itemId: itemId! }), {
-        timeout: 15_000,
-      })
-      .toEqual([]);
+    test('its undo has nothing to bring back, and the app carries on', async ({
+      on,
+      page,
+    }) => {
+      const app = on(page);
+      const title = uniqueTitle('Mit Eintrag weg');
+      try {
+        await photographThenEntryDeleted(app, title);
+
+        await app.toast.do.undo();
+
+        await expect(app.toast.locators.buttons.action).toHaveCount(0);
+        await expect(app.appError()).toHaveCount(0);
+        await expect(app.catalogue.card(title)()).toHaveCount(0);
+        await expect(app.catalogue.locators.buttons.newEntry).toBeVisible();
+      } finally {
+        await removeEntriesTitled(title);
+      }
+    });
+
+    test('its own delete counts as done, not as failed', async ({
+      on,
+      page,
+    }) => {
+      const app = on(page);
+      const title = uniqueTitle('Schon mitgenommen');
+      try {
+        const itemId = await photographThenEntryDeleted(app, title);
+        // After the row delete finds nothing, the app asks whether the entry went too.
+        const entryLookedUp = page.waitForResponse(
+          (response) =>
+            response.request().method() === 'GET' &&
+            new URL(response.url()).pathname.endsWith('/rest/v1/items') &&
+            new URL(response.url()).searchParams.get('id') === `eq.${itemId}`,
+        );
+
+        await app.toast.do.close();
+        await entryLookedUp;
+
+        await expect(app.toast.locators.alert).toHaveCount(0);
+        await expect(app.appError()).toHaveCount(0);
+        await expect(app.catalogue.card(title)()).toHaveCount(0);
+      } finally {
+        await removeEntriesTitled(title);
+      }
+    });
   });
 });

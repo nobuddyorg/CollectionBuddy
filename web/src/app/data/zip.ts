@@ -1,12 +1,12 @@
-// Store-only and no Zip64: the 4 GiB / 65535-entry ceilings are refused, never rolled over.
+// The writer: store-only and no Zip64, so the 4 GiB / 65535-entry ceilings are refused, never rolled over.
 
-const LOCAL_HEADER_SIGNATURE = 0x04034b50;
-const CENTRAL_HEADER_SIGNATURE = 0x02014b50;
-const END_OF_CENTRAL_DIR_SIGNATURE = 0x06054b50;
+export const LOCAL_HEADER_SIGNATURE = 0x04034b50;
+export const CENTRAL_HEADER_SIGNATURE = 0x02014b50;
+export const END_OF_CENTRAL_DIR_SIGNATURE = 0x06054b50;
 
-const LOCAL_HEADER_BYTES = 30;
-const CENTRAL_HEADER_BYTES = 46;
-const END_OF_CENTRAL_DIR_BYTES = 22;
+export const LOCAL_HEADER_BYTES = 30;
+export const CENTRAL_HEADER_BYTES = 46;
+export const END_OF_CENTRAL_DIR_BYTES = 22;
 
 /** 2.0: what a stored entry with no extras needs, and nothing beyond it. */
 const VERSION = 20;
@@ -15,7 +15,7 @@ const VERSION = 20;
 const FLAG_UTF8 = 0x0800;
 
 /** Compression method 0 -- the bytes are stored verbatim. */
-const METHOD_STORE = 0;
+export const METHOD_STORE = 0;
 
 /** Past these the 32-bit header fields cannot describe the archive without Zip64. */
 export const MAX_ZIP_BYTES = 0xffffffff;
@@ -164,70 +164,12 @@ export function endOfCentralDirectory({
   return bytes;
 }
 
+/** A file that is not a ZIP, is damaged, contradicts itself, or needs a feature the reader lacks. */
 export class ZipReadError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'ZipReadError';
   }
-}
-
-/** Reads an archive `createZipWriter` produced back into entries by path, via the central directory. */
-export async function readZipEntries(
-  blob: Blob,
-): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  if (bytes.length < END_OF_CENTRAL_DIR_BYTES) {
-    throw new ZipReadError('Not a ZIP archive: file is too small');
-  }
-  const dataView = new DataView(
-    bytes.buffer,
-    bytes.byteOffset,
-    bytes.byteLength,
-  );
-  const trailerAt = bytes.length - END_OF_CENTRAL_DIR_BYTES;
-  if (dataView.getUint32(trailerAt, true) !== END_OF_CENTRAL_DIR_SIGNATURE) {
-    // No backward scan for an archive comment: `createZipWriter` never writes one.
-    throw new ZipReadError(
-      'Not a ZIP archive: no end-of-central-directory record',
-    );
-  }
-
-  const entryCount = dataView.getUint16(trailerAt + 8, true);
-  let directoryAt = dataView.getUint32(trailerAt + 16, true);
-
-  const entries = new Map<string, Uint8Array<ArrayBuffer>>();
-  const decoder = new TextDecoder();
-  for (let i = 0; i < entryCount; i++) {
-    if (directoryAt + CENTRAL_HEADER_BYTES > bytes.length) {
-      throw new ZipReadError(
-        'Corrupt archive: central directory runs past the file',
-      );
-    }
-    if (dataView.getUint32(directoryAt, true) !== CENTRAL_HEADER_SIGNATURE) {
-      throw new ZipReadError(
-        'Corrupt archive: malformed central directory entry',
-      );
-    }
-    const size = dataView.getUint32(directoryAt + 24, true);
-    const nameLength = dataView.getUint16(directoryAt + 28, true);
-    const localOffset = dataView.getUint32(directoryAt + 42, true);
-    const name = decoder.decode(
-      bytes.slice(
-        directoryAt + CENTRAL_HEADER_BYTES,
-        directoryAt + CENTRAL_HEADER_BYTES + nameLength,
-      ),
-    );
-
-    const localNameLength = dataView.getUint16(localOffset + 26, true);
-    const dataStart = localOffset + LOCAL_HEADER_BYTES + localNameLength;
-    if (dataStart + size > bytes.length) {
-      throw new ZipReadError(`Corrupt archive: "${name}" runs past the file`);
-    }
-    entries.set(name, bytes.slice(dataStart, dataStart + size));
-
-    directoryAt += CENTRAL_HEADER_BYTES + nameLength;
-  }
-  return entries;
 }
 
 export class ZipLimitError extends Error {
@@ -263,8 +205,6 @@ export type ZipWriter = {
     bytes: Uint8Array<ArrayBuffer>;
     modified?: Date;
   }) => void;
-  /** Bytes written so far, which is what the archive would weigh today. */
-  size: () => number;
   finish: () => Blob;
 };
 
@@ -301,8 +241,6 @@ export function createZipWriter({
       offset += headerLength + bytes.length;
       entries.push(entry);
     },
-
-    size: () => offset,
 
     finish() {
       const directory = entries.map(centralDirectoryEntry);

@@ -6,9 +6,23 @@ import { STRIP_MAX } from './imageEntries';
 import { useI18n } from '../../i18n/useI18n';
 import { Spinner } from '../ui/Spinner';
 
+// ItemList's grid: one column, two from sm, three from lg inside max-w-6xl's 1120px of content.
+const HERO_SIZES = '(min-width: 1024px) 363px, (min-width: 640px) 50vw, 100vw';
+
+/** Lets the browser take the signed 600px thumbnail where a plate needs no more; widths are the long edge. */
+function heroSources(image: ImageEntry): { srcSet?: string; sizes?: string } {
+  if (!image.urlThumb) return {};
+  return {
+    srcSet: `${image.urlThumb} 600w, ${image.urlFull} 1000w`,
+    sizes: HERO_SIZES,
+  };
+}
+
 // Holds the frame and fades the photograph in: a signed URL doesn't mean the bytes have arrived.
 function Plate({
   src,
+  srcSet,
+  sizes,
   alt,
   ratio,
   onOpen,
@@ -18,6 +32,8 @@ function Plate({
   onReady,
 }: {
   src: string;
+  srcSet?: string;
+  sizes?: string;
   alt: string;
   ratio: string;
   onOpen: () => void;
@@ -48,6 +64,8 @@ function Plate({
         <img
           data-testid="item-image"
           src={src}
+          srcSet={srcSet}
+          sizes={sizes}
           alt={alt}
           decoding="async"
           // No credentials, so the browser doesn't reject Cloudflare's __cf_bm cookie scoped to supabase.co.
@@ -139,9 +157,7 @@ export function ImageGrid({
   if (!total) return null;
 
   const altFor = (index: number) =>
-    t('item_list.image_alt')
-      .replace('{title}', itemTitle)
-      .replace('{idx}', String(index + 1));
+    t('item_list.image_alt', { title: itemTitle, idx: index + 1 });
 
   // Not a trash icon, which means the whole entry: this reads as "take this one off".
   const deleteButton = ({
@@ -213,7 +229,7 @@ export function ImageGrid({
       );
 
     const alt = overflowCount
-      ? t('item_list.more_images').replace('{count}', String(overflowCount))
+      ? t('item_list.more_images', { count: overflowCount })
       : altFor(index);
 
     return (
@@ -221,6 +237,7 @@ export function ImageGrid({
         key={image.pathFull}
         // Separate from `small`: a pair's half is thumbnail-sized but keeps full-size delete controls.
         src={preferThumb ? image.urlThumb || image.urlFull : image.urlFull}
+        {...(preferThumb ? {} : heroSources(image))}
         alt={alt}
         ratio={ratio}
         onOpen={() => onOpenModal(index)}

@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { expect, test } from './test';
 
+import { removeEntriesTitled } from './cleanup';
 import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
 // photos.spec.ts proves a photograph is stored; this opens it full size and walks the carousel.
 test.use({ locale: 'en-GB' });
@@ -14,8 +15,6 @@ test.describe.configure({ timeout: 120_000 });
 const ARRIVES = 45_000;
 
 const PHOTO = resolve(process.cwd(), 'public/logo.png');
-// A file input ignores the very file it already holds, so repeated uploads alternate.
-const PHOTOS = [PHOTO, resolve(process.cwd(), 'public/icon-192.png')];
 const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
 
 const context = () =>
@@ -81,7 +80,74 @@ test.describe('looking at a photograph full size', () => {
       await page.keyboard.press('Escape');
       await expect(app.viewer()).toHaveCount(0);
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
+    }
+  });
+
+  // #785: the keyboard belonged to every open dialog, so Escape on the confirm closed the viewer too.
+  test('a confirmation raised from it takes Escape and the arrows, and it stays open', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await app.categories.do.open(SEED.viewerCategory);
+
+    const title = uniqueTitle('Gestapelt');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toHaveCount(1, { timeout: ARRIVES });
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toHaveCount(2, { timeout: ARRIVES });
+
+      await card.do.openImage();
+      await app.viewer.do.deleteImage();
+      await expect(app.confirm()).toBeVisible();
+
+      // The photograph behind the question must stay the one it asks about.
+      await page.keyboard.press('ArrowRight');
+      await expect(app.viewer.locators.position).toHaveText('1 / 2');
+
+      await page.keyboard.press('Escape');
+      await expect(app.confirm()).toHaveCount(0);
+      await expect(app.viewer()).toBeVisible();
+      await expect(app.viewer.locators.position).toHaveText('1 / 2');
+
+      await page.keyboard.press('Escape');
+      await expect(app.viewer()).toHaveCount(0);
+      await expect(card.locators.images).toHaveCount(2);
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
+  // #785: hidden with its last photograph, the viewer used to pop back open once Undo brought it back.
+  test('closes for good once its only photograph is deleted, Undo included', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await app.categories.do.open(SEED.viewerCategory);
+
+    const title = uniqueTitle('Einzelstück');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toHaveCount(1, { timeout: ARRIVES });
+
+      await card.do.openImage();
+      await app.viewer.do.deleteImage();
+      await app.confirm.do.accept();
+      await expect(app.viewer()).toHaveCount(0);
+      await expect(card.locators.images).toHaveCount(0);
+
+      await app.toast.do.undo();
+      await expect(card.locators.images).toHaveCount(1);
+      await expect(app.viewer()).toHaveCount(0);
+    } finally {
+      await removeEntriesTitled(title);
     }
   });
 
@@ -105,7 +171,7 @@ test.describe('looking at a photograph full size', () => {
         await expect(
           app.catalogue.card(title).locators.uploadInput,
         ).toBeEnabled({ timeout: ARRIVES });
-        await app.catalogue.card(title).do.uploadPhoto(PHOTOS[upload % 2]);
+        await app.catalogue.card(title).do.uploadPhoto(PHOTO);
         await expect
           .poll(() => photoCount(token, itemId), { timeout: ARRIVES })
           .toBe(upload);
@@ -124,10 +190,8 @@ test.describe('looking at a photograph full size', () => {
         'src',
         /\/object\/sign\//,
       );
-
-      await page.keyboard.press('Escape');
     } finally {
-      await app.catalogue.do.removeEntry(title);
+      await removeEntriesTitled(title);
     }
   });
 });

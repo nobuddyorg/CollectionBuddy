@@ -1,25 +1,30 @@
-import { createImageRow, imagePrefix, uploadImageObject } from './images';
+import {
+  createImageRow,
+  imagePrefix,
+  isTransientStorageError,
+  uploadImageObject,
+} from './images';
 import { checkCancelled, ImportCancelledError } from './importCancellation';
-import { attempts, backoffDelayMs } from '../lib/backoff';
-import { WEBP_COMPRESSION_OPTIONS } from '../lib/imageCompression';
+import { isQuotaExceeded } from './quota';
+import { retryWithBackoff } from '../lib/backoff';
+import { compressPhoto } from '../lib/imageCompression';
+import { extensionForType, typeForArchivePath } from './photoType';
+import type { PhotoTask } from './importFormat';
+import { ZipReadError } from './zip';
+import type { ZipEntryReader } from './zipReader';
 
 const PHOTO_UPLOAD_ATTEMPTS = 3;
 const PHOTO_UPLOAD_RETRY_BASE_MS = 500;
 
 /** The archive carries only the full size, so the 600px thumbnail is remade the way uploads do. */
-export async function realCompressThumb(
-  bytes: Uint8Array<ArrayBuffer>,
-): Promise<Blob> {
-  const { default: imageCompression } =
-    await import('browser-image-compression');
-  const file = new File([bytes], 'photo.webp', { type: 'image/webp' });
-  return imageCompression(file, {
-    maxWidthOrHeight: 600,
-    ...WEBP_COMPRESSION_OPTIONS,
-  });
+export function realCompressThumb(photo: Blob): Promise<Blob> {
+  return compressPhoto(
+    new File([photo], 'photo.webp', { type: 'image/webp' }),
+    600,
+  );
 }
 
-/** Storage attaches no reliable status, so every failure here is retried as transient. */
+/** Retries only what `isTransientStorageError` says may pass; a 403, 409 or 413 is returned at once. */
 async function uploadWithRetry({
   path,
   blob,
@@ -31,57 +36,57 @@ async function uploadWithRetry({
   uploadImage: typeof uploadImageObject;
   signal?: AbortSignal;
 }): Promise<unknown> {
-  let lastError: unknown;
-  for (const attempt of attempts(PHOTO_UPLOAD_ATTEMPTS)) {
-    checkCancelled(signal);
-    if (attempt > 0) {
-      await new Promise((resolve) =>
-        setTimeout(
-          resolve,
-          backoffDelayMs(PHOTO_UPLOAD_RETRY_BASE_MS, attempt - 1),
-        ),
-      );
-    }
-    const { error } = await uploadImage(path, blob);
-    if (!error) return null;
-    lastError = error;
-  }
-  return lastError;
+  return retryWithBackoff({
+    maxAttempts: PHOTO_UPLOAD_ATTEMPTS,
+    baseMs: PHOTO_UPLOAD_RETRY_BASE_MS,
+    run: async () => {
+      checkCancelled(signal);
+      const { error } = await uploadImage(path, blob);
+      return {
+        value: error,
+        retry: error !== null && isTransientStorageError(error),
+      };
+    },
+  });
 }
-
-export type PhotoTask = { itemId: string; archivePath: string };
 
 /** The raw calls one photograph's round trip makes, threaded through from `importCategory`. */
 export type PhotoImportCalls = {
   uploadImage: typeof uploadImageObject;
   createImage: typeof createImageRow;
-  compressThumb: (bytes: Uint8Array<ArrayBuffer>) => Promise<Blob>;
+  compressThumb: (photo: Blob) => Promise<Blob>;
   signal?: AbortSignal;
 };
 
-/** False for a photograph left out (missing, or failing after retrying); only a cancel propagates. */
+/** False for a photograph left out (missing, or failing after retrying); a cancel, a quota refusal or a damaged archive propagates. */
 export async function importPhoto({
   task,
-  bytes,
+  readPhoto,
   uid,
   calls: { uploadImage, createImage, compressThumb, signal },
 }: {
   task: PhotoTask;
-  bytes: Uint8Array<ArrayBuffer> | undefined;
+  readPhoto: ZipEntryReader | undefined;
   uid: string;
   calls: PhotoImportCalls;
 }): Promise<boolean> {
-  if (!bytes) {
+  if (!readPhoto) {
     console.error('Photo missing from archive', task.archivePath);
     return false;
   }
   try {
-    const thumb = await compressThumb(bytes);
+    // Stored as the export named it, so a round trip keeps each photograph's own type.
+    const fullType = typeForArchivePath(task.archivePath);
+    // Read only now, one photograph per pool slot, so the archive never sits in memory whole.
+    const photo = await readPhoto();
+    const thumb = await compressThumb(photo);
     const base = crypto.randomUUID();
     const pathBase = `${imagePrefix(uid, task.itemId)}/${base}`;
+    const pathFull = `${pathBase}${extensionForType(fullType)}`;
+    const pathThumb = `${pathBase}.thumb${extensionForType(thumb.type)}`;
     const fullError = await uploadWithRetry({
-      path: `${pathBase}.webp`,
-      blob: new Blob([bytes], { type: 'image/webp' }),
+      path: pathFull,
+      blob: new Blob([photo], { type: fullType }),
       uploadImage,
       signal,
     });
@@ -90,7 +95,7 @@ export async function importPhoto({
     }
     // A failed thumbnail is not a failed photograph: `path_thumb` goes null, as in the upload path.
     const thumbError = await uploadWithRetry({
-      path: `${pathBase}.thumb.webp`,
+      path: pathThumb,
       blob: thumb,
       uploadImage,
       signal,
@@ -101,16 +106,24 @@ export async function importPhoto({
 
     const { error: rowError } = await createImage({
       item_id: task.itemId,
-      path_full: `${pathBase}.webp`,
-      path_thumb: thumbError ? null : `${pathBase}.thumb.webp`,
-      size_bytes: bytes.length,
+      path_full: pathFull,
+      path_thumb: thumbError ? null : pathThumb,
+      size_bytes: photo.size,
+      created_at: task.createdAt,
     });
     if (rowError) {
       throw new Error('Could not record photograph', { cause: rowError });
     }
     return true;
   } catch (error) {
-    if (error instanceof ImportCancelledError) throw error;
+    // A full quota refuses every later photograph too; an archive that lies about one entry is trusted for none.
+    if (
+      error instanceof ImportCancelledError ||
+      error instanceof ZipReadError ||
+      isQuotaExceeded(error)
+    ) {
+      throw error;
+    }
     console.error('Skipping photograph', task.archivePath, error);
     return false;
   }

@@ -122,15 +122,14 @@ select
 from pg_catalog.pg_proc p
 where p.oid = 'public.search_category_items(uuid, text, int, int)'::regprocedure \gset
 
--- The catalogue page as data/items.ts rawListItems composes it through PostgREST: driven from item_categories, newest first.
+-- The catalogue page's ids as data/itemPage.ts rawListItemIds reads them: item_categories alone, newest first, no embed (#758).
 select format(
   $sql$
-    select ic.item_id, i.title
+    select ic.item_id
     from public.item_categories ic
-    join public.items i on i.id = ic.item_id
     where ic.category_id = %L::uuid
     order by ic.created_at desc, ic.item_id
-    limit 50 offset 0
+    limit 9 offset 0
   $sql$,
   :'category_id'
 ) as catalogue_sql \gset
@@ -217,6 +216,71 @@ select pg_temp.plan_has_no_seq_scan_on(
   :'catalogue_sql', 'item_categories', 'preferred: the catalogue page does not scan item_categories sequentially'
 );
 
+-- The last page (#781) beside other collectors' links, as in production: it flips from sorting every link to the index between 20,000 and 30,000 of them (measured); 45,000 is under the entry quota.
+select pg_temp.auth_as(gen_random_uuid(), 'plans-other@collectionbuddy.test');
+insert into public.categories (name) values ('Plans other (pgTAP)')
+returning id as other_category_id \gset
+insert into public.items (title)
+select 'Plan other ' || g from generate_series(1, 45000) as g;
+insert into public.item_categories (item_id, category_id)
+select i.id, :'other_category_id'::uuid from public.items i where i.title like 'Plan other %';
+reset role;
+analyze public.items, public.item_categories;
+select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
+
+select format(
+  $sql$
+    select ic.item_id
+    from public.item_categories ic
+    where ic.category_id = %L::uuid
+    order by ic.created_at desc, ic.item_id
+    limit 9 offset %s
+  $sql$,
+  :'category_id',
+  (select (ceil(count(*) / 9.0)::int - 1) * 9
+   from public.item_categories ic
+   where ic.category_id = :'category_id'::uuid)
+) as last_page_sql \gset
+
+select pg_temp.plan_uses_index(
+  :'last_page_sql', 'idx_item_categories_cat_created',
+  'preferred: the catalogue''s last page uses idx_item_categories_cat_created under RLS'
+);
+select pg_temp.plan_has_no_seq_scan_on(
+  :'last_page_sql', 'item_categories', 'preferred: the catalogue''s last page does not scan item_categories sequentially'
+);
+
+-- rawListItemsByIds, as PostgREST embeds the photographs: nine entries by id, each with its own ordered lateral read of images.
+select format(
+  $sql$
+    select i.id, i.title, coalesce(photos.body, '[]') as images
+    from public.items i
+    left join lateral (
+      select json_agg(im) as body
+      from (
+        select im.id, im.item_id, im.path_full, im.path_thumb
+        from public.images im
+        where im.item_id = i.id
+        order by im.created_at, im.id
+      ) im
+    ) photos on true
+    where i.id = any(%L::uuid[])
+  $sql$,
+  (select array_agg(page.item_id)
+   from (
+     select ic.item_id
+     from public.item_categories ic
+     where ic.category_id = :'category_id'::uuid
+     order by ic.created_at desc, ic.item_id
+     limit 9
+   ) page)
+) as page_items_sql \gset
+
+select pg_temp.plan_uses_index(
+  :'page_items_sql', 'items_pkey',
+  'preferred: the page''s entries are read by id through items_pkey under RLS'
+);
+
 -- The FK cascades' own queries, planned as the owner that runs them: item_categories keeps no index on item_id or category_id alone (#717).
 reset role;
 select pg_temp.plan_uses_index(
@@ -231,21 +295,27 @@ select pg_temp.plan_uses_index(
   'preferred: deleting a category cascades to its links through idx_item_categories_cat_created'
 );
 
--- tg_images_quota()'s per-owner sum reads size_bytes from the index alone, never the owner's heap rows (#718).
+-- tg_images_quota()'s per-owner sum reads both sizes from the index alone, never the owner's heap rows (#718, 0025).
+-- 50 rows with nothing stored count 250 MiB, inside the owner's 256 MiB.
 select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
 insert into public.images (item_id, path_full)
 select i.id, :'owner_id'::text || '/' || i.id::text || '/plan.webp'
 from public.items i
 where i.title like 'Plan filler %'
-limit 100;
+limit 50;
 reset role;
 analyze public.images;
 set local enable_seqscan = off;
 set local enable_bitmapscan = off;
 select pg_temp.plan_uses_index_only(
-  format('select coalesce(sum(im.size_bytes), 0) from public.images im where im.user_id = %L::uuid', :'owner_id'),
-  'idx_images_user_size',
-  'reachable: the photo quota sum is an index-only scan on idx_images_user_size'
+  format('select coalesce(sum(im.size_bytes + im.thumb_size_bytes), 0) from public.images im where im.user_id = %L::uuid', :'owner_id'),
+  'idx_images_user_sizes',
+  'reachable: the photo quota sum is an index-only scan on idx_images_user_sizes'
+);
+select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
+select pg_temp.plan_uses_index(
+  :'page_items_sql', 'idx_images_item_created_at',
+  'reachable: the page''s photographs come in order from idx_images_item_created_at under RLS'
 );
 
 -- The map's query for a small category beside a large one, planned for the category it names as 0018 makes every call.
@@ -310,16 +380,54 @@ select pg_temp.plan_never_mentions(
   'search_category_items checks the grant once per call, not per row'
 );
 
--- A SQL function's body gets a generic plan in Postgres 17, costed on an average category rather than the one named (0018).
+-- The entry and link quotas' checks, read from the live functions with a statement's keys inlined, as each call is planned (0032).
 reset role;
+select
+  regexp_replace(
+    substring(p.prosrc from 'if exists \((.*)\) then'),
+    '\mlinked\M',
+    quote_literal((select array_agg(ic.item_id) from (
+      select ic.item_id from public.item_categories ic
+      where ic.category_id = :'other_category_id'::uuid limit 100
+    ) ic)) || '::uuid[]',
+    'g'
+  ) as link_quota_sql
+from pg_catalog.pg_proc p
+where p.oid = 'public.tg_item_categories_quota()'::regprocedure \gset
+select
+  regexp_replace(
+    substring(p.prosrc from 'if exists \((.*)\) then'),
+    '\mowners\M',
+    quote_literal(array[:'owner_id'::uuid]) || '::uuid[]',
+    'g'
+  ) as entry_quota_sql
+from pg_catalog.pg_proc p
+where p.oid = 'public.tg_items_quota()'::regprocedure \gset
+
+select pg_temp.plan_uses_index(
+  :'link_quota_sql', 'item_categories_pkey',
+  'preferred: a batch''s link quota probes each linked entry through item_categories_pkey'
+);
+select pg_temp.plan_has_no_seq_scan_on(
+  :'link_quota_sql', 'item_categories', 'preferred: a batch''s link quota does not scan every link'
+);
+select pg_temp.plan_uses_index(
+  :'entry_quota_sql', 'idx_items_user_created_at',
+  'preferred: the entry quota counts one owner''s entries through idx_items_user_created_at'
+);
+
+-- A SQL function's body gets a generic plan in Postgres 17, costed on an average category rather than the one named (0018); a trigger's, on its connection's first calls (0031, 0032).
 select is(
   (select array_agg(p.proname::text order by p.proname)
    from pg_catalog.pg_proc p
    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
      and coalesce(p.proconfig, '{}') @> array['plan_cache_mode=force_custom_plan']),
-  array['list_category_places', 'search_category_items'],
-  'the map and search RPCs plan each call for the category it names'
+  array[
+    'create_items_in_category', 'delete_item_if_orphan', 'list_category_places',
+    'search_category_items', 'tg_item_categories_quota', 'tg_items_quota'
+  ],
+  'the map and search RPCs plan each call for the category it names, entry creation and its quotas for the rows it adds, the orphan cleanup for the links it lost'
 );
 
 select * from finish();

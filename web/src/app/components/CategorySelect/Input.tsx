@@ -7,13 +7,13 @@ type Props = {
   name: string;
   setName: (value: string) => void;
   createCategory: () => void;
-  setExpanded: (value: boolean) => void;
+  onCollapse: () => void;
 };
 export function CategoryInput({
   name,
   setName,
   createCategory,
-  setExpanded,
+  onCollapse,
 }: Props) {
   const { t } = useI18n();
   return (
@@ -31,7 +31,7 @@ export function CategoryInput({
           if (name !== '') {
             setName('');
           } else {
-            setExpanded(false);
+            onCollapse();
           }
         }
       }}

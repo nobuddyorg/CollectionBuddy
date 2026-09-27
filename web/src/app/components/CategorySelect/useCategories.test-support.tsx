@@ -11,7 +11,10 @@ import {
   listItemIdsLinkedElsewhere,
   renameCategory,
 } from '../../data/categories';
-import { listImagePathsForItems, removeImageObjects } from '../../data/images';
+import {
+  listImagePathsForCategory,
+  removeImageObjects,
+} from '../../data/images';
 import { useCategories } from './useCategories';
 
 export function wrapper({ children }: { children: React.ReactNode }) {
@@ -25,8 +28,13 @@ export function wrapper({ children }: { children: React.ReactNode }) {
 export const CATEGORY_ONE = { id: 'cat-1', name: 'Cat 1', user_id: 'owner-1' };
 
 export const IMAGE_ROWS = [
-  { item_id: 'i1', path_full: 'u/i1/a.webp', path_thumb: null },
-  { item_id: 'i2', path_full: 'u/i2/b.webp', path_thumb: 'u/i2/b.thumb.webp' },
+  { id: 'p1', item_id: 'i1', path_full: 'u/i1/a.webp', path_thumb: null },
+  {
+    id: 'p2',
+    item_id: 'i2',
+    path_full: 'u/i2/b.webp',
+    path_thumb: 'u/i2/b.thumb.webp',
+  },
 ];
 
 export function listCategoriesReturns(categories: (typeof CATEGORY_ONE)[]) {
@@ -46,7 +54,7 @@ export async function renderLoadedCategories() {
 
 // Commits the deferred delete by closing the toast, the same as letting it auto-dismiss would.
 export async function commitDeferredDelete() {
-  await screen.findByRole('status');
+  await screen.findByTestId('toast');
   await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 }
 
@@ -71,7 +79,7 @@ export function installDeleteMocks() {
     data: [],
     error: null,
   });
-  vi.mocked(listImagePathsForItems).mockResolvedValue({
+  vi.mocked(listImagePathsForCategory).mockResolvedValue({
     data: IMAGE_ROWS,
     error: null,
   });

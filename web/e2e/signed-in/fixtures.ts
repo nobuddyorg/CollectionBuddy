@@ -41,6 +41,7 @@ const BASELINE_ITEMS: SeedItem[] = [
   'Fotoalbum',
   'Depot',
   'Dunkelkammer',
+  'Tauschkiste',
 ].map((category) => ({
   category,
   title: `${category}stück`,
@@ -56,6 +57,17 @@ const PAGING_ITEMS: SeedItem[] = Array.from({ length: 11 }, (_, index) => ({
   category: 'Schaukasten',
   title: `Schaustück ${String(index + 1).padStart(2, '0')}`,
   description: 'Füllt den Schaukasten über eine Seite hinaus.',
+  place: null,
+  place_lat: null,
+  place_lng: null,
+  tags: [],
+}));
+
+/** One more than a page, so page two holds a single entry that a delete can empty. */
+const SORTING_ITEMS: SeedItem[] = Array.from({ length: 10 }, (_, index) => ({
+  category: 'Sortierkasten',
+  title: `Sortierstück ${String(index + 1).padStart(2, '0')}`,
+  description: 'Füllt den Sortierkasten um eines über eine Seite hinaus.',
   place: null,
   place_lat: null,
   place_lng: null,
@@ -87,6 +99,7 @@ export const SEED = {
     'Schatulle',
     'Umzugskiste',
     'Schaukasten',
+    'Sortierkasten',
     'Etikett',
     'Bildergalerie',
     'Rückgängig',
@@ -95,6 +108,8 @@ export const SEED = {
     'Bibliothek',
     'Depot',
     'Dunkelkammer',
+    'Tauschkiste',
+    'Neuzugänge',
   ],
   /** For entries.spec.ts. */
   scratchCategory: 'Werkstatt',
@@ -112,6 +127,8 @@ export const SEED = {
   importCategory: 'Umzugskiste',
   /** For pagination.spec.ts -- the collection PAGING_ITEMS fills. */
   pagingCategory: 'Schaukasten',
+  /** For pagination.spec.ts's delete-then-create journey, which empties its second page. */
+  sortingCategory: 'Sortierkasten',
   /** For entry-details.spec.ts, which files entries with places and tags. */
   detailCategory: 'Etikett',
   /** For photo-viewer.spec.ts, which photographs an entry and opens it. */
@@ -120,6 +137,32 @@ export const SEED = {
   undoCategory: 'Rückgängig',
   /** For failures.spec.ts, whose uploads are made to fail. */
   failureCategory: 'Pannenwerkstatt',
+  /** For sign-out.spec.ts, as a collector of its own per parallel slot: a global sign-out revokes every session of its user. */
+  signOut: {
+    password: 'sign-out-password-not-a-secret',
+    category: 'Garderobe',
+    item: 'Garderobenstück',
+  },
+  /** For help.spec.ts's first run, as a collector of its own per parallel slot who owns nothing. */
+  firstRun: {
+    password: 'first-run-password-not-a-secret',
+  },
+  /** For account-deletion.spec.ts and rls/account-deletion.spec.ts, as collectors of their own per parallel slot: each deletes its account. */
+  accountDeletion: {
+    password: 'account-deletion-password-not-a-secret',
+    category: 'Nachlass',
+    item: 'Nachlassstück',
+  },
+  /** For import-quota.spec.ts, as a collector of its own per parallel slot: it fills that collector's photo quota. */
+  photoQuota: {
+    password: 'photo-quota-password-not-a-secret',
+    category: 'Fotokontingent',
+    item: 'Kontingentstück',
+  },
+  /** For rls/quotas.spec.ts's creation ceiling, as an owner and an editor of their own per parallel slot: it fills both to the brim. */
+  entryQuota: {
+    password: 'entry-quota-password-not-a-secret',
+  },
   // The RLS specs below run in parallel files and category_shares is unique per (category, grantee).
   /** For rls/viewer-share-photographs.spec.ts, which grants and revokes around a photograph. */
   viewerPhotoCategory: 'Fotoalbum',
@@ -129,6 +172,10 @@ export const SEED = {
   editorLimitsCategory: 'Depot',
   /** For rls/editor-share-photographs.spec.ts, whose grantee photographs the owner's entries. */
   editorPhotoCategory: 'Dunkelkammer',
+  /** For shared-with-me-editor.spec.ts, whose grantee writes here through the interface until demoted. */
+  editorJourneyCategory: 'Tauschkiste',
+  /** For rls/create-rpc.spec.ts, into which each kind of grantee tries to create an entry. */
+  createCategory: 'Neuzugänge',
 
   // Oldest first; the list sorts newest first, so the last one here is the first card on the page.
   items: [
@@ -247,6 +294,7 @@ export const SEED = {
     },
     ...BASELINE_ITEMS,
     ...PAGING_ITEMS,
+    ...SORTING_ITEMS,
   ],
 } as const;
 

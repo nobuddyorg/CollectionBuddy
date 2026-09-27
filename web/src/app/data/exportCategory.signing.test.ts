@@ -9,9 +9,7 @@ import {
 import {
   type SignUrls,
   item,
-  fakeGetSession,
   paginatedListItems,
-  fakeListImages,
   okResponse,
 } from './exportCategory.test-support';
 
@@ -23,9 +21,7 @@ describe('exportCategory, signing the photograph URLs', () => {
     })) as unknown as SignUrls;
     const result = await exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
-      listItems: paginatedListItems([item({ id: 'a' })]),
-      listImages: fakeListImages({ a: ['1.webp'] }),
+      listItems: paginatedListItems([item({ id: 'a' })], { a: ['1.webp'] }),
       signUrls,
     });
     expect(result.skippedPhotoCount).toBe(1);
@@ -46,9 +42,7 @@ describe('exportCategory, signing the photograph URLs', () => {
     try {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImages({ a: ['1.webp'] }),
+        listItems: paginatedListItems([item({ id: 'a' })], { a: ['1.webp'] }),
         signUrls,
       });
 
@@ -79,16 +73,18 @@ describe('exportCategory, signing the photograph URLs', () => {
   });
 
   it('throws when signing fails, rather than exporting with unreadable photo URLs', async () => {
-    const signingError = { message: 'signing failed' };
+    const signingError = {
+      message: 'signing failed',
+      status: 400,
+      statusCode: '403',
+    };
     const signUrls = (async () => ({
       data: null,
       error: signingError,
     })) as unknown as SignUrls;
     const failure = exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
-      listItems: paginatedListItems([item({ id: 'a' })]),
-      listImages: fakeListImages({ a: ['1.webp'] }),
+      listItems: paginatedListItems([item({ id: 'a' })], { a: ['1.webp'] }),
       signUrls,
     });
     await expect(failure).rejects.toThrow('Could not sign photograph URLs');
@@ -111,9 +107,7 @@ describe('exportCategory, signing the photograph URLs', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImages({
+        listItems: paginatedListItems([item({ id: 'a' })], {
           a: paths.map((path) => path.split('/').at(-1)!),
         }),
         signUrls: signUrls as unknown as SignUrls,
@@ -144,9 +138,7 @@ describe('exportCategory, signing the photograph URLs', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
-        listItems: paginatedListItems([item({ id: 'a' })]),
-        listImages: fakeListImages({ a: paths }),
+        listItems: paginatedListItems([item({ id: 'a' })], { a: paths }),
         signUrls: signUrls as unknown as SignUrls,
       });
       // An off-by-one the other way (<=) would ask for a second, empty batch.
@@ -187,7 +179,7 @@ describe('exportCategory, signing the photograph URLs', () => {
     );
     const signUrls = vi.fn(async () => ({
       data: null,
-      error: { message: 'signing failed' },
+      error: { message: 'signing failed', status: 400, statusCode: '403' },
     }));
 
     await expect(

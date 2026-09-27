@@ -3,7 +3,6 @@
 import { useCallback, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
-import { chunk } from '../../lib/chunk';
 import { restoreAt } from '../../lib/optimistic';
 import { useRequestSequence } from '../../lib/useRequestSequence';
 import { useToast } from '../Toast/ToastProvider';
@@ -16,23 +15,11 @@ import {
   listItemIdsLinkedElsewhere,
   renameCategory as renameCategoryRow,
 } from '../../data/categories';
-import {
-  listImagePathsForItems,
-  REMOVE_OBJECTS_BATCH_SIZE,
-  removeImageObjects,
-} from '../../data/images';
+import { listImagePathsForCategory } from '../../data/images';
+import { objectPathsOf, removeObjectsThenRows } from '../../data/imageRemoval';
 import type { CategorySummary } from '../../data/categories';
 
 export type UseCategories = ReturnType<typeof useCategories>;
-
-function storagePathsOf(image: {
-  path_full: string;
-  path_thumb: string | null;
-}): string[] {
-  return image.path_thumb
-    ? [image.path_full, image.path_thumb]
-    : [image.path_full];
-}
 
 // Owned by the page, which decides what renders below the strip once the categories have arrived.
 export function useCategories() {
@@ -41,6 +28,8 @@ export function useCategories() {
   const [categories, setCategories] = useState<CategorySummary[]>([]);
   // Starts true: an initial false flashed the "no categories" state before the first fetch.
   const [isLoading, setIsLoading] = useState(true);
+  // Kept apart from an empty list: a failed load must not read as a collector who has no collections.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -54,12 +43,18 @@ export function useCategories() {
       const { data, error } = await listCategories();
       if (error) throw error;
       const list = data ?? [];
-      if (isCurrent(mySequence)) setCategories(list);
+      if (isCurrent(mySequence)) {
+        setCategories(list);
+        setLoadFailed(false);
+      }
       return list;
     } catch (error) {
       // Logged even for a superseded request; only the toast is gated.
       console.error(error);
-      if (isCurrent(mySequence)) toast.error(t('category_select.load_error'));
+      if (isCurrent(mySequence)) {
+        setLoadFailed(true);
+        toast.error(t('category_select.load_error'));
+      }
       return [];
     } finally {
       if (isCurrent(mySequence)) setIsLoading(false);
@@ -183,7 +178,7 @@ export function useCategories() {
             // Read before the row delete: the cascade would drop these rows and the paths with them.
             let orphanedPaths: string[] = [];
             if (orphanedItemIds.length) {
-              const listed = await listImagePathsForItems(orphanedItemIds);
+              const listed = await listImagePathsForCategory(id);
               if (listed.error !== null) {
                 throw new Error('Could not read images for orphaned items', {
                   cause: listed.error,
@@ -192,19 +187,13 @@ export function useCategories() {
               const orphaned = new Set(orphanedItemIds);
               orphanedPaths = listed.data
                 .filter((row) => orphaned.has(row.item_id))
-                .flatMap(storagePathsOf);
+                .flatMap(objectPathsOf);
             }
 
-            // Objects before the row: only Storage can delete bytes, and a row that is gone cannot name them.
-            for (const paths of chunk(
-              orphanedPaths,
-              REMOVE_OBJECTS_BATCH_SIZE,
-            )) {
-              const { error: removeError } = await removeImageObjects(paths);
-              if (removeError) throw removeError;
-            }
-
-            const { error } = await deleteCategoryRow(id);
+            const { error } = await removeObjectsThenRows({
+              paths: orphanedPaths,
+              deleteRows: () => deleteCategoryRow(id),
+            });
             if (error) throw error;
             await reload();
           } catch (error) {
@@ -226,6 +215,7 @@ export function useCategories() {
   return {
     categories,
     isLoading,
+    loadFailed,
     isCreating,
     isDeleting,
     isRenaming,

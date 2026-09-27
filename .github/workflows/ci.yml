@@ -5,28 +5,56 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  # auto-merge.yml's catch-up dispatches it on main: a merge made with GITHUB_TOKEN starts no push run.
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  # Unconditional: hygiene and secret scanning must see every changed file. The web hooks are skipped because build_and_test runs the same commands.
+  # Unconditional: hygiene must see every changed file, the secret scan every commit. The web hooks are skipped because build_and_test runs the same commands.
   prek:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      # The hook's own version (.pre-commit-config.yaml); the checksum is the release's gitleaks_<version>_checksums.txt entry.
+      - name: Install gitleaks
+        shell: bash
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -fsSL --connect-timeout 10 --max-time 120 --retry 3 -o "$RUNNER_TEMP/gitleaks.tar.gz" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+
+      # Every commit HEAD reaches, the PR's own included even if a later one removes the secret; the hook sees only staged changes, so it is skipped below.
+      - name: Scan the history for secrets
+        run: |
+          "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --redact --no-banner --log-opts=HEAD .
+
+      # An edited, renamed or deleted migration makes every later `supabase db push` fail (docs/how-to/developer-guide.md#roll-back-a-bad-deploy).
+      - name: Check the migration history only grows
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+        run: supabase/check-migration-history.sh "$BASE"
 
       - uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0
         with:
           extra-args: "--all-files"
+          prek-version: "0.5.3"
         env:
-          SKIP: no-commit-to-branch,prettier,eslint,tsc,depcruise,knip
+          SKIP: no-commit-to-branch,gitleaks,prettier,eslint,tsc,depcruise,knip
 
-  # A push to main forces every job: it is the event that deploys, and a squash-merge may combine unrelated changes.
+  # A push to main or a dispatch forces every job: Deploy Pages waits for this whole run to pass, and a merge may combine unrelated changes.
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -34,16 +62,16 @@ jobs:
       web: ${{ steps.force.outputs.value == 'true' || steps.filter.outputs.web == 'true' }}
       sql: ${{ steps.force.outputs.value == 'true' || steps.filter.outputs.sql == 'true' }}
     steps:
-      - name: Force a full run on pushes to main
+      - name: Force a full run on pushes to main and on dispatches
         id: force
-        run: echo "value=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}" >> "$GITHUB_OUTPUT"
+        run: echo "value=${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 2
 
-      # ci.yml is in both filters so a change to this file always exercises what it changed.
+      # Whatever the jobs run on (ci.yml, the composite actions, the local stack's config.toml) is in both; the sweep runs 0022's pgTAP-tested query.
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
@@ -52,17 +80,24 @@ jobs:
               - 'web/**'
               - '.zap/rules.tsv'
               - '.github/workflows/ci.yml'
+              - '.github/actions/**'
+              - 'supabase/config.toml'
             sql:
               - 'supabase/migrations/**'
               - 'supabase/tests/database/**'
               - 'supabase/splinter.sh'
+              - 'supabase/config.toml'
               - '.sqlfluff'
+              - '.semgrepignore'
+              - '.github/workflows/cleanup-orphaned-photos.yml'
               - '.github/workflows/ci.yml'
+              - '.github/actions/**'
 
   build_and_test:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: ./web
@@ -128,7 +163,7 @@ jobs:
       # Reads the json-summary reporter vitest.config.mts adds for this step.
       - name: Add coverage report to job summary
         if: always()
-        uses: davelosert/vitest-coverage-report-action@c4bbc33a89b7ace0e63d35f1f7d4bcee31155a73 # v2
+        uses: davelosert/vitest-coverage-report-action@c4bbc33a89b7ace0e63d35f1f7d4bcee31155a73 # v2.13.0
         with:
           working-directory: web
           vite-config-path: vitest.config.mts
@@ -157,6 +192,7 @@ jobs:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true' || needs.changes.outputs.sql == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: ./web
@@ -233,6 +269,7 @@ jobs:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     defaults:
       run:
         working-directory: ./web
@@ -277,6 +314,7 @@ jobs:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true' || needs.changes.outputs.sql == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       security-events: write
@@ -285,12 +323,19 @@ jobs:
         with:
           persist-credentials: false
 
-      # `shell: bash` adds pipefail, so a failed download cannot pipe an empty script into bash and pass.
+      # The release binary install.sh picks for a glibc x86_64 runner; the release publishes no checksum file, so the hash is of that asset.
       - name: Install Opengrep
         shell: bash
+        env:
+          OPENGREP_VERSION: v1.30.0
+          OPENGREP_SHA256: 35779bdd72e92129c8df2a77f0c55e8c08356801ea92591ef32108d6b28d564c
         run: |
-          curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash -s -- -v v1.30.0
-          echo "$HOME/.opengrep/cli/latest" >> "$GITHUB_PATH"
+          mkdir -p "$RUNNER_TEMP/opengrep"
+          curl -fsSL --connect-timeout 10 --max-time 300 --retry 3 -o "$RUNNER_TEMP/opengrep/opengrep" "https://github.com/opengrep/opengrep/releases/download/${OPENGREP_VERSION}/opengrep_manylinux_x86"
+          echo "${OPENGREP_SHA256}  $RUNNER_TEMP/opengrep/opengrep" | sha256sum --check --strict
+          chmod +x "$RUNNER_TEMP/opengrep/opengrep"
+          "$RUNNER_TEMP/opengrep/opengrep" --version
+          echo "$RUNNER_TEMP/opengrep" >> "$GITHUB_PATH"
 
       # `--config auto` fetches the public community pack anonymously. .semgrepignore is the one suppression file; Opengrep scans only git-tracked files.
       - name: Run Opengrep
@@ -302,7 +347,7 @@ jobs:
             web/src web/scripts web/e2e supabase
 
       - name: Upload SARIF to code scanning
-        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
         with:
           sarif_file: opengrep-results.sarif
           category: opengrep
@@ -376,6 +421,7 @@ jobs:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: ./web
@@ -416,9 +462,13 @@ jobs:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: ./web
+    # The tag the action's default `:stable` pointed at, pinned by digest; bumped by hand (developer-guide.md, Bump a pinned CI tool).
+    env:
+      ZAP_IMAGE: ghcr.io/zaproxy/zaproxy:2.17.0@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -431,7 +481,7 @@ jobs:
         run: |
           status=$(supabase status -o json)
           echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL <<< "$status")" >> "$GITHUB_ENV"
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .ANON_KEY <<< "$status")" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .PUBLISHABLE_KEY <<< "$status")" >> "$GITHUB_ENV"
         working-directory: .
 
       - name: Build the signed-out export
@@ -443,13 +493,14 @@ jobs:
           ln -s . out/CollectionBuddy
           npx serve out -l 4173 &
           echo $! > /tmp/zap-serve.pid
-          timeout 30 bash -c 'until curl -sf http://127.0.0.1:4173/ >/dev/null; do sleep 1; done'
+          timeout 30 bash -c 'until curl -sf --max-time 5 http://127.0.0.1:4173/ >/dev/null; do sleep 1; done'
 
       # `-I`: only a rule promoted to FAIL in .zap/rules.tsv fails the job; the rest lands in the report for triage.
       - name: ZAP baseline scan -- signed out
         uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
           target: 'http://127.0.0.1:4173/'
+          docker_name: ${{ env.ZAP_IMAGE }}
           rules_file_name: '.zap/rules.tsv'
           cmd_options: '-I'
           fail_action: true
@@ -479,12 +530,13 @@ jobs:
           ln -s . out/CollectionBuddy
           npx serve out -l 4174 &
           echo $! > /tmp/zap-serve.pid
-          timeout 30 bash -c 'until curl -sf http://127.0.0.1:4174/ >/dev/null; do sleep 1; done'
+          timeout 30 bash -c 'until curl -sf --max-time 5 http://127.0.0.1:4174/ >/dev/null; do sleep 1; done'
 
       - name: ZAP baseline scan -- signed in (demo mode)
         uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
           target: 'http://127.0.0.1:4174/'
+          docker_name: ${{ env.ZAP_IMAGE }}
           rules_file_name: '.zap/rules.tsv'
           cmd_options: '-I'
           fail_action: true

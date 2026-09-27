@@ -58,19 +58,23 @@ select ok(
 -- sides by foreign key, so a missing row would be refused either way --
 -- but the trigger runs first, and its message is what a client actually
 -- sees. Both directions, since the function looks each up separately.
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.item_categories (item_id, category_id) values (%L, %L)',
     gen_random_uuid(), :'category_id'::uuid
-  )),
+  ),
+  'P0001',
+  'item or category not found',
   'filing an entry that does not exist is refused'
 );
 
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.item_categories (item_id, category_id) values (%L, %L)',
     :'item_id'::uuid, gen_random_uuid()
-  )),
+  ),
+  'P0001',
+  'item or category not found',
   'and so is filing one into a collection that does not exist'
 );
 
@@ -78,11 +82,13 @@ select ok(
 -- photograph record being written against an item id nobody owns. The
 -- foreign key would refuse it too; the trigger is what refuses it first,
 -- and with a message rather than a constraint violation.
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.images (item_id, path_full) values (%L, %L)',
     gen_random_uuid(), :'owner_id'::text || '/' || gen_random_uuid()::text || '/x.webp'
-  )),
+  ),
+  'P0001',
+  'item not found',
   'a photograph record for an item that does not exist is refused'
 );
 

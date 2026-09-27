@@ -1,65 +1,19 @@
 // The requests web/src/app/data/*.ts sends through supabase-js, spelled out as HTTP; keep the two in step.
-import http from 'k6/http';
-import { check } from 'k6';
-import { Counter } from 'k6/metrics';
+import { expectOk, query, send, sendAll, sendJson } from './http.js';
+import { SUPABASE_URL } from './target.js';
 
-import { ANON_KEY, SUPABASE_URL } from './target.js';
-
-// k6's error code for a request that ran into its own timeout (k6 docs, "Error codes").
-const REQUEST_TIMEOUT = 1050;
-const timeouts = new Counter('http_req_timeouts');
+export { query } from './http.js';
 
 const BUCKET = 'item-images';
 const ITEM_FIELDS = 'id,title,description,place,place_lat,place_lng,tags';
-// data/items.ts ITEM_CATEGORY_PAGE_WITH_IMAGES_SELECT.
-const PAGE_SELECT = `items!inner(${ITEM_FIELDS},images(id,item_id,path_full,path_thumb))`;
+// data/itemPage.ts ITEM_WITH_IMAGES_SELECT.
+const ITEM_WITH_IMAGES_SELECT = `${ITEM_FIELDS},images(id,item_id,path_full,path_thumb)`;
 // components/ItemList/paging.ts PAGE_SIZE.
 const PAGE_SIZE = 9;
-
-function query(params) {
-  return Object.entries(params)
-    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-    .join('&');
-}
-
-function send({ method, path, session, body, headers = {}, name }) {
-  const response = http.request(method, `${SUPABASE_URL}${path}`, body, {
-    headers: {
-      apikey: ANON_KEY,
-      Authorization: `Bearer ${session ? session.token : ANON_KEY}`,
-      ...headers,
-    },
-    tags: { name },
-  });
-  if (response.error_code === REQUEST_TIMEOUT) timeouts.add(1, { name });
-  check(response, {
-    [`${name} succeeded`]: (checked) =>
-      checked.status >= 200 && checked.status < 300,
-  });
-  return response;
-}
-
-function sendJson({ method, path, session, payload, prefer, name }) {
-  return send({
-    method,
-    path,
-    session,
-    name,
-    body: JSON.stringify(payload),
-    headers: {
-      'Content-Type': 'application/json',
-      Prefer: prefer ?? 'return=minimal',
-    },
-  });
-}
-
-/** Throws with the response body, for setup and teardown steps a run cannot continue without. */
-function expectOk(response, what) {
-  if (response.status < 200 || response.status >= 300) {
-    throw new Error(`${what} failed: HTTP ${response.status} ${response.body}`);
-  }
-  return response;
-}
+// data/items.ts PLACE_PAGE_SIZE.
+const PLACE_PAGE_SIZE = 1000;
+// data/exportCategory.ts ITEM_PAGE_SIZE.
+const EXPORT_PAGE_SIZE = 500;
 
 // Local stacks confirm email sign-ups instantly; the hosted project has no password sign-in to call.
 export function signUp(email, password) {
@@ -77,40 +31,98 @@ export function signUp(email, password) {
   return { token, userId: user.id, email };
 }
 
-/** data/items.ts rawListItems, unfiltered: one catalogue page with its photographs. */
-export function listPage({ session, categoryId, page }) {
+function pageIdsRequest({ session, categoryId, page, name }) {
   const params = query({
-    select: PAGE_SELECT,
+    select: 'item_id',
     category_id: `eq.${categoryId}`,
     order: 'created_at.desc,item_id.asc',
-    'items.images.order': 'created_at.asc,id.asc',
     offset: (page - 1) * PAGE_SIZE,
     limit: PAGE_SIZE,
   });
-  return send({
+  return {
     method: 'GET',
     path: `/rest/v1/item_categories?${params}`,
     session,
-    name: 'catalogue page',
-  });
+    name,
+  };
 }
 
-/** data/items.ts rawCountItems, unfiltered: the exact total, as a HEAD. */
-export function countItems(session, categoryId) {
+function countRequest(session, categoryId) {
   const params = query({
     select: 'item_id',
     category_id: `eq.${categoryId}`,
   });
-  return send({
+  return {
     method: 'HEAD',
     path: `/rest/v1/item_categories?${params}`,
     session,
     headers: { Prefer: 'count=exact' },
     name: 'catalogue count',
-  });
+  };
 }
 
-/** data/items.ts rawSearchCategoryItems: a searched page and its total. */
+/** The entries behind a page of ids, with their photographs, in page order. */
+function pageItems(session, idPage) {
+  // A refused request already fails its check; an empty page keeps the flow going.
+  const ids =
+    idPage.status === 200 ? idPage.json().map((link) => link.item_id) : [];
+  if (ids.length === 0)
+    return { items: [], durationMs: idPage.timings.duration };
+
+  const itemParams = query({
+    select: ITEM_WITH_IMAGES_SELECT,
+    id: `in.(${ids.join(',')})`,
+    'images.order': 'created_at.asc,id.asc',
+  });
+  const itemPage = send({
+    method: 'GET',
+    path: `/rest/v1/items?${itemParams}`,
+    session,
+    name: 'catalogue page items',
+  });
+  const rows = itemPage.status === 200 ? itemPage.json() : [];
+  const byId = new Map(rows.map((item) => [item.id, item]));
+  return {
+    items: ids.flatMap((id) => byId.get(id) ?? []),
+    durationMs: idPage.timings.duration + itemPage.timings.duration,
+  };
+}
+
+/** The page's ids, then its entries with their photographs; no count. */
+export function listPage({ session, categoryId, page }) {
+  return pageItems(
+    session,
+    send(
+      pageIdsRequest({ session, categoryId, page, name: 'catalogue page ids' }),
+    ),
+  );
+}
+
+/** data/itemPage.ts listItems, unfiltered, as the app sends it: ids and exact total side by side, then the entries; `name` tags the ids read. */
+export function readPage({
+  session,
+  categoryId,
+  page,
+  name = 'catalogue page ids',
+}) {
+  const [idPage, counted] = sendAll([
+    pageIdsRequest({ session, categoryId, page, name }),
+    countRequest(session, categoryId),
+  ]);
+  // PostgREST answers a counted HEAD with `Content-Range: */<total>`.
+  const total = Number((counted.headers['Content-Range'] ?? '').split('/')[1]);
+  return {
+    ...pageItems(session, idPage),
+    lastPage: Math.max(1, Math.ceil((total || 0) / PAGE_SIZE)),
+  };
+}
+
+/** data/itemPage.ts rawCountItems, unfiltered: the exact total, as a HEAD. */
+export function countItems(session, categoryId) {
+  return send(countRequest(session, categoryId));
+}
+
+/** data/itemPage.ts rawSearchCategoryItems: a searched page and its total. */
 export function searchPage({ session, categoryId, term, page }) {
   const params = query({
     cat_id: categoryId,
@@ -126,41 +138,94 @@ export function searchPage({ session, categoryId, term, page }) {
   });
 }
 
-/** data/items.ts rawListCategoryPlaces: the map's places, narrowed like the list. */
+/** data/items.ts listCategoryPlaces: the map's places, narrowed like the list, page by page until a short one. */
 export function listPlaces({ session, categoryId, term }) {
-  const params = query(
-    term
-      ? { cat_id: categoryId, like_pattern: `%${term}%` }
-      : { cat_id: categoryId },
-  );
-  return send({
-    method: 'GET',
-    path: `/rest/v1/rpc/list_category_places?${params}`,
-    session,
-    name: 'map places',
-  });
+  for (let offset = 0; ; offset += PLACE_PAGE_SIZE) {
+    const page = { offset, limit: PLACE_PAGE_SIZE };
+    const params = query(
+      term
+        ? { cat_id: categoryId, like_pattern: `%${term}%`, ...page }
+        : { cat_id: categoryId, ...page },
+    );
+    const response = send({
+      method: 'GET',
+      path: `/rest/v1/rpc/list_category_places?${params}`,
+      session,
+      name: 'map places',
+    });
+    const rows = response.status === 200 ? response.json() : [];
+    if (rows.length < PLACE_PAGE_SIZE) return;
+  }
 }
 
-/** data/items.ts createItem; user_id is the trigger's to fill in. */
-export function createItem(session, fields) {
-  const response = sendJson({
+/** data/images.ts createSignedUrls: one request for every path; Storage checks each object against its select policy. */
+export function signUrlsRequest({
+  session,
+  paths,
+  expiresIn = 3600,
+  name = 'sign urls',
+}) {
+  return {
     method: 'POST',
-    path: '/rest/v1/items?select=id',
+    path: `/storage/v1/object/sign/${BUCKET}`,
     session,
-    payload: fields,
-    prefer: 'return=representation',
-    name: 'create item',
-  });
-  return response.status === 201 ? response.json()[0].id : null;
+    body: JSON.stringify({ expiresIn, paths }),
+    headers: { 'Content-Type': 'application/json' },
+    name,
+  };
 }
 
-export function linkItem({ session, itemId, categoryId }) {
+export function signUrls(request) {
+  return send(signUrlsRequest(request));
+}
+
+/** Storage answers a sign call with URLs relative to its own root, as supabase-js resolves them. */
+export function signedUrlsOf(response) {
+  if (response.status !== 200) return [];
+  return response
+    .json()
+    .filter((signature) => signature.signedURL)
+    .map((signature) => `${SUPABASE_URL}/storage/v1${signature.signedURL}`);
+}
+
+/** data/exportItemPages.ts rawListItemsForExport: one keyset page of links, each entry with its full-size photographs. */
+export function exportPage({ session, categoryId, after }) {
+  const params = {
+    select: `created_at,item_id,items!inner(${ITEM_FIELDS},created_at,images(item_id,path_full,size_bytes))`,
+    category_id: `eq.${categoryId}`,
+    order: 'created_at.asc,item_id.asc',
+    'items.images.order': 'created_at.asc,id.asc',
+    limit: EXPORT_PAGE_SIZE,
+  };
+  if (after) {
+    // data/keyset.ts rowsAfterFilter.
+    const linkedAt = `"${after.created_at}"`;
+    params.created_at = `gte.${after.created_at}`;
+    params.or = `(created_at.gt.${linkedAt},and(created_at.eq.${linkedAt},item_id.gt."${after.item_id}"))`;
+  }
+  const response = send({
+    method: 'GET',
+    path: `/rest/v1/item_categories?${query(params)}`,
+    session,
+    name: 'export page',
+  });
+  const rows = response.status === 200 ? response.json() : [];
+  return {
+    paths: rows.flatMap((row) =>
+      row.items.images.map((image) => image.path_full),
+    ),
+    next: rows.length === EXPORT_PAGE_SIZE ? rows[rows.length - 1] : null,
+  };
+}
+
+/** data/items.ts createItemsInCategory: the entry and its link in one transaction; user_id is the trigger's to fill in. */
+export function createItemInCategory({ session, categoryId, fields }) {
   return sendJson({
     method: 'POST',
-    path: '/rest/v1/item_categories',
+    path: '/rest/v1/rpc/create_items_in_category',
     session,
-    payload: { item_id: itemId, category_id: categoryId },
-    name: 'link item',
+    payload: { target_category_id: categoryId, entries: [fields] },
+    name: 'create item',
   });
 }
 
@@ -247,11 +312,34 @@ export function removeObjects(session, paths) {
   );
 }
 
-export function deleteOwnRows(session, table) {
+/** The id that closes the caller's first `size` entries in id order, or null when fewer are left. */
+export function entrySliceEnd(session, size) {
+  const params = query({
+    select: 'id',
+    user_id: `eq.${session.userId}`,
+    order: 'id',
+    offset: size - 1,
+    limit: 1,
+  });
+  const [last] = expectOk(
+    send({
+      method: 'GET',
+      path: `/rest/v1/items?${params}`,
+      session,
+      name: 'teardown items',
+    }),
+    'listing entries',
+  ).json();
+  return last ? last.id : null;
+}
+
+/** `filters` narrows the delete further, as PostgREST filter params (`{ id: 'lte.<uuid>' }`). */
+export function deleteOwnRows(session, table, filters = {}) {
+  const params = query({ user_id: `eq.${session.userId}`, ...filters });
   return expectOk(
     send({
       method: 'DELETE',
-      path: `/rest/v1/${table}?user_id=eq.${session.userId}`,
+      path: `/rest/v1/${table}?${params}`,
       session,
       name: `teardown ${table}`,
     }),

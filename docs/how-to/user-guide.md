@@ -8,7 +8,34 @@ Recipes for specific tasks. New to the app? Start with
 Google is the only sign-in (`/login`). **Sign out** is in the user menu (click
 your email in the header). If the sign-out request fails — you are offline,
 say — the session is cleared locally anyway, so you are never stuck signed in
-on a device without network.
+on a device without network. Signing out also makes the browser forget the
+collection you last had open and the places the map looked up; your theme and
+language stay.
+
+## Delete your account
+
+**Delete account**, at the bottom of the user menu, deletes your account for
+good after one confirmation: every collection you own with its entries and
+photos, every share you made and every share made to you, and your sign-in.
+There is no undo, so export the collections you want to keep first. Anyone who
+shared a collection of yours loses it; signing in again with the same Google
+account starts a new, empty account.
+
+If someone let you edit their collection, the entries you created there go
+with your account. Photos you added to _their_ entries are theirs and stay.
+
+## Help
+
+**Help** in the user menu opens a short guide to each feature, in the
+language the app is set to. **Ctrl+/** (**Cmd+/** on a Mac) opens it from
+anywhere, even inside a text field. With no categories yet, the empty page has
+a **How it works** button that opens the same guide.
+If your categories or entries fail to load, the page says so and offers
+**Try again** instead of showing them as empty.
+
+The **Privacy notice** (`/privacy`) says what CollectionBuddy stores, who
+receives it and for how long. It opens without signing in: the sign-in page,
+the user menu and the help link it.
 
 ## Categories
 
@@ -21,7 +48,7 @@ You always browse one category at a time.
   pick from the list.
 - **Rename**: select the category, edit the name in the text field, confirm.
   Same rules as creation. Whitespace is trimmed and collapsed on save.
-- **Delete**: select the category, clear the text field, click delete, confirm.
+- **Delete**: select the category, click **Delete** beside its name, confirm.
   Its items are deleted with it: every item belongs to exactly one category.
 
 The picker opens collapsed on the category you had selected last.
@@ -43,41 +70,68 @@ can be granted access, and it is read-only until you say otherwise.
   you, as does taking edit access away again.
 - **Expiry**: access ends at the end of the chosen day. Blank means no expiry.
 - **Revoke**: trash icon beside the email in the shared-with list, confirm.
+  Access ends at once. **Undo** in the confirmation shares it again with the
+  same role and expiry.
+- **Entries an editor added** stay theirs: you do not see them in your copy
+  of the category, while everyone it is shared with does. Once you revoke the
+  editor or take edit access away, they can no longer change or delete those
+  entries or their photos. Deleting the category removes them; so can the
+  editor, if you let them edit again.
+- **Photos an editor adds to your entries** are yours: you see them, they
+  count towards your storage, and once you revoke the editor they can no
+  longer remove or replace them.
 - **Leave a category shared with you**: the delete control on a shared category
-  leaves it instead. The owner's copy is untouched.
+  leaves it instead, at once and with no undo: only the owner can share it with
+  you again. The owner's copy is untouched.
 
 ## Import and export a category
 
 - **Export**: select a category, click **Export**. You get a `.zip` with every
   item's data and photos. Large categories take a while; the button shows
-  progress and **Cancel** stops it.
+  progress and **Cancel** stops it. Only the owner can export: on a category
+  shared with you, **Export** is disabled.
 - **Import**: click **Import**, pick a `.zip` exported from CollectionBuddy. It
   becomes a new category. A taken name gets a suffix (`Coins (2)`) rather than
-  overwriting or failing.
+  overwriting or failing; a name at the 200-character limit is shortened to
+  make room for it. Each item keeps its photos in their order, so its cover
+  photo stays the same. An export you unzipped and zipped again with your
+  system's own tool imports too, as long as it keeps the export's folder and
+  is not encrypted. A damaged archive, or one that unpacks to more than an
+  import accepts, is refused with a message saying which, and nothing of it
+  is kept.
 
 ## Items
 
 - **Add**: **+** above the item grid.
-- **Edit**: hover a card (tap **⋯** on touch) for its action row, then the
-  pencil icon.
-- **Delete**: trash icon on the action row, confirm. Photos are deleted first,
-  then the item.
+- **Edit**: the pencil icon at the bottom of the card.
+- **Delete**: the trash icon at the bottom of the card, confirm. Photos are
+  deleted first, then the item.
+
+Deleting an item, a photo or a category can be taken back: **Undo** in the
+confirmation that appears, or **Ctrl+Z** (**Cmd+Z** on a Mac) from anywhere
+outside a text field. The delete is sent when that confirmation closes,
+after a few seconds or with its close button; the seconds stop counting while
+the pointer rests on it or keyboard focus is inside it. Signing out sends it
+first; reloading or closing the tab before then asks, because leaving would
+cancel the delete and keep the item.
 
 | Field | Notes |
 | --- | --- |
 | Title | Required. |
 | Description | Optional. |
-| Place | Optional. Suggestions appear from the third character, from the [Photon](https://photon.komoot.io/) geocoder. Pick a suggestion if you want the item on the map; free text is kept but not pinned. |
+| Place | Optional. Suggestions appear from the third character, from the [Photon](https://photon.komoot.io/) geocoder. Pick a suggestion to pin the item exactly there. Free text is kept too: the map looks it up when it opens, pins it where Photon finds it, and, if you may edit the collection, saves that position to the items naming that place. |
 | Tags | Optional. Enter or comma adds a chip; Backspace on an empty tag field removes the last one. Duplicates are ignored. |
 
 On save, whitespace is trimmed, blank fields become empty, and tags are
-deduplicated and sorted.
+deduplicated and sorted. The description keeps its line breaks; in the other
+fields a line break becomes a space.
 
 ## Photos
 
-- **Upload**: action row → upload icon → any image your browser can read. It
-  is compressed to WebP with a thumbnail before upload, so there is no size to
-  worry about.
+- **Upload**: **+** at the bottom of the card (or the empty photo frame of an
+  item that has none) → any image your browser can read. It is compressed to
+  WebP (JPEG in Safari and on iOS) with a thumbnail before upload, so there is
+  no size to worry about.
 - **View full size**: click a thumbnail. Escape or the backdrop closes it.
 - **Delete**: from the full-size view or the per-photo control, confirm.
 
@@ -108,13 +162,22 @@ buttons to zoom to it and to frame all pins.
 Two independent settings in the user menu:
 
 - **Language** (_Sprache_): Deutsch / English. Detected from your browser on
-  first visit, then remembered.
+  first visit, German if it is set to neither, then remembered. Dates and
+  sizes are written the way the chosen language writes them.
 - **Appearance** (_Darstellung_): System / Light / Dark. System follows your
   OS setting live. Light or Dark overrides it until you switch back.
 
 ## Accessibility
 
 The app works with a keyboard and a screen reader: dialogs trap focus and close
-on Escape, confirmation dialogs focus **Cancel** rather than the destructive
+on Escape, only the topmost one at a time (Escape on a confirmation raised in
+the photo viewer leaves the viewer open, and its arrow keys wait for the
+answer), confirmation dialogs focus **Cancel** rather than the destructive
 action, and result counts for search and place suggestions are announced,
-since their dropdowns render outside normal reading order.
+since their dropdowns render outside normal reading order. In the collection
+strip, the arrow keys, Home and End move between collections without opening
+them; Enter or Space opens the one in focus, and focus returns to the button
+that reopens the strip. After a delete, Ctrl+Z (Cmd+Z) undoes it without
+tabbing to the confirmation at the bottom of the page, and a screen reader
+reads the confirmation out together with that shortcut. **Ctrl+/** (Cmd+/)
+opens the help from anywhere.

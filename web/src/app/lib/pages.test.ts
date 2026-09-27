@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { readAllChunks, readAllPages } from './pages';
+import { readAllChunks, readAllKeysetPages, readAllPages } from './pages';
 
 /** Pages a fixed array the way a ranged reader does -- `to` inclusive. */
 function reader<T>(all: T[]) {
@@ -79,6 +79,90 @@ describe('readAllPages', () => {
 
     expect(await readAllPages(10, readPage)).toEqual({ data: [], error: null });
     expect(readPage).toHaveBeenCalledTimes(1);
+  });
+});
+
+type Row = { key: number };
+
+/** A table read the way a keyset query does: sorted by key, strictly past `after`, `size` rows at a time. */
+function keysetTable(keys: number[], size: number) {
+  const table = keys.map((key) => ({ key }));
+  const readPage = vi.fn(async (after: Row | null) => ({
+    data: table
+      .filter((row) => after === null || row.key > after.key)
+      .slice(0, size),
+    error: null,
+  }));
+  return { table, readPage };
+}
+
+describe('readAllKeysetPages', () => {
+  it('asks for the first page with no key, then after the last row of each full page', async () => {
+    const { readPage } = keysetTable([1, 2, 3, 4, 5], 2);
+
+    const result = await readAllKeysetPages(2, readPage);
+
+    expect(result).toEqual({
+      data: [1, 2, 3, 4, 5].map((key) => ({ key })),
+      error: null,
+    });
+    expect(readPage.mock.calls).toEqual([[null], [{ key: 2 }], [{ key: 4 }]]);
+  });
+
+  it('stops after one short page', async () => {
+    const { readPage } = keysetTable([1], 2);
+
+    await readAllKeysetPages(2, readPage);
+
+    expect(readPage).toHaveBeenCalledTimes(1);
+  });
+
+  // A full last page looks like there may be more, so it costs one empty request rather than dropping rows.
+  it('asks once more after a page that fills exactly, then stops', async () => {
+    const { readPage } = keysetTable([1, 2], 2);
+
+    const result = await readAllKeysetPages(2, readPage);
+
+    expect(result.data).toEqual([{ key: 1 }, { key: 2 }]);
+    expect(readPage).toHaveBeenCalledTimes(2);
+  });
+
+  // Regression (#766): an offset read of page two after row 1 went would start at row 4, skipping row 3.
+  it('skips no row when a row already read disappears between pages', async () => {
+    const { table, readPage } = keysetTable([1, 2, 3, 4, 5], 2);
+    const read = readPage.getMockImplementation()!;
+    readPage.mockImplementationOnce(async (after) => {
+      const page = await read(after);
+      table.shift();
+      return page;
+    });
+
+    const result = await readAllKeysetPages(2, readPage);
+
+    expect(result.data).toEqual([1, 2, 3, 4, 5].map((key) => ({ key })));
+  });
+
+  it('stops on a page that answers with nothing at all', async () => {
+    const readPage = vi.fn().mockResolvedValue({ data: null, error: null });
+
+    expect(await readAllKeysetPages(10, readPage)).toEqual({
+      data: [],
+      error: null,
+    });
+    expect(readPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up on the first failing page, keeping nothing it had read', async () => {
+    const boom = new Error('boom');
+    const readPage = vi
+      .fn()
+      .mockResolvedValueOnce({ data: [{ key: 1 }], error: null })
+      .mockResolvedValueOnce({ data: null, error: boom });
+
+    const result = await readAllKeysetPages(1, readPage);
+
+    expect(result).toEqual({ data: null, error: boom });
+    expect(readPage).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -1,0 +1,3 @@
+# generic-api-key false positives: minified supabase-js (`r.resolveFetch=void 0`) in a Next.js export once committed under docs/_next/.
+e59aff1698e9ddca8ae2dd0b03ec763b68c0fd7c:docs/_next/static/chunks/a0068b8aaf30a18f.js:generic-api-key:24
+e59aff1698e9ddca8ae2dd0b03ec763b68c0fd7c:docs/_next/static/chunks/7884bb3eb25f9e10.js:generic-api-key:24

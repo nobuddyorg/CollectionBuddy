@@ -4,10 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
-import { listItems } from '../../data/items';
+import { listItems } from '../../data/itemPage';
 import { clampPage, pageCount, pageRange } from './paging';
 import { takePrefetchedFirstPage } from './firstPagePrefetch';
-import { useRequestSequence } from '../../lib/useRequestSequence';
 import type { PageImages } from './imageEntries';
 import type { ItemLite } from './types';
 
@@ -20,11 +19,17 @@ export function useItems(categoryId: string, query: string) {
   const [page, setPage] = useState(1);
   // Starts true: starting false gave one render that looked exactly like "No entries yet".
   const [loading, setLoading] = useState(true);
-  const { next, isCurrent } = useRequestSequence();
-  // Aborts a superseded request's own fetch, not just its effect, so the response stops downloading.
+  // Kept apart from an empty list: a failed load must not read as a category with no entries.
+  const [loadFailed, setLoadFailed] = useState(false);
+  // Aborted when superseded or unmounted, so the response stops downloading and its answer is dropped.
   const abortRef = useRef<AbortController | null>(null);
   // Non-silent requests in flight: one superseded by a silent request used to leave `loading` stuck true.
   const pendingNonSilent = useRef(0);
+
+  const totalPages = useMemo(() => pageCount(total), [total]);
+
+  // Clamped in render, not an effect, so `.range()` never asks for an out-of-bounds slice.
+  const currentPage = clampPage(page, totalPages);
 
   // At render time, not in an effect, so the page resets the same render the filters change.
   const filterKey = `${categoryId} ${query}`;
@@ -32,17 +37,14 @@ export function useItems(categoryId: string, query: string) {
   if (filterKey !== previousFilterKey) {
     setPreviousFilterKey(filterKey);
     setPage(1);
+  } else if (page !== currentPage) {
+    // Written back, or a later rise in the total lifts the clamp and jumps to the stale page.
+    setPage(currentPage);
   }
-
-  const totalPages = useMemo(() => pageCount(total), [total]);
-
-  // Derived, not written back via an effect, so `.range()` never asks for an out-of-bounds slice.
-  const currentPage = clampPage(page, totalPages);
 
   // `silent` refetches without raising `loading`: a delete already removed its card up front.
   const load = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
-      const sequenceNumber = next();
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -68,9 +70,15 @@ export function useItems(categoryId: string, query: string) {
             signal: controller.signal,
           }));
 
-        if (!isCurrent(sequenceNumber)) return;
+        // postgrest-js resolves an aborted fetch with an AbortError `error`: not a failure worth a toast.
+        if (controller.signal.aborted) return;
         if (error) {
-          toast.reportError('load items', error, t('item_list.search_error'));
+          setLoadFailed(true);
+          toast.reportError(
+            'load items',
+            error,
+            search ? t('item_list.search_error') : t('item_list.load_error'),
+          );
           return;
         }
 
@@ -91,6 +99,7 @@ export function useItems(categoryId: string, query: string) {
           },
         );
         setTotal(count || 0);
+        setLoadFailed(false);
       } finally {
         // Runs for a discarded request too, so `loading` ends false whichever request resolves last.
         if (!silent) {
@@ -99,7 +108,7 @@ export function useItems(categoryId: string, query: string) {
         }
       }
     },
-    [categoryId, currentPage, query, t, toast, next, isCurrent],
+    [categoryId, currentPage, query, t, toast],
   );
 
   // A filter change aborts the previous load itself; unmount never gets that chance otherwise.
@@ -124,6 +133,7 @@ export function useItems(categoryId: string, query: string) {
     pageImages,
     total,
     loading,
+    loadFailed,
     page: currentPage,
     setPage,
     totalPages,

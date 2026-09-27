@@ -1,4 +1,4 @@
--- search_category_items (0002_functions.sql) is SECURITY DEFINER, so it must reproduce, never widen, an RLS-scoped read; rls.spec.ts holds the end-to-end half.
+-- search_category_items (latest body: 0030) is SECURITY DEFINER, so it must reproduce, never widen, an RLS-scoped read; rls/search-rpc.spec.ts holds the end-to-end half.
 begin;
 select no_plan();
 

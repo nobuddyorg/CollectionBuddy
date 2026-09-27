@@ -232,11 +232,12 @@ test.describe('a category shared with another collector', () => {
         .select('id');
       expect(renamed).toEqual([]);
 
+      // By a seeded Münzen title: an unordered pick could land where another spec holds an editor grant.
       const { data: mine } = await apiAs(otherToken)
         .from('items')
         .select('id')
         .eq('user_id', userId)
-        .limit(1)
+        .eq('title', itemsIn('Münzen')[0].title)
         .single();
       const { data: updated } = await apiAs(otherToken)
         .from('items')
@@ -254,6 +255,42 @@ test.describe('a category shared with another collector', () => {
       expect(after!.name).toBe('Münzen');
     } finally {
       await unshare(token, shareId);
+    }
+  });
+
+  // A fresh entry, so the one-collection quota cannot refuse it first: only tg_item_categories_enforce's write check is left.
+  test('a viewer cannot file an entry of its own into the collection', async () => {
+    const { token, userId, otherToken } = context();
+    const categoryId = await ownedCategoryId({ token, userId, name: 'Münzen' });
+    const viewer = apiAs(otherToken);
+    const { data: mine, error: insertError } = await viewer
+      .from('items')
+      .insert({ title: 'rls-viewer-filing-probe' })
+      .select('id')
+      .single();
+    expect(insertError).toBeNull();
+    const shareId = await share({
+      token,
+      categoryId,
+      invitedEmail: SEED.other.email,
+    });
+
+    try {
+      const { error } = await viewer
+        .from('item_categories')
+        .insert({ item_id: mine!.id, category_id: categoryId });
+      expect(error?.message).toBe('cross-tenant assignment is not allowed');
+
+      // Its own entry, so readable to it: no link means the insert was refused, not hidden.
+      const { data: after } = await viewer
+        .from('items')
+        .select('item_categories(category_id)')
+        .eq('id', mine!.id)
+        .single();
+      expect(after!.item_categories).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+      await viewer.from('items').delete().eq('id', mine!.id);
     }
   });
 });

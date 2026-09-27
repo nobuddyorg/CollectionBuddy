@@ -1,6 +1,17 @@
 import { expect, test } from '../test';
 import { SEED, itemsIn } from '../fixtures';
-import { apiAs, context, editorShare, ownerEntryIn, unshare } from './helpers';
+import {
+  OBJECT_HIDDEN,
+  UPLOAD_REFUSED,
+  apiAs,
+  context,
+  editorShare,
+  entryFiledBy,
+  ownedCategoryId,
+  ownerEntryIn,
+  removeFiledEntry,
+  unshare,
+} from './helpers';
 
 // An editor's photographs, and the owner's prefix and objects that stay out of the editor's reach.
 test.describe('a category shared at the editor role', () => {
@@ -31,7 +42,11 @@ test.describe('a category shared at the editor role', () => {
         })
         .select('id');
       expect(data).toBeNull();
-      expect(error).not.toBeNull();
+      expect(error).toMatchObject({
+        code: '23514',
+        message:
+          'new row for relation "images" violates check constraint "images_path_thumb_matches_item"',
+      });
     } finally {
       await unshare(token, shareId);
       await apiAs(token).from('items').delete().eq('id', itemId);
@@ -85,6 +100,289 @@ test.describe('a category shared at the editor role', () => {
     }
   });
 
+  // The editor's bytes sit under the editor's prefix, yet the record is the owner's, on the owner's entry (#741).
+  test('the owner signs and removes the photograph an editor added to the owner’s entry', async () => {
+    const { token, userId, otherToken, otherUserId } = context();
+    const { categoryId, itemId } = await ownerEntryIn({
+      token,
+      userId,
+      category: SEED.editorPhotoCategory,
+      title: 'rls-editor-added-probe',
+    });
+    const path = `${otherUserId}/${itemId}/rls-editor-added.webp`;
+    const unrecorded = `${otherUserId}/${itemId}/rls-editor-unrecorded.webp`;
+    const owner = apiAs(token).storage.from('item-images');
+    const editor = apiAs(otherToken);
+    const shareId = await editorShare(token, categoryId);
+
+    try {
+      for (const upload of [path, unrecorded]) {
+        const { error } = await editor.storage
+          .from('item-images')
+          .upload(upload, new Blob(['probe'], { type: 'image/webp' }));
+        expect(error).toBeNull();
+      }
+      const { error: rowError } = await editor
+        .from('images')
+        .insert({ item_id: itemId, path_full: path });
+      expect(rowError).toBeNull();
+
+      const { error: signError } = await owner.createSignedUrl(path, 60);
+      expect(signError).toBeNull();
+      // Only what the owner's own records name: the entry is no licence to read whatever lies under it.
+      const { error: unrecordedError } = await owner.createSignedUrl(
+        unrecorded,
+        60,
+      );
+      expect(unrecordedError).toMatchObject(OBJECT_HIDDEN);
+
+      const { data: removed } = await owner.remove([path]);
+      expect(removed?.map((object) => object.name)).toEqual([path]);
+    } finally {
+      await editor.storage.from('item-images').remove([path, unrecorded]);
+      await unshare(token, shareId);
+      await owner.remove([path]);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // The bytes are the editor's own prefix but the owner's photograph: revoking ends the editor's writes to them (#741).
+  test('a revoked editor can no longer remove or replace the photograph it added to the owner’s entry', async () => {
+    const { token, userId, otherToken, otherUserId } = context();
+    const { categoryId, itemId } = await ownerEntryIn({
+      token,
+      userId,
+      category: SEED.editorPhotoCategory,
+      title: 'rls-revoked-added-probe',
+    });
+    const path = `${otherUserId}/${itemId}/rls-revoked-added.webp`;
+    const pending = `${otherUserId}/${itemId}/rls-revoked-pending.webp`;
+    const owner = apiAs(token).storage.from('item-images');
+    const editor = apiAs(otherToken);
+    const shareId = await editorShare(token, categoryId);
+
+    try {
+      const { error: uploadError } = await editor.storage
+        .from('item-images')
+        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+      expect(uploadError).toBeNull();
+      // The second record names bytes not stored yet, a path the editor could fill later.
+      const { error: rowError } = await editor.from('images').insert([
+        { item_id: itemId, path_full: path },
+        { item_id: itemId, path_full: pending },
+      ]);
+      expect(rowError).toBeNull();
+
+      await unshare(token, shareId);
+
+      const { data: removed, error: removeError } = await editor.storage
+        .from('item-images')
+        .remove([path]);
+      expect(removeError).toBeNull();
+      expect(removed).toEqual([]);
+      const { error: fillError } = await editor.storage
+        .from('item-images')
+        .upload(pending, new Blob(['swapped'], { type: 'image/webp' }));
+      expect(fillError).toMatchObject(UPLOAD_REFUSED);
+
+      // Signing proves the bytes are still there; the owner's record names them.
+      const { error: signError } = await owner.createSignedUrl(path, 60);
+      expect(signError).toBeNull();
+    } finally {
+      await unshare(token, shareId);
+      await owner.remove([path, pending]);
+      await editor.storage.from('item-images').remove([path, pending]);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // The owner's quota counts the sizes sampled when the record was written; bytes stored at its paths later would outgrow it (#753).
+  test('an editor cannot store new bytes at the paths of a photograph it recorded on the owner’s entry', async () => {
+    const { token, userId, otherToken, otherUserId } = context();
+    const { categoryId, itemId } = await ownerEntryIn({
+      token,
+      userId,
+      category: SEED.editorPhotoCategory,
+      title: 'rls-editor-refill-probe',
+    });
+    const full = `${otherUserId}/${itemId}/rls-refill.webp`;
+    const thumb = `${otherUserId}/${itemId}/rls-refill.thumb.webp`;
+    const editor = apiAs(otherToken);
+    const bucket = editor.storage.from('item-images');
+    const shareId = await editorShare(token, categoryId);
+
+    try {
+      for (const path of [full, thumb]) {
+        const { error } = await bucket.upload(
+          path,
+          new Blob(['small'], { type: 'image/webp' }),
+        );
+        expect(error).toBeNull();
+      }
+      const { error: rowError } = await editor
+        .from('images')
+        .insert({ item_id: itemId, path_full: full, path_thumb: thumb });
+      expect(rowError).toBeNull();
+
+      // Still granted, so removing the bytes is allowed; storing others in their place is not.
+      const { data: removed } = await bucket.remove([full, thumb]);
+      expect(removed).toHaveLength(2);
+      for (const path of [full, thumb]) {
+        const { error } = await bucket.upload(
+          path,
+          new Blob([new Uint8Array(100_000)], { type: 'image/webp' }),
+        );
+        expect(error).toMatchObject(UPLOAD_REFUSED);
+      }
+
+      const { data: row } = await apiAs(token)
+        .from('images')
+        .select('user_id, size_bytes, thumb_size_bytes')
+        .eq('item_id', itemId)
+        .single();
+      expect(row).toEqual({
+        user_id: userId,
+        size_bytes: 5,
+        thumb_size_bytes: 5,
+      });
+    } finally {
+      await bucket.remove([full, thumb]);
+      await unshare(token, shareId);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // The positive side of the policies a viewer is refused: 'delete shared objects' reaches the owner's own prefix.
+  test('an editor removes the owner’s photograph, its record and the entry’s link', async () => {
+    const { token, userId, otherToken } = context();
+    const { categoryId, itemId } = await ownerEntryIn({
+      token,
+      userId,
+      category: SEED.editorPhotoCategory,
+      title: 'rls-editor-remove-probe',
+    });
+    const path = `${userId}/${itemId}/rls-editor-remove-probe.webp`;
+    const owner = apiAs(token);
+    const editor = apiAs(otherToken);
+    const shareId = await editorShare(token, categoryId);
+
+    try {
+      const { error: uploadError } = await owner.storage
+        .from('item-images')
+        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+      expect(uploadError).toBeNull();
+      const { error: recordError } = await owner
+        .from('images')
+        .insert({ item_id: itemId, path_full: path });
+      expect(recordError).toBeNull();
+
+      const { data: removedObjects } = await editor.storage
+        .from('item-images')
+        .remove([path]);
+      expect(removedObjects?.map((object) => object.name)).toEqual([path]);
+      const { data: removedRecord } = await editor
+        .from('images')
+        .delete()
+        .eq('item_id', itemId)
+        .select('id');
+      expect(removedRecord).toHaveLength(1);
+      const { data: unlinked } = await editor
+        .from('item_categories')
+        .delete()
+        .eq('item_id', itemId)
+        .select('item_id');
+      expect(unlinked).toHaveLength(1);
+
+      // Read back as the owner: the bytes are gone, and the unlinked entry with them.
+      const { data: listed, error: listError } = await owner.storage
+        .from('item-images')
+        .list(`${userId}/${itemId}`);
+      expect(listError).toBeNull();
+      expect(listed).toEqual([]);
+      const { data: entry } = await owner
+        .from('items')
+        .select('id')
+        .eq('id', itemId);
+      expect(entry).toEqual([]);
+    } finally {
+      await unshare(token, shareId);
+      await owner.storage.from('item-images').remove([path]);
+      await owner.from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // Own-prefix bytes under an entry it can no longer write: removing one and uploading at its path would swap the photograph (#739).
+  test('a revoked editor can no longer change the photographs of the entry it filed', async () => {
+    const { token, userId, otherToken, otherUserId } = context();
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.editorPhotoCategory,
+    });
+    const shareId = await editorShare(token, categoryId);
+    const itemId = await entryFiledBy(
+      { token: otherToken, categoryId },
+      'rls-filed-photo-probe',
+    );
+    const path = `${otherUserId}/${itemId}/rls-filed-probe.webp`;
+    const replacement = `${otherUserId}/${itemId}/rls-filed-replacement.webp`;
+    const editor = apiAs(otherToken);
+
+    try {
+      const { error: uploadError } = await editor.storage
+        .from('item-images')
+        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+      expect(uploadError).toBeNull();
+      const { data: row, error: rowError } = await editor
+        .from('images')
+        .insert({ item_id: itemId, path_full: path })
+        .select('id')
+        .single();
+      expect(rowError).toBeNull();
+
+      await unshare(token, shareId);
+
+      await editor.storage.from('item-images').remove([path]);
+      const { error: replaceError } = await editor.storage
+        .from('item-images')
+        .upload(replacement, new Blob(['swapped'], { type: 'image/webp' }));
+      expect(replaceError).toMatchObject(UPLOAD_REFUSED);
+
+      const { data: removedRow } = await editor
+        .from('images')
+        .delete()
+        .eq('id', row!.id)
+        .select('id');
+      expect(removedRow).toEqual([]);
+
+      const { error: addError } = await editor
+        .from('images')
+        .insert({ item_id: itemId, path_full: replacement });
+      expect(addError).toMatchObject({
+        code: 'P0001',
+        message: 'ownership mismatch',
+      });
+
+      // Its own prefix, so still listable to it: the object left in place is the refused remove, not a hidden one.
+      const { data: listed, error: listError } = await editor.storage
+        .from('item-images')
+        .list(`${otherUserId}/${itemId}`);
+      expect(listError).toBeNull();
+      expect(listed!.map((object) => object.name)).toEqual([
+        'rls-filed-probe.webp',
+      ]);
+    } finally {
+      await unshare(token, shareId);
+      await removeFiledEntry({
+        token,
+        otherToken,
+        categoryId,
+        itemId,
+        paths: [path, replacement],
+      });
+    }
+  });
+
   // move() is denied only by the missing UPDATE policy on storage.objects, hence asserted through the API.
   test('an editor cannot move the owner photograph out of the owner prefix', async () => {
     const { token, userId, otherToken, otherUserId } = context();
@@ -107,13 +405,14 @@ test.describe('a category shared at the editor role', () => {
       const { error: moveError } = await apiAs(otherToken)
         .storage.from('item-images')
         .move(path, stolen);
-      expect(moveError).not.toBeNull();
+      expect(moveError).toMatchObject(OBJECT_HIDDEN);
 
       // Copying stays allowed; what matters is that the owner's own object is still where it was.
-      const { data: stillThere } = await apiAs(token)
+      const { data: stillThere, error: listError } = await apiAs(token)
         .storage.from('item-images')
         .list(`${userId}/${itemId}`);
-      expect((stillThere ?? []).map((object) => object.name)).toContain(
+      expect(listError).toBeNull();
+      expect(stillThere!.map((object) => object.name)).toContain(
         'rls-editor-move-probe.webp',
       );
 
@@ -146,13 +445,14 @@ test.describe('a category shared at the editor role', () => {
       const { error: plantError } = await apiAs(otherToken)
         .storage.from('item-images')
         .upload(planted, new Blob(['hostile'], { type: 'image/webp' }));
-      expect(plantError).not.toBeNull();
+      expect(plantError).toMatchObject(UPLOAD_REFUSED);
 
       // Satisfiable read: the owner sees her own prefix, so an empty listing is the write refused, not hidden.
-      const { data: mine } = await apiAs(token)
+      const { data: mine, error: listError } = await apiAs(token)
         .storage.from('item-images')
         .list(`${userId}/${itemId}`);
-      expect(mine ?? []).toEqual([]);
+      expect(listError).toBeNull();
+      expect(mine).toEqual([]);
     } finally {
       await apiAs(otherToken).storage.from('item-images').remove([planted]);
       await apiAs(token).storage.from('item-images').remove([planted]);
@@ -182,7 +482,7 @@ test.describe('a category shared at the editor role', () => {
       const { error: moveError } = await apiAs(token)
         .storage.from('item-images')
         .move(path, moved);
-      expect(moveError).not.toBeNull();
+      expect(moveError).toMatchObject(OBJECT_HIDDEN);
 
       // Uploading, signing and removing, all the app does, are untouched by the missing UPDATE.
       const { error: signError } = await apiAs(token)

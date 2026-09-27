@@ -23,7 +23,12 @@ describe('usePlaces listing', () => {
 
   it('does nothing while disabled, leaving the initial loading/error state untouched', async () => {
     const { result } = renderHook(() =>
-      usePlaces({ categoryId: 'cat-1', search: '', enabled: false }),
+      usePlaces({
+        categoryId: 'cat-1',
+        search: '',
+        enabled: false,
+        canEdit: true,
+      }),
     );
     await act(async () => {
       await Promise.resolve();
@@ -106,7 +111,7 @@ describe('usePlaces listing', () => {
 
     const { rerender } = renderHook(
       ({ categoryId, search }: { categoryId: string; search: string }) =>
-        usePlaces({ categoryId, search, enabled: true }),
+        usePlaces({ categoryId, search, enabled: true, canEdit: true }),
       { initialProps: { categoryId: 'cat-1', search: '' } },
     );
     await act(async () => {
@@ -138,7 +143,7 @@ describe('usePlaces listing', () => {
 
     const { result, rerender } = renderHook(
       ({ categoryId }: { categoryId: string }) =>
-        usePlaces({ categoryId, search: '', enabled: true }),
+        usePlaces({ categoryId, search: '', enabled: true, canEdit: true }),
       { initialProps: { categoryId: 'cat-1' } },
     );
     await act(async () => {
@@ -198,7 +203,12 @@ describe('usePlaces listing', () => {
     let renderCount = 0;
     renderHook(() => {
       renderCount += 1;
-      return usePlaces({ categoryId: 'cat-1', search: '', enabled: true });
+      return usePlaces({
+        categoryId: 'cat-1',
+        search: '',
+        enabled: true,
+        canEdit: true,
+      });
     });
     const countAfterMount = renderCount;
 

@@ -1,0 +1,4 @@
+# zizmor 1.30's self-repository audit asks for `uses: $/...`, which actionlint 1.7.12 rejects; re-enable once actionlint accepts it.
+rules:
+  self-repository:
+    disable: true

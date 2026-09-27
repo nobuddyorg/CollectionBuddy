@@ -48,7 +48,8 @@ export function sharesState(
     isUpdatingRole: false,
     reload: vi.fn().mockResolvedValue([]),
     createShare: vi.fn(),
-    deleteShare: vi.fn(),
+    revokeShare: vi.fn(),
+    leaveShare: vi.fn(),
     updateShareRole: vi.fn(),
     ...overrides,
   };
@@ -66,6 +67,7 @@ export function categories(
   return {
     categories: CATEGORIES,
     isLoading: false,
+    loadFailed: false,
     isCreating: false,
     isDeleting: false,
     isRenaming: false,

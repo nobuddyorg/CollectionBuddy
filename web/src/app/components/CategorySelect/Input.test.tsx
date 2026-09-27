@@ -13,7 +13,7 @@ function renderInput(
     name: '',
     setName: vi.fn(),
     createCategory: vi.fn(),
-    setExpanded: vi.fn(),
+    onCollapse: vi.fn(),
     ...overrides,
   };
   render(
@@ -44,7 +44,7 @@ describe('CategoryInput', () => {
     const props = renderInput({ name: 'Stamps' });
     await userEvent.type(screen.getByRole('textbox'), '{Enter}');
     expect(props.createCategory).toHaveBeenCalledOnce();
-    expect(props.setExpanded).not.toHaveBeenCalled();
+    expect(props.onCollapse).not.toHaveBeenCalled();
   });
 
   // Matches the rename field: the first Escape clears the field, nothing more.
@@ -52,14 +52,14 @@ describe('CategoryInput', () => {
     const props = renderInput({ name: 'Stamps' });
     await userEvent.type(screen.getByRole('textbox'), '{Escape}');
     expect(props.setName).toHaveBeenCalledWith('');
-    expect(props.setExpanded).not.toHaveBeenCalled();
+    expect(props.onCollapse).not.toHaveBeenCalled();
     expect(props.createCategory).not.toHaveBeenCalled();
   });
 
   it('collapses the panel on a second Escape, once the field is already empty', async () => {
     const props = renderInput({ name: '' });
     await userEvent.type(screen.getByRole('textbox'), '{Escape}');
-    expect(props.setExpanded).toHaveBeenCalledWith(false);
+    expect(props.onCollapse).toHaveBeenCalledOnce();
     expect(props.setName).not.toHaveBeenCalled();
   });
 

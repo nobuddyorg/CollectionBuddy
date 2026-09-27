@@ -2,11 +2,8 @@ import { vi } from 'vitest';
 
 import type { exportCategory, ExportResult } from './exportCategory';
 import type { ExportItem } from './exportFormat';
-import type { supabase } from '../supabase';
 
-type GetSession = () => ReturnType<typeof supabase.auth.getSession>;
 export type ListItems = Parameters<typeof exportCategory>[0]['listItems'];
-export type ListImages = Parameters<typeof exportCategory>[0]['listImages'];
 export type SignUrls = Parameters<typeof exportCategory>[0]['signUrls'];
 
 export function item(overrides: Partial<ExportItem> = {}): ExportItem {
@@ -23,15 +20,14 @@ export function item(overrides: Partial<ExportItem> = {}): ExportItem {
   };
 }
 
-// Only `data.session.user.id` is ever read, so that's all the fake carries.
-export function fakeGetSession(uid: string | null): GetSession {
-  return (async () => ({
-    data: { session: uid ? { user: { id: uid } } : null },
-  })) as unknown as GetSession;
-}
+/** A photograph by file name (`size_bytes` null), or by name and the byte size the total-size check reads. */
+type PhotoSpec = string | { name: string; size: number };
 
-// Pages a fixed array by cursor as listItemsForExport does: a full page points at its last item.
-export function paginatedListItems(allItems: ExportItem[]): ListItems {
+// Pages a fixed array by cursor as listItemsForExport does: a full page points at its last item and carries its items' photographs.
+export function paginatedListItems(
+  allItems: ExportItem[],
+  photosByItemId: Record<string, PhotoSpec[]> = {},
+): ListItems {
   return vi.fn(
     async (page: { after: { itemId: string } | null; size: number }) => {
       const start = page.after
@@ -42,23 +38,17 @@ export function paginatedListItems(allItems: ExportItem[]): ListItems {
         items.length === page.size
           ? { linkedAt: 'at', itemId: items[items.length - 1].id }
           : null;
-      return { data: { items, next }, error: null };
+      // The `uid/itemId/name` path shape a real row carries.
+      const photos = items.flatMap(({ id }) =>
+        (photosByItemId[id] ?? []).map((spec) => ({
+          item_id: id,
+          path_full: `uid/${id}/${typeof spec === 'string' ? spec : spec.name}`,
+          size_bytes: typeof spec === 'string' ? null : spec.size,
+        })),
+      );
+      return { data: { items, photos, next }, error: null };
     },
   );
-}
-
-// Keyed by item id, building the `uid/itemId/name` path shape a real row carries; `size_bytes` null.
-export function fakeListImages(byItemId: Record<string, string[]>): ListImages {
-  return async (itemIds: string[]) => ({
-    data: itemIds.flatMap((itemId) =>
-      (byItemId[itemId] ?? []).map((name) => ({
-        item_id: itemId,
-        path_full: `uid/${itemId}/${name}`,
-        size_bytes: null,
-      })),
-    ),
-    error: null,
-  });
 }
 
 // Every path signs to a URL derived from itself, so a test can tell which photograph a fetch was for.

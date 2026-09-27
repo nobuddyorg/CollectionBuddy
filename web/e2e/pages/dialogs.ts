@@ -1,4 +1,4 @@
-import { type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 interface Confirm {
   (): Locator;
@@ -15,13 +15,20 @@ interface Confirm {
   };
 }
 
+/** The table whose row a deferred delete removes last, after the objects. */
+type DeletedTable = 'items' | 'images' | 'categories';
+
 interface Toast {
   (): Locator;
   do: {
     close(): Promise<void>;
+    commitDeletion(table: DeletedTable): Promise<void>;
+    hold(): Promise<void>;
     undo(): Promise<void>;
+    undoByKeyboard(): Promise<void>;
   };
   locators: {
+    alert: Locator;
     buttons: {
       action: Locator;
       close: Locator;
@@ -33,11 +40,13 @@ interface ImageViewer {
   (): Locator;
   do: {
     close(): Promise<void>;
+    deleteImage(): Promise<void>;
     previous(): Promise<void>;
   };
   locators: {
     buttons: {
       close: Locator;
+      deleteImage: Locator;
       previous: Locator;
     };
     photo: Locator;
@@ -70,6 +79,8 @@ export function initToast(page: Page): Toast {
   // The newest toast that offers an action: a plain success toast may still be on screen beside the undo one.
   const pending = root.filter({ has: page.getByTestId('toast-action') }).last();
   const locators = {
+    // An error toast, the one kind that interrupts; a success toast may be on screen beside it.
+    alert: root.and(page.getByRole('alert')),
     buttons: {
       action: pending.getByTestId('toast-action'),
       close: pending.getByTestId('toast-close'),
@@ -79,8 +90,26 @@ export function initToast(page: Page): Toast {
     close: async () => {
       await locators.buttons.close.click();
     },
+    // Closing ends the undo window; waiting for the row's delete keeps a navigation from aborting it.
+    commitDeletion: async (table: DeletedTable) => {
+      const deleted = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'DELETE' &&
+          new URL(response.url()).pathname.endsWith(`/rest/v1/${table}`),
+      );
+      await locators.buttons.close.click();
+      expect((await deleted).ok()).toBe(true);
+    },
+    // A pointer resting on the toast stops its timer until it leaves.
+    hold: async () => {
+      await pending.hover();
+    },
     undo: async () => {
       await locators.buttons.action.click();
+    },
+    // From wherever focus is: the toasts come last in the tab order.
+    undoByKeyboard: async () => {
+      await page.keyboard.press('ControlOrMeta+z');
     },
   };
   return Object.assign(() => root, { locators, do: interactions });
@@ -91,6 +120,7 @@ export function initImageViewer(page: Page): ImageViewer {
   const locators = {
     buttons: {
       close: root.getByTestId('close-image'),
+      deleteImage: root.getByTestId('delete-image'),
       previous: root.getByTestId('previous-image'),
     },
     photo: root.getByTestId('viewer-photo'),
@@ -99,6 +129,10 @@ export function initImageViewer(page: Page): ImageViewer {
   const interactions = {
     close: async () => {
       await locators.buttons.close.click();
+    },
+    // Opens the confirmation only: answering it is the caller's step.
+    deleteImage: async () => {
+      await locators.buttons.deleteImage.click();
     },
     previous: async () => {
       await locators.buttons.previous.click();

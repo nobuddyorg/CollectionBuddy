@@ -1,18 +1,12 @@
 import { expect, test } from './test';
 
+import { expectNoSeriousA11yViolations } from '../axe';
+import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
-import type { PageTree } from '../pages';
 // The undo window is the one place the interface and the database deliberately disagree for a while.
 test.use({ locale: 'en-GB' });
 
 const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
-
-/** Cleanup, so it has to cope with the entry already being gone. */
-async function deleteIfPresent(app: PageTree, title: string) {
-  const card = app.catalogue.card(title);
-  if ((await card().count()) === 0) return;
-  await app.catalogue.do.removeEntry(title);
-}
 
 test.describe('taking a deletion back', () => {
   test.beforeEach(async ({ on, page }) => {
@@ -36,7 +30,53 @@ test.describe('taking a deletion back', () => {
       await app.categories.do.open(SEED.undoCategory);
       await expect(app.catalogue.card(title)()).toBeVisible();
     } finally {
-      await deleteIfPresent(app, title);
+      await removeEntriesTitled(title);
+    }
+  });
+
+  // WCAG 2.2.1: Undo sits last in the tab order, so the shortcut is how the keyboard reaches it in time.
+  test('a keyboard user takes it back with the shortcut, from wherever focus landed', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const title = uniqueTitle('Per Tastatur');
+    try {
+      await app.catalogue.do.addEntry(title);
+      await app.catalogue.do.removeEntryByKeyboard(title);
+      await expect(app.toast.locators.buttons.action).toBeVisible();
+
+      await app.toast.do.undoByKeyboard();
+      await expect(app.catalogue.card(title)()).toBeVisible();
+      await expect(app.toast.locators.buttons.action).toHaveCount(0);
+
+      await app.categories.do.open(SEED.undoCategory);
+      await expect(app.catalogue.card(title)()).toBeVisible();
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
+  test('the undo toast has no serious or critical violations', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const app = on(page);
+    const title = uniqueTitle('Barrierefrei');
+    try {
+      await app.catalogue.do.addEntry(title);
+      await app.catalogue.do.removeEntry(title);
+      // Held, so the delete cannot go out while axe runs.
+      await app.toast.do.hold();
+      // Cards fade in (.fade-up, 500ms); axe samples contrast mid-fade as a false positive unless settled.
+      await expect(app.catalogue.locators.cards.first()).toHaveCSS(
+        'opacity',
+        '1',
+      );
+      await expectNoSeriousA11yViolations(page, testInfo);
+      await app.toast.do.undo();
+    } finally {
+      await removeEntriesTitled(title);
     }
   });
 
@@ -58,7 +98,7 @@ test.describe('taking a deletion back', () => {
       await expect(app.catalogue.card('Rückgängigstück')()).toBeVisible();
       await expect(app.catalogue.card(title)()).toHaveCount(0);
     } finally {
-      await deleteIfPresent(app, title);
+      await removeEntriesTitled(title);
     }
   });
 });

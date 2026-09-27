@@ -45,12 +45,14 @@ It is designed for keeping a structured personal record of collected items rathe
 
 ## Features
 
-- **Photo-first entries**: one photo, a pair, or a whole strip. Phone photos are compressed to WebP in the browser before upload, so there's no manual resizing.
+- **Photo-first entries**: one photo, a pair, or a whole strip. Phone photos are compressed to WebP (JPEG in Safari and on iOS) in the browser before upload, so there's no manual resizing.
 - **Categories** to keep collections apart, with **sharing** so someone else can browse yours — read-only by default, or with edit access if you grant it.
 - **Place and map**: give an item a location, then see your whole collection pinned on a map.
 - **Tags and search** across title, description, place, and tags at once.
-- **Import/export** a category as a portable archive.
+- **Import/export** a category you own as a portable archive.
 - **Bilingual, themeable**: German/English and light/dark/system, both remembered per visitor.
+- **Your data, your call**: export any collection, or delete your account and everything in it from the account menu.
+- **Built-in help**: a short guide to every feature under **Help** in the account menu, or Ctrl+/ (Cmd+/) from anywhere.
 - Built to work with a keyboard and a screen reader, not just a mouse.
 - **Local demo mode**: run a local Supabase stack in Docker and try the app with no Google account or sign-in screen — see [CONTRIBUTING.md](CONTRIBUTING.md#try-the-local-demo).
 
@@ -71,9 +73,7 @@ Full docs live in [`docs/`](docs/README.md), organised by [Diátaxis](https://di
 
 ## Contributing
 
-Contributions are welcome. Whether it's a bug fix, a new feature, or just improving the docs, open an issue or submit a pull request.
-
-Before contributing, please check out [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and the checks CI runs.
+CollectionBuddy is a personal hobby project and doesn't accept outside pull requests, issues or feature requests; they are closed without review. Want to change something? Fork it: [CONTRIBUTING.md](CONTRIBUTING.md) has why, local setup, and the checks CI runs.
 
 ## License
 

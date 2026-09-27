@@ -1,8 +1,13 @@
 // @vitest-environment jsdom
-import { screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { I18nProvider } from '../../i18n/I18nProvider';
+import { ConfirmProvider } from '../Confirm/ConfirmProvider';
+import { ToastProvider } from '../Toast/ToastProvider';
+import CategorySelect from './index';
 import {
   categories,
   installHookStates,
@@ -31,6 +36,37 @@ vi.mock('./useShares', () => ({
 
 const heading = () => screen.getByRole('heading', { name: 'Collection' });
 
+const openToggle = () =>
+  screen.getByRole('button', { name: 'Open collection' });
+
+// Real selection state, as the page holds it: a selection re-renders the panel with the new id.
+function SelectWithState() {
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    'a',
+  );
+  const [state] = useState(categories);
+  return (
+    <CategorySelect
+      selectedCategoryId={selectedCategoryId}
+      onSelect={setSelectedCategoryId}
+      categories={state}
+      userId="owner-1"
+    />
+  );
+}
+
+function renderWithSelectionState() {
+  render(
+    <I18nProvider>
+      <ToastProvider>
+        <ConfirmProvider>
+          <SelectWithState />
+        </ConfirmProvider>
+      </ToastProvider>
+    </I18nProvider>,
+  );
+}
+
 // The header's name line, as distinct from the same name on a tab or in the rename field.
 const headerName = () => heading().parentElement?.lastElementChild;
 
@@ -47,6 +83,23 @@ describe('CategorySelect', () => {
     renderSelect({ ready: false });
     expect(heading()).toBeVisible();
     expect(screen.queryByText('None selected')).not.toBeInTheDocument();
+  });
+
+  // Nothing is selected before the first load, which would open the panel on create and import for a collector who has collections.
+  it('keeps the panel shut while not ready, even with nothing selected yet', () => {
+    renderSelect({ ready: false, selectedCategoryId: null });
+    expect(screen.queryByTestId('new-category-input')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('import-category')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('opens the panel on create and import once ready with nothing to select', () => {
+    renderSelect({
+      selectedCategoryId: null,
+      categories: categories({ categories: [] }),
+    });
+    expect(screen.getByTestId('new-category-input')).toBeVisible();
+    expect(screen.getByTestId('import-category')).toBeVisible();
   });
 
   it('keeps the same header when the panel is opened', async () => {
@@ -141,6 +194,73 @@ describe('CategorySelect', () => {
       await userEvent.type(rename, '{Escape}{Escape}');
 
       expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+      expect(openToggle()).toHaveFocus();
+    });
+  });
+
+  it('hands focus to the toggle when Escape in the new-category field closes the panel', async () => {
+    renderSelect();
+    await openPanel();
+
+    await userEvent.type(screen.getByLabelText('New collection'), '{Escape}');
+
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(openToggle()).toHaveFocus();
+  });
+
+  // No selection means no toggle to take focus; closing must still work.
+  it('closes without a toggle to focus when nothing is selected', async () => {
+    renderSelect({ selectedCategoryId: null });
+
+    await userEvent.type(screen.getByLabelText('New collection'), '{Escape}');
+
+    expect(screen.queryByLabelText('New collection')).not.toBeInTheDocument();
+    expect(document.body).toHaveFocus();
+  });
+
+  describe('keyboard in the tablist, with real selection state', () => {
+    it('keeps focus on the header toggle as Enter opens and closes the panel', async () => {
+      const user = userEvent.setup();
+      renderWithSelectionState();
+      openToggle().focus();
+
+      await user.keyboard('{Enter}');
+      expect(screen.getByRole('tablist')).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
+
+      await user.keyboard('{Enter}');
+      expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+      expect(openToggle()).toHaveFocus();
+    });
+
+    it('keeps the panel open and focus on the tabs while arrowing, switching nothing', async () => {
+      const user = userEvent.setup();
+      renderWithSelectionState();
+      await user.click(openToggle());
+      screen.getByRole('tab', { name: 'Coins' }).focus();
+
+      await user.keyboard('{ArrowRight}');
+
+      expect(screen.getByRole('tablist')).toBeVisible();
+      expect(screen.getByRole('tab', { name: 'Stamps' })).toHaveFocus();
+      expect(headerName()).toHaveTextContent('Coins');
+      expect(screen.getByLabelText('Rename')).toHaveValue('Coins');
+
+      await user.keyboard('{ArrowRight}');
+      expect(screen.getByRole('tab', { name: 'Coins' })).toHaveFocus();
+    });
+
+    it('switches on Enter, closes the panel and hands focus to its toggle', async () => {
+      const user = userEvent.setup();
+      renderWithSelectionState();
+      await user.click(openToggle());
+      screen.getByRole('tab', { name: 'Coins' }).focus();
+
+      await user.keyboard('{End}{Enter}');
+
+      expect(headerName()).toHaveTextContent('Stamps');
+      expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+      expect(openToggle()).toHaveFocus();
     });
   });
 

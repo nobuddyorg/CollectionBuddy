@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import type { Category } from '../../types';
@@ -31,7 +31,7 @@ type Props = {
   onSelect: (id: string | null) => void;
   categories: UseCategories;
   userId: string | null;
-  /** False until the page's initial load resolves; stops a one-render "None selected" flash. */
+  /** False until the page's initial load resolves: the header holds a placeholder and the panel stays shut. */
   ready?: boolean;
 };
 
@@ -72,6 +72,20 @@ export default function CategorySelect({
   const [name, setName] = useState('');
   const [renameValue, setRenameValue] = useState('');
   const [expanded, setExpanded] = useState(!selectedCategoryId);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const toggleTakesFocus = useRef(false);
+
+  // Toggling swaps the header button and closing unmounts the focused control, so the new toggle takes focus.
+  const toggleExpanded = useCallback((next: boolean) => {
+    toggleTakesFocus.current = true;
+    setExpanded(next);
+  }, []);
+  const collapse = useCallback(() => toggleExpanded(false), [toggleExpanded]);
+  useEffect(() => {
+    if (!toggleTakesFocus.current) return;
+    toggleTakesFocus.current = false;
+    toggleRef.current?.focus();
+  }, [expanded]);
 
   // Render-time transition, not an effect: no extra render between selection change and collapse.
   const [previousSelectedCategoryId, setPreviousSelectedCategoryId] =
@@ -131,9 +145,9 @@ export default function CategorySelect({
     if (created?.id) {
       setName('');
       onSelect(created.id);
-      setExpanded(false);
+      collapse();
     }
-  }, [name, createCategory, onSelect]);
+  }, [name, createCategory, onSelect, collapse]);
 
   const onImportFile = useCallback(
     async (file: File) => {
@@ -168,25 +182,28 @@ export default function CategorySelect({
         {selected &&
           (expanded ? (
             <CollapseButton
-              onClick={() => setExpanded(false)}
+              ref={toggleRef}
+              onClick={collapse}
               label={t('common.close')}
             />
           ) : (
             <ExpandButton
-              onClick={() => setExpanded(true)}
+              ref={toggleRef}
+              onClick={() => toggleExpanded(true)}
               label={t('category_select.open_category')}
             />
           ))}
       </div>
 
-      {expanded && (
+      {/* Not before ready: nothing is selected yet, so the panel would open on create/import, then snap shut. */}
+      {expanded && ready && (
         <>
           <CategorySelectDropdown
             selectedCategoryId={selectedCategoryId}
             onSelect={onSelect}
             sortedCategories={sortedCategories}
             isLoading={isLoading}
-            setExpanded={setExpanded}
+            onCollapse={collapse}
             userId={userId}
           />
 
@@ -220,7 +237,7 @@ export default function CategorySelect({
                       if (renameValue !== selected.name) {
                         setRenameValue(selected.name);
                       } else {
-                        setExpanded(false);
+                        collapse();
                       }
                     }
                   }}
@@ -256,7 +273,7 @@ export default function CategorySelect({
               name={name}
               setName={setName}
               createCategory={() => void onCreate()}
-              setExpanded={setExpanded}
+              onCollapse={collapse}
             />
             <AddButton
               onClick={() => void onCreate()}

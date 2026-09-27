@@ -3,7 +3,11 @@ import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { deleteImageRow, listImagesForItems } from '../../data/images';
+import {
+  deleteImageRow,
+  listImagesForItems,
+  removeImageObjects,
+} from '../../data/images';
 import {
   acceptConfirmation,
   entry,
@@ -51,6 +55,7 @@ describe('useItemImages deleteImage undo', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Undo' }));
 
     expect(result.current.images['item-1']).toEqual([image]);
+    expect(removeImageObjects).not.toHaveBeenCalled();
     expect(deleteImageRow).not.toHaveBeenCalled();
   });
 
@@ -98,6 +103,49 @@ describe('useItemImages deleteImage undo', () => {
       );
 
       expect(result.current.images['item-1']).toEqual([imageA, imageB, imageC]);
+    });
+  });
+
+  // #784: the entry's own delete can commit inside the photograph's undo window, taking the row with it.
+  describe('once its entry was deleted inside the undo window', () => {
+    async function deletedWithItsEntry() {
+      const hook = await withOnePhotograph();
+      act(() => {
+        void hook.result.current.deleteImage('item-1', image);
+      });
+      await acceptConfirmation();
+      act(() => hook.result.current.forgetItemImages('item-1'));
+      return hook;
+    }
+
+    it('has nothing to bring back on undo, and does not crash', async () => {
+      const { result } = await deletedWithItsEntry();
+
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Undo' }),
+      );
+
+      expect(result.current.images).not.toHaveProperty('item-1');
+    });
+
+    it('stays gone when its own delete then fails', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      vi.mocked(removeImageObjects).mockResolvedValue({ error: null } as never);
+      vi.mocked(deleteImageRow).mockResolvedValue({
+        data: null,
+        error: new Error('no row'),
+      } as never);
+      const { result } = await deletedWithItsEntry();
+
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Close' }),
+      );
+
+      await vi.waitFor(() => expect(consoleError).toHaveBeenCalled());
+      expect(result.current.images).not.toHaveProperty('item-1');
+      consoleError.mockRestore();
     });
   });
 });

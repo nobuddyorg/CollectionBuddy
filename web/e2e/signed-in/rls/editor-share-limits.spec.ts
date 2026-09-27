@@ -4,8 +4,10 @@ import {
   apiAs,
   context,
   editorShare,
+  entryFiledBy,
   ownedCategoryId,
   ownerEntryIn,
+  removeFiledEntry,
   share,
   unshare,
 } from './helpers';
@@ -78,7 +80,7 @@ test.describe('a category shared at the editor role', () => {
         .single();
       expect(after!.role).toBe('viewer');
 
-      // tg_category_shares_enforce re-derives the owner from the category, so an error, not an empty result.
+      // tg_category_shares_enforce re-derives the owner from the category, so its own refusal, not an empty result.
       const { error: passedOn } = await apiAs(otherToken)
         .from('category_shares')
         .insert({
@@ -87,7 +89,16 @@ test.describe('a category shared at the editor role', () => {
           invited_email: 'nobody-invited@collectionbuddy.test',
           role: 'editor',
         });
-      expect(passedOn).not.toBeNull();
+      expect(passedOn).toMatchObject({
+        code: 'P0001',
+        message: 'ownership mismatch',
+      });
+      const { data: issued } = await apiAs(token)
+        .from('category_shares')
+        .select('id')
+        .eq('category_id', categoryId)
+        .eq('invited_email', 'nobody-invited@collectionbuddy.test');
+      expect(issued).toEqual([]);
     } finally {
       await unshare(token, shareId);
     }
@@ -166,6 +177,119 @@ test.describe('a category shared at the editor role', () => {
     }
   });
 
+  // The entry stays the editor's own row, so only the grant, not ownership, may decide its writes (#739).
+  test('a revoked editor can no longer write the entry it filed, with the entry still there', async () => {
+    const { token, userId, otherToken } = context();
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.editorLimitsCategory,
+    });
+    const shareId = await editorShare(token, categoryId);
+    const itemId = await entryFiledBy(
+      { token: otherToken, categoryId },
+      'rls-filed-revoked-probe',
+    );
+
+    try {
+      await unshare(token, shareId);
+      const formerEditor = apiAs(otherToken);
+
+      const { data: updated } = await formerEditor
+        .from('items')
+        .update({ title: 'edited after revocation' })
+        .eq('id', itemId)
+        .select('id');
+      expect(updated).toEqual([]);
+
+      const { data: unlinked } = await formerEditor
+        .from('item_categories')
+        .delete()
+        .eq('item_id', itemId)
+        .select('item_id');
+      expect(unlinked).toEqual([]);
+
+      const { data: deleted } = await formerEditor
+        .from('items')
+        .delete()
+        .eq('id', itemId)
+        .select('id');
+      expect(deleted).toEqual([]);
+
+      // Its own row, so still readable to it: an empty write above is the revocation, not a hidden row.
+      const { data: after } = await formerEditor
+        .from('items')
+        .select('title,item_categories(category_id)')
+        .eq('id', itemId)
+        .single();
+      expect(after).toEqual({
+        title: 'rls-filed-revoked-probe',
+        item_categories: [{ category_id: categoryId }],
+      });
+    } finally {
+      await unshare(token, shareId);
+      await removeFiledEntry({
+        token,
+        otherToken,
+        categoryId,
+        itemId,
+        paths: [],
+      });
+    }
+  });
+
+  test('an editor demoted to viewer reads the entry it filed but no longer writes it', async () => {
+    const { token, userId, otherToken } = context();
+    const categoryId = await ownedCategoryId({
+      token,
+      userId,
+      name: SEED.editorLimitsCategory,
+    });
+    const shareId = await editorShare(token, categoryId);
+    const itemId = await entryFiledBy(
+      { token: otherToken, categoryId },
+      'rls-filed-demoted-probe',
+    );
+
+    try {
+      const { error: demoteError } = await apiAs(token)
+        .from('category_shares')
+        .update({ role: 'viewer' })
+        .eq('id', shareId);
+      expect(demoteError).toBeNull();
+
+      const { data: updated } = await apiAs(otherToken)
+        .from('items')
+        .update({ title: 'edited as a viewer' })
+        .eq('id', itemId)
+        .select('id');
+      expect(updated).toEqual([]);
+
+      const { data: deleted } = await apiAs(otherToken)
+        .from('items')
+        .delete()
+        .eq('id', itemId)
+        .select('id');
+      expect(deleted).toEqual([]);
+
+      const { data: after } = await apiAs(otherToken)
+        .from('items')
+        .select('title')
+        .eq('id', itemId)
+        .single();
+      expect(after!.title).toBe('rls-filed-demoted-probe');
+    } finally {
+      await unshare(token, shareId);
+      await removeFiledEntry({
+        token,
+        otherToken,
+        categoryId,
+        itemId,
+        paths: [],
+      });
+    }
+  });
+
   test('an expired editor grant writes no more than no grant at all', async () => {
     const { token, userId, otherToken } = context();
     const { categoryId, itemId } = await ownerEntryIn({
@@ -200,6 +324,53 @@ test.describe('a category shared at the editor role', () => {
       expect(after!.title).toBe('rls-editor-expired-probe');
     } finally {
       await unshare(token, shareId);
+      await apiAs(token).from('items').delete().eq('id', itemId);
+    }
+  });
+
+  // Filing is checked by a trigger that reads every grant past RLS, so the role must be the caller's own (0028).
+  test('another address’s editor grant makes no editor of a viewer', async () => {
+    const { token, userId, otherToken } = context();
+    const { categoryId, itemId } = await ownerEntryIn({
+      token,
+      userId,
+      category: SEED.editorLimitsCategory,
+      title: 'rls-viewer-beside-editor-probe',
+    });
+    const viewerShareId = await share({
+      token,
+      categoryId,
+      invitedEmail: SEED.other.email,
+    });
+    const editorShareId = await share({
+      token,
+      categoryId,
+      invitedEmail: 'someone-else@collectionbuddy.test',
+      role: 'editor',
+    });
+    const { data: ownEntry, error: entryError } = await apiAs(otherToken)
+      .from('items')
+      .insert({ title: 'rls-viewer-own-entry' })
+      .select('id')
+      .single();
+    if (entryError) throw entryError;
+
+    try {
+      const { data: updated } = await apiAs(otherToken)
+        .from('items')
+        .update({ title: 'edited by a viewer' })
+        .eq('id', itemId)
+        .select('id');
+      expect(updated).toEqual([]);
+
+      const { error: filed } = await apiAs(otherToken)
+        .from('item_categories')
+        .insert({ item_id: ownEntry!.id, category_id: categoryId });
+      expect(filed?.message).toBe('cross-tenant assignment is not allowed');
+    } finally {
+      await unshare(token, viewerShareId);
+      await unshare(token, editorShareId);
+      await apiAs(otherToken).from('items').delete().eq('id', ownEntry!.id);
       await apiAs(token).from('items').delete().eq('id', itemId);
     }
   });

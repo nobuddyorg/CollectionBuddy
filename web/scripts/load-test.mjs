@@ -38,8 +38,8 @@ function supabaseStatus() {
 }
 
 function localStack() {
-  const { API_URL, ANON_KEY, DB_URL } = JSON.parse(supabaseStatus());
-  return { url: API_URL, anonKey: ANON_KEY, databaseUrl: DB_URL };
+  const { API_URL, PUBLISHABLE_KEY, DB_URL } = JSON.parse(supabaseStatus());
+  return { url: API_URL, anonKey: PUBLISHABLE_KEY, databaseUrl: DB_URL };
 }
 
 function hosted(confirmed) {

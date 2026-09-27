@@ -346,8 +346,17 @@ beyond a dedicated hook and the platform's own tooling.
 - **Build the bundle against the stack it tests.** The Supabase URL is baked in
   at build time; a bundle built against another project passes while testing
   the wrong backend.
-- **Clean up in `finally`.** Probe rows and objects must not survive a failed
-  assertion.
+- **Clean up in `finally`, through the API as the owner.** Probe rows and
+  objects must not survive a failed assertion. An interface that defers a
+  delete behind an undo window sends it after the test has ended, so cleanup
+  through it deletes nothing; where the committed delete is the journey, wait
+  for its response before navigating away, or the navigation aborts it.
+- **Assert on a known row, never a count or an unordered pick** of data that
+  parallel specs write — above all a second identity every authorization spec
+  shares.
+- **Give a session-ending test an identity of its own.** A global sign-out
+  revokes every session of its user, and every parallel spec signed in as that
+  user with it.
 - **Fail on an unexpected console or runtime error.** This catches a rejected
   background query hiding behind a passing assertion.
 - **Flush browser coverage before every full navigation.** V8 keeps counts
@@ -596,7 +605,12 @@ like a schema change**; **a dry-run mode that lists what it would delete and
 exits before fetching any elevated credential**, defaulted on for manual runs;
 and **a grace period** between "looks orphaned" and "eligible" long enough that
 a slow or partial write can never fall inside it — the invariant a future edit
-is most likely to shrink while "simplifying."
+is most likely to shrink while "simplifying." Two more, once the job is worth
+keeping: **keep its query where the database suite runs it**, against seeded
+objects, rather than inline in the job's script; and **a proportionality
+ceiling** — refuse to delete more than a small share of what exists without an
+explicit override, because a bulk loss of the referencing records looks
+exactly like mass orphaning, and the sweep would make that loss permanent.
 
 Three lessons for the query itself:
 
@@ -621,7 +635,8 @@ Three lessons for the query itself:
 2. **Path-filter heavy jobs on PRs.** A job skipped by its own condition
    reports as passing and never weakens branch protection.
 3. **Full, unconditional set on the branch that deploys**, whatever the push
-   touched.
+   touched, and the deploy starts only once that run has passed on the same
+   commit.
 4. **Deploy pipeline fails safe**: migrate, reload the PostgREST schema cache,
    build, deploy, smoke-test — each depending on the last, so a rejected
    migration leaves the previous bundle serving the previous schema.
@@ -634,8 +649,14 @@ Three lessons for the query itself:
 
 **Scheduled jobs:** a destructive sweep (dry-run by default, §12); a keep-alive
 (a mitigation, not a test); dependency updates — auto-merge patch-level
-dev-only bumps at most. A dev dependency reaches the CI runner; a runtime one
-reaches every user's browser. That asymmetry is a security control.
+bumps at most, and only of packages the build that produces the deployed
+artifact never runs. A package that only reaches the CI runner is a smaller
+risk than one that reaches every user's browser, and that asymmetry is a
+security control only if it is true: the manifest's dev/runtime split does not
+make it so, since build tools and install scripts run where the bundle is made.
+Keep build tools out of the dev section, install without lifecycle scripts, and
+gate auto-merge on the resolved lockfile, where a dev bump can also move a
+package the build shares.
 
 ---
 

@@ -3,7 +3,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createItem, linkItemToCategory } from '../../data/items';
+import { createItemsInCategory } from '../../data/items';
 import {
   defaultMutationsState,
   item,
@@ -17,8 +17,7 @@ import type { useItemMutations } from './useItemMutations';
 
 vi.mock('../../data/items', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../data/items')>()),
-  createItem: vi.fn(),
-  linkItemToCategory: vi.fn(),
+  createItemsInCategory: vi.fn(),
 }));
 
 // The three data hooks are tested on their own; mocked here to drive exactly what the grid paints.
@@ -46,13 +45,11 @@ beforeEach(() => {
 
 describe('ItemList create flow', () => {
   beforeEach(() => {
-    vi.mocked(createItem).mockReset();
-    vi.mocked(linkItemToCategory).mockReset();
-    vi.mocked(createItem).mockResolvedValue({
-      data: { id: 'item-2' },
+    vi.mocked(createItemsInCategory).mockReset();
+    vi.mocked(createItemsInCategory).mockResolvedValue({
+      data: null,
       error: null,
     } as never);
-    vi.mocked(linkItemToCategory).mockResolvedValue({ error: null } as never);
   });
 
   async function createEntry() {
@@ -72,10 +69,9 @@ describe('ItemList create flow', () => {
 
     await createEntry();
 
-    expect(createItem).toHaveBeenCalledWith(
+    expect(createItemsInCategory).toHaveBeenCalledWith('cat-1', [
       expect.objectContaining({ title: 'Roman coin' }),
-    );
-    expect(linkItemToCategory).toHaveBeenCalledWith('item-2', 'cat-1');
+    ]);
     expect(reload).toHaveBeenCalled();
     expect(setPage).not.toHaveBeenCalled();
   });

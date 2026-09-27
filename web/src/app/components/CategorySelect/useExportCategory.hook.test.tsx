@@ -42,7 +42,6 @@ function exported(overrides: Record<string, unknown> = {}) {
     filename: 'CollectionBuddy-coins.zip',
     photoCount: 2,
     skippedPhotoCount: 0,
-    skippedItemCount: 0,
     ...overrides,
   };
 }
@@ -159,6 +158,30 @@ describe('useExportCategory', () => {
     expect(downloadBlob).toHaveBeenCalled();
   });
 
+  it('reports that size the way the app language writes numbers', async () => {
+    window.localStorage.setItem('lang', 'de');
+    vi.mocked(exportCategory).mockImplementation((async (args: ExportArgs) => {
+      const go = await args.confirmLargeExport!(2.5 * 1024 ** 3);
+      if (!go) throw new ExportCancelledError();
+      return exported();
+    }) as never);
+    const { result } = renderHook(() => useExportCategory(), { wrapper });
+
+    let done: Promise<void>;
+    act(() => {
+      done = result.current.runExport(CATEGORY);
+    });
+
+    // The matcher collapses the no-break space Intl puts before the unit.
+    expect(await screen.findByText(/etwa 2,5 GB/)).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('confirm-accept'));
+    await act(async () => {
+      await done;
+    });
+
+    expect(downloadBlob).toHaveBeenCalled();
+  });
+
   it('treats declining that confirmation as a cancellation, not a failure', async () => {
     vi.mocked(exportCategory).mockImplementation((async (args: ExportArgs) => {
       const go = await args.confirmLargeExport!(2.5 * 1024 ** 3);
@@ -202,21 +225,6 @@ describe('useExportCategory', () => {
     expect(downloadBlob).toHaveBeenCalled();
   });
 
-  it('reports entries whose photographs could not even be listed', async () => {
-    vi.mocked(exportCategory).mockResolvedValue(
-      exported({ skippedItemCount: 4 }) as never,
-    );
-    const { result } = renderHook(() => useExportCategory(), { wrapper });
-
-    await act(async () => {
-      await result.current.runExport(CATEGORY);
-    });
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "4 entries' photographs could not be listed and are missing from the export.",
-    );
-  });
-
   it('says an archive that cannot fit is too large, not that it should be retried', async () => {
     vi.mocked(exportCategory).mockRejectedValue(
       new ZipLimitError('too many bytes'),
@@ -251,6 +259,23 @@ describe('useExportCategory', () => {
       'Could not export this collection. Please try again.',
     );
     expect(result.current.isExporting).toBe(false);
+    consoleError.mockRestore();
+  });
+
+  it('reports a rejection that carries no error at all', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    vi.mocked(exportCategory).mockRejectedValue(undefined);
+    const { result } = renderHook(() => useExportCategory(), { wrapper });
+
+    await act(async () => {
+      await result.current.runExport(CATEGORY);
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not export this collection. Please try again.',
+    );
     consoleError.mockRestore();
   });
 });

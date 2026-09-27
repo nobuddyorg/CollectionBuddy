@@ -42,4 +42,19 @@ test.describe('the account menu', () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.locator('html')).toHaveAttribute('lang', 'de');
   });
+
+  test('links the privacy notice, which leads back to the catalogue', async ({
+    on,
+    page,
+  }) => {
+    await on(page).account.locators.privacyLink.click();
+    await expect(on(page).privacy.locators.title).toHaveText('Privacy notice');
+    await expect(on(page).privacy.locators.contact).toHaveAttribute(
+      'href',
+      'mailto:info@nobuddy.org',
+    );
+
+    await on(page).privacy.locators.back.click();
+    await expect(on(page).categories.locators.selected).not.toBeEmpty();
+  });
 });

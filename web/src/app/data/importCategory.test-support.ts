@@ -8,15 +8,19 @@ import {
   type ExportItem,
 } from './exportFormat';
 import { createZipWriter } from './zip';
+import {
+  craftZip,
+  INFO_ZIP_EXTRA,
+  type CraftedEntry,
+} from './zipReader.test-support';
 
 type ImportParams = Parameters<typeof importCategory>[0];
 type GetUid = ImportParams['getUid'];
 export type CreateCategoryRow = ImportParams['createCategoryRow'];
 export type DeleteCategoryRow = ImportParams['deleteCategoryRow'];
 export type CreateItemRows = ImportParams['createItemRows'];
-export type LinkItemRows = ImportParams['linkItemRows'];
-export type DeleteItemRows = ImportParams['deleteItemRows'];
 export type UploadImage = ImportParams['uploadImage'];
+export type RemoveImages = ImportParams['removeImages'];
 export type CreateImage = ImportParams['createImage'];
 export type CompressThumb = ImportParams['compressThumb'];
 
@@ -74,6 +78,47 @@ export async function buildArchive({
   return writer.finish();
 }
 
+const PACKED_ROOT = 'CollectionBuddy-coins-2026-08-06';
+
+/** One item and its photograph as a zip tool packs an unzipped export again, `change` applied to each entry. */
+export function buildRepackedArchive({
+  photo = new Uint8Array([9, 8, 7, 6]),
+  change = (entry) => entry,
+}: {
+  photo?: Uint8Array;
+  change?: (entry: CraftedEntry) => CraftedEntry;
+} = {}): Blob {
+  const entries = exportEntries(
+    [item()],
+    new Map([['orig-item-1', ['a.jpg']]]),
+  );
+  const manifest = buildManifest({
+    category: { id: 'orig-cat-1', name: 'Coins' },
+    entries,
+    exportedAt: new Date('2026-08-06T00:00:00.000Z'),
+  });
+  const packed: CraftedEntry[] = (
+    [
+      { name: `${PACKED_ROOT}/`, data: new Uint8Array(), method: 'store' },
+      {
+        name: `${PACKED_ROOT}/${MANIFEST_NAME}`,
+        data: new TextEncoder().encode(JSON.stringify(manifest)),
+      },
+      {
+        name: `${PACKED_ROOT}/${entries[0].photos[0].archivePath}`,
+        data: photo,
+      },
+    ] satisfies CraftedEntry[]
+  ).map((entry) => ({
+    ...entry,
+    extra: INFO_ZIP_EXTRA,
+    dataDescriptor: true,
+  }));
+  return new Blob([
+    craftZip({ entries: packed.map(change), comment: 're-packed' }),
+  ]);
+}
+
 export function fakeGetUid(uid: string | null): GetUid {
   return async () => uid;
 }
@@ -93,14 +138,6 @@ export function fakeCreateItems(): CreateItemRows {
   return vi.fn(async () => ({ error: null })) as unknown as CreateItemRows;
 }
 
-export function fakeLinkItems(): LinkItemRows {
-  return vi.fn(async () => ({ error: null })) as unknown as LinkItemRows;
-}
-
-export function fakeDeleteItems(): DeleteItemRows {
-  return vi.fn(async () => ({ error: null })) as unknown as DeleteItemRows;
-}
-
 // Sequential, so each new item's id is predictable: new-item-1, -2, ...
 function fakeNewItemId(): () => string {
   let n = 0;
@@ -113,6 +150,13 @@ export function fakeUploadImage(): UploadImage {
   return vi.fn(async () => ({ error: null })) as unknown as UploadImage;
 }
 
+export function fakeRemoveImages(): RemoveImages {
+  return vi.fn(async () => ({
+    data: [],
+    error: null,
+  }));
+}
+
 export function fakeCreateImage(): CreateImage {
   return vi.fn(async () => ({
     data: { id: 'img-1', item_id: 'item', path_full: 'a', path_thumb: null },
@@ -121,7 +165,7 @@ export function fakeCreateImage(): CreateImage {
 }
 
 export function fakeCompressThumb(): CompressThumb {
-  return vi.fn(async () => new Blob(['thumb']));
+  return vi.fn(async () => new Blob(['thumb'], { type: 'image/webp' }));
 }
 
 export function baseFakes() {
@@ -130,11 +174,10 @@ export function baseFakes() {
     createCategoryRow: fakeCreateCategory(),
     deleteCategoryRow: fakeDeleteCategory(),
     createItemRows: fakeCreateItems(),
-    linkItemRows: fakeLinkItems(),
-    deleteItemRows: fakeDeleteItems(),
     newItemId: fakeNewItemId(),
     now: () => NOW,
     uploadImage: fakeUploadImage(),
+    removeImages: fakeRemoveImages(),
     createImage: fakeCreateImage(),
     compressThumb: fakeCompressThumb(),
   };

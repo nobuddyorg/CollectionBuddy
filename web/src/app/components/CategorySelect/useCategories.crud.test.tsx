@@ -24,7 +24,7 @@ vi.mock('../../data/categories', () => ({
 }));
 
 vi.mock('../../data/images', () => ({
-  listImagePathsForItems: vi.fn(),
+  listImagePathsForCategory: vi.fn(),
   removeImageObjects: vi.fn(),
   REMOVE_OBJECTS_BATCH_SIZE: 1000,
 }));
@@ -225,7 +225,7 @@ describe('useCategories', () => {
 
       expect(renameCategory).toHaveBeenCalledWith('cat-1', 'coins & medals');
       expect(result.current.categories[0]?.name).toBe('Coins & Medals');
-      expect(await screen.findByRole('status')).toBeVisible();
+      expect(await screen.findByTestId('toast')).toBeVisible();
     });
 
     it('refuses a blank new name without asking the database', async () => {

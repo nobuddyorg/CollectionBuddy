@@ -3,9 +3,8 @@
 -- inside someone else's category. Everything in 020_category_shares_rls_test.sql
 -- tests a viewer, whose grant stops at reading, so none of it says
 -- anything about this path -- the same reasoning
--- web/e2e/signed-in/rls.spec.ts's own "a category shared at the editor
--- role" describe block gives for testing it separately, on its own
--- collection.
+-- web/e2e/signed-in/rls/editor-share.spec.ts gives for testing it
+-- separately, on its own collection.
 begin;
 select no_plan();
 
@@ -42,6 +41,27 @@ with attempt as (
 )
 select is((select count(*) from attempt), 1::bigint,
   'an editor can delete the owner''s entry in the shared collection');
+
+-- The positive side of the delete policies a viewer is refused (020), each probe undone again.
+select pg_temp.auth_as(:'owner_id'::uuid, 'editor-test-owner@collectionbuddy.test');
+insert into public.items (title) values ('Photographed owner entry')
+returning id as photographed_id \gset
+insert into public.item_categories (item_id, category_id)
+values (:'photographed_id'::uuid, :'category_id'::uuid);
+insert into public.images (item_id, path_full)
+values (:'photographed_id'::uuid, :'owner_id'::text || '/' || :'photographed_id'::text || '/a.webp');
+
+select pg_temp.auth_as(:'editor_id'::uuid, 'editor@collectionbuddy.test');
+select is(
+  pg_temp.rows_written(format('delete from public.images where item_id = %L returning id', :'photographed_id')),
+  1::bigint,
+  'an editor can delete the photograph record on the owner''s entry'
+);
+select is(
+  pg_temp.rows_written(format('delete from public.item_categories where item_id = %L returning item_id', :'photographed_id')),
+  1::bigint,
+  'and unlink the owner''s entry from the shared collection'
+);
 
 -- An editor files an entry of its own into the shared collection --
 -- tg_item_categories_enforce, not a bare RLS predicate.
@@ -98,11 +118,13 @@ select is((select count(*) from attempt), 0::bigint,
 -- ...nor issue a grant of its own -- tg_category_shares_enforce re-derives
 -- owner_user_id from the category itself, so a forged value in the
 -- payload never reaches the policy.
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.category_shares (category_id, owner_user_id, invited_email, role) values (%L, %L, %L, %L)',
     :'category_id'::uuid, :'editor_id'::uuid, 'nobody-invited@collectionbuddy.test', 'editor'
-  )),
+  ),
+  'P0001',
+  'ownership mismatch',
   'an editor cannot issue a grant of its own on the collection'
 );
 
@@ -155,6 +177,14 @@ with attempt as (
 )
 select is((select count(*) from attempt), 0::bigint,
   'an expired editor grant writes no more than no grant at all');
+select is(
+  array[
+    public.has_category_read_access(:'category_id'::uuid),
+    public.has_category_write_access(:'category_id'::uuid)
+  ],
+  array[false, false],
+  'read and write agree on an expired editor grant: neither is open'
+);
 
 -- An editor may leave the share, which ends its own access and nobody
 -- else's -- "delete own or invited category_shares" deliberately covers
@@ -177,6 +207,70 @@ select is(
   (select count(*) from public.categories where id = :'category_id'::uuid),
   0::bigint,
   'and immediately loses access to the collection'
+);
+
+-- Another address's editor grant makes no editor of a viewer: the write predicate binds the role to the caller's own grant (0028).
+select pg_temp.auth_as(:'owner_id'::uuid, 'editor-test-owner@collectionbuddy.test');
+insert into public.categories (name) values ('Two grants (pgTAP)')
+returning id as two_grants_category_id \gset
+insert into public.items (title) values ('Two grants probe')
+returning id as two_grants_item_id \gset
+insert into public.item_categories (item_id, category_id)
+values (:'two_grants_item_id'::uuid, :'two_grants_category_id'::uuid);
+insert into public.category_shares (category_id, invited_email)
+values (:'two_grants_category_id'::uuid, 'editor@collectionbuddy.test')
+returning id as two_grants_share_id \gset
+insert into public.category_shares (category_id, invited_email, role)
+values (:'two_grants_category_id'::uuid, 'someone-else@collectionbuddy.test', 'editor');
+
+select pg_temp.auth_as(:'editor_id'::uuid, 'editor@collectionbuddy.test');
+select is(
+  pg_temp.rows_written(format(
+    'update public.items set title = %L where id = %L returning id',
+    'edited by a viewer', :'two_grants_item_id')),
+  0::bigint,
+  'a viewer beside another address''s editor grant still cannot write'
+);
+-- The filing trigger asks as its owner, past category_shares' RLS, so only the predicate itself tells the two grants apart.
+insert into public.items (title) values ('Viewer''s own entry')
+returning id as viewer_entry_id \gset
+select throws_ok(
+  format(
+    'insert into public.item_categories (item_id, category_id) values (%L, %L)',
+    :'viewer_entry_id'::uuid, :'two_grants_category_id'::uuid),
+  'P0001',
+  'cross-tenant assignment is not allowed',
+  'nor file an entry into the collection'
+);
+
+-- Write follows the one definition of an active grant: were granted_category_ids() to drop a grant, an editor's row would open nothing.
+select pg_temp.auth_as(:'owner_id'::uuid, 'editor-test-owner@collectionbuddy.test');
+update public.category_shares set role = 'editor' where id = :'two_grants_share_id'::uuid;
+select pg_temp.auth_as(:'editor_id'::uuid, 'editor@collectionbuddy.test');
+select ok(public.has_category_write_access(:'two_grants_category_id'::uuid),
+  'an active editor grant opens writing');
+
+reset role;
+create or replace function public.granted_category_ids()
+returns setof uuid
+language plpgsql
+stable
+security invoker
+set search_path = ''
+as $$
+begin
+  return;
+end
+$$;
+
+select pg_temp.auth_as(:'editor_id'::uuid, 'editor@collectionbuddy.test');
+select is(
+  array[
+    public.has_category_read_access(:'two_grants_category_id'::uuid),
+    public.has_category_write_access(:'two_grants_category_id'::uuid)
+  ],
+  array[false, false],
+  'a grant granted_category_ids() no longer yields opens neither read nor write'
 );
 
 select * from finish();

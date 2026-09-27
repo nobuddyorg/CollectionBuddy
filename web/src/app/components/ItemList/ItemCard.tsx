@@ -126,7 +126,7 @@ function ItemCardComponent({
           {item.description && (
             <p
               data-testid="item-card-description"
-              className="text-sm leading-relaxed text-muted-foreground line-clamp-2"
+              className="text-sm leading-relaxed text-muted-foreground line-clamp-2 whitespace-pre-line"
             >
               {item.description}
             </p>

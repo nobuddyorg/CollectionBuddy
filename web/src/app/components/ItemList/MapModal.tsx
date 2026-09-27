@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
-import { searchMinLength } from '../../data/itemSearch';
+import { SEARCH_MIN_LENGTH } from '../../data/itemSearch';
 import CenteredModal from '../CenteredModal';
 import Icon, { IconType } from '../Icon';
 import { Spinner } from '../ui/Spinner';
@@ -13,16 +13,25 @@ import { usePlaces } from '../Map/usePlaces';
 import { useCurrentLocation } from '../Map/useCurrentLocation';
 import { useMapFraming } from '../Map/useMapFraming';
 
-const MapView = dynamic(() => import('../Map'), { ssr: false });
+// The map's only import() site, shared with the prefetch: Turbopack emits a separate chunk per site.
+const loadMap = () => import('../Map');
+const MapView = dynamic(loadMap, { ssr: false });
+
+/** Warms the map's chunk and Leaflet's on intent; a failed prefetch is retried on the actual open. */
+export function prefetchMap(): void {
+  void Promise.all([loadMap(), import('leaflet')]).catch(() => {});
+}
 
 export function MapModal({
   categoryId,
   search,
+  canEdit,
   open,
   onOpenChange,
 }: {
   categoryId: string;
   search: string;
+  canEdit: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -33,7 +42,13 @@ export function MapModal({
     places,
     loading: loadingPlaces,
     error: placesError,
-  } = usePlaces({ categoryId, search, enabled: open, locale: language });
+  } = usePlaces({
+    categoryId,
+    search,
+    enabled: open,
+    canEdit,
+    locale: language,
+  });
 
   // Starts empty; the map frames pins as they stream in on its own.
   const {
@@ -52,10 +67,9 @@ export function MapModal({
         // Only when count > 1: a lone entry is already named by the place line, and "1 entries" is avoided.
         countLabel:
           place.titles.length > 1
-            ? t('item_list.map_entries_count').replace(
-                '{count}',
-                String(place.titles.length),
-              )
+            ? t('item_list.map_entries_count', {
+                count: place.titles.length,
+              })
             : undefined,
       })),
     [places, t],
@@ -111,7 +125,7 @@ export function MapModal({
           className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70"
         >
           {t(
-            search.length >= searchMinLength(search)
+            search.length >= SEARCH_MIN_LENGTH
               ? 'item_list.map_empty_filtered'
               : 'item_list.map_empty',
           )}
