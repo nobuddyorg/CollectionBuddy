@@ -61,7 +61,8 @@ describe('openZip, on what the export writes', () => {
   // #755: a photograph's bytes stay in the file until its upload asks for them.
   it('reads no more than the trailer search and the directory up front', async () => {
     const writer = createZipWriter();
-    const photo = new Uint8Array(1_000_000).fill(7);
+    // Three times the bound below, so reading it up front would fail the test.
+    const photo = new Uint8Array(200_000).fill(7);
     writer.add({ path: 'p.webp', bytes: photo });
     const archive = writer.finish();
     const sliced: number[] = [];
@@ -77,8 +78,9 @@ describe('openZip, on what the export writes', () => {
 
     const upFront = sliced.reduce((sum, length) => sum + length, 0);
     expect(upFront).toBeLessThan(22 + 0xffff + 100);
-    const read = await entries.get('p.webp')!();
-    expect(await bytesOf(read)).toEqual(photo);
+    const read = await bytesOf(await entries.get('p.webp')!());
+    // A deep toEqual walks 200,000 elements one by one; Buffer compares the bytes at once.
+    expect(Buffer.from(read).equals(Buffer.from(photo))).toBe(true);
   });
 
   it('reads an empty archive as an empty map, not an error', async () => {
