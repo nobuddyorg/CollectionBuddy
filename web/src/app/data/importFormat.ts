@@ -1,42 +1,104 @@
 import {
   EXPORT_FORMAT,
   EXPORT_FORMAT_VERSION,
-  type ExportManifest,
+  MANIFEST_NAME,
 } from './exportFormat';
 
+/** Why an archive cannot be imported as it is: not an export, unreadable as a ZIP, or past a size limit. */
+export type ImportFormatReason = 'not_export' | 'unreadable' | 'too_large';
+
+/** The archive's own fault, which no retry fixes. */
 export class ImportFormatError extends Error {
-  constructor(message: string) {
-    super(message);
+  readonly reason: ImportFormatReason;
+
+  constructor(
+    reason: ImportFormatReason,
+    message: string,
+    options?: { cause?: unknown },
+  ) {
+    super(message, options);
     this.name = 'ImportFormatError';
+    this.reason = reason;
   }
 }
 
-/** Checks only the format tag and version: past those, the manifest is `buildManifest`'s own. */
-export function parseManifest(data: unknown): ExportManifest {
+/** The manifest fields the import reads; the rest (ids, folders, dates) it never trusts. */
+export type ManifestItem = {
+  title: string;
+  description: string | null;
+  place: string | null;
+  place_lat: number | null;
+  place_lng: number | null;
+  tags: string[];
+  photos: string[];
+};
+
+export type ImportManifest = {
+  category: { name: string };
+  items: ManifestItem[];
+};
+
+const isString = (value: unknown): value is string => typeof value === 'string';
+
+const isStringOrNull = (value: unknown) => value === null || isString(value);
+
+const isNumberOrNull = (value: unknown) =>
+  value === null || typeof value === 'number';
+
+const isStringList = (value: unknown) =>
+  Array.isArray(value) && value.every(isString);
+
+function isManifestItem(value: unknown): value is ManifestItem {
+  const item = (value ?? {}) as Record<string, unknown>;
+  return (
+    isString(item.title) &&
+    isStringOrNull(item.description) &&
+    isStringOrNull(item.place) &&
+    isNumberOrNull(item.place_lat) &&
+    isNumberOrNull(item.place_lng) &&
+    isStringList(item.tags) &&
+    isStringList(item.photos)
+  );
+}
+
+function notAnExport(message: string): ImportFormatError {
+  return new ImportFormatError('not_export', message);
+}
+
+/** Checks the format tag, the version and the shape of every field the import goes on to read. */
+export function parseManifest(data: unknown): ImportManifest {
   // No `typeof data === 'object'` check: anything else has no `format` and fails the tag check.
   if (!data || (data as { format?: unknown }).format !== EXPORT_FORMAT) {
-    throw new ImportFormatError('Not a CollectionBuddy export archive');
+    throw notAnExport('Not a CollectionBuddy export archive');
   }
-  const version = (data as { version?: unknown }).version;
+  const { version, category, items } = data as Record<string, unknown>;
   if (version !== EXPORT_FORMAT_VERSION) {
-    throw new ImportFormatError(
+    throw notAnExport(
       `Cannot import a version ${String(version)} export archive`,
     );
   }
-  return data as ExportManifest;
+  if (!isString((category as { name?: unknown } | null)?.name)) {
+    throw notAnExport('The manifest names no category');
+  }
+  if (!Array.isArray(items) || !items.every(isManifestItem)) {
+    throw notAnExport('The manifest has a malformed entry');
+  }
+  return data as ImportManifest;
 }
+
+const MANIFEST_SUFFIX = `/${MANIFEST_NAME}`;
 
 /** The entry ending in `/collection.json`; the importer cannot recompute the root folder's name. */
 export function findManifestPath(entryNames: Iterable<string>): string | null {
   for (const name of entryNames) {
-    if (name.endsWith('/collection.json')) return name;
+    if (name.endsWith(MANIFEST_SUFFIX)) return name;
   }
   return null;
 }
 
 /** The archive's root folder, given the path `findManifestPath` returned. */
 export function rootFolderOf(manifestPath: string): string {
-  return manifestPath.slice(0, -'/collection.json'.length);
+  return manifestPath.slice(0, -MANIFEST_SUFFIX.length);
 }
 
 /** One `created_at` per row, 1 ms apart, ending at `now`, so any insert order keeps the archive order. */
@@ -58,7 +120,15 @@ export function importPhotoTasks(
   items: { id: string; item: { photos: string[] } }[],
   now: Date,
 ): PhotoTask[] {
-  return items.flatMap(({ id, item: { photos } }) => {
+  // An export names each photograph once; a repeat would only upload the same bytes into the quota again.
+  const seen = new Set<string>();
+  const firstMention = (archivePath: string) => {
+    if (seen.has(archivePath)) return false;
+    seen.add(archivePath);
+    return true;
+  };
+  return items.flatMap(({ id, item }) => {
+    const photos = item.photos.filter(firstMention);
     const createdAts = importTimestamps(photos.length, now);
     return photos.map((archivePath, i) => ({
       itemId: id,

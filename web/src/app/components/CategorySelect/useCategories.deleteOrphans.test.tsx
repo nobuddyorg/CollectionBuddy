@@ -7,7 +7,10 @@ import {
   listItemIdsForCategory,
   listItemIdsLinkedElsewhere,
 } from '../../data/categories';
-import { listImagePathsForItems, removeImageObjects } from '../../data/images';
+import {
+  listImagePathsForCategory,
+  removeImageObjects,
+} from '../../data/images';
 import {
   CATEGORY_ONE,
   commitDeferredDelete,
@@ -26,7 +29,7 @@ vi.mock('../../data/categories', () => ({
 
 // Two paths per removal, so IMAGE_ROWS' three paths span two batches.
 vi.mock('../../data/images', () => ({
-  listImagePathsForItems: vi.fn(),
+  listImagePathsForCategory: vi.fn(),
   removeImageObjects: vi.fn(),
   REMOVE_OBJECTS_BATCH_SIZE: 2,
 }));
@@ -128,7 +131,8 @@ describe('useCategories deleteCategory orphan detection', () => {
       itemIds: ['i1', 'i2'],
       excludingCategoryId: 'cat-1',
     });
-    expect(listImagePathsForItems).toHaveBeenCalledWith(['i2']);
+    // The read covers the whole collection; only the orphan's photographs are removed.
+    expect(listImagePathsForCategory).toHaveBeenCalledWith('cat-1');
     expect(removeImageObjects).toHaveBeenCalledTimes(1);
   });
 
@@ -151,7 +155,7 @@ describe('useCategories deleteCategory orphan detection', () => {
 
     await screen.findByRole('alert');
     expect(deleteCategoryRow).not.toHaveBeenCalled();
-    expect(listImagePathsForItems).not.toHaveBeenCalled();
+    expect(listImagePathsForCategory).not.toHaveBeenCalled();
     expect(removeImageObjects).not.toHaveBeenCalled();
     expect(result.current.categories).toEqual([CATEGORY_ONE]);
     expect(consoleError).toHaveBeenCalledWith(
@@ -184,7 +188,7 @@ describe('useCategories deleteCategory orphan detection', () => {
     // Settled, so the removal step has run -- and had nothing to remove.
     await waitFor(() => expect(result.current.isDeleting).toBe(false));
     expect(listItemIdsLinkedElsewhere).not.toHaveBeenCalled();
-    expect(listImagePathsForItems).not.toHaveBeenCalled();
+    expect(listImagePathsForCategory).not.toHaveBeenCalled();
     expect(removeImageObjects).not.toHaveBeenCalled();
   });
 });

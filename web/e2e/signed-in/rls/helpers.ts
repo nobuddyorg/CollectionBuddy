@@ -7,6 +7,15 @@ import { CONTEXT_PATH, SEED, type SeedContext } from '../fixtures';
 export const context = () =>
   JSON.parse(readFileSync(CONTEXT_PATH, 'utf8')) as SeedContext;
 
+/** Storage's answer when the storage.objects insert policy refuses an upload. */
+export const UPLOAD_REFUSED = {
+  statusCode: '403',
+  message: 'new row violates row-level security policy',
+};
+
+/** Storage's answer for an object no policy lets the caller sign or move; only a stored-object control tells it from absence. */
+export const OBJECT_HIDDEN = { statusCode: '404', message: 'Object not found' };
+
 /** A PostgREST client carrying one user's access token, and nothing more. */
 export function apiAs(token: string) {
   return createClient(

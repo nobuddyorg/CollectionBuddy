@@ -216,6 +216,40 @@ select pg_temp.plan_has_no_seq_scan_on(
   :'catalogue_sql', 'item_categories', 'preferred: the catalogue page does not scan item_categories sequentially'
 );
 
+-- The last page (#781) beside other collectors' links, as in production: it flips from sorting every link to the index between 20,000 and 30,000 of them (measured); 45,000 is under the entry quota.
+select pg_temp.auth_as(gen_random_uuid(), 'plans-other@collectionbuddy.test');
+insert into public.categories (name) values ('Plans other (pgTAP)')
+returning id as other_category_id \gset
+insert into public.items (title)
+select 'Plan other ' || g from generate_series(1, 45000) as g;
+insert into public.item_categories (item_id, category_id)
+select i.id, :'other_category_id'::uuid from public.items i where i.title like 'Plan other %';
+reset role;
+analyze public.items, public.item_categories;
+select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
+
+select format(
+  $sql$
+    select ic.item_id
+    from public.item_categories ic
+    where ic.category_id = %L::uuid
+    order by ic.created_at desc, ic.item_id
+    limit 9 offset %s
+  $sql$,
+  :'category_id',
+  (select (ceil(count(*) / 9.0)::int - 1) * 9
+   from public.item_categories ic
+   where ic.category_id = :'category_id'::uuid)
+) as last_page_sql \gset
+
+select pg_temp.plan_uses_index(
+  :'last_page_sql', 'idx_item_categories_cat_created',
+  'preferred: the catalogue''s last page uses idx_item_categories_cat_created under RLS'
+);
+select pg_temp.plan_has_no_seq_scan_on(
+  :'last_page_sql', 'item_categories', 'preferred: the catalogue''s last page does not scan item_categories sequentially'
+);
+
 -- rawListItemsByIds, as PostgREST embeds the photographs: nine entries by id, each with its own ordered lateral read of images.
 select format(
   $sql$
@@ -346,16 +380,54 @@ select pg_temp.plan_never_mentions(
   'search_category_items checks the grant once per call, not per row'
 );
 
--- A SQL function's body gets a generic plan in Postgres 17, costed on an average category rather than the one named (0018).
+-- The entry and link quotas' checks, read from the live functions with a statement's keys inlined, as each call is planned (0032).
 reset role;
+select
+  regexp_replace(
+    substring(p.prosrc from 'if exists \((.*)\) then'),
+    '\mlinked\M',
+    quote_literal((select array_agg(ic.item_id) from (
+      select ic.item_id from public.item_categories ic
+      where ic.category_id = :'other_category_id'::uuid limit 100
+    ) ic)) || '::uuid[]',
+    'g'
+  ) as link_quota_sql
+from pg_catalog.pg_proc p
+where p.oid = 'public.tg_item_categories_quota()'::regprocedure \gset
+select
+  regexp_replace(
+    substring(p.prosrc from 'if exists \((.*)\) then'),
+    '\mowners\M',
+    quote_literal(array[:'owner_id'::uuid]) || '::uuid[]',
+    'g'
+  ) as entry_quota_sql
+from pg_catalog.pg_proc p
+where p.oid = 'public.tg_items_quota()'::regprocedure \gset
+
+select pg_temp.plan_uses_index(
+  :'link_quota_sql', 'item_categories_pkey',
+  'preferred: a batch''s link quota probes each linked entry through item_categories_pkey'
+);
+select pg_temp.plan_has_no_seq_scan_on(
+  :'link_quota_sql', 'item_categories', 'preferred: a batch''s link quota does not scan every link'
+);
+select pg_temp.plan_uses_index(
+  :'entry_quota_sql', 'idx_items_user_created_at',
+  'preferred: the entry quota counts one owner''s entries through idx_items_user_created_at'
+);
+
+-- A SQL function's body gets a generic plan in Postgres 17, costed on an average category rather than the one named (0018); a trigger's, on its connection's first calls (0031, 0032).
 select is(
   (select array_agg(p.proname::text order by p.proname)
    from pg_catalog.pg_proc p
    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
      and coalesce(p.proconfig, '{}') @> array['plan_cache_mode=force_custom_plan']),
-  array['list_category_places', 'search_category_items'],
-  'the map and search RPCs plan each call for the category it names'
+  array[
+    'create_items_in_category', 'delete_item_if_orphan', 'list_category_places',
+    'search_category_items', 'tg_item_categories_quota', 'tg_items_quota'
+  ],
+  'the map and search RPCs plan each call for the category it names, entry creation and its quotas for the rows it adds, the orphan cleanup for the links it lost'
 );
 
 select * from finish();

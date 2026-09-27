@@ -28,18 +28,19 @@ const STATEMENTS_SQL = `
       and s.query !~* ${PLUMBING}
   ) t`;
 
+// storage too: signing and uploads check storage.objects' policies on every path.
 const TABLES_SQL = `
   select coalesce(json_agg(t), '[]') from (
-    select relname as table, seq_scan, seq_tup_read, coalesce(idx_scan, 0) as idx_scan, coalesce(idx_tup_fetch, 0) as idx_tup_fetch
+    select schemaname || '.' || relname as table, seq_scan, seq_tup_read, coalesce(idx_scan, 0) as idx_scan, coalesce(idx_tup_fetch, 0) as idx_tup_fetch
     from pg_catalog.pg_stat_user_tables
-    where schemaname = 'public'
+    where schemaname in ('public', 'storage')
   ) t`;
 
 const INDEXES_SQL = `
   select coalesce(json_agg(t), '[]') from (
-    select relname as table, indexrelname as index, idx_scan
+    select schemaname || '.' || relname as table, schemaname || '.' || indexrelname as index, idx_scan
     from pg_catalog.pg_stat_user_indexes
-    where schemaname = 'public'
+    where schemaname in ('public', 'storage')
   ) t`;
 
 // A backend with nothing to do flushes its pending table counters within 10 s (PGSTAT_IDLE_INTERVAL).

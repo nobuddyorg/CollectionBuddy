@@ -76,7 +76,11 @@ test.describe('create_items_in_category (creating an entry)', () => {
         categoryId,
         titles: [title, '   '],
       });
-      expect(error).not.toBeNull();
+      expect(error).toMatchObject({
+        code: '23502',
+        message:
+          'null value in column "title" of relation "items" violates not-null constraint',
+      });
       expect(await ownEntriesTitled(token, title)).toEqual([]);
     } finally {
       await removeEntriesTitled(token, title);
@@ -95,7 +99,10 @@ test.describe('create_items_in_category (creating an entry)', () => {
         categoryId,
         titles: [title],
       });
-      expect(error).not.toBeNull();
+      expect(error).toMatchObject({
+        code: 'P0001',
+        message: 'cross-tenant assignment is not allowed',
+      });
       expect(await ownEntriesTitled(otherToken, title)).toEqual([]);
     } finally {
       await removeEntriesTitled(otherToken, title);
@@ -118,7 +125,10 @@ test.describe('create_items_in_category (creating an entry)', () => {
         categoryId,
         titles: [title],
       });
-      expect(error).not.toBeNull();
+      expect(error).toMatchObject({
+        code: 'P0001',
+        message: 'cross-tenant assignment is not allowed',
+      });
       expect(await ownEntriesTitled(otherToken, title)).toEqual([]);
     } finally {
       await unshare(token, shareId);

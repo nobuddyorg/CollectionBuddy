@@ -80,7 +80,7 @@ jobs:
           if [ "$orphans" -gt "$ceiling" ] && [ "${ALLOW_MASS_DELETE:-false}" != "true" ]; then
             {
               echo "Refusing to delete: $orphans orphaned object(s) is more than the ceiling of $ceiling."
-              echo "If images rows were lost, disable this workflow and restore first: docs/how-to/developer-guide.md#restore-production-from-a-backup."
+              echo "If images rows were lost, disable this workflow first: a deleted object cannot be brought back."
               echo "If every listed object is truly orphaned: review a dry run, then run this workflow by hand with dry_run off and allow_mass_delete on."
             } | tee -a "$GITHUB_STEP_SUMMARY" >&2
             exit 1

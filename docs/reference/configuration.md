@@ -34,7 +34,7 @@ Sized to the hosted project's plan, Supabase Free, whose 1 GB of Storage is for 
 
 ## Hosted Auth settings
 
-The hosted project's Auth configuration lives in its dashboard, so the values sharing depends on are pinned in [`supabase/hosted-auth.json`](../../supabase/hosted-auth.json), keyed by their [Management API](https://supabase.com/docs/reference/api/v1-get-auth-service-config) field names. [`hosted-auth-check.yml`](../../.github/workflows/hosted-auth-check.yml) fails when production differs ([why](../explanation/design-decisions.md#why-the-hosted-auth-settings-are-pinned); [when it fails](../how-to/developer-guide.md#check-the-hosted-auth-settings)).
+The hosted project's Auth configuration lives in its dashboard, so the values sharing depends on are pinned in [`supabase/hosted-auth.json`](../../supabase/hosted-auth.json), keyed by their [Management API](https://supabase.com/docs/reference/api/v1-get-auth-service-config) field names, and compared with the dashboard by hand ([why](../explanation/design-decisions.md#why-the-hosted-auth-settings-are-pinned); [how](../how-to/developer-guide.md#check-the-hosted-auth-settings)).
 
 | Dashboard setting | Field | Production | Local stack (`config.toml`) |
 | --- | --- | --- | --- |
@@ -48,22 +48,22 @@ The hosted project's Auth configuration lives in its dashboard, so the values sh
 | Third-party auth | `/config/auth/third-party-auth` | none | none |
 | Customize access token hook | `hook_custom_access_token_enabled` | off | off |
 | Refresh token rotation, reuse interval | `refresh_token_rotation_enabled`, `security_refresh_token_reuse_interval` | on, 10 s | same |
-| Site URL | `site_url` | `https://nobuddyorg.github.io/CollectionBuddy/` | `http://localhost:3000` |
+| Site URL | `site_url` | `https://nobuddy.org/CollectionBuddy/` | `http://localhost:3000` |
 | Redirect URLs | `uri_allow_list` | empty | the two local dev origins |
 
 - **Redirect URLs stay empty.** Sign-in returns to the site's own URL, and GoTrue admits any redirect with the Site URL's scheme, host and port without an entry. A wildcard matching a host nobody here controls would let a sign-in hand its code to that host.
 - **One setting is recorded, not checked**: Data API → exposed schemas is `public` only, as in `config.toml`'s `[api]`. Reading it through the Management API also returns the project's JWT secret.
 - **Site URL follows the Pages URL.** A custom domain changes both in one PR ([Move to a custom domain](../how-to/developer-guide.md#move-to-a-custom-domain)).
-- **Changing a value** is a PR to the file, reviewed like a policy change, with the dashboard changed as it merges; the push to `main` re-runs the check. For a fork, `site_url` is its own Pages URL.
+- **Changing a value** is a PR to the file, reviewed like a policy change, with the dashboard changed as it merges. For a fork, `site_url` is its own Pages URL.
 
 ## GitHub Actions secrets
 
-`SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_AUTH_CONFIG_TOKEN`
-and `SUPABASE_PROJECT_REF` are secrets of the `production` environment, not
+`SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` are
+secrets of the `production` environment, not
 repository secrets: that
 environment's deployment-branch policy allows only `main`, so a workflow run
-on any other branch cannot read them. `migrate`, `cleanup`, both
-`backup.yml` jobs and `hosted-auth-check.yml` reference it and also refuse
+on any other branch cannot read them. `migrate` and `cleanup` reference it
+and also refuse
 any ref but `main`. The
 `github-pages` environment is restricted to `main` the same way. The other
 secrets are repository secrets. A run Dependabot starts reads Dependabot
@@ -73,12 +73,11 @@ and `CODECOV_TOKEN` are set there too, or every Dependabot PR fails
 
 | Secret | Used by | Notes |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml`, `backup.yml`; `k6-load-test.yml` with `target=hosted` only | Required |
+| `NEXT_PUBLIC_SUPABASE_URL` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml`; `k6-load-test.yml` with `target=hosted` only | Required |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml`, `pages-deploy.yml`, `keep-alive.yml`; `k6-load-test.yml` with `target=hosted` only | Required. Either key format ([API keys](#api-keys)); `pages-deploy.yml`'s `build` calls `keepalive()` with it and publishes nothing if the project rejects it |
-| `SUPABASE_DB_URL` | `pages-deploy.yml` (`migrate`), `backup.yml` (`database`) | Required. The **session pooler** string (`aws-0-<region>.pooler.supabase.com`), password percent-encoded. The direct `db.<ref>.supabase.co` host is IPv6-only and unreachable from GitHub runners; `supabase link` reports success anyway and the push fails. `migrate` also sends PostgREST's schema-cache reload through it. |
-| `SUPABASE_ACCESS_TOKEN` | `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`) | Required. Scoped Management API token: runs a read-only query and fetches a fresh secret key ([Management API tokens](#management-api-tokens)). |
-| `SUPABASE_AUTH_CONFIG_TOKEN` | `hosted-auth-check.yml` | Recommended. Scoped Management API token that reads the Auth config ([Management API tokens](#management-api-tokens)). Until it is set, the check borrows `SUPABASE_ACCESS_TOKEN` and warns on every run. |
-| `SUPABASE_PROJECT_REF` | `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`), `hosted-auth-check.yml` | Required |
+| `SUPABASE_DB_URL` | `pages-deploy.yml` (`migrate`) | Required. The **session pooler** string (`aws-0-<region>.pooler.supabase.com`), password percent-encoded. The direct `db.<ref>.supabase.co` host is IPv6-only and unreachable from GitHub runners; `supabase link` reports success anyway and the push fails. `migrate` also sends PostgREST's schema-cache reload through it. |
+| `SUPABASE_ACCESS_TOKEN` | `cleanup-orphaned-photos.yml` | Required. Scoped Management API token: runs a read-only query and fetches a fresh secret key ([Management API tokens](#management-api-tokens)). |
+| `SUPABASE_PROJECT_REF` | `cleanup-orphaned-photos.yml` | Required |
 | `CODECOV_TOKEN` | `ci.yml` (`build_and_test`) | Required: the repository's upload token from codecov.io; a refused upload fails the job (`fail_ci_if_error`) |
 | `STRYKER_DASHBOARD_API_KEY` | `ci.yml` (`mutation_test`, on `main` only) | Optional; without it Stryker writes a local HTML report only |
 
@@ -114,14 +113,12 @@ project and nothing else, never a classic token
 
 | Secret | Permissions, on this project only | Endpoints | Used by |
 | --- | --- | --- | --- |
-| `SUPABASE_ACCESS_TOKEN` | **Database**: Read; **API Keys**: Read; **API Key Secrets**: Read | `POST /v1/projects/{ref}/database/query/read-only`, `GET /v1/projects/{ref}/api-keys?reveal=true` | `cleanup-orphaned-photos.yml`, `backup.yml` (`photographs`) |
-| `SUPABASE_AUTH_CONFIG_TOKEN` | **Auth Config**: Read | `GET /v1/projects/{ref}/config/auth`, `GET /v1/projects/{ref}/config/auth/third-party-auth` | `hosted-auth-check.yml` |
+| `SUPABASE_ACCESS_TOKEN` | **Database**: Read; **API Keys**: Read; **API Key Secrets**: Read | `POST /v1/projects/{ref}/database/query/read-only`, `GET /v1/projects/{ref}/api-keys?reveal=true` | `cleanup-orphaned-photos.yml` |
 
 - **Names** are the dashboard's, from Supabase's [permission
   table](https://supabase.com/docs/guides/platform/personal-access-tokens#permission-scopes);
   the Management API spec calls them `database_read`,
-  `api_gateway_keys_read`, `api_gateway_keys_secret_read` and
-  `auth_config_read`. Grant nothing else: no Read-write, no organization or
+  `api_gateway_keys_read` and `api_gateway_keys_secret_read`. Grant nothing else: no Read-write, no organization or
   account access.
 - **Database: Read, not Read-write.** The read-only endpoint runs as
   `supabase_read_only_user`, which reads every table past RLS and writes
@@ -152,8 +149,8 @@ secret keys](../how-to/developer-guide.md#migrate-to-publishable-and-secret-keys
   the publishable key once migrated: both map to the `anon` Postgres role,
   supabase-js takes either, and one secret swapping its value avoids a
   rename across every workflow and script.
-- **No secret key is stored.** `cleanup-orphaned-photos.yml` and
-  `backup.yml` fetch one per run through the Management API
+- **No secret key is stored.** `cleanup-orphaned-photos.yml` fetches one
+  per run through the Management API
   (`SUPABASE_ACCESS_TOKEN`): the first key of type `secret`, else the legacy
   `service_role` key while the project has no secret key. Rotating it
   therefore changes nothing in GitHub.
@@ -163,38 +160,21 @@ secret keys](../how-to/developer-guide.md#migrate-to-publishable-and-secret-keys
   both on its own.
 - **Local stack.** `supabase status` prints both kinds. `web/.env.example`
   holds the legacy anon key; `npm run e2e:local`, `demo`, `lighthouse` and
-  `load`, and CI's `zap_baseline`, pass the publishable key (`e2e:local` the
-  secret key too), so CI covers the new format while production may still run
-  the old one.
+  `load`, and CI's `zap_baseline`, pass the publishable key (`e2e:local` and
+  `lighthouse` the secret key too, to create their password users), so CI
+  covers the new format while production may still run the old one.
   The local stack accepts an unknown `apikey` as `anon`; only the hosted
   project rejects a wrong key.
 
 Rotating any credential in this section: [Rotate a
 credential](../how-to/developer-guide.md#rotate-a-credential).
 
-### Backups
-
-[`backup.yml`](../../.github/workflows/backup.yml) and the pre-migration dump
-in `migrate` ([Back up production](../how-to/developer-guide.md#back-up-production))
-read six more values from the `production` environment. All are required: a
-missing one fails the job by name, so `backup.yml` fails every night and a
-deploy with a pending migration stops before applying it.
-
-| Name | Kind | Value |
-| --- | --- | --- |
-| `BACKUP_S3_ENDPOINT` | variable | The S3 API endpoint of the off-site store, e.g. `https://<account>.r2.cloudflarestorage.com` or `https://s3.<region>.backblazeb2.com` |
-| `BACKUP_S3_REGION` | variable | Its region for request signing, e.g. `auto` on R2 |
-| `BACKUP_S3_BUCKET` | variable | A private bucket used for nothing else |
-| `BACKUP_S3_ACCESS_KEY_ID` | secret | A key scoped to that one bucket, read and write |
-| `BACKUP_S3_SECRET_ACCESS_KEY` | secret | Its secret |
-| `BACKUP_AGE_RECIPIENT` | variable | The `age1…` public key everything is encrypted to. Public by design; its identity file never goes into GitHub |
-
 ## Coverage and mutation thresholds
 
 | Gate | Where | Value |
 | --- | --- | --- |
 | Unit coverage, global | `web/vitest.config.mts` `GLOBAL_COVERAGE_THRESHOLDS` | 99% statements, branches, functions, lines |
-| Unit coverage, per file | same file, `PER_FILE_FLOOR`, over `mutation-targets.mjs` | 100%, except the two `Map/` hooks in `NO_COVERAGE_FLOOR` |
+| Unit coverage, per file | same file, `PER_FILE_FLOOR`, over `mutation-targets.mjs` | 100% |
 | Unit coverage, what counts | same file, `coverage.exclude` | Product code only: `*.test.*` (Vitest's own rule) and `*.test-support.*`, the fixtures and fakes a family of test files shares, are test code |
 | Mutation score | `web/stryker.config.mjs` `thresholds.break` | 99 — one below the measured 100, so a single new equivalent mutant cannot block unrelated work |
 | E2E JS/CSS coverage | `web/e2e/coverage.ts` `COVERAGE_THRESHOLDS` | One floor, on `npm run e2e:local` only (every Chromium project, source-mapped); `npm run e2e` and the smoke test collect nothing |
@@ -241,4 +221,4 @@ Each job writes its report to its own Actions summary (`$GITHUB_STEP_SUMMARY`); 
 
 ## i18n
 
-German (`de`, default) and English (`en`): [`web/src/app/i18n/de.json`](../../web/src/app/i18n/de.json), `en.json`, keys grouped by area (`brand`, `page`, `header`, `category_select`, `item_create`, `item_list`, `google_sign_in_button`, `login_page`, `common`). `web/src/app/i18n/parity.test.ts` scans every `t('…')` call site and fails on a key missing from either file or on the two files declaring different key sets.
+German (`de`, default) and English (`en`): [`web/src/app/i18n/de.json`](../../web/src/app/i18n/de.json), `en.json`, keys grouped by area (`brand`, `page`, `header`, `category_select`, `item_create`, `item_list`, `google_sign_in_button`, `login_page`, `common`). The language is a stored choice (`lang` in `localStorage`), else the browser's, else German; `pickLanguage()` in `I18nProvider.tsx` and `LANG_INIT_SCRIPT` in `layout.tsx` decide alike, so `<html lang>` is right before first paint. Dates and numbers are formatted in `useI18n().locale`: the app language, in the browser's regional form of it when the browser speaks it (`en-GB` writes 31/12/2099), else the bare language. A `{name}` placeholder is filled through `t(key, { name })`, never `String.replace`, so user text such as `US$$` lands verbatim. `web/src/app/i18n/parity.test.ts` scans every `t('…')` call site and fails on a key missing from either file or on the two files declaring different key sets.

@@ -5,6 +5,7 @@ import { type Locator, type Page } from '@playwright/test';
 // Not './test': every case drives the app into toast.reportError, which logs to the console by design.
 import { expect, test } from '../fixture';
 
+import { writeArchiveClaiming } from './archives';
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
 import { apiAs, context, ownedCategoryId, share, unshare } from './rls/helpers';
@@ -68,6 +69,37 @@ test.describe('when something outside the app fails', () => {
       await expect(app.toast()).toContainText('Could not upload this');
       await expect(app.toast()).toHaveAttribute('role', 'alert');
       await expect(card.locators.images).toHaveCount(0);
+    } finally {
+      await page.unroute('**/storage/v1/object/**');
+      await removeEntriesTitled(title);
+    }
+  });
+
+  // #785: the input still held the file, so picking it again for a retry fired no change and did nothing.
+  test('the same photograph can be picked again once its upload failed', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const title = uniqueTitle('Nochmal');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      // The first through the empty frame, so the next ones go through the card's own + control, which stays mounted.
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toHaveCount(1, { timeout: 45_000 });
+
+      await page.route('**/storage/v1/object/**', (route) =>
+        route.request().method() === 'POST'
+          ? route.fulfill({ status: 500, json: { message: 'nope' } })
+          : route.fallback(),
+      );
+      await card.do.uploadPhoto(PHOTO);
+      await expect(app.toast()).toContainText('Could not upload this');
+      await page.unroute('**/storage/v1/object/**');
+
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toHaveCount(2, { timeout: 45_000 });
     } finally {
       await page.unroute('**/storage/v1/object/**');
       await removeEntriesTitled(title);
@@ -232,5 +264,94 @@ test.describe('when something outside the app fails', () => {
       await app.catalogue.do.openEntryForm();
       await expect(app.form.locators.inputs.title).toBeVisible();
     });
+  });
+});
+
+// A failed load must not read as an empty collection, or a collector may rebuild what is still there.
+test.describe('when a list fails to load', () => {
+  /** Fails every read of `table` with a 500 until the returned switch is turned off. */
+  async function failReads(page: Page, table: string) {
+    const outage = { on: true };
+    await page.route(
+      (url) => url.pathname.endsWith(`/rest/v1/${table}`),
+      (route) =>
+        outage.on && route.request().method() === 'GET'
+          ? route.fulfill({ status: 500, json: { message: 'nope' } })
+          : route.fallback(),
+    );
+    return outage;
+  }
+
+  test('the collections say they failed, not that there are none, and a retry loads them', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const outage = await failReads(page, 'categories');
+
+    await page.goto('');
+
+    await expect(app.collectionsLoadError.locators.title).toHaveText(
+      'Your collections could not be loaded',
+    );
+    await expect(app.toast()).toContainText('Could not load collections');
+    await expect(app.help.locators.buttons.emptyState).toBeHidden();
+
+    outage.on = false;
+    await app.collectionsLoadError.do.retry();
+
+    await expect(app.collectionsLoadError()).toBeHidden();
+    await expect(app.categories.locators.selected).not.toBeEmpty();
+    await expect(app.catalogue.locators.buttons.newEntry).toBeVisible();
+  });
+
+  test('the entries say they failed, not that there are none, and a retry loads them', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await app.categories.do.open(SEED.failureCategory);
+    const outage = await failReads(page, 'item_categories');
+
+    await page.reload();
+
+    await expect(app.entriesLoadError.locators.title).toHaveText(
+      'The entries could not be loaded',
+    );
+    await expect(app.toast()).toContainText('Could not load entries');
+    await expect(app.catalogue.locators.texts.emptyTitle).toBeHidden();
+
+    outage.on = false;
+    await app.entriesLoadError.locators.buttons.retry.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(app.entriesLoadError()).toBeHidden();
+    await expect(app.catalogue.locators.cards.first()).toBeVisible();
+  });
+});
+
+// #787: a crafted archive is refused before anything is created, and says why rather than "try again".
+test.describe('when an archive is not what the export wrote', () => {
+  test('one claiming to unpack past the limit is refused, and no collection appears', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const app = on(page);
+    await app.categories.do.open(SEED.failureCategory);
+    const category = uniqueTitle('Riesenarchiv');
+    const crafted = testInfo.outputPath('crafted.zip');
+    writeArchiveClaiming(
+      { category, declaredSize: 200 * 1024 * 1024 },
+      crafted,
+    );
+
+    await app.categories.do.importArchive(crafted);
+
+    await expect(app.toast()).toContainText(
+      'This archive unpacks to more than an import accepts, so nothing was imported.',
+    );
+    await expect(app.categories.locators.buttons.cancelImport).toBeHidden();
+    await app.categories.do.openPanel();
+    await expect(app.categories.tab(category)).toHaveCount(0);
   });
 });

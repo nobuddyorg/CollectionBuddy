@@ -50,7 +50,7 @@ npx playwright show-report             # after a failed run
 The same suite runs against the deployed site after every release:
 
 ```bash
-E2E_BASE_URL="https://nobuddyorg.github.io/CollectionBuddy/" npm run e2e
+E2E_BASE_URL="https://nobuddy.org/CollectionBuddy/" npm run e2e
 ```
 
 With `E2E_BASE_URL` set it starts no server. That run catches what only
@@ -67,7 +67,7 @@ bypass the interface almost entirely: they ask Postgres, with a real token, the
 questions the app never would, one file per boundary (`isolation`,
 `viewer-share`, `editor-share`, each with a `-photographs` half for Storage,
 and `editor-share` a `-limits` one, plus `search-rpc`, `create-rpc`,
-`orphan-sweep-rpc` and `quotas`; shared helpers in `rls/helpers.ts`). Change a
+`orphan-sweep-rpc`, `orphan-entries`, `quotas` and `account-deletion`; shared helpers in `rls/helpers.ts`). Change a
 policy and these files say whether it holds.
 
 ```bash
@@ -182,14 +182,26 @@ supabase test db
 | `070_quotas_test.sql` | The quotas: photographs and thumbnails per owner, the bucket's ceilings at record and upload time, and entries, categories, shares, links and text |
 | `075_query_plans_test.sql` | That every index-backed query can reach its index, and picks it at a realistic size |
 | `080_orphan_sweep_test.sql` | What the orphan sweep may delete: both path columns, no uuid cast, the 48 h grace, other buckets, the mass-deletion ceiling; `supabase_read_only_user` and no API role runs it, in a read-only transaction |
+| `085_delete_own_account_test.sql` | Deleting one's own account: the objects-first guard, what goes (rows, grants to its email, the Auth user) and what another account keeps |
+| `090_owned_rows_follow_the_auth_user_test.sql` | Deleting the Auth user as the dashboard does: every owner key cascades and is validated, what goes and what another account keeps, what the sweep may then take, and a leftover token's refused write |
 
 `_helpers.psql` holds the shared fixtures; it is `.psql` because
-`supabase test db` collects every `.sql` file as a test. pgTAP proves the
+`supabase test db` collects every `.sql` file as a test. Its `auth_as()` also
+creates the `auth.users` row it names, if missing, since every owner column
+references one (`0034`). pgTAP proves the
 policy, trigger and constraint logic fast; `e2e/signed-in/rls/` proves the same
 properties through the real PostgREST-and-JWT pipeline and is the only place
 the Storage API and the bytes behind a `storage.objects` row are exercised. A
 policy, grant, or ownership-trigger change needs its `rls/` case
 regardless of pgTAP coverage.
+
+Assert a refusal by what refused it, never by "some error came back": a quota,
+a unique key or a MIME check would pass that too. In pgTAP that is
+`throws_ok(sql, sqlstate, message, description)`, and `lives_ok()` for the
+write that must pass; in `rls/` it is PostgREST's `code` and `message`, or
+Storage's `statusCode` and `message` (`UPLOAD_REFUSED`, `OBJECT_HIDDEN` in
+`rls/helpers.ts`). Check every setup step too, so a failed fixture cannot pass
+as a refusal.
 
 A new query that names its index (CLAUDE.md, "measure, don't assume") also gets
 a plan case in `075_query_plans_test.sql`, at both levels the file runs.
@@ -306,8 +318,8 @@ expected: keep the count at zero rather than adding the file to
 ## Run Lighthouse
 
 CI's `lighthouse` job runs [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci)
-against the production export twice — signed out, and signed in through demo
-mode — never against `next dev`:
+against the production export twice — signed out, and signed in to a
+photographed collection — never against `next dev`:
 
 ```bash
 supabase start   # repository root
@@ -319,9 +331,27 @@ Thresholds and the baseline they were measured against are in
 against a measured baseline; accessibility must score exactly 1.0 on both
 flows, a second, weighted lens on the pages `@axe-core/playwright` already
 checks in the e2e suite. A finding fixed for Lighthouse gets an axe or
-Playwright case too, so it cannot regress between runs. A fresh demo account
-has no categories, so the signed-in pass measures a different code path than a
-populated catalogue.
+Playwright case too, so it cannot regress between runs.
+
+The signed-in pass measures the photo grid, the app's main path. Before it,
+`scripts/lighthouse-collector.ts` rebuilds one password collector's collection
+through the e2e helpers (`e2e/signed-in/collectors.ts`), under RLS: one
+category, 12 entries, 24 photographs painted in Chromium as photo-like WebP at
+the upload sizes (1000 px full size, 600 px thumbnail). It then opens the
+catalogue once in a Chrome profile (`web/.lighthouse-profile`, deleted
+afterwards) and fails unless a photograph renders. Lighthouse runs in that
+profile (`--user-data-dir` in `lighthouserc.signed-in.json`). Lighthouse clears
+the HTTP cache, service workers and Cache Storage before each run but keeps
+localStorage, so every run starts signed in with a cold cache. The script
+then fails the job unless every run's largest paint was a photograph: a
+signed-out or photo-less page would pass every budget.
+
+Measured on the populated grid (local stack, three runs): LCP 5.5 s (the first
+card's photograph), CLS 0.008 to 0.036, performance 0.79 to 0.80. CLS is held
+to Google's "good" 0.1. LCP stays at 7 s: 5.5 s is past Google's "poor"
+boundary of 4 s, so a limit inside it would fail today. What the grid waits for
+before its first photograph (session, categories, page, signing) is what LCP
+measures.
 
 ## Run the OWASP ZAP baseline scan
 
@@ -527,12 +557,10 @@ For a fork, or a new production project:
 ## Deploy to GitHub Pages
 
 [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) runs when CI
-has passed on `main`, run by a push or a dispatch (`workflow_run`), and
-deploys exactly that commit: `gate` checks it is still `main`'s tip and reads the Pages site URL,
-whose path the build uses as `basePath`, `migrate` uploads an encrypted
-dump when the dry run lists a pending migration
-([Back up production](#back-up-production)), applies them and reloads the
-PostgREST schema cache, `build` exports the site, `deploy` publishes it,
+has passed on `main`, run by a push or a dispatch (`workflow_run`), and hourly
+as a safety net, and deploys exactly that commit: `gate` checks it is still `main`'s tip and reads the Pages site URL,
+whose path the build uses as `basePath`, `migrate` lists the pending
+migrations, applies them and reloads the PostgREST schema cache, `build` exports the site, `deploy` publishes it,
 `smoke_test` runs the signed-out suite against the live URL. Each job depends
 on the last, so a failed migration leaves the previous bundle serving the
 previous schema. Nothing deploys from a developer machine.
@@ -547,7 +575,9 @@ previous schema. Nothing deploys from a developer machine.
 - **An auto-merged Dependabot bump deploys on its own.** `auto-merge.yml`
   merges with `GITHUB_TOKEN`, and a push made with it starts no workflow, so
   its hourly `catch-up-ci` job dispatches CI on `main`'s tip when no push or
-  dispatch run exists for it; a green run deploys like a push. A human merge
+  dispatch run exists for it. That run was started with `GITHUB_TOKEN` too, so
+  it starts no `workflow_run`; the deploy's own hourly run (`41 * * * *`)
+  deploys `main`'s tip once CI passed on it and no run has tried it. A human merge
   landing before that hour is up still carries the bump untested on its own.
   To run it sooner: Actions → *CI* → *Run workflow* from `main`.
 - **By hand:** Actions → *Deploy Pages* → *Run workflow* from `main`
@@ -564,7 +594,7 @@ One-time setup for a fork:
    **Selected branches** → `main` only, and set the same rule on
    `github-pages`.
 3. Secrets: `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`,
-   `SUPABASE_AUTH_CONFIG_TOKEN`, `SUPABASE_PROJECT_REF` as **`production`
+   `SUPABASE_PROJECT_REF` as **`production`
    environment** secrets; `NEXT_PUBLIC_SUPABASE_URL`,
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `CODECOV_TOKEN` as repository secrets,
    and those three again as **Dependabot** secrets, since a Dependabot PR's
@@ -577,14 +607,12 @@ One-time setup for a fork:
 4. Nothing to change for another repository name or a custom domain: the
    deploy takes `basePath` from the Pages site URL. A fork's own Site URL
    still goes into `supabase/hosted-auth.json`.
-5. The backup bucket, key and age recipient:
-   [Back up production](#back-up-production). Without them a deploy with a
-   pending migration stops before applying it.
-6. Optional: `STRYKER_DASHBOARD_API_KEY` to publish mutation reports;
-   `keep-alive.yml` stays enabled on a free-tier project.
-7. The README's CodeQL badge relies on GitHub's default code-scanning setup
+5. Optional: `STRYKER_DASHBOARD_API_KEY` to publish mutation reports;
+   `keep-alive.yml` stays enabled on a free-tier project
+   ([Keep the schedules alive](#keep-the-schedules-alive)).
+6. The README's CodeQL badge relies on GitHub's default code-scanning setup
    (Settings → Code security), a per-repo setting that does not carry over.
-8. Settings → Branches (or Rules → Rulesets) → `main`: **Require status checks
+7. Settings → Branches (or Rules → Rulesets) → `main`: **Require status checks
    to pass** with the CI jobs required (at least `prek`, `build_and_test`,
    `e2e_local_stack`), and **Require branches to be up to date before
    merging**. The deploy gate already keeps an untested merge out of
@@ -592,7 +620,7 @@ One-time setup for a fork:
    until fixed. A Dependabot PR that falls behind then merges only once
    rebased (`@dependabot rebase`).
    A merge queue would do the same, but `ci.yml` has no `merge_group` trigger.
-9. Settings → Code security: enable **Secret Protection** and its **Push
+8. Settings → Code security: enable **Secret Protection** and its **Push
    protection** (free on a public repository). It blocks a secret key or a
    classic access token before it lands; `prek`'s gitleaks scan covers the
    legacy JWT and the database URL, which GitHub has no pattern for
@@ -626,9 +654,7 @@ writes a migration from production's schema.
   undoes or corrects the bad one — drop what it added, re-create a policy with
   the predicate of the file that defined it before — and test it against a
   populated database ([Change the database schema](#change-the-database-schema)).
-  It deploys like any other. If rows were lost,
-  [restore them](#restore-production-from-a-backup) from the
-  `…-pre-migration` archive `migrate` uploaded before applying the bad one.
+  It deploys like any other.
 - **A migration failed in production:** it ran in one transaction, so none of
   it was applied and no version recorded, but every deploy stops at `migrate`
   until it passes. Check that the failed run's *Show pending migrations* step
@@ -640,8 +666,7 @@ writes a migration from production's schema.
   then compensate as above:
   `git checkout <commit that had it> -- supabase/migrations/<file>`. Only when
   a file must stay gone, as after a squash, does the repository owner
-  reconcile the table by hand, after running *Back up production*
-  ([Back up production](#back-up-production)):
+  reconcile the table by hand:
 
   ```bash
   supabase migration list --db-url "$SUPABASE_DB_URL"
@@ -689,9 +714,8 @@ the end of step 5, a few minutes: do it at a quiet time.
 5. **Actions → Deploy Pages → Run workflow** from `main`. `gate` now reads
    the new URL, the build is served at `/`, and `smoke_test` runs against
    the new address. Then Supabase → Authentication → URL Configuration →
-   Site URL to the new address, and merge the PR; its push re-runs
-   `hosted-auth-check.yml`. Until the Site URL changes, sign-in on the new
-   address fails.
+   Site URL to the new address, and merge the PR. Until the Site URL
+   changes, sign-in on the new address fails.
 6. **Revoke every session.** Tokens stay in the old origin's
    `localStorage`, still readable by the sibling sites, and a refresh token
    never used again stays valid. In the dashboard's SQL editor,
@@ -708,17 +732,14 @@ and `hosted-auth.json` back.
 
 ## Check the hosted Auth settings
 
-[`hosted-auth-check.yml`](../../.github/workflows/hosted-auth-check.yml)
-reads the production Auth config through the Management API every hour (at
-:23), on a push to `main` that changes it or
-[`supabase/hosted-auth.json`](../../supabase/hosted-auth.json), and by hand
-from `main`. It fails when a pinned value differs, when any sign-in provider
-the file does not name is on, or when a third-party auth integration exists,
-and lists each difference in the job summary. It only reads; nothing it does
-changes the project, and the response, which carries the Google client secret,
-is never printed.
+Nothing checks these automatically. Compare the dashboard (Authentication →
+Sign In / Providers, and URL Configuration) with
+[`supabase/hosted-auth.json`](../../supabase/hosted-auth.json) whenever
+Supabase announces an Auth change, after a project restore, and before
+relying on sharing with someone new. Every provider the file does not name
+must be off, and Authentication → Third-party Auth must be empty.
 
-When it fails:
+When something differs:
 
 1. **Not deliberate, or anonymous sign-ins, the email provider, Confirm email
    or unverified sign-ins moved:** set the dashboard back first (Authentication
@@ -732,13 +753,6 @@ When it fails:
 2. **Deliberate:** change the file in a PR that says why, reviewed like a
    policy change. The four settings above stay off (Confirm email on) unless
    the sharing model changes first.
-3. **The API renamed a field** (a pinned field found `null`): check the
-   [Management API reference](https://supabase.com/docs/reference/api/v1-get-auth-service-config)
-   and rename it in the file.
-
-A 401 or 403 means `SUPABASE_AUTH_CONFIG_TOKEN` expired, was revoked or
-lacks **Auth Config: Read**
-([Configuration](../reference/configuration.md#management-api-tokens)).
 
 ## Sweep orphaned photographs
 
@@ -753,8 +767,7 @@ lists what a real run would delete and never fetches the secret key.
 anything else: Actions → *Clean up orphaned photographs* → ⋯ → *Disable
 workflow* (or `gh workflow disable cleanup-orphaned-photos.yml`). To it, every
 photograph whose `images` row is gone is an orphan, deleted for good once it is
-48 h old. Then find the cause, and [restore](#restore-production-from-a-backup)
-if rows are gone.
+48 h old. Then find the cause.
 
 **When a run refuses.** It fails and deletes nothing when more objects are
 orphaned than max(50, 5 % of the bucket), because lost `images` rows look
@@ -770,155 +783,110 @@ A change to the plan, its migration or the workflow runs CI's pgTAP job
 (`080_orphan_sweep_test.sql`); after it merges, run the default dry run once
 before the next 04:30 run.
 
-## Back up production
+## Honour an account deletion request
 
-Supabase's Free plan keeps no database backup, and no plan's backup contains
-Storage objects ([why a workflow](../explanation/design-decisions.md#why-production-is-backed-up-by-a-workflow)).
-[`backup.yml`](../../.github/workflows/backup.yml) runs daily at 02:47 UTC,
-ahead of the 04:30 sweep, and by hand from `main`:
+The collector's own **Delete account**, at the bottom of the account menu
+([user guide](user-guide.md#delete-your-account)), is the way to go: it
+removes the photographs first, then `delete_own_account()` (`0033`) deletes
+the rows, the grants made to the collector's email and the Auth user. Reply to
+a request by email with that, and delete by hand only when the collector
+cannot sign in any more. Make sure the request comes from the account's own
+address.
 
-- `database` dumps roles, schema and the `auth` and `public` data with
-  `supabase db dump` through the session pooler, adds `commit.txt` (the `main`
-  commit it ran on) and `migration.txt` (the last migration production had
-  applied), encrypts the tarball to
-  `BACKUP_AGE_RECIPIENT` on the runner and uploads
-  `database/<UTC time>-daily.tar.gz.age`. `migrate` uploads the same archive as
-  `…-pre-migration.tar.gz.age` whenever its dry run lists a pending migration;
-  if that upload fails, nothing is applied. Storage's tables are left out:
-  `0007` recreates the bucket, and re-uploading a photograph recreates its row.
-- `photographs` encrypts each `item-images` object not yet mirrored to
-  `photos/<path>.age`. Paths never change, so each object is copied once. An
-  object gone from the bucket moves to `photos-removed/<UTC day>/<path>.age`.
+By hand, it is the same order: objects, grants to the email, then the user.
+Every step runs against production, so it is the owner's, never an
+assistant's.
 
-Nothing leaves the runner unencrypted, and nothing is an Actions artifact: the
-repository is public.
+1. **Find the user.** Dashboard → Authentication → Users, search the email,
+   copy the user's UID.
+2. **Remove the photographs from Storage.** Either way needs no secret key;
+   never paste one into a shell or a chat (CLAUDE.md keeps service-role-level
+   keys in CI only).
+   - **Now:** list the user's photograph paths in the dashboard's SQL editor
+     and delete them in the Storage browser (bucket `item-images`):
 
-One-time setup:
-
-1. A private bucket on an S3-compatible store outside Supabase (Cloudflare R2,
-   Backblaze B2, AWS S3). Lifecycle rules expire `database/` and
-   `photos-removed/` after 30 days, and nothing under `photos/`. Anything
-   shorter than a week leaves too little time to notice a loss the sweep made
-   permanent 48 h after it happened.
-2. An access key scoped to that bucket, read and write.
-3. On a trusted machine, `age-keygen -o backup-identity.txt`. Keep that file
-   offline or in a password manager, never in GitHub or the repository;
-   without it no backup can be read. Its `Public key:` line is
-   `BACKUP_AGE_RECIPIENT`.
-4. The six values in the `production` environment
-   ([Configuration](../reference/configuration.md#backups)). Then run
-   **Back up production** by hand and check both jobs and the bucket.
-
-## Restore production from a backup
-
-Rehearse this on the local stack once after setup, and again after any change
-to `backup.yml`, the dump, or the schema's shape.
-
-1. **Disable the sweep first:** Actions → *Clean up orphaned photographs* →
-   ⋯ → *Disable workflow* (or `gh workflow disable cleanup-orphaned-photos.yml`).
-   To it every photograph whose `images` row is gone is an orphan, and it
-   deletes those once they are 48 h old. Its mass-deletion ceiling
-   ([Sweep orphaned photographs](#sweep-orphaned-photographs)) stops only a
-   loss larger than max(50, 5 % of the bucket).
-2. If a migration caused the loss, also disable *Deploy Pages* and merge
-   nothing to `main` until the restore is done: every merge that passes CI
-   migrates production. Leave *Back up production* running; it never
-   overwrites an archive, and a photograph it no longer finds waits in
-   `photos-removed/<day>/` until the 30-day rule expires it.
-3. Fetch and decrypt the last archive from before the loss. With the backup
-   key in `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL`,
-   `AWS_REGION`, and `BUCKET` set:
-
-   ```bash
-   aws s3 ls "s3://$BUCKET/database/"
-   aws s3 cp "s3://$BUCKET/database/<archive>" .
-   age -d -i backup-identity.txt <archive> | tar -xz  # roles.sql schema.sql data.sql commit.txt migration.txt
-   aws s3 cp --recursive "s3://$BUCKET/photos/" encrypted/
-   aws s3 cp --recursive "s3://$BUCKET/photos-removed/<day>/" encrypted/  # each day since the loss
-   (cd encrypted && find . -name '*.age' -printf '%P\n') | while IFS= read -r f; do
-     mkdir -p "item-images/$(dirname "$f")"
-     age -d -i backup-identity.txt -o "item-images/${f%.age}" "encrypted/$f"
-   done
-   ```
-
-4. Load it into the local stack: `git checkout "$(cat commit.txt)"`,
-   `supabase db reset --version "$(cat migration.txt)"` (a pre-migration
-   commit already holds the migrations that were about to run), then, with
-   `DB_URL` the local database:
-
-   ```bash
-   psql --single-transaction --variable ON_ERROR_STOP=1 \
-     --file roles.sql \
-     --command 'set session_replication_role = replica' \
-     --file data.sql \
-     --dbname "$DB_URL"
-   ```
-
-   `supabase db dump --local -f restored.sql` and `diff -B schema.sql
-   restored.sql` should differ by nothing but `pgtap`, if you ever ran
-   `supabase test db`; anything else is schema production had and the
-   migrations lack. Upload the photographs (step 6) against the local API and
-   look at the result in `npm run dev`.
-5. Restore production, one of:
-   - **The project still exists** (a migration, a bug or the sweep lost rows
-     or photographs): copy back what is missing from the local stack of
-     step 4, with `LOCAL_DB_URL` the local database and `SUPABASE_DB_URL`
-     production's session pooler URL, then step 6. `on conflict do nothing`
-     leaves every row production still has alone; a row deleted on purpose
-     since the backup comes back too, so narrow the export with a `where`
-     when you know what the loss touched. Replica mode keeps the ownership
-     and quota triggers from judging a restore by the session's identity.
-
-     ```bash
-     echo 'set session_replication_role = replica;' > restore-rows.sql
-     for t in categories items item_categories images category_shares; do
-       cols=$(psql "$LOCAL_DB_URL" -Atc "select string_agg(quote_ident(attname), ', ' order by attnum) from pg_attribute where attrelid = 'public.$t'::regclass and attnum > 0 and not attisdropped and attgenerated = ''")
-       psql "$LOCAL_DB_URL" -c "\\copy public.$t ($cols) to '$t.csv' csv"
-       printf '%s\n' >> restore-rows.sql \
-         "create temp table restore_$t as select $cols from public.$t with no data;" \
-         "\\copy restore_$t from '$t.csv' csv" \
-         "insert into public.$t ($cols) select * from restore_$t on conflict do nothing;"
-     done
-     psql "$SUPABASE_DB_URL" --single-transaction --variable ON_ERROR_STOP=1 --file restore-rows.sql
+     ```sql
+     select path
+     from public.images as im
+     cross join lateral unnest(array[im.path_full, im.path_thumb]) as path
+     where im.user_id = '<uid>' and path is not null
+     order by path;
      ```
 
-   - **The project is gone:** create one ([Set up a new Supabase
-     environment](#set-up-a-new-supabase-environment)) and, from the
-     `commit.txt` checkout with every migration after `migration.txt`
-     deleted, `supabase db push --db-url "<its session pooler URL>"`: that
-     creates the schema, the bucket, the Storage policies and the migration
-     history. Run step 4's `psql` against the same URL, then step 6.
-     Point `SUPABASE_DB_URL`, `SUPABASE_PROJECT_REF`,
-     `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` at it, and
-     the Google OAuth client's redirect URI. Collectors sign in with Google as
-     before: `auth.identities` came back with their user ids.
-6. Upload the photographs with a secret key of the target (Settings → API
-   Keys) and its API URL. The key goes on `apikey` alone; a legacy
-   `service_role` JWT would also need `-H "Authorization: Bearer $SECRET_KEY"`:
+     Do not delete the whole `<uid>/` folder: a photograph the user added as
+     an editor to someone else's entry lies there and belongs to that entry.
+     This must then return 0:
 
-   ```bash
-   (cd item-images && find . -type f -printf '%P\n') | while IFS= read -r name; do
-     encoded=$(jq -rn --arg name "$name" '$name | split("/") | map(@uri) | join("/")')
-     curl -sS -o /dev/null -w "%{http_code} $name\n" -X POST \
-       "$SUPABASE_URL/storage/v1/object/item-images/$encoded" \
-       -H "apikey: $SECRET_KEY" \
-       -H "Content-Type: $(file --brief --mime-type "item-images/$name")" \
-       --data-binary "@item-images/$name"
-   done
-   ```
+     ```sql
+     select count(*)
+     from public.images as im
+     join storage.objects as o
+       on o.bucket_id = 'item-images' and o.name in (im.path_full, im.path_thumb)
+     where im.user_id = '<uid>';
+     ```
 
-   `200` restored the object; `400` with `Duplicate` means Storage still had
-   it, since an upload never overwrites. A photograph whose row stays deleted
-   is an orphan again, which the re-enabled sweep removes once it is 48 h old.
-7. Check that no `images` row lacks its objects, then enable the sweep and
-   *Deploy Pages* again:
+   - **Or let the sweep do it:** skip to step 3. Deleting the user removes
+     their photograph records (`0034`), and the daily orphan sweep deletes the
+     objects once they are 48 hours old, so within about three days. If that
+     is more than max(50, 5% of the bucket) objects, the scheduled run
+     refuses: review its dry run and run it with `allow_mass_delete`
+     ([above](#sweep-orphaned-photographs)).
 
-   ```sql
-   select count(*) from public.images im
-   where not exists (select 1 from storage.objects o where o.bucket_id = 'item-images' and o.name = im.path_full)
-      or (im.path_thumb is not null
-          and not exists (select 1 from storage.objects o where o.bucket_id = 'item-images' and o.name = im.path_thumb));
-   ```
+3. **Delete the grants made to the email**, which nothing ties to the user,
+   so no cascade reaches them:
+   `delete from public.category_shares where invited_email = lower('<email>');`
+4. **Delete the user**: Authentication → Users → ⋯ → *Delete user*. Since
+   `0034` every row it owns cascades: collections with their shares and
+   links, entries, including the ones it filed in other people's collections,
+   and photograph records. Entries editors filed in its collections go with
+   them, as a collection delete takes them.
+5. **Leave the rest to the sweep.** The objects of those editors' entries, and
+   anything step 2 missed, are unnamed now; the [sweep](#sweep-orphaned-photographs)
+   deletes them 48 h later. A large account can push that over its
+   mass-deletion ceiling, and the scheduled run then refuses: handle it as
+   [When a run refuses](#sweep-orphaned-photographs) says.
+
+Users deleted in the dashboard before `0034` left their rows behind; `0034`
+deleted those rows when it deployed, so their photographs reach the sweep 48 h
+later, possibly past the ceiling in the same way.
+
+## Notice a failed production run
+
+Nothing reports a failure beyond GitHub's own email
+([why](../explanation/design-decisions.md#why-production-has-no-alerting)):
+it goes to the account that triggered the run, and for a scheduled run to
+whoever last changed its `cron` line, if their notification settings send
+Actions email. So after merging, check that *Deploy Pages* went green, and
+look at the Actions tab now and then for `keep-alive.yml` and
+`cleanup-orphaned-photos.yml`. A render error in a visitor's browser shows a
+translated screen with a reload button (`error.tsx`, and `global-error.tsx`
+when the root layout itself throws) and reaches only that browser's console.
+
+## Keep the schedules alive
+
+In a public repository, GitHub disables a workflow with a `schedule` trigger
+once the repository has had no activity for 60 days; commits count, the
+workflows' own runs do not. It disables the whole workflow, not only its
+schedule, and `pages-deploy.yml`, `keep-alive.yml`,
+`cleanup-orphaned-photos.yml` and `auto-merge.yml` all have one: a disabled `pages-deploy.yml` also
+ignores CI's `workflow_run`, so the first merge after a quiet spell deploys
+nothing. GitHub emails a warning some days before. With `keep-alive.yml`
+disabled, Supabase pauses the Free project after 7 days of low activity, with
+only Supabase's own email as a warning; restore it from the Supabase
+dashboard.
+
+What keeps them alive is any commit on `main`: a merged pull request,
+Dependabot's weekly auto-merged patch bumps included. Nothing guarantees one,
+so after a quiet spell, or on GitHub's warning:
+
+```bash
+gh workflow list --all                     # a disabled one shows disabled_inactivity
+gh workflow enable keep-alive.yml          # likewise pages-deploy.yml, cleanup-orphaned-photos.yml, auto-merge.yml
+```
+
+or Actions → the workflow → *Enable workflow*. Re-enabling
+`cleanup-orphaned-photos.yml` is safe only if it was not disabled on purpose
+([Sweep orphaned photographs](#sweep-orphaned-photographs)).
 
 ## Migrate to publishable and secret keys
 
@@ -932,12 +900,9 @@ reversible. Budget a quiet evening, well before December.
    **Publishable and secret API keys** → **Create new API keys**. That adds a
    `default` publishable and a `default` secret key; the legacy keys keep
    working.
-2. **The sweep and the backup switch themselves.** From their next run,
-   `cleanup-orphaned-photos.yml` and `backup.yml` fetch the secret key
-   instead of `service_role`. To prove it now: add a photograph to any entry
-   in production, then run Actions → *Back up production*; `photographs`
-   must copy its two objects with `failed: 0`, downloading them with the
-   secret key.
+2. **The sweep switches itself.** From its next run,
+   `cleanup-orphaned-photos.yml` fetches the secret key instead of
+   `service_role`.
 3. **Swap the public key.** Repository Settings → Secrets and variables →
    Actions → `NEXT_PUBLIC_SUPABASE_ANON_KEY` → **Update**, paste the
    publishable key (`sb_publishable_…`). The name stays.
@@ -953,7 +918,7 @@ reversible. Budget a quiet evening, well before December.
    reloaded the new bundle: Settings → API Keys → tab **Legacy API keys** →
    disable. Reversible from the same tab. Afterwards run *CollectionBuddy
    Keepalive* again, and watch the next scheduled *Clean up orphaned
-   photographs* and *Back up production* runs.
+   photographs* run.
 
 Supabase's separate JWT signing-keys migration (the key that signs users'
 sessions) is independent of this one and has no deadline attached here.
@@ -961,28 +926,21 @@ sessions) is independent of this one and has no deadline attached here.
 ## Scope the Management API tokens
 
 The workflows once shared one access token, most likely a classic one, which
-reaches every project on its owner's account. This replaces it with the two
-scoped tokens in [Configuration](../reference/configuration.md#management-api-tokens).
+reaches every project on its owner's account. This replaces it with the
+scoped token in [Configuration](../reference/configuration.md#management-api-tokens).
 Every step keeps the jobs running; do it after the change that added `0024`
 has deployed.
 
-1. **The Auth check's token.** Supabase Dashboard → Account → Access Tokens
-   → **Generate new token**, named for its use. Expiry 90 days; resource
-   access this one project; **Auth Config**: Read, nothing else. Copy the
-   `sbp_fc…` value into a new `production` environment secret,
-   `SUPABASE_AUTH_CONFIG_TOKEN`. Run Actions → *Check hosted Auth settings*:
-   it must pass without the warning that it borrowed `SUPABASE_ACCESS_TOKEN`.
-2. **The sweep and backup token.** Generate a second one the same way with
-   **Database**: Read, **API Keys**: Read and **API Key Secrets**: Read, and
-   update `SUPABASE_ACCESS_TOKEN` with it.
-3. **Prove it.** Run *Clean up orphaned photographs* with the defaults (a dry
-   run: the read-only query). Add a photograph to any entry in production,
-   then run *Back up production*: `photographs` must copy its two objects
-   with `failed: 0`, which fetches the secret key.
-4. **Revoke the classic token** on the Access Tokens page, once nothing else
+1. **The sweep token.** Supabase Dashboard → Account → Access Tokens →
+   **Generate new token**, named for its use, expiry 90 days, resource
+   access this one project, with **Database**: Read, **API Keys**: Read and
+   **API Key Secrets**: Read, and update `SUPABASE_ACCESS_TOKEN` with it.
+2. **Prove it.** Run *Clean up orphaned photographs* with the defaults (a dry
+   run: the read-only query); the next scheduled run fetches the secret key.
+3. **Revoke the classic token** on the Access Tokens page, once nothing else
    uses it. `supabase login` on a laptop stores its own token and is
    unaffected.
-5. Put the expiry date a week early in a calendar: [Rotate a
+4. Put the expiry date a week early in a calendar: [Rotate a
    credential](#rotate-a-credential).
 
 ## Rotate a credential
@@ -1004,22 +962,20 @@ password, which Supabase replaces at once.
   legacy `service_role` key cannot be rotated on its own either: migrate, then
   deactivate the legacy keys.
 - **Database password** (`SUPABASE_DB_URL`, a `production` environment
-  secret). Only `migrate` and the `database` backup use it; the app never
-  does. Wait until no *Deploy Pages* or *Back up production* run is in
+  secret). Only `migrate` uses it; the app never
+  does. Wait until no *Deploy Pages* run is in
   progress, then Dashboard → Database → Settings → **Reset database
   password**; it can take a few minutes to apply. Build the new session
   pooler string with the password percent-encoded ([Configuration](../reference/configuration.md#github-actions-secrets)),
-  update the secret, and run *Back up production*: `database` must pass.
-- **Management API tokens** (`SUPABASE_ACCESS_TOKEN`,
-  `SUPABASE_AUTH_CONFIG_TOKEN`, `production`). Every 90 days, a week before
-  they expire, with a calendar reminder for the next time. Supabase Dashboard
+  update the secret, and run *Deploy Pages*: `migrate` must pass.
+- **Management API token** (`SUPABASE_ACCESS_TOKEN`, `production`). Every
+  90 days, a week before it expires, with a calendar reminder for the next time. Supabase Dashboard
   → Account → Access Tokens → generate a scoped token with the same project,
   permissions and 90-day expiry ([Configuration](../reference/configuration.md#management-api-tokens)),
-  and update its secret. Prove `SUPABASE_AUTH_CONFIG_TOKEN` with *Check hosted
-  Auth settings*, and `SUPABASE_ACCESS_TOKEN` with *Clean up orphaned
-  photographs* (a dry run by default) and *Back up production*; each must
+  and update its secret. Prove it with *Clean up orphaned
+  photographs* (a dry run by default); it must
   pass. Then revoke the old token on the same page. A classic token still in
-  either secret: [Scope the Management API
+  the secret: [Scope the Management API
   tokens](#scope-the-management-api-tokens).
 - **Google OAuth client secret** (Supabase Dashboard → Authentication →
   Sign In / Providers → Google). Google Cloud Console → APIs & Services →
@@ -1028,12 +984,3 @@ password, which Supabase replaces at once.
   Then disable and delete the old secret in Google Cloud. A developer whose
   local stack uses this client updates `GOTRUE_EXTERNAL_GOOGLE_SECRET` and
   restarts it.
-- **Backup store key** (`BACKUP_S3_ACCESS_KEY_ID`,
-  `BACKUP_S3_SECRET_ACCESS_KEY`, `production`). Create a new key scoped to
-  the bucket at the provider, update both secrets, run *Back up production*,
-  then delete the old key.
-- **Backup age identity.** Generate a new identity ([Back up
-  production](#back-up-production)), update `BACKUP_AGE_RECIPIENT`, and keep
-  the old identity: `database/` archives need it until they expire, and
-  objects already under `photos/` are never copied again, so they stay
-  encrypted to it for good.

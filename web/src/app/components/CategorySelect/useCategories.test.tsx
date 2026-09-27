@@ -25,7 +25,7 @@ vi.mock('../../data/categories', () => ({
 }));
 
 vi.mock('../../data/images', () => ({
-  listImagePathsForItems: vi.fn(),
+  listImagePathsForCategory: vi.fn(),
   removeImageObjects: vi.fn(),
   REMOVE_OBJECTS_BATCH_SIZE: 2,
 }));
@@ -83,6 +83,67 @@ describe('useCategories reload', () => {
       expect.objectContaining({ message: 'network down' }),
     );
     consoleError.mockRestore();
+  });
+
+  it('has not failed before any answer arrives', () => {
+    vi.mocked(listCategories).mockReturnValue(new Promise(() => {}) as never);
+
+    const { result } = renderHook(() => useCategories(), { wrapper });
+
+    expect(result.current.loadFailed).toBe(false);
+  });
+
+  // An empty list is what a first run looks like, so a failure has to be told apart from it.
+  it('marks a failed load, and clears it once a later load answers', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(listCategories).mockResolvedValueOnce({
+      data: null,
+      error: new Error('network down'),
+    } as never);
+    const { result } = renderHook(() => useCategories(), { wrapper });
+
+    await act(async () => {
+      await result.current.reload();
+    });
+    expect(result.current.loadFailed).toBe(true);
+    expect(result.current.categories).toEqual([]);
+
+    listCategoriesReturns([CATEGORY_ONE]);
+    await act(async () => {
+      await result.current.reload();
+    });
+    expect(result.current.loadFailed).toBe(false);
+    expect(result.current.categories).toEqual([CATEGORY_ONE]);
+    vi.mocked(console.error).mockRestore();
+  });
+
+  it('ignores the failure of a load a newer one has already answered', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let failFirst!: (value: { data: null; error: Error }) => void;
+    vi.mocked(listCategories)
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          failFirst = resolve;
+        }) as never,
+      )
+      .mockResolvedValueOnce({ data: [CATEGORY_ONE], error: null } as never);
+    const { result } = renderHook(() => useCategories(), { wrapper });
+
+    let firstPromise!: Promise<unknown>;
+    act(() => {
+      firstPromise = result.current.reload();
+    });
+    await act(async () => {
+      await result.current.reload();
+    });
+    await act(async () => {
+      failFirst({ data: null, error: new Error('stale') });
+      await firstPromise;
+    });
+
+    expect(result.current.loadFailed).toBe(false);
+    expect(screen.queryByRole('alert')).toBeNull();
+    vi.mocked(console.error).mockRestore();
   });
 
   it('keeps loading true while a newer reload supersedes one still resolving', async () => {

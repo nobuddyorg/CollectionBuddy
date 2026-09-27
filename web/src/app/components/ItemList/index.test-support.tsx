@@ -26,6 +26,7 @@ export function defaultItemsState() {
     pageImages: null as ReturnType<typeof useItems>['pageImages'],
     total: 0,
     loading: false,
+    loadFailed: false,
     page: 1,
     setPage: vi.fn(),
     totalPages: 1,
@@ -79,16 +80,21 @@ export function resetHookMocks({
   useItemMutationsMock.mockReset().mockReturnValue(defaultMutationsState());
 }
 
-export function renderList(
-  props: Partial<Parameters<typeof ItemList>[0]> = {},
-) {
-  return render(
+/** The rendered tree, for a test that re-renders it after changing what a hook mock returns. */
+export function listTree(props: Partial<Parameters<typeof ItemList>[0]> = {}) {
+  return (
     <I18nProvider>
       <ToastProvider>
         <ConfirmProvider>
           <ItemList categoryId="cat-1" canEdit={true} {...props} />
         </ConfirmProvider>
       </ToastProvider>
-    </I18nProvider>,
+    </I18nProvider>
   );
+}
+
+export function renderList(
+  props: Partial<Parameters<typeof ItemList>[0]> = {},
+) {
+  return render(listTree(props));
 }

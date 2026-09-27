@@ -1,3 +1,4 @@
+import { isRetryableStatus } from '../lib/backoff';
 import { chunk } from '../lib/chunk';
 import { readAllChunks, readAllKeysetPages } from '../lib/pages';
 import { supabase } from '../supabase';
@@ -23,6 +24,18 @@ export function uploadImageObject(path: string, file: Blob) {
   return supabase.storage.from(ITEM_IMAGES_BUCKET).upload(path, file);
 }
 
+/** Only no response, a 429 or a 5xx can pass on a retry; Storage sends its own code as `statusCode`, often under an HTTP 400. */
+export function isTransientStorageError({
+  status,
+  statusCode,
+}: {
+  status?: number;
+  statusCode?: string;
+}): boolean {
+  if (status === undefined) return true;
+  return [status, Number(statusCode)].some(isRetryableStatus);
+}
+
 // Storage's bulk delete refuses more than 1,000 objects per request.
 export const REMOVE_OBJECTS_BATCH_SIZE = 1000;
 
@@ -30,7 +43,7 @@ export function removeImageObjects(paths: string[]) {
   return supabase.storage.from(ITEM_IMAGES_BUCKET).remove(paths);
 }
 
-export type ImageRow = Database['public']['Tables']['images']['Row'];
+type ImageRow = Database['public']['Tables']['images']['Row'];
 
 /** Carries the row's own `id`, so a single photograph can be deleted by it. */
 export type ImageListRow = Pick<
@@ -69,14 +82,30 @@ export function createImageRow(row: NewImageRow | ImportedImageRow) {
     .single<ImageListRow>();
 }
 
-// `.single()` makes a delete that matched no row, hidden by RLS or already gone, an error.
-export function deleteImageRow(id: string) {
-  return supabase
+/** A delete that matched no row, hidden by RLS or already gone, fails, unless its entry is gone and its cascade took the row. */
+export async function deleteImageRow({
+  id,
+  itemId,
+}: {
+  id: string;
+  itemId: string;
+}): Promise<{ error: Error | null }> {
+  // No `.single()`: its 406 on no row is a console error in every browser, and a gone entry is no failure.
+  const deleted = await supabase
     .from('images')
     .delete()
     .eq('id', id)
+    .select('id');
+  if (deleted.error !== null) return deleted;
+  if (deleted.data.length > 0) return { error: null };
+  const item = await supabase
+    .from('items')
     .select('id')
-    .single<Pick<ImageRow, 'id'>>();
+    .eq('id', itemId)
+    .maybeSingle();
+  if (item.error !== null) return item;
+  if (item.data === null) return { error: null };
+  return { error: new Error(`Photograph ${id} was not deleted`) };
 }
 
 // PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.
@@ -159,12 +188,37 @@ export function listImagePathsForItems(
   );
 }
 
-// Never selects path_thumb; an export never wants thumbnails.
-export function listExportImagesForItems(
-  itemIds: string[],
-): Promise<{ data: ExportImageRow[] | null; error: unknown }> {
-  return selectImagesForItems<ExportImageRow>(
-    itemIds,
-    'item_id, path_full, size_bytes',
+type CategoryImagePathRow = ImagePathRow & Pick<ImageRow, 'id'>;
+
+// Keyset-paged down images_pkey, each row kept via items_pkey and item_categories_pkey; the empty embeds only filter.
+function rawListImagePathsForCategory({
+  categoryId,
+  after,
+}: {
+  categoryId: string;
+  after: CategoryImagePathRow | null;
+}) {
+  let query = supabase
+    .from('images')
+    .select(
+      'id, item_id, path_full, path_thumb, items!inner(item_categories!inner())',
+    )
+    .eq('items.item_categories.category_id', categoryId);
+  if (after) query = query.gt('id', after.id);
+  return query
+    .order('id')
+    .limit(ROW_PAGE_SIZE)
+    .overrideTypes<CategoryImagePathRow[], { merge: false }>();
+}
+
+/** Every photograph of every entry filed in the category, walked a page at a time; runs before the category delete, never after. */
+export function listImagePathsForCategory(
+  categoryId: string,
+): Promise<
+  | { data: CategoryImagePathRow[]; error: null }
+  | { data: null; error: NonNullable<unknown> }
+> {
+  return readAllKeysetPages<CategoryImagePathRow>(ROW_PAGE_SIZE, (after) =>
+    rawListImagePathsForCategory({ categoryId, after }),
   );
 }

@@ -1,6 +1,7 @@
 import { expect, test } from '../test';
 import { SEED } from '../fixtures';
-import { apiAs, context, ownedCategoryId } from './helpers';
+import { clearCollection, ensureUser, mintSession } from '../collectors';
+import { apiAs, context, ownedCategoryId, share, unshare } from './helpers';
 
 // Each over-the-limit write is one statement refused whole, so nothing persists for parallel specs to see.
 test.describe('per-owner quotas', () => {
@@ -13,6 +14,82 @@ test.describe('per-owner quotas', () => {
 
     expect(error?.code).toBe('PT507');
     expect(error?.message).toBe('entry quota of 50000 reached');
+  });
+
+  // The form and the import create entries through create_items_in_category; each entry is the caller's own row, so the caller's ceiling applies.
+  test('entries created in a shared collection meet the caller’s own ceiling, owner and editor alike', async ({}, testInfo) => {
+    test.setTimeout(120_000);
+    // Collectors of their own, filled to just under the ceiling, so an app-sized batch crosses it without touching another spec.
+    const { password } = SEED.entryQuota;
+    const collector = async (role: string) => {
+      const email = `e2e-entry-quota-${role}-${testInfo.parallelIndex}@collectionbuddy.test`;
+      const userId = await ensureUser(email, password);
+      const { token, client } = await mintSession(email, password);
+      await clearCollection(client, userId);
+      return { email, userId, token, client };
+    };
+    const owner = await collector('owner');
+    const editor = await collector('editor');
+    const fill = async (token: string) => {
+      for (let batch = 0; batch < 5; batch += 1) {
+        const { error } = await apiAs(token)
+          .from('items')
+          .insert(Array.from({ length: 9_990 }, () => ({ title: 'fill' })));
+        if (error) throw error;
+      }
+    };
+
+    const { data: category, error: categoryError } = await apiAs(owner.token)
+      .from('categories')
+      .insert({ name: 'quota-rpc-probe' })
+      .select('id')
+      .single();
+    if (categoryError) throw categoryError;
+    const shareId = await share({
+      token: owner.token,
+      categoryId: category.id,
+      invitedEmail: editor.email,
+      role: 'editor',
+    });
+    const create = (callerToken: string, count: number) =>
+      apiAs(callerToken).rpc('create_items_in_category', {
+        target_category_id: category.id,
+        entries: Array.from({ length: count }, (_, i) => ({
+          title: `quota-rpc ${i}`,
+        })),
+      });
+
+    try {
+      await fill(owner.token);
+      await fill(editor.token);
+
+      for (const callerToken of [owner.token, editor.token]) {
+        const { error } = await create(callerToken, 51);
+        expect(error?.code).toBe('PT507');
+        expect(error?.message).toBe('entry quota of 50000 reached');
+      }
+
+      // 49,950 plus 50 is exactly the ceiling.
+      const { error } = await create(editor.token, 50);
+      expect(error).toBeNull();
+      const { data: created } = await apiAs(editor.token)
+        .from('items')
+        .select('user_id')
+        .like('title', 'quota-rpc %');
+      expect(created).toHaveLength(50);
+      expect(new Set(created!.map((item) => item.user_id))).toEqual(
+        new Set([editor.userId]),
+      );
+    } finally {
+      // The editor's entries go while the grant still gives it write access to them.
+      const { error: editorError } = await apiAs(editor.token)
+        .from('items')
+        .delete()
+        .eq('user_id', editor.userId);
+      if (editorError) throw editorError;
+      await unshare(owner.token, shareId);
+      await clearCollection(owner.client, owner.userId);
+    }
   });
 
   test('photographs that would pass 256 MiB are refused, however small the client says they are', async () => {

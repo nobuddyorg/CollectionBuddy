@@ -118,11 +118,13 @@ select is((select count(*) from attempt), 0::bigint,
 -- ...nor issue a grant of its own -- tg_category_shares_enforce re-derives
 -- owner_user_id from the category itself, so a forged value in the
 -- payload never reaches the policy.
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.category_shares (category_id, owner_user_id, invited_email, role) values (%L, %L, %L, %L)',
     :'category_id'::uuid, :'editor_id'::uuid, 'nobody-invited@collectionbuddy.test', 'editor'
-  )),
+  ),
+  'P0001',
+  'ownership mismatch',
   'an editor cannot issue a grant of its own on the collection'
 );
 
@@ -232,10 +234,12 @@ select is(
 -- The filing trigger asks as its owner, past category_shares' RLS, so only the predicate itself tells the two grants apart.
 insert into public.items (title) values ('Viewer''s own entry')
 returning id as viewer_entry_id \gset
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.item_categories (item_id, category_id) values (%L, %L)',
-    :'viewer_entry_id'::uuid, :'two_grants_category_id'::uuid)),
+    :'viewer_entry_id'::uuid, :'two_grants_category_id'::uuid),
+  'P0001',
+  'cross-tenant assignment is not allowed',
   'nor file an entry into the collection'
 );
 

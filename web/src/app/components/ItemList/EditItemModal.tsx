@@ -5,11 +5,12 @@ import dynamic from 'next/dynamic';
 
 import CenteredModal from '../CenteredModal';
 import { EMPTY_ITEM_FORM_VALUES, ItemFormValues } from '../ItemForm/types';
+import { loadItemForm } from '../ItemForm/load';
 import { useI18n } from '../../i18n/useI18n';
 import { useGuardedModalClose } from '../../lib/useGuardedModalClose';
 import type { ItemLite } from './types';
 
-const ItemForm = dynamic(() => import('../ItemForm'), { ssr: false });
+const ItemForm = dynamic(loadItemForm, { ssr: false });
 
 // A snapshot taken when edit was pressed, so the form can't shift under the user if the list changes.
 function valuesFor(item: ItemLite | null): ItemFormValues {

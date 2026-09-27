@@ -1,11 +1,17 @@
-import { createImageRow, imagePrefix, uploadImageObject } from './images';
+import {
+  createImageRow,
+  imagePrefix,
+  isTransientStorageError,
+  uploadImageObject,
+} from './images';
 import { checkCancelled, ImportCancelledError } from './importCancellation';
 import { isQuotaExceeded } from './quota';
-import { isRetryableStatus, retryWithBackoff } from '../lib/backoff';
+import { retryWithBackoff } from '../lib/backoff';
 import { compressPhoto } from '../lib/imageCompression';
 import { extensionForType, typeForArchivePath } from './photoType';
 import type { PhotoTask } from './importFormat';
-import type { ZipEntryReader } from './zip';
+import { ZipReadError } from './zip';
+import type { ZipEntryReader } from './zipReader';
 
 const PHOTO_UPLOAD_ATTEMPTS = 3;
 const PHOTO_UPLOAD_RETRY_BASE_MS = 500;
@@ -18,19 +24,7 @@ export function realCompressThumb(photo: Blob): Promise<Blob> {
   );
 }
 
-/** Only no response, a 429 or a 5xx can pass on a retry; Storage sends its own code as `statusCode`, often under an HTTP 400. */
-export function isTransientUploadError({
-  status,
-  statusCode,
-}: {
-  status?: number;
-  statusCode?: string;
-}): boolean {
-  if (status === undefined) return true;
-  return [status, Number(statusCode)].some(isRetryableStatus);
-}
-
-/** Retries only what `isTransientUploadError` says may pass; a 403, 409 or 413 is returned at once. */
+/** Retries only what `isTransientStorageError` says may pass; a 403, 409 or 413 is returned at once. */
 async function uploadWithRetry({
   path,
   blob,
@@ -50,7 +44,7 @@ async function uploadWithRetry({
       const { error } = await uploadImage(path, blob);
       return {
         value: error,
-        retry: error !== null && isTransientUploadError(error),
+        retry: error !== null && isTransientStorageError(error),
       };
     },
   });
@@ -64,7 +58,7 @@ export type PhotoImportCalls = {
   signal?: AbortSignal;
 };
 
-/** False for a photograph left out (missing, unreadable, or failing after retrying); a cancel or a quota refusal propagates. */
+/** False for a photograph left out (missing, or failing after retrying); a cancel, a quota refusal or a damaged archive propagates. */
 export async function importPhoto({
   task,
   readPhoto,
@@ -122,8 +116,12 @@ export async function importPhoto({
     }
     return true;
   } catch (error) {
-    // A full quota refuses every later photograph too, so the caller stops the rest.
-    if (error instanceof ImportCancelledError || isQuotaExceeded(error)) {
+    // A full quota refuses every later photograph too; an archive that lies about one entry is trusted for none.
+    if (
+      error instanceof ImportCancelledError ||
+      error instanceof ZipReadError ||
+      isQuotaExceeded(error)
+    ) {
       throw error;
     }
     console.error('Skipping photograph', task.archivePath, error);

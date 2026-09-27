@@ -77,7 +77,7 @@ describe('AppError', () => {
 
   it('speaks German by default', () => {
     window.localStorage.removeItem('lang');
-    vi.stubGlobal('navigator', { ...navigator, language: 'de-DE' });
+    vi.stubGlobal('navigator', { language: 'de-DE', languages: ['de-DE'] });
 
     renderBoundary(new TypeError('x is undefined'));
 

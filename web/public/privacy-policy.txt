@@ -4,7 +4,7 @@ PRIVACY NOTICE (ENGLISH)
 
 CollectionBuddy's privacy notice has moved to:
 
-https://nobuddyorg.github.io/CollectionBuddy/privacy/
+https://nobuddy.org/CollectionBuddy/privacy/
 
 It is also linked from the sign-in page and from the account menu.
 Controller: Matthias Eggert, info@nobuddy.org
@@ -16,7 +16,7 @@ DATENSCHUTZHINWEIS (DEUTSCH)
 
 Der Datenschutzhinweis von CollectionBuddy ist umgezogen:
 
-https://nobuddyorg.github.io/CollectionBuddy/privacy/
+https://nobuddy.org/CollectionBuddy/privacy/
 
 Er ist außerdem auf der Anmeldeseite und im Kontomenü verlinkt.
 Verantwortlicher: Matthias Eggert, info@nobuddy.org

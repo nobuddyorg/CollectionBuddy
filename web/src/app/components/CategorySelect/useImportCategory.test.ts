@@ -1,17 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
+import { interpolate, type TranslationValues } from '../../i18n/I18nProvider';
 import {
   importPartialMessage,
   importProgressMessage,
 } from './useImportCategory';
 
 describe('importProgressMessage', () => {
-  const t = ((key: string) =>
-    ({
-      'category_select.import_reading': 'Reading the archive…',
-      'category_select.import_items': 'Creating entries…',
-      'category_select.import_photos': 'Photos {done} of {total}…',
-    })[key] ?? key) as Parameters<typeof importProgressMessage>[1];
+  const t = ((key: string, values: TranslationValues = {}) =>
+    interpolate(
+      {
+        'category_select.import_reading': 'Reading the archive…',
+        'category_select.import_items': 'Creating entries…',
+        'category_select.import_photos': 'Photos {done} of {total}…',
+      }[key] ?? key,
+      values,
+    )) as Parameters<typeof importProgressMessage>[1];
 
   it('says nothing when no import is running', () => {
     expect(importProgressMessage(null, t)).toBeNull();

@@ -16,6 +16,45 @@ test.describe('the catalogue', () => {
     await expect(on(page).catalogue.locators.inputs.search).toBeVisible();
   });
 
+  // Nothing is selected until the collections arrive; the first-run create and import controls must not stand in.
+  test('holds placeholders, not create and import, while the collections load', async ({
+    on,
+    page,
+  }) => {
+    const categories = on(page).categories;
+    const categoryList = (url: URL) =>
+      url.pathname.endsWith('/rest/v1/categories');
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let listRequested!: () => void;
+    const requested = new Promise<void>((resolve) => {
+      listRequested = resolve;
+    });
+    await page.route(categoryList, async (route) => {
+      listRequested();
+      await released;
+      await route.fallback();
+    });
+    try {
+      await page.goto('');
+      await requested;
+      await expect(categories.locators.selected).toBeVisible();
+      await expect(categories.locators.selected).toBeEmpty();
+      await expect(categories.locators.inputs.newName).toHaveCount(0);
+      await expect(categories.locators.inputs.importFile).toHaveCount(0);
+
+      release();
+      await expect(categories.locators.selected).not.toBeEmpty();
+      await expect(categories.locators.buttons.expand).toBeVisible();
+      await expect(categories.locators.inputs.newName).toHaveCount(0);
+    } finally {
+      release();
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    }
+  });
+
   test('shows a category exactly, newest first', async ({ on, page }) => {
     await on(page).categories.do.open('Münzen');
     await expectTitles(

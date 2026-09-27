@@ -29,11 +29,18 @@ describe('the query behind an export page', () => {
     expect(exportQuery().has('or')).toBe(false);
   });
 
-  it('drives the export from the category link, embedding every listed field plus the timestamp', () => {
+  it('drives the export from the category link, embedding every listed field, the timestamp and the full-size photographs', () => {
     expect(exportQuery().get('select')).toBe(
-      'created_at,item_id,items!inner(id,title,description,place,place_lat,place_lng,tags,created_at)',
+      'created_at,item_id,items!inner(id,title,description,place,place_lat,place_lng,tags,created_at,images(item_id,path_full,size_bytes))',
     );
     expect(exportQuery().get('category_id')).toBe('eq.cat-1');
+  });
+
+  // The order the app shows an entry's photographs in, so the archive's first is the cover.
+  it("orders each item's photographs oldest-first, the id breaking a tie", () => {
+    expect(exportQuery().get('items.images.order')).toBe(
+      'created_at.asc,id.asc',
+    );
   });
 
   it('asks for one page of the requested size, with no offset', () => {
@@ -68,19 +75,28 @@ describe('exportCursorFilter', () => {
 });
 
 describe('listItemsForExport', () => {
-  function link(id: string) {
+  function item(id: string) {
+    return {
+      id,
+      title: id,
+      description: null,
+      place: null,
+      place_lat: null,
+      place_lng: null,
+      tags: [],
+      created_at: `item-created-${id}`,
+    };
+  }
+  function photo(itemId: string, name: string) {
+    return { item_id: itemId, path_full: `u/${itemId}/${name}`, size_bytes: 7 };
+  }
+  function link(id: string, photoNames: string[] = []) {
     return {
       created_at: `2026-01-0${id}T00:00:00+00:00`,
       item_id: id,
       items: {
-        id,
-        title: id,
-        description: null,
-        place: null,
-        place_lat: null,
-        place_lng: null,
-        tags: [],
-        created_at: `item-created-${id}`,
+        ...item(id),
+        images: photoNames.map((name) => photo(id, name)),
       },
     };
   }
@@ -96,9 +112,9 @@ describe('listItemsForExport', () => {
     expect(raw).toHaveBeenCalledWith(page);
   });
 
-  it('flattens a full page to its items, pointing the cursor at its last link', async () => {
+  it('flattens a full page to its items and their photographs, pointing the cursor at its last link', async () => {
     const raw = rawReturning({
-      data: [link('1'), link('2'), link('3')],
+      data: [link('1', ['a', 'b']), link('2'), link('3', ['c'])],
       error: null,
     });
 
@@ -107,9 +123,11 @@ describe('listItemsForExport', () => {
       raw,
     );
 
+    // The items without their photograph rows: the manifest spreads an item whole.
     expect(result).toEqual({
       data: {
-        items: [link('1').items, link('2').items, link('3').items],
+        items: [item('1'), item('2'), item('3')],
+        photos: [photo('1', 'a'), photo('1', 'b'), photo('3', 'c')],
         next: { linkedAt: '2026-01-03T00:00:00+00:00', itemId: '3' },
       },
       error: null,
@@ -133,7 +151,10 @@ describe('listItemsForExport', () => {
         { categoryId: 'cat-1', after: null, size: 2 },
         rawReturning({ data, error: null }),
       );
-      expect(result).toEqual({ data: { items: [], next: null }, error: null });
+      expect(result).toEqual({
+        data: { items: [], photos: [], next: null },
+        error: null,
+      });
     }
   });
 

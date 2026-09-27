@@ -12,9 +12,7 @@ import {
   localFileHeader,
   MAX_ZIP_BYTES,
   MAX_ZIP_ENTRIES,
-  openZip,
   ZipLimitError,
-  ZipReadError,
   type ZipEntry,
 } from './zip';
 
@@ -42,16 +40,6 @@ function entry(overrides: Partial<ZipEntry> = {}): ZipEntry {
     date: 0x5cc6,
     ...overrides,
   };
-}
-
-async function oneEntryArchive(): Promise<Uint8Array<ArrayBuffer>> {
-  const writer = createZipWriter();
-  writer.add({ path: 'a.txt', bytes: new Uint8Array([1, 2, 3]) });
-  return bytesOf(writer.finish());
-}
-
-function dataViewOf(bytes: Uint8Array): DataView {
-  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
 describe('crc32', () => {
@@ -391,170 +379,5 @@ describe('assertZipRoom', () => {
   it('names its errors, so a caller can tell them from an I/O failure', () => {
     expect(new ZipLimitError('x').name).toBe('ZipLimitError');
     expect(new ZipLimitError('x')).toBeInstanceOf(Error);
-  });
-});
-
-// Every entry's bytes, read the way the import reads one photograph at a time.
-async function readAll(archive: Blob): Promise<Map<string, Uint8Array>> {
-  const entries = new Map<string, Uint8Array>();
-  for (const [path, read] of await openZip(archive)) {
-    entries.set(path, await bytesOf(await read()));
-  }
-  return entries;
-}
-
-// The one entry's directory record, which directly precedes the trailer.
-function directoryRecordAt(bytes: Uint8Array): number {
-  return bytes.length - 22 - (46 + 'a.txt'.length);
-}
-
-// Every archive read back here was produced by createZipWriter, so a round trip proves they agree.
-describe('openZip', () => {
-  it('reads back every entry a writer produced, byte for byte', async () => {
-    const writer = createZipWriter();
-    writer.add({ path: 'collection.json', bytes: encoder.encode('{"a":1}') });
-    writer.add({
-      path: 'photos/1.webp',
-      bytes: new Uint8Array([1, 2, 3, 4, 5]),
-    });
-    const entries = await readAll(writer.finish());
-
-    expect(entries.size).toBe(2);
-    expect(new TextDecoder().decode(entries.get('collection.json'))).toBe(
-      '{"a":1}',
-    );
-    expect(entries.get('photos/1.webp')).toEqual(
-      new Uint8Array([1, 2, 3, 4, 5]),
-    );
-  });
-
-  // #755: a photograph's bytes stay in the file until its upload asks for them.
-  it('opens an archive by its directory alone, loading no entry until it is read', async () => {
-    const writer = createZipWriter();
-    const photo = new Uint8Array(100_000).fill(7);
-    writer.add({ path: 'p.webp', bytes: photo });
-    const archive = writer.finish();
-    const photoEnds = 30 + 'p.webp'.length + photo.length;
-    const sliced: number[] = [];
-    const watched = {
-      size: archive.size,
-      slice: (start: number, end: number) => {
-        sliced.push(start);
-        return archive.slice(start, end);
-      },
-    } as Blob;
-
-    const entries = await openZip(watched);
-
-    expect(sliced.length).toBeGreaterThan(0);
-    expect(sliced.every((start) => start >= photoEnds)).toBe(true);
-    const read = await entries.get('p.webp')!();
-    expect(read.size).toBe(photo.length);
-    expect(await bytesOf(read)).toEqual(photo);
-  });
-
-  it('reads an empty archive as an empty map, not an error', async () => {
-    const entries = await openZip(createZipWriter().finish());
-    expect(entries.size).toBe(0);
-  });
-
-  it('keeps entries with the same name apart by path, not by basename', async () => {
-    const writer = createZipWriter();
-    writer.add({ path: 'a/1.webp', bytes: new Uint8Array([1]) });
-    writer.add({ path: 'b/1.webp', bytes: new Uint8Array([2]) });
-    const entries = await readAll(writer.finish());
-
-    expect(entries.get('a/1.webp')).toEqual(new Uint8Array([1]));
-    expect(entries.get('b/1.webp')).toEqual(new Uint8Array([2]));
-  });
-
-  it('rejects a file too small to hold even the end-of-central-directory record', async () => {
-    await expect(openZip(new Blob([new Uint8Array(10)]))).rejects.toThrow(
-      /file is too small/,
-    );
-  });
-
-  // Both bounds are `>`, not `>=`: a structure ending on the file's last byte is inside the file.
-  it('reads an entry whose data ends on the very last byte', async () => {
-    const bytes = await oneEntryArchive();
-    const dataStart = 30 + 'a.txt'.length;
-    dataViewOf(bytes).setUint32(
-      directoryRecordAt(bytes) + 24,
-      bytes.length - dataStart,
-      true,
-    );
-
-    const entries = await readAll(new Blob([bytes]));
-
-    expect(entries.get('a.txt')).toHaveLength(bytes.length - dataStart);
-  });
-
-  it('reads a directory pointer that leaves exactly one header of room', async () => {
-    const bytes = await oneEntryArchive();
-    const dataView = dataViewOf(bytes);
-    // Not past the end, so the bound lets it through; the signature found there is what rejects it.
-    dataView.setUint32(bytes.length - 22 + 16, bytes.length - 46, true);
-
-    await expect(openZip(new Blob([bytes]))).rejects.toThrow(
-      /malformed central directory entry/,
-    );
-  });
-
-  it('rejects a file with no end-of-central-directory signature at all', async () => {
-    const junk = new Uint8Array(30);
-    await expect(openZip(new Blob([junk]))).rejects.toThrow(
-      /end-of-central-directory/,
-    );
-  });
-
-  // Opening reads no entry, so a bad size surfaces when that one entry is read.
-  it('rejects reading an entry whose size runs past the file', async () => {
-    const bytes = await oneEntryArchive();
-    dataViewOf(bytes).setUint32(directoryRecordAt(bytes) + 24, 0xffffff, true);
-    const entries = await openZip(new Blob([bytes]));
-
-    const failure = entries.get('a.txt')!();
-    await expect(failure).rejects.toBeInstanceOf(ZipReadError);
-    await expect(failure).rejects.toThrow('"a.txt" runs past the file');
-  });
-
-  it('rejects reading an entry whose local header lies past the file', async () => {
-    const bytes = await oneEntryArchive();
-    dataViewOf(bytes).setUint32(
-      directoryRecordAt(bytes) + 42,
-      // Short of the name-length field, which a read past the file's end would otherwise fail on as a RangeError.
-      bytes.length - 27,
-      true,
-    );
-    const entries = await openZip(new Blob([bytes]));
-
-    const failure = entries.get('a.txt')!();
-    await expect(failure).rejects.toBeInstanceOf(ZipReadError);
-    await expect(failure).rejects.toThrow('"a.txt" runs past the file');
-  });
-
-  it('rejects when the end-of-central-directory record claims more entries than the file actually holds', async () => {
-    const bytes = await oneEntryArchive();
-    const dataView = dataViewOf(bytes);
-    const trailerAt = bytes.length - 22;
-    // Both entry-count fields say 2 for one real entry, so the second directory pointer overruns.
-    dataView.setUint16(trailerAt + 8, 2, true);
-    dataView.setUint16(trailerAt + 10, 2, true);
-    await expect(openZip(new Blob([bytes]))).rejects.toThrow(
-      /central directory runs past the file/,
-    );
-  });
-
-  it('rejects a central directory entry with the wrong signature', async () => {
-    const bytes = await oneEntryArchive();
-    dataViewOf(bytes).setUint32(directoryRecordAt(bytes), 0xdeadbeef, true);
-    await expect(openZip(new Blob([bytes]))).rejects.toThrow(
-      /malformed central directory entry/,
-    );
-  });
-
-  it('names its errors, so a caller can tell them from any other failure', () => {
-    expect(new ZipReadError('x').name).toBe('ZipReadError');
-    expect(new ZipReadError('x')).toBeInstanceOf(Error);
   });
 });

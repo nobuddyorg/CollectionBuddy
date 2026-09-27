@@ -8,8 +8,8 @@ import {
 import {
   item,
   paginatedListItems,
-  fakeListImages,
   fakeSignUrls,
+  okResponse,
 } from './exportCategory.test-support';
 
 describe('exportCategory, paging through the items', () => {
@@ -18,7 +18,6 @@ describe('exportCategory, paging through the items', () => {
     const result = await exportCategory({
       category: { id: 'cat', name: 'Coins' },
       listItems,
-      listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
     });
     expect(result.itemCount).toBe(0);
@@ -31,7 +30,6 @@ describe('exportCategory, paging through the items', () => {
     const result = await exportCategory({
       category: { id: 'cat', name: 'Coins' },
       listItems,
-      listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
     });
     expect(result.itemCount).toBe(3);
@@ -46,7 +44,6 @@ describe('exportCategory, paging through the items', () => {
     const result = await exportCategory({
       category: { id: 'cat', name: 'Coins' },
       listItems,
-      listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
     });
     // Stopping on the first page would silently truncate a collection of exactly ITEM_PAGE_SIZE items.
@@ -62,7 +59,6 @@ describe('exportCategory, paging through the items', () => {
     const result = await exportCategory({
       category: { id: 'cat', name: 'Coins' },
       listItems,
-      listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
     });
     expect(result.itemCount).toBe(ITEM_PAGE_SIZE + 1);
@@ -77,7 +73,6 @@ describe('exportCategory, paging through the items', () => {
     await exportCategory({
       category: { id: 'cat', name: 'Coins' },
       listItems,
-      listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
     });
     expect(vi.mocked(listItems!).mock.calls).toEqual([
@@ -92,6 +87,29 @@ describe('exportCategory, paging through the items', () => {
     ]);
   });
 
+  it('gathers the photographs of every page, not only the first', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => okResponse([1])),
+    );
+    try {
+      const items = Array.from({ length: ITEM_PAGE_SIZE + 1 }, (_, i) =>
+        item({ id: `item-${i}` }),
+      );
+      const result = await exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        listItems: paginatedListItems(items, {
+          'item-0': ['1.webp'],
+          [`item-${ITEM_PAGE_SIZE}`]: ['1.webp', '2.webp'],
+        }),
+        signUrls: fakeSignUrls(),
+      });
+      expect(result.photoCount).toBe(3);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('reports the running item count after every page', async () => {
     const onProgress = vi.fn<(progress: ExportProgress) => void>();
     await exportCategory({
@@ -102,7 +120,6 @@ describe('exportCategory, paging through the items', () => {
           item({ id: `item-${i}` }),
         ),
       ),
-      listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
     });
     expect(

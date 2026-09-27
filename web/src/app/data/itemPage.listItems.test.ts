@@ -226,7 +226,7 @@ describe('listItems', () => {
 });
 
 describe('listItems, once a search term earns a filter', () => {
-  function searchRow(id: string, totalCount: number) {
+  function searchRow(id: string, totalCount: number, photoIds: string[] = []) {
     return {
       id,
       title: id,
@@ -236,6 +236,12 @@ describe('listItems, once a search term earns a filter', () => {
       place_lng: null,
       tags: [],
       total_count: totalCount,
+      images: photoIds.map((photoId) => ({
+        id: photoId,
+        item_id: id,
+        path_full: `u/${id}/${photoId}.webp`,
+        path_thumb: null,
+      })),
     };
   }
 
@@ -262,9 +268,9 @@ describe('listItems, once a search term earns a filter', () => {
     });
   });
 
-  it('strips total_count off each row and reads the exact total from it', async () => {
+  it('strips total_count and the photographs off each row and reads the exact total from it', async () => {
     const rawSearch = vi.fn().mockResolvedValue({
-      data: [searchRow('a', 5), searchRow('b', 5)],
+      data: [searchRow('a', 5, ['p1', 'p2']), searchRow('b', 5, ['p3'])],
       error: null,
     });
 
@@ -275,8 +281,12 @@ describe('listItems, once a search term earns a filter', () => {
 
     expect(error).toBeNull();
     expect(count).toBe(5);
-    // The RPC carries no photographs; the caller lists those itself.
-    expect(imageRows).toBeNull();
+    // Every row's photographs, in page order, so the page needs no read of its own for them.
+    expect(imageRows).toEqual([
+      { id: 'p1', item_id: 'a', path_full: 'u/a/p1.webp', path_thumb: null },
+      { id: 'p2', item_id: 'a', path_full: 'u/a/p2.webp', path_thumb: null },
+      { id: 'p3', item_id: 'b', path_full: 'u/b/p3.webp', path_thumb: null },
+    ]);
     expect(data).toEqual([
       {
         id: 'a',
@@ -333,7 +343,10 @@ describe('listItems, once a search term earns a filter', () => {
     const rawSearch = vi
       .fn()
       .mockResolvedValueOnce({ data: [], error: null })
-      .mockResolvedValueOnce({ data: [searchRow('a', 12)], error: null });
+      .mockResolvedValueOnce({
+        data: [searchRow('a', 12, ['p1'])],
+        error: null,
+      });
 
     const { data, error, count, imageRows } = await listItems(
       { categoryId: 'cat-1', search: 'coin', from: 18, to: 26 },
@@ -350,9 +363,9 @@ describe('listItems, once a search term earns a filter', () => {
     });
     expect(error).toBeNull();
     expect(count).toBe(12);
-    // Still the empty page it asked for, not the row that carried the total.
+    // Still the empty page it asked for, not the row that carried the total, nor its photographs.
     expect(data).toEqual([]);
-    expect(imageRows).toBeNull();
+    expect(imageRows).toEqual([]);
   });
 
   it('reports a count of zero when a later page is empty because nothing matches any more', async () => {

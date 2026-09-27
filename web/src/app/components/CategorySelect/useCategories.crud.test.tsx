@@ -24,7 +24,7 @@ vi.mock('../../data/categories', () => ({
 }));
 
 vi.mock('../../data/images', () => ({
-  listImagePathsForItems: vi.fn(),
+  listImagePathsForCategory: vi.fn(),
   removeImageObjects: vi.fn(),
   REMOVE_OBJECTS_BATCH_SIZE: 1000,
 }));

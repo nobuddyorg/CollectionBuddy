@@ -135,3 +135,48 @@ test.describe('sharing a collection', () => {
     }
   });
 });
+
+// Whichever side of UTC's date line is on the other day right now, so a UTC "today" would show.
+const OFF_UTC_TIMEZONE =
+  new Date().getUTCHours() < 11 ? 'Pacific/Pago_Pago' : 'Pacific/Kiritimati';
+
+test.describe('sharing a collection in German on an American browser', () => {
+  test.use({ locale: 'en-US', timezoneId: OFF_UTC_TIMEZONE });
+
+  test.beforeEach(async ({ on, page }) => {
+    await page.addInitScript(() => localStorage.setItem('lang', 'de'));
+    const app = on(page);
+    await app.categories.do.open(SEED.shareCategory);
+    await app.categories.do.openPanel();
+  });
+
+  test("starts the expiry picker at the collector's own today and dates the grant in German", async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: OFF_UTC_TIMEZONE,
+    }).format(new Date());
+    await expect(app.sharing.locators.inputs.expiry).toHaveAttribute(
+      'min',
+      today,
+    );
+
+    const grants = await grantsToOther();
+    try {
+      await app.sharing.do.setExpiry('2099-12-31');
+      await expect(app.sharing.locators.buttons.expiry).toHaveText(
+        'Bis 31.12.2099',
+      );
+      await app.sharing.do.invite(SEED.other.email);
+
+      await expect(
+        app.sharing.row(SEED.other.email).locators.expiry,
+      ).toHaveText('Läuft ab am 31.12.2099');
+    } finally {
+      const { error } = await grants.revoke();
+      if (error) throw error;
+    }
+  });
+});

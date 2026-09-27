@@ -1,5 +1,5 @@
 // One iteration of every journey, to prove the scripts and the target work before a heavier run.
-import { browse, search, write } from './lib/flows.js';
+import { browse, exportArchive, search, write } from './lib/flows.js';
 import {
   LIFECYCLE_TIMEOUTS,
   SUMMARY_TREND_STATS,
@@ -20,6 +20,7 @@ export const options = {
     shared_browse: { ...ONCE, exec: 'browseShared' },
     shared_search: { ...ONCE, exec: 'searchShared' },
     write: { ...ONCE, exec: 'writeEntry' },
+    export: { ...ONCE, exec: 'exportOwn' },
   },
   thresholds: correctnessThresholds([
     'browse',
@@ -27,6 +28,7 @@ export const options = {
     'shared_browse',
     'shared_search',
     'write',
+    'export',
   ]),
 };
 
@@ -48,6 +50,10 @@ export function searchShared(data) {
 
 export function writeEntry(data) {
   write(data.writer, data.writtenCategoryId);
+}
+
+export function exportOwn(data) {
+  exportArchive(data.owner, data.searchedCategoryId);
 }
 
 export function handleSummary(data) {

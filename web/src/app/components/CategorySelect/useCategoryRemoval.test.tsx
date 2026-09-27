@@ -25,6 +25,7 @@ function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   return {
     categories: CATEGORIES,
     isLoading: false,
+    loadFailed: false,
     isCreating: false,
     isDeleting: false,
     isRenaming: false,
@@ -187,6 +188,16 @@ describe('useCategoryRemoval deleting a category you own', () => {
         'Delete "Coins"? Its 3 entries and all their photographs will be permanently deleted.',
       ),
     ).toBeInTheDocument();
+  });
+
+  // String.replace read "$$" as "$" and "$'" as the rest of the sentence, misstating what goes.
+  it('names a category whose name holds $ sequences exactly as it is spelled', async () => {
+    const name = "US$$ coins $'";
+    const { result } = setUp({ selected: { ...CATEGORIES[0], name } });
+
+    void result.current.onDelete();
+
+    expect(await screen.findByText(`Delete "${name}"?`)).toBeInTheDocument();
   });
 
   it('deletes nothing when the warning is declined', async () => {

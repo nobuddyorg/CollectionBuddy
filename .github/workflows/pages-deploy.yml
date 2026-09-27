@@ -8,6 +8,9 @@ on:
     types: [completed]
     branches: [main]
   workflow_dispatch:
+  # A CI run auto-merge.yml's catch-up dispatches starts no workflow_run (GITHUB_TOKEN), so its green tip would wait for the next merge.
+  schedule:
+    - cron: '41 * * * *'
 
 # Read-only by default: `pages: write` and `id-token: write` at the top would reach the jobs that install and run npm packages.
 permissions:
@@ -19,11 +22,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # CI finishes out of order and can be re-run, so only main's current tip deploys; a dispatch deploys it only if CI passed on it.
+  # CI finishes out of order and can be re-run, so only main's current tip deploys; a dispatch or the schedule deploys it only if CI passed on it.
   gate:
     if: >-
       github.ref == 'refs/heads/main' && (
-        github.event_name == 'workflow_dispatch' || (
+        github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (
           github.event.workflow_run.conclusion == 'success' &&
           (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') &&
           github.event.workflow_run.head_repository.full_name == github.repository
@@ -32,7 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      actions: read # CI's runs of the commit, on a dispatch
+      actions: read # CI's runs of the commit, on a dispatch or the schedule
+      deployments: read # whether a run already deployed the commit, on the schedule
       contents: read # main's current tip
       pages: read # the site's URL, custom domain included
     outputs:
@@ -54,12 +58,24 @@ jobs:
             echo "::notice::Skipped: $CI_COMMIT is no longer main's tip ($tip), which deploys once CI passes on it."
             exit 0
           fi
-          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+          if [ "$EVENT_NAME" != workflow_run ]; then
             passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&status=success" \
               --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")] | length')
+            if [ "$passed" = 0 ] && [ "$EVENT_NAME" = schedule ]; then
+              echo "Skipped: CI has not passed on $COMMIT yet."
+              exit 0
+            fi
             if [ "$passed" = 0 ]; then
               echo "::error::CI has not passed on $COMMIT; nothing deploys."
               exit 1
+            fi
+          fi
+          # Any earlier run that reached migrate left a production deployment; a failed one is a human's to look at, not an hourly retry.
+          if [ "$EVENT_NAME" = schedule ]; then
+            tried=$(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=production&sha=$COMMIT" --jq length)
+            if [ "$tried" != 0 ]; then
+              echo "Skipped: a run already tried to deploy $COMMIT."
+              exit 0
             fi
           fi
           echo "sha=$COMMIT" >> "$GITHUB_OUTPUT"
@@ -87,32 +103,9 @@ jobs:
 
       # Not `supabase link` + `--linked`: that resolves db.<ref>.supabase.co, which has only an AAAA record, and runners have no IPv6. The URL is one secret so log masking covers it whole.
       - name: Show pending migrations
-        id: pending
-        run: |
-          set -euo pipefail
-          result=$(supabase db push --db-url "$SUPABASE_DB_URL" --dry-run --output-format json)
-          echo "$result"
-          # Anything but an explicit "up to date" takes the backup below.
-          case "$(jq -r '.upToDate' <<<"$result")" in
-            true) echo "migrations=false" >> "$GITHUB_OUTPUT" ;;
-            *) echo "migrations=true" >> "$GITHUB_OUTPUT" ;;
-          esac
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-
-      # Only when something will be applied, so a deploy without migrations never waits on the backup bucket; a failed backup stops the migration.
-      - name: Back up before migrating
-        if: steps.pending.outputs.migrations == 'true'
-        uses: ./.github/actions/backup-database
-        with:
-          label: pre-migration
-          db-url: ${{ secrets.SUPABASE_DB_URL }}
-          s3-endpoint: ${{ vars.BACKUP_S3_ENDPOINT }}
-          s3-region: ${{ vars.BACKUP_S3_REGION }}
-          s3-bucket: ${{ vars.BACKUP_S3_BUCKET }}
-          s3-access-key-id: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
-          s3-secret-access-key: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
-          age-recipient: ${{ vars.BACKUP_AGE_RECIPIENT }}
 
       - name: Apply migrations
         run: supabase db push --db-url "$SUPABASE_DB_URL"

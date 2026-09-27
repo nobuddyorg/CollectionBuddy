@@ -80,7 +80,7 @@ test.describe('a category shared at the editor role', () => {
         .single();
       expect(after!.role).toBe('viewer');
 
-      // tg_category_shares_enforce re-derives the owner from the category, so an error, not an empty result.
+      // tg_category_shares_enforce re-derives the owner from the category, so its own refusal, not an empty result.
       const { error: passedOn } = await apiAs(otherToken)
         .from('category_shares')
         .insert({
@@ -89,7 +89,16 @@ test.describe('a category shared at the editor role', () => {
           invited_email: 'nobody-invited@collectionbuddy.test',
           role: 'editor',
         });
-      expect(passedOn).not.toBeNull();
+      expect(passedOn).toMatchObject({
+        code: 'P0001',
+        message: 'ownership mismatch',
+      });
+      const { data: issued } = await apiAs(token)
+        .from('category_shares')
+        .select('id')
+        .eq('category_id', categoryId)
+        .eq('invited_email', 'nobody-invited@collectionbuddy.test');
+      expect(issued).toEqual([]);
     } finally {
       await unshare(token, shareId);
     }

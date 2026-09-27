@@ -40,11 +40,13 @@ interface ImageViewer {
   (): Locator;
   do: {
     close(): Promise<void>;
+    deleteImage(): Promise<void>;
     previous(): Promise<void>;
   };
   locators: {
     buttons: {
       close: Locator;
+      deleteImage: Locator;
       previous: Locator;
     };
     photo: Locator;
@@ -118,6 +120,7 @@ export function initImageViewer(page: Page): ImageViewer {
   const locators = {
     buttons: {
       close: root.getByTestId('close-image'),
+      deleteImage: root.getByTestId('delete-image'),
       previous: root.getByTestId('previous-image'),
     },
     photo: root.getByTestId('viewer-photo'),
@@ -126,6 +129,10 @@ export function initImageViewer(page: Page): ImageViewer {
   const interactions = {
     close: async () => {
       await locators.buttons.close.click();
+    },
+    // Opens the confirmation only: answering it is the caller's step.
+    deleteImage: async () => {
+      await locators.buttons.deleteImage.click();
     },
     previous: async () => {
       await locators.buttons.previous.click();

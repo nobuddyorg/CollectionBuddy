@@ -27,6 +27,7 @@ function categoriesState(
   return {
     categories: categories,
     isLoading: false,
+    loadFailed: false,
     isCreating: false,
     isDeleting: false,
     isRenaming: false,
@@ -126,6 +127,61 @@ describe('useCatalogue', () => {
 
     await waitFor(() => expect(result.current.catalogueReady).toBe(true));
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  // A failed load answers with no categories; a retry has to pick the selection the first load could not.
+  it('selects a category once a retry after a failed load answers', async () => {
+    const reload = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValue(categories);
+    vi.mocked(useCategories).mockReturnValue(categoriesState({ reload }));
+    const { result } = renderHook(() => useCatalogue(false, 'user-1'));
+    await waitFor(() => expect(result.current.catalogueReady).toBe(true));
+    expect(result.current.selectedCategoryId).toBeNull();
+
+    await act(() => result.current.retryLoad());
+
+    expect(reload).toHaveBeenCalledTimes(2);
+    expect(result.current.selectedCategoryId).toBe('a');
+  });
+
+  it('opens the remembered category on a retry', async () => {
+    window.localStorage.setItem(SELECTED_CATEGORY_KEY, 'b');
+    const reload = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValue(categories);
+    vi.mocked(useCategories).mockReturnValue(categoriesState({ reload }));
+    const { result } = renderHook(() => useCatalogue(false, 'user-1'));
+    await waitFor(() => expect(result.current.catalogueReady).toBe(true));
+
+    await act(() => result.current.retryLoad());
+
+    expect(result.current.selectedCategoryId).toBe('b');
+  });
+
+  // reload follows the language, so a retry after a switch has to toast in the language now shown.
+  it('retries through the reload current at the time, not the first one', async () => {
+    const firstReload = vi.fn().mockResolvedValue([]);
+    vi.mocked(useCategories).mockReturnValue(
+      categoriesState({ reload: firstReload }),
+    );
+    const { result, rerender } = renderHook(() =>
+      useCatalogue(false, 'user-1'),
+    );
+    await waitFor(() => expect(result.current.catalogueReady).toBe(true));
+    const currentReload = vi.fn().mockResolvedValue(categories);
+    vi.mocked(useCategories).mockReturnValue(
+      categoriesState({ reload: currentReload }),
+    );
+    rerender();
+
+    await act(() => result.current.retryLoad());
+
+    expect(firstReload).toHaveBeenCalledTimes(1);
+    expect(currentReload).toHaveBeenCalled();
+    expect(result.current.selectedCategoryId).toBe('a');
   });
 
   // Naming it in another callback's dependency array has to be free.
