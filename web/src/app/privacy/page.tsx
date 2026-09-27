@@ -159,7 +159,6 @@ export default function PrivacyPage() {
           <li>{t('privacy.retention_orphans')}</li>
           <li>{t('privacy.retention_account')}</li>
           <li>{t('privacy.retention_sharing')}</li>
-          <li>{t('privacy.retention_backups')}</li>
           <li>{t('privacy.retention_logs')}</li>
         </List>
       </Section>

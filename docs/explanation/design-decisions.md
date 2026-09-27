@@ -148,24 +148,17 @@ So `create_items_in_category()` takes the entries as a JSON array and inserts th
 
 `delete_item_if_orphan()` removes an item once it belongs to zero categories. The first version ran `FOR EACH ROW`, one `EXISTS` probe per deleted `item_categories` row — deleting a 500-item category meant ~500 sequential lookups. It now runs `FOR EACH STATEMENT` with a transition table, one set-based `DELETE ... WHERE id IN (...) AND NOT EXISTS (...)`. Same logic, one query instead of N.
 
-## Why production is backed up by a workflow
+## Why production has no off-site backup
 
-The project runs on Supabase's Free plan, which keeps no database backup, and no plan's backup contains Storage objects. Production is migrated unattended on every merge that passes CI and swept daily by an irreversible `service_role` delete, so one bad migration or sweep regression would be permanent. Moving to Pro would buy daily database backups and still leave the photographs uncovered, so `backup.yml` does both halves on the Free plan (#736).
-
-- **Encrypted on the runner, to a public key.** The repository is public and so are its Actions artifacts. age needs only the recipient in GitHub; the identity that decrypts stays off it, so a leaked backup key or bucket exposes ciphertext.
-- **An S3-compatible bucket, not a service integration.** Any provider works through the AWS CLI already on the runner; the owner picks it by setting three variables.
-- **Photographs are copied once.** An object's path never changes ([above](#why-a-storage-objects-path-can-never-change)), so a name already mirrored holds the same bytes and a daily run downloads only what is new, which keeps Free-plan egress small. A removed object moves to a dated prefix the bucket's lifecycle rule expires, rather than being kept forever or deleted at once: long enough to outlive the sweep's 48 h grace, not longer than a restore needs.
-- **The listing and the key come from the Management API**, as in the sweep: no second long-lived Storage credential.
-- **Storage's tables are not in the dump.** A new project gets the bucket from `0007` and each object's row from its re-upload; restoring either from the dump would collide with both, and `postgres` may not write Storage's other tables at all (found rehearsing the restore).
-- **The pre-migration dump runs only when something is pending.** A deploy without migrations never depends on the backup bucket; one with migrations stops rather than migrate without a copy.
+The project runs on Supabase's Free plan, which keeps no database backup, and no plan's backup contains Storage objects. A workflow once dumped the database and mirrored the photographs, encrypted, to an S3-compatible bucket, and `migrate` refused to apply a migration without a fresh dump (#736). It needed a bucket, its keys and an age recipient in the `production` environment that the owner could not provide, so every deploy with a pending migration stopped and nothing reached production; it was removed. A bad migration or a sweep regression is therefore permanent. What guards against them is upstream: expand-then-contract migrations tested against a populated database, pgTAP and RLS e2e cases, and the sweep's 48 h grace, dry runs and mass-deletion ceiling ([Sweep orphaned photographs](../how-to/developer-guide.md#sweep-orphaned-photographs)). Bringing the backup back means restoring that workflow and its configuration together.
 
 ## Why the Management API tokens are scoped per job
 
-The sweep and the backup fetch the secret key per run so it is never stored, but the token they fetched it with was a classic one: every permission on every organization and project on the owner's account, including revealing every key, running any SQL and deleting projects, and it reached every deploy and an hourly job (#748). Now each job holds a token scoped to this project and to the endpoints it calls ([Configuration](../reference/configuration.md#management-api-tokens)).
+The sweep fetches the secret key per run so it is never stored, but the token it fetched it with was a classic one: every permission on every organization and project on the owner's account, including revealing every key, running any SQL and deleting projects, and it reached every deploy and an hourly job (#748). Now each job holds a token scoped to this project and to the endpoints it calls ([Configuration](../reference/configuration.md#management-api-tokens)).
 
 - **`migrate` needs none.** It already holds the database URL; `supabase db query` sends the `NOTIFY` over it, and PostgREST receives it when that statement commits.
 - **Database: Read, not Read-write.** Read-write runs any SQL as `postgres`, so a leaked token could plant a function, trigger or role that outlives every key rotation. The read-only endpoint runs as `supabase_read_only_user`; granting it `orphan_sweep_plan()` in `0024` adds nothing that role could not select itself.
-- **Two tokens, not one per workflow.** The hourly Auth check needs only Auth Config: Read, so it no longer carries a token that reveals keys. The sweep and the backup need the same three permissions; splitting them would narrow nothing and double the rotation.
+- **Two tokens, not one per workflow.** The hourly Auth check needs only Auth Config: Read, so it no longer carries a token that reveals keys. The sweep needs the other three permissions.
 - **What remains.** The secret key that token reveals still reads and deletes every collector's data; that is the price of not storing it, and the 90-day expiry bounds how long an unnoticed leak stays useful.
 
 ## Why the deploy waits for CI on `main`
@@ -272,11 +265,11 @@ What would regress under load is gated deterministically instead: `075_query_pla
 
 ## Why the privacy notice is a page of its own
 
-[`web/src/app/privacy/page.tsx`](../../web/src/app/privacy/page.tsx) is the Art. 13 GDPR notice: the controller, the data and where it comes from, purposes and legal bases, recipients and transfers outside the EU, retention (backups and logs included), what the browser stores, and the user's rights. Anyone with a Google account can sign in, and sharing stores other people's email addresses, so the app is not single-user.
+[`web/src/app/privacy/page.tsx`](../../web/src/app/privacy/page.tsx) is the Art. 13 GDPR notice: the controller, the data and where it comes from, purposes and legal bases, recipients and transfers outside the EU, retention (logs included), what the browser stores, and the user's rights. Anyone with a Google account can sign in, and sharing stores other people's email addresses, so the app is not single-user.
 
 - **A route, not a dialog.** It needs no session, so it opens before sign-in, a sign-up flow or the Google consent screen can link it, and the service worker keeps it for offline. The sign-in page, the account menu and the help link it.
 - **Through the app's i18n.** Every sentence is a `privacy.*` key in both dictionaries, so `parity.test.ts` catches a missing translation. The controller's name and address are not translated and sit in the page itself.
-- **Derived from the code, not copied.** Each claim traces to something in this repository or its hosted configuration: Google sign-in and the metadata Auth keeps, the uploader's canvas re-encode dropping EXIF (an import stores archive bytes as they are), Photon and OpenStreetMap tiles in the CSP, the 48 h sweep, `backup.yml`'s 30-day expiry, the Free plan's log retention, and the `localStorage` keys. The Supabase region and where the backups live came from the owner.
+- **Derived from the code, not copied.** Each claim traces to something in this repository or its hosted configuration: Google sign-in and the metadata Auth keeps, the uploader's canvas re-encode dropping EXIF (an import stores archive bytes as they are), Photon and OpenStreetMap tiles in the CSP, the 48 h sweep, the Free plan's log retention, and the `localStorage` keys. The Supabase region came from the owner.
 - **Kept in sync in the same change.** A change to what the app collects, whom it sends data to (a new origin in the CSP is the usual sign), how long it keeps it, or what it stores in the browser updates the notice and its "Last updated" line in the same PR. `web/public/privacy-policy.txt`, the address the Google consent screen once named, only points here.
 
 ## npm audit: what's overridden and what's accepted risk
