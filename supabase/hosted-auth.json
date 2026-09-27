@@ -12,6 +12,6 @@
   "saml_enabled": false,
   "security_manual_linking_enabled": false,
   "security_refresh_token_reuse_interval": 10,
-  "site_url": "https://nobuddyorg.github.io/CollectionBuddy/",
+  "site_url": "https://nobuddy.org/CollectionBuddy/",
   "uri_allow_list": ""
 }
