@@ -129,8 +129,8 @@ describe('isQueryLongEnough', () => {
     expect(isQueryLongEnough('  abc  ')).toBe(true);
   });
 
-  it('accepts a two-character non-ASCII query, matching the PostgREST filter', () => {
-    expect(isQueryLongEnough('京')).toBe(false);
-    expect(isQueryLongEnough('京都')).toBe(true);
+  it('holds a non-ASCII query to the same minimum, matching the PostgREST filter', () => {
+    expect(isQueryLongEnough('京都')).toBe(false);
+    expect(isQueryLongEnough('Köln')).toBe(true);
   });
 });

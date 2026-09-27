@@ -16,8 +16,8 @@ describe('searchStatusFor', () => {
     expect(searchStatusFor('abc', 5)).toEqual({ kind: 'active', total: 5 });
   });
 
-  it('uses the lower non-ASCII floor', () => {
-    expect(searchStatusFor('日本', 3)).toEqual({ kind: 'active', total: 3 });
-    expect(searchStatusFor('日', 40)).toEqual({ kind: 'tooShort' });
+  it('holds a non-ASCII term to the same minimum', () => {
+    expect(searchStatusFor('Öl', 40)).toEqual({ kind: 'tooShort' });
+    expect(searchStatusFor('Öle', 3)).toEqual({ kind: 'active', total: 3 });
   });
 });

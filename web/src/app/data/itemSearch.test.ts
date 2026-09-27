@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  SEARCH_MIN_LENGTH,
-  SEARCH_MIN_LENGTH_NON_ASCII,
-  likePatternFor,
-  searchMinLength,
-} from './itemSearch';
+import { SEARCH_MIN_LENGTH, likePatternFor } from './itemSearch';
 
 describe('likePatternFor', () => {
   it('produces the bare %...% pattern for a term long enough to use it', () => {
@@ -24,13 +19,14 @@ describe('likePatternFor', () => {
     expect(likePatternFor('')).toBeNull();
   });
 
-  // Two characters earns a pattern here, where the same length declines for plain ASCII above.
-  it('filters a two-character non-ASCII term', () => {
-    expect(likePatternFor('日本')).toBe('%日本%');
+  // `%Öl%` holds no trigram either, so the index could not narrow it.
+  it('declines a two-character non-ASCII term like any other', () => {
+    expect(likePatternFor('Öl')).toBeNull();
+    expect(likePatternFor('日本')).toBeNull();
   });
 
-  it('still declines a one-character non-ASCII term', () => {
-    expect(likePatternFor('日')).toBeNull();
+  it('filters a three-character non-ASCII term', () => {
+    expect(likePatternFor('Öle')).toBe('%Öle%');
   });
 
   it('escapes % and _ so they are not treated as wildcards', () => {
@@ -40,19 +36,5 @@ describe('likePatternFor', () => {
 
   it('escapes a literal backslash for the LIKE layer', () => {
     expect(likePatternFor('a\\b')).toBe('%a\\\\b%');
-  });
-});
-
-describe('searchMinLength', () => {
-  it('is the ASCII minimum for a plain Latin term', () => {
-    expect(searchMinLength('ab')).toBe(SEARCH_MIN_LENGTH);
-  });
-
-  it('is lower for a term carrying any non-ASCII character', () => {
-    expect(searchMinLength('日本')).toBe(SEARCH_MIN_LENGTH_NON_ASCII);
-  });
-
-  it('drops to the non-ASCII floor even for a single non-ASCII character mixed with ASCII', () => {
-    expect(searchMinLength('a€')).toBe(SEARCH_MIN_LENGTH_NON_ASCII);
   });
 });
