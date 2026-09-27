@@ -16,6 +16,7 @@ interface AccountMenu {
       signOut: Locator;
     };
     languages: { de: Locator; en: Locator };
+    privacyLink: Locator;
     themes: { system: Locator; light: Locator; dark: Locator };
   };
 }
@@ -32,6 +33,7 @@ export function initAccountMenu(page: Page): AccountMenu {
       de: page.getByTestId('lang-de'),
       en: page.getByTestId('lang-en'),
     },
+    privacyLink: page.getByTestId('menu-privacy-link'),
     themes: {
       system: page.getByTestId('theme-system'),
       light: page.getByTestId('theme-light'),
