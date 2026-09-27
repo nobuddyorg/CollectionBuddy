@@ -21,8 +21,21 @@ const anon = requireEnv(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 );
 
+// supabase-js's own default for this URL, spelled out so sessions stored before it survive and a sign-out can clear it.
+export const AUTH_STORAGE_KEY = `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
+
+/** Removes the stored session, which auth-js's sign-out leaves in place when it cannot refresh an expired one (offline). */
+export function forgetStoredSession(): void {
+  try {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    // Refused storage holds no session: auth-js keeps it in memory then, gone with the tab.
+  }
+}
+
 export const supabase = createClient<Database>(url, anon, {
   auth: {
+    storageKey: AUTH_STORAGE_KEY,
     // auth-js defaults to the implicit flow, which leaks the refresh token to history via the URL fragment.
     flowType: 'pkce',
     persistSession: true,

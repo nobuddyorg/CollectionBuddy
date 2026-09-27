@@ -11,7 +11,11 @@ import { forgetUserData } from './userData';
 const replace = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
 const signOut = vi.hoisted(() => vi.fn());
-vi.mock('./supabase', () => ({ supabase: { auth: { signOut } } }));
+const forgetStoredSession = vi.hoisted(() => vi.fn());
+vi.mock('./supabase', () => ({
+  forgetStoredSession,
+  supabase: { auth: { signOut } },
+}));
 vi.mock('./userData', () => ({ forgetUserData: vi.fn() }));
 
 const SIGN_OUT_ERROR =
@@ -29,6 +33,11 @@ function setUp() {
 }
 
 function expectSessionEnded() {
+  expect(forgetStoredSession).toHaveBeenCalledOnce();
+  // Before the revoke, sign-out would find no session to revoke.
+  expect(forgetStoredSession.mock.invocationCallOrder[0]).toBeGreaterThan(
+    signOut.mock.invocationCallOrder[0],
+  );
   expect(forgetUserData).toHaveBeenCalledOnce();
   expect(replace).toHaveBeenCalledExactlyOnceWith('/login');
 }
@@ -61,9 +70,9 @@ describe('useSignOut', () => {
     expectSessionEnded();
   });
 
-  // auth-js already clears the local session when the revoke fails; a second, local-only call adds nothing.
-  it('reports a failed revoke and still ends the session here, without a second sign-out call', async () => {
-    const error = new Error('revoke failed');
+  // auth-js returns this without removing the stored session: an expired token it cannot refresh offline.
+  it('reports a sign-out that could not reach the server, and still removes the stored session here', async () => {
+    const error = new Error('Failed to fetch');
     signOut.mockResolvedValue({ error });
     const { result } = setUp();
 
@@ -75,11 +84,9 @@ describe('useSignOut', () => {
     expectSessionEnded();
   });
 
-  it('clears the local session when sign-out throws, and still ends the session', async () => {
+  it('reports a sign-out that throws, and still removes the stored session here', async () => {
     const thrown = new Error('lock timed out');
-    signOut
-      .mockRejectedValueOnce(thrown)
-      .mockResolvedValueOnce({ error: null });
+    signOut.mockRejectedValue(thrown);
     const { result } = setUp();
 
     await act(() => result.current.signOut());
@@ -89,17 +96,7 @@ describe('useSignOut', () => {
       'sign out unexpected error',
       thrown,
     );
-    expect(signOut).toHaveBeenLastCalledWith({ scope: 'local' });
-    expectSessionEnded();
-  });
-
-  it('still ends the session when the local clear after a throw fails too', async () => {
-    signOut.mockRejectedValue(new Error('offline'));
-    const { result } = setUp();
-
-    await act(() => result.current.signOut());
-
-    expect(signOut).toHaveBeenCalledTimes(2);
+    expect(signOut).toHaveBeenCalledOnce();
     expectSessionEnded();
   });
 });
