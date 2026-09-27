@@ -1,0 +1,33 @@
+name: Report a production failure
+description: "Comments this run's link on the newest `production-health` issue, reopening it when closed and opening one when none exists, so its subscribers get a GitHub notification. Needs `issues: write`."
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+        label=production-health
+        run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT"
+        guide="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/main/docs/how-to/developer-guide.md#watch-production-health"
+
+        # Newest first, closed included: one long-lived issue, open while something on main is failing.
+        latest=$(gh issue list --label "$label" --state all --limit 1 --json number,state --jq '.[] | "\(.number) \(.state)"')
+        if [ -z "$latest" ]; then
+          gh label create "$label" --force --color B60205 --description "A production workflow failed on main"
+          issue_url=$(gh issue create --title "Production health" --label "$label" \
+            --body "Every failed run of a production workflow on \`main\` comments here. Close this issue once production is healthy again; the next failure reopens it. Subscribe to get notified: [Watch production health]($guide).")
+          number=${issue_url##*/}
+        else
+          read -r number state <<<"$latest"
+          if [ "$state" = CLOSED ]; then
+            gh issue reopen "$number"
+          fi
+        fi
+
+        gh issue comment "$number" \
+          --body "**$GITHUB_WORKFLOW** failed on \`$GITHUB_REF_NAME\` at ${GITHUB_SHA:0:7}, triggered by \`$GITHUB_EVENT_NAME\`: $run_url"
+        echo "::notice::Reported this failure on issue #$number."

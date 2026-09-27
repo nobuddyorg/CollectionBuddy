@@ -3,10 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 import { expect, test } from '../test';
 import { SEED } from '../fixtures';
 import { clearCollection, ensureUser, mintSession } from '../collectors';
-import { apiAs } from './helpers';
+import { apiAs, share } from './helpers';
 
 const BUCKET = 'item-images';
 const probe = () => new Blob(['probe'], { type: 'image/webp' });
+
+/** The operator's client: the secret key, which reaches Auth's admin API and every Storage prefix. */
+const admin = () =>
+  createClient(
+    process.env.E2E_SUPABASE_URL!,
+    process.env.E2E_SUPABASE_SERVICE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
 
 async function collector(email: string) {
   const userId = await ensureUser(email, SEED.accountDeletion.password);
@@ -220,13 +228,74 @@ test.describe('deleting one’s own account', () => {
     } finally {
       // Left for the daily sweep in production; nobody's token reaches it now.
       if (strandedPhoto) {
-        const admin = createClient(
-          process.env.E2E_SUPABASE_URL!,
-          process.env.E2E_SUPABASE_SERVICE_KEY!,
-          { auth: { persistSession: false, autoRefreshToken: false } },
-        );
-        await admin.storage.from(BUCKET).remove([strandedPhoto]);
+        await admin().storage.from(BUCKET).remove([strandedPhoto]);
       }
+      await clearCollection(keeper.client, keeper.userId);
+    }
+  });
+});
+
+// The operator's path for a request by email (developer-guide.md): objects first, then the Auth user, whose rows 0034 cascades.
+test.describe('an operator deleting the Auth user', () => {
+  test('takes its rows and the grants it made, leaves another’s, and its leftover token writes nothing', async ({}, testInfo) => {
+    const slot = testInfo.parallelIndex;
+    const leaver = await collector(
+      `e2e-rls-removed-${slot}@collectionbuddy.test`,
+    );
+    const keeper = await collector(
+      `e2e-rls-remaining-${slot}@collectionbuddy.test`,
+    );
+
+    try {
+      const left = await collectionWithEntry(leaver.token, 'rls-removed');
+      const ownPhoto = await photograph(leaver.token, {
+        uploaderId: leaver.userId,
+        itemId: left.itemId,
+        name: 'own',
+      });
+      await share({
+        token: leaver.token,
+        categoryId: left.categoryId,
+        invitedEmail: keeper.email,
+      });
+      const kept = await collectionWithEntry(keeper.token, 'rls-remaining');
+      const keeperApi = apiAs(keeper.token);
+      const { data: sharedBefore } = await keeperApi
+        .from('categories')
+        .select('id')
+        .eq('id', left.categoryId);
+      expect(sharedBefore).toHaveLength(1);
+
+      const operator = admin();
+      const { error: removeError } = await operator.storage
+        .from(BUCKET)
+        .remove([ownPhoto]);
+      expect(removeError).toBeNull();
+      const { error } = await operator.auth.admin.deleteUser(leaver.userId);
+      expect(error).toBeNull();
+
+      const { data: sharedAfter } = await keeperApi
+        .from('categories')
+        .select('id')
+        .eq('id', left.categoryId);
+      expect(sharedAfter).toEqual([]);
+      const { data: sharedEntry } = await keeperApi
+        .from('items')
+        .select('id')
+        .eq('id', left.itemId);
+      expect(sharedEntry).toEqual([]);
+      const { data: keptItem } = await keeperApi
+        .from('items')
+        .select('id')
+        .eq('id', kept.itemId);
+      expect(keptItem).toHaveLength(1);
+
+      // A token outlives its user until it expires; the foreign keys refuse a row under a uid no one can sign in as.
+      const { error: writeError } = await apiAs(leaver.token)
+        .from('categories')
+        .insert({ name: 'rls-after-the-account' });
+      expect(writeError?.code).toBe('23503');
+    } finally {
       await clearCollection(keeper.client, keeper.userId);
     }
   });

@@ -105,7 +105,7 @@ export function formattingLocale(
   );
 }
 
-function detectLanguage(): Language {
+export function detectLanguage(): Language {
   let stored: string | null = null;
   try {
     stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);

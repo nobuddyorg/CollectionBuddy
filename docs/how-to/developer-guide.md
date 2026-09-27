@@ -183,9 +183,12 @@ supabase test db
 | `075_query_plans_test.sql` | That every index-backed query can reach its index, and picks it at a realistic size |
 | `080_orphan_sweep_test.sql` | What the orphan sweep may delete: both path columns, no uuid cast, the 48 h grace, other buckets, the mass-deletion ceiling; `supabase_read_only_user` and no API role runs it, in a read-only transaction |
 | `085_delete_own_account_test.sql` | Deleting one's own account: the objects-first guard, what goes (rows, grants to its email, the Auth user) and what another account keeps |
+| `090_owned_rows_follow_the_auth_user_test.sql` | Deleting the Auth user as the dashboard does: every owner key cascades and is validated, what goes and what another account keeps, what the sweep may then take, and a leftover token's refused write |
 
 `_helpers.psql` holds the shared fixtures; it is `.psql` because
-`supabase test db` collects every `.sql` file as a test. pgTAP proves the
+`supabase test db` collects every `.sql` file as a test. Its `auth_as()` also
+creates the `auth.users` row it names, if missing, since every owner column
+references one (`0034`). pgTAP proves the
 policy, trigger and constraint logic fast; `e2e/signed-in/rls/` proves the same
 properties through the real PostgREST-and-JWT pipeline and is the only place
 the Storage API and the bytes behind a `storage.objects` row are exercised. A
@@ -605,7 +608,8 @@ One-time setup for a fork:
    deploy takes `basePath` from the Pages site URL. A fork's own Site URL
    still goes into `supabase/hosted-auth.json`.
 5. Optional: `STRYKER_DASHBOARD_API_KEY` to publish mutation reports;
-   `keep-alive.yml` stays enabled on a free-tier project.
+   `keep-alive.yml` stays enabled on a free-tier project
+   ([Keep the schedules alive](#keep-the-schedules-alive)).
 6. The README's CodeQL badge relies on GitHub's default code-scanning setup
    (Settings → Code security), a per-repo setting that does not carry over.
 7. Settings → Branches (or Rules → Rulesets) → `main`: **Require status checks
@@ -621,6 +625,9 @@ One-time setup for a fork:
    classic access token before it lands; `prek`'s gitleaks scan covers the
    legacy JWT and the database URL, which GitHub has no pattern for
    ([Configuration](../reference/configuration.md#github-actions-secrets)).
+9. Create and pin the *Production health* issue, labelled
+   `production-health`, so failures notify you
+   ([Watch production health](#watch-production-health)).
 
 ## Roll back a bad deploy
 
@@ -778,6 +785,128 @@ dry run is under it, then enable the workflow again.
 A change to the plan, its migration or the workflow runs CI's pgTAP job
 (`080_orphan_sweep_test.sql`); after it merges, run the default dry run once
 before the next 04:30 run.
+
+## Honour an account deletion request
+
+The collector's own **Delete account**, at the bottom of the account menu
+([user guide](user-guide.md#delete-your-account)), is the way to go: it
+removes the photographs first, then `delete_own_account()` (`0033`) deletes
+the rows, the grants made to the collector's email and the Auth user. Reply to
+a request by email with that, and delete by hand only when the collector
+cannot sign in any more. Make sure the request comes from the account's own
+address.
+
+By hand, it is the same order: objects, grants to the email, then the user.
+Every step runs against production, so it is the owner's, never an
+assistant's.
+
+1. **Find the user.** Dashboard → Authentication → Users, search the email,
+   copy the user's UID.
+2. **Remove the photographs from Storage.** Either way needs no secret key;
+   never paste one into a shell or a chat (CLAUDE.md keeps service-role-level
+   keys in CI only).
+   - **Now:** list the user's photograph paths in the dashboard's SQL editor
+     and delete them in the Storage browser (bucket `item-images`):
+
+     ```sql
+     select path
+     from public.images as im
+     cross join lateral unnest(array[im.path_full, im.path_thumb]) as path
+     where im.user_id = '<uid>' and path is not null
+     order by path;
+     ```
+
+     Do not delete the whole `<uid>/` folder: a photograph the user added as
+     an editor to someone else's entry lies there and belongs to that entry.
+     This must then return 0:
+
+     ```sql
+     select count(*)
+     from public.images as im
+     join storage.objects as o
+       on o.bucket_id = 'item-images' and o.name in (im.path_full, im.path_thumb)
+     where im.user_id = '<uid>';
+     ```
+
+   - **Or let the sweep do it:** skip to step 3. Deleting the user removes
+     their photograph records (`0034`), and the daily orphan sweep deletes the
+     objects once they are 48 hours old, so within about three days. If that
+     is more than max(50, 5% of the bucket) objects, the scheduled run
+     refuses: review its dry run and run it with `allow_mass_delete`
+     ([above](#sweep-orphaned-photographs)).
+
+3. **Delete the grants made to the email**, which nothing ties to the user,
+   so no cascade reaches them:
+   `delete from public.category_shares where invited_email = lower('<email>');`
+4. **Delete the user**: Authentication → Users → ⋯ → *Delete user*. Since
+   `0034` every row it owns cascades: collections with their shares and
+   links, entries, including the ones it filed in other people's collections,
+   and photograph records. Entries editors filed in its collections go with
+   them, as a collection delete takes them.
+5. **Leave the rest to the sweep.** The objects of those editors' entries, and
+   anything step 2 missed, are unnamed now; the [sweep](#sweep-orphaned-photographs)
+   deletes them 48 h later. A large account can push that over its
+   mass-deletion ceiling, and the scheduled run then refuses: handle it as
+   [When a run refuses](#sweep-orphaned-photographs) says.
+
+Users deleted in the dashboard before `0034` left their rows behind; `0034`
+deleted those rows when it deployed, so their photographs reach the sweep 48 h
+later, possibly past the ceiling in the same way.
+
+## Watch production health
+
+Monitoring stays inside GitHub
+([why](../explanation/design-decisions.md#why-production-monitoring-stays-inside-github)).
+Every workflow that deploys or runs on a schedule ends in a `report-failure`
+job: `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml`, and
+`auto-merge.yml`, for its `catch-up-ci`, which brings auto-merged bumps to
+production. When a run on `main` fails, that job
+([`report-production-failure`](../../.github/actions/report-production-failure/action.yml))
+comments the workflow, commit and run link on the newest issue labelled
+`production-health`, reopening it if it is closed, and opens one, creating
+the label, if none exists. Close the issue once production is healthy again;
+the next failure reopens it. Only that job holds `issues: write`.
+
+**Who is told.** A comment notifies whoever is subscribed to the issue, and a
+new or reopened issue also everyone watching the repository with *All
+Activity*. The action posts as `github-actions[bot]`, so nobody is subscribed
+by default. Once, as the owner: create the issue yourself (title *Production
+health*, label `production-health`), pin it, and stay subscribed as its
+author; or subscribe on the issue the first failure opens. Apart from that,
+GitHub emails a failed run only to the account that triggered it, and for a
+scheduled run to whoever last changed its `cron` line, if their notification
+settings send Actions email.
+
+**What it cannot see.** A run that never happens: a disabled workflow (below)
+leaves no failed run to report. Errors in a visitor's browser: `error.tsx`
+and, when the root layout itself throws, `global-error.tsx` show a translated
+screen with a reload button, and the error reaches only that browser's
+console.
+
+### Keep the schedules alive
+
+In a public repository, GitHub disables a workflow with a `schedule` trigger
+once the repository has had no activity for 60 days; commits count, the
+workflows' own runs do not. It disables the whole workflow, not only its
+schedule, and all four above have one: a disabled `pages-deploy.yml` also
+ignores CI's `workflow_run`, so the first merge after a quiet spell deploys
+nothing. GitHub emails a warning some days before. With `keep-alive.yml`
+disabled, Supabase pauses the Free project after 7 days of low activity, with
+only Supabase's own email as a warning; restore it from the Supabase
+dashboard.
+
+What keeps them alive is any commit on `main`: a merged pull request,
+Dependabot's weekly auto-merged patch bumps included. Nothing guarantees one,
+so after a quiet spell, or on GitHub's warning:
+
+```bash
+gh workflow list --all                     # a disabled one shows disabled_inactivity
+gh workflow enable keep-alive.yml          # likewise pages-deploy.yml, cleanup-orphaned-photos.yml, auto-merge.yml
+```
+
+or Actions → the workflow → *Enable workflow*. Re-enabling
+`cleanup-orphaned-photos.yml` is safe only if it was not disabled on purpose
+([Sweep orphaned photographs](#sweep-orphaned-photographs)).
 
 ## Migrate to publishable and secret keys
 
