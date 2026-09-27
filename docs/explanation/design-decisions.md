@@ -177,13 +177,13 @@ A plpgsql function caches its query plans for the life of the connection, and a 
 
 The project runs on Supabase's Free plan, which keeps no database backup, and no plan's backup contains Storage objects. A workflow once dumped the database and mirrored the photographs, encrypted, to an S3-compatible bucket, and `migrate` refused to apply a migration without a fresh dump (#736). It needed a bucket, its keys and an age recipient in the `production` environment that the owner could not provide, so every deploy with a pending migration stopped and nothing reached production; it was removed. A bad migration or a sweep regression is therefore permanent. What guards against them is upstream: expand-then-contract migrations tested against a populated database, pgTAP and RLS e2e cases, and the sweep's 48 h grace, dry runs and mass-deletion ceiling ([Sweep orphaned photographs](../how-to/developer-guide.md#sweep-orphaned-photographs)). Bringing the backup back means restoring that workflow and its configuration together.
 
-## Why production monitoring stays inside GitHub
+## Why production has no alerting
 
-Failures went unnoticed: Deploy Pages failed on seven consecutive runs on `main` over 37 hours, and nobody looked, because GitHub's own email goes only to whoever triggered a run (#791). The owner chose to watch production with what the repository already has, rather than an uptime or error-reporting service that needs an account of its own: a failed run of a production workflow on `main` comments on one `production-health` issue, whose subscribers GitHub notifies ([Watch production health](../how-to/developer-guide.md#watch-production-health)).
+Failures went unnoticed: Deploy Pages failed on seven consecutive runs on `main` over 37 hours, and nobody looked, because GitHub's own email goes only to whoever triggered a run (#791). A failure job that commented on a pinned issue was built and then removed at the owner's call: production is watched by hand, with GitHub's own email and the Actions tab ([Notice a failed production run](../how-to/developer-guide.md#notice-a-failed-production-run)).
 
 - **No client error sink.** Collecting browser errors would need a table that `anon` may insert into, with its RLS, grants and abuse limits, and a change to what the privacy notice says the app collects. A render error shows a translated screen with a reload button (`error.tsx`, and `global-error.tsx` for the root layout) and reaches only that browser's console.
-- **No external uptime check.** The smoke test and `build`'s `keepalive()` call exercise the live site and project on every deploy, and the daily keep-alive in between; each failure reaches the issue.
-- **What that leaves blind.** A workflow GitHub disabled after 60 quiet days never fails, so nothing reports it ([Keep the schedules alive](../how-to/developer-guide.md#keep-the-schedules-alive)); an outage between runs shows only in Supabase's dashboard, whose Free plan keeps logs for a day.
+- **No external uptime check.** The smoke test and `build`'s `keepalive()` call exercise the live site and project on every deploy, and the daily keep-alive in between.
+- **What that leaves blind.** A failed run nobody opens; a workflow GitHub disabled after 60 quiet days, which never fails ([Keep the schedules alive](../how-to/developer-guide.md#keep-the-schedules-alive)); an outage between runs, which shows only in Supabase's dashboard, whose Free plan keeps logs for a day.
 
 ## Why the Management API tokens are scoped per job
 
