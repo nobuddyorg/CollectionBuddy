@@ -380,7 +380,7 @@ select pg_temp.plan_never_mentions(
   'search_category_items checks the grant once per call, not per row'
 );
 
--- A SQL function's body gets a generic plan in Postgres 17, costed on an average category rather than the one named (0018).
+-- A SQL function's body gets a generic plan in Postgres 17, costed on an average category rather than the one named (0018); the orphan cleanup's, on its first call's row counts (0031).
 reset role;
 select is(
   (select array_agg(p.proname::text order by p.proname)
@@ -388,8 +388,8 @@ select is(
    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
      and coalesce(p.proconfig, '{}') @> array['plan_cache_mode=force_custom_plan']),
-  array['list_category_places', 'search_category_items'],
-  'the map and search RPCs plan each call for the category it names'
+  array['delete_item_if_orphan', 'list_category_places', 'search_category_items'],
+  'the map and search RPCs plan each call for the category it names, the orphan cleanup for the links it lost'
 );
 
 select * from finish();

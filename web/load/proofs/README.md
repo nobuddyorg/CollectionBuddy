@@ -24,6 +24,7 @@ Some proofs replay the client's own request sequence, the way `lib/api.js` mirro
 | `quota-refused-import.js` (#765) | `importPhoto.ts` retry loop                                                                     | Stop after a quota refusal; 4xx is permanent                                               |
 | `round-trips.js` (#780)          | `exportCategory.ts`, `images.ts`, `categories.ts`/`useCategories.tsx` delete reads, search path | Embedded export read; one keyset-paged images read for delete; search returning image rows |
 | `gate-blind-spots.js` (#781)     | `lib/flows.js` `browse`                                                                         | Name the new requests `catalogue last page` and `sign urls`                                |
+| `orphan-delete.js` (no issue)    | `data/categories.ts` `deleteCategory`                                                           | How a category is deleted                                                                  |
 
 The browser proofs drive the real app, so they need no mirror.
 
@@ -37,7 +38,7 @@ load/proofs/browser/serve-demo.sh &
 BROWSER=1 load/proofs/run-all.sh             # sw-deploy builds its own pair on :4174
 ```
 
-`run-all.sh` runs #779 and its control first, on the freshly reset stack, then the rest. A proof whose script is not in the tree yet is listed as skipped. It sorts each run into one of four groups:
+`run-all.sh` runs #779 and its control first, on the freshly reset stack, then vacuums the emptied `items` and `item_categories` for `orphan-delete.js` (it needs `psql`), then the rest. A proof whose script is not in the tree yet is listed as skipped. It sorts each run into one of four groups:
 
 - **Red:** exit 99 and a conclusive report.
 - **Green:** exit 0.
@@ -69,6 +70,7 @@ A failed setup is cleaned up. A setup killed by its 5-minute timeout can leave r
 | #765 uploads after quota   | `quota-refused-import.js`                                      | Bytes are still uploaded, and objects orphaned, after the first quota refusal (orphans counted from Storage's own listing). A 409 or 413 is retried.                                                                                                                                             |
 | #780 round trips           | `round-trips.js`                                               | PERF-14: the export metadata phase sends more requests than the embedded read needs (521 vs 121 at 40,000 entries), and category delete's reads send ~841 against a budget of 446 (measured read-only; nothing is deleted). PERF-13: a search page needs 3 sequential steps to reach its photos. |
 | #781 blind gate            | `gate-blind-spots.js`                                          | The stock `browse` flow sends no last-page and no sign request. The deep and photo scenarios' p95 rows are the evidence.                                                                                                                                                                         |
+| Orphan delete (no issue)   | `orphan-delete.js`                                             | Deleting a category of 40,000 entries takes 4 s or more (or hits the 8 s statement timeout), or costs more per entry than a quarter-size one. The pooled connections first plan `delete_item_if_orphan()` on empty, vacuumed tables, which `run-all.sh` prepares with `psql`.                    |
 | #738 Safari PNG            | `browser/safari-webp.js`                                       | With Safari's canvas emulated in Chromium, the app stores PNG objects. `png-vs-webp.js` only records the cost and has no verdict.                                                                                                                                                                |
 | #771 worker CSP            | `browser/worker-csp.js`                                        | Compression workers report failure (2 today: full size and thumbnail).                                                                                                                                                                                                                           |
 | #778 Photon                | `browser/photon-geocoding.js`                                  | About 2 s pass between the last failed attempt and the end of loading. In-flight requests complete after the map closes. More than 3 requests start per second after the first burst. A viewer's map sends write-backs.                                                                          |
