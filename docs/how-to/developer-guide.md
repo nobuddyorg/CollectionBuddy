@@ -67,7 +67,7 @@ bypass the interface almost entirely: they ask Postgres, with a real token, the
 questions the app never would, one file per boundary (`isolation`,
 `viewer-share`, `editor-share`, each with a `-photographs` half for Storage,
 and `editor-share` a `-limits` one, plus `search-rpc`, `create-rpc`,
-`orphan-sweep-rpc` and `quotas`; shared helpers in `rls/helpers.ts`). Change a
+`orphan-sweep-rpc`, `orphan-entries` and `quotas`; shared helpers in `rls/helpers.ts`). Change a
 policy and these files say whether it holds.
 
 ```bash

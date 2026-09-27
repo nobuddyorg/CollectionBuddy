@@ -115,7 +115,7 @@ export function inconclusiveReasons(data, verdictMetrics, guards = []) {
   return reasons;
 }
 
-/** `claim` is the issue's sentence under test; `notes` are the seed and environment facts a reader needs to weigh the numbers. */
+/** `claim` is the issue's sentence under test (`issue` is left out for a defect filed without one); `notes` are the seed and environment facts a reader needs to weigh the numbers. */
 /** `purpose: 'record'` marks a run with no verdict (an impact measurement or a control), so the report does not promise one. */
 export function proofSummary({
   proof,
@@ -132,7 +132,7 @@ export function proofSummary({
   const name = __ENV.PROOF_VARIANT ? `${proof}-${__ENV.PROOF_VARIANT}` : proof;
   const inconclusive = inconclusiveReasons(data, extra, guards);
   const markdown = [
-    `## k6 proof \`${name}\` for #${issue}`,
+    `## k6 proof \`${name}\`${issue ? ` for #${issue}` : ''}`,
     '',
     ...(inconclusive.length
       ? [
