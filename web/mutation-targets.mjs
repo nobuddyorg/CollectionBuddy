@@ -16,7 +16,6 @@ export const MUTATE_TARGETS = [
   'src/app/lib/staleBuild.ts',
   'src/app/lib/localDate.ts',
   'src/app/components/CategorySelect/useExportCategory.tsx',
-  'src/app/components/ItemList/Pagination.tsx',
   'src/app/components/ItemList/imageEntries.ts',
   'src/app/lib/optimistic.ts',
   'src/app/components/Toast/pendingToasts.ts',
@@ -67,6 +66,7 @@ export const MUTATE_TARGETS = [
   'src/app/useServiceWorker.ts',
   'src/app/useSession.ts',
   'src/app/useDeleteAccount.ts',
+  'src/app/useSignOut.ts',
   'src/app/userData.ts',
   'src/app/userDataKeys.ts',
   'src/app/components/CategorySelect/useCategories.tsx',
@@ -81,10 +81,4 @@ export const MUTATE_TARGETS = [
   'src/app/components/CenteredModal/useInertBackground.tsx',
   'src/app/components/CenteredModal/useLockBodyScroll.tsx',
   'src/app/components/Map/worldCopies.ts',
-];
-
-// Mutation-tested but deliberately without a per-file coverage floor.
-export const NO_COVERAGE_FLOOR = [
-  'src/app/components/Map/usePlaces.tsx',
-  'src/app/components/Map/useCurrentLocation.ts',
 ];

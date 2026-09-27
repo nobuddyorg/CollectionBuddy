@@ -1,5 +1,4 @@
 'use client';
-import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { useToast } from './components/Toast/ToastProvider';
@@ -12,15 +11,14 @@ export function useSignOut() {
   const { t } = useI18n();
   const toast = useToast();
 
-  return useCallback(async () => {
+  return async () => {
     try {
       // A delete still inside its undo window would otherwise run later as anon, and fail.
       await toast.commitPending();
-      // Global sign-out revokes the refresh token server-side; on failure a local clear still ends it here.
+      // Global sign-out revokes the refresh token server-side; auth-js clears the local session even when that fails.
       const { error } = await supabase.auth.signOut();
       if (error) {
         toast.reportError('sign out failed', error, t('header.sign_out_error'));
-        await supabase.auth.signOut({ scope: 'local' });
       }
     } catch (error) {
       toast.reportError(
@@ -34,5 +32,5 @@ export function useSignOut() {
       forgetUserData();
       router.replace('/login');
     }
-  }, [router, t, toast]);
+  };
 }

@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-import { MUTATE_TARGETS, NO_COVERAGE_FLOOR } from './mutation-targets.mjs';
+import { MUTATE_TARGETS } from './mutation-targets.mjs';
 
 // Declared before PER_FILE_FLOOR: ci.yml's vitest-coverage-report-action regex-scans this file for the first `statements: N`.
 const GLOBAL_COVERAGE_THRESHOLDS = {
@@ -18,9 +18,7 @@ const PER_FILE_FLOOR = {
 };
 
 const perFileThresholds = Object.fromEntries(
-  MUTATE_TARGETS.filter((path) => !NO_COVERAGE_FLOOR.includes(path)).map(
-    (path) => [path, PER_FILE_FLOOR],
-  ),
+  MUTATE_TARGETS.map((path) => [path, PER_FILE_FLOOR]),
 );
 
 export default defineConfig({
@@ -50,7 +48,6 @@ export default defineConfig({
         'src/app/layout.tsx',
         'src/app/page.tsx',
         'src/app/login/page.tsx',
-        'src/app/useSignOut.ts',
         'src/app/login/useGoogleSignIn.ts',
         'src/app/login/useAuthRedirect.ts',
         'src/app/login/useDemoSignIn.ts',
