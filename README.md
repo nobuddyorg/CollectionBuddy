@@ -49,7 +49,7 @@ It is designed for keeping a structured personal record of collected items rathe
 - **Categories** to keep collections apart, with **sharing** so someone else can browse yours — read-only by default, or with edit access if you grant it.
 - **Place and map**: give an item a location, then see your whole collection pinned on a map.
 - **Tags and search** across title, description, place, and tags at once.
-- **Import/export** a category as a portable archive.
+- **Import/export** a category you own as a portable archive.
 - **Bilingual, themeable**: German/English and light/dark/system, both remembered per visitor.
 - **Built-in help**: a short guide to every feature under **Help** in the account menu, or Ctrl+/ (Cmd+/) from anywhere.
 - Built to work with a keyboard and a screen reader, not just a mouse.

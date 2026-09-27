@@ -85,7 +85,7 @@ test.describe('a collection shared with you', () => {
       await expect(app.catalogue.locators.buttons.newEntry).toBeDisabled();
 
       await app.categories.do.openPanel();
-      // Both would be refused: the rename by RLS, the export by the prefix.
+      // Rename is refused by RLS; export is owners-only by product decision.
       await expect(app.categories.locators.buttons.rename).toBeDisabled();
       await expect(app.categories.locators.buttons.export).toBeDisabled();
       // Who else a collection is shared with is the owner's business.

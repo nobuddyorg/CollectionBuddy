@@ -5,7 +5,6 @@ import { MANIFEST_NAME, type ExportManifest } from './exportFormat';
 import {
   type SignUrls,
   item,
-  fakeGetSession,
   paginatedListItems,
   fakeListImages,
   fakeSignUrls,
@@ -39,7 +38,6 @@ describe('exportCategory, a photograph that cannot be fetched', () => {
     try {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({
           'item-1': ['1.webp', '2.webp'],
@@ -86,7 +84,6 @@ describe('exportCategory, a photograph that cannot be fetched', () => {
     try {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({
           'item-1': ['1.webp', '2.webp'],
@@ -116,7 +113,6 @@ describe('exportCategory, a photograph that cannot be fetched', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
@@ -145,7 +141,6 @@ describe('exportCategory, a photograph that cannot be fetched', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls,

@@ -74,7 +74,8 @@ can be granted access, and it is read-only until you say otherwise.
 
 - **Export**: select a category, click **Export**. You get a `.zip` with every
   item's data and photos. Large categories take a while; the button shows
-  progress and **Cancel** stops it.
+  progress and **Cancel** stops it. Only the owner can export: on a category
+  shared with you, **Export** is disabled.
 - **Import**: click **Import**, pick a `.zip` exported from CollectionBuddy. It
   becomes a new category. A taken name gets a suffix (`Coins (2)`) rather than
   overwriting or failing. Each item keeps its photos in their order, so its

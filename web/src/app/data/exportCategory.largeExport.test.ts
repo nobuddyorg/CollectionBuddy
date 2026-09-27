@@ -8,7 +8,6 @@ import {
 import {
   type ListImages,
   item,
-  fakeGetSession,
   paginatedListItems,
   fakeSignUrls,
   okResponse,
@@ -35,7 +34,6 @@ describe('confirmLargeExport', () => {
     const confirmLargeExport = vi.fn().mockResolvedValue(true);
     await exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
       listItems: paginatedListItems([item({ id: 'a' })]),
       listImages: fakeListImagesWithSizes({
         a: [{ name: '1.webp', size: 1024 }],
@@ -56,7 +54,6 @@ describe('confirmLargeExport', () => {
     try {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImagesWithSizes({
           a: [{ name: '1.webp', size: LARGE_EXPORT_WARN_BYTES }],
@@ -81,7 +78,6 @@ describe('confirmLargeExport', () => {
     try {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImagesWithSizes({
           a: [{ name: '1.webp', size: bigSize }],
@@ -104,7 +100,6 @@ describe('confirmLargeExport', () => {
     try {
       const failure = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImagesWithSizes({
           a: [{ name: '1.webp', size: bigSize }],
@@ -128,7 +123,6 @@ describe('confirmLargeExport', () => {
     try {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImagesWithSizes({
           a: [{ name: '1.webp', size: bigSize }],
@@ -151,7 +145,6 @@ describe('confirmLargeExport', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' }), item({ id: 'b' })]),
         listImages: fakeListImagesWithSizes({
           a: [{ name: '1.webp', size: half }],

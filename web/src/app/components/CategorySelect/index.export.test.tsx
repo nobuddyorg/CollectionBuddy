@@ -20,7 +20,14 @@ vi.mock('./useShares', () => ({
   }),
 }));
 
-// The real hook: with no session, exportCategory rejects before any Supabase call.
+// The real hook and export; only the first read is stubbed, refused as PostgREST refuses a signed-out caller.
+vi.mock('../../data/exportItemPages', () => ({
+  listItemsForExport: vi.fn().mockResolvedValue({
+    data: null,
+    error: { code: '42501', message: 'permission denied for table items' },
+  }),
+}));
+
 function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   return {
     categories: [{ id: 'a', name: 'Coins', user_id: 'owner-1' }],
@@ -37,10 +44,8 @@ function categories(overrides: Partial<UseCategories> = {}): UseCategories {
   } as UseCategories;
 }
 
-describe('exporting with no session', () => {
+describe('exporting when the collection cannot be read', () => {
   beforeEach(() => {
-    // Cleared, not assumed empty: getSession() finds no session only if nothing is persisted.
-    window.localStorage.clear();
     window.localStorage.setItem('lang', 'en');
   });
 

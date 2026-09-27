@@ -16,6 +16,10 @@ A public link means an anonymous reader. Every predicate here resolves an actual
 
 The `editor` role (#562) widened the grant without touching that argument: sharing is no longer read-only, but it is still _identified_. If public links are ever wanted, they are a separate, explicitly higher-risk piece of work.
 
+## Why only the owner can export a category
+
+Export is owners-only, a product choice rather than a technical limit (#777). RLS already lets a viewer or editor read every row of a category shared with them and sign its photographs, so a grantee's export would work. It stays off because a share grants access to a collection, not a copy of it: a full archive outlives a revocation, and who gets one is the owner's decision. For a shared category the Export button is disabled; this is UX only, since the data a grantee could export is exactly what it can already see.
+
 ## Why the hosted Auth settings are pinned
 
 Sharing authorizes on an address: `caller_email()` reads the access token's `email` claim, and a grant has no accept step, so whoever first holds a session carrying the invited address holds the grant. Whether that address was proven is decided by the hosted Auth configuration, not by anything in the repository, and a few dashboard toggles turn it into an invite takeover (#745). In GoTrue's source:
@@ -206,7 +210,7 @@ Stryker's incremental mode (#714) reuses a mutant's previous result when neither
 
 ### No suppressions
 
-There is no `Stryker disable` or `/* v8 ignore */` in `src/`. There used to be — around the Supabase query builders, the whole of `useExportCategory`, and a handful of lines carrying mutants nobody could kill. What they hid is now tested: a PostgREST builder composes its request eagerly and only sends it when awaited, so `items.test.ts` reads back the table, filter, method, headers and body each call produced, without a server; the one real call per module (`getSession`, `compressThumb`) has a small test that mocks the module underneath and drives the default. Three suppressed lines turned out to guard code that did not need to exist — a guard for a value the callee accepted anyway, an option that spelled out the library's default, a wrapper every caller unwrapped — which is the ending [TEST_STRATEGY.md](../../TEST_STRATEGY.md) §11 calls the one that pays for the exercise.
+There is no `Stryker disable` or `/* v8 ignore */` in `src/`. There used to be — around the Supabase query builders, the whole of `useExportCategory`, and a handful of lines carrying mutants nobody could kill. What they hid is now tested: a PostgREST builder composes its request eagerly and only sends it when awaited, so `items.test.ts` reads back the table, filter, method, headers and body each call produced, without a server; the one real call per module (`compressThumb`) has a small test that mocks the module underneath and drives the default. Three suppressed lines turned out to guard code that did not need to exist — a guard for a value the callee accepted anyway, an option that spelled out the library's default, a wrapper every caller unwrapped — which is the ending [TEST_STRATEGY.md](../../TEST_STRATEGY.md) §11 calls the one that pays for the exercise.
 
 ### What still survives, and why no test can kill it
 

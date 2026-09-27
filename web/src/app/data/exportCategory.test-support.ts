@@ -2,9 +2,7 @@ import { vi } from 'vitest';
 
 import type { exportCategory, ExportResult } from './exportCategory';
 import type { ExportItem } from './exportFormat';
-import type { supabase } from '../supabase';
 
-type GetSession = () => ReturnType<typeof supabase.auth.getSession>;
 export type ListItems = Parameters<typeof exportCategory>[0]['listItems'];
 export type ListImages = Parameters<typeof exportCategory>[0]['listImages'];
 export type SignUrls = Parameters<typeof exportCategory>[0]['signUrls'];
@@ -21,13 +19,6 @@ export function item(overrides: Partial<ExportItem> = {}): ExportItem {
     created_at: '2026-01-02T03:04:05.000Z',
     ...overrides,
   };
-}
-
-// Only `data.session.user.id` is ever read, so that's all the fake carries.
-export function fakeGetSession(uid: string | null): GetSession {
-  return (async () => ({
-    data: { session: uid ? { user: { id: uid } } : null },
-  })) as unknown as GetSession;
 }
 
 // Pages a fixed array by cursor as listItemsForExport does: a full page points at its last item.

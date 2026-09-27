@@ -7,7 +7,6 @@ import {
 } from './exportCategory';
 import {
   item,
-  fakeGetSession,
   paginatedListItems,
   fakeListImages,
   fakeSignUrls,
@@ -24,7 +23,6 @@ describe('exportCategory, timeout and cancellation', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
@@ -50,7 +48,6 @@ describe('exportCategory, timeout and cancellation', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
@@ -81,7 +78,6 @@ describe('exportCategory, timeout and cancellation', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),
@@ -102,7 +98,6 @@ describe('exportCategory, timeout and cancellation', () => {
     const listItems = vi.fn(paginatedListItems([item()]));
     const failure = exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
       listItems,
       listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
@@ -137,7 +132,6 @@ describe('exportCategory, timeout and cancellation', () => {
       );
       const failure = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems(items),
         listImages,
         signUrls: fakeSignUrls(),
@@ -166,7 +160,6 @@ describe('exportCategory, timeout and cancellation', () => {
     try {
       const promise = exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'item-1' })]),
         listImages: fakeListImages({ 'item-1': ['1.webp'] }),
         signUrls: fakeSignUrls(),

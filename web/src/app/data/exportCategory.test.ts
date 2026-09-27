@@ -11,7 +11,6 @@ import {
   type ListImages,
   type SignUrls,
   item,
-  fakeGetSession,
   paginatedListItems,
   fakeListImages,
   fakeSignUrls,
@@ -21,18 +20,6 @@ import {
 } from './exportCategory.test-support';
 
 describe('exportCategory', () => {
-  it('throws a named ExportError rather than exporting when there is no session', async () => {
-    const failure = exportCategory({
-      category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession(null),
-      listItems: paginatedListItems([]),
-      listImages: fakeListImages({}),
-      signUrls: fakeSignUrls(),
-    });
-    await expect(failure).rejects.toThrow('No user session');
-    await expect(failure).rejects.toHaveProperty('name', 'ExportError');
-  });
-
   it('throws when the item listing fails, rather than exporting an incomplete collection', async () => {
     const readError = { message: 'read failed' };
     const listItems = (async () => ({
@@ -41,13 +28,13 @@ describe('exportCategory', () => {
     })) as unknown as ListItems;
     const failure = exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
       listItems,
       listImages: fakeListImages({}),
       signUrls: fakeSignUrls(),
     });
     await expect(failure).rejects.toThrow('Could not read items');
     await expect(failure).rejects.toHaveProperty('cause', readError);
+    await expect(failure).rejects.toHaveProperty('name', 'ExportError');
   });
 
   it('throws when the photograph listing fails, rather than exporting an incomplete collection', async () => {
@@ -58,7 +45,6 @@ describe('exportCategory', () => {
     })) as unknown as ListImages;
     const failure = exportCategory({
       category: { id: 'cat', name: 'Coins' },
-      getSession: fakeGetSession('uid'),
       listItems: paginatedListItems([item({ id: 'a' })]),
       listImages,
       signUrls: fakeSignUrls(),
@@ -76,7 +62,6 @@ describe('exportCategory', () => {
     await expect(
       exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages,
         signUrls: fakeSignUrls(),
@@ -98,7 +83,6 @@ describe('exportCategory', () => {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
         now,
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems(items),
         listImages: fakeListImages({
           a: ['1.webp'],
@@ -132,7 +116,6 @@ describe('exportCategory', () => {
     try {
       const result = await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImages({ a: ['1.webp'] }),
         signUrls: fakeSignUrls(),
@@ -158,7 +141,6 @@ describe('exportCategory', () => {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
         onProgress,
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' }), item({ id: 'b' })]),
         listImages: fakeListImages({
           a: ['1.webp'],
@@ -193,7 +175,6 @@ describe('exportCategory', () => {
     try {
       await exportCategory({
         category: { id: 'cat', name: 'Coins' },
-        getSession: fakeGetSession('uid'),
         listItems: paginatedListItems([item({ id: 'a' })]),
         listImages: fakeListImages({ a: ['1.webp'] }),
         signUrls: signUrls as unknown as SignUrls,
