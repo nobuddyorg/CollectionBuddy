@@ -17,7 +17,7 @@ import {
   importPhotoTasks,
   importTimestamps,
   parseManifest,
-  rootFolderOf,
+  archivePrefixOf,
   type ImportManifest,
   type ManifestItem,
 } from './importFormat';
@@ -162,19 +162,13 @@ export async function importCategory({
   }
 
   const manifestPath = findManifestPath(entries.keys());
-  if (!manifestPath) {
-    throw new ImportFormatError(
-      'not_export',
-      'Not a CollectionBuddy export archive',
-    );
-  }
   // Non-null: findManifestPath only returns a key it read out of `entries` itself.
   const manifest = await readManifest(entries.get(manifestPath)!);
   const manifestItems = manifest.items;
   const archivedName = manifest.category.name;
 
   checkCancelled(signal);
-  const root = rootFolderOf(manifestPath);
+  const prefix = archivePrefixOf(manifestPath);
   const { data: category, error: categoryError } = await createCategoryRow(
     nameCategory(archivedName),
   );
@@ -229,7 +223,7 @@ export async function importCategory({
           checkCancelled(signal);
           const imported = await importPhoto({
             task,
-            readPhoto: entries.get(`${root}/${task.archivePath}`),
+            readPhoto: entries.get(`${prefix}${task.archivePath}`),
             uid,
             calls: {
               uploadImage: recordingUpload,

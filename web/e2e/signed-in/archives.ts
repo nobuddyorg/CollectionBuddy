@@ -98,6 +98,17 @@ export function repackLikeZipTool(exported: string, to: string): void {
   writeFileSync(to, writeAsZipTool(readStoredEntries(readFileSync(exported))));
 }
 
+/** The export at `exported`, its folder's contents packed again without the folder, as selecting them all and zipping does. */
+export function repackContentsLikeZipTool(exported: string, to: string): void {
+  const contents = readStoredEntries(readFileSync(exported))
+    .map(({ name, data }) => ({
+      name: name.slice(name.indexOf('/') + 1),
+      data,
+    }))
+    .filter(({ name }) => name !== '');
+  writeFileSync(to, writeAsZipTool(contents));
+}
+
 /** A small archive whose manifest claims to inflate to `declaredSize` bytes, written to `to`. */
 export function writeArchiveClaiming(
   { category, declaredSize }: { category: string; declaredSize: number },

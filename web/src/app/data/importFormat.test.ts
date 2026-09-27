@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  archivePrefixOf,
   findManifestPath,
   ImportFormatError,
   importPhotoTasks,
   importTimestamps,
   parseManifest,
-  rootFolderOf,
 } from './importFormat';
 import { EXPORT_FORMAT, EXPORT_FORMAT_VERSION } from './exportFormat';
 
@@ -154,29 +154,64 @@ describe('findManifestPath', () => {
     );
   });
 
-  it('returns null when no entry is a manifest', () => {
-    expect(findManifestPath(['a.txt', 'b.txt'])).toBeNull();
+  // The folder's contents zipped instead of the folder itself.
+  it('finds a collection.json at the root of the archive', () => {
+    expect(
+      findManifestPath([
+        'collection.csv',
+        'collection.json',
+        'photos/001-dime/1.webp',
+      ]),
+    ).toBe('collection.json');
+  });
+
+  it('refuses an archive without a manifest as not an export', () => {
+    expect(() => findManifestPath(['a.txt', 'b.txt'])).toThrow(
+      expect.objectContaining({
+        name: 'ImportFormatError',
+        reason: 'not_export',
+        message: 'Not a CollectionBuddy export archive',
+      }),
+    );
   });
 
   it('takes the name whole, not a file that only ends the same way', () => {
-    expect(
-      findManifestPath(['root/old-collection.json', 'root/collection.jsonx']),
-    ).toBeNull();
+    expect(() =>
+      findManifestPath([
+        'root/old-collection.json',
+        'root/collection.jsonx',
+        'old-collection.json',
+      ]),
+    ).toThrow('Not a CollectionBuddy export archive');
   });
 
-  it('returns the first match when more than one entry could be one', () => {
-    // A real archive never has two; this pins which one wins rather than leaving it to iteration order.
-    expect(
-      findManifestPath(['root/sub/collection.json', 'root/collection.json']),
-    ).toBe('root/sub/collection.json');
+  it.each([
+    ['both layouts', ['collection.json', 'root/collection.json']],
+    ['two folders', ['a/collection.json', 'b/collection.json']],
+    [
+      'a folder inside the folder',
+      ['root/sub/collection.json', 'root/collection.json'],
+    ],
+  ])('refuses an archive with more than one manifest (%s)', (_, names) => {
+    expect(() => findManifestPath([...names, 'photos/1.webp'])).toThrow(
+      expect.objectContaining({
+        name: 'ImportFormatError',
+        reason: 'not_export',
+        message: 'More than one collection.json in this archive',
+      }),
+    );
   });
 });
 
-describe('rootFolderOf', () => {
-  it('strips the trailing /collection.json', () => {
+describe('archivePrefixOf', () => {
+  it('keeps the folder, trailing slash and all', () => {
     expect(
-      rootFolderOf('CollectionBuddy-coins-2026-08-06/collection.json'),
-    ).toBe('CollectionBuddy-coins-2026-08-06');
+      archivePrefixOf('CollectionBuddy-coins-2026-08-06/collection.json'),
+    ).toBe('CollectionBuddy-coins-2026-08-06/');
+  });
+
+  it('is nothing for a manifest at the archive root', () => {
+    expect(archivePrefixOf('collection.json')).toBe('');
   });
 });
 
