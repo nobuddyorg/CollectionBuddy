@@ -184,7 +184,7 @@ Every floor is raised by hand when a real run reports a higher number, and never
 
 Stryker runs incrementally (`incremental: true`, reusing `web/reports/stryker-incremental.json`); CI caches that file keyed on `package-lock.json` and the Stryker and Vitest config, and `main` passes `--force` for a full run. k6's p95 thresholds (`web/load/lib/options.js`) are calibrated from two `normal` runs per script with a 3× margin ([Load testing](../how-to/load-testing.md#read-the-results)).
 
-Stryker runs Vitest through `web/vitest.mutation.config.mts`, which only changes `test.reporters`: Vitest adds a `github-actions` annotation reporter under `GITHUB_ACTIONS`, and a killed mutant is an expected test failure that would otherwise become a workflow annotation.
+Stryker runs Vitest through `web/vitest.mutation.config.mts`, which changes two things. It sets `test.reporters`: Vitest adds a `github-actions` annotation reporter under `GITHUB_ACTIONS`, and a killed mutant is an expected test failure that would otherwise become a workflow annotation. And its `stryker-test-name-separator` plugin lets each space in Stryker's test-name filter also match `' > '`: Stryker's Vitest runner (up to 10.0.0) filters a mutant's tests by their suite path joined with spaces, Vitest 5 matches the path joined with `' > '`, and without the plugin every test inside a `describe` is skipped, so nearly every mutant survives. Drop the plugin once the runner builds `' > '`-joined names itself.
 
 ## CI job summaries
 
