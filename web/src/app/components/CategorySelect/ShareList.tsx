@@ -29,10 +29,9 @@ export function ShareList({ shares }: { shares: UseShares }) {
     async (share: CategoryShareSummary, role: ShareRole) => {
       // Only granting needs confirmation; taking edit access away is the safe direction.
       if (role === 'editor') {
-        const message = t('category_select.share_editor_confirm').replace(
-          '{email}',
-          share.invited_email,
-        );
+        const message = t('category_select.share_editor_confirm', {
+          email: share.invited_email,
+        });
         if (!(await confirm(message))) return;
       }
       await updateShareRole(share.id, role);
@@ -59,10 +58,9 @@ export function ShareList({ shares }: { shares: UseShares }) {
 
   const onRevoke = useCallback(
     async (shareId: string, invitedEmail: string) => {
-      const message = t('category_select.share_revoke_confirm').replace(
-        '{email}',
-        invitedEmail,
-      );
+      const message = t('category_select.share_revoke_confirm', {
+        email: invitedEmail,
+      });
       if (!(await confirm(message))) return;
       await revokeShare(shareId);
     },
@@ -90,8 +88,8 @@ export function ShareList({ shares }: { shares: UseShares }) {
             if (share.expires_at) {
               const date = new Date(share.expires_at).toLocaleDateString();
               expiryLabel = isExpired
-                ? t('category_select.share_expired_on').replace('{date}', date)
-                : t('category_select.share_expires_on').replace('{date}', date);
+                ? t('category_select.share_expired_on', { date })
+                : t('category_select.share_expires_on', { date });
             }
             return (
               <li

@@ -73,8 +73,8 @@ export function TagsInput({
             data-testid="remove-tag"
             onClick={() => removeTag(tag)}
             className="relative w-3.5 h-3.5 flex items-center justify-center rounded-full text-foreground/50 hover:text-destructive after:absolute after:-inset-2 after:content-['']"
-            aria-label={t('item_create.remove_tag').replace('{tag}', tag)}
-            title={t('item_create.remove_tag').replace('{tag}', tag)}
+            aria-label={t('item_create.remove_tag', { tag })}
+            title={t('item_create.remove_tag', { tag })}
           >
             <Icon
               icon={IconType.Close}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { interpolate, type TranslationValues } from '../../i18n/I18nProvider';
 import { exportProgressMessage } from './useExportCategory';
 
 // Stands in for the real t: the key's English string, so an assertion also proves which key was asked for.
@@ -9,7 +10,8 @@ const strings: Record<string, string> = {
   'category_select.export_photos': 'Photographs {done} of {total}…',
   'category_select.export_packing': 'Packing the archive…',
 };
-const t = ((key: string) => strings[key] ?? key) as Parameters<
+const t = ((key: string, values: TranslationValues = {}) =>
+  interpolate(strings[key] ?? key, values)) as Parameters<
   typeof exportProgressMessage
 >[1];
 

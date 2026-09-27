@@ -67,10 +67,9 @@ export function MapModal({
         // Only when count > 1: a lone entry is already named by the place line, and "1 entries" is avoided.
         countLabel:
           place.titles.length > 1
-            ? t('item_list.map_entries_count').replace(
-                '{count}',
-                String(place.titles.length),
-              )
+            ? t('item_list.map_entries_count', {
+                count: place.titles.length,
+              })
             : undefined,
       })),
     [places, t],

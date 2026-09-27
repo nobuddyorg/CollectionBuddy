@@ -2,7 +2,11 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-import type { TranslationKey } from '../../i18n/I18nProvider';
+import {
+  interpolate,
+  type Translate,
+  type TranslationKey,
+} from '../../i18n/I18nProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
@@ -15,13 +19,14 @@ import { isQuotaExceeded } from '../../data/quota';
 /** What to say while an import runs. Same shape as exportProgressMessage. */
 export function importProgressMessage(
   progress: ImportProgress | null,
-  t: (key: TranslationKey) => string,
+  t: Translate,
 ): string | null {
   if (!progress) return null;
   if (progress.phase === 'photos' && progress.total > 0) {
-    return t('category_select.import_photos')
-      .replace('{done}', String(progress.done))
-      .replace('{total}', String(progress.total));
+    return t('category_select.import_photos', {
+      done: progress.done,
+      total: progress.total,
+    });
   }
   if (progress.phase === 'reading') {
     return t('category_select.import_reading');
@@ -51,9 +56,10 @@ export function importPartialMessage(
   t: (key: TranslationKey) => string,
 ): string | null {
   if (skippedPhotoCount === 0) return null;
-  return partialTemplate(photoQuotaReached, t)
-    .replace('{skipped}', String(skippedPhotoCount))
-    .replace('{total}', String(photoCount + skippedPhotoCount));
+  return interpolate(partialTemplate(photoQuotaReached, t), {
+    skipped: skippedPhotoCount,
+    total: photoCount + skippedPhotoCount,
+  });
 }
 
 export function useImportCategory(existingCategoryNames: string[]) {
@@ -83,10 +89,7 @@ export function useImportCategory(existingCategoryNames: string[]) {
         });
         onImported?.(result.category.id);
         toast.success(
-          t('category_select.import_success').replace(
-            '{name}',
-            result.category.name,
-          ),
+          t('category_select.import_success', { name: result.category.name }),
         );
         const partial = importPartialMessage(result, t);
         if (partial) toast.error(partial);

@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-import type { TranslationKey } from '../../i18n/I18nProvider';
+import type { Translate } from '../../i18n/I18nProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
@@ -18,19 +18,17 @@ const isNamed = (error: unknown, name: string): boolean =>
 /** Reading counts up per page, photos count against their total, and "0 of 0" falls back to packing. */
 export function exportProgressMessage(
   progress: ExportProgress | null,
-  t: (key: TranslationKey) => string,
+  t: Translate,
 ): string | null {
   if (!progress) return null;
   if (progress.phase === 'photos' && progress.total > 0) {
-    return t('category_select.export_photos')
-      .replace('{done}', String(progress.done))
-      .replace('{total}', String(progress.total));
+    return t('category_select.export_photos', {
+      done: progress.done,
+      total: progress.total,
+    });
   }
   if (progress.phase === 'items' && progress.done > 0) {
-    return t('category_select.export_reading_count').replace(
-      '{done}',
-      String(progress.done),
-    );
+    return t('category_select.export_reading_count', { done: progress.done });
   }
   if (progress.phase === 'items') return t('category_select.export_reading');
   return t('category_select.export_packing');
@@ -60,22 +58,19 @@ export function useExportCategory() {
           // Asked once the listing has totalled the real size; declining reads as a cancel.
           confirmLargeExport: (totalBytes) =>
             confirm(
-              t('category_select.export_large_confirm').replace(
-                '{size}',
-                formatExportBytes(totalBytes),
-              ),
+              t('category_select.export_large_confirm', {
+                size: formatExportBytes(totalBytes),
+              }),
             ),
         });
         downloadBlob(result.blob, result.filename);
         // Export-then-delete is a canonical use, so a skipped photograph must never go unsaid.
         if (result.skippedPhotoCount > 0) {
           toast.error(
-            t('category_select.export_partial')
-              .replace('{skipped}', String(result.skippedPhotoCount))
-              .replace(
-                '{total}',
-                String(result.photoCount + result.skippedPhotoCount),
-              ),
+            t('category_select.export_partial', {
+              skipped: result.skippedPhotoCount,
+              total: result.photoCount + result.skippedPhotoCount,
+            }),
           );
         }
       } catch (error) {

@@ -86,4 +86,110 @@ describe('useEscapeToClose', () => {
     await user.keyboard('{Escape}');
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  describe('with a second dialog stacked above', () => {
+    function Stack({
+      onCloseBeneath,
+      onCloseAbove,
+      aboveOpen,
+    }: {
+      onCloseBeneath: () => void;
+      onCloseAbove: () => void;
+      aboveOpen: boolean;
+    }) {
+      return (
+        <>
+          <Harness enabled onClose={onCloseBeneath} />
+          <Harness enabled={aboveOpen} onClose={onCloseAbove} />
+        </>
+      );
+    }
+
+    it('closes only the dialog on top', async () => {
+      const user = userEvent.setup();
+      const onCloseBeneath = vi.fn();
+      const onCloseAbove = vi.fn();
+      const { rerender } = render(
+        <Stack
+          onCloseBeneath={onCloseBeneath}
+          onCloseAbove={onCloseAbove}
+          aboveOpen={false}
+        />,
+      );
+      rerender(
+        <Stack
+          onCloseBeneath={onCloseBeneath}
+          onCloseAbove={onCloseAbove}
+          aboveOpen
+        />,
+      );
+
+      await user.keyboard('{Escape}');
+      expect(onCloseAbove).toHaveBeenCalledOnce();
+      expect(onCloseBeneath).not.toHaveBeenCalled();
+    });
+
+    it('hands Escape back to the dialog beneath once the top one closes', async () => {
+      const user = userEvent.setup();
+      const onCloseBeneath = vi.fn();
+      const onCloseAbove = vi.fn();
+      const { rerender } = render(
+        <Stack
+          onCloseBeneath={onCloseBeneath}
+          onCloseAbove={onCloseAbove}
+          aboveOpen={false}
+        />,
+      );
+      rerender(
+        <Stack
+          onCloseBeneath={onCloseBeneath}
+          onCloseAbove={onCloseAbove}
+          aboveOpen
+        />,
+      );
+      rerender(
+        <Stack
+          onCloseBeneath={onCloseBeneath}
+          onCloseAbove={onCloseAbove}
+          aboveOpen={false}
+        />,
+      );
+
+      await user.keyboard('{Escape}');
+      expect(onCloseBeneath).toHaveBeenCalledOnce();
+      expect(onCloseAbove).not.toHaveBeenCalled();
+    });
+
+    it('keeps the dialog beneath below when it re-renders with a new onClose', async () => {
+      const user = userEvent.setup();
+      const onCloseAbove = vi.fn();
+      const firstOnCloseBeneath = vi.fn();
+      const nextOnCloseBeneath = vi.fn();
+      const { rerender } = render(
+        <Stack
+          onCloseBeneath={firstOnCloseBeneath}
+          onCloseAbove={onCloseAbove}
+          aboveOpen={false}
+        />,
+      );
+      rerender(
+        <Stack
+          onCloseBeneath={firstOnCloseBeneath}
+          onCloseAbove={onCloseAbove}
+          aboveOpen
+        />,
+      );
+      rerender(
+        <Stack
+          onCloseBeneath={nextOnCloseBeneath}
+          onCloseAbove={onCloseAbove}
+          aboveOpen
+        />,
+      );
+
+      await user.keyboard('{Escape}');
+      expect(onCloseAbove).toHaveBeenCalledOnce();
+      expect(nextOnCloseBeneath).not.toHaveBeenCalled();
+    });
+  });
 });

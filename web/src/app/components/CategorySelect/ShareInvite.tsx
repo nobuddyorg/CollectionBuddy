@@ -86,10 +86,11 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
                 className={`truncate ${expiryDate ? '' : 'text-muted-foreground'}`}
               >
                 {expiryDate
-                  ? t('category_select.share_expiry_chip').replace(
-                      '{date}',
-                      new Date(`${expiryDate}T00:00:00`).toLocaleDateString(),
-                    )
+                  ? t('category_select.share_expiry_chip', {
+                      date: new Date(
+                        `${expiryDate}T00:00:00`,
+                      ).toLocaleDateString(),
+                    })
                   : t('category_select.share_no_expiry')}
               </span>
             </button>

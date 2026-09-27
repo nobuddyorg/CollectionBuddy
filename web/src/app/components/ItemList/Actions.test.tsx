@@ -64,6 +64,15 @@ describe('Actions', () => {
     expect(onUpload).toHaveBeenCalledWith(file);
   });
 
+  // A retry after a failed upload picks the very same file, which an input still holding it ignores.
+  it('hands over the same file again when it is picked a second time', async () => {
+    const { onUpload, input } = renderActions();
+    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    await userEvent.upload(input, file);
+    await userEvent.upload(input, file);
+    expect(onUpload).toHaveBeenCalledTimes(2);
+  });
+
   it('does not call onUpload when the picker is dismissed with no file chosen', () => {
     const { onUpload, input } = renderActions();
     fireEvent.change(input, { target: { files: [] } });

@@ -118,6 +118,8 @@ export default function ItemList({
     index: number;
   } | null>(null);
   const modalImages = modalState ? images[modalState.itemId] : [];
+  // Its last photograph deleted: closed for good, or an Undo or a new upload would pop the viewer back open.
+  if (modalState && modalImages.length === 0) setModalState(null);
   const modalItemId = modalState?.itemId;
   const modalNeedsSigning = modalImages.some((image) => !image.urlFull);
   useEffect(() => {
@@ -235,10 +237,7 @@ export default function ItemList({
                 className="font-display text-lg text-foreground"
               >
                 {searchStatus.kind === 'active'
-                  ? t('item_list.no_results_title').replace(
-                      '{q}',
-                      debouncedQuery,
-                    )
+                  ? t('item_list.no_results_title', { q: debouncedQuery })
                   : t('item_list.no_items_title')}
               </h3>
               <p className="text-sm text-muted-foreground">
