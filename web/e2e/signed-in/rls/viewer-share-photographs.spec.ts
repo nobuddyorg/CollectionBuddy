@@ -1,6 +1,8 @@
 import { expect, test } from '../test';
 import { SEED, itemsIn } from '../fixtures';
 import {
+  OBJECT_HIDDEN,
+  UPLOAD_REFUSED,
   apiAs,
   context,
   ownedCategoryId,
@@ -53,7 +55,7 @@ test.describe('a category shared with another collector', () => {
         .storage.from('item-images')
         .createSignedUrl(path, 60);
       expect(after).toBeNull();
-      expect(afterError).not.toBeNull();
+      expect(afterError).toMatchObject(OBJECT_HIDDEN);
     } finally {
       await apiAs(token).storage.from('item-images').remove([path]);
     }
@@ -101,7 +103,7 @@ test.describe('a category shared with another collector', () => {
       try {
         const { data, error } = await sign(shared);
         expect(data).toBeNull();
-        expect(error).not.toBeNull();
+        expect(error).toMatchObject(OBJECT_HIDDEN);
       } finally {
         await unshare(token, expiredId);
       }
@@ -116,7 +118,7 @@ test.describe('a category shared with another collector', () => {
         expect((await sign(shared)).error).toBeNull();
         const { data, error } = await sign(sibling);
         expect(data).toBeNull();
-        expect(error).not.toBeNull();
+        expect(error).toMatchObject(OBJECT_HIDDEN);
       } finally {
         await unshare(token, activeId);
       }
@@ -192,10 +194,11 @@ test.describe('a category shared with another collector', () => {
     let shareId = '';
 
     const removalsRefused = async () => {
-      const { data: removedObjects } = await other.storage
+      const { data: removedObjects, error: removeError } = await other.storage
         .from('item-images')
         .remove([path]);
-      expect(removedObjects ?? []).toEqual([]);
+      expect(removeError).toBeNull();
+      expect(removedObjects).toEqual([]);
       const { data: removedRecord } = await other
         .from('images')
         .delete()
@@ -290,20 +293,24 @@ test.describe('a category shared with another collector', () => {
       const { error: uploadError } = await viewer.storage
         .from('item-images')
         .upload(path, new Blob(['probe'], { type: 'image/webp' }));
-      expect(uploadError).not.toBeNull();
+      expect(uploadError).toMatchObject(UPLOAD_REFUSED);
 
       const { data: record, error: recordError } = await viewer
         .from('images')
         .insert({ item_id: itemId, path_full: path })
         .select('id');
       expect(record).toBeNull();
-      expect(recordError).not.toBeNull();
+      expect(recordError).toMatchObject({
+        code: 'P0001',
+        message: 'ownership mismatch',
+      });
 
       // Its own prefix, so listable to it: empty is the refused upload, not a hidden object.
-      const { data: listed } = await viewer.storage
+      const { data: listed, error: listError } = await viewer.storage
         .from('item-images')
         .list(`${otherUserId}/${itemId}`);
-      expect(listed ?? []).toEqual([]);
+      expect(listError).toBeNull();
+      expect(listed).toEqual([]);
       const { data: records } = await apiAs(token)
         .from('images')
         .select('id')

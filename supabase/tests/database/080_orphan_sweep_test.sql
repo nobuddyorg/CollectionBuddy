@@ -52,8 +52,8 @@ insert into public.images (item_id, path_full, path_thumb)
 values (:'item_id'::uuid, :'prefix' || '/kept.webp', :'prefix' || '/kept.thumb.webp');
 reset role;
 
-select ok(
-  not pg_temp.raises('select * from public.orphan_sweep_plan(10000)'),
+select lives_ok(
+  'select * from public.orphan_sweep_plan(10000)',
   'a name that is no uuid path does not abort the plan -- nothing in it is cast to uuid'
 );
 
@@ -170,8 +170,10 @@ select ok(
 );
 
 select pg_temp.auth_as(:'owner_id'::uuid, 'sweep-owner@collectionbuddy.test');
-select ok(
-  pg_temp.raises('select * from public.orphan_sweep_plan(10)'),
+select throws_ok(
+  'select * from public.orphan_sweep_plan(10)',
+  '42501',
+  'permission denied for function orphan_sweep_plan',
   'a signed-in user cannot run the plan'
 );
 reset role;

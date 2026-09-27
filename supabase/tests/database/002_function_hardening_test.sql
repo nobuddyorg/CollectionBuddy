@@ -116,22 +116,21 @@ select ok(
   'has_item_write_access runs as its caller'
 );
 
--- 001_grants_test.sql leaves the trigger functions out of anon's reachable
--- surface on the grounds that a trigger function cannot be called
--- directly. That is a property of PostgreSQL rather than of this schema,
--- but the exclusion rests on it, so it is asserted rather than assumed.
-set local role anon;
-select ok(
-  pg_temp.raises('select public.enforce_user_id()'),
-  'a trigger function cannot be invoked directly, which is what keeps it off anon''s reachable surface'
+-- 001_grants_test.sql keeps trigger functions off anon's surface as PostgreSQL refuses a direct call; asserted as postgres, who holds EXECUTE.
+select throws_ok(
+  'select public.enforce_user_id()',
+  '0A000',
+  'trigger functions can only be called as triggers',
+  'a trigger function cannot be invoked directly, even with EXECUTE, which is what keeps it off anon''s reachable surface'
 );
 
 -- keepalive() is the one thing anon is meant to do: pinged on a schedule
 -- so the free-tier project does not auto-pause
 -- (.github/workflows/keep-alive.yml). A workflow that starts failing
 -- against a 42501 would be noticed late and cost the app its availability.
-select ok(
-  not pg_temp.raises('select public.keepalive()'),
+set local role anon;
+select lives_ok(
+  'select public.keepalive()',
   'anon can call keepalive() -- the one function the keep-alive schedule depends on'
 );
 reset role;

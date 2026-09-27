@@ -18,11 +18,11 @@ begin
   return next is(
     pg_temp.rows_written(format('delete from public.images where item_id = %L returning id', filed)),
     0::bigint, p_state || ': nor remove its photograph record');
-  return next ok(
-    pg_temp.raises(format('select pg_temp.rows_written(%L)', format(
+  return next throws_ok(
+    format('select pg_temp.rows_written(%L)', format(
       'insert into public.images (item_id, path_full) values (%L, %L) returning id',
-      filed, current_setting('t.editor') || '/' || filed || '/b.webp'))),
-    p_state || ': nor add a photograph record to it');
+      filed, current_setting('t.editor') || '/' || filed || '/b.webp')),
+    'P0001', 'ownership mismatch', p_state || ': nor add a photograph record to it');
   return next is(
     pg_temp.rows_written(format('delete from public.item_categories where item_id = %L returning item_id', filed)),
     0::bigint, p_state || ': nor unlink it from the collection');

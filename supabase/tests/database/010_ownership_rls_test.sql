@@ -108,11 +108,13 @@ select is(
 -- bare RLS predicate, since the insert policy alone only checks
 -- user_id = auth.uid() and user_id is set by that same trigger.
 select pg_temp.auth_as(:'stranger_id'::uuid, 'stranger@collectionbuddy.test');
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.item_categories (item_id, category_id) values (%L, %L)',
     :'owner_item_id'::uuid, :'stranger_category_id'::uuid
-  )),
+  ),
+  'P0001',
+  'ownership mismatch',
   'a stranger cannot file the owner''s item into their own category'
 );
 
@@ -125,12 +127,14 @@ select is(
   'a stranger cannot see the owner''s photograph record'
 );
 
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.images (item_id, path_full) values (%L, %L)',
     :'owner_item_id'::uuid,
     :'stranger_id'::text || '/' || :'owner_item_id'::text || '/planted.webp'
-  )),
+  ),
+  'P0001',
+  'ownership mismatch',
   'an images row cannot be inserted for the owner''s item, even with a conforming path'
 );
 
@@ -185,13 +189,17 @@ select throws_ok(
 -- existed and RLS was doing the work (TEST_STRATEGY.md trust boundary 3).
 select pg_temp.auth_as_anon();
 
-select ok(
-  pg_temp.raises('select id from public.items limit 1'),
+select throws_ok(
+  'select id from public.items limit 1',
+  '42501',
+  'permission denied for table items',
   'a visitor with no session is refused items outright, not shown an empty result'
 );
 
-select ok(
-  pg_temp.raises('select id from public.categories limit 1'),
+select throws_ok(
+  'select id from public.categories limit 1',
+  '42501',
+  'permission denied for table categories',
   'a visitor with no session is refused categories outright'
 );
 

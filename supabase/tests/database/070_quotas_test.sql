@@ -41,19 +41,21 @@ select is(:'absent_size'::bigint, 5242880::bigint,
   'with nothing stored yet, the row counts the bucket''s 5 MiB cap, so under-claiming buys nothing');
 
 -- Fill to just under 256 MiB: 123456 + 51 x 5 MiB fits (267510336 <= 268435456); a 52nd does not.
-select ok(
-  not pg_temp.raises(format(
+select lives_ok(
+  format(
     'insert into public.images (item_id, path_full) select %L, %L || ''/fill-'' || g || ''.webp'' from generate_series(1, 50) g',
     :'item_id'::uuid, :'owner_id'::text || '/' || :'item_id'::text
-  )),
+  ),
   'an owner under 256 MiB of photographs may add more'
 );
 
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.images (item_id, path_full) values (%L, %L)',
     :'item_id'::uuid, :'owner_id'::text || '/' || :'item_id'::text || '/over.webp'
-  )),
+  ),
+  'PT507',
+  'photo storage quota of 256 MiB reached',
   'the photograph that would take the owner past 256 MiB is refused'
 );
 
@@ -71,11 +73,13 @@ select throws_ok(
 insert into public.category_shares (category_id, invited_email, role)
 values (:'category_id'::uuid, 'quota-editor@collectionbuddy.test', 'editor');
 select pg_temp.auth_as(:'editor_id'::uuid, 'quota-editor@collectionbuddy.test');
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.images (item_id, path_full) values (%L, %L)',
     :'item_id'::uuid, :'editor_id'::text || '/' || :'item_id'::text || '/editor.webp'
-  )),
+  ),
+  'PT507',
+  'photo storage quota of 256 MiB reached',
   'an editor cannot add a photograph past the owner''s quota either'
 );
 
@@ -111,11 +115,11 @@ select is(:'bare_thumb_size'::bigint, 0::bigint,
   'a photograph without a thumbnail counts none');
 
 -- 3345 + 15 MiB so far; 24 more at 10 MiB each fit (267390225 <= 268435456), a 25th does not. Uncounted, thumbnails would leave it far inside.
-select ok(
-  not pg_temp.raises(format(
+select lives_ok(
+  format(
     'insert into public.images (item_id, path_full, path_thumb) select %L, %L || ''/fill-'' || g || ''.webp'', %L || ''/fill-'' || g || ''.thumb.webp'' from generate_series(1, 24) g',
     :'thumb_item_id'::uuid, :'thumb_prefix', :'thumb_prefix'
-  )),
+  ),
   'an owner may add photographs with thumbnails up to 256 MiB in all'
 );
 select throws_ok(
@@ -133,8 +137,8 @@ select gen_random_uuid() as collector_id \gset
 select pg_temp.auth_as(:'collector_id'::uuid, 'quota-collector@collectionbuddy.test');
 insert into public.categories (name) values ('Collector (pgTAP)')
 returning id as collector_category_id \gset
-select ok(
-  not pg_temp.raises('insert into public.items (title) select ''bulk '' || g from generate_series(1, 49900) g'),
+select lives_ok(
+  'insert into public.items (title) select ''bulk '' || g from generate_series(1, 49900) g',
   'a collector may hold 49,900 entries'
 );
 select throws_ok(
@@ -149,9 +153,9 @@ select is(
   49900::bigint,
   'whole: none of its entries is kept'
 );
-select ok(
-  not pg_temp.raises(format('select public.create_items_in_category(%L, %L)', :'collector_category_id',
-    (select jsonb_agg(jsonb_build_object('title', 'batch ' || g)) from generate_series(1, 100) g))),
+select lives_ok(
+  format('select public.create_items_in_category(%L, %L)', :'collector_category_id',
+    (select jsonb_agg(jsonb_build_object('title', 'batch ' || g)) from generate_series(1, 100) g)),
   'a batch of 100 up to exactly 50,000 is imported'
 );
 select throws_ok(
@@ -184,24 +188,24 @@ select throws_ok(
 insert into public.category_shares (category_id, invited_email, role)
 values (:'collector_category_id'::uuid, 'quota-editor@collectionbuddy.test', 'editor');
 select pg_temp.auth_as(:'editor_id'::uuid, 'quota-editor@collectionbuddy.test');
-select ok(
-  not pg_temp.raises(format('select public.create_items_in_category(%L, %L)', :'collector_category_id',
-    (select jsonb_agg(jsonb_build_object('title', 'editor batch ' || g)) from generate_series(1, 100) g))),
+select lives_ok(
+  format('select public.create_items_in_category(%L, %L)', :'collector_category_id',
+    (select jsonb_agg(jsonb_build_object('title', 'editor batch ' || g)) from generate_series(1, 100) g)),
   'while its editor still adds a batch to its full collection'
 );
 
 -- A different collector is unaffected by someone else's ceiling.
 select pg_temp.auth_as(:'editor_id'::uuid, 'quota-editor@collectionbuddy.test');
-select ok(
-  not pg_temp.raises('insert into public.items (title) values (''unaffected'')'),
+select lives_ok(
+  'insert into public.items (title) values (''unaffected'')',
   'one collector''s ceiling is not another''s'
 );
 
 -- Categories: 1,000 per owner, checked once per statement like entries.
 select gen_random_uuid() as curator_id \gset
 select pg_temp.auth_as(:'curator_id'::uuid, 'quota-curator@collectionbuddy.test');
-select ok(
-  not pg_temp.raises('insert into public.categories (name) select ''Category '' || g from generate_series(1, 1000) g'),
+select lives_ok(
+  'insert into public.categories (name) select ''Category '' || g from generate_series(1, 1000) g',
   'a collector may hold 1,000 categories'
 );
 select throws_ok(
@@ -213,11 +217,11 @@ select throws_ok(
 
 -- Shares: 1,000 per owner, however many categories they are spread over.
 select id as shared_category_id from public.categories where name = 'Category 1' \gset
-select ok(
-  not pg_temp.raises(format(
+select lives_ok(
+  format(
     'insert into public.category_shares (category_id, invited_email) select %L, ''guest'' || g || ''@collectionbuddy.test'' from generate_series(1, 1000) g',
     :'shared_category_id'::uuid
-  )),
+  ),
   'an owner may hold 1,000 shares'
 );
 select throws_ok(
@@ -233,11 +237,11 @@ select throws_ok(
 -- Links: an entry belongs to one collection (0020).
 insert into public.items (title) values ('Linked entry')
 returning id as linked_item_id \gset
-select ok(
-  not pg_temp.raises(format(
+select lives_ok(
+  format(
     'insert into public.item_categories (item_id, category_id) select %L, c.id from public.categories c where c.name = ''Category 1''',
     :'linked_item_id'::uuid
-  )),
+  ),
   'an entry may sit in one collection'
 );
 select throws_ok(
@@ -277,12 +281,12 @@ select is(
 );
 
 -- Text: each column's ceiling holds, and the value one past it is refused.
-select ok(
-  not pg_temp.raises(format(
+select lives_ok(
+  format(
     'insert into public.items (title, description, place, tags) values (%L, %L, %L, %L)',
     repeat('t', 300), repeat('d', 10000), repeat('p', 500),
     (select array_agg(lpad(g::text, 100, 'x')) from generate_series(1, 50) g)
-  )),
+  ),
   'an entry at every text ceiling is accepted'
 );
 select throws_ok(
@@ -312,9 +316,9 @@ select throws_ok(
     array['short', repeat('a', 101)]),
   '23514', null, 'one tag past 100 characters is refused, however short the rest (0028)'
 );
-select ok(
-  not pg_temp.raises(format('insert into public.items (title, tags) values (''w'', %L)',
-    array['  ' || repeat('ä', 100) || '  '])),
+select lives_ok(
+  format('insert into public.items (title, tags) values (''w'', %L)',
+    array['  ' || repeat('ä', 100) || '  ']),
   'a tag is measured in characters after normalization, not bytes or padding'
 );
 select throws_ok(
@@ -332,14 +336,6 @@ select throws_ok(
 -- Storage itself (0025): what the upload policy and the photograph trigger see of the bucket, orphans included.
 -- storage.protect_delete() refuses a delete from SQL without this; the policies are what is under test.
 select set_config('storage.allow_delete_query', 'true', true);
-
-create function pg_temp.upload(p_path text)
-returns boolean
-language sql
-as $$
-  select not pg_temp.raises(format(
-    'insert into storage.objects (bucket_id, name) values (%L, %L)', 'item-images', p_path))
-$$;
 
 -- An object of p_size bytes under p_prefix, stored the way Storage records one, past every policy.
 create function pg_temp.store(p_prefix text, p_size bigint)
@@ -381,29 +377,33 @@ insert into public.items (title) values ('Uploader entry')
 returning :'uploader_id'::text || '/' || id::text as uploader_prefix, id as uploader_item_id \gset
 
 -- A recorded path takes no bytes once its size is sampled, not even after its object is removed.
-select ok(pg_temp.upload(:'uploader_prefix' || '/photo.webp'), 'a collector uploads a photograph');
-select ok(pg_temp.upload(:'uploader_prefix' || '/photo.thumb.webp'), 'and its thumbnail');
+select lives_ok(pg_temp.upload_statement(:'uploader_prefix' || '/photo.webp'), 'a collector uploads a photograph');
+select lives_ok(pg_temp.upload_statement(:'uploader_prefix' || '/photo.thumb.webp'), 'and its thumbnail');
 insert into public.images (item_id, path_full, path_thumb)
 values (:'uploader_item_id'::uuid, :'uploader_prefix' || '/photo.webp', :'uploader_prefix' || '/photo.thumb.webp');
 delete from storage.objects
 where bucket_id = 'item-images' and name like :'uploader_prefix' || '/photo.%';
-select ok(not pg_temp.upload(:'uploader_prefix' || '/photo.webp'),
+select throws_ok(pg_temp.upload_statement(:'uploader_prefix' || '/photo.webp'), '42501',
+  'new row violates row-level security policy for table "objects"',
   'removed, the path its record names as the photograph takes no new bytes');
-select ok(not pg_temp.upload(:'uploader_prefix' || '/photo.thumb.webp'),
+select throws_ok(pg_temp.upload_statement(:'uploader_prefix' || '/photo.thumb.webp'), '42501',
+  'new row violates row-level security policy for table "objects"',
   'nor the path it names as the thumbnail');
 insert into public.images (item_id, path_full)
 values (:'uploader_item_id'::uuid, :'uploader_prefix' || '/pending.webp');
-select ok(not pg_temp.upload(:'uploader_prefix' || '/pending.webp'),
+select throws_ok(pg_temp.upload_statement(:'uploader_prefix' || '/pending.webp'), '42501',
+  'new row violates row-level security policy for table "objects"',
   'nor the path of a record written before its bytes');
 
 -- 320 MiB under one uploader's prefix, recorded or not, and that uploader stores nothing more.
 reset role;
 select pg_temp.store(:'uploader_prefix', 335544320);
 select pg_temp.auth_as(:'uploader_id'::uuid, 'quota-uploader@collectionbuddy.test');
-select ok(not pg_temp.upload(:'uploader_prefix' || '/one-more.webp'),
+select throws_ok(pg_temp.upload_statement(:'uploader_prefix' || '/one-more.webp'), '42501',
+  'new row violates row-level security policy for table "objects"',
   'an uploader holding 320 MiB of objects, with or without records, uploads nothing more');
 select pg_temp.auth_as(:'neighbour_id'::uuid, 'quota-neighbour@collectionbuddy.test');
-select ok(pg_temp.upload(:'neighbour_prefix' || '/unaffected.webp'),
+select lives_ok(pg_temp.upload_statement(:'neighbour_prefix' || '/unaffected.webp'),
   'while another collector still uploads');
 
 -- Past 768 MiB in the bucket, no photograph is recorded, with a detail the client tells apart from the owner's quota.
@@ -423,14 +423,15 @@ select is(
   'project',
   'and the refusal names the project, not the owner'
 );
-select ok(pg_temp.upload(:'neighbour_prefix' || '/backstop.webp'),
+select lives_ok(pg_temp.upload_statement(:'neighbour_prefix' || '/backstop.webp'),
   'uploads still pass below the 832 MiB backstop, so the recorded refusal is what a collector meets');
 
 -- 832 MiB in the bucket, and nobody uploads.
 reset role;
 select pg_temp.store(gen_random_uuid()::text, 872415232 - pg_temp.bucket_bytes());
 select pg_temp.auth_as(:'neighbour_id'::uuid, 'quota-neighbour@collectionbuddy.test');
-select ok(not pg_temp.upload(:'neighbour_prefix' || '/too-much.webp'),
+select throws_ok(pg_temp.upload_statement(:'neighbour_prefix' || '/too-much.webp'), '42501',
+  'new row violates row-level security policy for table "objects"',
   'at 832 MiB in the bucket nobody uploads, however little they hold');
 
 select * from finish();

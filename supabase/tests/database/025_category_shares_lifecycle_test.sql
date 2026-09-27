@@ -77,43 +77,53 @@ select is(
 -- issued it for -- a different category, a different person, or a longer
 -- life than they agreed to -- so each is refused outright rather than
 -- ignored.
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'update public.category_shares set invited_email = %L where id = %L',
     'someone-else@collectionbuddy.test', :'share_id'::uuid
-  )),
+  ),
+  'P0001',
+  'only role may be changed on an existing share',
   'a live grant cannot be re-addressed to a different person'
 );
 
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'update public.category_shares set category_id = %L where id = %L',
     :'other_category_id'::uuid, :'share_id'::uuid
-  )),
+  ),
+  'P0001',
+  'only role may be changed on an existing share',
   'nor re-pointed at a different collection'
 );
 
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     $q$update public.category_shares set expires_at = now() + interval '1 year' where id = %L$q$,
     :'share_id'::uuid
-  )),
+  ),
+  'P0001',
+  'only role may be changed on an existing share',
   'nor given a longer life than it was issued with'
 );
 
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     $q$update public.category_shares set created_at = now() - interval '1 year' where id = %L$q$,
     :'share_id'::uuid
-  )),
+  ),
+  'P0001',
+  'only role may be changed on an existing share',
   'nor backdated'
 );
 
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'update public.category_shares set owner_user_id = %L where id = %L',
     :'grantee_id'::uuid, :'share_id'::uuid
-  )),
+  ),
+  'P0001',
+  'only role may be changed on an existing share',
   'nor handed to a different owner'
 );
 
@@ -140,19 +150,23 @@ select is(
 -- tests owner_user_id, which the trigger has already re-derived from the
 -- category by the time the policy sees it.
 select pg_temp.auth_as(:'bystander_id'::uuid, 'lifecycle-bystander@collectionbuddy.test');
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.category_shares (category_id, invited_email) values (%L, %L)',
     :'category_id'::uuid, 'lifecycle-bystander@collectionbuddy.test'
-  )),
+  ),
+  'P0001',
+  'ownership mismatch',
   'a bystander cannot issue a grant on somebody else''s collection'
 );
 
-select ok(
-  pg_temp.raises(format(
+select throws_ok(
+  format(
     'insert into public.category_shares (category_id, invited_email) values (%L, %L)',
     gen_random_uuid(), 'lifecycle-bystander@collectionbuddy.test'
-  )),
+  ),
+  'P0001',
+  'category not found',
   'nor on a collection that does not exist'
 );
 
