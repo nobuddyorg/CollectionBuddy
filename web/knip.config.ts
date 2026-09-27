@@ -5,6 +5,8 @@ const config: KnipConfig = {
   entry: [
     // playwright.config.ts's `webServer.command` is a shell string.
     'scripts/serve-export.mjs',
+    // Run by scripts/lighthouse.mjs as a subprocess.
+    'scripts/lighthouse-collector.ts',
     // playwright.config.ts's `testMatch` is a regex against a conditionally-spread project.
     'e2e/signed-in.setup.ts',
     // Named only as a string in stryker.config.mjs's `configFile`.

@@ -306,8 +306,8 @@ expected: keep the count at zero rather than adding the file to
 ## Run Lighthouse
 
 CI's `lighthouse` job runs [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci)
-against the production export twice — signed out, and signed in through demo
-mode — never against `next dev`:
+against the production export twice — signed out, and signed in to a
+photographed collection — never against `next dev`:
 
 ```bash
 supabase start   # repository root
@@ -319,9 +319,27 @@ Thresholds and the baseline they were measured against are in
 against a measured baseline; accessibility must score exactly 1.0 on both
 flows, a second, weighted lens on the pages `@axe-core/playwright` already
 checks in the e2e suite. A finding fixed for Lighthouse gets an axe or
-Playwright case too, so it cannot regress between runs. A fresh demo account
-has no categories, so the signed-in pass measures a different code path than a
-populated catalogue.
+Playwright case too, so it cannot regress between runs.
+
+The signed-in pass measures the photo grid, the app's main path. Before it,
+`scripts/lighthouse-collector.ts` rebuilds one password collector's collection
+through the e2e helpers (`e2e/signed-in/collectors.ts`), under RLS: one
+category, 12 entries, 24 photographs painted in Chromium as photo-like WebP at
+the upload sizes (1000 px full size, 600 px thumbnail). It then opens the
+catalogue once in a Chrome profile (`web/.lighthouse-profile`, deleted
+afterwards) and fails unless a photograph renders. Lighthouse runs in that
+profile (`--user-data-dir` in `lighthouserc.signed-in.json`). Lighthouse clears
+the HTTP cache, service workers and Cache Storage before each run but keeps
+localStorage, so every run starts signed in with a cold cache. The script
+then fails the job unless every run's largest paint was a photograph: a
+signed-out or photo-less page would pass every budget.
+
+Measured on the populated grid (local stack, three runs): LCP 5.5 s (the first
+card's photograph), CLS 0.008 to 0.036, performance 0.79 to 0.80. CLS is held
+to Google's "good" 0.1. LCP stays at 7 s: 5.5 s is past Google's "poor"
+boundary of 4 s, so a limit inside it would fail today. What the grid waits for
+before its first photograph (session, categories, page, signing) is what LCP
+measures.
 
 ## Run the OWASP ZAP baseline scan
 

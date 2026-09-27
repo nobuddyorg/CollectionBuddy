@@ -10,11 +10,10 @@ const TARGETS = [
     maxCls: 0.1,
   },
   {
-    label: 'Signed in (`/`, demo mode)',
+    label: 'Signed in (`/`, a photographed collection)',
     manifest: 'lighthouse-reports/signed-in/manifest.json',
     minPerformance: 0.65,
-    // Loose on purpose: a new demo account's first render shifts from skeleton to empty state.
-    maxCls: 0.4,
+    maxCls: 0.1,
   },
 ];
 
