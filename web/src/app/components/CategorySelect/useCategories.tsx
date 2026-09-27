@@ -28,6 +28,8 @@ export function useCategories() {
   const [categories, setCategories] = useState<CategorySummary[]>([]);
   // Starts true: an initial false flashed the "no categories" state before the first fetch.
   const [isLoading, setIsLoading] = useState(true);
+  // Kept apart from an empty list: a failed load must not read as a collector who has no collections.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -41,12 +43,18 @@ export function useCategories() {
       const { data, error } = await listCategories();
       if (error) throw error;
       const list = data ?? [];
-      if (isCurrent(mySequence)) setCategories(list);
+      if (isCurrent(mySequence)) {
+        setCategories(list);
+        setLoadFailed(false);
+      }
       return list;
     } catch (error) {
       // Logged even for a superseded request; only the toast is gated.
       console.error(error);
-      if (isCurrent(mySequence)) toast.error(t('category_select.load_error'));
+      if (isCurrent(mySequence)) {
+        setLoadFailed(true);
+        toast.error(t('category_select.load_error'));
+      }
       return [];
     } finally {
       if (isCurrent(mySequence)) setIsLoading(false);
@@ -207,6 +215,7 @@ export function useCategories() {
   return {
     categories,
     isLoading,
+    loadFailed,
     isCreating,
     isDeleting,
     isRenaming,

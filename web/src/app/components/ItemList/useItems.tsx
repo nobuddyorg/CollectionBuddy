@@ -19,6 +19,8 @@ export function useItems(categoryId: string, query: string) {
   const [page, setPage] = useState(1);
   // Starts true: starting false gave one render that looked exactly like "No entries yet".
   const [loading, setLoading] = useState(true);
+  // Kept apart from an empty list: a failed load must not read as a category with no entries.
+  const [loadFailed, setLoadFailed] = useState(false);
   // Aborted when superseded or unmounted, so the response stops downloading and its answer is dropped.
   const abortRef = useRef<AbortController | null>(null);
   // Non-silent requests in flight: one superseded by a silent request used to leave `loading` stuck true.
@@ -71,7 +73,12 @@ export function useItems(categoryId: string, query: string) {
         // postgrest-js resolves an aborted fetch with an AbortError `error`: not a failure worth a toast.
         if (controller.signal.aborted) return;
         if (error) {
-          toast.reportError('load items', error, t('item_list.search_error'));
+          setLoadFailed(true);
+          toast.reportError(
+            'load items',
+            error,
+            search ? t('item_list.search_error') : t('item_list.load_error'),
+          );
           return;
         }
 
@@ -92,6 +99,7 @@ export function useItems(categoryId: string, query: string) {
           },
         );
         setTotal(count || 0);
+        setLoadFailed(false);
       } finally {
         // Runs for a discarded request too, so `loading` ends false whichever request resolves last.
         if (!silent) {
@@ -125,6 +133,7 @@ export function useItems(categoryId: string, query: string) {
     pageImages,
     total,
     loading,
+    loadFailed,
     page: currentPage,
     setPage,
     totalPages,

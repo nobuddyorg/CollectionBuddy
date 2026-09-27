@@ -7,6 +7,7 @@ import { initCategoryPanel } from './category-panel';
 import { initConfirm, initImageViewer, initToast } from './dialogs';
 import { initEntryForm } from './entry-form';
 import { initHelp } from './help';
+import { initLoadError } from './load-error';
 import { initLoginPage } from './login';
 import { initMap } from './map';
 import { initPrivacyPage } from './privacy';
@@ -37,6 +38,12 @@ export function createPageTree(page: Page) {
     },
     get help() {
       return initHelp(page);
+    },
+    get collectionsLoadError() {
+      return initLoadError(page, 'collections');
+    },
+    get entriesLoadError() {
+      return initLoadError(page, 'entries');
     },
     get login() {
       return initLoginPage(page);

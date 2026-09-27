@@ -25,17 +25,35 @@ export function useCatalogue(loading: boolean, userId: string | undefined) {
     storeSelectedCategory(id);
   }, []);
 
+  const loadAndSelect = useCallback(
+    (storedId: string | null) =>
+      reload().then((loadedCategories) => {
+        setSelectedCategoryId(
+          (current) =>
+            current ?? pickInitialCategory(loadedCategories, storedId),
+        );
+        setCatalogueReady(true);
+      }),
+    [reload],
+  );
+
   useEffect(() => {
     if (loading || !userId) return;
     const storedId = readStoredCategory();
     if (storedId) prefetchFirstPage(storedId);
-    void reload().then((loadedCategories) => {
-      setSelectedCategoryId(
-        (current) => current ?? pickInitialCategory(loadedCategories, storedId),
-      );
-      setCatalogueReady(true);
-    });
-  }, [loading, userId, reload]);
+    void loadAndSelect(storedId);
+  }, [loading, userId, loadAndSelect]);
 
-  return { categories, selectedCategoryId, selectCategory, catalogueReady };
+  const retryLoad = useCallback(
+    () => loadAndSelect(readStoredCategory()),
+    [loadAndSelect],
+  );
+
+  return {
+    categories,
+    selectedCategoryId,
+    selectCategory,
+    catalogueReady,
+    retryLoad,
+  };
 }

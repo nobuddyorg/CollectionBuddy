@@ -67,6 +67,7 @@ export function categories(
   return {
     categories: CATEGORIES,
     isLoading: false,
+    loadFailed: false,
     isCreating: false,
     isDeleting: false,
     isRenaming: false,
