@@ -11,17 +11,22 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-function renderHeader(onSignOut = vi.fn(), onOpenHelp = vi.fn()) {
+function renderHeader(
+  onSignOut = vi.fn(),
+  onOpenHelp = vi.fn(),
+  onDeleteAccount = vi.fn(),
+) {
   const rendered = render(
     <I18nProvider>
       <Header
         user={{ email: 'collector@example.com' }}
         onSignOut={onSignOut}
+        onDeleteAccount={onDeleteAccount}
         onOpenHelp={onOpenHelp}
       />
     </I18nProvider>,
   );
-  return { ...rendered, onSignOut, onOpenHelp };
+  return { ...rendered, onSignOut, onOpenHelp, onDeleteAccount };
 }
 
 async function openMenu() {
@@ -117,6 +122,21 @@ describe('Menu', () => {
     const menu = document.getElementById('user-menu') as HTMLElement;
     await user.click(within(menu).getByRole('button', { name: 'Help' }));
     expect(onOpenHelp).toHaveBeenCalledTimes(1);
+    expect(document.getElementById('user-menu')).toBeNull();
+    expect(trigger).toHaveFocus();
+  });
+
+  it('starts the account deletion, closes the menu and leaves focus on the trigger for the confirmation to return to', async () => {
+    const onDeleteAccount = vi.fn();
+    const user = userEvent.setup();
+    renderHeader(vi.fn(), vi.fn(), onDeleteAccount);
+    const trigger = screen.getByRole('button', { name: 'Account menu' });
+    await user.click(trigger);
+    const menu = document.getElementById('user-menu') as HTMLElement;
+    await user.click(
+      within(menu).getByRole('button', { name: 'Delete account' }),
+    );
+    expect(onDeleteAccount).toHaveBeenCalledTimes(1);
     expect(document.getElementById('user-menu')).toBeNull();
     expect(trigger).toHaveFocus();
   });

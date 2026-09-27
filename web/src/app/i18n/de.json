@@ -23,7 +23,14 @@
     "theme": "Darstellung",
     "theme_system": "System",
     "theme_light": "Hell",
-    "theme_dark": "Dunkel"
+    "theme_dark": "Dunkel",
+    "delete_account": "Konto löschen"
+  },
+  "account": {
+    "confirm_delete": "Dein Konto löschen? Alle deine Sammlungen, Einträge und Fotos werden endgültig gelöscht, ebenso jede Freigabe, die du erteilt hast, und jede, die dir erteilt wurde. Fotos, die du zu Einträgen anderer hinzugefügt hast, bleiben bei diesen Einträgen. Exportiere vorher die Sammlungen, die du behalten möchtest. Das lässt sich nicht rückgängig machen.",
+    "deleting": "Dein Konto wird gelöscht…",
+    "delete_error": "Dein Konto konnte nicht gelöscht werden, einige seiner Fotos sind aber womöglich schon entfernt. Bitte erneut versuchen.",
+    "delete_success": "Dein Konto wurde gelöscht."
   },
   "category_select": {
     "title": "Sammlung",
@@ -270,7 +277,7 @@
     "retention_heading": "Wie lange Daten gespeichert werden",
     "retention_until_deleted": "Deine Sammlungen, Einträge und Fotos bleiben gespeichert, bis du sie löschst. Nach dem Löschen kannst du es in der App einige Sekunden lang rückgängig machen; danach wird es aus der Datenbank und dem Fotospeicher entfernt. Einen Papierkorb gibt es nicht.",
     "retention_orphans": "Fotodateien, die ein abgebrochenes Hochladen oder Löschen zurücklässt, werden nach 48 Stunden automatisch entfernt.",
-    "retention_account": "Dein Konto bleibt bestehen, bis du seine Löschung verlangst. Schreib an den oben genannten Kontakt, dann werden dein Konto und alle seine Daten gelöscht.",
+    "retention_account": "Dein Konto bleibt bestehen, bis du es löschst: „Konto löschen“ im Kontomenü löscht es mit allen seinen Sammlungen, Einträgen und Fotos, jeder Freigabe, die du erteilt hast, und jeder, die dir erteilt wurde. Du kannst auch an den oben genannten Kontakt schreiben. Fotos, die du zum Eintrag einer anderen Person hinzugefügt hast, gehören zu diesem Eintrag und bleiben dort.",
     "retention_sharing": "Eine Einladung bleibt gespeichert, bis die besitzende oder die eingeladene Person sie entfernt oder die Sammlung gelöscht wird, auch nach ihrem Ablaufdatum.",
     "retention_logs": "Supabase bewahrt seine technischen Protokolle mit IP-Adressen einen Tag und seine Anmeldeprotokolle eine Stunde lang auf. Aufzeichnungen deiner Anmeldungen können außerdem bei deinem Konto gespeichert bleiben, solange es besteht. GitHub, Google, Komoot und die OpenStreetMap Foundation führen eigene Protokolle nach ihren eigenen Regeln.",
     "browser_heading": "Was in deinem Browser gespeichert wird",
@@ -278,8 +285,8 @@
     "browser_cache": "Ein Service Worker hält eine Kopie der App-eigenen Dateien vor, damit sie schneller startet und auch offline öffnet; deine Sammlungen und Fotos speichert er nicht.",
     "browser_no_cookies": "CollectionBuddy setzt keine Cookies und nutzt kein Tracking. Was es speichert, ist für den Dienst erforderlich, den du nutzen willst (§ 25 Abs. 2 Nr. 2 TDDDG).",
     "rights_heading": "Deine Rechte",
-    "rights_in_app": "Du kannst deine Sammlungen, Einträge und Fotos jederzeit in der App ansehen, berichtigen und löschen und jede Sammlung als ZIP-Archiv exportieren.",
-    "rights_list": "Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18) und Datenübertragbarkeit (Art. 20) sowie das Recht, einer Verarbeitung aufgrund berechtigter Interessen zu widersprechen (Art. 21). Um dein Konto löschen zu lassen oder eines dieser Rechte auszuüben, schreib an den oben genannten Kontakt.",
+    "rights_in_app": "Du kannst deine Sammlungen, Einträge und Fotos jederzeit in der App ansehen, berichtigen und löschen, jede Sammlung als ZIP-Archiv exportieren und dein Konto löschen.",
+    "rights_list": "Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18) und Datenübertragbarkeit (Art. 20) sowie das Recht, einer Verarbeitung aufgrund berechtigter Interessen zu widersprechen (Art. 21). Um eines dieser Rechte auszuüben, schreib an den oben genannten Kontakt.",
     "rights_complaint": "Außerdem hast du das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren, insbesondere in dem EU-Mitgliedstaat, in dem du lebst oder arbeitest oder in dem der mutmaßliche Verstoß stattfand (Art. 77 DSGVO)."
   }
 }

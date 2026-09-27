@@ -23,7 +23,14 @@
     "theme": "Appearance",
     "theme_system": "System",
     "theme_light": "Light",
-    "theme_dark": "Dark"
+    "theme_dark": "Dark",
+    "delete_account": "Delete account"
+  },
+  "account": {
+    "confirm_delete": "Delete your account? All your collections, entries and photographs are permanently deleted, along with every share you made and every share made to you. Photographs you added to other people's entries stay with those entries. Export the collections you want to keep first. This cannot be undone.",
+    "deleting": "Deleting your account…",
+    "delete_error": "Your account could not be deleted, though some of its photographs may already be gone. Please try again.",
+    "delete_success": "Your account has been deleted."
   },
   "category_select": {
     "title": "Collection",
@@ -270,7 +277,7 @@
     "retention_heading": "How long data is kept",
     "retention_until_deleted": "Your collections, entries and photos are kept until you delete them. After you delete something, the app lets you undo it for a few seconds; then it is removed from the database and the photo storage. There is no recycle bin.",
     "retention_orphans": "Photo files left behind by an interrupted upload or deletion are removed automatically after 48 hours.",
-    "retention_account": "Your account is kept until you ask for it to be deleted. Write to the contact above, and your account and all its data are deleted.",
+    "retention_account": "Your account is kept until you delete it: \"Delete account\" in the account menu deletes it with all its collections, entries and photos, every share you made and every share made to you. You can also write to the contact above. Photos you added to someone else's entry belong to that entry and stay with it.",
     "retention_sharing": "An invitation is kept until the owner or the invited person removes it, or the collection is deleted, even after its expiry date has passed.",
     "retention_logs": "Supabase keeps its technical logs, with IP addresses, for one day and its sign-in logs for one hour. Records of your sign-ins can also be kept with your account while it exists. GitHub, Google, Komoot and the OpenStreetMap Foundation keep their own logs under their own policies.",
     "browser_heading": "What is stored in your browser",
@@ -278,8 +285,8 @@
     "browser_cache": "A service worker keeps a copy of the app's own files so that it starts faster and opens offline; it keeps none of your collections or photos.",
     "browser_no_cookies": "CollectionBuddy sets no cookies and uses no tracking. What it stores is needed for the service you asked for (Section 25(2) no. 2 TDDDG).",
     "rights_heading": "Your rights",
-    "rights_in_app": "You can see, correct and delete your collections, entries and photos in the app at any time, and export each collection as a ZIP archive.",
-    "rights_list": "You have the right of access (Art. 15 GDPR), rectification (Art. 16), erasure (Art. 17), restriction of processing (Art. 18) and data portability (Art. 20), and the right to object to processing based on legitimate interests (Art. 21). To delete your account or to exercise any of these rights, write to the contact above.",
+    "rights_in_app": "You can see, correct and delete your collections, entries and photos in the app at any time, export each collection as a ZIP archive, and delete your account.",
+    "rights_list": "You have the right of access (Art. 15 GDPR), rectification (Art. 16), erasure (Art. 17), restriction of processing (Art. 18) and data portability (Art. 20), and the right to object to processing based on legitimate interests (Art. 21). To exercise any of these rights, write to the contact above.",
     "rights_complaint": "You also have the right to lodge a complaint with a data protection supervisory authority, in particular in the EU member state where you live or work or where you believe the infringement took place (Art. 77 GDPR)."
   }
 }
