@@ -12,6 +12,17 @@ on a device without network. Signing out also makes the browser forget the
 collection you last had open and the places the map looked up; your theme and
 language stay.
 
+## Delete your account
+
+**Delete account**, at the bottom of the user menu, deletes your account for
+good after one confirmation: every collection you own with its entries and
+photos, the entries you filed in other people's collections, every share you
+made and every share made to you, and your sign-in. There is no undo, so
+export the collections you want to keep first. Photos you added to someone
+else's entry are theirs and stay. Anyone who shared a collection of yours
+loses it; signing in again with the same Google account starts a new, empty
+account.
+
 ## Help
 
 **Help** in the user menu opens a short guide to each feature, in the

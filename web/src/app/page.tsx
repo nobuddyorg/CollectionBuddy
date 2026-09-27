@@ -18,6 +18,7 @@ import { labelClasses } from './components/ui/labelClasses';
 import { canEditCategory } from './data/categories';
 import { useI18n } from './i18n/useI18n';
 import { useCatalogue } from './useCatalogue';
+import { useDeleteAccount } from './useDeleteAccount';
 import { useSession } from './useSession';
 import { useSignOut } from './useSignOut';
 
@@ -37,6 +38,7 @@ export default function Page() {
   const { categories, selectedCategoryId, selectCategory, catalogueReady } =
     useCatalogue(loading, userId);
   const signOut = useSignOut();
+  const accountDeletion = useDeleteAccount(userId ?? '');
   const help = useHelp();
 
   if (loading)
@@ -62,8 +64,16 @@ export default function Page() {
         {t('page.skip_to_content')}
       </a>
 
-      <Header user={headerUser} onSignOut={signOut} onOpenHelp={help.show} />
+      <Header
+        user={headerUser}
+        onSignOut={signOut}
+        onDeleteAccount={accountDeletion.deleteAccount}
+        onOpenHelp={help.show}
+      />
       <HelpDialog open={help.open} onOpenChange={help.setOpen} />
+      {accountDeletion.deleting && (
+        <LoadingOverlay label={t('account.deleting')} />
+      )}
 
       {/* No wrapper panels: cards nested in bordered trays ate the width on a 390px screen. */}
       <main

@@ -147,6 +147,12 @@ export const SEED = {
   firstRun: {
     password: 'first-run-password-not-a-secret',
   },
+  /** For account-deletion.spec.ts and rls/account-deletion.spec.ts, as collectors of their own per parallel slot: each deletes its account. */
+  accountDeletion: {
+    password: 'account-deletion-password-not-a-secret',
+    category: 'Nachlass',
+    item: 'Nachlassstück',
+  },
   /** For import-quota.spec.ts, as a collector of its own per parallel slot: it fills that collector's photo quota. */
   photoQuota: {
     password: 'photo-quota-password-not-a-secret',

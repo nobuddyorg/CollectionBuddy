@@ -67,7 +67,7 @@ bypass the interface almost entirely: they ask Postgres, with a real token, the
 questions the app never would, one file per boundary (`isolation`,
 `viewer-share`, `editor-share`, each with a `-photographs` half for Storage,
 and `editor-share` a `-limits` one, plus `search-rpc`, `create-rpc`,
-`orphan-sweep-rpc`, `orphan-entries` and `quotas`; shared helpers in `rls/helpers.ts`). Change a
+`orphan-sweep-rpc`, `orphan-entries`, `quotas` and `account-deletion`; shared helpers in `rls/helpers.ts`). Change a
 policy and these files say whether it holds.
 
 ```bash
@@ -182,6 +182,7 @@ supabase test db
 | `070_quotas_test.sql` | The quotas: photographs and thumbnails per owner, the bucket's ceilings at record and upload time, and entries, categories, shares, links and text |
 | `075_query_plans_test.sql` | That every index-backed query can reach its index, and picks it at a realistic size |
 | `080_orphan_sweep_test.sql` | What the orphan sweep may delete: both path columns, no uuid cast, the 48 h grace, other buckets, the mass-deletion ceiling; `supabase_read_only_user` and no API role runs it, in a read-only transaction |
+| `085_delete_own_account_test.sql` | Deleting one's own account: the objects-first guard, what goes (rows, grants to its email, the Auth user) and what another account keeps |
 
 `_helpers.psql` holds the shared fixtures; it is `.psql` because
 `supabase test db` collects every `.sql` file as a test. pgTAP proves the

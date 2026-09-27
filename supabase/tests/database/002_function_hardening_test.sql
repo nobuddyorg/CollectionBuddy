@@ -32,7 +32,7 @@ select is(
   'every function in schema public pins search_path to the empty string'
 );
 
--- Every security-definer function, in full: fourteen trigger functions, search_category_items and photo_upload_has_room, deliberate boundaries. A seventeenth must be added here on purpose.
+-- Every security-definer function, in full: fourteen trigger functions, search_category_items, photo_upload_has_room and delete_own_account, deliberate boundaries. An eighteenth must be added here on purpose.
 select is(
   (select array_agg(p.proname::text order by p.proname)
    from pg_catalog.pg_proc p
@@ -44,14 +44,14 @@ select is(
        where d.objid = p.oid and d.deptype = 'e'
      )),
   array[
-    'delete_item_if_orphan', 'enforce_user_id', 'photo_upload_has_room', 'search_category_items',
+    'delete_item_if_orphan', 'delete_own_account', 'enforce_user_id', 'photo_upload_has_room', 'search_category_items',
     'tg_categories_normalize', 'tg_categories_quota', 'tg_category_shares_enforce',
     'tg_category_shares_quota', 'tg_images_enforce',
     'tg_images_quota', 'tg_images_size_from_storage',
     'tg_item_categories_enforce', 'tg_item_categories_quota',
     'tg_items_normalize', 'tg_items_quota', 'tg_set_updated_at'
   ],
-  'exactly sixteen functions run as their owner, and search_category_items and photo_upload_has_room are the only non-trigger ones'
+  'exactly seventeen functions run as their owner, and search_category_items, photo_upload_has_room and delete_own_account are the only non-trigger ones'
 );
 
 -- A `security definer` function runs as whoever owns it, so the owner is
@@ -71,7 +71,7 @@ select is(
   'every security definer function is owned by postgres, not by a lesser role'
 );
 
--- A trigger fires without EXECUTE, so the API roles hold it on two definers only: the search RPC and the upload policy's bucket count (0010, 0025, Splinter 0028/0029).
+-- A trigger fires without EXECUTE, so the API roles hold it on three definers only: the search RPC, the upload policy's bucket count and the account deletion (0010, 0025, 0033, Splinter 0028/0029).
 select is(
   (select array_agg(p.proname::text || ' to ' || r.rolname order by p.proname, r.rolname)
    from pg_catalog.pg_proc p
@@ -80,8 +80,8 @@ select is(
    where n.nspname = 'public'
      and p.prosecdef
      and has_function_privilege(r.rolname, p.oid, 'EXECUTE')),
-  array['photo_upload_has_room to authenticated', 'search_category_items to authenticated'],
-  'the API roles can execute exactly two security definer functions, both signed in only'
+  array['delete_own_account to authenticated', 'photo_upload_has_room to authenticated', 'search_category_items to authenticated'],
+  'the API roles can execute exactly three security definer functions, all signed in only'
 );
 
 -- These must stay `security invoker`. list_category_places and create_items_in_category check nothing themselves; as definers they would be unsound second boundaries.
