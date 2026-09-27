@@ -380,16 +380,54 @@ select pg_temp.plan_never_mentions(
   'search_category_items checks the grant once per call, not per row'
 );
 
--- A SQL function's body gets a generic plan in Postgres 17, costed on an average category rather than the one named (0018); the orphan cleanup's, on its first call's row counts (0031).
+-- The entry and link quotas' checks, read from the live functions with a statement's keys inlined, as each call is planned (0032).
 reset role;
+select
+  regexp_replace(
+    substring(p.prosrc from 'if exists \((.*)\) then'),
+    '\mlinked\M',
+    quote_literal((select array_agg(ic.item_id) from (
+      select ic.item_id from public.item_categories ic
+      where ic.category_id = :'other_category_id'::uuid limit 100
+    ) ic)) || '::uuid[]',
+    'g'
+  ) as link_quota_sql
+from pg_catalog.pg_proc p
+where p.oid = 'public.tg_item_categories_quota()'::regprocedure \gset
+select
+  regexp_replace(
+    substring(p.prosrc from 'if exists \((.*)\) then'),
+    '\mowners\M',
+    quote_literal(array[:'owner_id'::uuid]) || '::uuid[]',
+    'g'
+  ) as entry_quota_sql
+from pg_catalog.pg_proc p
+where p.oid = 'public.tg_items_quota()'::regprocedure \gset
+
+select pg_temp.plan_uses_index(
+  :'link_quota_sql', 'item_categories_pkey',
+  'preferred: a batch''s link quota probes each linked entry through item_categories_pkey'
+);
+select pg_temp.plan_has_no_seq_scan_on(
+  :'link_quota_sql', 'item_categories', 'preferred: a batch''s link quota does not scan every link'
+);
+select pg_temp.plan_uses_index(
+  :'entry_quota_sql', 'idx_items_user_created_at',
+  'preferred: the entry quota counts one owner''s entries through idx_items_user_created_at'
+);
+
+-- A SQL function's body gets a generic plan in Postgres 17, costed on an average category rather than the one named (0018); a trigger's, on its connection's first calls (0031, 0032).
 select is(
   (select array_agg(p.proname::text order by p.proname)
    from pg_catalog.pg_proc p
    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
      and coalesce(p.proconfig, '{}') @> array['plan_cache_mode=force_custom_plan']),
-  array['delete_item_if_orphan', 'list_category_places', 'search_category_items'],
-  'the map and search RPCs plan each call for the category it names, the orphan cleanup for the links it lost'
+  array[
+    'create_items_in_category', 'delete_item_if_orphan', 'list_category_places',
+    'search_category_items', 'tg_item_categories_quota', 'tg_items_quota'
+  ],
+  'the map and search RPCs plan each call for the category it names, entry creation and its quotas for the rows it adds, the orphan cleanup for the links it lost'
 );
 
 select * from finish();

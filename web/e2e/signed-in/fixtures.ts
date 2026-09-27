@@ -153,6 +153,10 @@ export const SEED = {
     category: 'Fotokontingent',
     item: 'Kontingentstück',
   },
+  /** For rls/quotas.spec.ts's creation ceiling, as an owner and an editor of their own per parallel slot: it fills both to the brim. */
+  entryQuota: {
+    password: 'entry-quota-password-not-a-secret',
+  },
   // The RLS specs below run in parallel files and category_shares is unique per (category, grantee).
   /** For rls/viewer-share-photographs.spec.ts, which grants and revokes around a photograph. */
   viewerPhotoCategory: 'Fotoalbum',
