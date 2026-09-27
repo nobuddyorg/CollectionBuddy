@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   coordsFromFeature,
-  isRetryableStatus,
+  coordsFromPhotonResponse,
   photonLang,
   photonSearchUrl,
 } from './photon';
@@ -69,20 +69,46 @@ describe('coordsFromFeature', () => {
   });
 });
 
-describe('isRetryableStatus', () => {
-  it('asks again when the service refused to serve right now', () => {
-    expect(isRetryableStatus(429)).toBe(true);
+function photon(coordinates: unknown) {
+  return { features: [{ geometry: { coordinates } }] };
+}
+
+describe('coordsFromPhotonResponse', () => {
+  it('reads GeoJSON lng-first coordinates into lat/lng', () => {
+    expect(coordsFromPhotonResponse(photon([6.96, 50.94]))).toEqual({
+      lat: 50.94,
+      lng: 6.96,
+    });
   });
 
-  it('asks again when the service is broken right now', () => {
-    expect(isRetryableStatus(500)).toBe(true);
-    expect(isRetryableStatus(502)).toBe(true);
-    expect(isRetryableStatus(503)).toBe(true);
+  it('returns null when the query matched nothing', () => {
+    expect(coordsFromPhotonResponse({ features: [] })).toBeNull();
   });
 
-  it('gives up on an answered request, however unwelcome the answer', () => {
-    expect(isRetryableStatus(400)).toBe(false);
-    expect(isRetryableStatus(403)).toBe(false);
-    expect(isRetryableStatus(404)).toBe(false);
+  it('returns null for a response with no features at all', () => {
+    expect(coordsFromPhotonResponse({})).toBeNull();
+    expect(coordsFromPhotonResponse(null)).toBeNull();
+  });
+
+  it('returns null for a malformed geometry instead of producing NaN pins', () => {
+    expect(coordsFromPhotonResponse(photon([6.96]))).toBeNull();
+    expect(coordsFromPhotonResponse(photon(undefined))).toBeNull();
+    expect(coordsFromPhotonResponse(photon(['6.96', '50.94']))).toBe(null);
+  });
+
+  // A pair with one usable side is the dangerous shape: a check needing both wrong would pin at NaN.
+  it('returns null when only one of the two coordinates is a number', () => {
+    expect(coordsFromPhotonResponse(photon([6.96, '50.94']))).toBeNull();
+    expect(coordsFromPhotonResponse(photon(['6.96', 50.94]))).toBeNull();
+    expect(coordsFromPhotonResponse(photon([6.96, null]))).toBeNull();
+  });
+
+  // A GeoJSON feature need not carry a geometry; reaching through one would throw inside a worker.
+  it('returns null for a feature with nothing to read', () => {
+    expect(coordsFromPhotonResponse({ features: [null] })).toBeNull();
+    expect(coordsFromPhotonResponse({ features: [{}] })).toBeNull();
+    expect(
+      coordsFromPhotonResponse({ features: [{ geometry: {} }] }),
+    ).toBeNull();
   });
 });

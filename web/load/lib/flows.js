@@ -5,8 +5,7 @@ import encoding from 'k6/encoding';
 import {
   countItems,
   createImageRow,
-  createItem,
-  linkItem,
+  createItemInCategory,
   listPage,
   listPlaces,
   searchPage,
@@ -52,14 +51,20 @@ export function search({ session, categoryId, terms = SEARCH_TERMS }) {
 
 /** Catalogue a new entry and attach a photograph, full size and thumbnail. */
 export function write(session, categoryId) {
-  const itemId = createItem(session, {
-    title: `Neuzugang ${crypto.randomUUID().slice(0, 8)}`,
-    description: 'Catalogued under load',
-    place: pick(['Rom', 'Wien', 'Prag']),
-    tags: ['last'],
+  // The app lets the database pick the id; the flow picks its own, to upload under it.
+  const itemId = crypto.randomUUID();
+  const created = createItemInCategory({
+    session,
+    categoryId,
+    fields: {
+      id: itemId,
+      title: `Neuzugang ${itemId.slice(0, 8)}`,
+      description: 'Catalogued under load',
+      place: pick(['Rom', 'Wien', 'Prag']),
+      tags: ['last'],
+    },
   });
-  if (!itemId) return;
-  linkItem({ session, itemId, categoryId });
+  if (created.status >= 300) return;
 
   const base = `${session.userId}/${itemId}/${crypto.randomUUID()}`;
   uploadObject({ session, path: `${base}.webp`, bytes: PHOTO });

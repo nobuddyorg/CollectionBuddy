@@ -24,6 +24,44 @@ test.describe('the catalogue', () => {
     );
   });
 
+  // postgrest-js resolves an aborted read with an error; a switch mid-load must not call that a failed search.
+  test('switches collection mid-load without reporting a failure', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await app.categories.do.open('Münzen');
+    const itemList = (url: URL) =>
+      url.pathname.endsWith('/rest/v1/item_categories');
+    const hold = { armed: true };
+    let listRequested!: () => void;
+    const requested = new Promise<void>((resolve) => {
+      listRequested = resolve;
+    });
+    // A held read never answers, so only the switch away can end it.
+    await page.route(itemList, (route) => {
+      if (!hold.armed) return route.fallback();
+      listRequested();
+    });
+    try {
+      await app.categories.do.openPanel();
+      await app.categories.tab('Briefmarken').click();
+      await requested;
+      hold.armed = false;
+
+      await app.categories.do.openPanel();
+      await app.categories.tab('Münzen').click();
+
+      await expectTitles(
+        page,
+        itemsIn('Münzen').map((item) => item.title),
+      );
+      await expect(app.toast()).toHaveCount(0);
+    } finally {
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    }
+  });
+
   test('keeps another category to itself', async ({ on, page }) => {
     await on(page).categories.do.open('Münzen');
     expect(await visibleTitles(page)).not.toContain('Blaue Mauritius');

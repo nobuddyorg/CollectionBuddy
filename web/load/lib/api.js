@@ -166,26 +166,14 @@ export function listPlaces({ session, categoryId, term }) {
   });
 }
 
-/** data/items.ts createItem; user_id is the trigger's to fill in. */
-export function createItem(session, fields) {
-  const response = sendJson({
-    method: 'POST',
-    path: '/rest/v1/items?select=id',
-    session,
-    payload: fields,
-    prefer: 'return=representation',
-    name: 'create item',
-  });
-  return response.status === 201 ? response.json()[0].id : null;
-}
-
-export function linkItem({ session, itemId, categoryId }) {
+/** data/items.ts createItemsInCategory: the entry and its link in one transaction; user_id is the trigger's to fill in. */
+export function createItemInCategory({ session, categoryId, fields }) {
   return sendJson({
     method: 'POST',
-    path: '/rest/v1/item_categories',
+    path: '/rest/v1/rpc/create_items_in_category',
     session,
-    payload: { item_id: itemId, category_id: categoryId },
-    name: 'link item',
+    payload: { target_category_id: categoryId, entries: [fields] },
+    name: 'create item',
   });
 }
 

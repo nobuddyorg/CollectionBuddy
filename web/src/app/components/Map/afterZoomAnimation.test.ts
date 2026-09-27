@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { afterZoomAnimation, type ZoomingMap } from './afterZoomAnimation';
+import {
+  afterZoomAnimation,
+  removeMidZoom,
+  type ZoomingMap,
+} from './afterZoomAnimation';
 
 /** Ends a zoom animation the way Leaflet does: flag first, then zoomend. */
 function fakeMap(animating: boolean) {
@@ -63,5 +67,18 @@ describe('afterZoomAnimation', () => {
     afterZoomAnimation(map, framing)();
 
     expect(framing).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('removeMidZoom', () => {
+  it('clears the zoom flag before removing, so the pending zoom end finds nothing to do', () => {
+    const { map } = fakeMap(true);
+    const flagAtRemoval: Array<boolean | undefined> = [];
+    const remove = vi.fn(() => flagAtRemoval.push(map._animatingZoom));
+
+    removeMidZoom(Object.assign(map, { remove }));
+
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(flagAtRemoval).toEqual([false]);
   });
 });

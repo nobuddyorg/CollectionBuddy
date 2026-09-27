@@ -14,8 +14,6 @@ type GetUid = ImportParams['getUid'];
 export type CreateCategoryRow = ImportParams['createCategoryRow'];
 export type DeleteCategoryRow = ImportParams['deleteCategoryRow'];
 export type CreateItemRows = ImportParams['createItemRows'];
-export type LinkItemRows = ImportParams['linkItemRows'];
-export type DeleteItemRows = ImportParams['deleteItemRows'];
 export type UploadImage = ImportParams['uploadImage'];
 export type RemoveImages = ImportParams['removeImages'];
 export type CreateImage = ImportParams['createImage'];
@@ -94,14 +92,6 @@ export function fakeCreateItems(): CreateItemRows {
   return vi.fn(async () => ({ error: null })) as unknown as CreateItemRows;
 }
 
-export function fakeLinkItems(): LinkItemRows {
-  return vi.fn(async () => ({ error: null })) as unknown as LinkItemRows;
-}
-
-export function fakeDeleteItems(): DeleteItemRows {
-  return vi.fn(async () => ({ error: null })) as unknown as DeleteItemRows;
-}
-
 // Sequential, so each new item's id is predictable: new-item-1, -2, ...
 function fakeNewItemId(): () => string {
   let n = 0;
@@ -138,8 +128,6 @@ export function baseFakes() {
     createCategoryRow: fakeCreateCategory(),
     deleteCategoryRow: fakeDeleteCategory(),
     createItemRows: fakeCreateItems(),
-    linkItemRows: fakeLinkItems(),
-    deleteItemRows: fakeDeleteItems(),
     newItemId: fakeNewItemId(),
     now: () => NOW,
     uploadImage: fakeUploadImage(),

@@ -65,7 +65,6 @@ describe('importCategory with no thumbnailer injected', () => {
       })) as never,
       deleteCategoryRow: (async () => ({ error: null })) as never,
       createItemRows: (async () => ({ error: null })) as never,
-      linkItemRows: (async () => ({ error: null })) as never,
       uploadImage: (async () => ({ error: null })) as never,
       createImage: (async () => ({
         data: { id: 'img-1' },
@@ -95,7 +94,6 @@ describe('importCategory with no thumbnailer injected', () => {
       })) as never,
       deleteCategoryRow: (async () => ({ error: null })) as never,
       createItemRows: createItemRows as never,
-      linkItemRows: (async () => ({ error: null })) as never,
       uploadImage: (async () => ({ error: null })) as never,
       createImage: (async () => ({
         data: { id: 'img-1' },
@@ -103,8 +101,8 @@ describe('importCategory with no thumbnailer injected', () => {
       })) as never,
     });
 
-    const [[rows]] = createItemRows.mock.calls as unknown as [
-      [{ id: string; created_at: string }[]],
+    const [[, rows]] = createItemRows.mock.calls as unknown as [
+      [string, { id: string; created_at: string }[]],
     ];
     expect(rows[0].id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,

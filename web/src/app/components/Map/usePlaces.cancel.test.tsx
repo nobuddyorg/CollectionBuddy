@@ -29,7 +29,7 @@ const berlin = {
 function renderByCategory() {
   return renderHook(
     ({ categoryId }: { categoryId: string }) =>
-      usePlaces({ categoryId, search: '', enabled: true }),
+      usePlaces({ categoryId, search: '', enabled: true, canEdit: true }),
     { initialProps: { categoryId: 'cat-1' } },
   );
 }
@@ -56,6 +56,67 @@ describe('usePlaces cancellation', () => {
     unmount();
 
     expect(capturedSignal?.aborted).toBe(true);
+  });
+
+  it('aborts an in-flight Photon lookup on unmount, and retries nothing after it', async () => {
+    vi.useFakeTimers();
+    vi.mocked(listCategoryPlaces).mockResolvedValue({
+      data: [group('Cologne', null, null)],
+      error: null,
+    });
+    const fetchMock = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal!.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError')),
+          );
+        }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { unmount } = renderUsePlaces();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.signal!.aborted).toBe(false);
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(init.signal!.aborted).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(updateItemsPlace).not.toHaveBeenCalled();
+  });
+
+  // Each place a worker took would claim a paced turn, keeping timers alive for a map nobody sees.
+  it('stops walking the queue after unmount, once the turns already claimed have passed', async () => {
+    vi.useFakeTimers();
+    vi.mocked(listCategoryPlaces).mockResolvedValue({
+      data: Array.from({ length: 8 }, (_, index) =>
+        group(`Place${index}`, null, null, ['An entry'], [`id-${index}`]),
+      ),
+      error: null,
+    });
+    const fetchMock = vi.fn().mockResolvedValue(photonOk([6.96, 50.94]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { unmount } = renderUsePlaces();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    unmount();
+    // Four turns were claimed by then, a third of a second apart; the last one's gap ends at 1,336 ms.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1400);
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   // `cancelled` guards `setPlaces`, not the write-back: a late geocode is still worth persisting.

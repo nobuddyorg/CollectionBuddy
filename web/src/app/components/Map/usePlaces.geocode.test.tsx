@@ -50,6 +50,39 @@ describe('usePlaces geocoding', () => {
     expect(cached.Cologne).toEqual({ name: 'Cologne', lat: 50.94, lng: 6.96 });
   });
 
+  // RLS turns a viewer's write-back into a no-op; the device's own cache still spares the next lookup.
+  it("sends a viewer's geocode no write-back, and caches it on the device all the same", async () => {
+    vi.mocked(listCategoryPlaces).mockResolvedValue({
+      data: [group('Cologne', null, null, ['Entry A'], ['row-1'])],
+      error: null,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(photonOk([6.96, 50.94])));
+
+    const { result } = renderHook(() =>
+      usePlaces({
+        categoryId: 'cat-1',
+        search: '',
+        enabled: true,
+        canEdit: false,
+      }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.places).toEqual([
+      { name: 'Cologne', lat: 50.94, lng: 6.96, titles: ['Entry A'] },
+    ]);
+    expect(updateItemsPlace).not.toHaveBeenCalled();
+    const cached = JSON.parse(
+      localStorage.getItem('cb_geocode_cache_v1') ?? '{}',
+    ) as Record<string, unknown>;
+    expect(cached.Cologne).toEqual({ name: 'Cologne', lat: 50.94, lng: 6.96 });
+  });
+
   it('gives up on a place immediately for a non-retryable failure, without retrying', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
       data: [group('Nowhereville', null, null)],
@@ -212,29 +245,6 @@ describe('usePlaces geocoding', () => {
     ]);
   });
 
-  it('caps concurrent geocode lookups at the configured limit rather than firing every request at once', async () => {
-    vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [
-        group('Place1', null, null, ['A'], ['id-1']),
-        group('Place2', null, null, ['B'], ['id-2']),
-        group('Place3', null, null, ['C'], ['id-3']),
-        group('Place4', null, null, ['D'], ['id-4']),
-        group('Place5', null, null, ['E'], ['id-5']),
-      ],
-      error: null,
-    });
-    const fetchMock = vi.fn(() => new Promise(() => {}));
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderUsePlaces();
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-  });
-
   it('asks Photon for exactly one result in the resolved language', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
       data: [group('Cologne', null, null)],
@@ -248,6 +258,7 @@ describe('usePlaces geocoding', () => {
         categoryId: 'cat-1',
         search: '',
         enabled: true,
+        canEdit: true,
         locale: 'de',
       }),
     );

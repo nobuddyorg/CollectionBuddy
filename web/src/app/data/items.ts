@@ -5,7 +5,7 @@ import type { Database } from './database.types';
 import { likePatternFor } from './itemSearch';
 
 type ItemRow = Database['public']['Tables']['items']['Row'];
-export type ItemInsert = Database['public']['Tables']['items']['Insert'];
+type ItemInsert = Database['public']['Tables']['items']['Insert'];
 export type ItemUpdate = Database['public']['Tables']['items']['Update'];
 
 // One list for the type and the `.select()` string: `.overrideTypes()` asserts, it never checks.
@@ -43,17 +43,6 @@ export function withSignal<T extends { abortSignal(signal: AbortSignal): T }>(
   return query.abortSignal(signal as AbortSignal);
 }
 
-export function createItem(payload: Pick<ItemInsert, ItemEditableFieldKey>) {
-  return (
-    supabase
-      .from('items')
-      // user_id is never sent: enforce_user_id() fills it from the JWT, so no row changes hands.
-      .insert(payload as ItemInsert)
-      .select('id')
-      .single<{ id: string }>()
-  );
-}
-
 export function updateItem(
   id: string,
   payload: Pick<ItemUpdate, ItemEditableFieldKey>,
@@ -84,38 +73,22 @@ export function deleteItem(id: string) {
     .single<{ id: string }>();
 }
 
-export function linkItemToCategory(itemId: string, categoryId: string) {
-  return supabase.from('item_categories').insert({
-    item_id: itemId,
-    category_id: categoryId,
-    // tg_item_categories_enforce() derives user_id from the linked rows, never from the client.
-  } as Database['public']['Tables']['item_categories']['Insert']);
-}
+/** An entry as the form sends it: its id and timestamp are the database's to choose. */
+export type NewItem = Pick<ItemInsert, ItemEditableFieldKey>;
 
-/** A row an import writes in bulk: its id and timestamp are chosen by the caller. */
-export type ImportedItemInsert = Pick<ItemInsert, ItemEditableFieldKey> & {
-  id: string;
-  created_at: string;
-};
+/** An entry an import sends: its id and timestamp are chosen by the caller. */
+export type ImportedItemInsert = NewItem & { id: string; created_at: string };
 
-// user_id is filled in by enforce_user_id(), exactly as for createItem.
-export function createItems(rows: ImportedItemInsert[]) {
-  return supabase.from('items').insert(rows as ItemInsert[]);
-}
-
-// tg_item_categories_enforce() derives and rechecks user_id per row.
-export function linkItemsToCategory(
-  links: { item_id: string; category_id: string; created_at: string }[],
+// One transaction for the entries and their links, so a failed request leaves no entry in no category.
+export function createItemsInCategory(
+  categoryId: string,
+  entries: NewItem[] | ImportedItemInsert[],
 ) {
-  return supabase
-    .from('item_categories')
-    .insert(
-      links as Database['public']['Tables']['item_categories']['Insert'][],
-    );
-}
-
-export function deleteItems(ids: string[]) {
-  return supabase.from('items').delete().in('id', ids);
+  // user_id is never sent: enforce_user_id() fills it from the JWT, so no row changes hands.
+  return supabase.rpc('create_items_in_category', {
+    target_category_id: categoryId,
+    entries,
+  });
 }
 
 // PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.

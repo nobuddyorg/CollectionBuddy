@@ -58,6 +58,7 @@ function renderModal(props: Partial<Parameters<typeof MapModal>[0]> = {}) {
         <MapModal
           categoryId="cat-1"
           search=""
+          canEdit
           open
           onOpenChange={vi.fn()}
           {...props}
@@ -74,6 +75,15 @@ describe('MapModal', () => {
     window.localStorage.setItem('lang', 'en');
     placesState();
     locationState();
+  });
+
+  // A viewer's map must not write coordinates RLS would refuse anyway.
+  it("hands the category's write access to the places it loads", () => {
+    renderModal({ canEdit: false });
+
+    expect(usePlaces).toHaveBeenCalledWith(
+      expect.objectContaining({ categoryId: 'cat-1', canEdit: false }),
+    );
   });
 
   it('reports that the map itself is broken rather than showing an empty one', () => {

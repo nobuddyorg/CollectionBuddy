@@ -109,6 +109,41 @@ describe('exportCategory, retrying a photograph fetch', () => {
     }
   });
 
+  it('skips a photograph whose every fetch rejects, and logs the last rejection', async () => {
+    vi.useFakeTimers();
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const networkError = new TypeError('network error');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw networkError;
+      }),
+    );
+    try {
+      const promise = exportCategory({
+        category: { id: 'cat', name: 'Coins' },
+        getSession: fakeGetSession('uid'),
+        listItems: paginatedListItems([item({ id: 'item-1' })]),
+        listImages: fakeListImages({ 'item-1': ['1.webp'] }),
+        signUrls: fakeSignUrls(),
+      });
+      await vi.advanceTimersByTimeAsync(10_000);
+      const result = await promise;
+
+      expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3);
+      expect(result.skippedPhotoCount).toBe(1);
+      expect(result.photoCount).toBe(0);
+      const [, , error] = consoleError.mock.calls[0] as unknown[];
+      expect(error).toBe(networkError);
+    } finally {
+      vi.useRealTimers();
+      consoleError.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('names the exhausted status in the log once every retry is spent, not a blank message', async () => {
     vi.useFakeTimers();
     const consoleError = vi
