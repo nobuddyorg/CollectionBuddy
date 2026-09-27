@@ -545,8 +545,8 @@ For a fork, or a new production project:
 ## Deploy to GitHub Pages
 
 [`pages-deploy.yml`](../../.github/workflows/pages-deploy.yml) runs when CI
-has passed on `main`, run by a push or a dispatch (`workflow_run`), and
-deploys exactly that commit: `gate` checks it is still `main`'s tip and reads the Pages site URL,
+has passed on `main`, run by a push or a dispatch (`workflow_run`), and hourly
+as a safety net, and deploys exactly that commit: `gate` checks it is still `main`'s tip and reads the Pages site URL,
 whose path the build uses as `basePath`, `migrate` lists the pending
 migrations, applies them and reloads the PostgREST schema cache, `build` exports the site, `deploy` publishes it,
 `smoke_test` runs the signed-out suite against the live URL. Each job depends
@@ -563,7 +563,9 @@ previous schema. Nothing deploys from a developer machine.
 - **An auto-merged Dependabot bump deploys on its own.** `auto-merge.yml`
   merges with `GITHUB_TOKEN`, and a push made with it starts no workflow, so
   its hourly `catch-up-ci` job dispatches CI on `main`'s tip when no push or
-  dispatch run exists for it; a green run deploys like a push. A human merge
+  dispatch run exists for it. That run was started with `GITHUB_TOKEN` too, so
+  it starts no `workflow_run`; the deploy's own hourly run (`41 * * * *`)
+  deploys `main`'s tip once CI passed on it and no run has tried it. A human merge
   landing before that hour is up still carries the bump untested on its own.
   To run it sooner: Actions → *CI* → *Run workflow* from `main`.
 - **By hand:** Actions → *Deploy Pages* → *Run workflow* from `main`
