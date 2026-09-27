@@ -216,6 +216,40 @@ select pg_temp.plan_has_no_seq_scan_on(
   :'catalogue_sql', 'item_categories', 'preferred: the catalogue page does not scan item_categories sequentially'
 );
 
+-- The last page (#781) beside other collectors' links, as in production: it flips from sorting every link to the index between 20,000 and 30,000 of them (measured); 45,000 is under the entry quota.
+select pg_temp.auth_as(gen_random_uuid(), 'plans-other@collectionbuddy.test');
+insert into public.categories (name) values ('Plans other (pgTAP)')
+returning id as other_category_id \gset
+insert into public.items (title)
+select 'Plan other ' || g from generate_series(1, 45000) as g;
+insert into public.item_categories (item_id, category_id)
+select i.id, :'other_category_id'::uuid from public.items i where i.title like 'Plan other %';
+reset role;
+analyze public.items, public.item_categories;
+select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
+
+select format(
+  $sql$
+    select ic.item_id
+    from public.item_categories ic
+    where ic.category_id = %L::uuid
+    order by ic.created_at desc, ic.item_id
+    limit 9 offset %s
+  $sql$,
+  :'category_id',
+  (select (ceil(count(*) / 9.0)::int - 1) * 9
+   from public.item_categories ic
+   where ic.category_id = :'category_id'::uuid)
+) as last_page_sql \gset
+
+select pg_temp.plan_uses_index(
+  :'last_page_sql', 'idx_item_categories_cat_created',
+  'preferred: the catalogue''s last page uses idx_item_categories_cat_created under RLS'
+);
+select pg_temp.plan_has_no_seq_scan_on(
+  :'last_page_sql', 'item_categories', 'preferred: the catalogue''s last page does not scan item_categories sequentially'
+);
+
 -- rawListItemsByIds, as PostgREST embeds the photographs: nine entries by id, each with its own ordered lateral read of images.
 select format(
   $sql$

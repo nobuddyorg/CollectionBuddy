@@ -178,7 +178,7 @@ Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (N
 | `ci.yml` (`e2e_local_stack`) | `web` or `sql` changed | Supabase in Docker: pgTAP (query plans included), Splinter, the `database.types.ts` drift check, the full Chromium Playwright suite (signed-out and signed-in) with the one e2e coverage floor. |
 | `ci.yml` (`mutation_test`) | `web` changed | Stryker over `mutation-targets.mjs`: incremental on a PR from `main`'s cached results, every mutant on `main`. |
 | `ci.yml` (`opengrep`) | `web` or `sql` changed | Opengrep SAST; SARIF to code scanning; fails on ERROR severity. |
-| `ci.yml` (`lighthouse`) | `web` changed | Lighthouse CI against the export, signed out and in demo mode. |
+| `ci.yml` (`lighthouse`) | `web` changed | Lighthouse CI against the export, signed out and signed in to a seeded, photographed collection. |
 | `ci.yml` (`zap_baseline`) | `web` changed | OWASP ZAP passive scan against the export, signed out and in demo mode, served on the runner. |
 | `pages-deploy.yml` (`gate` → `migrate` → `build` → `deploy` → `smoke_test`) | `ci.yml` passed on `main`, run by a push or a dispatch (`workflow_run`), manual from `main` | Only `main`'s tip, only once CI passed on it. When migrations are pending, upload an encrypted dump first; apply them and reload the PostgREST cache; export, and call `keepalive()` with the URL and key just baked in, so a rejected key never publishes; publish to Pages; run the signed-out suite against the live site. |
 | `keep-alive.yml` | daily, manual | Calls `keepalive()` so a free-tier project does not pause. |

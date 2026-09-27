@@ -1,8 +1,9 @@
-// Normal load on the owner's own 10,000-entry category: browsing pages and searching, side by side.
-import { browse, search } from './lib/flows.js';
+// Normal load on the owner's own 10,000-entry category: browsing pages, searching and, at one VU, exporting, side by side.
+import { browse, exportArchive, search } from './lib/flows.js';
 import {
   LIFECYCLE_TIMEOUTS,
   SUMMARY_TREND_STATS,
+  correctnessThresholds,
   rampTo,
   thresholdsFor,
 } from './lib/options.js';
@@ -16,8 +17,18 @@ export const options = {
   scenarios: {
     browse: { executor: 'ramping-vus', exec: 'browseOwn', stages: rampTo(10) },
     search: { executor: 'ramping-vus', exec: 'searchOwn', stages: rampTo(5) },
+    // One collector exporting at a time: every page, sign call and photograph of the category, back to back.
+    export: {
+      executor: 'ramping-vus',
+      exec: 'exportOwn',
+      stages: rampTo(1),
+    },
   },
-  thresholds: thresholdsFor(['browse', 'search']),
+  // No p95 for export yet: it has no calibrated baseline (docs/how-to/load-testing.md).
+  thresholds: {
+    ...correctnessThresholds(['export']),
+    ...thresholdsFor(['browse', 'search']),
+  },
 };
 
 export function browseOwn(data) {
@@ -26,6 +37,10 @@ export function browseOwn(data) {
 
 export function searchOwn(data) {
   search({ session: data.owner, categoryId: data.searchedCategoryId });
+}
+
+export function exportOwn(data) {
+  exportArchive(data.owner, data.searchedCategoryId);
 }
 
 export function handleSummary(data) {

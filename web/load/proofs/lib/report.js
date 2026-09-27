@@ -73,7 +73,7 @@ const SHARED_GUARD =
   /^(checks|http_req_failed|proof_measured)(\{scenario:[^}]+\})?$/;
 
 /** Why the numbers cannot be read as a verdict: an iteration stopped early, a guard failed, or a verdict metric has no sample. */
-function inconclusiveReasons(data, verdictMetrics, guards = []) {
+export function inconclusiveReasons(data, verdictMetrics, guards = []) {
   const reasons = [];
   const finished = data.metrics.proof_measured?.values.count ?? 0;
   const iterations = data.metrics.iterations?.values.count ?? 0;

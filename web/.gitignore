@@ -56,6 +56,8 @@ out/
 # scratch directory.
 /lighthouse-reports
 /.lighthouseci
+# The signed-in Chrome profile scripts/lighthouse-collector.ts writes; removed after the run.
+/.lighthouse-profile
 
 # k6 end-of-test summaries (npm run load).
 /load-results

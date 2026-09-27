@@ -163,9 +163,9 @@ secret keys](../how-to/developer-guide.md#migrate-to-publishable-and-secret-keys
   both on its own.
 - **Local stack.** `supabase status` prints both kinds. `web/.env.example`
   holds the legacy anon key; `npm run e2e:local`, `demo`, `lighthouse` and
-  `load`, and CI's `zap_baseline`, pass the publishable key (`e2e:local` the
-  secret key too), so CI covers the new format while production may still run
-  the old one.
+  `load`, and CI's `zap_baseline`, pass the publishable key (`e2e:local` and
+  `lighthouse` the secret key too, to create their password users), so CI
+  covers the new format while production may still run the old one.
   The local stack accepts an unknown `apikey` as `anon`; only the hosted
   project rejects a wrong key.
 
