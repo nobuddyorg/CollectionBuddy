@@ -605,7 +605,8 @@ One-time setup for a fork:
    deploy takes `basePath` from the Pages site URL. A fork's own Site URL
    still goes into `supabase/hosted-auth.json`.
 5. Optional: `STRYKER_DASHBOARD_API_KEY` to publish mutation reports;
-   `keep-alive.yml` stays enabled on a free-tier project.
+   `keep-alive.yml` stays enabled on a free-tier project
+   ([Keep the schedules alive](#keep-the-schedules-alive)).
 6. The README's CodeQL badge relies on GitHub's default code-scanning setup
    (Settings → Code security), a per-repo setting that does not carry over.
 7. Settings → Branches (or Rules → Rulesets) → `main`: **Require status checks
@@ -621,6 +622,9 @@ One-time setup for a fork:
    classic access token before it lands; `prek`'s gitleaks scan covers the
    legacy JWT and the database URL, which GitHub has no pattern for
    ([Configuration](../reference/configuration.md#github-actions-secrets)).
+9. Create and pin the *Production health* issue, labelled
+   `production-health`, so failures notify you
+   ([Watch production health](#watch-production-health)).
 
 ## Roll back a bad deploy
 
@@ -778,6 +782,61 @@ dry run is under it, then enable the workflow again.
 A change to the plan, its migration or the workflow runs CI's pgTAP job
 (`080_orphan_sweep_test.sql`); after it merges, run the default dry run once
 before the next 04:30 run.
+
+## Watch production health
+
+Monitoring stays inside GitHub
+([why](../explanation/design-decisions.md#why-production-monitoring-stays-inside-github)).
+Every workflow that deploys or runs on a schedule ends in a `report-failure`
+job: `pages-deploy.yml`, `keep-alive.yml`, `cleanup-orphaned-photos.yml`, and
+`auto-merge.yml`, for its `catch-up-ci`, which brings auto-merged bumps to
+production. When a run on `main` fails, that job
+([`report-production-failure`](../../.github/actions/report-production-failure/action.yml))
+comments the workflow, commit and run link on the newest issue labelled
+`production-health`, reopening it if it is closed, and opens one, creating
+the label, if none exists. Close the issue once production is healthy again;
+the next failure reopens it. Only that job holds `issues: write`.
+
+**Who is told.** A comment notifies whoever is subscribed to the issue, and a
+new or reopened issue also everyone watching the repository with *All
+Activity*. The action posts as `github-actions[bot]`, so nobody is subscribed
+by default. Once, as the owner: create the issue yourself (title *Production
+health*, label `production-health`), pin it, and stay subscribed as its
+author; or subscribe on the issue the first failure opens. Apart from that,
+GitHub emails a failed run only to the account that triggered it, and for a
+scheduled run to whoever last changed its `cron` line, if their notification
+settings send Actions email.
+
+**What it cannot see.** A run that never happens: a disabled workflow (below)
+leaves no failed run to report. Errors in a visitor's browser: `error.tsx`
+and, when the root layout itself throws, `global-error.tsx` show a translated
+screen with a reload button, and the error reaches only that browser's
+console.
+
+### Keep the schedules alive
+
+In a public repository, GitHub disables a workflow with a `schedule` trigger
+once the repository has had no activity for 60 days; commits count, the
+workflows' own runs do not. It disables the whole workflow, not only its
+schedule, and all four above have one: a disabled `pages-deploy.yml` also
+ignores CI's `workflow_run`, so the first merge after a quiet spell deploys
+nothing. GitHub emails a warning some days before. With `keep-alive.yml`
+disabled, Supabase pauses the Free project after 7 days of low activity, with
+only Supabase's own email as a warning; restore it from the Supabase
+dashboard.
+
+What keeps them alive is any commit on `main`: a merged pull request,
+Dependabot's weekly auto-merged patch bumps included. Nothing guarantees one,
+so after a quiet spell, or on GitHub's warning:
+
+```bash
+gh workflow list --all                     # a disabled one shows disabled_inactivity
+gh workflow enable keep-alive.yml          # likewise pages-deploy.yml, cleanup-orphaned-photos.yml, auto-merge.yml
+```
+
+or Actions → the workflow → *Enable workflow*. Re-enabling
+`cleanup-orphaned-photos.yml` is safe only if it was not disabled on purpose
+([Sweep orphaned photographs](#sweep-orphaned-photographs)).
 
 ## Migrate to publishable and secret keys
 
