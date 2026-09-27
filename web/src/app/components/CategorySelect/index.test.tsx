@@ -85,6 +85,23 @@ describe('CategorySelect', () => {
     expect(screen.queryByText('None selected')).not.toBeInTheDocument();
   });
 
+  // Nothing is selected before the first load, which would open the panel on create and import for a collector who has collections.
+  it('keeps the panel shut while not ready, even with nothing selected yet', () => {
+    renderSelect({ ready: false, selectedCategoryId: null });
+    expect(screen.queryByTestId('new-category-input')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('import-category')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('opens the panel on create and import once ready with nothing to select', () => {
+    renderSelect({
+      selectedCategoryId: null,
+      categories: categories({ categories: [] }),
+    });
+    expect(screen.getByTestId('new-category-input')).toBeVisible();
+    expect(screen.getByTestId('import-category')).toBeVisible();
+  });
+
   it('keeps the same header when the panel is opened', async () => {
     renderSelect();
     const before = heading().parentElement?.parentElement;
