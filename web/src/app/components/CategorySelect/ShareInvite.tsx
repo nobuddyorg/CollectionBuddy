@@ -9,6 +9,7 @@ import { Spinner } from '../ui/Spinner';
 import { fieldClasses } from '../ui/fieldClasses';
 import { labelClasses } from '../ui/labelClasses';
 import { MAX_EMAIL_LENGTH } from '../../lib/textLimits';
+import { localDateStamp } from '../../lib/localDate';
 import type { UseShares } from './useShares';
 
 // End of day, not midnight: midnight would trip category_shares_expiry_in_future for most of the day.
@@ -16,12 +17,8 @@ function endOfDayIso(dateString: string): string {
   return new Date(`${dateString}T23:59:59`).toISOString();
 }
 
-function todayDateString(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export function ShareInvite({ shares }: { shares: UseShares }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { isSharing, createShare } = shares;
   const [email, setEmail] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
@@ -89,7 +86,7 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
                   ? t('category_select.share_expiry_chip', {
                       date: new Date(
                         `${expiryDate}T00:00:00`,
-                      ).toLocaleDateString(),
+                      ).toLocaleDateString(locale),
                     })
                   : t('category_select.share_no_expiry')}
               </span>
@@ -117,7 +114,8 @@ export function ShareInvite({ shares }: { shares: UseShares }) {
             data-testid="share-expiry-input"
             type="date"
             value={expiryDate}
-            min={todayDateString()}
+            // The picker offers local days, so the earliest is the local today, not UTC's.
+            min={localDateStamp(new Date())}
             onChange={(event) => setExpiryDate(event.target.value)}
             aria-label={t('category_select.share_expiry_label')}
             className="sr-only"

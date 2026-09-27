@@ -14,7 +14,6 @@ import {
   extensionOf,
   formatExportBytes,
   indexPrefix,
-  localDateStamp,
   MANIFEST_NAME,
   PHOTOS_DIR,
   slugify,
@@ -129,28 +128,21 @@ describe('extensionOf', () => {
 
 describe('formatExportBytes', () => {
   it('renders one decimal place of gigabytes', () => {
-    expect(formatExportBytes(1.5 * 1024 ** 3)).toBe('1.5 GB');
+    expect(formatExportBytes(1.5 * 1024 ** 3, 'en')).toBe('1.5 GB');
   });
 
   it('rounds rather than truncating', () => {
-    expect(formatExportBytes(1.55 * 1024 ** 3)).toBe('1.6 GB');
-    expect(formatExportBytes(1.96 * 1024 ** 3)).toBe('2.0 GB');
+    expect(formatExportBytes(1.55 * 1024 ** 3, 'en')).toBe('1.6 GB');
+    expect(formatExportBytes(1.96 * 1024 ** 3, 'en')).toBe('2.0 GB');
   });
 
   it('is zero for no bytes at all', () => {
-    expect(formatExportBytes(0)).toBe('0.0 GB');
-  });
-});
-
-describe('localDateStamp', () => {
-  it('formats the local date, zero-padded', () => {
-    expect(localDateStamp(new Date(2026, 7, 6))).toBe('2026-08-06');
-    expect(localDateStamp(new Date(2026, 0, 9))).toBe('2026-01-09');
+    expect(formatExportBytes(0, 'en')).toBe('0.0 GB');
   });
 
-  it('reads the date the exporter is having, not the one in UTC', () => {
-    // Late enough that a timezone west of UTC would otherwise stamp yesterday.
-    expect(localDateStamp(new Date(2026, 7, 6, 23, 30))).toBe('2026-08-06');
+  it('writes the figure the way the given locale does, not the way the browser does', () => {
+    // German takes a decimal comma and keeps the unit on the same line.
+    expect(formatExportBytes(1.55 * 1024 ** 3, 'de')).toBe('1,6\u00a0GB');
   });
 });
 

@@ -158,6 +158,30 @@ describe('useExportCategory', () => {
     expect(downloadBlob).toHaveBeenCalled();
   });
 
+  it('reports that size the way the app language writes numbers', async () => {
+    window.localStorage.setItem('lang', 'de');
+    vi.mocked(exportCategory).mockImplementation((async (args: ExportArgs) => {
+      const go = await args.confirmLargeExport!(2.5 * 1024 ** 3);
+      if (!go) throw new ExportCancelledError();
+      return exported();
+    }) as never);
+    const { result } = renderHook(() => useExportCategory(), { wrapper });
+
+    let done: Promise<void>;
+    act(() => {
+      done = result.current.runExport(CATEGORY);
+    });
+
+    // The matcher collapses the no-break space Intl puts before the unit.
+    expect(await screen.findByText(/etwa 2,5 GB/)).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('confirm-accept'));
+    await act(async () => {
+      await done;
+    });
+
+    expect(downloadBlob).toHaveBeenCalled();
+  });
+
   it('treats declining that confirmation as a cancellation, not a failure', async () => {
     vi.mocked(exportCategory).mockImplementation((async (args: ExportArgs) => {
       const go = await args.confirmLargeExport!(2.5 * 1024 ** 3);

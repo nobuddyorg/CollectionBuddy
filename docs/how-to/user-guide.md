@@ -113,7 +113,7 @@ cancel the delete and keep the item.
 | --- | --- |
 | Title | Required. |
 | Description | Optional. |
-| Place | Optional. Suggestions appear from the third character, from the [Photon](https://photon.komoot.io/) geocoder. Pick a suggestion if you want the item on the map; free text is kept but not pinned. |
+| Place | Optional. Suggestions appear from the third character, from the [Photon](https://photon.komoot.io/) geocoder. Pick a suggestion to pin the item exactly there. Free text is kept too: the map looks it up when it opens, pins it where Photon finds it, and, if you may edit the collection, saves that position to the items naming that place. |
 | Tags | Optional. Enter or comma adds a chip; Backspace on an empty tag field removes the last one. Duplicates are ignored. |
 
 On save, whitespace is trimmed, blank fields become empty, and tags are
@@ -156,7 +156,8 @@ buttons to zoom to it and to frame all pins.
 Two independent settings in the user menu:
 
 - **Language** (_Sprache_): Deutsch / English. Detected from your browser on
-  first visit, then remembered.
+  first visit, German if it is set to neither, then remembered. Dates and
+  sizes are written the way the chosen language writes them.
 - **Appearance** (_Darstellung_): System / Light / Dark. System follows your
   OS setting live. Light or Dark overrides it until you switch back.
 

@@ -35,7 +35,7 @@ export function exportProgressMessage(
 }
 
 export function useExportCategory() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const toast = useToast();
   const confirm = useConfirm();
   // Null means not exporting; a separate boolean would be a second source of truth.
@@ -59,7 +59,7 @@ export function useExportCategory() {
           confirmLargeExport: (totalBytes) =>
             confirm(
               t('category_select.export_large_confirm', {
-                size: formatExportBytes(totalBytes),
+                size: formatExportBytes(totalBytes, locale),
               }),
             ),
         });
@@ -92,7 +92,7 @@ export function useExportCategory() {
         setProgress(null);
       }
     },
-    [progress, t, toast, confirm],
+    [progress, t, locale, toast, confirm],
   );
 
   // Not memoized: it goes straight onto a button in a component nothing memoizes.
