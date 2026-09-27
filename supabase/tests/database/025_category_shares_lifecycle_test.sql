@@ -150,10 +150,11 @@ select is(
 -- tests owner_user_id, which the trigger has already re-derived from the
 -- category by the time the policy sees it.
 select pg_temp.auth_as(:'bystander_id'::uuid, 'lifecycle-bystander@collectionbuddy.test');
+-- A third party's address, as the self-share check would refuse the bystander's own.
 select throws_ok(
   format(
     'insert into public.category_shares (category_id, invited_email) values (%L, %L)',
-    :'category_id'::uuid, 'lifecycle-bystander@collectionbuddy.test'
+    :'category_id'::uuid, 'lifecycle-third-party@collectionbuddy.test'
   ),
   'P0001',
   'ownership mismatch',
@@ -163,7 +164,7 @@ select throws_ok(
 select throws_ok(
   format(
     'insert into public.category_shares (category_id, invited_email) values (%L, %L)',
-    gen_random_uuid(), 'lifecycle-bystander@collectionbuddy.test'
+    gen_random_uuid(), 'lifecycle-third-party@collectionbuddy.test'
   ),
   'P0001',
   'category not found',

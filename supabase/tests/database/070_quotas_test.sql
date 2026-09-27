@@ -291,30 +291,37 @@ select lives_ok(
 );
 select throws_ok(
   format('insert into public.items (title) values (%L)', repeat('t', 301)),
-  '23514', null, 'a title past 300 characters is refused'
+  '23514', 'new row for relation "items" violates check constraint "items_title_length"',
+  'a title past 300 characters is refused'
 );
 select throws_ok(
   format('insert into public.items (title, description) values (''d'', %L)', repeat('d', 10001)),
-  '23514', null, 'a description past 10,000 characters is refused'
+  '23514', 'new row for relation "items" violates check constraint "items_description_length"',
+  'a description past 10,000 characters is refused'
 );
 select throws_ok(
   format('insert into public.items (title, place) values (''p'', %L)', repeat('p', 501)),
-  '23514', null, 'a place past 500 characters is refused'
+  '23514', 'new row for relation "items" violates check constraint "items_place_length"',
+  'a place past 500 characters is refused'
 );
 select throws_ok(
   format('insert into public.items (title, tags) values (''n'', %L)',
     (select array_agg('tag' || g) from generate_series(1, 51) g)),
-  '23514', null, 'a 51st tag is refused'
+  '23514', 'new row for relation "items" violates check constraint "items_tags_bounded"',
+  'a 51st tag is refused'
 );
+-- items_tags_bounded's length half cannot refuse since 0028: 50 tags of 100 characters join to 5049 at most (design-decisions.md).
 select throws_ok(
   format('insert into public.items (title, tags) values (''l'', %L)',
     array[repeat('a', 5050)]),
-  '23514', null, 'tags longer together than 50 tags of 100 characters are refused'
+  '23514', 'new row for relation "items" violates check constraint "items_tag_length"',
+  'one tag as long as 50 full tags together is refused by the per-tag limit'
 );
 select throws_ok(
   format('insert into public.items (title, tags) values (''o'', %L)',
     array['short', repeat('a', 101)]),
-  '23514', null, 'one tag past 100 characters is refused, however short the rest (0028)'
+  '23514', 'new row for relation "items" violates check constraint "items_tag_length"',
+  'one tag past 100 characters is refused, however short the rest (0028)'
 );
 select lives_ok(
   format('insert into public.items (title, tags) values (''w'', %L)',
@@ -323,14 +330,16 @@ select lives_ok(
 );
 select throws_ok(
   format('update public.categories set name = %L where name = ''Category 3''', repeat('n', 201)),
-  '23514', null, 'a category name past 200 characters is refused, on rename too'
+  '23514', 'new row for relation "categories" violates check constraint "categories_name_length"',
+  'a category name past 200 characters is refused, on rename too'
 );
 select throws_ok(
   format(
     'insert into public.category_shares (category_id, invited_email) values (%L, %L)',
     :'shared_category_id'::uuid, repeat('e', 309) || '@example.org'
   ),
-  '23514', null, 'an invited email past 320 characters is refused'
+  '23514', 'new row for relation "category_shares" violates check constraint "category_shares_invited_email_length"',
+  'an invited email past 320 characters is refused'
 );
 
 -- Storage itself (0025): what the upload policy and the photograph trigger see of the bucket, orphans included.
