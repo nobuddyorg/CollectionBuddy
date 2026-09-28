@@ -12,7 +12,6 @@ import {
 } from './importCategory.test-support';
 import { craftZip } from './zipReader.test-support';
 
-// #787: what an archive can be besides the byte-for-byte file the export downloaded.
 describe('importCategory, on an export packed again by a zip tool', () => {
   it('imports every entry and photograph, byte for byte', async () => {
     const photo = new Uint8Array(4096).map((_, i) => i % 13);
@@ -21,8 +20,8 @@ describe('importCategory, on an export packed again by a zip tool', () => {
 
     const result = await importCategory({
       file: buildRepackedArchive({ photo }),
-      nameCategory: (name) => name,
       ...baseFakes(),
+      nameCategory: (name) => name,
       createCategoryRow,
       uploadImage,
     });
@@ -33,8 +32,7 @@ describe('importCategory, on an export packed again by a zip tool', () => {
       skippedPhotoCount: 0,
     });
     expect(createCategoryRow).toHaveBeenCalledWith('Coins');
-    const [[path, uploaded]] = (uploadImage as ReturnType<typeof vi.fn>).mock
-      .calls as [string, Blob][];
+    const [[path, uploaded]] = uploadImage.mock.calls;
     expect(path).toMatch(/\.jpg$/);
     expect(new Uint8Array(await uploaded.arrayBuffer())).toEqual(photo);
   });
@@ -49,8 +47,8 @@ describe('importCategory, on an export whose contents were zipped without their 
 
     const result = await importCategory({
       file: buildRepackedArchive({ photo, prefix: '' }),
-      nameCategory: (name) => name,
       ...baseFakes(),
+      nameCategory: (name) => name,
       createCategoryRow,
       uploadImage,
     });
@@ -61,8 +59,7 @@ describe('importCategory, on an export whose contents were zipped without their 
       skippedPhotoCount: 0,
     });
     expect(createCategoryRow).toHaveBeenCalledWith('Coins');
-    const [[, uploaded]] = (uploadImage as ReturnType<typeof vi.fn>).mock
-      .calls as [string, Blob][];
+    const [[, uploaded]] = uploadImage.mock.calls;
     expect(new Uint8Array(await uploaded.arrayBuffer())).toEqual(photo);
   });
 });
@@ -72,7 +69,6 @@ describe('importCategory, refusing an archive before it creates anything', () =>
     const createCategoryRow = fakeCreateCategory();
     const failure = importCategory({
       file,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
     });
@@ -221,7 +217,6 @@ describe('importCategory, on a photograph the archive lies about', () => {
 
     const failure = importCategory({
       file,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage,
       removeImages,

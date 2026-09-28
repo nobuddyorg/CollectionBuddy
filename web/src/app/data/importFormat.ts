@@ -130,13 +130,11 @@ export function importPhotoTasks(
 ): PhotoTask[] {
   // An export names each photograph once; a repeat would only upload the same bytes into the quota again.
   const seen = new Set<string>();
-  const firstMention = (archivePath: string) => {
-    if (seen.has(archivePath)) return false;
-    seen.add(archivePath);
-    return true;
-  };
   return items.flatMap(({ id, item }) => {
-    const photos = item.photos.filter(firstMention);
+    const photos = [...new Set(item.photos)].filter(
+      (archivePath) => !seen.has(archivePath),
+    );
+    photos.forEach((archivePath) => seen.add(archivePath));
     const createdAts = importTimestamps(photos.length, now);
     return photos.map((archivePath, i) => ({
       itemId: id,

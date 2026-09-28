@@ -2,12 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { importCategory } from './importCategory';
 import {
-  buildManifest,
-  exportEntries,
-  MANIFEST_NAME,
-  type ExportItem,
-} from './exportFormat';
-import { createZipWriter } from './zip';
+  buildArchive,
+  fakeCreateCategory,
+  fakeCreateImage,
+  fakeCreateItems,
+  fakeDeleteCategory,
+  fakeGetUserId,
+  fakeUploadImage,
+} from './importCategory.test-support';
 
 // Every other importCategory test injects a thumbnailer; this file exercises the real default alone.
 const compress = vi.fn(async () => new Blob(['thumb'], { type: 'image/webp' }));
@@ -17,59 +19,17 @@ vi.mock('../lib/imageCompression', () => ({
 
 const PHOTO = new Uint8Array([1, 2, 3]);
 
-function itemRow(): ExportItem {
-  return {
-    id: 'orig-item-1',
-    title: 'Seated Dime',
-    description: null,
-    place: null,
-    place_lat: null,
-    place_lng: null,
-    tags: [],
-    created_at: '2026-01-02T03:04:05.000Z',
-  };
-}
-
-async function archiveWithOnePhoto(): Promise<Blob> {
-  const entries = exportEntries(
-    [itemRow()],
-    new Map([['orig-item-1', ['orig-item-1/0.webp']]]),
-  );
-  const manifest = buildManifest({
-    category: { id: 'orig-cat-1', name: 'Coins' },
-    entries,
-    exportedAt: new Date('2026-08-06T00:00:00.000Z'),
-  });
-  const writer = createZipWriter();
-  const root = 'CollectionBuddy-coins-2026-08-06';
-  writer.add({
-    path: `${root}/${MANIFEST_NAME}`,
-    bytes: new TextEncoder().encode(JSON.stringify(manifest)),
-  });
-  writer.add({
-    path: `${root}/${entries[0].photos[0].archivePath}`,
-    bytes: PHOTO,
-  });
-  return writer.finish();
-}
-
 describe('importCategory with no thumbnailer injected', () => {
   it('makes the thumbnail with the app own compression settings', async () => {
     const result = await importCategory({
-      file: await archiveWithOnePhoto(),
+      file: await buildArchive({ photosByItemId: { 'orig-item-1': [PHOTO] } }),
       nameCategory: () => 'Coins',
-      getUid: async () => 'uid',
-      createCategoryRow: (async () => ({
-        data: { id: 'cat-1', name: 'Coins' },
-        error: null,
-      })) as never,
-      deleteCategoryRow: (async () => ({ error: null })) as never,
-      createItemRows: (async () => ({ error: null })) as never,
-      uploadImage: (async () => ({ error: null })) as never,
-      createImage: (async () => ({
-        data: { id: 'img-1' },
-        error: null,
-      })) as never,
+      getUserId: fakeGetUserId('uid'),
+      createCategoryRow: fakeCreateCategory(),
+      deleteCategoryRow: fakeDeleteCategory(),
+      createItemRows: fakeCreateItems(),
+      uploadImage: fakeUploadImage(),
+      createImage: fakeCreateImage(),
     });
 
     expect(result.photoCount).toBe(1);
@@ -82,28 +42,23 @@ describe('importCategory with no thumbnailer injected', () => {
   });
 
   it('gives each new item a fresh random UUID and stamps it with the current time', async () => {
-    const createItemRows = vi.fn(async () => ({ error: null }));
+    const createItemRows = fakeCreateItems();
     const before = Date.now();
     await importCategory({
-      file: await archiveWithOnePhoto(),
+      file: await buildArchive({ photosByItemId: { 'orig-item-1': [PHOTO] } }),
       nameCategory: () => 'Coins',
-      getUid: async () => 'uid',
-      createCategoryRow: (async () => ({
-        data: { id: 'cat-1', name: 'Coins' },
-        error: null,
-      })) as never,
-      deleteCategoryRow: (async () => ({ error: null })) as never,
-      createItemRows: createItemRows as never,
-      uploadImage: (async () => ({ error: null })) as never,
-      createImage: (async () => ({
-        data: { id: 'img-1' },
-        error: null,
-      })) as never,
+      getUserId: fakeGetUserId('uid'),
+      createCategoryRow: fakeCreateCategory(),
+      deleteCategoryRow: fakeDeleteCategory(),
+      createItemRows,
+      uploadImage: fakeUploadImage(),
+      createImage: fakeCreateImage(),
     });
 
-    const [[, rows]] = createItemRows.mock.calls as unknown as [
-      [string, { id: string; created_at: string }[]],
-    ];
+    const [[, rows]] = createItemRows.mock.calls as [
+      string,
+      { id: string; created_at: string }[],
+    ][];
     expect(rows[0].id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );

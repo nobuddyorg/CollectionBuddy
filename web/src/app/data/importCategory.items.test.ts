@@ -27,7 +27,6 @@ describe('importCategory, recreating the items', () => {
     const createCategoryRow = fakeCreateCategory('new-cat-1');
     const result = await importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       createItemRows,
@@ -72,7 +71,6 @@ describe('importCategory, recreating the items', () => {
     const createItemRows = fakeCreateItems();
     await importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       createItemRows,
     });
@@ -101,17 +99,15 @@ describe('importCategory, recreating the items', () => {
     const onProgress = vi.fn<(progress: ImportProgress) => void>();
     await importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       createItemRows,
       onProgress,
     });
 
-    const sizes = (mock: unknown) =>
-      (mock as ReturnType<typeof vi.fn>).mock.calls.map(
-        ([, rows]) => (rows as unknown[]).length,
-      );
-    expect(sizes(createItemRows)).toEqual([ITEM_INSERT_BATCH_SIZE, 1]);
+    expect(createItemRows.mock.calls.map(([, rows]) => rows.length)).toEqual([
+      ITEM_INSERT_BATCH_SIZE,
+      1,
+    ]);
     expect(
       onProgress.mock.calls
         .map(([progress]) => progress)

@@ -8,6 +8,7 @@ import {
   type DeleteCategoryRow,
   type RemoveImages,
   type UploadImage,
+  archiveWithOnePhotoPerEntry,
   item,
   buildArchive,
   fakeCreateCategory,
@@ -25,7 +26,6 @@ describe('importCategory, cancelled', () => {
 
     const failure = importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       signal: controller.signal,
@@ -58,7 +58,6 @@ describe('importCategory, cancelled', () => {
 
     const failure = importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       createItemRows,
@@ -83,7 +82,6 @@ describe('importCategory, cancelled', () => {
 
     const failure = importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       deleteCategoryRow,
@@ -95,17 +93,6 @@ describe('importCategory, cancelled', () => {
     expect(deleteCategoryRow).toHaveBeenCalledWith('new-cat-1');
   });
 });
-
-// Two photographs, so the cancel lands while the other is still in the pool.
-async function twoPhotoArchive() {
-  return buildArchive({
-    items: [item({ id: 'o1' }), item({ id: 'o2' })],
-    photosByItemId: {
-      o1: [new Uint8Array([1])],
-      o2: [new Uint8Array([2])],
-    },
-  });
-}
 
 // Cancels on the first upload, which the fake still answers as `result`.
 function uploadThatCancels(
@@ -130,8 +117,8 @@ describe('importCategory, rolling back photographs already sent', () => {
     const deleteCategoryRow = fakeDeleteCategory();
 
     const failure = importCategory({
-      file: await twoPhotoArchive(),
-      nameCategory: () => 'Coins',
+      // Two photographs, so the cancel lands while the other is still in the pool.
+      file: await archiveWithOnePhotoPerEntry(2),
       ...baseFakes(),
       uploadImage,
       removeImages,
@@ -145,7 +132,7 @@ describe('importCategory, rolling back photographs already sent', () => {
     expect(removeImages).toHaveBeenCalledExactlyOnceWith(paths);
     expect(deleteCategoryRow).toHaveBeenCalledWith('new-cat-1');
     expect(vi.mocked(removeImages!).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(deleteCategoryRow!).mock.invocationCallOrder[0],
+      deleteCategoryRow.mock.invocationCallOrder[0],
     );
   });
 
@@ -157,8 +144,7 @@ describe('importCategory, rolling back photographs already sent', () => {
     const removeImages = fakeRemoveImages();
 
     const failure = importCategory({
-      file: await twoPhotoArchive(),
-      nameCategory: () => 'Coins',
+      file: await archiveWithOnePhotoPerEntry(2),
       ...baseFakes(),
       uploadImage,
       removeImages,
@@ -184,12 +170,11 @@ describe('importCategory, rolling back photographs already sent', () => {
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
-    const archive = await twoPhotoArchive();
+    const archive = await archiveWithOnePhotoPerEntry(2);
     vi.useFakeTimers();
     try {
       const failure = importCategory({
         file: archive,
-        nameCategory: () => 'Coins',
         ...baseFakes(),
         uploadImage,
         removeImages,
@@ -224,8 +209,7 @@ describe('importCategory, rolling back photographs already sent', () => {
       .mockImplementation(() => {});
 
     const failure = importCategory({
-      file: await twoPhotoArchive(),
-      nameCategory: () => 'Coins',
+      file: await archiveWithOnePhotoPerEntry(2),
       ...baseFakes(),
       uploadImage: uploadThatCancels(controller, { error: null }),
       removeImages,
@@ -253,8 +237,7 @@ describe('importCategory, rolling back photographs already sent', () => {
     const deleteCategoryRow = fakeDeleteCategory();
 
     const failure = importCategory({
-      file: await twoPhotoArchive(),
-      nameCategory: () => 'Coins',
+      file: await archiveWithOnePhotoPerEntry(2),
       ...baseFakes(),
       compressThumb,
       removeImages,

@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 
 import type { importCategory } from './importCategory';
 import {
@@ -15,7 +15,7 @@ import {
 } from './zipReader.test-support';
 
 type ImportParams = Parameters<typeof importCategory>[0];
-type GetUid = ImportParams['getUid'];
+type GetUserId = ImportParams['getUserId'];
 export type CreateCategoryRow = ImportParams['createCategoryRow'];
 export type DeleteCategoryRow = ImportParams['deleteCategoryRow'];
 export type CreateItemRows = ImportParams['createItemRows'];
@@ -125,23 +125,40 @@ export function buildRepackedArchive({
   ]);
 }
 
-export function fakeGetUid(uid: string | null): GetUid {
-  return async () => uid;
+export function archiveWithOnePhotoPerEntry(count: number): Promise<Blob> {
+  const photosByItemId = Object.fromEntries(
+    Array.from({ length: count }, (_, i) => [
+      `item-${i}`,
+      [new Uint8Array([i])],
+    ]),
+  );
+  const items = Object.keys(photosByItemId).map((id) => item({ id }));
+  return buildArchive({ items, photosByItemId });
 }
 
-export function fakeCreateCategory(id = 'new-cat-1'): CreateCategoryRow {
+export function fakeGetUserId(userId: string | null): GetUserId {
+  return async () => userId;
+}
+
+export function fakeCreateCategory(
+  id = 'new-cat-1',
+): Mock<NonNullable<CreateCategoryRow>> {
   return vi.fn(async (name: string) => ({
     data: { id, name },
     error: null,
-  })) as unknown as CreateCategoryRow;
+  })) as unknown as Mock<NonNullable<CreateCategoryRow>>;
 }
 
-export function fakeDeleteCategory(): DeleteCategoryRow {
-  return vi.fn(async () => ({ error: null })) as unknown as DeleteCategoryRow;
+export function fakeDeleteCategory(): Mock<NonNullable<DeleteCategoryRow>> {
+  return vi.fn(async () => ({ error: null })) as unknown as Mock<
+    NonNullable<DeleteCategoryRow>
+  >;
 }
 
-export function fakeCreateItems(): CreateItemRows {
-  return vi.fn(async () => ({ error: null })) as unknown as CreateItemRows;
+export function fakeCreateItems(): Mock<NonNullable<CreateItemRows>> {
+  return vi.fn(async () => ({ error: null })) as unknown as Mock<
+    NonNullable<CreateItemRows>
+  >;
 }
 
 // Sequential, so each new item's id is predictable: new-item-1, -2, ...
@@ -152,8 +169,10 @@ function fakeNewItemId(): () => string {
 
 export const NOW = new Date('2026-08-07T12:00:00.000Z');
 
-export function fakeUploadImage(): UploadImage {
-  return vi.fn(async () => ({ error: null })) as unknown as UploadImage;
+export function fakeUploadImage(): Mock<NonNullable<UploadImage>> {
+  return vi.fn(async () => ({ error: null })) as unknown as Mock<
+    NonNullable<UploadImage>
+  >;
 }
 
 export function fakeRemoveImages(): RemoveImages {
@@ -163,11 +182,11 @@ export function fakeRemoveImages(): RemoveImages {
   }));
 }
 
-export function fakeCreateImage(): CreateImage {
+export function fakeCreateImage(): Mock<NonNullable<CreateImage>> {
   return vi.fn(async () => ({
     data: { id: 'img-1', item_id: 'item', path_full: 'a', path_thumb: null },
     error: null,
-  })) as unknown as CreateImage;
+  })) as unknown as Mock<NonNullable<CreateImage>>;
 }
 
 export function fakeCompressThumb(): CompressThumb {
@@ -176,7 +195,8 @@ export function fakeCompressThumb(): CompressThumb {
 
 export function baseFakes() {
   return {
-    getUid: fakeGetUid('uid'),
+    nameCategory: () => 'Coins',
+    getUserId: fakeGetUserId('uid'),
     createCategoryRow: fakeCreateCategory(),
     deleteCategoryRow: fakeDeleteCategory(),
     createItemRows: fakeCreateItems(),
