@@ -93,10 +93,18 @@ async function createImportedItems(
 /** A ZIP the reader refuses is the archive's fault: a format error, never "try again". */
 function asFormatError(error: unknown): unknown {
   if (error instanceof ZipLimitError) {
-    return new ImportFormatError('too_large', error.message, { cause: error });
+    return new ImportFormatError({
+      reason: 'too_large',
+      message: error.message,
+      cause: error,
+    });
   }
   if (error instanceof ZipReadError) {
-    return new ImportFormatError('unreadable', error.message, { cause: error });
+    return new ImportFormatError({
+      reason: 'unreadable',
+      message: error.message,
+      cause: error,
+    });
   }
   return error;
 }
@@ -112,11 +120,11 @@ async function readManifest(read: ZipEntryReader): Promise<ImportManifest> {
     return parseManifest(JSON.parse(text));
   } catch (error) {
     if (error instanceof ImportFormatError) throw error;
-    throw new ImportFormatError(
-      'not_export',
-      'Could not read collection.json in this archive',
-      { cause: error },
-    );
+    throw new ImportFormatError({
+      reason: 'not_export',
+      message: 'Could not read collection.json in this archive',
+      cause: error,
+    });
   }
 }
 

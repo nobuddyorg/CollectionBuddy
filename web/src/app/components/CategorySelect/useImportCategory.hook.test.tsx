@@ -148,10 +148,10 @@ describe('useImportCategory', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
     vi.mocked(importCategory).mockRejectedValue(
-      new ImportFormatError(
-        'not_export',
-        'Not a CollectionBuddy export archive',
-      ),
+      new ImportFormatError({
+        reason: 'not_export',
+        message: 'Not a CollectionBuddy export archive',
+      }),
     );
     const { result } = renderHook(() => useImportCategory([]), { wrapper });
 
@@ -187,7 +187,7 @@ describe('useImportCategory', () => {
         .spyOn(console, 'error')
         .mockImplementation(() => {});
       vi.mocked(importCategory).mockRejectedValue(
-        new ImportFormatError(reason, 'refused'),
+        new ImportFormatError({ reason, message: 'refused' }),
       );
       const { result } = renderHook(() => useImportCategory([]), { wrapper });
 

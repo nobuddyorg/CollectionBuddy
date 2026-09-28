@@ -11,11 +11,15 @@ export type ImportFormatReason = 'not_export' | 'unreadable' | 'too_large';
 export class ImportFormatError extends Error {
   readonly reason: ImportFormatReason;
 
-  constructor(
-    reason: ImportFormatReason,
-    message: string,
-    options?: { cause?: unknown },
-  ) {
+  constructor({
+    reason,
+    message,
+    ...options
+  }: {
+    reason: ImportFormatReason;
+    message: string;
+    cause?: unknown;
+  }) {
     super(message, options);
     this.name = 'ImportFormatError';
     this.reason = reason;
@@ -62,7 +66,7 @@ function isManifestItem(value: unknown): value is ManifestItem {
 }
 
 function notAnExport(message: string): ImportFormatError {
-  return new ImportFormatError('not_export', message);
+  return new ImportFormatError({ reason: 'not_export', message });
 }
 
 /** Checks the format tag, the version and the shape of every field the import goes on to read. */

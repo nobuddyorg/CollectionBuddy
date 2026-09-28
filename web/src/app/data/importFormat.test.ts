@@ -133,7 +133,11 @@ describe('parseManifest', () => {
 
   it('names its errors and keeps the reason and the cause', () => {
     const cause = new Error('zip');
-    const error = new ImportFormatError('too_large', 'x', { cause });
+    const error = new ImportFormatError({
+      reason: 'too_large',
+      message: 'x',
+      cause,
+    });
     expect(error.name).toBe('ImportFormatError');
     expect(error).toBeInstanceOf(Error);
     expect(error.reason).toBe('too_large');
