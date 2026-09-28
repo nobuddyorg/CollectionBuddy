@@ -58,7 +58,7 @@ class ImportError extends Error {
   }
 }
 
-/** Bounded like PHOTO_DOWNLOAD_CONCURRENCY in exportPhotos.ts, so few Blobs are in memory at once. */
+/** Bounded like the export's PHOTO_DOWNLOAD_CONCURRENCY, so few Blobs are in memory at once. */
 export const PHOTO_UPLOAD_CONCURRENCY = 6;
 
 /** Entries per create request, each request one transaction. */
