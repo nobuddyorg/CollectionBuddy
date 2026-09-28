@@ -1,6 +1,6 @@
 import { readStoredValue } from './lib/browserStorage';
 
-// A leaf, so the lazily loaded map reads these without pulling in the caches forgetting an account clears.
+// Kept apart from userData.ts, so the lazily loaded map reads these without pulling in the caches forgetting an account clears.
 export const GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
 
 export const STORAGE_OWNER_KEY = 'collectionbuddy.storageOwner';
