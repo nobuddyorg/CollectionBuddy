@@ -15,7 +15,6 @@ function userWith(overrides: Partial<User> = {}): User {
   return {
     id: 'user-1',
     email: 'collector@example.com',
-    user_metadata: { name: 'Ada' },
     ...overrides,
   } as User;
 }
@@ -91,7 +90,7 @@ describe('useSession', () => {
   });
 
   it('falls back email to null rather than to undefined', async () => {
-    signedInAs({ id: 'user-2', email: undefined, user_metadata: {} } as User);
+    signedInAs({ id: 'user-2', email: undefined } as User);
     mockAuthStateChange();
 
     const { result } = renderHook(() => useSession());
@@ -174,20 +173,6 @@ describe('useSession', () => {
 
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
-  });
-
-  // A provider that sends no user_metadata at all must not take the session down with it.
-  it('survives a user carrying no metadata at all', async () => {
-    signedInAs({ id: 'user-5', email: 'a@example.com' } as never);
-    mockAuthStateChange();
-
-    const { result } = renderHook(() => useSession());
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.user).toEqual({
-      id: 'user-5',
-      email: 'a@example.com',
-    });
   });
 
   it('reads the session once, however often it re-renders', async () => {

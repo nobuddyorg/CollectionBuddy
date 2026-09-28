@@ -88,7 +88,7 @@ describe('runPool', () => {
     await expect(
       runPool({
         items: [1, 2, 3],
-        concurrency: 1,
+        concurrency: 2,
         worker: (item) => {
           seen.push(item);
           // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- an empty rejection is the behavior under test
@@ -96,7 +96,7 @@ describe('runPool', () => {
         },
       }),
     ).rejects.toThrow(new Error('undefined'));
-    expect(seen).toEqual([1]);
+    expect(seen).toEqual([1, 2]);
   });
 
   it('resolves immediately for an empty item list', async () => {
