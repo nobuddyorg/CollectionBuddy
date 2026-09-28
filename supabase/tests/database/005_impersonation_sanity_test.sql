@@ -1,25 +1,10 @@
--- Sanity check for the impersonation mechanism every other file in this
--- suite relies on: SET LOCAL ROLE plus request.jwt.claims must actually
--- exercise the same grant-and-policy path PostgREST does, not silently run
--- as postgres/superuser -- which bypasses both grants and RLS entirely,
--- and would make every other test in this suite pass without testing
--- anything (issue #649's own requirement: "a test that impersonates
--- incorrectly and silently runs as postgres/superuser would pass without
--- testing anything").
---
--- Proven the way that issue asked for: the identical query is shown to
--- fail under the wrong identity and pass once switched to the right one,
--- and a read is shown to depend on the specific claim, not merely on
--- having assumed the authenticated role. Every switch goes through
--- pg_temp.auth_as() and auth_as_anon(), the helpers every other file uses.
+-- Proves the suite's impersonation reaches grants and RLS: refused as the wrong identity, allowed as the right one, and dependent on the sub claim.
 begin;
 select no_plan();
 
 \ir _helpers.psql
 
--- As postgres -- the role pg_prove actually connects as -- RLS and grants
--- are both bypassed, which is exactly what every other file in this suite
--- has to work around before it can assert anything meaningful.
+-- pg_prove connects as postgres, the superuser every other file must switch away from before asserting anything.
 select lives_ok(
   'select 1 from public.categories limit 1',
   'as the postgres role, reading categories raises nothing (RLS and grants both bypassed, as expected of a superuser)'
@@ -34,18 +19,14 @@ select throws_ok(
   'as anon, the identical read is refused -- the grant is doing the work, not a coincidence of empty data'
 );
 
--- Switching to authenticated with a real claim: the identical query
--- succeeds again, because authenticated holds the grant and the policy
--- now has an auth.uid() to evaluate.
+-- authenticated holds the grant, and the claim gives the policy an auth.uid() to evaluate.
 select pg_temp.auth_as(gen_random_uuid());
 select lives_ok(
   'select 1 from public.categories limit 1',
   'as authenticated with a claim, the identical read is permitted again'
 );
 
--- And the read genuinely depends on the claim's content, not merely on
--- having assumed the authenticated role: a category created under one sub
--- claim is visible to that same claim...
+-- The read depends on the sub claim, not just the role: the creating claim sees the row...
 select gen_random_uuid() as probe_user_id \gset
 select pg_temp.auth_as(:'probe_user_id'::uuid);
 insert into public.categories (name) values ('Impersonation probe')
@@ -57,9 +38,7 @@ select is(
   'the identity that created the row can read it back'
 );
 
--- ...and a second, different sub claim -- same role, same table grant --
--- cannot see it, which is the part that proves the policy is reading
--- request.jwt.claims and not merely checking role membership.
+-- ...and a different sub under the same role and grant does not, so the policy reads request.jwt.claims.
 select pg_temp.auth_as(gen_random_uuid());
 select is(
   (select count(*) from public.categories where id = :'probe_category_id'::uuid),

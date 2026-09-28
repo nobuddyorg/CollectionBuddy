@@ -1,29 +1,10 @@
--- Schema-level pgTAP tests: the orphan-sweep trigger stays statement-level
--- (design-decisions.md: delete_item_if_orphan must not go back to FOR EACH
--- ROW), and every constraint keeping the data model honest actually
--- rejects what it is supposed to -- asserted by attempting the write, not
--- by reading the constraint back out of the catalog.
---
--- The grant surface (who may address which table and function at all) is
--- 001_grants_test.sql's, and row level security being enabled on every
--- table is asserted there too, across the whole schema rather than table
--- by table.
---
--- Complements web/e2e/signed-in/rls/ rather than duplicating it:
--- this file runs directly against Postgres, inside a transaction that
--- rolls back, and is fast enough to run on every schema change. The
--- Playwright suite is what proves the same policies hold through a real
--- PostgREST request carrying a real JWT -- see TEST_STRATEGY.md for the
--- division of labor between the two.
+-- The orphan sweep's shape and every data-model constraint, each refusal attempted as a real write; grants and RLS are 001's.
 begin;
 select no_plan();
 
 \ir _helpers.psql
 
--- delete_item_if_orphan is deliberately FOR EACH STATEMENT: the row-level
--- version was a real O(n) performance bug at category-deletion scale
--- (design-decisions.md, "Why the orphan-cleanup trigger is statement-level").
--- tgtype's bit 0 (value 1) marks a trigger ROW-level; unset means STATEMENT.
+-- tgtype bit 0 set means FOR EACH ROW; the orphan sweep must stay statement-level (design-decisions.md).
 select ok(
   (select (tgtype::int & 1) = 0
    from pg_catalog.pg_trigger
@@ -32,11 +13,7 @@ select ok(
   'the orphan-sweep trigger stays statement-level, not per-row'
 );
 
--- images_path_full_matches_item (0003): a row may not claim a path naming
--- a different item, or one that does not parse as <uid>/<itemId>/<file>
--- at all -- both collapse to the same "is not distinct from" comparison
--- against NULL, since storage_item_id() answers NULL rather than raising
--- on an unparsable path.
+-- images_path_full_matches_item (0003): storage_item_id() answers NULL on an unparsable path, so the check uses is not distinct from.
 select gen_random_uuid() as owner_id \gset
 select pg_temp.auth_as(:'owner_id'::uuid, 'schema-test-owner@collectionbuddy.test');
 
@@ -65,8 +42,7 @@ select lives_ok(
   'a photograph record naming its own item is accepted'
 );
 
--- images_path_thumb_matches_item (0019): the thumbnail path too, since the
--- owner's client removes both paths when the record goes.
+-- images_path_thumb_matches_item (0019): the owner's client removes the thumbnail too when the record goes.
 select throws_ok(
   format(
     'insert into public.images (item_id, path_full, path_thumb) values (%L, %L, %L)',
@@ -98,10 +74,7 @@ select is(
   'every constraint on images holds for every row, not only for writes since it was added'
 );
 
--- category_shares_category_email_unique: re-sharing the same (category,
--- email) pair is refused outright, not a second grant with its own expiry
--- (TEST_STRATEGY.md §8's idempotency table, "creating a grant/share that
--- already exists").
+-- Re-sharing the same (category, email) is a clear conflict, never a second grant (TEST_STRATEGY.md §8, idempotency).
 insert into public.category_shares (category_id, invited_email)
 values (:'category_id'::uuid, 'schema-test-grantee@collectionbuddy.test');
 
@@ -115,12 +88,7 @@ select throws_ok(
   're-sharing the same category with the same email is refused, not a second grant'
 );
 
--- The rest of the constraints, each attempted as a real write. A CHECK
--- read back out of the catalog proves it exists; only a rejected insert
--- proves it rejects the shape it was written for -- images_path_full_
--- matches_item is the standing example, since a plausible spelling of it
--- (`=` rather than `is not distinct from`) exists, still applies cleanly,
--- and admits every unparsable path.
+-- A plausible `=` spelling of images_path_full_matches_item applies cleanly yet admits unparsable paths, so refusals are attempted, not read from the catalog.
 select throws_ok(
   format(
     'insert into public.images (item_id, path_full) values (%L, %L)',
@@ -132,9 +100,7 @@ select throws_ok(
   'a well-formed path naming a different item is refused too, not just an unparsable one'
 );
 
--- images_path_full_key / images_path_thumb_key: one row per stored object,
--- so a second row can never claim bytes the first one already owns and
--- outlive it -- a delete of either would take the other's object with it.
+-- images_path_full_key / images_path_thumb_key: one row per object, else deleting either row takes the other's object.
 select throws_ok(
   format(
     'insert into public.images (item_id, path_full) values (%L, %L)',
@@ -164,9 +130,7 @@ select throws_ok(
   'nor the same thumbnail object'
 );
 
--- The thumbnail index is partial for a reason: a photograph whose
--- thumbnail upload failed is an accepted failure mode (uploadImage,
--- useItemImages.tsx), and several of those must be able to coexist.
+-- The thumbnail index is partial: a failed thumbnail upload is an accepted failure mode (uploadImage, useItemImages.tsx).
 select lives_ok(
   format(
     'insert into public.images (item_id, path_full) values (%L, %L)',
@@ -175,10 +139,7 @@ select lives_ok(
   'but any number of photographs may have no thumbnail at all'
 );
 
--- categories_name_not_blank / items_title_not_blank via the normalize
--- triggers: a whitespace-only name normalizes to NULL and the NOT NULL is
--- what catches it, which is why neither constraint needs a blank-string
--- test of its own (0003_tables.sql).
+-- The normalize triggers turn a whitespace-only name into NULL, so NOT NULL refuses it before either not_blank CHECK.
 select throws_ok(
   $q$insert into public.categories (name) values ('   ')$q$,
   '23502',
@@ -192,9 +153,7 @@ select throws_ok(
   'a whitespace-only entry title is refused too'
 );
 
--- categories_user_lower_name_idx: case-insensitively unique per owner, so
--- "Münzen" and "münzen" are one collection rather than two that look
--- identical in the catalogue list.
+-- categories_user_lower_name_idx: "Münzen" and "münzen" are one collection, never two lookalikes in the list.
 select throws_ok(
   $q$insert into public.categories (name) values ('schema TEST category')$q$,
   '23505',
@@ -211,12 +170,7 @@ select lives_ok(
 );
 select pg_temp.auth_as(:'owner_id'::uuid, 'schema-test-owner@collectionbuddy.test');
 
--- tags is addressed as a flat list everywhere (join_tags, the tag filter),
--- and PostgreSQL's array type would happily accept a nested one. items_tags_1d is the backstop; what actually answers a
--- nested array first is tg_items_normalize, whose unnest() flattens it --
--- so the constraint never sees one, and the row that lands is still
--- one-dimensional. Asserted as it behaves rather than as the constraint
--- alone would suggest.
+-- tg_items_normalize's unnest() flattens a nested array before items_tags_1d sees it.
 insert into public.items (title, tags)
 values ('Nested tags', array[array['b', 'a'], array['a', 'c']])
 returning id as nested_tags_item \gset
@@ -227,10 +181,7 @@ select is(
   'a nested tag array is flattened, deduplicated and sorted by normalization, never stored nested'
 );
 
--- The other half of the same column: tags has no meaningful null state --
--- an entry with no tags carries an empty array -- and the normalize
--- trigger deliberately leaves a null alone rather than defaulting it, so
--- NOT NULL is what refuses it.
+-- The normalize trigger leaves a NULL tags alone rather than defaulting it, so NOT NULL is what refuses it.
 select throws_ok(
   $q$insert into public.items (title, tags) values ('No tags at all', null)$q$,
   '23502',
@@ -238,10 +189,7 @@ select throws_ok(
   'tags cannot be null -- an entry with no tags carries an empty array'
 );
 
--- category_shares_invited_email_looks_like_email: the invited address is
--- the entire authorization identity of a grant, so a value that could
--- never match a JWT email claim is refused at write time rather than
--- becoming a grant that silently opens nothing.
+-- The invited address is a grant's whole identity, so an address no JWT email claim could match is refused at write time.
 select throws_ok(
   format(
     'insert into public.category_shares (category_id, invited_email) values (%L, %L)',
@@ -252,9 +200,7 @@ select throws_ok(
   'a grant addressed to something that is not an email address is refused'
 );
 
--- The trigger normalizes before the constraint runs, so a whitespace-only
--- address is caught by tg_category_shares_enforce's own check rather than
--- by the CHECK above.
+-- tg_category_shares_enforce normalizes before the CHECK runs, so its own check refuses a blank address.
 select throws_ok(
   format(
     'insert into public.category_shares (category_id, invited_email) values (%L, %L)',
@@ -265,10 +211,7 @@ select throws_ok(
   'nor may a grant be addressed to nothing at all'
 );
 
--- category_shares_expiry_in_future: an expiry at or before creation is a
--- grant that was never usable. Already-expired grants are still legal and
--- deliberately so (020_category_shares_rls_test.sql relies on it) -- what
--- is refused is one whose expiry precedes its own creation.
+-- Already-expired grants stay legal (020 relies on it); only an expiry before the grant's own creation is refused.
 select throws_ok(
   format(
     $q$insert into public.category_shares (category_id, invited_email, created_at, expires_at)
@@ -291,9 +234,7 @@ select throws_ok(
   'a grant cannot carry a role outside viewer and editor'
 );
 
--- Cascade behaviour: deleting the category removes the item_categories
--- mapping, and the statement-level orphan-sweep trigger then removes the
--- now-orphaned item in the same statement.
+-- The category's cascade unlinks the entry and the statement-level sweep removes it in the same statement.
 delete from public.categories where id = :'category_id'::uuid;
 
 select is(

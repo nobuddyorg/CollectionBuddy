@@ -1,23 +1,10 @@
--- The properties that decide what a function in this schema may do at all:
--- whose privileges it runs with, and how it resolves the names inside it.
--- Both are set once per function in 0002_functions.sql and never mentioned
--- again, which makes them exactly the kind of thing a later edit drops
--- without anyone noticing -- `create or replace function` silently replaces
--- the whole definition, `security definer` and `set search_path` included.
---
--- Derived from the catalog rather than checked function by function, so a
--- function added later is covered by these the day it lands.
+-- security definer and search_path, derived from the catalog so a new function is covered the day it lands.
 begin;
 select no_plan();
 
 \ir _helpers.psql
 
--- Every function in the schema pins search_path. Without it a `security
--- definer` function resolves unqualified names through the *caller's*
--- search_path, so anyone able to create an object could have their own
--- code run as the function's owner -- and a `security invoker` one is
--- still worth pinning, since it is the reason 0001_extensions.sql keeps
--- pgcrypto and pg_trgm out of `public` in the first place.
+-- Unpinned, a definer resolves names via the caller's search_path and runs their objects as its owner; invokers pin it too.
 select is(
   (select array_agg(p.proname::text order by p.proname)
    from pg_catalog.pg_proc p
@@ -48,8 +35,7 @@ select is(
   'exactly seventeen functions run as their owner, and search_category_items, photo_upload_has_room and delete_own_account are the only non-trigger ones'
 );
 
--- A `security definer` function runs as whoever owns it, so the owner is
--- as much part of the boundary as the body is.
+-- A `security definer` function runs as its owner, so the owner is as much part of the boundary as the body.
 select is(
   (select array_agg(p.proname::text order by p.proname)
    from pg_catalog.pg_proc p
@@ -85,11 +71,7 @@ select ok(
   'create_items_in_category runs as its caller, so the items policies and the link trigger decide as for two inserts'
 );
 
--- has_category_read_access, has_category_write_access and
--- granted_category_ids are called from inside policy predicates; as
--- definers they would evaluate auth.uid() just the same, but they would
--- also stop being filtered by the RLS on category_shares that currently
--- scopes what they can see.
+-- Called inside policy predicates; as definers they would escape the category_shares RLS that scopes what they see.
 select ok(
   not (select prosecdef from pg_catalog.pg_proc where oid = 'public.has_category_read_access(uuid)'::regprocedure),
   'has_category_read_access runs as its caller'
@@ -115,10 +97,7 @@ select throws_ok(
   'a trigger function cannot be invoked directly, even with EXECUTE, which is what keeps it off anon''s reachable surface'
 );
 
--- keepalive() is the one thing anon is meant to do: pinged on a schedule
--- so the free-tier project does not auto-pause
--- (.github/workflows/keep-alive.yml). A workflow that starts failing
--- against a 42501 would be noticed late and cost the app its availability.
+-- keepalive() keeps the free-tier project from auto-pausing (keep-alive.yml); a 42501 there would be noticed late.
 select pg_temp.auth_as_anon();
 select lives_ok(
   'select public.keepalive()',
@@ -126,12 +105,7 @@ select lives_ok(
 );
 reset role;
 
--- join_tags has to stay immutable: items.tags_text is a stored generated
--- column defined as join_tags(tags), and PostgreSQL only accepts an
--- immutable expression there -- so a later edit marking it stable or
--- volatile would fail against an existing database while still applying
--- cleanly from scratch, which is precisely the migration shape CI cannot
--- catch (TEST_STRATEGY.md §8).
+-- items.tags_text is generated from join_tags(tags), which Postgres only accepts while join_tags is immutable.
 select is(
   (select provolatile from pg_catalog.pg_proc where oid = 'public.join_tags(text[])'::regprocedure),
   'i'::"char",
