@@ -3,6 +3,7 @@ import { Archivo, IBM_Plex_Mono, Inter } from 'next/font/google';
 import './globals.css';
 import { ConfirmProvider } from './components/Confirm/ConfirmProvider';
 import { ToastProvider } from './components/Toast/ToastProvider';
+import de from './i18n/de.json';
 import { I18nProvider } from './i18n/I18nProvider';
 import { requireEnv, withBasePath } from './lib/env';
 import { ServiceWorkerRegistration } from './ServiceWorkerRegistration';
@@ -74,7 +75,7 @@ export default function RootLayout({
       <head>
         <title>CollectionBuddy</title>
         {/* I18nProvider updates this via a `meta[name="description"]` selector that must keep matching. */}
-        <meta name="description" content="Sammeln • Ordnen • Behalten" />
+        <meta name="description" content={de.page.footer} />
         <link rel="manifest" href={withBasePath('/site.webmanifest')} />
         <link rel="icon" href={withBasePath('/favicon.ico')} />
         <link

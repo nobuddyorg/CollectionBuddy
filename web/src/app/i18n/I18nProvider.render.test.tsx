@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider, type TranslationKey } from './I18nProvider';
 import { useI18n } from './useI18n';
-import realEn from './en.json';
 
 function Probe() {
   const { language, locale, setLanguage, t, tCount } = useI18n();
@@ -148,6 +147,30 @@ describe('I18nProvider', () => {
     expect(localStorage.getItem('lang')).toBe('de');
   });
 
+  it('still switches the language, without an error, when storing the choice throws', async () => {
+    localStorage.setItem('lang', 'en');
+    renderProbe();
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage disabled');
+    });
+    // React reports an event handler's throw as a window error event, not to the caller of click().
+    const reportedErrors: unknown[] = [];
+    const collectError = (event: ErrorEvent) => {
+      event.preventDefault();
+      reportedErrors.push(event.error);
+    };
+    window.addEventListener('error', collectError);
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Deutsch' }).click();
+    });
+    window.removeEventListener('error', collectError);
+
+    expect(reportedErrors).toEqual([]);
+    expect(screen.getByTestId('lang')).toHaveTextContent('de');
+    expect(screen.getByTestId('close')).toHaveTextContent('Schließen');
+  });
+
   it('falls back to the key itself for a translation that does not exist', () => {
     localStorage.setItem('lang', 'en');
     renderProbe();
@@ -169,32 +192,6 @@ describe('I18nProvider', () => {
 
     expect(document.documentElement.lang).toBe('de');
     expect(meta.getAttribute('content')).toBe('Sammeln • Ordnen • Behalten');
-  });
-
-  // The parity test guards only t()/tCount() literals, not this direct resolveTranslationKey call.
-  it('falls back to an empty meta description when the active language is missing page.footer', async () => {
-    vi.resetModules();
-    vi.doMock('./en.json', () => ({
-      default: { ...realEn, page: { ...realEn.page, footer: undefined } },
-    }));
-    const { I18nProvider: FreshProvider } = await import('./I18nProvider');
-    const { useI18n: freshUseI18n } = await import('./useI18n');
-    function FreshProbe() {
-      const { language } = freshUseI18n();
-      return <span data-testid="lang">{language}</span>;
-    }
-    localStorage.setItem('lang', 'en');
-
-    render(
-      <FreshProvider>
-        <FreshProbe />
-      </FreshProvider>,
-    );
-
-    expect(screen.getByTestId('lang')).toHaveTextContent('en');
-    expect(meta.getAttribute('content')).toBe('');
-    vi.doUnmock('./en.json');
-    vi.resetModules();
   });
 
   it('tolerates a document with no meta description tag at all', () => {

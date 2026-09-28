@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
+import { readStoredValue, writeStoredValue } from '../lib/browserStorage';
 import de from './de.json';
 import en from './en.json';
 
@@ -122,13 +123,10 @@ export function formattingLocale(
 }
 
 export function detectLanguage(): Language {
-  let stored: string | null = null;
-  try {
-    stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-  } catch {
-    // localStorage can throw (private browsing); the browser language still decides.
-  }
-  return pickLanguage(stored, navigator.language);
+  return pickLanguage(
+    readStoredValue(LANGUAGE_STORAGE_KEY),
+    navigator.language,
+  );
 }
 
 export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
@@ -156,7 +154,7 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
 
   const setLanguageAndPersist = useCallback((next: Language) => {
     setLanguage(next);
-    localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
+    writeStoredValue(LANGUAGE_STORAGE_KEY, next);
   }, []);
 
   // Keeps <html lang> and the meta description with the language, or screen readers use the wrong phonetics.
@@ -164,10 +162,7 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
     document.documentElement.lang = language;
     document
       .querySelector('meta[name="description"]')
-      ?.setAttribute(
-        'content',
-        resolveTranslationKey(translations[language], 'page.footer') ?? '',
-      );
+      ?.setAttribute('content', translations[language].page.footer);
   }, [language]);
 
   const t = useCallback(
