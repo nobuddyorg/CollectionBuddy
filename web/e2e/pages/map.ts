@@ -15,6 +15,7 @@ interface MapView {
       close: Locator;
       frameAll: Locator;
       zoomIn: Locator;
+      zoomOut: Locator;
       zoomToLocation: Locator;
     };
     pins: Locator;
@@ -33,6 +34,7 @@ export function initMap(page: Page): MapView {
       close: page.getByTestId('dialog-close'),
       frameAll: page.getByTestId('frame-all-pins'),
       zoomIn: page.locator('.leaflet-control-zoom-in'),
+      zoomOut: page.locator('.leaflet-control-zoom-out'),
       zoomToLocation: page.getByTestId('zoom-to-location'),
     },
     pins: page.locator('.leaflet-marker-icon'),

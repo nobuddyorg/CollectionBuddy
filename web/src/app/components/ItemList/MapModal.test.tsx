@@ -145,7 +145,7 @@ describe('MapModal', () => {
       expect(drawn.at(-1)?.labels).toEqual({
         zoomIn: 'Zoom in',
         zoomOut: 'Zoom out',
-        attribution: 'contributors',
+        attribution: 'OpenStreetMap contributors',
       }),
     );
   });

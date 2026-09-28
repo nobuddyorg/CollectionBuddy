@@ -184,7 +184,7 @@
     "map_entries_count": "{count} entries",
     "map_zoom_in": "Zoom in",
     "map_zoom_out": "Zoom out",
-    "map_attribution_contributors": "contributors",
+    "map_attribution": "OpenStreetMap contributors",
     "location_denied": "Location access is blocked. Allow it for CollectionBuddy in your device or browser settings, then try again.",
     "location_unavailable": "Couldn't determine your location. Please try again.",
     "pagination": "Pagination",

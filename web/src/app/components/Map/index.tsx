@@ -40,9 +40,6 @@ const toUrl = (imported: unknown): string => {
 
 const BOUNDS_PAD_RATIO = 0.015;
 
-const OSM_COPYRIGHT_LINK =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
-
 type LoadedMap = {
   L: Leaflet;
   map: LeafletMap;
@@ -189,7 +186,7 @@ const MapView: React.FC<MapProps> = ({
       const { zoomIn, zoomOut, attribution } = labelsRef.current;
       L.control.zoom({ zoomInTitle: zoomIn, zoomOutTitle: zoomOut }).addTo(map);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: `${OSM_COPYRIGHT_LINK} ${attribution}`,
+        attribution: `&copy; <a href="https://www.openstreetmap.org/copyright">${attribution}</a>`,
       }).addTo(map);
 
       const loadedMap: LoadedMap = {

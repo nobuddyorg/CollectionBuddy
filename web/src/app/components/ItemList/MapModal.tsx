@@ -150,7 +150,7 @@ export function MapModal({
             labels={{
               zoomIn: t('item_list.map_zoom_in'),
               zoomOut: t('item_list.map_zoom_out'),
-              attribution: t('item_list.map_attribution_contributors'),
+              attribution: t('item_list.map_attribution'),
             }}
           />
           {loadingPlaces && (

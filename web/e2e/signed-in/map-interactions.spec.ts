@@ -64,7 +64,10 @@ test.describe('the map, in German', () => {
     await expect(app.map.locators.buttons.zoomIn).toHaveAccessibleName(
       'Vergrößern',
     );
-    await expect(app.map()).toContainText('OpenStreetMap Mitwirkende');
+    await expect(app.map.locators.buttons.zoomOut).toHaveAccessibleName(
+      'Verkleinern',
+    );
+    await expect(app.map()).toContainText('OpenStreetMap-Mitwirkende');
   });
 });
 

@@ -27,7 +27,7 @@ export interface MapProps {
   markers: MarkerInput[];
   currentLocation?: Coordinates & { popupText: string };
   command?: MapCommand | null;
-  /** Already translated, as countLabel is; read once, as the language cannot change while the map is open. */
+  /** Already translated, read once at mount; attribution is set as HTML, so never user text. */
   labels: { zoomIn: string; zoomOut: string; attribution: string };
 }
 
