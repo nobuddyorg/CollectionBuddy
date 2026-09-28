@@ -53,7 +53,7 @@ export async function settle(page, log) {
   }
 }
 
-/** Routes Photon to a fake whose behaviour `mode()` picks per request, and logs every request and how it ended. */
+/** Routes Photon to a fake whose behaviour `mode.current` picks per request, and logs every request and how it ended. */
 export async function fakePhoton(page, mode) {
   const requests = [];
   const outcomes = new Map();

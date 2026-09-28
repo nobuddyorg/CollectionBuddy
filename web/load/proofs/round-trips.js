@@ -93,7 +93,7 @@ export const options = {
     ],
     [`export_metadata_requests{pattern:embedded}`]: ['min>0'],
     export_current_over_embedded: [],
-    // PERF-14's delete half: today ~841 reads at 40,000 entries.
+    // PERF-14's delete half: category delete's reads should fit DELETE_BUDGET.
     delete_metadata_requests: [`max<=${DELETE_BUDGET}`, 'min>0'],
     // PERF-13: a search page should reach its photographs in two sequential round trips, the RPC and the sign call.
     search_page_round_trips: ['max<=2', 'min>0'],

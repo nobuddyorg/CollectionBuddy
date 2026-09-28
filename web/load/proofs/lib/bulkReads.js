@@ -18,9 +18,9 @@ export const CLIENT_EXPORT_INNER = `${ITEM_FIELDS},created_at,images(item_id,pat
 // The suggested fix's read, which the budget is taken from.
 export const EMBEDDED_INNER = `${ITEM_FIELDS},created_at,images(path_full,size_bytes)`;
 
-function authorized(session, probe, extra = {}) {
+function authorized({ session, probe, headers = {} }) {
   return {
-    headers: { ...authHeaders(session), ...extra },
+    headers: { ...authHeaders(session), ...headers },
     tags: { name: probe, probe },
   };
 }
@@ -72,7 +72,7 @@ function chunkedReads({ session, ids, probe, pathFor }) {
       batch.push({
         method: 'GET',
         url: `${SUPABASE_URL}${pathFor(ids.slice(chunk, chunk + ID_CHUNK))}`,
-        params: authorized(session, probe),
+        params: authorized({ session, probe }),
       });
     }
     for (const response of http.batch(batch)) {
@@ -159,8 +159,10 @@ export function signBatches({ session, paths, probe }) {
         method: 'POST',
         url: `${SUPABASE_URL}/storage/v1/object/sign/${BUCKET}`,
         body: JSON.stringify({ expiresIn: 21600, paths: batch }),
-        params: authorized(session, probe, {
-          'Content-Type': 'application/json',
+        params: authorized({
+          session,
+          probe,
+          headers: { 'Content-Type': 'application/json' },
         }),
       }));
     for (const response of http.batch(requestsNow))
