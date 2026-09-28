@@ -4,6 +4,15 @@ import { vi } from 'vitest';
 import { usePlaces } from './usePlaces';
 import { updateItemsPlace } from '../../data/items';
 
+type UsePlacesOptions = Parameters<typeof usePlaces>[0];
+
+const DEFAULT_OPTIONS = {
+  categoryId: 'cat-1',
+  search: '',
+  enabled: true,
+  canEdit: true,
+};
+
 // Relies on the importing test file's `vi.mock('../../data/items')`, which Vitest applies to this module too.
 export function installUsePlacesMocks() {
   vi.clearAllMocks();
@@ -16,13 +25,11 @@ export function restoreGlobalsAndTimers() {
   vi.useRealTimers();
 }
 
-export function renderUsePlaces() {
-  return renderHook(() =>
-    usePlaces({
-      categoryId: 'cat-1',
-      search: '',
-      enabled: true,
-      canEdit: true,
-    }),
+// rerender() replaces the props outright, so the defaults merge inside the callback, not into initialProps.
+export function renderUsePlaces(initial: Partial<UsePlacesOptions> = {}) {
+  return renderHook(
+    (props: Partial<UsePlacesOptions>) =>
+      usePlaces({ ...DEFAULT_OPTIONS, ...props }),
+    { initialProps: initial },
   );
 }

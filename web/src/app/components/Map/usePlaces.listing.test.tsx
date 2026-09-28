@@ -22,14 +22,7 @@ describe('usePlaces listing', () => {
   afterEach(restoreGlobalsAndTimers);
 
   it('does nothing while disabled, leaving the initial loading/error state untouched', async () => {
-    const { result } = renderHook(() =>
-      usePlaces({
-        categoryId: 'cat-1',
-        search: '',
-        enabled: false,
-        canEdit: true,
-      }),
-    );
+    const { result } = renderUsePlaces({ enabled: false });
     await act(async () => {
       await Promise.resolve();
     });
@@ -42,7 +35,13 @@ describe('usePlaces listing', () => {
 
   it('draws already-located places immediately, with no geocoding needed', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', 50.94, 6.96, ['Entry A'])],
+      data: [
+        group('Cologne', {
+          place_lat: 50.94,
+          place_lng: 6.96,
+          titles: ['Entry A'],
+        }),
+      ],
       error: null,
     });
     const fetchMock = vi.fn();
@@ -105,15 +104,11 @@ describe('usePlaces listing', () => {
 
   it('re-fetches when the category, search, or enabled flag changes', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', 50.94, 6.96)],
+      data: [group('Cologne', { place_lat: 50.94, place_lng: 6.96 })],
       error: null,
     });
 
-    const { rerender } = renderHook(
-      ({ categoryId, search }: { categoryId: string; search: string }) =>
-        usePlaces({ categoryId, search, enabled: true, canEdit: true }),
-      { initialProps: { categoryId: 'cat-1', search: '' } },
-    );
+    const { rerender } = renderUsePlaces();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -137,15 +132,11 @@ describe('usePlaces listing', () => {
 
   it('sets loading back to true for a later fetch, not only the first one', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValueOnce({
-      data: [group('Cologne', 50.94, 6.96)],
+      data: [group('Cologne', { place_lat: 50.94, place_lng: 6.96 })],
       error: null,
     });
 
-    const { result, rerender } = renderHook(
-      ({ categoryId }: { categoryId: string }) =>
-        usePlaces({ categoryId, search: '', enabled: true, canEdit: true }),
-      { initialProps: { categoryId: 'cat-1' } },
-    );
+    const { result, rerender } = renderUsePlaces();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -173,11 +164,13 @@ describe('usePlaces listing', () => {
     expect(result.current.places).toEqual([]);
   });
 
-  it('treats a null places listing the same as an empty one', async () => {
+  it('treats a null places listing the same as an empty one, looking nothing up', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
       data: null,
       error: null,
     });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
 
     const { result } = renderUsePlaces();
     await act(async () => {
@@ -187,12 +180,16 @@ describe('usePlaces listing', () => {
 
     expect(result.current.places).toEqual([]);
     expect(result.current.error).toBe(false);
+    // A macrotask runs only once every microtask, a first lookup's included, has settled.
+    await act(() => new Promise((resolve) => setTimeout(resolve)));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.current.loading).toBe(false);
   });
 
   // An empty `known` batch equals the unconditional `setPlaces([])` before it, so only a render count tells.
   it('does not re-render for an empty already-known batch before geocoding starts', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', null, null)],
+      data: [group('Cologne')],
       error: null,
     });
     vi.stubGlobal(

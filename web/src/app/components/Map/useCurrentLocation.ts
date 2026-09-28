@@ -35,11 +35,11 @@ const coordsOf = (position: GeolocationPosition): Coordinates => ({
 });
 
 /** "You said no" gets different advice from every other failure, and only it can be undone. */
-export function classifyLocationError(error: {
-  code?: number;
-}): LocationFailure {
+export function classifyLocationError(
+  error: Pick<GeolocationPositionError, 'code'>,
+): LocationFailure {
   // GeolocationPositionError.PERMISSION_DENIED, spelled out: the constant lives on an instance jsdom lacks.
-  return error?.code === 1 ? 'denied' : 'unavailable';
+  return error.code === 1 ? 'denied' : 'unavailable';
 }
 
 /** Reads the permission without prompting: an unprompted dialog gets dismissed, and dismissals add up to a block. */

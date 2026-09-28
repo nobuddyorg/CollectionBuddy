@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 import { useMapFraming } from './useMapFraming';
 
-function renderFraming(open = true) {
+function renderFraming() {
   return renderHook(({ isOpen }) => useMapFraming(isOpen), {
-    initialProps: { isOpen: open },
+    initialProps: { isOpen: true },
   });
 }
 

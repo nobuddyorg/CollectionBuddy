@@ -26,7 +26,7 @@ describe('usePlaces geocode cache', () => {
       JSON.stringify({ Berlin: { name: 'Berlin', lat: 52.52, lng: 13.4 } }),
     );
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Berlin', null, null, ['Entry B'])],
+      data: [group('Berlin', { titles: ['Entry B'] })],
       error: null,
     });
     const fetchMock = vi.fn();
@@ -48,7 +48,7 @@ describe('usePlaces geocode cache', () => {
   it('reads a corrupted cache as empty rather than throwing', async () => {
     localStorage.setItem('cb_geocode_cache_v1', 'not json at all {');
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', null, null)],
+      data: [group('Cologne')],
       error: null,
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(photonOk([6.96, 50.94])));
@@ -73,7 +73,7 @@ describe('usePlaces geocode cache', () => {
         throw new DOMException('Quota exceeded', 'QuotaExceededError');
       });
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', null, null)],
+      data: [group('Cologne')],
       error: null,
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(photonOk([6.96, 50.94])));
@@ -99,7 +99,7 @@ describe('usePlaces geocode cache', () => {
       JSON.stringify({ Berlin: { name: 'Berlin', lat: 52.52, lng: 13.4 } }),
     );
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', null, null)],
+      data: [group('Cologne')],
       error: null,
     });
     let resolveFetch!: (value: unknown) => void;
@@ -132,7 +132,7 @@ describe('usePlaces geocode cache', () => {
   it('never touches the geocode cache on disk when nothing needed a fresh lookup', async () => {
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', 50.94, 6.96)],
+      data: [group('Cologne', { place_lat: 50.94, place_lng: 6.96 })],
       error: null,
     });
 

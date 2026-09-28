@@ -14,9 +14,9 @@ const berlin: PlaceCoords = { name: 'Berlin', lat: 52.52, lng: 13.4 };
 describe('partitionByStoredCoords', () => {
   it('draws a place with a stored coordinate pair, and lists the rest as unlocated', () => {
     const { located, unlocated } = partitionByStoredCoords([
-      group('Cologne', 50.94, 6.96),
+      group('Cologne', { place_lat: 50.94, place_lng: 6.96 }),
       group('Paris'),
-      group('Berlin', 52.52, 13.4),
+      group('Berlin', { place_lat: 52.52, place_lng: 13.4 }),
     ]);
     expect(located).toEqual([cologne, berlin]);
     expect(unlocated).toEqual(['Paris']);
@@ -24,9 +24,9 @@ describe('partitionByStoredCoords', () => {
 
   it('preserves input order within each side of the split', () => {
     const { located, unlocated } = partitionByStoredCoords([
-      group('Berlin', 52.52, 13.4),
+      group('Berlin', { place_lat: 52.52, place_lng: 13.4 }),
       group('Paris'),
-      group('Cologne', 50.94, 6.96),
+      group('Cologne', { place_lat: 50.94, place_lng: 6.96 }),
       group('Rome'),
     ]);
     expect(located).toEqual([berlin, cologne]);
@@ -35,29 +35,35 @@ describe('partitionByStoredCoords', () => {
 
   it('falls back to a lookup when only one coordinate was stored', () => {
     expect(
-      partitionByStoredCoords([group('Cologne', 50.94, null)]),
+      partitionByStoredCoords([group('Cologne', { place_lat: 50.94 })]),
     ).toMatchObject({ located: [], unlocated: ['Cologne'] });
     expect(
-      partitionByStoredCoords([group('Cologne', null, 6.96)]),
+      partitionByStoredCoords([group('Cologne', { place_lng: 6.96 })]),
     ).toMatchObject({ located: [], unlocated: ['Cologne'] });
   });
 
   it('falls back to a lookup rather than pinning a non-finite coordinate', () => {
-    expect(partitionByStoredCoords([group('Broken', NaN, 6.96)])).toMatchObject(
-      { located: [], unlocated: ['Broken'] },
-    );
     expect(
-      partitionByStoredCoords([group('Broken', 50.94, Infinity)]),
+      partitionByStoredCoords([
+        group('Broken', { place_lat: NaN, place_lng: 6.96 }),
+      ]),
+    ).toMatchObject({ located: [], unlocated: ['Broken'] });
+    expect(
+      partitionByStoredCoords([
+        group('Broken', { place_lat: 50.94, place_lng: Infinity }),
+      ]),
     ).toMatchObject({ located: [], unlocated: ['Broken'] });
   });
 
   it('treats zero coordinates as a real location, not a missing one', () => {
-    expect(partitionByStoredCoords([group('Null Island', 0, 0)])).toMatchObject(
-      {
-        located: [{ name: 'Null Island', lat: 0, lng: 0 }],
-        unlocated: [],
-      },
-    );
+    expect(
+      partitionByStoredCoords([
+        group('Null Island', { place_lat: 0, place_lng: 0 }),
+      ]),
+    ).toMatchObject({
+      located: [{ name: 'Null Island', lat: 0, lng: 0 }],
+      unlocated: [],
+    });
   });
 
   it('has nothing to do for an empty row list', () => {
@@ -71,14 +77,18 @@ describe('partitionByStoredCoords', () => {
 describe('partitionByStoredCoords, on the entries at each place', () => {
   it('carries through the titles and ids the row already grouped', () => {
     const { titles, ids } = partitionByStoredCoords([
-      group(
-        'Cologne',
-        50.94,
-        6.96,
-        ['Seated Dime', 'Silver Eagle'],
-        ['item-1', 'item-2'],
-      ),
-      group('Berlin', 52.52, 13.4, ['Buffalo Nickel'], ['item-3']),
+      group('Cologne', {
+        place_lat: 50.94,
+        place_lng: 6.96,
+        titles: ['Seated Dime', 'Silver Eagle'],
+        ids: ['item-1', 'item-2'],
+      }),
+      group('Berlin', {
+        place_lat: 52.52,
+        place_lng: 13.4,
+        titles: ['Buffalo Nickel'],
+        ids: ['item-3'],
+      }),
     ]);
     expect(titles.get('Cologne')).toEqual(['Seated Dime', 'Silver Eagle']);
     expect(titles.get('Berlin')).toEqual(['Buffalo Nickel']);
@@ -88,7 +98,7 @@ describe('partitionByStoredCoords, on the entries at each place', () => {
 
   it('carries through titles and ids for a place still awaiting a lookup', () => {
     const { unlocated, titles, ids } = partitionByStoredCoords([
-      group('Paris', null, null, ['Napoleon Franc'], ['item-1']),
+      group('Paris', { titles: ['Napoleon Franc'], ids: ['item-1'] }),
     ]);
     expect(unlocated).toEqual(['Paris']);
     expect(titles.get('Paris')).toEqual(['Napoleon Franc']);

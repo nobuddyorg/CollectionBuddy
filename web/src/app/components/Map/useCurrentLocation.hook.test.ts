@@ -54,11 +54,8 @@ function mockGeolocation() {
 }
 
 // vi.fn() records every argument a call passed, including the PositionOptions the typed signature omits.
-function thirdArgument(
-  mocked: { mock: { calls: unknown[][] } },
-  callIndex = 0,
-) {
-  return mocked.mock.calls[callIndex]?.[2] as PositionOptions | undefined;
+function thirdArgument(mocked: { mock: { calls: unknown[][] } }) {
+  return mocked.mock.calls[0]?.[2] as PositionOptions | undefined;
 }
 
 function stubNavigator(

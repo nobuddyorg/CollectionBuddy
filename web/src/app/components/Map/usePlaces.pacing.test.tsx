@@ -7,7 +7,7 @@ import {
   renderUsePlaces,
   restoreGlobalsAndTimers,
 } from './usePlaces.hook.test-support';
-import { group, photonOk } from './usePlaces.test-support';
+import { group, photonFailure, photonOk } from './usePlaces.test-support';
 import { listCategoryPlaces } from '../../data/items';
 
 vi.mock('../../data/items', () => ({
@@ -17,7 +17,7 @@ vi.mock('../../data/items', () => ({
 
 const unlocated = (count: number) =>
   Array.from({ length: count }, (_, index) =>
-    group(`Place${index + 1}`, null, null, ['An entry'], [`id-${index + 1}`]),
+    group(`Place${index + 1}`, { ids: [`id-${index + 1}`] }),
   );
 
 async function advance(milliseconds: number) {
@@ -78,9 +78,7 @@ describe('usePlaces pacing', () => {
       data: unlocated(1),
       error: null,
     });
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
+    const fetchMock = vi.fn().mockResolvedValue(photonFailure(503));
     vi.stubGlobal('fetch', fetchMock);
 
     renderUsePlaces();
@@ -98,9 +96,7 @@ describe('usePlaces pacing', () => {
       data: unlocated(1),
       error: null,
     });
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
+    const fetchMock = vi.fn().mockResolvedValue(photonFailure(503));
     vi.stubGlobal('fetch', fetchMock);
 
     const { result } = renderUsePlaces();

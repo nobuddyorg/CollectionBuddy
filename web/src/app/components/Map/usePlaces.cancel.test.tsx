@@ -1,14 +1,13 @@
 // @vitest-environment jsdom
-import { act, renderHook } from '@testing-library/react';
+import { act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { usePlaces } from './usePlaces';
 import {
   installUsePlacesMocks,
   renderUsePlaces,
   restoreGlobalsAndTimers,
 } from './usePlaces.hook.test-support';
-import { group, photonOk } from './usePlaces.test-support';
+import { group, photonFailure, photonOk } from './usePlaces.test-support';
 import { listCategoryPlaces, updateItemsPlace } from '../../data/items';
 import type { PlaceGroupRow } from '../../data/items';
 
@@ -25,14 +24,6 @@ const berlin = {
   lng: 13.4,
   titles: ['Berlin entry'],
 };
-
-function renderByCategory() {
-  return renderHook(
-    ({ categoryId }: { categoryId: string }) =>
-      usePlaces({ categoryId, search: '', enabled: true, canEdit: true }),
-    { initialProps: { categoryId: 'cat-1' } },
-  );
-}
 
 describe('usePlaces cancellation', () => {
   beforeEach(installUsePlacesMocks);
@@ -61,7 +52,7 @@ describe('usePlaces cancellation', () => {
   it('aborts an in-flight Photon lookup on unmount, and retries nothing after it', async () => {
     vi.useFakeTimers();
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', null, null)],
+      data: [group('Cologne')],
       error: null,
     });
     const fetchMock = vi.fn(
@@ -96,7 +87,7 @@ describe('usePlaces cancellation', () => {
     vi.useFakeTimers();
     vi.mocked(listCategoryPlaces).mockResolvedValue({
       data: Array.from({ length: 8 }, (_, index) =>
-        group(`Place${index}`, null, null, ['An entry'], [`id-${index}`]),
+        group(`Place${index}`, { ids: [`id-${index}`] }),
       ),
       error: null,
     });
@@ -122,7 +113,7 @@ describe('usePlaces cancellation', () => {
   // `cancelled` guards `setPlaces`, not the write-back: a late geocode is still worth persisting.
   it('still writes a late-resolving geocode back to its rows after being cancelled, even though the UI has moved on', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', null, null)],
+      data: [group('Cologne')],
       error: null,
     });
     let resolveFetch!: (value: unknown) => void;
@@ -165,11 +156,17 @@ describe('usePlaces cancellation', () => {
           }),
       )
       .mockResolvedValueOnce({
-        data: [group('Berlin', 52.52, 13.4, ['Berlin entry'])],
+        data: [
+          group('Berlin', {
+            place_lat: 52.52,
+            place_lng: 13.4,
+            titles: ['Berlin entry'],
+          }),
+        ],
         error: null,
       });
 
-    const { result, rerender } = renderByCategory();
+    const { result, rerender } = renderUsePlaces();
 
     rerender({ categoryId: 'cat-2' });
     await act(async () => {
@@ -180,7 +177,13 @@ describe('usePlaces cancellation', () => {
     expect(result.current.places).toEqual([berlin]);
 
     resolveFirst({
-      data: [group('Cologne', 50.94, 6.96, ['Cologne entry'])],
+      data: [
+        group('Cologne', {
+          place_lat: 50.94,
+          place_lng: 6.96,
+          titles: ['Cologne entry'],
+        }),
+      ],
       error: null,
     });
     await act(async () => {
@@ -195,11 +198,17 @@ describe('usePlaces cancellation', () => {
     let resolveFetch!: (value: unknown) => void;
     vi.mocked(listCategoryPlaces)
       .mockResolvedValueOnce({
-        data: [group('Cologne', null, null, ['Cologne entry'])],
+        data: [group('Cologne', { titles: ['Cologne entry'] })],
         error: null,
       })
       .mockResolvedValueOnce({
-        data: [group('Berlin', 52.52, 13.4, ['Berlin entry'])],
+        data: [
+          group('Berlin', {
+            place_lat: 52.52,
+            place_lng: 13.4,
+            titles: ['Berlin entry'],
+          }),
+        ],
         error: null,
       });
     vi.stubGlobal(
@@ -212,7 +221,7 @@ describe('usePlaces cancellation', () => {
       ),
     );
 
-    const { result, rerender } = renderByCategory();
+    const { result, rerender } = renderUsePlaces();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -246,11 +255,17 @@ describe('usePlaces cancellation', () => {
           }),
       )
       .mockResolvedValueOnce({
-        data: [group('Berlin', 52.52, 13.4, ['Berlin entry'])],
+        data: [
+          group('Berlin', {
+            place_lat: 52.52,
+            place_lng: 13.4,
+            titles: ['Berlin entry'],
+          }),
+        ],
         error: null,
       });
 
-    const { result, rerender } = renderByCategory();
+    const { result, rerender } = renderUsePlaces();
 
     rerender({ categoryId: 'cat-2' });
     await act(async () => {
@@ -285,7 +300,7 @@ describe('usePlaces cancellation', () => {
       )
       .mockImplementationOnce(() => new Promise(() => {}));
 
-    const { result, rerender } = renderByCategory();
+    const { result, rerender } = renderUsePlaces();
 
     rerender({ categoryId: 'cat-2' });
     expect(result.current.loading).toBe(true);
@@ -303,16 +318,14 @@ describe('usePlaces cancellation', () => {
     vi.useFakeTimers();
     vi.mocked(listCategoryPlaces)
       .mockResolvedValueOnce({
-        data: [group('Cologne', null, null)],
+        data: [group('Cologne')],
         error: null,
       })
       .mockImplementationOnce(() => new Promise(() => {}));
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: false, status: 429, json: async () => ({}) });
+    const fetchMock = vi.fn().mockResolvedValue(photonFailure(429));
     vi.stubGlobal('fetch', fetchMock);
 
-    const { rerender } = renderByCategory();
+    const { rerender } = renderUsePlaces();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
