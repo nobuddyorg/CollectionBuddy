@@ -50,7 +50,7 @@ function noopCollaborators(): Collaborators {
   };
 }
 
-// A real ConfirmProvider, not a mock: the index-capture-before-removal ordering lives past that await.
+// A real ConfirmProvider, not a mock: the index-capture-before-removal ordering lives past the confirmation's await.
 describe('useItemMutations removeItem', () => {
   beforeEach(() => {
     vi.clearAllMocks();
