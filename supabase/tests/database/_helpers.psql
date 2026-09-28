@@ -66,7 +66,7 @@ as $$
   select format('insert into storage.objects (bucket_id, name) values (%L, %L)', 'item-images', p_path)
 $$;
 
--- Rows one write would touch, always rolled back, so an attempt that wrongly succeeds cannot hide the ones after it.
+-- Rows one write would touch, always rolled back; keep a probe inline when a later read-back (TEST_STRATEGY.md §7 rule 5) must see it.
 create or replace function pg_temp.rows_written(p_sql text)
 returns bigint
 language plpgsql
@@ -79,4 +79,29 @@ begin
 exception when sqlstate 'UNDO0' then
   return touched;
 end
+$$;
+
+-- Files an entry into one more collection past trg_item_categories_quota, a shape only rows from before 0020 have.
+create or replace function pg_temp.file_as_before_0020(p_item_id uuid, p_category_id uuid)
+returns void
+language plpgsql
+as $$
+begin
+  reset role;
+  alter table public.item_categories disable trigger trg_item_categories_quota;
+  set local role authenticated;
+  insert into public.item_categories (item_id, category_id) values (p_item_id, p_category_id);
+  reset role;
+  alter table public.item_categories enable trigger trg_item_categories_quota;
+  set local role authenticated;
+end;
+$$;
+
+-- True for an object an extension owns (pg_depend deptype 'e'), excluded from the schema-wide catalog checks.
+create or replace function pg_temp.is_extension_member(p_oid oid)
+returns boolean
+language sql
+stable
+as $$
+  select exists (select 1 from pg_catalog.pg_depend d where d.objid = p_oid and d.deptype = 'e')
 $$;

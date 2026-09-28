@@ -78,17 +78,17 @@ select is(
 );
 
 -- A viewer grant does not extend to writing.
-with attempt as (
-  update public.categories set name = 'taken over' where id = :'category_id'::uuid returning id
-)
-select is((select count(*) from attempt), 0::bigint,
-  'a viewer grant does not extend to renaming the category');
+select is(
+  pg_temp.rows_written(format('update public.categories set name = %L where id = %L returning id', 'taken over', :'category_id')),
+  0::bigint,
+  'a viewer grant does not extend to renaming the category'
+);
 
-with attempt as (
-  update public.items set title = 'taken over' where id = :'item_id'::uuid returning id
-)
-select is((select count(*) from attempt), 0::bigint,
-  'a viewer grant does not extend to editing an item inside it');
+select is(
+  pg_temp.rows_written(format('update public.items set title = %L where id = %L returning id', 'taken over', :'item_id')),
+  0::bigint,
+  'a viewer grant does not extend to editing an item inside it'
+);
 
 -- Nor to removing: the viewer reads each row above, so only a delete policy can refuse it. An unlink would also sweep the entry.
 select is(

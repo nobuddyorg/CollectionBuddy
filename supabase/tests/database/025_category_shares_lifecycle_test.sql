@@ -36,11 +36,11 @@ returning id as share_id \gset
 -- grantee's write access follows immediately -- there is no accept step
 -- and nothing cached, the predicate is re-evaluated per request.
 select pg_temp.auth_as(:'grantee_id'::uuid, 'lifecycle-grantee@collectionbuddy.test');
-with attempt as (
-  update public.items set title = 'edited as a viewer' where id = :'item_id'::uuid returning id
-)
-select is((select count(*) from attempt), 0::bigint,
-  'the grantee cannot write while the grant is still at viewer');
+select is(
+  pg_temp.rows_written(format('update public.items set title = %L where id = %L returning id', 'edited as a viewer', :'item_id')),
+  0::bigint,
+  'the grantee cannot write while the grant is still at viewer'
+);
 
 select pg_temp.auth_as(:'owner_id'::uuid, 'lifecycle-owner@collectionbuddy.test');
 update public.category_shares set role = 'editor' where id = :'share_id'::uuid;

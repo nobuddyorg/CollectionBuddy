@@ -23,10 +23,7 @@ select is(
    from pg_catalog.pg_proc p
    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
-     and not exists (
-       select 1 from pg_catalog.pg_depend d
-       where d.objid = p.oid and d.deptype = 'e'
-     )
+     and not pg_temp.is_extension_member(p.oid)
      and not coalesce(p.proconfig, '{}') @> array['search_path=""']),
   null,
   'every function in schema public pins search_path to the empty string'
@@ -39,10 +36,7 @@ select is(
    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
      and p.prosecdef
-     and not exists (
-       select 1 from pg_catalog.pg_depend d
-       where d.objid = p.oid and d.deptype = 'e'
-     )),
+     and not pg_temp.is_extension_member(p.oid)),
   array[
     'delete_item_if_orphan', 'delete_own_account', 'enforce_user_id', 'photo_upload_has_room', 'search_category_items',
     'tg_categories_normalize', 'tg_categories_quota', 'tg_category_shares_enforce',
@@ -63,10 +57,7 @@ select is(
    where n.nspname = 'public'
      and p.prosecdef
      and pg_catalog.pg_get_userbyid(p.proowner) <> 'postgres'
-     and not exists (
-       select 1 from pg_catalog.pg_depend d
-       where d.objid = p.oid and d.deptype = 'e'
-     )),
+     and not pg_temp.is_extension_member(p.oid)),
   null,
   'every security definer function is owned by postgres, not by a lesser role'
 );
@@ -128,7 +119,7 @@ select throws_ok(
 -- so the free-tier project does not auto-pause
 -- (.github/workflows/keep-alive.yml). A workflow that starts failing
 -- against a 42501 would be noticed late and cost the app its availability.
-set local role anon;
+select pg_temp.auth_as_anon();
 select lives_ok(
   'select public.keepalive()',
   'anon can call keepalive() -- the one function the keep-alive schedule depends on'

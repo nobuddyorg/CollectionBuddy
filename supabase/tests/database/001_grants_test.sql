@@ -21,10 +21,7 @@ select is(
    where n.nspname = 'public'
      and c.relkind in ('r', 'p', 'v', 'm', 'f')
      and has_table_privilege('anon', c.oid, p.privilege)
-     and not exists (
-       select 1 from pg_catalog.pg_depend d
-       where d.objid = c.oid and d.deptype = 'e'
-     )),
+     and not pg_temp.is_extension_member(c.oid)),
   null,
   'anon holds no privilege of any kind on any table or view in schema public'
 );
@@ -38,10 +35,7 @@ select is(
    where n.nspname = 'public'
      and c.relkind in ('r', 'p', 'v', 'm', 'f')
      and has_table_privilege('authenticated', c.oid, p.privilege)
-     and not exists (
-       select 1 from pg_catalog.pg_depend d
-       where d.objid = c.oid and d.deptype = 'e'
-     )
+     and not pg_temp.is_extension_member(c.oid)
      and not exists (
        select 1 from pg_catalog.pg_policies pol
        where pol.schemaname = 'public'
@@ -121,44 +115,10 @@ select ok(
 -- a denial nobody had asserted, holding for a reason nobody had written
 -- down. Both halves need asserting independently (TEST_STRATEGY.md trust
 -- boundary 3), so the table grants above are stated separately from the
--- function grants here.
-select function_privs_are('public', 'has_category_write_access', array['uuid'],
-  'anon', array[]::text[], 'anon cannot execute has_category_write_access');
-select function_privs_are('public', 'has_category_read_access', array['uuid'],
-  'anon', array[]::text[], 'anon cannot execute has_category_read_access');
-select function_privs_are('public', 'has_item_write_access', array['uuid', 'uuid'],
-  'anon', array[]::text[], 'anon cannot execute has_item_write_access');
-select function_privs_are('public', 'caller_email', array[]::text[],
-  'anon', array[]::text[], 'anon cannot execute caller_email');
-select function_privs_are('public', 'granted_category_ids', array[]::text[],
-  'anon', array[]::text[], 'anon cannot execute granted_category_ids');
-select function_privs_are('public', 'list_category_places', array['uuid', 'text'],
-  'anon', array[]::text[], 'anon cannot execute list_category_places');
-select function_privs_are('public', 'create_items_in_category', array['uuid', 'jsonb'],
-  'anon', array[]::text[], 'anon cannot execute create_items_in_category');
-select function_privs_are('public', 'search_category_items',
-  array['uuid', 'text', 'int', 'int'], 'anon', array[]::text[],
-  'anon cannot execute search_category_items -- SECURITY DEFINER makes this the highest-stakes grant to get right');
-select function_privs_are('public', 'normalize_text', array['text'],
-  'anon', array[]::text[], 'anon cannot execute normalize_text');
-select function_privs_are('public', 'join_tags', array['text[]'],
-  'anon', array[]::text[], 'anon cannot execute join_tags');
-select function_privs_are('public', 'longest_tag_length', array['text[]'],
-  'anon', array[]::text[], 'anon cannot execute longest_tag_length');
-select function_privs_are('public', 'normalize_multiline_text', array['text'],
-  'authenticated', array[]::text[], 'only its trigger calls normalize_multiline_text, so authenticated cannot either');
-select function_privs_are('public', 'storage_item_id', array['text'],
-  'anon', array[]::text[], 'anon cannot execute storage_item_id');
-select function_privs_are('public', 'photo_upload_has_room', array[]::text[],
-  'anon', array[]::text[], 'anon cannot execute photo_upload_has_room');
-select function_privs_are('public', 'delete_own_account', array[]::text[],
-  'anon', array[]::text[], 'anon cannot execute delete_own_account');
-
--- ...and the same set from the other side: the application's own role can
--- reach every function it actually calls. An EXECUTE quietly lost here is
--- a feature that fails with 42501 for every signed-in user at once.
-select function_privs_are('public', f.name, f.args, 'authenticated', array['EXECUTE'],
-  'authenticated can execute ' || f.name)
+-- function grants here. The application's own role, in turn, must reach
+-- every function it actually calls: an EXECUTE quietly lost here is a
+-- feature that fails with 42501 for every signed-in user at once.
+select function_privs_are('public', f.name, f.args, r.role, r.privileges, r.role || r.verb || f.name)
 from (values
   ('has_category_write_access', array['uuid']),
   ('has_category_read_access', array['uuid']),
@@ -173,9 +133,16 @@ from (values
   ('delete_own_account', array[]::text[]),
   ('normalize_text', array['text']),
   ('join_tags', array['text[]']),
-  ('longest_tag_length', array['text[]']),
-  ('keepalive', array[]::text[])
-) as f(name, args);
+  ('longest_tag_length', array['text[]'])
+) as f(name, args)
+cross join (values
+  ('anon', array[]::text[], ' cannot execute '),
+  ('authenticated', array['EXECUTE'], ' can execute ')
+) as r(role, privileges, verb);
+select function_privs_are('public', 'normalize_multiline_text', array['text'],
+  'authenticated', array[]::text[], 'only its trigger calls normalize_multiline_text, so authenticated cannot either');
+select function_privs_are('public', 'keepalive', array[]::text[],
+  'authenticated', array['EXECUTE'], 'authenticated can execute keepalive');
 
 -- Postgres grants EXECUTE to PUBLIC on every new function, which reaches
 -- `anon` too -- so what has *not* been revoked from PUBLIC is the real
@@ -195,10 +162,7 @@ select is(
    where n.nspname = 'public'
      and p.prorettype <> 'pg_catalog.trigger'::regtype
      and has_function_privilege('anon', p.oid, 'EXECUTE')
-     and not exists (
-       select 1 from pg_catalog.pg_depend d
-       where d.objid = p.oid and d.deptype = 'e'
-     )),
+     and not pg_temp.is_extension_member(p.oid)),
   array['keepalive'],
   'the only non-trigger function anon may execute is keepalive'
 );
@@ -240,10 +204,7 @@ select is(
    where n.nspname = 'public'
      and c.relkind = 'r'
      and not c.relrowsecurity
-     and not exists (
-       select 1 from pg_catalog.pg_depend d
-       where d.objid = c.oid and d.deptype = 'e'
-     )),
+     and not pg_temp.is_extension_member(c.oid)),
   null,
   'no table in schema public is missing row level security'
 );

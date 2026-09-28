@@ -36,11 +36,11 @@ select is(
 );
 
 select pg_temp.auth_as(:'editor_id'::uuid, 'editor@collectionbuddy.test');
-with attempt as (
-  delete from public.items where id = :'owner_entry_id'::uuid returning id
-)
-select is((select count(*) from attempt), 1::bigint,
-  'an editor can delete the owner''s entry in the shared collection');
+select is(
+  pg_temp.rows_written(format('delete from public.items where id = %L returning id', :'owner_entry_id')),
+  1::bigint,
+  'an editor can delete the owner''s entry in the shared collection'
+);
 
 -- The positive side of the delete policies a viewer is refused (020), each probe undone again.
 select pg_temp.auth_as(:'owner_id'::uuid, 'editor-test-owner@collectionbuddy.test');
@@ -90,17 +90,17 @@ select is(
 -- The line the role is supposed to stop at: item content, never the
 -- collection itself.
 select pg_temp.auth_as(:'editor_id'::uuid, 'editor@collectionbuddy.test');
-with attempt as (
-  update public.categories set name = 'taken over' where id = :'category_id'::uuid returning id
-)
-select is((select count(*) from attempt), 0::bigint,
-  'an editor cannot rename the collection');
+select is(
+  pg_temp.rows_written(format('update public.categories set name = %L where id = %L returning id', 'taken over', :'category_id')),
+  0::bigint,
+  'an editor cannot rename the collection'
+);
 
-with attempt as (
-  delete from public.categories where id = :'category_id'::uuid returning id
-)
-select is((select count(*) from attempt), 0::bigint,
-  'an editor cannot delete the collection');
+select is(
+  pg_temp.rows_written(format('delete from public.categories where id = %L returning id', :'category_id')),
+  0::bigint,
+  'an editor cannot delete the collection'
+);
 
 -- Cannot promote another grant on the collection...
 select pg_temp.auth_as(:'owner_id'::uuid, 'editor-test-owner@collectionbuddy.test');
@@ -109,11 +109,11 @@ values (:'category_id'::uuid, 'bystander@collectionbuddy.test')
 returning id as bystander_share_id \gset
 
 select pg_temp.auth_as(:'editor_id'::uuid, 'editor@collectionbuddy.test');
-with attempt as (
-  update public.category_shares set role = 'editor' where id = :'bystander_share_id'::uuid returning id
-)
-select is((select count(*) from attempt), 0::bigint,
-  'an editor cannot promote another grant on the collection');
+select is(
+  pg_temp.rows_written(format('update public.category_shares set role = %L where id = %L returning id', 'editor', :'bystander_share_id')),
+  0::bigint,
+  'an editor cannot promote another grant on the collection'
+);
 
 -- ...nor issue a grant of its own -- tg_category_shares_enforce re-derives
 -- owner_user_id from the category itself, so a forged value in the
@@ -172,11 +172,11 @@ values (
 );
 
 select pg_temp.auth_as(:'editor_id'::uuid, 'editor@collectionbuddy.test');
-with attempt as (
-  update public.items set title = 'edited by an expired editor' where id = :'revocation_item_id'::uuid returning id
-)
-select is((select count(*) from attempt), 0::bigint,
-  'an expired editor grant writes no more than no grant at all');
+select is(
+  pg_temp.rows_written(format('update public.items set title = %L where id = %L returning id', 'edited by an expired editor', :'revocation_item_id')),
+  0::bigint,
+  'an expired editor grant writes no more than no grant at all'
+);
 select is(
   array[
     public.has_category_read_access(:'category_id'::uuid),

@@ -166,14 +166,8 @@ insert into public.categories (name) values ('Kept B')
 returning id as kept_b \gset
 insert into public.items (title) values ('Filed twice')
 returning id as kept_item \gset
-reset role;
-alter table public.item_categories disable trigger trg_item_categories_quota;
-select pg_temp.auth_as(:'owner_id'::uuid, 'edge-owner@collectionbuddy.test');
-insert into public.item_categories (item_id, category_id)
-values (:'kept_item'::uuid, :'kept_a'::uuid), (:'kept_item'::uuid, :'kept_b'::uuid);
-reset role;
-alter table public.item_categories enable trigger trg_item_categories_quota;
-select pg_temp.auth_as(:'owner_id'::uuid, 'edge-owner@collectionbuddy.test');
+select pg_temp.file_as_before_0020(:'kept_item'::uuid, :'kept_a'::uuid);
+select pg_temp.file_as_before_0020(:'kept_item'::uuid, :'kept_b'::uuid);
 
 delete from public.item_categories
 where item_id = :'kept_item'::uuid and category_id = :'kept_a'::uuid;

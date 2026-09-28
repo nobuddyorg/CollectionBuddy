@@ -68,14 +68,11 @@ select is(
 -- target, it does not error.
 select pg_temp.auth_as(:'stranger_id'::uuid, 'stranger@collectionbuddy.test');
 
-with attempt as (
-  update public.categories
-  set name = 'taken over'
-  where id = :'owner_category_id'::uuid
-  returning id
-)
-select is((select count(*) from attempt), 0::bigint,
-  'a stranger''s update against the owner''s category affects no rows');
+select is(
+  pg_temp.rows_written(format('update public.categories set name = %L where id = %L returning id', 'taken over', :'owner_category_id')),
+  0::bigint,
+  'a stranger''s update against the owner''s category affects no rows'
+);
 
 with attempt as (
   update public.items
