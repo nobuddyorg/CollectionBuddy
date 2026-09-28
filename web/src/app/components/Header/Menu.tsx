@@ -60,6 +60,7 @@ export default function Menu({
   return (
     <div
       id={menuId}
+      data-testid="user-menu"
       aria-labelledby="user-menu-button"
       className="absolute right-0 mt-2 w-56 rounded-sm border bg-card text-card-foreground backdrop-blur p-1 shadow-lg"
     >

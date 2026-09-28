@@ -105,7 +105,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         {/* Dialogs portal to document.body, so useInertBackground can mark this wrapper inert without them. */}
-        <div id="app-root">
+        <div id="app-root" data-testid="app-root">
           <SupabaseWarmup />
           <ServiceWorkerRegistration />
           <I18nProvider>
