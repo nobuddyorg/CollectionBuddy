@@ -46,7 +46,7 @@ It is designed for keeping a structured personal record of collected items rathe
 ## Features
 
 - **Photo-first entries**: one photo, a pair, or a whole strip. Phone photos are compressed to WebP (JPEG in Safari and on iOS) in the browser before upload, so there's no manual resizing.
-- **Coin cut-outs, if you want them**: turn on **Cut out coins** in the account menu and each photo is offered with its background removed, next to the original, before it uploads. It runs entirely in your browser; the model is downloaded once (about 90 MB), and nothing changes for anyone who leaves it off.
+- **Background removal, if you want it**: turn on **Remove backgrounds** in the account menu and each photo is offered without its background, next to the original, before it uploads: a coin, a stamp, whatever you collect. It runs entirely in your browser; the model is downloaded once (about 90 MB), and nothing changes for anyone who leaves it off.
 - **Categories** to keep collections apart, with **sharing** so someone else can browse yours — read-only by default, or with edit access if you grant it.
 - **Place and map**: give an item a location, then see your whole collection pinned on a map.
 - **Tags and search** across title, description, place, and tags at once.
@@ -80,4 +80,4 @@ CollectionBuddy is a personal hobby project and doesn't accept outside pull requ
 
 This project is licensed under the MIT License.
 
-The optional coin cut-out uses third-party components under their own licenses, none of them copyleft: the [ISNet](https://github.com/xuebinqin/DIS) segmentation model (Apache-2.0), in the ONNX export published by [rembg](https://github.com/danielgatis/rembg) (MIT), run by [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (MIT). It deliberately does not use `@imgly/background-removal`, which is AGPL-3.0 (a commercial license is available from IMG.LY): see [design decisions](docs/explanation/design-decisions.md#why-coin-cut-outs-run-isnet-in-a-worker-and-not-imglybackground-removal).
+The optional background removal uses third-party components under their own licenses, none of them copyleft: the [ISNet](https://github.com/xuebinqin/DIS) segmentation model (Apache-2.0), in the ONNX export published by [rembg](https://github.com/danielgatis/rembg) (MIT), run by [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (MIT). It deliberately does not use `@imgly/background-removal`, which is AGPL-3.0 (a commercial license is available from IMG.LY): see [design decisions](docs/explanation/design-decisions.md#why-background-removal-runs-isnet-in-a-worker-and-not-imglybackground-removal).

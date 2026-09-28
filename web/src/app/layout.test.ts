@@ -40,18 +40,18 @@ describe('the Content-Security-Policy meta tag in layout.tsx', () => {
       "img-src 'self' data: blob: ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org",
     );
     expect(layout).toContain(
-      "connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io ${COIN_MODEL_ORIGIN}`.trimEnd()",
+      "connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io ${MODEL_ORIGIN}`.trimEnd()",
     );
   });
 
-  // The coin cut-out previews the photo and its cut-out from object URLs; nothing is fetched for them.
+  // The background removal previews the photo and its result from object URLs; nothing is fetched for them.
   it('allows a blob: image, and no other new image source', () => {
     expect(policy).toMatch(/img-src[^;]*\bblob:/);
   });
 
-  it('adds the coin model host only when it is a full URL on another origin', () => {
-    expect(layout).toContain('URL.canParse(coinModelPath)');
-    expect(layout).toContain('new URL(coinModelPath).origin');
+  it('adds the model host only when it is a full URL on another origin', () => {
+    expect(layout).toContain('URL.canParse(modelPath)');
+    expect(layout).toContain('new URL(modelPath).origin');
   });
 
   it('allows a worker to be created from a blob: URL', () => {

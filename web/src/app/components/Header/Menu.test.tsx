@@ -37,11 +37,11 @@ async function openMenu() {
 }
 
 describe('Menu', () => {
-  it('offers the coin cut-out, off by default', async () => {
+  it('offers background removal, off by default', async () => {
     await openMenu();
 
     expect(
-      screen.getByRole('checkbox', { name: 'Cut out coins' }),
+      screen.getByRole('checkbox', { name: 'Remove backgrounds' }),
     ).not.toBeChecked();
   });
 

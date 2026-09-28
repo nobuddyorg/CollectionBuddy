@@ -4,7 +4,7 @@ import { initAccountMenu } from './account-menu';
 import { initAppError } from './app-error';
 import { initCatalogue } from './catalogue';
 import { initCategoryPanel } from './category-panel';
-import { initCoinCutoutReview } from './coin-cutout';
+import { initCutoutReview } from './background-removal';
 import { initConfirm, initImageViewer, initToast } from './dialogs';
 import { initEntryForm } from './entry-form';
 import { initHelp } from './help';
@@ -31,8 +31,8 @@ export function createPageTree(page: Page) {
     get categories() {
       return initCategoryPanel(page);
     },
-    get coinCutout() {
-      return initCoinCutoutReview(page);
+    get backgroundRemoval() {
+      return initCutoutReview(page);
     },
     get confirm() {
       return initConfirm(page);

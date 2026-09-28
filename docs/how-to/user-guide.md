@@ -137,19 +137,21 @@ fields a line break becomes a space.
 
 An item can have any number of photos, in the order you added them.
 
-### Cut out a coin
+### Remove the background
 
-Tick **Cut out coins** in the user menu. From then on a photo you add opens a
-review first: the original, and next to it the coin with its background removed,
-on a checkerboard where the background is now transparent. **Use cut-out**
-uploads the cut-out; **Keep original** uploads the photo as it was, and is
-always available, also when no coin was found or the cut-out failed. Closing
-the review uploads nothing.
+Tick **Remove backgrounds** in the user menu. From then on a photo you add opens
+a review first: the original, and next to it the item with its background
+removed, on a checkerboard where the background is now transparent. It works
+for any item, a coin, a stamp, a figurine; several items in one photo are kept
+together. **Use without background** uploads the result; **Keep original**
+uploads the photo as it was, and is always available, also when no item was
+found or the removal failed. Closing the review uploads nothing.
 
-Everything happens in your browser. The first cut-out downloads a model of about
+Everything happens in your browser. The first photo downloads a model of about
 90 MB once, with its progress shown; **Download model now** in the menu does
-that ahead of time, for example on Wi-Fi. A cut-out takes about 20 seconds on
-a desktop computer, longer on a phone. With the box unticked, uploads work exactly as before.
+that ahead of time, for example on Wi-Fi. Removing a background takes about 20
+seconds on a desktop computer, longer on a phone. With the box unticked,
+uploads work exactly as before.
 
 ## Search and pages
 

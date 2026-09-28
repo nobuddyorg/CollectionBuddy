@@ -6,7 +6,7 @@ import { useI18n } from '../../i18n/useI18n';
 import { THEME_PREFERENCES, useTheme } from '../../useTheme';
 import type { MenuProps } from './types';
 import { labelClasses } from '../ui/labelClasses';
-import { CoinCutoutSetting } from '../CoinCutout/CoinCutoutSetting';
+import { BackgroundRemovalSetting } from '../BackgroundRemoval/BackgroundRemovalSetting';
 
 function SegmentedControl<T extends string>({
   value,
@@ -93,7 +93,7 @@ export default function Menu({
         />
       </div>
 
-      <CoinCutoutSetting />
+      <BackgroundRemovalSetting />
 
       <div className="my-1 border-t" />
 

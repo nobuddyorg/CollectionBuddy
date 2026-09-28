@@ -22,8 +22,8 @@ test.describe('when something outside the app fails', () => {
     await on(page).categories.do.open(SEED.failureCategory);
   });
 
-  // The cut-out is an extra, never a gate: with no model to be had, the original still uploads.
-  test('a photo still uploads as it was when the coin model cannot be loaded', async ({
+  // Background removal is an extra, never a gate: with no model to be had, the original still uploads.
+  test('a photo still uploads as it was when the background model cannot be loaded', async ({
     on,
     page,
   }) => {
@@ -34,7 +34,7 @@ test.describe('when something outside the app fails', () => {
         route.fulfill({ status: 404, body: '' }),
       );
     await app.account.do.open();
-    await app.account.do.toggleCoinCutout();
+    await app.account.do.toggleCutout();
     await page.keyboard.press('Escape');
 
     const title = uniqueTitle('Ohne Modell');
@@ -43,13 +43,15 @@ test.describe('when something outside the app fails', () => {
       const card = app.catalogue.card(title);
       await card.do.uploadPhoto(PHOTO);
 
-      await expect(app.coinCutout.locators.status).toHaveText(
+      await expect(app.backgroundRemoval.locators.status).toHaveText(
         'The background could not be removed. The original can still be uploaded.',
         { timeout: 45_000 },
       );
-      await expect(app.coinCutout.locators.original).toBeVisible();
-      await expect(app.coinCutout.locators.buttons.useCutout).toBeDisabled();
-      await app.coinCutout.do.keepOriginal();
+      await expect(app.backgroundRemoval.locators.original).toBeVisible();
+      await expect(
+        app.backgroundRemoval.locators.buttons.useCutout,
+      ).toBeDisabled();
+      await app.backgroundRemoval.do.keepOriginal();
 
       await expect(card.locators.images).toBeVisible({ timeout: 45_000 });
     } finally {
