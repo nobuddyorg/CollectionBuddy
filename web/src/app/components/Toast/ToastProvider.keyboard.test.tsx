@@ -40,9 +40,9 @@ function renderDeletions(...deletions: Deletion[]) {
 const post = (message: string) =>
   fireEvent.click(screen.getByRole('button', { name: message }));
 
-const wait = (ms: number) =>
+const wait = (milliseconds: number) =>
   act(() => {
-    vi.advanceTimersByTime(ms);
+    vi.advanceTimersByTime(milliseconds);
   });
 
 const toast = () => screen.queryByTestId('toast');
