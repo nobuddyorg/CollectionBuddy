@@ -110,9 +110,7 @@ export function initCategoryPanel(page: Page): CategoryPanel {
           await locators.buttons.export.click();
         })(),
       ]);
-      const path = await download.path();
-      if (!path) throw new Error('the export did not save a file to disk');
-      return path;
+      return download.path();
     },
     importArchive: async (file: string) => {
       await openPanel();

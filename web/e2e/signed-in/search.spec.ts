@@ -29,7 +29,7 @@ test.describe('searching a collection', () => {
   });
 
   test('matches on a tag', async ({ on, page }) => {
-    await on(page).catalogue.do.search('silber');
+    await on(page).catalogue.do.search('antik');
     await expectTitles(page, ['Silberdenar']);
   });
 

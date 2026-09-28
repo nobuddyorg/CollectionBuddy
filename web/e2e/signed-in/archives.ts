@@ -52,9 +52,13 @@ function localFileHeader({ nameLength }: { nameLength: number }): Buffer {
   return header;
 }
 
-type Sizes = { crc: number; compressedSize: number; size: number };
+type EntryDescriptor = { crc: number; compressedSize: number; size: number };
 
-function dataDescriptor({ crc, compressedSize, size }: Sizes): Buffer {
+function dataDescriptor({
+  crc,
+  compressedSize,
+  size,
+}: EntryDescriptor): Buffer {
   const descriptor = Buffer.alloc(16);
   descriptor.writeUInt32LE(DATA_DESCRIPTOR_SIGNATURE, 0);
   descriptor.writeUInt32LE(crc, 4);
@@ -69,7 +73,7 @@ function centralDirectoryHeader({
   compressedSize,
   size,
   offset,
-}: Sizes & { nameLength: number; offset: number }): Buffer {
+}: EntryDescriptor & { nameLength: number; offset: number }): Buffer {
   const header = Buffer.alloc(46);
   header.writeUInt32LE(CENTRAL_DIRECTORY_SIGNATURE, 0);
   header.writeUInt16LE(0x031e, 4);

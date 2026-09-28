@@ -173,7 +173,7 @@ export const SEED = {
 
   // Oldest first; the list sorts newest first, so the last one here is the first card on the page.
   items: [
-    // The Münzen entries: each term search.spec.ts types matches one of them through a different column.
+    // The Münzen entries: search.spec.ts's title, description, place and tag cases each match through that column alone.
     {
       category: 'Münzen',
       title: 'Silberdenar',

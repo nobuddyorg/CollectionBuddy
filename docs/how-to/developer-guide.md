@@ -121,17 +121,18 @@ reads as the journey it is. [TEST_STRATEGY.md](../../TEST_STRATEGY.md) §9 has
 the shape and the rules; the screens are:
 
 - `catalogue` — grid, search box, pagination; `card(title)` for one entry and
-  its photos
-- `categories` — the collection strip, the panel behind it, `tab(name)`
+  its photos; `do.waitForCardsSettled()` before an axe scan
+- `categories` — the collection strip, the panel behind it, `tab(name)`;
+  `do.load()` to open the app, `do.downloadExport()` for an archive on disk
 - `form` — the entry form, tag chips, place autocomplete
 - `sharing` — the invite box; `row(email)` for a grant's role, expiry, revoke
 - `map`, `viewer`, `confirm`, `toast`, `account`, `login`, `appError`
 
-Leaflet's pins and popups are the one thing reached by class name, inside
-`e2e/pages/map.ts`: that markup is the library's. A new case that needs an
-element with no id adds the id to the component and a locator to the page
-object. The grep that keeps this honest should return only `html`, `body`,
-`meta` and `link` assertions:
+Leaflet's own DOM (container, zoom control, pins, popup) is the one thing
+reached by class name, inside `e2e/pages/map.ts`: that markup is the library's.
+A new case that needs an element with no id adds the id to the component and a
+locator to the page object. The grep that keeps this honest should return only
+`html`, `body`, `meta` and `link` assertions:
 
 ```bash
 grep -rn 'getByTestId\|getByRole\|locator(' web/e2e --include=*.spec.ts
