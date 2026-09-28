@@ -10,7 +10,7 @@ export type IconDefaultPrivate = Icon.Default & {
 export interface MarkerInput extends Coordinates {
   popupText: string;
   /** The entries catalogued at this place, named under it in the popup. */
-  titles?: string[];
+  titles: string[];
   /** Already translated: the map draws Leaflet layers, not React, and has no i18n of its own. */
   countLabel?: string;
 }
@@ -25,8 +25,10 @@ export interface MapCommand {
 
 export interface MapProps {
   markers: MarkerInput[];
-  currentLocation?: Coordinates & { popupText?: string };
+  currentLocation?: Coordinates & { popupText: string };
   command?: MapCommand | null;
+  /** Already translated, as countLabel is; read once, as the language cannot change while the map is open. */
+  labels: { zoomIn: string; zoomOut: string; attribution: string };
 }
 
 /** Exactly what the geocode cache holds: coordinates stay true whatever entries are catalogued there. */

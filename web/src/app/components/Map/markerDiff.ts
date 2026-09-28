@@ -6,7 +6,7 @@ export function markerKey(marker: MarkerInput): string {
     marker.lat,
     marker.lng,
     marker.popupText,
-    marker.titles ?? [],
+    marker.titles,
     marker.countLabel ?? '',
   ]);
 }

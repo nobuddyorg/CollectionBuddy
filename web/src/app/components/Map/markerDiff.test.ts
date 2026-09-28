@@ -10,7 +10,12 @@ const berlin: MarkerInput = {
   titles: ['Dime'],
   countLabel: '1 entry',
 };
-const paris: MarkerInput = { lat: 48.9, lng: 2.35, popupText: 'Paris' };
+const paris: MarkerInput = {
+  lat: 48.9,
+  lng: 2.35,
+  popupText: 'Paris',
+  titles: [],
+};
 
 describe('markerKey', () => {
   it('is the same for two pins that would draw identically', () => {
@@ -27,10 +32,8 @@ describe('markerKey', () => {
     expect(markerKey({ ...berlin, ...change })).not.toBe(markerKey(berlin));
   });
 
-  it('reads missing titles and count label as empty', () => {
-    expect(markerKey(paris)).toBe(
-      markerKey({ ...paris, titles: [], countLabel: '' }),
-    );
+  it('reads a missing count label as empty', () => {
+    expect(markerKey(paris)).toBe(markerKey({ ...paris, countLabel: '' }));
   });
 });
 

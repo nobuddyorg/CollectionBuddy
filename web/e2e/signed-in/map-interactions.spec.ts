@@ -48,6 +48,26 @@ test.describe('the map, up close', () => {
   });
 });
 
+test.describe('the map, in German', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('lang', 'de'));
+  });
+
+  // Leaflet builds both itself, and left alone it labels them in English whatever the app's language.
+  test('labels its zoom control and attribution in the app language', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await openMap(app);
+
+    await expect(app.map.locators.buttons.zoomIn).toHaveAccessibleName(
+      'Vergrößern',
+    );
+    await expect(app.map()).toContainText('OpenStreetMap Mitwirkende');
+  });
+});
+
 test.describe('the map, with a location to show', () => {
   test.use({
     geolocation: { latitude: 52.52, longitude: 13.405 },
