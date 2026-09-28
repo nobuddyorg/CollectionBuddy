@@ -72,7 +72,7 @@ export function findTrailer(tail: Uint8Array, tailStart: number): Trailer {
       view.getUint32(at, true) === END_OF_CENTRAL_DIR_SIGNATURE &&
       view.getUint16(at + 20, true) === commentLength
     ) {
-      return readTrailer(view, at, tailStart);
+      return readTrailer(view, { at, tailStart });
     }
   }
   throw new ZipReadError(
@@ -80,7 +80,10 @@ export function findTrailer(tail: Uint8Array, tailStart: number): Trailer {
   );
 }
 
-function readTrailer(view: DataView, at: number, tailStart: number): Trailer {
+function readTrailer(
+  view: DataView,
+  { at, tailStart }: { at: number; tailStart: number },
+): Trailer {
   const entryCount = view.getUint16(at + 10, true);
   // Both disk numbers at once: zero reads the same in either byte order.
   const splitAcrossDisks =

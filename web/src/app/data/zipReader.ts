@@ -21,7 +21,10 @@ import {
 /** Reads an entry's bytes out of the archive; until called, nothing past the directory is loaded. */
 export type ZipEntryReader = () => Promise<Blob>;
 
-async function readRange(blob: Blob, start: number, end: number) {
+async function readRange(
+  blob: Blob,
+  { start, end }: { start: number; end: number },
+) {
   return new Uint8Array(await blob.slice(start, end).arrayBuffer());
 }
 
@@ -37,7 +40,10 @@ async function dataStartOf(
 ): Promise<number> {
   const headerEnd =
     record.localOffset + LOCAL_HEADER_BYTES + record.nameBytes.length;
-  const header = await readRange(archive, record.localOffset, headerEnd);
+  const header = await readRange(archive, {
+    start: record.localOffset,
+    end: headerEnd,
+  });
   const view = dataViewOf(header);
   const agrees =
     view.getUint32(0, true) === LOCAL_HEADER_SIGNATURE &&
@@ -55,8 +61,7 @@ async function dataStartOf(
 /** Inflates into exactly `size` bytes, cancelling the stream the moment it produces more. */
 export async function inflateExactly(
   compressed: Blob,
-  size: number,
-  name: string,
+  { size, name }: Pick<CentralRecord, 'size' | 'name'>,
 ): Promise<Uint8Array<ArrayBuffer>> {
   const output = new Uint8Array(size);
   const reader = compressed
@@ -89,8 +94,7 @@ export async function inflateExactly(
 /** Reads, inflates and checks one entry; a stored entry stays a slice of the file, not a copy. */
 function entryReader(
   archive: Blob,
-  record: CentralRecord,
-  end: number,
+  { record, end }: { record: CentralRecord; end: number },
 ): ZipEntryReader {
   return async () => {
     const dataStart = await dataStartOf(archive, record);
@@ -103,7 +107,7 @@ function entryReader(
     const stored = record.method === METHOD_STORE;
     const bytes = stored
       ? new Uint8Array(await data.arrayBuffer())
-      : await inflateExactly(data, record.size, record.name);
+      : await inflateExactly(data, record);
     if (crc32(bytes) !== record.crc) {
       throw new ZipReadError(
         `Corrupt archive: "${record.name}" fails its checksum`,
@@ -123,11 +127,14 @@ export async function openZip(
   }
   const tailStart = Math.max(0, archive.size - MAX_TRAILER_SEARCH);
   const trailer = findTrailer(
-    await readRange(archive, tailStart, archive.size),
+    await readRange(archive, { start: tailStart, end: archive.size }),
     tailStart,
   );
   const records = parseCentralDirectory(
-    await readRange(archive, trailer.directoryOffset, trailer.at),
+    await readRange(archive, {
+      start: trailer.directoryOffset,
+      end: trailer.at,
+    }),
     trailer.entryCount,
   );
   assertWithinReadLimits(records, limits);
@@ -135,7 +142,7 @@ export async function openZip(
   return new Map(
     records.map((record) => [
       record.name,
-      entryReader(archive, record, ends.get(record)!),
+      entryReader(archive, { record, end: ends.get(record)! }),
     ]),
   );
 }

@@ -31,16 +31,16 @@ describe('dosDateTime, for any date', () => {
         expect(packed.time).toBeGreaterThanOrEqual(0);
         expect(packed.time).toBeLessThan(0x10000);
 
-        const d = decode(packed);
-        expect(d.year).toBeGreaterThanOrEqual(1980);
-        expect(d.year).toBeLessThanOrEqual(2107);
-        expect(d.month).toBeGreaterThanOrEqual(1);
-        expect(d.month).toBeLessThanOrEqual(12);
-        expect(d.day).toBeGreaterThanOrEqual(1);
-        expect(d.day).toBeLessThanOrEqual(31);
-        expect(d.hours).toBeLessThanOrEqual(23);
-        expect(d.minutes).toBeLessThanOrEqual(59);
-        expect(d.seconds).toBeLessThanOrEqual(58);
+        const decoded = decode(packed);
+        expect(decoded.year).toBeGreaterThanOrEqual(1980);
+        expect(decoded.year).toBeLessThanOrEqual(2107);
+        expect(decoded.month).toBeGreaterThanOrEqual(1);
+        expect(decoded.month).toBeLessThanOrEqual(12);
+        expect(decoded.day).toBeGreaterThanOrEqual(1);
+        expect(decoded.day).toBeLessThanOrEqual(31);
+        expect(decoded.hours).toBeLessThanOrEqual(23);
+        expect(decoded.minutes).toBeLessThanOrEqual(59);
+        expect(decoded.seconds).toBeLessThanOrEqual(58);
       }),
     );
   });
