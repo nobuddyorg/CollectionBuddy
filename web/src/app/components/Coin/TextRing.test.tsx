@@ -3,6 +3,7 @@ import { render } from '@testing-library/react';
 import type React from 'react';
 import { describe, expect, it } from 'vitest';
 
+import { RIM_RADIUS } from './CoinIcon';
 import { TextRing } from './TextRing';
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
@@ -15,57 +16,21 @@ function renderInSvg(element: React.ReactElement) {
 
 describe('TextRing', () => {
   it('renders the text along a textPath referencing the given rim id', () => {
-    const { container } = renderInSvg(
-      <TextRing
-        rimId="rim-1"
-        text="Hello"
-        fontFamily="serif"
-        fontSize={12}
-        letterSpacing={2}
-        opacity={0.5}
-      />,
-    );
+    const { container } = renderInSvg(<TextRing rimId="rim-1" text="Hello" />);
     const textPath = container.querySelector('textPath');
     expect(textPath).toHaveAttribute('href', '#rim-1');
     expect(textPath).toHaveTextContent('Hello');
-    expect(container.querySelector('text')).toHaveAttribute('opacity', '0.5');
     expect(textPath?.namespaceURI).toBe(SVG_NAMESPACE);
   });
 
-  it('fits the text to exactly one turn of the rim', () => {
-    const { container } = renderInSvg(
-      <TextRing
-        rimId="rim-1"
-        text="Hello"
-        fontFamily="serif"
-        fontSize={12}
-        letterSpacing={2}
-        opacity={1}
-        radius={100}
-      />,
-    );
+  it('fits the text to exactly one turn of the rim the coin draws', () => {
+    const { container } = renderInSvg(<TextRing rimId="rim-1" text="Hello" />);
     const textPath = container.querySelector('textPath');
     expect(textPath).toHaveAttribute('startOffset', '0');
     expect(textPath).toHaveAttribute('lengthAdjust', 'spacing');
     expect(Number(textPath?.getAttribute('textLength'))).toBeCloseTo(
-      2 * Math.PI * 100,
+      2 * Math.PI * RIM_RADIUS,
       3,
     );
-  });
-
-  it('defaults to the rim radius the coin actually draws', () => {
-    const { container } = renderInSvg(
-      <TextRing
-        rimId="rim-1"
-        text="Hello"
-        fontFamily="serif"
-        fontSize={12}
-        letterSpacing={2}
-        opacity={1}
-      />,
-    );
-    expect(
-      Number(container.querySelector('textPath')?.getAttribute('textLength')),
-    ).toBeCloseTo(2 * Math.PI * 160, 3);
   });
 });

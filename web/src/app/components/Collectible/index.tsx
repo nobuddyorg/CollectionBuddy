@@ -9,37 +9,25 @@ type CSSVarStyle = React.CSSProperties & {
   ['--delay']?: string;
 };
 
-function joinClasses(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(' ');
-}
+const SIZE_PX = 44;
 
 // Grayscaled: bright emoji would bring their own color into an achromatic system.
-function CollectibleComponent({
-  delay,
-  emoji,
-  x,
-  y,
-  size = 44,
-  className,
-}: CollectibleProps) {
+function CollectibleComponent({ delay, emoji, x, y }: CollectibleProps) {
   const style: CSSVarStyle = useMemo(
     () => ({
-      width: `${size}px`,
-      height: `${size}px`,
+      width: `${SIZE_PX}px`,
+      height: `${SIZE_PX}px`,
       ['--delay']: `${delay}s`,
       ['--x']: x,
       ['--y']: y,
     }),
-    [size, delay, x, y],
+    [delay, x, y],
   );
 
   return (
     <div
       data-testid="collectible"
-      className={joinClasses(
-        'collectible-bob absolute z-0 select-none pointer-events-none',
-        className,
-      )}
+      className="collectible-bob absolute z-0 select-none pointer-events-none"
       style={style}
       aria-hidden="true"
     >

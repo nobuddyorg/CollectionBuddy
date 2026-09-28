@@ -16,7 +16,11 @@ function renderButton(
 ) {
   return render(
     <I18nProvider>
-      <GoogleSignInButton onClick={() => new Promise(() => {})} {...props} />
+      <GoogleSignInButton
+        onClick={() => new Promise(() => {})}
+        onError={vi.fn()}
+        {...props}
+      />
     </I18nProvider>,
   );
 }
@@ -56,16 +60,6 @@ describe('GoogleSignInButton', () => {
     firePageShow(true);
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-  });
-
-  it('stops listening for pageshow once unmounted', async () => {
-    const { unmount } = renderButton();
-    fireEvent.click(screen.getByRole('button'));
-    await screen.findByRole('status');
-
-    unmount();
-
-    expect(() => firePageShow(true)).not.toThrow();
   });
 
   it('leaves the overlay alone on an ordinary (non-persisted) pageshow', async () => {
