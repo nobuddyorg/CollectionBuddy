@@ -4,6 +4,8 @@ import type { Database } from './data/database.types';
 import { removeStoredValue } from './lib/browserStorage';
 import { requireEnv } from './lib/env';
 
+export { isAuthRetryableFetchError } from '@supabase/supabase-js';
+
 // Read as a literal `process.env.NEXT_PUBLIC_X` expression, the only form Next's static export inlines.
 const url = requireEnv(
   'NEXT_PUBLIC_SUPABASE_URL',
