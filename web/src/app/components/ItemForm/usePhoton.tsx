@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SEARCH_MIN_LENGTH } from '../../data/itemSearch';
+import { useSyncedRef } from '../../lib/useSyncedRef';
 import {
   coordsFromFeature,
   photonLang,
@@ -13,12 +14,10 @@ import type { PlaceChoice } from './types';
 const SEARCH_DEBOUNCE_MS = 300;
 const PLACE_SUGGESTION_LIMIT = 5;
 
-type RegionNames = Intl.DisplayNames | null;
-
 export function formatPlaceDisplay(
   properties: PhotonFeature['properties'],
-  regionNames: RegionNames,
-): { city: string; line2: string; key: string } {
+  regionNames: Intl.DisplayNames,
+): { city: string; country: string | undefined; line2: string; key: string } {
   const city =
     properties.city ||
     properties.town ||
@@ -28,7 +27,7 @@ export function formatPlaceDisplay(
     '';
   const country =
     properties.country ||
-    (properties.countrycode && regionNames
+    (properties.countrycode
       ? regionNames.of(properties.countrycode.toUpperCase())
       : undefined);
   const line2 = [properties.state, country].filter(Boolean).join(', ');
@@ -36,13 +35,22 @@ export function formatPlaceDisplay(
   const normalize = (text: string) =>
     text.toLowerCase().replace(/\s+/g, ' ').trim();
   const key = `${normalize(city)}|||${normalize(line2)}`;
-  return { city, line2, key };
+  return { city, country, line2, key };
+}
+
+export function placeLabel(
+  properties: PhotonFeature['properties'],
+  regionNames: Intl.DisplayNames,
+): string {
+  const { city, country } = formatPlaceDisplay(properties, regionNames);
+  const suffix = country || properties.state;
+  return suffix ? `${city}, ${suffix}` : city;
 }
 
 // First by OSM id, then by rendered display: differently-tagged nodes for one city format identically.
 export function dedupePhotonFeatures(
   features: PhotonFeature[],
-  regionNames: RegionNames,
+  regionNames: Intl.DisplayNames,
 ): PhotonFeature[] {
   const uniqueByOsm = Array.from(
     new Map(
@@ -65,7 +73,13 @@ export function isQueryLongEnough(query: string): boolean {
   return query.trim().length >= SEARCH_MIN_LENGTH;
 }
 
-export function usePhotonSearch(language?: string) {
+export function usePhotonSearch({
+  language,
+  onPick,
+}: {
+  language?: string;
+  onPick: (choice: PlaceChoice) => void;
+}) {
   const [query, setQuery] = useState('');
   const [focus, setFocus] = useState(false);
   const [results, setResults] = useState<PhotonFeature[]>([]);
@@ -79,18 +93,12 @@ export function usePhotonSearch(language?: string) {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const onPickRef = useSyncedRef(onPick);
 
   const lang = useMemo(() => photonLang(language), [language]);
-
-  const DisplayNamesConstructor = (
-    Intl as { DisplayNames?: typeof Intl.DisplayNames }
-  ).DisplayNames;
-  const regionNames: RegionNames = useMemo(
-    () =>
-      DisplayNamesConstructor
-        ? new DisplayNamesConstructor([lang], { type: 'region' })
-        : null,
-    [DisplayNamesConstructor, lang],
+  const regionNames = useMemo(
+    () => new Intl.DisplayNames([lang], { type: 'region' }),
+    [lang],
   );
 
   const formatDisplay = useCallback(
@@ -167,21 +175,21 @@ export function usePhotonSearch(language?: string) {
   }, [focus]);
 
   const choose = useCallback(
-    (hit: PhotonFeature): PlaceChoice => {
-      const { city, line2 } = formatDisplay(hit.properties);
-      const countryOnly = line2.split(', ').pop() || '';
-      const label = countryOnly ? `${city}, ${countryOnly}` : city;
+    (hit: PhotonFeature) => {
       setResults([]);
       setActiveIndex(-1);
       setFocus(false);
       // The one moment the app knows where the picked place is; dropped, the map would re-geocode it.
-      return { label, coords: coordsFromFeature(hit) };
+      onPickRef.current({
+        label: placeLabel(hit.properties, regionNames),
+        coords: coordsFromFeature(hit),
+      });
     },
-    [formatDisplay],
+    [regionNames, onPickRef],
   );
 
   const onKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLInputElement>): PlaceChoice | undefined => {
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (!results.length) return;
       if (event.key === 'ArrowDown') {
         event.preventDefault();
@@ -194,8 +202,7 @@ export function usePhotonSearch(language?: string) {
       } else if (event.key === 'Enter') {
         event.preventDefault();
         // Clamped, not branched: with nothing highlighted Enter picks the first.
-        const selected = results[Math.max(activeIndex, 0)];
-        if (selected) return choose(selected);
+        choose(results[Math.max(activeIndex, 0)]);
       } else if (event.key === 'Escape') {
         // Left to bubble, the keystroke reaches the modal's Escape listener and closes the whole form.
         event.preventDefault();
@@ -208,7 +215,6 @@ export function usePhotonSearch(language?: string) {
   );
 
   return {
-    query,
     setQuery,
     focus,
     setFocus,
@@ -217,7 +223,6 @@ export function usePhotonSearch(language?: string) {
     error,
     searched,
     activeIndex,
-    setActiveIndex,
     dropdownRef,
     inputRef,
     menuRef,

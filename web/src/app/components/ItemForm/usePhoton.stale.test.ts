@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { act, renderHook } from '@testing-library/react';
+import { act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { usePhotonSearch } from './usePhoton';
-import { feature } from './usePhoton.test-support';
+import { renderPhotonSearch, searchFor } from './usePhoton.hook.test-support';
+import { feature, photonAnswer } from './usePhoton.test-support';
 
 /** A fetch response settled by the test, plus whether it honours its abort signal. */
 function deferredResponse() {
@@ -22,19 +22,6 @@ function deferredResponse() {
   return { response, resolve, reject, abortable };
 }
 
-async function searchFor(
-  result: { current: ReturnType<typeof usePhotonSearch> },
-  query: string,
-) {
-  act(() => {
-    result.current.setFocus(true);
-    result.current.setQuery(query);
-  });
-  await act(async () => {
-    await vi.advanceTimersByTimeAsync(300);
-  });
-}
-
 describe('usePhotonSearch superseded requests', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -51,13 +38,10 @@ describe('usePhotonSearch superseded requests', () => {
     const fetchMock = vi
       .fn()
       .mockImplementationOnce(first.abortable)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ features: [feature(1, { city: 'Cologne' })] }),
-      });
+      .mockResolvedValueOnce(photonAnswer([feature(1, { city: 'Cologne' })]));
     vi.stubGlobal('fetch', fetchMock);
 
-    const { result } = renderHook(() => usePhotonSearch('en'));
+    const { result } = renderPhotonSearch();
     await searchFor(result, 'Col');
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.current.loading).toBe(true);
@@ -84,7 +68,7 @@ describe('usePhotonSearch superseded requests', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
-    const { result } = renderHook(() => usePhotonSearch('en'));
+    const { result } = renderPhotonSearch();
     await searchFor(result, 'Col');
     await searchFor(result, 'Colo');
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -107,7 +91,7 @@ describe('usePhotonSearch superseded requests', () => {
     const fetchMock = vi.fn().mockImplementationOnce(pending.abortable);
     vi.stubGlobal('fetch', fetchMock);
 
-    const { result } = renderHook(() => usePhotonSearch('en'));
+    const { result } = renderPhotonSearch();
     await searchFor(result, 'Col');
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -131,26 +115,20 @@ describe('usePhotonSearch superseded requests', () => {
       .mockImplementationOnce(() => second.response);
     vi.stubGlobal('fetch', fetchMock);
 
-    const { result } = renderHook(() => usePhotonSearch('en'));
+    const { result } = renderPhotonSearch();
     await searchFor(result, 'Col');
     await searchFor(result, 'Colo');
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     await act(async () => {
-      second.resolve({
-        ok: true,
-        json: async () => ({ features: [feature(2, { city: 'Colmar' })] }),
-      });
+      second.resolve(photonAnswer([feature(2, { city: 'Colmar' })]));
     });
     expect(result.current.results).toEqual([feature(2, { city: 'Colmar' })]);
     expect(result.current.loading).toBe(false);
 
     // The stale first request must not overwrite the results, reopen `loading`, or mark `searched` again.
     await act(async () => {
-      first.resolve({
-        ok: true,
-        json: async () => ({ features: [feature(1, { city: 'Cologne' })] }),
-      });
+      first.resolve(photonAnswer([feature(1, { city: 'Cologne' })]));
     });
     expect(result.current.results).toEqual([feature(2, { city: 'Colmar' })]);
     expect(result.current.loading).toBe(false);
@@ -169,15 +147,12 @@ describe('usePhotonSearch superseded requests', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
-    const { result } = renderHook(() => usePhotonSearch('en'));
+    const { result } = renderPhotonSearch();
     await searchFor(result, 'Col');
     await searchFor(result, 'Colo');
 
     await act(async () => {
-      second.resolve({
-        ok: true,
-        json: async () => ({ features: [feature(2, { city: 'Colmar' })] }),
-      });
+      second.resolve(photonAnswer([feature(2, { city: 'Colmar' })]));
     });
     expect(result.current.results).toEqual([feature(2, { city: 'Colmar' })]);
     expect(result.current.error).toBe(false);

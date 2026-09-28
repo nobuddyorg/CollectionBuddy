@@ -1,6 +1,6 @@
 import type { PhotonFeature } from '../../data/photon';
 
-export function props(
+export function placeProperties(
   partial: Partial<PhotonFeature['properties']> = {},
 ): PhotonFeature['properties'] {
   return {
@@ -14,7 +14,11 @@ export function feature(
   partial: Partial<PhotonFeature['properties']> = {},
 ): PhotonFeature {
   return {
-    properties: props({ osm_id, ...partial }),
+    properties: placeProperties({ osm_id, ...partial }),
     geometry: { type: 'Point', coordinates: [0, 0] },
   };
+}
+
+export function photonAnswer(features: PhotonFeature[] = []) {
+  return { ok: true, json: async () => ({ features }) };
 }
