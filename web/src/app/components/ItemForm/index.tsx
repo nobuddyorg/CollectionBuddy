@@ -12,7 +12,6 @@ import { MAX_DESCRIPTION_LENGTH, MAX_TITLE_LENGTH } from '../../lib/textLimits';
 import { buttonClasses } from '../ui/buttonClasses';
 
 export type { ItemFormValues } from './types';
-export { EMPTY_ITEM_FORM_VALUES } from './types';
 
 // `block` on all four labels or none: an inline label's line box pushes its field out of alignment.
 const LABEL = 'block text-xs font-medium text-muted-foreground';
@@ -28,27 +27,27 @@ export default function ItemForm({
   const { t } = useI18n();
 
   // Callers reset by changing `key`; resyncing on `initial` identity would clear typing on any re-render.
-  const [title, setTitle] = useState(initial.title ?? '');
-  const [description, setDescription] = useState(initial.description ?? '');
-  const [place, setPlace] = useState(initial.place ?? '');
+  const [title, setTitle] = useState(initial.title);
+  const [description, setDescription] = useState(initial.description);
+  const [place, setPlace] = useState(initial.place);
   // Carried through untouched unless the field is edited, so editing a title keeps the place's coordinates.
   const [placeCoords, setPlaceCoords] = useState<Coordinates | null>(
     initial.place_lat != null && initial.place_lng != null
       ? { lat: initial.place_lat, lng: initial.place_lng }
       : null,
   );
-  const [tags, setTags] = useState<string[]>(initial.tags ?? []);
+  const [tags, setTags] = useState<string[]>(initial.tags);
   const [titleTouched, setTitleTouched] = useState(false);
 
   // `initial` does not change for the life of one mount, so it already is the "nothing typed" baseline.
   const isDirty =
-    title !== (initial.title ?? '') ||
-    description !== (initial.description ?? '') ||
-    place !== (initial.place ?? '') ||
-    (placeCoords?.lat ?? null) !== (initial.place_lat ?? null) ||
-    (placeCoords?.lng ?? null) !== (initial.place_lng ?? null) ||
-    tags.length !== (initial.tags?.length ?? 0) ||
-    tags.some((tag, i) => tag !== initial.tags?.[i]);
+    title !== initial.title ||
+    description !== initial.description ||
+    place !== initial.place ||
+    (placeCoords?.lat ?? null) !== initial.place_lat ||
+    (placeCoords?.lng ?? null) !== initial.place_lng ||
+    tags.length !== initial.tags.length ||
+    tags.some((tag, index) => tag !== initial.tags[index]);
 
   useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -170,11 +169,7 @@ export default function ItemForm({
           </button>
         )}
 
-        <Submit
-          submitting={submitting}
-          disabled={submitting}
-          label={submitLabel}
-        />
+        <Submit submitting={submitting} label={submitLabel} />
       </div>
     </form>
   );
