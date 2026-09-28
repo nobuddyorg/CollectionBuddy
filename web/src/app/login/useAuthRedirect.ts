@@ -17,7 +17,8 @@ export function useAuthRedirect(redirectTo: string) {
     };
     const { data: authListener } = supabase.auth.onAuthStateChange(handler);
 
-    void supabase.auth.getSession().then(({ data }) => {
+    void supabase.auth.getSession().then(({ data, error }) => {
+      if (error) console.error('Restoring the session failed:', error);
       if (data.session) router.replace(redirectTo);
       else setChecking(false);
     });

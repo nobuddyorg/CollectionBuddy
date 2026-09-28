@@ -1,9 +1,13 @@
 /** Delay before retry `attempt` (0-indexed): `baseMs`, then 2x, 4x, and so on, scaled by `share` (full jitter draws it from [0, 1)). */
-export function backoffDelayMs(
-  baseMs: number,
-  attempt: number,
-  share: number,
-): number {
+export function backoffDelayMs({
+  baseMs,
+  attempt,
+  share,
+}: {
+  baseMs: number;
+  attempt: number;
+  share: number;
+}): number {
   return baseMs * 2 ** attempt * share;
 }
 
@@ -33,7 +37,7 @@ export async function retryWithBackoff<T>({
 }): Promise<T> {
   let outcome = await run();
   for (let retry = 0; outcome.retry && retry < maxAttempts - 1; retry += 1) {
-    await sleep(backoffDelayMs(baseMs, retry, jitter()));
+    await sleep(backoffDelayMs({ baseMs, attempt: retry, share: jitter() }));
     outcome = await run();
   }
   return outcome.value;

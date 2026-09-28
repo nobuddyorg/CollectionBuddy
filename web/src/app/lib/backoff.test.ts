@@ -9,19 +9,19 @@ import {
 
 describe('backoffDelayMs', () => {
   it('waits the base delay before the first retry', () => {
-    expect(backoffDelayMs(100, 0, 1)).toBe(100);
+    expect(backoffDelayMs({ baseMs: 100, attempt: 0, share: 1 })).toBe(100);
   });
 
   it('doubles for each further attempt', () => {
-    expect(backoffDelayMs(100, 1, 1)).toBe(200);
-    expect(backoffDelayMs(100, 2, 1)).toBe(400);
-    expect(backoffDelayMs(100, 3, 1)).toBe(800);
+    expect(backoffDelayMs({ baseMs: 100, attempt: 1, share: 1 })).toBe(200);
+    expect(backoffDelayMs({ baseMs: 100, attempt: 2, share: 1 })).toBe(400);
+    expect(backoffDelayMs({ baseMs: 100, attempt: 3, share: 1 })).toBe(800);
   });
 
   it('scales the whole backoff by its share, so a draw of zero waits not at all', () => {
-    expect(backoffDelayMs(100, 2, 0.25)).toBe(100);
-    expect(backoffDelayMs(100, 0, 0.5)).toBe(50);
-    expect(backoffDelayMs(100, 3, 0)).toBe(0);
+    expect(backoffDelayMs({ baseMs: 100, attempt: 2, share: 0.25 })).toBe(100);
+    expect(backoffDelayMs({ baseMs: 100, attempt: 0, share: 0.5 })).toBe(50);
+    expect(backoffDelayMs({ baseMs: 100, attempt: 3, share: 0 })).toBe(0);
   });
 });
 

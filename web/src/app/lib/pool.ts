@@ -16,21 +16,21 @@ export async function runPool<T>({
 }): Promise<void> {
   // One shared iterator is the hand-off: each pull claims the next item exactly once.
   const remaining = items[Symbol.iterator]();
-  let poolError: unknown;
+  const failures: unknown[] = [];
   const runners = Array.from(
     { length: Math.min(concurrency, items.length) },
     async () => {
       for (let step = remaining.next(); !step.done; step = remaining.next()) {
-        if (poolError !== undefined) return;
+        if (failures.length > 0) return;
         try {
           await worker(step.value);
         } catch (error) {
-          if (poolError === undefined) poolError = error;
+          failures.push(error);
           return;
         }
       }
     },
   );
   await Promise.all(runners);
-  if (poolError !== undefined) throwAsError(poolError);
+  if (failures.length > 0) throwAsError(failures[0]);
 }
