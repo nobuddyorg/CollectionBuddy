@@ -263,6 +263,10 @@ Only `main` publishes to the
 [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main);
 locally, the report is `web/reports/mutation/index.html`.
 
+A test written with `it.each` never runs against a mutant: Stryker's per-test
+filter does not match its title, so a mutant only it kills survives. Write the
+cases as plain `it()` calls in a `for` loop instead.
+
 ## Run a load test
 
 k6 scripts in `web/load/`, run by hand against your own `supabase start`

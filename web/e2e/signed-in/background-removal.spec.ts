@@ -174,6 +174,12 @@ test.describe('background removal', () => {
     await turnOnBackgroundRemoval(app, page);
     await app.account.do.open();
     expect(requests).toEqual([]);
+    // Off the account button, whose hover state is outside this feature; cards measured mid-fade read as a false positive.
+    await page.mouse.move(0, 0);
+    await expect(app.catalogue.locators.cards.first()).toHaveCSS(
+      'opacity',
+      '1',
+    );
     await expectNoSeriousA11yViolations(page, testInfo);
 
     await app.account.do.downloadModel();

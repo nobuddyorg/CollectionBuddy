@@ -303,6 +303,55 @@ describe('analyzeMask', () => {
     expect(count(mask)).toBe(49);
   });
 
+  // Each notch touches exactly one edge, so only that edge's seeds can tell it from a hole.
+  // Plain it() in a loop, not it.each: Stryker's per-test filter never matches an it.each title.
+  for (const [edge, x, y] of [
+    ['top', 2, 0],
+    ['bottom', 2, 4],
+    ['left', 0, 2],
+    ['right', 4, 3],
+  ] as const) {
+    it(`leaves a notch reaching only the ${edge} edge open, but fills a hole`, () => {
+      const alpha = new Uint8Array(5 * 5).fill(255);
+      alpha[y * 5 + x] = 0;
+      alpha[2 * 5 + 2] = 0;
+
+      const { mask } = analyzeMask(alpha, 5, 5)!;
+
+      expect(mask[y * 5 + x]).toBe(0);
+      expect(mask[2 * 5 + 2]).toBe(1);
+    });
+  }
+
+  // On a grey table, so every channel's mean is a real average, not a sum of zeros.
+  for (const [name, channel] of [
+    ['red', 0],
+    ['green', 1],
+    ['blue', 2],
+  ] as const) {
+    it(`judges the ${name} channel by its exact mean: 48 from the table stays open, 49 is filled`, () => {
+      const ring = alphaWhere((x, y) => {
+        const distance = Math.hypot(x - 60, y - 50);
+        return distance <= 40 && distance > 25;
+      });
+      const centre = alphaWhere((x, y) => Math.hypot(x - 60, y - 50) <= 25);
+      const photo = (shift: number) => {
+        const pixels = new Uint8Array(WIDTH * HEIGHT * 4).fill(100);
+        centre.forEach((inside, index) => {
+          if (inside) pixels[index * 4 + channel] = 100 + shift;
+        });
+        return pixels;
+      };
+
+      expect(
+        analyzeMask(ring, WIDTH, HEIGHT, photo(48))!.mask[50 * WIDTH + 60],
+      ).toBe(0);
+      expect(
+        analyzeMask(ring, WIDTH, HEIGHT, photo(49))!.mask[50 * WIDTH + 60],
+      ).toBe(1);
+    });
+  }
+
   it('returns null for an empty mask', () => {
     expect(
       analyzeMask(new Uint8Array(WIDTH * HEIGHT), WIDTH, HEIGHT),
@@ -369,6 +418,10 @@ describe('edgeNeighbours', () => {
 
   it('gives a top-left corner only right and below', () => {
     expect(edgeNeighbours(0, 3, 9)).toEqual([1, 3]);
+  });
+
+  it('gives a bottom-left corner only right and above', () => {
+    expect(edgeNeighbours(6, 3, 9)).toEqual([7, 3]);
   });
 
   it('gives a bottom-right corner only left and above', () => {

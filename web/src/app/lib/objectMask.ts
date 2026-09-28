@@ -97,20 +97,30 @@ function floodFill({
   return count;
 }
 
+/** Labels each four-connected region `include` accepts after its first pixel (index + 1, so 0 stays "not reached"); returns every label's size. */
+function labelRegions({
+  include,
+  marks,
+  width,
+}: {
+  include: (index: number) => boolean;
+  marks: Int32Array;
+  width: number;
+}): Int32Array {
+  const sizes = new Int32Array(marks.length + 1);
+  marks.forEach((_, index) => {
+    const label = index + 1;
+    sizes[label] = floodFill({ seeds: [index], include, marks, label, width });
+  });
+  return sizes;
+}
+
 function significantBlobs(alpha: ArrayLike<number>, width: number) {
   const labels = new Int32Array(alpha.length);
-  const include = (index: number) => isOpaque(alpha[index]);
-  // Each blob is labelled after its first pixel, index + 1, so 0 stays free for "not yet reached".
-  const sizes = new Int32Array(alpha.length + 1);
-  labels.forEach((_, index) => {
-    const label = index + 1;
-    sizes[label] = floodFill({
-      seeds: [index],
-      include,
-      marks: labels,
-      label,
-      width,
-    });
+  const sizes = labelRegions({
+    include: (index) => isOpaque(alpha[index]),
+    marks: labels,
+    width,
   });
   const largest = sizes.reduce((most, size) => Math.max(most, size), 0);
   if (largest === 0) return null;
@@ -131,23 +141,28 @@ function borderIndices(width: number, height: number): number[] {
 }
 
 type Colour = [red: number, green: number, blue: number];
+type RegionStats = { colour: Colour; size: number };
 
-/** Each region's mean colour, keyed by its label; -1 is the background the border reaches. */
-function meanColours(regions: Int32Array, pixels: ArrayLike<number>) {
-  const sums = new Map<number, [...Colour, number]>();
+/** Each region's size and mean colour, keyed by its label; -1 is the background the border reaches, 0 the objects. */
+function regionStats(regions: Int32Array, pixels: ArrayLike<number>) {
+  // Unsigned, so a sum that ever went negative would wrap and show, not cancel out.
+  const sums = new Map<number, Uint32Array>();
   regions.forEach((region, index) => {
-    const sum = sums.get(region) ?? [0, 0, 0, 0];
+    const sum = sums.get(region) ?? new Uint32Array(4);
     sum[0] += pixels[index * 4];
     sum[1] += pixels[index * 4 + 1];
     sum[2] += pixels[index * 4 + 2];
     sum[3] += 1;
     sums.set(region, sum);
   });
-  const means = new Map<number, Colour>();
-  sums.forEach(([red, green, blue, count], region) =>
-    means.set(region, [red / count, green / count, blue / count]),
+  const stats = new Map<number, RegionStats>();
+  sums.forEach(([red, green, blue, size], region) =>
+    stats.set(region, {
+      colour: [red / size, green / size, blue / size],
+      size,
+    }),
   );
-  return means;
+  return stats;
 }
 
 /** Background is whatever the image border reaches; an enclosed hole is filled if it is small or does not look like that background. */
@@ -171,29 +186,19 @@ function fillHoles({
     label: -1,
     width,
   });
-  // Infinity for the object's own region 0, which is no hole and never small.
-  const holeSizes = new Float64Array(objects.length + 1).fill(Infinity);
-  regions.forEach((_, index) => {
-    const label = index + 1;
-    holeSizes[label] = floodFill({
-      seeds: [index],
-      include: isBackground,
-      marks: regions,
-      label,
-      width,
-    });
-  });
-  const colours = meanColours(regions, pixels);
+  labelRegions({ include: isBackground, marks: regions, width });
+  const stats = regionStats(regions, pixels);
   // No background at all when the object fills the frame's whole border: then no hole can look like it.
-  const background = colours.get(-1) ?? [Infinity, Infinity, Infinity];
-  const area = objects.reduce((sum, inside) => sum + inside, 0);
+  const background = stats.get(-1)?.colour ?? [Infinity, Infinity, Infinity];
+  const largestFilled = stats.get(0)!.size * MAX_FILLED_HOLE_SHARE;
   const filled = new Map<number, boolean>();
-  colours.forEach((colour, region) => {
-    const small = holeSizes[region] <= area * MAX_FILLED_HOLE_SHARE;
+  stats.forEach(({ colour, size }, region) => {
     const distance = Math.hypot(
       ...colour.map((value, channel) => value - background[channel]),
     );
-    filled.set(region, small || distance > BACKGROUND_COLOUR_DISTANCE);
+    const miss = size <= largestFilled || distance > BACKGROUND_COLOUR_DISTANCE;
+    // The background itself is never a hole, however small it is.
+    filled.set(region, region !== -1 && miss);
   });
   return Uint8Array.from(regions, (region, index) =>
     objects[index] === 1 || filled.get(region) === true ? 1 : 0,

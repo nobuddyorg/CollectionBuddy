@@ -101,8 +101,9 @@ describe('cutoutAlpha', () => {
     );
   });
 
+  // Worked by hand: only (2,0) and (0,1) are object, so a wrap across a row end would add a hit.
   it('counts nothing past the left or right edge, nor from the next row', () => {
-    const mask = Uint8Array.from([1, 0, 0, 1, 0, 0]);
+    const mask = Uint8Array.from([0, 0, 1, 1, 0, 0]);
 
     const { alpha } = cutoutAlpha({
       analysis: { ...analysisWith(0), mask },
@@ -111,7 +112,7 @@ describe('cutoutAlpha', () => {
     });
 
     const ninths = (hits: number) => Math.round((hits * 255) / 9);
-    expect(Array.from(alpha)).toEqual([2, 2, 0, 2, 2, 0].map(ninths));
+    expect(Array.from(alpha)).toEqual([1, 2, 1, 1, 2, 1].map(ninths));
   });
 });
 
@@ -203,6 +204,17 @@ describe('cropWithAlpha', () => {
     expect(Array.from(cropped).filter((_, index) => index % 4 === 0)).toEqual([
       4, 5, 7, 8,
     ]);
+  });
+
+  it('keeps bright colours as they are where the cut-out is half transparent', () => {
+    const cropped = cropWithAlpha({
+      pixels: [250, 240, 230, 255],
+      alpha: [100],
+      width: 1,
+      box: { x: 0, y: 0, width: 1, height: 1 },
+    });
+
+    expect(Array.from(cropped)).toEqual([250, 240, 230, 100]);
   });
 
   it('never makes a pixel more opaque than the photo already was', () => {

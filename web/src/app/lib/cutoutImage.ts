@@ -15,21 +15,19 @@ export function fitWithin(size: Size, maxSide: number): Size {
   };
 }
 
-// The pixel and its eight neighbours.
-const NEIGHBOURHOOD = [-1, 0, 1].flatMap((dy) =>
-  [-1, 0, 1].map((dx) => [dx, dy]),
-);
-
 /** Opaque inside, fading over one pixel either side of the edge: a stamp's perforation stays crisp but not jagged. */
 function softEdge(mask: Uint8Array, size: Size): Uint8ClampedArray {
   // Only x can wrap into the next row; a row off the image reads undefined, which is not 1.
   const covered = (x: number, y: number) =>
     x >= 0 && x < size.width && mask[y * size.width + x] === 1;
+  const row = (x: number, y: number) =>
+    [x - 1, x, x + 1].filter((column) => covered(column, y)).length;
   return Uint8ClampedArray.from(mask, (_, index) => {
     const x = index % size.width;
     const y = Math.floor(index / size.width);
-    const hits = NEIGHBOURHOOD.filter(([dx, dy]) => covered(x + dx, y + dy));
-    return (hits.length * 255) / NEIGHBOURHOOD.length;
+    const hits = row(x, y - 1) + row(x, y) + row(x, y + 1);
+    // Nine cells in the pixel's neighbourhood.
+    return (hits * 255) / 9;
   });
 }
 
