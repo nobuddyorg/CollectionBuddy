@@ -143,8 +143,8 @@ grep -rn 'getByTestId\|getByRole\|locator(' web/e2e --include=*.spec.ts
 `npm run e2e` and `npm run e2e:local` collect JS/CSS coverage through
 Playwright's own `page.coverage` (Chromium CDP, no instrumentation step);
 `e2e/global-teardown.ts` merges every worker's data into
-`web/coverage-e2e/index.html`. `i18n.spec.ts` (own browser context) and the
-`firefox` project (no CDP) do not contribute. V8 discards a document's counts
+`web/coverage-e2e/index.html`. The `firefox` project (no CDP) does not
+contribute. V8 discards a document's counts
 on a full navigation, whatever `resetOnNavigation` says, so the fixture
 flushes them before every `page.goto` and `page.reload`; a navigation the
 app triggers itself (the OAuth redirect) still loses what ran before it.
@@ -152,7 +152,10 @@ app triggers itself (the OAuth redirect) still loses what ran before it.
 Only `npm run e2e:local` collects, and it is gated by the floor in
 `e2e/coverage.ts`: it runs every Chromium-based project (`chromium`, `mobile`,
 `signed-in`) against a source-mapped build, so its report is the one complete
-picture. `npm run e2e` collects nothing: its job is Firefox and the
+picture. With collection on, a run that collected nothing, or whose report
+lacks a metric, fails like one below the floor, so a subset run
+(`e2e/signed-in/rls/` alone, say) fails the gate even when every test passes.
+`npm run e2e` collects nothing: its job is Firefox and the
 production-config bundle, and a build without `E2E_COVERAGE_SOURCEMAPS=true`
 (the deploy the smoke test runs against) has no `src/app/**` paths to map to,
 so its "lines" would be a few dozen minified ones.

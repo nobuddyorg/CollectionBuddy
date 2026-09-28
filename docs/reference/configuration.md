@@ -177,7 +177,7 @@ credential](../how-to/developer-guide.md#rotate-a-credential).
 | Unit coverage, per file | same file, `PER_FILE_FLOOR`, over `mutation-targets.mjs` | 100% |
 | Unit coverage, what counts | same file, `coverage.exclude` | Product code only: `*.test.*` (Vitest's own rule) and `*.test-support.*`, the fixtures and fakes a family of test files shares, are test code |
 | Mutation score | `web/stryker.config.mjs` `thresholds.break` | 99 — one below the measured 100, so a single new equivalent mutant cannot block unrelated work |
-| E2E JS/CSS coverage | `web/e2e/coverage.ts` `COVERAGE_THRESHOLDS` | One floor, on `npm run e2e:local` only (every Chromium project, source-mapped); `npm run e2e` and the smoke test collect nothing |
+| E2E JS/CSS coverage | `web/e2e/coverage.ts` `COVERAGE_THRESHOLDS` | One floor, on `npm run e2e:local` only (every Chromium project, source-mapped); a subset run, or one that collected nothing, fails it; `npm run e2e` and the smoke test collect nothing |
 | Lighthouse | `web/lighthouserc.signed-out.json`, `.signed-in.json` | Performance, best-practices and SEO scores plus LCP, TBT, CLS, set from a measured baseline with margin; accessibility at exactly 1.0 |
 
 Every floor is raised by hand when a real run reports a higher number, and never lowered to make a change fit. The global unit floor sits one point under the measured 100% because CI's pinned Node measures about 0.1 pp lower than a local run. `autoUpdate` is off in Vitest: it wrote the local measurement back into the config after every run, so a green local run produced a red PR.
