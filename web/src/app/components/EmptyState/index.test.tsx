@@ -12,11 +12,21 @@ describe('EmptyState', () => {
       </EmptyState>,
     );
 
-    expect(
-      screen.getByRole('heading', { level: 3, name: 'No collections yet' }),
-    ).toBeVisible();
-    expect(screen.getByText('Name one')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Open help' })).toBeVisible();
+    const heading = screen.getByRole('heading', {
+      level: 3,
+      name: 'No collections yet',
+    });
+    const hint = screen.getByText('Name one');
+    const action = screen.getByRole('button', { name: 'Open help' });
+    expect(heading).toBeVisible();
+    expect(hint).toBeVisible();
+    expect(action).toBeVisible();
+    expect(heading.compareDocumentPosition(hint)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(hint.compareDocumentPosition(action)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 
   it('keeps the decorative symbol from screen readers', () => {

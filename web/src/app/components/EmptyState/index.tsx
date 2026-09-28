@@ -5,7 +5,7 @@ type Props = {
   titleId?: string;
   titleTestId?: string;
   children?: React.ReactNode;
-} & React.ComponentProps<'section'>;
+} & Omit<React.ComponentProps<'section'>, 'className'>;
 
 export default function EmptyState({
   symbol,
