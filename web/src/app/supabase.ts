@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from './data/database.types';
+import { removeStoredValue } from './lib/browserStorage';
 
 function requireEnv(name: string, value: string | undefined): string {
   if (!value) {
@@ -26,11 +27,7 @@ export const AUTH_STORAGE_KEY = `sb-${new URL(url).hostname.split('.')[0]}-auth-
 
 /** Removes the stored session, which auth-js's sign-out leaves in place when it cannot refresh an expired one (offline). */
 export function forgetStoredSession(): void {
-  try {
-    window.localStorage.removeItem(AUTH_STORAGE_KEY);
-  } catch {
-    // Refused storage holds no session: auth-js keeps it in memory then, gone with the tab.
-  }
+  removeStoredValue(AUTH_STORAGE_KEY);
 }
 
 export const supabase = createClient<Database>(url, anon, {

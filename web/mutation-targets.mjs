@@ -15,6 +15,7 @@ export const MUTATE_TARGETS = [
   'src/app/lib/pages.ts',
   'src/app/lib/staleBuild.ts',
   'src/app/lib/localDate.ts',
+  'src/app/lib/browserStorage.ts',
   'src/app/components/CategorySelect/useExportCategory.tsx',
   'src/app/components/ItemList/imageEntries.ts',
   'src/app/lib/optimistic.ts',

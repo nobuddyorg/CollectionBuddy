@@ -1,4 +1,9 @@
 import type { CategorySummary } from '../../data/categories';
+import {
+  readStoredValue,
+  removeStoredValue,
+  writeStoredValue,
+} from '../../lib/browserStorage';
 
 // Namespaced: localStorage is shared with everything else served from this origin.
 export const SELECTED_CATEGORY_KEY = 'collectionbuddy.selectedCategory';
@@ -32,20 +37,11 @@ export function nextAfterRemoving<T extends { id: string }>(
   );
 }
 
-// Storage can throw (Safari private mode, cookies blocked); the preference is not worth failing for.
 export function readStoredCategory(): string | null {
-  try {
-    return window.localStorage.getItem(SELECTED_CATEGORY_KEY);
-  } catch {
-    return null;
-  }
+  return readStoredValue(SELECTED_CATEGORY_KEY);
 }
 
 export function storeSelectedCategory(id: string | null) {
-  try {
-    if (id) window.localStorage.setItem(SELECTED_CATEGORY_KEY, id);
-    else window.localStorage.removeItem(SELECTED_CATEGORY_KEY);
-  } catch {
-    // Storage can throw (Safari private mode); the preference is not worth failing for.
-  }
+  if (id) writeStoredValue(SELECTED_CATEGORY_KEY, id);
+  else removeStoredValue(SELECTED_CATEGORY_KEY);
 }

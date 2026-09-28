@@ -174,6 +174,55 @@ describe('useTheme', () => {
   });
 });
 
+describe('useTheme with storage that refuses access', () => {
+  function refuseStorage(method: 'getItem' | 'setItem' | 'removeItem') {
+    vi.spyOn(Storage.prototype, method).mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('renders the system preference when reading storage throws', () => {
+    mockMatchMedia(true);
+    refuseStorage('getItem');
+    const { result } = renderHook(() => useTheme());
+
+    expect(result.current.preference).toBe('system');
+    expect(result.current.resolved).toBe('dark');
+  });
+
+  it('still announces a choice, without an error, when writing storage throws', () => {
+    mockMatchMedia(false);
+    refuseStorage('setItem');
+    refuseStorage('removeItem');
+    const { result } = renderHook(() => useTheme());
+    const heard = vi.fn();
+    window.addEventListener('collectionbuddy:theme', heard);
+
+    expect(() =>
+      act(() => {
+        result.current.setThemePreference('dark');
+      }),
+    ).not.toThrow();
+    expect(() =>
+      act(() => {
+        result.current.setThemePreference('system');
+      }),
+    ).not.toThrow();
+    window.removeEventListener('collectionbuddy:theme', heard);
+
+    expect(heard).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('detectTheme', () => {
   beforeEach(() => {
     localStorage.clear();
