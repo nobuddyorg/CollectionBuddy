@@ -51,6 +51,13 @@ describe('GoogleSignInButton', () => {
     expect(screen.getByRole('button')).not.toBeDisabled();
   });
 
+  it('will not compile without onError, so no caller can swallow a rejected sign-in', () => {
+    // @ts-expect-error -- onError is required so a rejected sign-in cannot be swallowed
+    const withoutOnError = <GoogleSignInButton onClick={() => undefined} />;
+
+    expect(withoutOnError.props).not.toHaveProperty('onError');
+  });
+
   // Nothing clears `loading` on success, so a bfcache restore would leave the overlay stuck.
   it('drops a stuck overlay once the page is restored from bfcache', async () => {
     renderButton();
