@@ -1,13 +1,11 @@
 // #757 (PERF-05): the hourly refresh re-signs every entry the session has shown; Storage refuses more than 1,000 paths a call.
-import encoding from 'k6/encoding';
 import { Counter } from 'k6/metrics';
 
-import { listPage, query } from '../lib/api.js';
+import { PAGE_SIZE, listPage, query, signUrlsRequest } from '../lib/api.js';
+import { RENDERABLE_PLATES, platePaths } from '../lib/flows.js';
 import { LIFECYCLE_TIMEOUTS } from '../lib/options.js';
 import { clearAccount } from '../lib/seed.js';
 import {
-  BUCKET,
-  TINY_WEBP_BASE64,
   attachPhotos,
   call,
   envInt,
@@ -27,10 +25,7 @@ import {
 // The issue's walk: about 28 pages of a large category, two photographs per entry, full size plus thumbnail each.
 const PAGES = envInt('PROOF_PAGES', 28);
 const PHOTOS_EACH = envInt('PROOF_PHOTOS_EACH', 2);
-const PAGE_SIZE = 9;
-// imageEntries.ts RENDERABLE_PLATES = 1 + STRIP_MAX: only these are signed per card.
-const RENDERABLE_PLATES = 5;
-// images.ts ID_FILTER_CHUNK_SIZE, ROW_PAGE_SIZE and SIGN_URLS_BATCH_SIZE.
+// data/postgrestLimits.ts ID_FILTER_CHUNK_SIZE and POSTGREST_MAX_ROWS; images.ts SIGN_URLS_BATCH_SIZE.
 const ID_CHUNK = 100;
 const ROW_PAGE = 1000;
 const SIGN_BATCH = 1000;
@@ -86,21 +81,13 @@ export function setup() {
       session: owner,
       itemIds,
       photosEach: PHOTOS_EACH,
-      bytes: encoding.b64decode(TINY_WEBP_BASE64, 'std'),
     });
     return { owner, categoryId };
   });
 }
 
 function signedPaths({ session, paths, probe }) {
-  const response = call({
-    method: 'POST',
-    path: `/storage/v1/object/sign/${BUCKET}`,
-    session,
-    body: JSON.stringify({ expiresIn: 3600, paths }),
-    headers: { 'Content-Type': 'application/json' },
-    probe,
-  });
+  const response = call({ ...signUrlsRequest({ session, paths }), probe });
   if (response.status !== 200) {
     console.warn(
       `${probe}: ${paths.length} paths -> HTTP ${response.status} ${response.body}`,
@@ -113,16 +100,6 @@ function signedPaths({ session, paths, probe }) {
       .filter((row) => row.signedURL)
       .map((row) => row.path),
   );
-}
-
-function pathsOf(images) {
-  return images
-    .slice(0, RENDERABLE_PLATES)
-    .flatMap((image) =>
-      image.path_thumb
-        ? [image.path_full, image.path_thumb]
-        : [image.path_full],
-    );
 }
 
 /** images.ts listImagesForItems: 100 ids per request, paged at 1,000 rows. */
@@ -154,7 +131,7 @@ export function probe({ owner, categoryId }) {
   const shown = [];
   for (let page = 1; page <= PAGES; page++) {
     const { items } = listPage({ session: owner, categoryId, page });
-    const paths = items.flatMap((item) => pathsOf(item.images));
+    const paths = items.flatMap((item) => platePaths(item.images));
     signedPaths({ session: owner, paths, probe: 'page_sign' });
     shown.push(...items.map((item) => item.id));
   }
@@ -164,7 +141,7 @@ export function probe({ owner, categoryId }) {
   const byItem = new Map();
   for (const image of images)
     byItem.set(image.item_id, [...(byItem.get(image.item_id) ?? []), image]);
-  const wanted = [...byItem.values()].flatMap(pathsOf);
+  const wanted = [...byItem.values()].flatMap(platePaths);
   pathsPerRefresh.add(wanted.length);
   const signed = new Set();
   for (let start = 0; start < wanted.length; start += SIGN_BATCH) {

@@ -2,13 +2,12 @@
 import { check } from 'k6';
 import { Trend } from 'k6/metrics';
 
-import { listPage, query } from '../lib/api.js';
+import { ITEM_FIELDS, PAGE_SIZE, listPage, query } from '../lib/api.js';
 import { LIFECYCLE_TIMEOUTS } from '../lib/options.js';
 import { clearAccount } from '../lib/seed.js';
 import {
   ENTRIES,
   LAST_PAGE,
-  PAGE_SIZE,
   PHOTO_EVERY,
   seedDeepCatalogue,
 } from './lib/deepCatalogue.js';
@@ -21,7 +20,6 @@ import {
 } from './lib/report.js';
 
 const SAMPLES = envInt('PROOF_SAMPLES', 30);
-const ITEM_FIELDS = 'id,title,description,place,place_lat,place_lng,tags';
 // The repo's own p95 budget for a browse request (lib/options.js P95_MS.browse).
 const BROWSE_P95_MS = 150;
 

@@ -15,17 +15,20 @@ export function query(params) {
     .join('&');
 }
 
+export function authHeaders(session) {
+  return {
+    apikey: ANON_KEY,
+    Authorization: `Bearer ${session ? session.token : ANON_KEY}`,
+  };
+}
+
 function prepare({ method, path, session, body = null, headers = {}, name }) {
   return {
     method,
     url: `${SUPABASE_URL}${path}`,
     body,
     params: {
-      headers: {
-        apikey: ANON_KEY,
-        Authorization: `Bearer ${session ? session.token : ANON_KEY}`,
-        ...headers,
-      },
+      headers: { ...authHeaders(session), ...headers },
       tags: { name },
     },
   };
@@ -81,4 +84,9 @@ export function expectOk(response, what) {
     throw new Error(`${what} failed: HTTP ${response.status} ${response.body}`);
   }
   return response;
+}
+
+// PostgREST answers a counted request with `Content-Range: <range>/<total>`.
+export function countedTotal(response) {
+  return Number((response.headers['Content-Range'] ?? '').split('/')[1]);
 }

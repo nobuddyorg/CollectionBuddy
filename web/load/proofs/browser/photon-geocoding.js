@@ -6,6 +6,7 @@ import { Counter, Trend } from 'k6/metrics';
 import { setTimeout } from 'k6/timers';
 
 import { insertRows } from '../../lib/api.js';
+import { expectOk } from '../../lib/http.js';
 import { clearAccount } from '../../lib/seed.js';
 import { ANON_KEY, SUPABASE_URL } from '../../lib/target.js';
 import {
@@ -260,13 +261,16 @@ async function ownerMap() {
 async function viewerMap() {
   const owner = newCollector('photon-owner');
   const email = `proof-photon-viewer-${Date.now()}@collectionbuddy.test`;
-  const signup = http.post(
-    `${SUPABASE_URL}/auth/v1/signup`,
-    JSON.stringify({ email, password: crypto.randomUUID() }),
-    {
-      headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' },
-      tags: { name: 'viewer signup' },
-    },
+  const signup = expectOk(
+    http.post(
+      `${SUPABASE_URL}/auth/v1/signup`,
+      JSON.stringify({ email, password: crypto.randomUUID() }),
+      {
+        headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' },
+        tags: { name: 'viewer signup' },
+      },
+    ),
+    `signing up ${email}`,
   );
   // A local stack confirms sign-ups at once and answers with the whole session supabase-js stores.
   const readerSession = signup.json();

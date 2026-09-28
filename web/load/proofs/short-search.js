@@ -3,6 +3,7 @@ import { check } from 'k6';
 import { Trend } from 'k6/metrics';
 
 import { searchPage } from '../lib/api.js';
+import { expectOk } from '../lib/http.js';
 import { LIFECYCLE_TIMEOUTS } from '../lib/options.js';
 import { NOUNS, clearAccount } from '../lib/seed.js';
 import {
@@ -109,9 +110,7 @@ export function setup() {
 
 // A failed request ends the iteration before its verdict, so the report says INCONCLUSIVE rather than counting 0 matches.
 function totalOf(response) {
-  if (response.status !== 200)
-    throw new Error(`search RPC: HTTP ${response.status} ${response.body}`);
-  const rows = response.json();
+  const rows = expectOk(response, 'search RPC').json();
   return rows.length ? rows[0].total_count : 0;
 }
 

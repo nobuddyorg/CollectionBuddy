@@ -1,15 +1,22 @@
 // #780: export and category delete read photos in 100-id chunks (PERF-14, ~400 extra requests each at 40,000 entries); a search page costs a third round trip (PERF-13). Mirrors the fixed client.
 import http from 'k6/http';
-import encoding from 'k6/encoding';
 import { Trend } from 'k6/metrics';
 
-import { countItems, listPage, query, searchPage } from '../lib/api.js';
+import {
+  ITEM_FIELDS,
+  countItems,
+  listPage,
+  query,
+  searchPage,
+  signUrlsRequest,
+} from '../lib/api.js';
+import { platePaths } from '../lib/flows.js';
+import { authHeaders, expectOk } from '../lib/http.js';
 import { LIFECYCLE_TIMEOUTS } from '../lib/options.js';
 import { NOUNS, clearAccount } from '../lib/seed.js';
-import { ANON_KEY, SUPABASE_URL } from '../lib/target.js';
+import { SUPABASE_URL } from '../lib/target.js';
 import {
   BUCKET,
-  TINY_WEBP_BASE64,
   attachPhotos,
   call,
   envInt,
@@ -30,15 +37,12 @@ import {
 const ENTRIES = envInt('PROOF_ENTRIES', 40000);
 const PHOTO_EVERY = envInt('PROOF_PHOTO_EVERY', 10);
 const SAMPLES = envInt('PROOF_SAMPLES', 3);
-// exportCategory.ts ITEM_PAGE_SIZE, SIGN_BATCH_SIZE, SIGN_CONCURRENCY; images.ts ID_FILTER_CHUNK_SIZE, ROW_PAGE_SIZE; pages.ts CHUNK_READ_CONCURRENCY.
+// exportCategory.ts ITEM_PAGE_SIZE, SIGN_BATCH_SIZE, SIGN_CONCURRENCY; data/postgrestLimits.ts ID_FILTER_CHUNK_SIZE, POSTGREST_MAX_ROWS; pages.ts CHUNK_READ_CONCURRENCY.
 const ITEM_PAGE = 500;
 const SIGN_BATCH = 100;
 const CONCURRENCY = 6;
 const ID_CHUNK = 100;
 const ROW_PAGE = 1000;
-// imageEntries.ts RENDERABLE_PLATES: a card signs full size and thumbnail of its first five photographs.
-const RENDERABLE_PLATES = 5;
-const ITEM_FIELDS = 'id,title,description,place,place_lat,place_lng,tags';
 const PHOTOS = PHOTO_EVERY ? Math.ceil(ENTRIES / PHOTO_EVERY) : 0;
 // What the suggested fix costs: keyset pages with photos embedded (plus the short last page), then the same sign batches.
 const EMBEDDED_BUDGET =
@@ -126,7 +130,6 @@ export function setup() {
         ? itemIds.filter((_, n) => n % PHOTO_EVERY === 0)
         : [],
       photosEach: 1,
-      bytes: encoding.b64decode(TINY_WEBP_BASE64, 'std'),
     });
     return { owner, categoryId };
   });
@@ -134,11 +137,7 @@ export function setup() {
 
 function authorized(session, probe, extra = {}) {
   return {
-    headers: {
-      apikey: ANON_KEY,
-      Authorization: `Bearer ${session.token}`,
-      ...extra,
-    },
+    headers: { ...authHeaders(session), ...extra },
     tags: { name: probe, probe },
   };
 }
@@ -200,9 +199,7 @@ function chunkedReads({ session, ids, probe, pathFor }) {
     }
     for (const response of http.batch(batch)) {
       probeMs.add(response.timings.duration, { probe });
-      if (response.status !== 200)
-        throw new Error(`${probe}: HTTP ${response.status} ${response.body}`);
-      const page = response.json();
+      const page = expectOk(response, probe).json();
       if (page.length >= ROW_PAGE)
         throw new Error(
           `${probe}: a chunk filled a whole page; the mirror would need a second page`,
@@ -225,11 +222,7 @@ function deleteMetadata({ session, categoryId }) {
       session,
       probe: 'delete_current',
     });
-    if (response.status !== 200)
-      throw new Error(
-        `delete_current: HTTP ${response.status} ${response.body}`,
-      );
-    const page = response.json();
+    const page = expectOk(response, 'delete_current').json();
     requests += 1;
     itemIds.push(...page.map((row) => row.item_id));
     if (page.length < ROW_PAGE) break;
@@ -258,11 +251,7 @@ function deleteMetadata({ session, categoryId }) {
       session,
       probe: 'delete_current',
     });
-    if (response.status !== 200)
-      throw new Error(
-        `delete_current: HTTP ${response.status} ${response.body}`,
-      );
-    const page = response.json();
+    const page = expectOk(response, 'delete_current').json();
     pathRequests += 1;
     if (page.length < ROW_PAGE) break;
     after = page[page.length - 1].id;
@@ -270,7 +259,7 @@ function deleteMetadata({ session, categoryId }) {
   return requests + linked.requests + pathRequests;
 }
 
-/** exportCategory.ts signPhotoUrls: 100 paths per call, six calls at a time. */
+/** exportCategory.ts signAll: 100 paths per call, six calls at a time. */
 function signBatches({ session, paths, probe }) {
   const batches = [];
   for (let start = 0; start < paths.length; start += SIGN_BATCH)
@@ -333,27 +322,7 @@ export function bulkMetadata({ owner, categoryId }) {
 }
 
 function signPage({ session, paths, probe }) {
-  return call({
-    method: 'POST',
-    path: `/storage/v1/object/sign/${BUCKET}`,
-    session,
-    body: JSON.stringify({ expiresIn: 3600, paths }),
-    headers: { 'Content-Type': 'application/json' },
-    probe,
-  });
-}
-
-/** imageEntries.ts signItems: full size and thumbnail of each item's first RENDERABLE_PLATES photographs, items in page order. */
-function cardPaths(imagesByItem) {
-  return imagesByItem.flatMap((images) =>
-    images
-      .slice(0, RENDERABLE_PLATES)
-      .flatMap((image) =>
-        image.path_thumb
-          ? [image.path_full, image.path_thumb]
-          : [image.path_full],
-      ),
-  );
+  return call({ ...signUrlsRequest({ session, paths }), probe });
 }
 
 /** Wall time and sequential steps from request to signed URLs: browse = (ids ∥ count) → entries → sign; search = rpc → sign. */
@@ -364,7 +333,7 @@ export function searchPhotos({ owner, categoryId }) {
   countItems(owner, categoryId);
   // listPage reads the page's ids, then its entries with their photographs: two steps.
   let browseSteps = items.length ? 2 : 1;
-  const browsePaths = cardPaths(items.map((item) => item.images));
+  const browsePaths = items.flatMap((item) => platePaths(item.images));
   if (browsePaths.length) {
     signPage({ session: owner, paths: browsePaths, probe: 'browse_sign' });
     browseSteps += 1;
@@ -381,8 +350,7 @@ export function searchPhotos({ owner, categoryId }) {
   }).json();
   let searchSteps = 1;
   // itemPage.ts searchedPage: each row carries its photographs since #780.
-  const byItem = found.map((row) => row.images);
-  const searchPaths = cardPaths(byItem);
+  const searchPaths = found.flatMap((row) => platePaths(row.images));
   if (searchPaths.length) {
     signPage({ session: owner, paths: searchPaths, probe: 'search_sign' });
     searchSteps += 1;

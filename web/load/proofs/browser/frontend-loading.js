@@ -20,7 +20,8 @@ import {
 
 // String literals the minifier keeps, one per module that should load only on an Export or Import click.
 const ON_DEMAND_MARKERS = {
-  'data/zip.ts (read)': 'Not a ZIP archive: no end-of-central-directory record',
+  'data/zipDirectory.ts':
+    'Not a ZIP archive: no end-of-central-directory record',
   'data/zip.ts (write)': 'Archive would exceed 65535 ZIP entries',
   'data/exportCategory.ts': 'Could not sign photograph URLs',
   'data/importPhoto.ts': 'Could not record photograph',

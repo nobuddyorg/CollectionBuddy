@@ -1,16 +1,24 @@
 // The requests web/src/app/data/*.ts sends through supabase-js, spelled out as HTTP; keep the two in step.
-import { expectOk, query, send, sendAll, sendJson } from './http.js';
+import {
+  countedTotal,
+  expectOk,
+  query,
+  send,
+  sendAll,
+  sendJson,
+} from './http.js';
 import { SUPABASE_URL } from './target.js';
 
 export { query } from './http.js';
 
-const BUCKET = 'item-images';
-const ITEM_FIELDS = 'id,title,description,place,place_lat,place_lng,tags';
+export const BUCKET = 'item-images';
+export const ITEM_FIELDS =
+  'id,title,description,place,place_lat,place_lng,tags';
 // data/itemPage.ts ITEM_WITH_IMAGES_SELECT.
 const ITEM_WITH_IMAGES_SELECT = `${ITEM_FIELDS},images(id,item_id,path_full,path_thumb)`;
 // components/ItemList/paging.ts PAGE_SIZE.
-const PAGE_SIZE = 9;
-// data/items.ts PLACE_PAGE_SIZE.
+export const PAGE_SIZE = 9;
+// data/postgrestLimits.ts POSTGREST_MAX_ROWS.
 const PLACE_PAGE_SIZE = 1000;
 // data/exportCategory.ts ITEM_PAGE_SIZE.
 const EXPORT_PAGE_SIZE = 500;
@@ -47,7 +55,7 @@ function pageIdsRequest({ session, categoryId, page, name }) {
   };
 }
 
-function countRequest(session, categoryId) {
+export function countRequest(session, categoryId) {
   const params = query({
     select: 'item_id',
     category_id: `eq.${categoryId}`,
@@ -109,8 +117,7 @@ export function readPage({
     pageIdsRequest({ session, categoryId, page, name }),
     countRequest(session, categoryId),
   ]);
-  // PostgREST answers a counted HEAD with `Content-Range: */<total>`.
-  const total = Number((counted.headers['Content-Range'] ?? '').split('/')[1]);
+  const total = countedTotal(counted);
   return {
     ...pageItems(session, idPage),
     lastPage: Math.max(1, Math.ceil((total || 0) / PAGE_SIZE)),
@@ -250,6 +257,9 @@ export function createImageRow(session, row) {
     name: 'create image row',
   });
 }
+
+// One INSERT per request, set-based, at a body size no proxy in front of PostgREST refuses.
+export const SEED_BATCH = 10000;
 
 /** Bulk writes for setup: one request, so one INSERT statement, per call. */
 export function insertRows({ session, table, rows }) {

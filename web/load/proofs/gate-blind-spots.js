@@ -1,16 +1,17 @@
 // #781: the k6 gate's browse flow never reaches the paths that grow with data (deep pages, signed photo URLs), so it stays green while they are slow.
 import { sleep } from 'k6';
 
-import { countItems, listPage } from '../lib/api.js';
+import { countItems, listPage, signUrlsRequest } from '../lib/api.js';
 import { browse } from '../lib/flows.js';
 import {
   LIFECYCLE_TIMEOUTS,
   SUMMARY_TREND_STATS,
   correctnessThresholds,
 } from '../lib/options.js';
+import { photoPaths } from '../lib/photos.js';
 import { clearAccount } from '../lib/seed.js';
 import { summarize } from '../lib/summary.js';
-import { BUCKET, call } from './lib/fixtures.js';
+import { call } from './lib/fixtures.js';
 import {
   ENTRIES,
   LAST_PAGE,
@@ -80,20 +81,10 @@ export function photoBrowse({ owner, categoryId }) {
   const page = 1 + Math.floor(Math.random() * 20);
   const { items } = listPage({ session: owner, categoryId, page });
   countItems(owner, categoryId);
-  const paths = items.flatMap((item) =>
-    item.images.flatMap((image) =>
-      image.path_thumb
-        ? [image.path_full, image.path_thumb]
-        : [image.path_full],
-    ),
-  );
+  const paths = items.flatMap((item) => item.images.flatMap(photoPaths));
   if (paths.length) {
     call({
-      method: 'POST',
-      path: `/storage/v1/object/sign/${BUCKET}`,
-      session: owner,
-      body: JSON.stringify({ expiresIn: 3600, paths }),
-      headers: { 'Content-Type': 'application/json' },
+      ...signUrlsRequest({ session: owner, paths }),
       probe: 'photo_sign',
     });
   }

@@ -3,9 +3,10 @@ import http from 'k6/http';
 import { Rate, Trend } from 'k6/metrics';
 
 import { insertReturning, query } from '../lib/api.js';
+import { authHeaders, countedTotal, expectOk } from '../lib/http.js';
 import { LIFECYCLE_TIMEOUTS } from '../lib/options.js';
 import { NOUNS, clearAccount } from '../lib/seed.js';
-import { ANON_KEY, SUPABASE_URL } from '../lib/target.js';
+import { SUPABASE_URL } from '../lib/target.js';
 import {
   call,
   envInt,
@@ -84,15 +85,12 @@ function planOnEmptyTables(session) {
       method: 'DELETE',
       url: `${SUPABASE_URL}/rest/v1/categories?${query({ id: `eq.${id}` })}`,
       params: {
-        headers: { apikey: ANON_KEY, Authorization: `Bearer ${session.token}` },
+        headers: authHeaders(session),
         tags: { name: 'warm empty delete' },
       },
     })),
   );
-  const failed = responses.filter((response) => response.status !== 204);
-  if (failed.length) {
-    throw new Error(`warming: HTTP ${failed[0].status} ${failed[0].body}`);
-  }
+  for (const response of responses) expectOk(response, 'warming');
 }
 
 export function setup() {
@@ -128,8 +126,7 @@ function entriesLeft(session) {
     headers: { Prefer: 'count=exact' },
     probe: 'count_left',
   });
-  const range = response.headers['Content-Range'] ?? '';
-  return Number.parseInt(range.split('/')[1], 10);
+  return countedTotal(response);
 }
 
 export function probe({ small, large }) {

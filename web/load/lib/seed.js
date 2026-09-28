@@ -1,7 +1,6 @@
 // Every script's setup() and teardown(): three fresh identities and a production-shaped collection, all written through RLS.
-import encoding from 'k6/encoding';
-
 import {
+  SEED_BATCH,
   deleteOwnRows,
   entrySliceEnd,
   insertReturning,
@@ -10,14 +9,12 @@ import {
   removeObjects,
   signUp,
 } from './api.js';
-import { TINY_WEBP_BASE64, attachPhotos } from './photos.js';
+import { attachPhotos, photoPaths } from './photos.js';
 import { PROFILE } from './profile.js';
 
 // Below a few thousand rows every plan is a sequential scan and the numbers say nothing.
 export const SEARCHED_ITEMS = PROFILE.searchedItems;
 export const SHARED_ITEMS = PROFILE.sharedItems;
-// One INSERT per request, set-based, at a body size no proxy in front of PostgREST refuses.
-const SEED_BATCH = 10000;
 
 export const NOUNS = ['Denar', 'Sesterz', 'Taler', 'Groschen', 'Dukat', 'Obol'];
 const PLACES = ['Rom', 'Wien', 'Prag', 'Athen', 'Trier', 'Köln'];
@@ -29,7 +26,7 @@ const COORDINATES = {
   Trier: [49.75, 6.64],
   Köln: [50.94, 6.96],
 };
-// More places than one page of the map (data/items.ts PLACE_PAGE_SIZE), so the map pages as a large collection's does.
+// More places than one page of the map (data/postgrestLimits.ts POSTGREST_MAX_ROWS), so the map pages as a large collection's does.
 const PLACE_COUNT = 1200;
 // Most descriptions a line, some a paragraph, a few a page: wide rows are what spill a search's sort to disk.
 const DESCRIPTION_REPEATS = [0, 1, 4, 30];
@@ -60,72 +57,63 @@ function placeOf(n) {
   };
 }
 
-/** `count` items newest-first, a minute apart, filed into one category. */
-function itemRows({ count, categoryId, now, nouns }) {
-  const items = [];
-  const links = [];
-  for (let n = 0; n < count; n++) {
-    const id = crypto.randomUUID();
-    const createdAt = new Date(now - n * 60000).toISOString();
-    const where = placeOf(n);
-    items.push({
-      id,
-      title: `${nouns[n % nouns.length]} ${n}`,
-      description: `Probe ${n} aus ${where.place}.${DESCRIPTION_FILLER.repeat(DESCRIPTION_REPEATS[n % DESCRIPTION_REPEATS.length])}`,
-      ...where,
-      tags: [TAGS[n % TAGS.length], TAGS[(n + 2) % TAGS.length]],
-      created_at: createdAt,
-    });
-    links.push({ item_id: id, category_id: categoryId, created_at: createdAt });
+/** `count` entries newest-first, a minute apart, filed into one category; `fields(n)` supplies each entry's own columns. */
+export function insertEntries({ session, categoryId, count, fields }) {
+  const now = Date.now();
+  const ids = [];
+  for (let start = 0; start < count; start += SEED_BATCH) {
+    const items = [];
+    const links = [];
+    for (let n = start; n < Math.min(count, start + SEED_BATCH); n++) {
+      const id = crypto.randomUUID();
+      const createdAt = new Date(now - n * 60000).toISOString();
+      items.push({ id, created_at: createdAt, ...fields(n) });
+      links.push({
+        item_id: id,
+        category_id: categoryId,
+        created_at: createdAt,
+      });
+      ids.push(id);
+    }
+    insertRows({ session, table: 'items', rows: items });
+    insertRows({ session, table: 'item_categories', rows: links });
   }
-  return { items, links };
+  return ids;
 }
 
 /** Titles cycle through `nouns`, so one collector's word can be rare in their own collection and common elsewhere. */
 export function fillCategory({ session, categoryId, count, nouns = NOUNS }) {
-  const { items, links } = itemRows({
-    count,
+  const itemIds = insertEntries({
+    session,
     categoryId,
-    now: Date.now(),
-    nouns,
+    count,
+    fields: (n) => {
+      const where = placeOf(n);
+      return {
+        title: `${nouns[n % nouns.length]} ${n}`,
+        description: `Probe ${n} aus ${where.place}.${DESCRIPTION_FILLER.repeat(DESCRIPTION_REPEATS[n % DESCRIPTION_REPEATS.length])}`,
+        ...where,
+        tags: [TAGS[n % TAGS.length], TAGS[(n + 2) % TAGS.length]],
+      };
+    },
   });
-  for (let i = 0; i < count; i += SEED_BATCH) {
-    insertRows({
-      session,
-      table: 'items',
-      rows: items.slice(i, i + SEED_BATCH),
-    });
-    insertRows({
-      session,
-      table: 'item_categories',
-      rows: links.slice(i, i + SEED_BATCH),
-    });
-  }
   attachPhotos({
     session,
-    itemIds: items
-      .filter((_, n) => n % PHOTO_EVERY === 0)
-      .map((item) => item.id),
+    itemIds: itemIds.filter((_, n) => n % PHOTO_EVERY === 0),
     photosEach: 1,
-    bytes: encoding.b64decode(TINY_WEBP_BASE64, 'std'),
   });
 }
 
-export function setup() {
+export function newIdentity(label) {
   const run = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-  const owner = signUp(
-    `load-owner-${run}@collectionbuddy.test`,
-    crypto.randomUUID(),
-  );
-  const viewer = signUp(
-    `load-viewer-${run}@collectionbuddy.test`,
-    crypto.randomUUID(),
-  );
+  return signUp(`${label}-${run}@collectionbuddy.test`, crypto.randomUUID());
+}
+
+export function setup() {
+  const owner = newIdentity('load-owner');
+  const viewer = newIdentity('load-viewer');
   // Writes land in their own account, so a stress run's new entries never meet the seeded owner's quota.
-  const writer = signUp(
-    `load-writer-${run}@collectionbuddy.test`,
-    crypto.randomUUID(),
-  );
+  const writer = newIdentity('load-writer');
 
   const categories = insertReturning({
     session: owner,
@@ -182,12 +170,7 @@ export function clearAccount(session) {
   for (let offset = 0; ; offset += PHOTO_PAGE) {
     const rows = listImagePaths({ session, offset, limit: PHOTO_PAGE });
     if (rows.length === 0) break;
-    removeObjects(
-      session,
-      rows.flatMap((row) =>
-        row.path_thumb ? [row.path_full, row.path_thumb] : [row.path_full],
-      ),
-    );
+    removeObjects(session, rows.flatMap(photoPaths));
   }
   for (
     let last = entrySliceEnd(session, ENTRY_SLICE);

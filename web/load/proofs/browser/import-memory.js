@@ -1,11 +1,11 @@
 // #755: import reads and decodes the whole archive twice and copies every entry; import-memory.sh samples the renderer's RSS between the markers this prints.
 import { browser } from 'k6/browser';
 import { check } from 'k6';
-import encoding from 'k6/encoding';
 import { Trend } from 'k6/metrics';
 
 import { clearAccount } from '../../lib/seed.js';
 import {
+  TINY_WEBP,
   attachPhotos,
   envInt,
   insertEntries,
@@ -17,11 +17,6 @@ import { browserScenario, openAsDemoUser, reloadCatalogue } from './lib/app.js';
 
 // ~1 MB of high-entropy JPEG at 1024x768: bulky in the archive, ~3 MB per thumbnail decode, so decoding cannot pass for archive copies.
 const PHOTO = open('../fixtures/archive-photo.jpeg', 'b');
-// A 1x1 WebP: the export carries only full sizes, so seeded thumbnails need not weigh on the quota.
-const THUMB = encoding.b64decode(
-  'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA',
-  'std',
-);
 const ARCHIVE_MB = envInt('PROOF_ARCHIVE_MB', 100);
 const PHOTOS = Math.ceil((ARCHIVE_MB * 1024 * 1024) / PHOTO.byteLength);
 // Seeded photos plus imported copies and their thumbnails share one owner's 256 MiB photo quota; past this the import is refused part-way.
@@ -80,7 +75,8 @@ export default async function importOwnExport() {
         itemIds,
         photosEach: 1,
         bytes: PHOTO,
-        thumbBytes: THUMB,
+        // The export carries only full sizes, so seeded thumbnails need not weigh on the quota.
+        thumbBytes: TINY_WEBP,
       });
     });
     await reloadCatalogue(page);
