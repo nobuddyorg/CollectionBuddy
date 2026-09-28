@@ -26,6 +26,9 @@
 /.next/
 /out/
 
+# The coin cut-out model: fetched and converted by `npm run fetch-coin-model`, never committed (87 MB).
+/public/models/
+
 # production
 /build
 

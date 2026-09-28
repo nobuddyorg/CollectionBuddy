@@ -18,6 +18,12 @@ if (!supabaseUrl) {
 }
 const SUPABASE_ORIGIN = new URL(supabaseUrl).origin;
 
+// Only a model served from another origin (docs/reference/configuration.md) adds to connect-src; a path on this site adds nothing.
+const coinModelPath = process.env.NEXT_PUBLIC_COIN_MODEL_PATH ?? '';
+const COIN_MODEL_ORIGIN = URL.canParse(coinModelPath)
+  ? new URL(coinModelPath).origin
+  : '';
+
 // No weights for the variable fonts: naming them makes next/font preload a file per weight.
 const displayFont = Archivo({
   subsets: ['latin'],
@@ -54,9 +60,9 @@ const CONTENT_SECURITY_POLICY = [
   `default-src 'self'`,
   `script-src 'self' 'unsafe-inline'`,
   `style-src 'self' 'unsafe-inline'`,
-  // data: is for Leaflet's default icon, a 1x1 GIF loaded as a data URI.
-  `img-src 'self' data: ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org`,
-  `connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io`,
+  // data: is Leaflet's default icon, a 1x1 GIF; blob: is the coin cut-out's side-by-side preview, which never leaves the device.
+  `img-src 'self' data: blob: ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org`,
+  `connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io ${COIN_MODEL_ORIGIN}`.trimEnd(),
   `font-src 'self'`,
   // browser-image-compression always starts its worker from a blob: URL; script-src 'self' governs what that worker imports.
   `worker-src 'self' blob:`,

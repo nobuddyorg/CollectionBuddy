@@ -22,6 +22,41 @@ test.describe('when something outside the app fails', () => {
     await on(page).categories.do.open(SEED.failureCategory);
   });
 
+  // The cut-out is an extra, never a gate: with no model to be had, the original still uploads.
+  test('a photo still uploads as it was when the coin model cannot be loaded', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await page
+      .context()
+      .route('**/models/isnet-general-use-fp16.onnx', (route) =>
+        route.fulfill({ status: 404, body: '' }),
+      );
+    await app.account.do.open();
+    await app.account.do.toggleCoinCutout();
+    await page.keyboard.press('Escape');
+
+    const title = uniqueTitle('Ohne Modell');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      await card.do.uploadPhoto(PHOTO);
+
+      await expect(app.coinCutout.locators.status).toHaveText(
+        'The background could not be removed. The original can still be uploaded.',
+        { timeout: 45_000 },
+      );
+      await expect(app.coinCutout.locators.original).toBeVisible();
+      await expect(app.coinCutout.locators.buttons.useCutout).toBeDisabled();
+      await app.coinCutout.do.keepOriginal();
+
+      await expect(card.locators.images).toBeVisible({ timeout: 45_000 });
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
   // The form has to stay usable with the geocoder down rather than block an entry needing no lookup.
   test('a hand-typed place is still saved with the geocoder down', async ({
     on,

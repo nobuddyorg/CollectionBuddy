@@ -5,12 +5,15 @@ interface AccountMenu {
   do: {
     chooseLanguage(language: 'de' | 'en'): Promise<void>;
     chooseTheme(theme: 'system' | 'light' | 'dark'): Promise<void>;
+    downloadCoinModel(): Promise<void>;
+    toggleCoinCutout(): Promise<void>;
     deleteAccount(): Promise<void>;
     open(): Promise<void>;
     openHelp(): Promise<void>;
     signOut(): Promise<void>;
   };
   locators: {
+    coinCutout: { toggle: Locator; download: Locator; progress: Locator };
     buttons: {
       deleteAccount: Locator;
       open: Locator;
@@ -26,6 +29,11 @@ interface AccountMenu {
 export function initAccountMenu(page: Page): AccountMenu {
   const root = page.locator('#user-menu');
   const locators = {
+    coinCutout: {
+      toggle: page.getByTestId('coin-cutout-toggle'),
+      download: page.getByTestId('coin-model-preload'),
+      progress: page.getByTestId('coin-model-status'),
+    },
     buttons: {
       deleteAccount: page.getByTestId('delete-account'),
       open: page.getByTestId('account-menu'),
@@ -49,6 +57,12 @@ export function initAccountMenu(page: Page): AccountMenu {
     },
     chooseTheme: async (theme: 'system' | 'light' | 'dark') => {
       await locators.themes[theme].click();
+    },
+    downloadCoinModel: async () => {
+      await locators.coinCutout.download.click();
+    },
+    toggleCoinCutout: async () => {
+      await locators.coinCutout.toggle.click();
     },
     // Only starts it: the confirmation decides.
     deleteAccount: async () => {

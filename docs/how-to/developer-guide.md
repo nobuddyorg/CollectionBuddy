@@ -560,7 +560,7 @@ For a fork, or a new production project:
 has passed on `main`, run by a push or a dispatch (`workflow_run`), and hourly
 as a safety net, and deploys exactly that commit: `gate` checks it is still `main`'s tip and reads the Pages site URL,
 whose path the build uses as `basePath`, `migrate` lists the pending
-migrations, applies them and reloads the PostgREST schema cache, `build` exports the site, `deploy` publishes it,
+migrations, applies them and reloads the PostgREST schema cache, `build` fetches the [coin cut-out model](#the-coin-cut-out-model) and exports the site, `deploy` publishes it,
 `smoke_test` runs the signed-out suite against the live URL. Each job depends
 on the last, so a failed migration leaves the previous bundle serving the
 previous schema. Nothing deploys from a developer machine.
@@ -625,6 +625,39 @@ One-time setup for a fork:
    classic access token before it lands; `prek`'s gitleaks scan covers the
    legacy JWT and the database URL, which GitHub has no pattern for
    ([Configuration](../reference/configuration.md#github-actions-secrets)).
+
+## The coin cut-out model
+
+The optional coin cut-out loads ISNet from `web/public/models/isnet-general-use-fp16.onnx`
+(87 MB, float16). It is never committed (`.gitignore`); `pages-deploy.yml`
+fetches it before every build with:
+
+```bash
+cd web && npm run fetch-coin-model   # Linux or WSL: needs bash, curl, python3 and sha256sum
+```
+
+The script downloads rembg's float32 export from GitHub, checks its SHA-256,
+converts it to float16 in a throwaway virtualenv whose packages are pinned by
+hash (`scripts/coin-model/requirements.txt`), checks the result's SHA-256 too,
+and moves it into place. It skips all of that when the file is already there
+with the right hash. Nothing else needs it: without the model the review says
+the cut-out failed and **Keep original** uploads the photo, which is what CI and
+`npm run e2e:local` see (the specs serve a 231-byte stand-in model,
+`e2e/fixtures/red-channel.onnx`, where they need a cut-out).
+
+**Serve it from somewhere else**, a CDN or another bucket: put the same file
+there under the same name, allow this site's origin in that host's CORS
+settings, and set `NEXT_PUBLIC_COIN_MODEL_PATH` to the folder's URL, ending in
+`/`, for the build (`web/.env.local` locally, the build job's `env` in
+`pages-deploy.yml`). The layout adds that origin to `connect-src`. Update the
+privacy notice (`privacy.browser_cache` and the recipients) in the same change,
+since visitors' browsers then contact that host. The ONNX Runtime WebAssembly
+(14 MB) always comes from the app's own `_next/static/`.
+
+**Replace the model**: change the source URL and both hashes in
+`scripts/coin-model/fetch.sh`, and rename the file in `fetch.sh` and
+`MODEL_FILE` in `web/src/app/lib/coinCutout.ts` in the same change. The new
+name is what makes browsers drop their cached copy of the old one.
 
 ## Roll back a bad deploy
 

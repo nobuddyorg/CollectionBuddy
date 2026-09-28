@@ -37,6 +37,14 @@ async function openMenu() {
 }
 
 describe('Menu', () => {
+  it('offers the coin cut-out, off by default', async () => {
+    await openMenu();
+
+    expect(
+      screen.getByRole('checkbox', { name: 'Cut out coins' }),
+    ).not.toBeChecked();
+  });
+
   it('is closed until the account menu button is clicked', () => {
     renderHeader();
     expect(

@@ -32,7 +32,7 @@ import {
   signEntries,
   type ImageEntryData,
 } from './imageEntries';
-import { extensionForType } from '../../data/photoType';
+import { extensionForType, type PhotoEncoding } from '../../data/photoType';
 import { compressPhoto } from '../../lib/imageCompression';
 import { restoreAt } from '../../lib/optimistic';
 
@@ -155,7 +155,7 @@ export function useItemImages() {
   useSignedUrlRefresh(imagesRef, refreshAllImages);
 
   const uploadImage = useCallback(
-    async (itemId: string, file: File) => {
+    async (itemId: string, file: File, encoding: PhotoEncoding = 'opaque') => {
       try {
         setPendingUploads((previous) => ({
           ...previous,
@@ -164,9 +164,9 @@ export function useItemImages() {
         const userId = await verifiedUserId();
         if (!userId) throw new Error(t('item_list.no_user_session'));
 
-        const fullFile = await compressPhoto(file, 1000);
+        const fullFile = await compressPhoto(file, 1000, encoding);
         // From the already-downscaled full size; 600px covers strip cells and pair halves at 3x density.
-        const thumbnailFile = await compressPhoto(fullFile, 600);
+        const thumbnailFile = await compressPhoto(fullFile, 600, encoding);
 
         const base = crypto.randomUUID();
         const pathBase = `${imagePrefix(userId, itemId)}/${base}`;
