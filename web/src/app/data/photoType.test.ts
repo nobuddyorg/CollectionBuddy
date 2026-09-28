@@ -4,16 +4,32 @@ import { encodingFor, extensionForType, typeForArchivePath } from './photoType';
 
 describe('encodingFor', () => {
   it('keeps WebP where the canvas encoded it', () => {
-    expect(encodingFor('image/webp')).toBe('image/webp');
+    expect(encodingFor('image/webp', 'opaque')).toBe('image/webp');
   });
 
   // WebKit answers a WebP request with PNG; a null blob reads as no type at all.
   it.each(['image/png', ''])(
     'falls back to JPEG when the probe gave "%s"',
     (probed) => {
-      expect(encodingFor(probed)).toBe('image/jpeg');
+      expect(encodingFor(probed, 'opaque')).toBe('image/jpeg');
     },
   );
+
+  it('keeps WebP for a transparent cut-out, whose alpha WebP carries', () => {
+    expect(encodingFor('image/webp', 'transparent')).toBe('image/webp');
+  });
+
+  // JPEG has no alpha channel: a cut-out's background would come back white.
+  it.each(['image/png', ''])(
+    'falls back to PNG for a transparent cut-out when the probe gave "%s"',
+    (probed) => {
+      expect(encodingFor(probed, 'transparent')).toBe('image/png');
+    },
+  );
+
+  it('still falls back to JPEG for an opaque photo', () => {
+    expect(encodingFor('image/png', 'opaque')).toBe('image/jpeg');
+  });
 });
 
 describe('extensionForType', () => {

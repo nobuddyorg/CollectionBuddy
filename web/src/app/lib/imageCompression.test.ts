@@ -93,6 +93,19 @@ describe('compressPhoto', () => {
     );
   });
 
+  it('encodes a transparent cut-out as PNG, not JPEG, where the canvas has no WebP', async () => {
+    canvasEncodes('image/png');
+    const compressPhoto = await freshCompressPhoto();
+
+    const output = await compressPhoto(photo(), 600, 'transparent');
+
+    expect(imageCompression).toHaveBeenCalledWith(
+      expect.any(File),
+      expect.objectContaining({ fileType: 'image/png' }),
+    );
+    expect(output.type).toBe('image/png');
+  });
+
   it('probes a 1x1 canvas for WebP once, however many photographs follow', async () => {
     const toBlob = canvasEncodes('image/webp');
     const compressPhoto = await freshCompressPhoto();

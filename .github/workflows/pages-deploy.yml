@@ -136,6 +136,8 @@ jobs:
 
       - uses: ./.github/actions/setup-web
 
+      # The background removal model, pinned by hash and converted here, never committed (docs/how-to/developer-guide.md#the-background-removal-model).
+      - run: npm run fetch-segmentation-model
       - run: npm run build
       - run: test -d out && test -f out/index.html
       - run: touch out/.nojekyll

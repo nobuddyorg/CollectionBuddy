@@ -37,6 +37,14 @@ async function openMenu() {
 }
 
 describe('Menu', () => {
+  it('offers background removal, off by default', async () => {
+    await openMenu();
+
+    expect(
+      screen.getByRole('checkbox', { name: 'Remove backgrounds' }),
+    ).not.toBeChecked();
+  });
+
   it('is closed until the account menu button is clicked', () => {
     renderHeader();
     expect(

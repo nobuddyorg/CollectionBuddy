@@ -2,13 +2,14 @@
 
 ## Web app environment variables
 
-`web/.env.local`, from `web/.env.example`. Both are required; the Supabase client throws at import time without them.
+`web/.env.local`, from `web/.env.example`. The two Supabase variables are required; the Supabase client throws at import time without them.
 
 | Variable | Local | Production |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | `http://127.0.0.1:54321` | The project's API URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase's well-known local anon key; the `npm run` scripts that read `supabase status` pass its publishable key | The project's publishable key (`sb_publishable_…`), or its legacy anon key until [migrated](../how-to/developer-guide.md#migrate-to-publishable-and-secret-keys) |
 | `NEXT_PUBLIC_DEMO_MODE` | `true` signs every visitor in anonymously; `npm run demo` sets it | unset |
+| `NEXT_PUBLIC_SEGMENTATION_MODEL_PATH` | unset: the background removal model loads from the site's own `models/` folder | unset, the same. Set to a folder URL ending in `/` to serve the model from elsewhere; its origin is added to `connect-src` ([the background removal model](../how-to/developer-guide.md#the-background-removal-model)) |
 | `PAGES_BASE_URL` | unset: the export is served under `/CollectionBuddy` | Build only: `pages-deploy.yml` sets it to the Pages site URL (`actions/configure-pages`), whose path becomes `basePath`, empty on a custom domain |
 
 Place search uses the public [Photon](https://photon.komoot.io/) API unauthenticated; there is no key.

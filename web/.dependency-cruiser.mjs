@@ -111,6 +111,11 @@ const config = {
     // Type-only imports are erased at runtime but are real coupling; without this most sibling `types.ts` files misreport as orphans.
     tsPreCompilationDeps: true,
     doNotFollow: { path: 'node_modules' },
+    // A subpath such as `onnxruntime-web/wasm` exists only in its package's `exports`, which the resolver skips by default.
+    enhancedResolveOptions: {
+      exportsFields: ['exports'],
+      conditionNames: ['import', 'require', 'node', 'default', 'types'],
+    },
     progress: { type: 'none' },
   },
 };

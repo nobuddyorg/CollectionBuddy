@@ -26,6 +26,9 @@
 /.next/
 /out/
 
+# The background removal model: fetched and converted by `npm run fetch-segmentation-model`, never committed (87 MB).
+/public/models/
+
 # production
 /build
 
