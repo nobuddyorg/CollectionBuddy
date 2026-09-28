@@ -6,7 +6,7 @@ function entry(id: string): { id: string } {
   return { id };
 }
 
-const idsOf = (list: { id: string }[]) => list.map((entry) => entry.id);
+const idsOf = (list: { id: string }[]) => list.map((listed) => listed.id);
 
 const a = entry('a');
 const b = entry('b');
