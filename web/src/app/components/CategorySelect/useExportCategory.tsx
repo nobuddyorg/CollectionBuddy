@@ -94,7 +94,6 @@ export function useExportCategory() {
     [progress, t, locale, toast, confirm],
   );
 
-  // Not memoized: it goes straight onto a button in a component nothing memoizes.
   const cancelExport = () => {
     controllerRef.current?.abort();
   };

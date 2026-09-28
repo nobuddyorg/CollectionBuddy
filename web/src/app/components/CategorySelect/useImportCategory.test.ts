@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { interpolate, type TranslationValues } from '../../i18n/I18nProvider';
+import {
+  formatNumbers,
+  interpolate,
+  type TranslationValues,
+} from '../../i18n/I18nProvider';
 import {
   importPartialMessage,
   importProgressMessage,
@@ -45,14 +49,17 @@ describe('importProgressMessage', () => {
 });
 
 describe('importPartialMessage', () => {
-  const t = ((key: string) =>
-    ({
-      'category_select.import_partial': '{skipped} of {total} left out.',
-      'category_select.import_partial_quota':
-        '{skipped} of {total} left out: your quota is full.',
-      'category_select.import_partial_storage_full':
-        "{skipped} of {total} left out: the app's storage is full.",
-    })[key] ?? key) as Parameters<typeof importPartialMessage>[1];
+  const t = ((key: string, values: TranslationValues = {}) =>
+    interpolate(
+      {
+        'category_select.import_partial': '{skipped} of {total} left out.',
+        'category_select.import_partial_quota':
+          '{skipped} of {total} left out: your quota is full.',
+        'category_select.import_partial_storage_full':
+          "{skipped} of {total} left out: the app's storage is full.",
+      }[key] ?? key,
+      formatNumbers(values, new Intl.NumberFormat('de')),
+    )) as Parameters<typeof importPartialMessage>[1];
 
   it('says nothing when every photograph arrived', () => {
     expect(
@@ -89,5 +96,27 @@ describe('importPartialMessage', () => {
         t,
       ),
     ).toBe("4 of 4 left out: the app's storage is full.");
+  });
+
+  // The counts reach t as numbers, so the locale's digit grouping applies to them.
+  it('hands t the counts as numbers', () => {
+    const spy = vi.fn(() => '');
+    importPartialMessage(
+      { photoCount: 2, skippedPhotoCount: 1000, photoQuotaReached: 'none' },
+      spy,
+    );
+    expect(spy).toHaveBeenCalledWith('category_select.import_partial', {
+      skipped: 1000,
+      total: 1002,
+    });
+  });
+
+  it('formats large counts in the digit grouping of the language', () => {
+    expect(
+      importPartialMessage(
+        { photoCount: 2, skippedPhotoCount: 1000, photoQuotaReached: 'none' },
+        t,
+      ),
+    ).toBe('1.000 of 1.002 left out.');
   });
 });

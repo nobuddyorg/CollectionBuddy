@@ -2,11 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-import {
-  interpolate,
-  type Translate,
-  type TranslationKey,
-} from '../../i18n/I18nProvider';
+import type { Translate } from '../../i18n/I18nProvider';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
@@ -19,7 +15,6 @@ import {
 import { uniqueCategoryName } from '../../data/categories';
 import { isQuotaExceeded } from '../../data/quota';
 
-/** What to say while an import runs. Same shape as exportProgressMessage. */
 export function importProgressMessage(
   progress: ImportProgress | null,
   t: Translate,
@@ -38,10 +33,7 @@ export function importProgressMessage(
 }
 
 /** What each kind of unimportable archive says instead of "try again", which never helps. */
-function formatErrorMessage(
-  reason: ImportFormatReason,
-  t: (key: TranslationKey) => string,
-): string {
+function formatErrorMessage(reason: ImportFormatReason, t: Translate): string {
   if (reason === 'unreadable') {
     return t('category_select.import_unreadable_error');
   }
@@ -49,15 +41,6 @@ function formatErrorMessage(
     return t('category_select.import_too_large_error');
   }
   return t('category_select.import_format_error');
-}
-
-function partialTemplate(
-  quota: ImportResult['photoQuotaReached'],
-  t: (key: TranslationKey) => string,
-): string {
-  if (quota === 'owner') return t('category_select.import_partial_quota');
-  if (quota === 'app') return t('category_select.import_partial_storage_full');
-  return t('category_select.import_partial');
 }
 
 /** The warning for photographs left out, naming the quota that stopped the rest; null when none was. */
@@ -70,13 +53,20 @@ export function importPartialMessage(
     ImportResult,
     'photoCount' | 'skippedPhotoCount' | 'photoQuotaReached'
   >,
-  t: (key: TranslationKey) => string,
+  t: Translate,
 ): string | null {
   if (skippedPhotoCount === 0) return null;
-  return interpolate(partialTemplate(photoQuotaReached, t), {
+  const counts = {
     skipped: skippedPhotoCount,
     total: photoCount + skippedPhotoCount,
-  });
+  };
+  if (photoQuotaReached === 'owner') {
+    return t('category_select.import_partial_quota', counts);
+  }
+  if (photoQuotaReached === 'app') {
+    return t('category_select.import_partial_storage_full', counts);
+  }
+  return t('category_select.import_partial', counts);
 }
 
 export function useImportCategory(existingCategoryNames: string[]) {
@@ -136,12 +126,11 @@ export function useImportCategory(existingCategoryNames: string[]) {
     [progress, t, toast, existingCategoryNames],
   );
 
-  // Not memoized: it goes straight onto a button in a component nothing memoizes.
   const cancelImport = () => {
     controllerRef.current?.abort();
   };
 
-  // Same beforeunload guard as useExportCategory.tsx, for the same reason.
+  // An import can run for minutes; closing the tab mid-run would silently abandon it.
   useBeforeUnloadGuard(progress !== null);
 
   return {
