@@ -22,7 +22,7 @@ const THINK_SECONDS = 1;
 
 // components/ItemList/imageEntries.ts RENDERABLE_PLATES: a card signs full size and thumbnail of its first five photographs.
 export const RENDERABLE_PLATES = 5;
-// data/exportCategory.ts SIGN_BATCH_SIZE, SIGN_CONCURRENCY (= PHOTO_DOWNLOAD_CONCURRENCY) and EXPORT_SIGNED_URL_TTL_SECONDS.
+// data/exportCategory.ts SIGN_BATCH_SIZE, SIGN_CONCURRENCY (= data/exportPhotos.ts PHOTO_DOWNLOAD_CONCURRENCY) and EXPORT_SIGNED_URL_TTL_SECONDS.
 const EXPORT_SIGN_BATCH = 100;
 const EXPORT_CONCURRENCY = 6;
 const EXPORT_URL_TTL_SECONDS = 6 * 3600;
