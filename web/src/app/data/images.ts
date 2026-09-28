@@ -1,14 +1,19 @@
 import { isRetryableStatus } from '../lib/backoff';
 import { chunk } from '../lib/chunk';
-import { readAllChunks, readAllKeysetPages } from '../lib/pages';
+import {
+  readAllChunks,
+  readAllKeysetPages,
+  type ReadResult,
+} from '../lib/pages';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
-import { rowsAfterFilter } from './keyset';
+import { afterKeyset } from './keyset';
+import { ID_FILTER_CHUNK_SIZE, POSTGREST_MAX_ROWS } from './postgrestLimits';
 
 export const ITEM_IMAGES_BUCKET = 'item-images';
 
-export function imagePrefix(uid: string, itemId: string): string {
-  return `${uid}/${itemId}`;
+export function imagePrefix(userId: string, itemId: string): string {
+  return `${userId}/${itemId}`;
 }
 
 export function createSignedUrls(paths: string[], expiresInSeconds = 3600) {
@@ -45,11 +50,10 @@ export function removeImageObjects(paths: string[]) {
 
 type ImageRow = Database['public']['Tables']['images']['Row'];
 
+const IMAGE_LIST_KEYS = ['id', 'item_id', 'path_full', 'path_thumb'] as const;
 /** Carries the row's own `id`, so a single photograph can be deleted by it. */
-export type ImageListRow = Pick<
-  ImageRow,
-  'id' | 'item_id' | 'path_full' | 'path_thumb'
->;
+export type ImageListRow = Pick<ImageRow, (typeof IMAGE_LIST_KEYS)[number]>;
+export const IMAGE_LIST_SELECT = IMAGE_LIST_KEYS.join(', ');
 
 /** No `path_thumb`: an export's manifest is only ever built from full-size paths. */
 export type ExportImageRow = Pick<
@@ -72,7 +76,7 @@ export function createImageRow(row: NewImageRow | ImportedImageRow) {
   return supabase
     .from('images')
     .insert(row as Database['public']['Tables']['images']['Insert'])
-    .select('id, item_id, path_full, path_thumb')
+    .select(IMAGE_LIST_SELECT)
     .single<ImageListRow>();
 }
 
@@ -102,12 +106,6 @@ export async function deleteImageRow({
   return { error: new Error(`Photograph ${id} was not deleted`) };
 }
 
-// PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.
-const ROW_PAGE_SIZE = 1000;
-
-// Ids per `.in()` filter; a few thousand UUIDs would hit a URL length limit before the row cap.
-const ID_FILTER_CHUNK_SIZE = 100;
-
 type ImagePageRow = ImageListRow & Pick<ImageRow, 'created_at'>;
 
 // Keyset-paged oldest-first, so a photograph deleted mid-walk shifts none past a page; the key rides along on every row.
@@ -123,31 +121,24 @@ function rawSelectImagesPage({
     .select('item_id, path_full, path_thumb, created_at, id')
     .in('item_id', itemIds);
   if (after) {
-    query = query
-      .gte('created_at', after.created_at)
-      .or(
-        rowsAfterFilter(
-          { column: 'created_at', value: after.created_at },
-          { column: 'id', value: after.id },
-        ),
-      );
+    query = afterKeyset(query, {
+      first: { column: 'created_at', value: after.created_at },
+      second: { column: 'id', value: after.id },
+    });
   }
   return query
     .order('created_at', { ascending: true })
     .order('id', { ascending: true })
-    .limit(ROW_PAGE_SIZE)
+    .limit(POSTGREST_MAX_ROWS)
     .overrideTypes<ImagePageRow[], { merge: false }>();
 }
 
 // Oldest-first, `id` breaking a same-instant tie, matching idx_images_item_created_at.
 export function listImagesForItems(
   itemIds: string[],
-): Promise<
-  | { data: ImageListRow[]; error: null }
-  | { data: null; error: NonNullable<unknown> }
-> {
+): Promise<ReadResult<ImageListRow[]>> {
   return readAllChunks(chunk(itemIds, ID_FILTER_CHUNK_SIZE), (ids) =>
-    readAllKeysetPages<ImagePageRow>(ROW_PAGE_SIZE, (after) =>
+    readAllKeysetPages<ImagePageRow>(POSTGREST_MAX_ROWS, (after) =>
       rawSelectImagesPage({ itemIds: ids, after }),
     ),
   );
@@ -163,25 +154,20 @@ function rawListImagePathsForCategory({
 }) {
   let query = supabase
     .from('images')
-    .select(
-      'id, item_id, path_full, path_thumb, items!inner(item_categories!inner())',
-    )
+    .select(`${IMAGE_LIST_SELECT}, items!inner(item_categories!inner())`)
     .eq('items.item_categories.category_id', categoryId);
   if (after) query = query.gt('id', after.id);
   return query
     .order('id')
-    .limit(ROW_PAGE_SIZE)
+    .limit(POSTGREST_MAX_ROWS)
     .overrideTypes<ImageListRow[], { merge: false }>();
 }
 
 /** Every photograph of every entry filed in the category, walked a page at a time; runs before the category delete, never after. */
 export function listImagePathsForCategory(
   categoryId: string,
-): Promise<
-  | { data: ImageListRow[]; error: null }
-  | { data: null; error: NonNullable<unknown> }
-> {
-  return readAllKeysetPages<ImageListRow>(ROW_PAGE_SIZE, (after) =>
+): Promise<ReadResult<ImageListRow[]>> {
+  return readAllKeysetPages<ImageListRow>(POSTGREST_MAX_ROWS, (after) =>
     rawListImagePathsForCategory({ categoryId, after }),
   );
 }

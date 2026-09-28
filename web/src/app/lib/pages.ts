@@ -1,7 +1,7 @@
 import { runPool } from './pool';
 
-type ReadResult<T> =
-  { data: T[]; error: null } | { data: null; error: NonNullable<unknown> };
+export type ReadResult<T> =
+  { data: T; error: null } | { data: null; error: NonNullable<unknown> };
 
 /** All rows, walked page by page until a page comes back short; a full last page costs one empty read. */
 export async function readAllPages<T>(
@@ -11,7 +11,7 @@ export async function readAllPages<T>(
     from: number,
     to: number,
   ) => PromiseLike<{ data: T[] | null; error: unknown }>,
-): Promise<ReadResult<T>> {
+): Promise<ReadResult<T[]>> {
   const rows: T[] = [];
   for (let page = 0; ; page++) {
     const from = page * pageSize;
@@ -31,7 +31,7 @@ export async function readAllKeysetPages<T>(
   readPage: (
     after: T | null,
   ) => PromiseLike<{ data: T[] | null; error: unknown }>,
-): Promise<ReadResult<T>> {
+): Promise<ReadResult<T[]>> {
   const rows: T[] = [];
   let after: T | null = null;
   for (;;) {
@@ -51,8 +51,8 @@ const CHUNK_READ_CONCURRENCY = 6;
 /** Chunked reads a few at a time, joined in chunk order; the first failure ends it with no partial data. */
 export async function readAllChunks<C, T>(
   chunks: readonly C[],
-  readChunk: (chunk: C) => PromiseLike<ReadResult<T>>,
-): Promise<ReadResult<T>> {
+  readChunk: (chunk: C) => PromiseLike<ReadResult<T[]>>,
+): Promise<ReadResult<T[]>> {
   const results: T[][] = [];
   let firstError: NonNullable<unknown> | undefined;
   try {

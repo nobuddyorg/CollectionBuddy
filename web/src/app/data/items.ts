@@ -3,6 +3,7 @@ import { readAllPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
 import { likePatternFor } from './itemSearch';
+import { ID_FILTER_CHUNK_SIZE, POSTGREST_MAX_ROWS } from './postgrestLimits';
 
 type ItemRow = Database['public']['Tables']['items']['Row'];
 type ItemInsert = Database['public']['Tables']['items']['Insert'];
@@ -91,9 +92,6 @@ export function createItemsInCategory(
   });
 }
 
-// PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.
-const PLACE_PAGE_SIZE = 1000;
-
 /** One page of places grouped in Postgres (`list_category_places`, security invoker, ordered by place) under the list's search gate. */
 export function rawListCategoryPlaces({
   categoryId,
@@ -130,13 +128,10 @@ export async function listCategoryPlaces(
   }: { categoryId: string; search: string; signal?: AbortSignal },
   rawList: typeof rawListCategoryPlaces = rawListCategoryPlaces,
 ): Promise<{ data: PlaceGroupRow[] | null; error: unknown }> {
-  return readAllPages<PlaceGroupRow>(PLACE_PAGE_SIZE, (from, to) =>
+  return readAllPages<PlaceGroupRow>(POSTGREST_MAX_ROWS, (from, to) =>
     rawList({ categoryId, search, from, to, signal }),
   );
 }
-
-// Ids per `.in()` filter; more risks a URL length limit before PostgREST's row cap.
-const ID_FILTER_CHUNK_SIZE = 100;
 
 /** Writes a geocoded place onto every item at it, one request per chunk; `updatePage` is for the test. */
 export async function updateItemsPlace(

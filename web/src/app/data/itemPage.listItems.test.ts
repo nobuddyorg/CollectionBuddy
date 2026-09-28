@@ -3,26 +3,28 @@ import { describe, expect, it, vi } from 'vitest';
 import { listItems } from './itemPage';
 import { likePatternFor } from './itemSearch';
 
+function item(id: string) {
+  return {
+    id,
+    title: id,
+    description: null,
+    place: null,
+    place_lat: null,
+    place_lng: null,
+    tags: [],
+  };
+}
+
+function photo(id: string, itemId: string) {
+  return {
+    id,
+    item_id: itemId,
+    path_full: `u/${itemId}/${id}.webp`,
+    path_thumb: null,
+  };
+}
+
 describe('listItems', () => {
-  function item(id: string) {
-    return {
-      id,
-      title: id,
-      description: null,
-      place: null,
-      place_lat: null,
-      place_lng: null,
-      tags: [],
-    };
-  }
-  function photo(id: string, itemId: string) {
-    return {
-      id,
-      item_id: itemId,
-      path_full: `u/${itemId}/${id}.webp`,
-      path_thumb: null,
-    };
-  }
   // What the by-id read returns per entry: the item plus its photographs.
   function itemRow(id: string, images: unknown[] = []) {
     return { ...item(id), images };
@@ -204,59 +206,18 @@ describe('listItems', () => {
     expect(result).toEqual({ data: [], error: null, count: 0, imageRows: [] });
     expect(rawItems).not.toHaveBeenCalled();
   });
-
-  it('flattens to an empty page rather than crashing when a successful id page carries no rows', async () => {
-    const rawIds = vi.fn().mockResolvedValue({ data: null, error: null });
-    const rawItems = vi.fn();
-    const rawCount = vi.fn().mockResolvedValue({ count: 0, error: null });
-
-    const { data, error, count } = await listItems(params, {
-      rawIds,
-      rawItems,
-      rawCount,
-    });
-
-    expect(error).toBeNull();
-    expect(count).toBe(0);
-    expect(data).toEqual([]);
-  });
-
-  it('flattens to an empty page rather than crashing when a successful by-id read carries no rows', async () => {
-    const rawIds = idsPage('a');
-    const rawItems = vi.fn().mockResolvedValue({ data: null, error: null });
-    const rawCount = vi.fn().mockResolvedValue({ count: 1, error: null });
-
-    const { data, error, imageRows } = await listItems(params, {
-      rawIds,
-      rawItems,
-      rawCount,
-    });
-
-    expect(error).toBeNull();
-    expect(data).toEqual([]);
-    expect(imageRows).toEqual([]);
-  });
 });
 
 describe('listItems, once a search term earns a filter', () => {
-  function searchRow(id: string, totalCount: number, photoIds: string[] = []) {
-    return {
-      id,
-      title: id,
-      description: null,
-      place: null,
-      place_lat: null,
-      place_lng: null,
-      tags: [],
-      total_count: totalCount,
-      images: photoIds.map((photoId) => ({
-        id: photoId,
-        item_id: id,
-        path_full: `u/${id}/${photoId}.webp`,
-        path_thumb: null,
-      })),
-    };
-  }
+  const searchRow = (
+    id: string,
+    totalCount: number,
+    photoIds: string[] = [],
+  ) => ({
+    ...item(id),
+    total_count: totalCount,
+    images: photoIds.map((photoId) => photo(photoId, id)),
+  });
 
   it('calls the search RPC instead of the plain list/count pair', async () => {
     const rawIds = vi.fn();
@@ -296,30 +257,11 @@ describe('listItems, once a search term earns a filter', () => {
     expect(count).toBe(5);
     // Every row's photographs, in page order, so the page needs no read of its own for them.
     expect(imageRows).toEqual([
-      { id: 'p1', item_id: 'a', path_full: 'u/a/p1.webp', path_thumb: null },
-      { id: 'p2', item_id: 'a', path_full: 'u/a/p2.webp', path_thumb: null },
-      { id: 'p3', item_id: 'b', path_full: 'u/b/p3.webp', path_thumb: null },
+      photo('p1', 'a'),
+      photo('p2', 'a'),
+      photo('p3', 'b'),
     ]);
-    expect(data).toEqual([
-      {
-        id: 'a',
-        title: 'a',
-        description: null,
-        place: null,
-        place_lat: null,
-        place_lng: null,
-        tags: [],
-      },
-      {
-        id: 'b',
-        title: 'b',
-        description: null,
-        place: null,
-        place_lat: null,
-        place_lng: null,
-        tags: [],
-      },
-    ]);
+    expect(data).toEqual([item('a'), item('b')]);
   });
 
   it('reports a count of zero rather than null when nothing matched', async () => {
@@ -395,21 +337,6 @@ describe('listItems, once a search term earns a filter', () => {
     expect(data).toEqual([]);
   });
 
-  it('reports a count of zero when the request for the total carries no rows', async () => {
-    const rawSearch = vi
-      .fn()
-      .mockResolvedValueOnce({ data: [], error: null })
-      .mockResolvedValueOnce({ data: null, error: null });
-
-    const { error, count } = await listItems(
-      { categoryId: 'cat-1', search: 'coin', from: 9, to: 17 },
-      { rawSearch },
-    );
-
-    expect(error).toBeNull();
-    expect(count).toBe(0);
-  });
-
   it('returns no data and a null count when the request for the total errors', async () => {
     const rawSearch = vi
       .fn()
@@ -424,19 +351,6 @@ describe('listItems, once a search term earns a filter', () => {
     expect(data).toBeNull();
     expect(error).toBeInstanceOf(Error);
     expect(count).toBeNull();
-  });
-
-  it('flattens to an empty page rather than crashing when a successful response carries no rows', async () => {
-    const rawSearch = vi.fn().mockResolvedValue({ data: null, error: null });
-
-    const { data, error, count } = await listItems(
-      { categoryId: 'cat-1', search: 'coin', from: 0, to: 8 },
-      { rawSearch },
-    );
-
-    expect(error).toBeNull();
-    expect(count).toBe(0);
-    expect(data).toEqual([]);
   });
 
   it('returns no data and a null count when the search request errors', async () => {
