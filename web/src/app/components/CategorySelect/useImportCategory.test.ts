@@ -98,7 +98,6 @@ describe('importPartialMessage', () => {
     ).toBe("4 of 4 left out: the app's storage is full.");
   });
 
-  // The counts reach t as numbers, so the locale's digit grouping applies to them.
   it('hands t the counts as numbers', () => {
     const spy = vi.fn(() => '');
     importPartialMessage(

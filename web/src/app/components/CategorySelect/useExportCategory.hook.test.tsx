@@ -49,7 +49,6 @@ function holdExport(): () => void {
   return () => release?.();
 }
 
-/** A 2.5 GB export: it asks first, and a decline cancels it. */
 function asksBeforeLargeExport() {
   vi.mocked(exportCategory).mockImplementation((async (args: ExportArgs) => {
     const go = await args.confirmLargeExport!(2.5 * 1024 ** 3);
