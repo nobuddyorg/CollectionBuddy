@@ -5,6 +5,11 @@ const model = vi.hoisted(() => ({
   runModel: vi.fn(),
 }));
 vi.mock('./segmentationModel', () => model);
+// ISNet's real 1024 input takes seconds per test under Stryker's instrumentation; the job only passes the size through.
+vi.mock('./isnetTensor', async (importActual) => ({
+  ...(await importActual<typeof import('./isnetTensor')>()),
+  MODEL_SIZE: 64,
+}));
 
 import { handleRequest, type CutoutReply } from './backgroundRemovalJob';
 import { MODEL_SIZE } from './isnetTensor';
@@ -115,7 +120,7 @@ describe('handleRequest', () => {
           return new Uint8Array([1]);
         },
       );
-    model.runModel.mockReset().mockResolvedValue(discPrediction(200));
+    model.runModel.mockReset().mockResolvedValue(discPrediction(12.5));
   });
 
   afterEach(() => {
@@ -158,7 +163,7 @@ describe('handleRequest', () => {
     expect(last.cutout.blob.type).toBe('image/png');
     expect(last.cutout.mode).toBe('ellipse');
     expect(last.cutout.fillRatio).toBeGreaterThan(0.9);
-    // A disc of radius 200 in 1024 spans 16 of the photo's 40 columns and 8 of its 20 rows.
+    // A disc of radius 12.5 in 64 spans 16 of the photo's 40 columns and 8 of its 20 rows.
     expect(last.cutout.width).toBeGreaterThanOrEqual(15);
     expect(last.cutout.width).toBeLessThanOrEqual(18);
     expect(last.cutout.height).toBeGreaterThanOrEqual(7);
@@ -201,8 +206,8 @@ describe('handleRequest', () => {
 
   it('falls back to the model mask when the object is not a clean ellipse', async () => {
     const square = new Float32Array(MODEL_SIZE * MODEL_SIZE);
-    for (let y = 200; y < 800; y += 1)
-      square.fill(1, y * MODEL_SIZE + 200, y * MODEL_SIZE + 800);
+    for (let y = 12; y < 50; y += 1)
+      square.fill(1, y * MODEL_SIZE + 12, y * MODEL_SIZE + 50);
     model.runModel.mockResolvedValue(square);
 
     const replies = await repliesTo(cutOutRequest);
