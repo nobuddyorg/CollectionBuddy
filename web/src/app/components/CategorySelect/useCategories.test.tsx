@@ -269,13 +269,13 @@ describe('useCategories createCategory', () => {
 });
 
 describe('useCategories renameCategory', () => {
-  const CAT_A = { id: 'cat-a', name: 'Cat A', user_id: 'owner-1' };
-  const CAT_B = { id: 'cat-b', name: 'Cat B', user_id: 'owner-1' };
+  const CATEGORY_A = { id: 'cat-a', name: 'Cat A', user_id: 'owner-1' };
+  const CATEGORY_B = { id: 'cat-b', name: 'Cat B', user_id: 'owner-1' };
 
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.setItem('lang', 'en');
-    listCategoriesReturns([CAT_A, CAT_B]);
+    listCategoriesReturns([CATEGORY_A, CATEGORY_B]);
   });
 
   it('renames only the matching category, leaving the rest untouched', async () => {
@@ -291,7 +291,7 @@ describe('useCategories renameCategory', () => {
 
     expect(result.current.categories).toEqual([
       { id: 'cat-a', name: 'Renamed A', user_id: 'owner-1' },
-      CAT_B,
+      CATEGORY_B,
     ]);
     expect(await screen.findByTestId('toast')).toHaveTextContent(
       'Collection renamed.',
@@ -364,7 +364,7 @@ describe('useCategories renameCategory', () => {
       await result.current.renameCategory('cat-a', 'Renamed A');
     });
 
-    expect(result.current.categories).toEqual([CAT_A, CAT_B]);
+    expect(result.current.categories).toEqual([CATEGORY_A, CATEGORY_B]);
     expect(result.current.isRenaming).toBe(false);
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not rename this collection. Please try again.',

@@ -109,7 +109,6 @@ describe('useCategories deleteCategory orphan detection', () => {
       data: ['i1', 'i2'],
       error: null,
     });
-    // i1 is still linked to another category, so the cascade leaves it in place.
     vi.mocked(listItemIdsLinkedElsewhere).mockResolvedValue({
       data: ['i1'],
       error: null,
@@ -136,7 +135,6 @@ describe('useCategories deleteCategory orphan detection', () => {
     expect(removeImageObjects).toHaveBeenCalledTimes(1);
   });
 
-  // An incomplete answer must stop the whole deletion, category row included.
   it('aborts the entire deletion, including the category row, when the linked-elsewhere check fails', async () => {
     const pageError = new Error('truncated page');
     vi.mocked(listItemIdsLinkedElsewhere).mockResolvedValue({
