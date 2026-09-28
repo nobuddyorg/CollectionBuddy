@@ -1,13 +1,7 @@
 import { expect, test } from './test';
 
 import { expectNoSeriousA11yViolations } from '../axe';
-import type { PageTree } from '../pages';
 test.use({ locale: 'en-GB' });
-
-// Cards fade in (.fade-up, 500ms); axe samples contrast mid-fade as a false positive unless settled.
-async function waitForCardsSettled(app: PageTree) {
-  await expect(app.catalogue.locators.cards.first()).toHaveCSS('opacity', '1');
-}
 
 test.describe('accessibility -- signed in', () => {
   // Also covers an entry's detail: everything is rendered inline on the card, there is no detail page.
@@ -17,7 +11,7 @@ test.describe('accessibility -- signed in', () => {
   }, testInfo) => {
     const app = on(page);
     await app.categories.do.open('Münzen');
-    await waitForCardsSettled(app);
+    await app.catalogue.do.waitForCardsSettled();
     await expectNoSeriousA11yViolations(page, testInfo);
   });
 
@@ -39,7 +33,7 @@ test.describe('accessibility -- signed in', () => {
     await app.categories.do.open('Münzen');
     await app.catalogue.do.search('Silberdenar');
     await expect(app.catalogue.locators.cards).toHaveCount(1);
-    await waitForCardsSettled(app);
+    await app.catalogue.do.waitForCardsSettled();
     await expectNoSeriousA11yViolations(page, testInfo);
   });
 
@@ -75,7 +69,7 @@ test.describe('accessibility -- signed in', () => {
   }, testInfo) => {
     const app = on(page);
     await app.categories.do.open('Münzen');
-    await waitForCardsSettled(app);
+    await app.catalogue.do.waitForCardsSettled();
     await app.categories.do.openPanel();
     await expect(app.categories.locators.inputs.newName).toBeVisible();
     await expectNoSeriousA11yViolations(page, testInfo);
@@ -87,7 +81,7 @@ test.describe('accessibility -- signed in', () => {
   }, testInfo) => {
     const app = on(page);
     await app.categories.do.open('Münzen');
-    await waitForCardsSettled(app);
+    await app.catalogue.do.waitForCardsSettled();
     await app.help.do.openByKeyboard();
     await app.help.do.openTopic('entries');
     await expect(app.help.locators.topic('entries')).toHaveAttribute('open');

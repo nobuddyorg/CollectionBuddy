@@ -1,5 +1,8 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
+import { initConfirm } from './dialogs';
+import { initEntryForm } from './entry-form';
+
 interface Catalogue {
   (): Locator;
   do: {
@@ -10,6 +13,7 @@ interface Catalogue {
     openEntryForm(): Promise<void>;
     openMap(): Promise<void>;
     search(term: string): Promise<void>;
+    waitForCardsSettled(): Promise<void>;
   };
   locators: {
     buttons: {
@@ -117,36 +121,35 @@ export function initCatalogue(page: Page): Catalogue {
       searchStatus: root.getByTestId('search-status'),
     },
   };
+  const card = (title: string) =>
+    initCard(locators.cards.filter({ hasText: title }));
+  const confirm = initConfirm(page);
+  const form = initEntryForm(page);
   const interactions = {
     addEntry: async (title: string, description?: string) => {
       await locators.buttons.newEntry.click();
-      await page.getByTestId('item-title').fill(title);
-      if (description) {
-        await page.getByTestId('item-description').fill(description);
-      }
-      await page.getByTestId('item-submit').click();
-      await expect(locators.cards.filter({ hasText: title })).toBeVisible();
+      await form.do.fill({ title, description });
+      await form.do.submit();
+      await expect(card(title)()).toBeVisible();
     },
     clearSearch: async () => {
       await locators.buttons.clearSearch.click();
     },
-    // Answers the confirmation too: that dialog is the second half of this action, not a screen of its own.
+    // Answers the confirmation too: an action spanning two screens belongs to the one that starts it.
     removeEntry: async (title: string) => {
-      const card = locators.cards.filter({ hasText: title });
-      await card.getByTestId('delete-entry').click();
-      await page.getByTestId('confirm-accept').click();
-      await expect(card).toHaveCount(0);
+      await card(title).do.delete();
+      await confirm.do.accept();
+      await expect(card(title)()).toHaveCount(0);
     },
     // The confirmation opens on Cancel, so Tab reaches Confirm.
     removeEntryByKeyboard: async (title: string) => {
-      const card = locators.cards.filter({ hasText: title });
-      await card.getByTestId('delete-entry').focus();
+      await card(title).locators.buttons.delete.focus();
       await page.keyboard.press('Enter');
-      await expect(page.getByTestId('confirm-cancel')).toBeFocused();
+      await expect(confirm.locators.buttons.cancel).toBeFocused();
       await page.keyboard.press('Tab');
-      await expect(page.getByTestId('confirm-accept')).toBeFocused();
+      await expect(confirm.locators.buttons.accept).toBeFocused();
       await page.keyboard.press('Enter');
-      await expect(card).toHaveCount(0);
+      await expect(card(title)()).toHaveCount(0);
     },
     openEntryForm: async () => {
       await locators.buttons.newEntry.click();
@@ -157,11 +160,13 @@ export function initCatalogue(page: Page): Catalogue {
     search: async (term: string) => {
       await locators.inputs.search.fill(term);
     },
+    // Cards fade in (.fade-up, 500ms); axe samples contrast mid-fade as a false positive unless settled.
+    waitForCardsSettled: async () => {
+      await expect(locators.cards.first()).toHaveCSS('opacity', '1');
+      for (const oneCard of await locators.cards.all()) {
+        await expect(oneCard).toHaveCSS('opacity', '1');
+      }
+    },
   };
-  return Object.assign(() => root, {
-    locators,
-    do: interactions,
-    card: (title: string) =>
-      initCard(locators.cards.filter({ hasText: title })),
-  });
+  return Object.assign(() => root, { locators, do: interactions, card });
 }

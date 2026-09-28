@@ -15,8 +15,7 @@ test.describe('managing categories', () => {
     const renamed = `${name} (renamed)`;
     const categories = on(page).categories;
 
-    await page.goto('', { waitUntil: 'networkidle' });
-    await expect(categories.locators.selected).not.toBeEmpty();
+    await categories.do.load();
 
     // Creating a category selects it and collapses the panel back down.
     await categories.do.create(name);
@@ -55,8 +54,7 @@ test.describe('managing categories', () => {
     const name = `E2E US$$ $' $& ${Date.now()}`;
     const app = on(page);
 
-    await page.goto('', { waitUntil: 'networkidle' });
-    await expect(app.categories.locators.selected).not.toBeEmpty();
+    await app.categories.do.load();
     await app.categories.do.create(name);
     try {
       await app.categories.do.delete();
@@ -99,10 +97,7 @@ test.describe('managing categories', () => {
     await page.keyboard.press('Home');
     await expect(categories.tab(names[0])).toBeFocused();
     await expect(categories.locators.selected).toHaveText('Münzen');
-    // Cards fade in (.fade-up); axe samples contrast mid-fade as a false positive unless settled.
-    for (const card of await on(page).catalogue.locators.cards.all()) {
-      await expect(card).toHaveCSS('opacity', '1');
-    }
+    await on(page).catalogue.do.waitForCardsSettled();
     await expectNoSeriousA11yViolations(page, testInfo);
 
     await page.keyboard.press('End');

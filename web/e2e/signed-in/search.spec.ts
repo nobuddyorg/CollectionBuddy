@@ -1,12 +1,12 @@
 import { test } from './test';
 
-import { itemsIn } from './fixtures';
+import { titlesIn } from './fixtures';
 import { expectTitles } from './helpers';
 
 // Unit tests cover the pattern sent to search_category_items; only a real database confirms what it matches.
 test.use({ locale: 'en-GB' });
 
-const allCoins = itemsIn('Münzen').map((item) => item.title);
+const allCoins = titlesIn('Münzen');
 
 test.describe('searching a collection', () => {
   test.beforeEach(async ({ on, page }) => {

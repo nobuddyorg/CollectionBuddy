@@ -36,6 +36,76 @@ const TIMESTAMP_EXTRA = Buffer.from([0x55, 0x54, 0x05, 0x00, 0x03, 0, 0, 0, 0]);
 
 type Lies = { declaredSize?: number };
 
+const LOCAL_FILE_SIGNATURE = 0x04034b50;
+const DATA_DESCRIPTOR_SIGNATURE = 0x08074b50;
+const CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
+const END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50;
+
+function localFileHeader({ nameLength }: { nameLength: number }): Buffer {
+  const header = Buffer.alloc(30);
+  header.writeUInt32LE(LOCAL_FILE_SIGNATURE, 0);
+  header.writeUInt16LE(20, 4);
+  header.writeUInt16LE(0x0808, 6);
+  header.writeUInt16LE(8, 8);
+  header.writeUInt16LE(nameLength, 26);
+  header.writeUInt16LE(TIMESTAMP_EXTRA.length, 28);
+  return header;
+}
+
+type Sizes = { crc: number; compressedSize: number; size: number };
+
+function dataDescriptor({ crc, compressedSize, size }: Sizes): Buffer {
+  const descriptor = Buffer.alloc(16);
+  descriptor.writeUInt32LE(DATA_DESCRIPTOR_SIGNATURE, 0);
+  descriptor.writeUInt32LE(crc, 4);
+  descriptor.writeUInt32LE(compressedSize, 8);
+  descriptor.writeUInt32LE(size, 12);
+  return descriptor;
+}
+
+function centralDirectoryHeader({
+  nameLength,
+  crc,
+  compressedSize,
+  size,
+  offset,
+}: Sizes & { nameLength: number; offset: number }): Buffer {
+  const header = Buffer.alloc(46);
+  header.writeUInt32LE(CENTRAL_DIRECTORY_SIGNATURE, 0);
+  header.writeUInt16LE(0x031e, 4);
+  header.writeUInt16LE(20, 6);
+  header.writeUInt16LE(0x0808, 8);
+  header.writeUInt16LE(8, 10);
+  header.writeUInt32LE(crc, 16);
+  header.writeUInt32LE(compressedSize, 20);
+  header.writeUInt32LE(size, 24);
+  header.writeUInt16LE(nameLength, 28);
+  header.writeUInt16LE(TIMESTAMP_EXTRA.length, 30);
+  header.writeUInt32LE(offset, 42);
+  return header;
+}
+
+function endOfCentralDirectory({
+  count,
+  directorySize,
+  directoryOffset,
+  commentLength,
+}: {
+  count: number;
+  directorySize: number;
+  directoryOffset: number;
+  commentLength: number;
+}): Buffer {
+  const trailer = Buffer.alloc(22);
+  trailer.writeUInt32LE(END_OF_CENTRAL_DIRECTORY_SIGNATURE, 0);
+  trailer.writeUInt16LE(count, 8);
+  trailer.writeUInt16LE(count, 10);
+  trailer.writeUInt32LE(directorySize, 12);
+  trailer.writeUInt32LE(directoryOffset, 16);
+  trailer.writeUInt16LE(commentLength, 20);
+  return trailer;
+}
+
 /** Deflated, a data descriptor after each entry, an extra field and an archive comment: a zip tool writing to a pipe. */
 function writeAsZipTool(
   entries: Entry[],
@@ -47,49 +117,38 @@ function writeAsZipTool(
   for (const { name, data } of entries) {
     const nameBytes = Buffer.from(name, 'utf8');
     const compressed = deflateRawSync(data);
-    const crc = crc32(data);
-    const size = lies[name]?.declaredSize ?? data.length;
-
-    const local = Buffer.alloc(30);
-    local.writeUInt32LE(0x04034b50, 0);
-    local.writeUInt16LE(20, 4);
-    local.writeUInt16LE(0x0808, 6);
-    local.writeUInt16LE(8, 8);
-    local.writeUInt16LE(nameBytes.length, 26);
-    local.writeUInt16LE(TIMESTAMP_EXTRA.length, 28);
-    const descriptor = Buffer.alloc(16);
-    descriptor.writeUInt32LE(0x08074b50, 0);
-    descriptor.writeUInt32LE(crc, 4);
-    descriptor.writeUInt32LE(compressed.length, 8);
-    descriptor.writeUInt32LE(size, 12);
-
-    const central = Buffer.alloc(46);
-    central.writeUInt32LE(0x02014b50, 0);
-    central.writeUInt16LE(0x031e, 4);
-    central.writeUInt16LE(20, 6);
-    central.writeUInt16LE(0x0808, 8);
-    central.writeUInt16LE(8, 10);
-    central.writeUInt32LE(crc, 16);
-    central.writeUInt32LE(compressed.length, 20);
-    central.writeUInt32LE(size, 24);
-    central.writeUInt16LE(nameBytes.length, 28);
-    central.writeUInt16LE(TIMESTAMP_EXTRA.length, 30);
-    central.writeUInt32LE(offset, 42);
-
-    const written = [local, nameBytes, TIMESTAMP_EXTRA, compressed, descriptor];
+    const sizes = {
+      crc: crc32(data),
+      compressedSize: compressed.length,
+      size: lies[name]?.declaredSize ?? data.length,
+    };
+    const written = [
+      localFileHeader({ nameLength: nameBytes.length }),
+      nameBytes,
+      TIMESTAMP_EXTRA,
+      compressed,
+      dataDescriptor(sizes),
+    ];
     parts.push(...written);
-    directory.push(central, nameBytes, TIMESTAMP_EXTRA);
+    directory.push(
+      centralDirectoryHeader({
+        ...sizes,
+        nameLength: nameBytes.length,
+        offset,
+      }),
+      nameBytes,
+      TIMESTAMP_EXTRA,
+    );
     offset += written.reduce((sum, part) => sum + part.length, 0);
   }
   const directoryBytes = Buffer.concat(directory);
   const comment = Buffer.from('packed again', 'utf8');
-  const trailer = Buffer.alloc(22);
-  trailer.writeUInt32LE(0x06054b50, 0);
-  trailer.writeUInt16LE(entries.length, 8);
-  trailer.writeUInt16LE(entries.length, 10);
-  trailer.writeUInt32LE(directoryBytes.length, 12);
-  trailer.writeUInt32LE(offset, 16);
-  trailer.writeUInt16LE(comment.length, 20);
+  const trailer = endOfCentralDirectory({
+    count: entries.length,
+    directorySize: directoryBytes.length,
+    directoryOffset: offset,
+    commentLength: comment.length,
+  });
   return Buffer.concat([...parts, directoryBytes, trailer, comment]);
 }
 

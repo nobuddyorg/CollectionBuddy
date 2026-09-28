@@ -68,11 +68,7 @@ test.describe('taking a deletion back', () => {
       await app.catalogue.do.removeEntry(title);
       // Held, so the delete cannot go out while axe runs.
       await app.toast.do.hold();
-      // Cards fade in (.fade-up, 500ms); axe samples contrast mid-fade as a false positive unless settled.
-      await expect(app.catalogue.locators.cards.first()).toHaveCSS(
-        'opacity',
-        '1',
-      );
+      await app.catalogue.do.waitForCardsSettled();
       await expectNoSeriousA11yViolations(page, testInfo);
       await app.toast.do.undo();
     } finally {

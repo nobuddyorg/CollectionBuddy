@@ -65,8 +65,7 @@ test.describe('deleting a collection that still holds things', () => {
     const name = `E2E Vollgepackt ${Date.now()}`;
     const title = `Inhalt ${Date.now()}`;
 
-    await page.goto('', { waitUntil: 'networkidle' });
-    await expect(app.categories.locators.selected).not.toBeEmpty();
+    await app.categories.do.load();
     await app.categories.do.create(name);
     try {
       await app.catalogue.do.addEntry(title);
@@ -99,8 +98,7 @@ test.describe('deleting a collection that still holds things', () => {
     const { token, userId } = context();
     const name = `E2E Tausend ${Date.now()}`;
 
-    await page.goto('', { waitUntil: 'networkidle' });
-    await expect(app.categories.locators.selected).not.toBeEmpty();
+    await app.categories.do.load();
     await app.categories.do.create(name);
     try {
       const categoryId = await ownedCategoryId({ token, userId, name });
@@ -130,8 +128,7 @@ test.describe('deleting a collection that still holds things', () => {
     const name = `E2E Doch behalten ${Date.now()}`;
     const title = `Inhalt ${Date.now()}`;
 
-    await page.goto('', { waitUntil: 'networkidle' });
-    await expect(app.categories.locators.selected).not.toBeEmpty();
+    await app.categories.do.load();
     await app.categories.do.create(name);
     try {
       await app.catalogue.do.addEntry(title);

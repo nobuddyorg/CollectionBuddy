@@ -4,7 +4,7 @@ import { expect, test } from './test';
 
 import { repackContentsLikeZipTool, repackLikeZipTool } from './archives';
 import { removeCategoryNamed, removeEntriesTitled } from './cleanup';
-import { SEED, itemsIn } from './fixtures';
+import { SEED, titlesIn } from './fixtures';
 import { expectTitles } from './helpers';
 import { apiAs, context } from './rls/helpers';
 
@@ -51,12 +51,7 @@ test.describe('importing an exported archive', () => {
     const app = on(page);
     await app.categories.do.open(SEED.importCategory);
 
-    const [download] = await Promise.all([
-      page.waitForEvent('download'),
-      app.categories.do.exportCollection(),
-    ]);
-    const archive = await download.path();
-    if (!archive) throw new Error('the export did not save a file to disk');
+    const archive = await app.categories.do.downloadExport();
 
     // Named the way a filesystem names a second copy, never overwriting.
     const copy = `${SEED.importCategory} (2)`;
@@ -67,10 +62,7 @@ test.describe('importing an exported archive', () => {
       await expect(app.categories.locators.selected).toHaveText(copy, {
         timeout: 60_000,
       });
-      await expectTitles(
-        page,
-        itemsIn(SEED.importCategory).map((item) => item.title),
-      );
+      await expectTitles(page, titlesIn(SEED.importCategory));
 
       // Not just the titles: an entry arrives with what was around it.
       const card = app.catalogue.card('Umzugsstück');
@@ -103,12 +95,7 @@ test.describe('importing an exported archive', () => {
 
       const copy = `${SEED.importCategory} (2)`;
       try {
-        const [download] = await Promise.all([
-          page.waitForEvent('download'),
-          app.categories.do.exportCollection(),
-        ]);
-        const archive = await download.path();
-        if (!archive) throw new Error('the export did not save a file to disk');
+        const archive = await app.categories.do.downloadExport();
         const repacked = testInfo.outputPath('repacked.zip');
         repack(archive, repacked);
 
@@ -141,12 +128,7 @@ test.describe('importing an exported archive', () => {
 
     const copy = `${SEED.importCategory} (2)`;
     try {
-      const [download] = await Promise.all([
-        page.waitForEvent('download'),
-        app.categories.do.exportCollection(),
-      ]);
-      const archive = await download.path();
-      if (!archive) throw new Error('the export did not save a file to disk');
+      const archive = await app.categories.do.downloadExport();
 
       await app.categories.do.importArchive(archive);
       await expect(app.categories.locators.selected).toHaveText(copy, {
@@ -188,12 +170,7 @@ test.describe('importing an exported archive', () => {
     const inserts = (url: URL) => url.pathname.endsWith('/rest/v1/images');
     const copy = `${SEED.importCategory} (2)`;
     try {
-      const [download] = await Promise.all([
-        page.waitForEvent('download'),
-        app.categories.do.exportCollection(),
-      ]);
-      const archive = await download.path();
-      if (!archive) throw new Error('the export did not save a file to disk');
+      const archive = await app.categories.do.downloadExport();
 
       // Gated by size, not by the first two rows: an earlier test's entry may still be in the archive.
       const [coverSize, detailSize] = sizes;
@@ -256,12 +233,7 @@ test.describe('importing an exported archive', () => {
     const uploads = '**/storage/v1/object/item-images/**';
     const copy = `${SEED.importCategory} (2)`;
     try {
-      const [download] = await Promise.all([
-        page.waitForEvent('download'),
-        app.categories.do.exportCollection(),
-      ]);
-      const archive = await download.path();
-      if (!archive) throw new Error('the export did not save a file to disk');
+      const archive = await app.categories.do.downloadExport();
 
       // Holds the import's first upload until Cancel is pressed, then lets it land.
       let release = () => {};

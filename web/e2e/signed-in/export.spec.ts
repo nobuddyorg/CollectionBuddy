@@ -29,13 +29,7 @@ test.describe('exporting a category', () => {
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
 
-      const [download] = await Promise.all([
-        page.waitForEvent('download'),
-        app.categories.do.exportCollection(),
-      ]);
-
-      const zipPath = await download.path();
-      if (!zipPath) throw new Error('the export did not save a file to disk');
+      const zipPath = await app.categories.do.downloadExport();
 
       const listing = execFileSync('unzip', ['-l', zipPath], {
         encoding: 'utf8',

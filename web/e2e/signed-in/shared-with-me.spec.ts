@@ -67,8 +67,7 @@ test.describe('a collection shared with you', () => {
     if (error) throw error;
 
     try {
-      await page.goto('', { waitUntil: 'networkidle' });
-      await expect(app.categories.locators.selected).not.toBeEmpty();
+      await app.categories.do.load();
       await app.categories.do.openPanel();
 
       await expect(
@@ -180,8 +179,7 @@ test.describe('the map of a collection shared with you', () => {
         route.fulfill({ contentType: 'image/png', body: BLANK_TILE }),
       );
 
-      await page.goto('', { waitUntil: 'networkidle' });
-      await expect(app.categories.locators.selected).not.toBeEmpty();
+      await app.categories.do.load();
       await app.categories.do.openPanel();
       await app.categories.tab(name).click();
       await expect(app.catalogue.card('Kartenstück')()).toBeVisible();

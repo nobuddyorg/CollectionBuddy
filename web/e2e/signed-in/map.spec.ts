@@ -77,8 +77,7 @@ test.describe('a map whose places are still being looked up', () => {
       route.fulfill({ json: { features: [] } }),
     );
 
-    await page.goto('', { waitUntil: 'networkidle' });
-    await expect(app.categories.locators.selected).not.toBeEmpty();
+    await app.categories.do.load();
     await app.categories.do.create(name);
     try {
       for (const place of Object.keys(LOOKED_UP)) {
