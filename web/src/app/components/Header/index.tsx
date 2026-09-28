@@ -1,14 +1,10 @@
 'use client';
 import { useI18n } from '../../i18n/useI18n';
+import { withBasePath } from '../../lib/env';
 import Icon, { IconType } from '../Icon';
 import { HeaderProps } from './types';
 import { useMenu } from './useMenu';
 import Menu from './Menu';
-
-const withBasePath = (path: `/${string}`): string => {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  return `${basePath}${path}`;
-};
 
 export default function Header({
   user,

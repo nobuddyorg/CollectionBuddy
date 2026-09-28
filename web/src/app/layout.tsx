@@ -4,19 +4,13 @@ import './globals.css';
 import { ConfirmProvider } from './components/Confirm/ConfirmProvider';
 import { ToastProvider } from './components/Toast/ToastProvider';
 import { I18nProvider } from './i18n/I18nProvider';
+import { requireEnv, withBasePath } from './lib/env';
 import { ServiceWorkerRegistration } from './ServiceWorkerRegistration';
 import { SupabaseWarmup } from './SupabaseWarmup';
 
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
-
-// Read as a literal `process.env.X` expression, the only form Next's static export inlines.
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-if (!supabaseUrl) {
-  throw new Error(
-    'Missing NEXT_PUBLIC_SUPABASE_URL -- copy web/.env.example to web/.env.local and fill it in.',
-  );
-}
-const SUPABASE_ORIGIN = new URL(supabaseUrl).origin;
+const SUPABASE_ORIGIN = new URL(
+  requireEnv('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL),
+).origin;
 
 // No weights for the variable fonts: naming them makes next/font preload a file per weight.
 const displayFont = Archivo({
@@ -81,19 +75,19 @@ export default function RootLayout({
         <title>CollectionBuddy</title>
         {/* I18nProvider updates this via a `meta[name="description"]` selector that must keep matching. */}
         <meta name="description" content="Sammeln • Ordnen • Behalten" />
-        <link rel="manifest" href={`${basePath}/site.webmanifest`} />
-        <link rel="icon" href={`${basePath}/favicon.ico`} />
+        <link rel="manifest" href={withBasePath('/site.webmanifest')} />
+        <link rel="icon" href={withBasePath('/favicon.ico')} />
         <link
           rel="icon"
-          href={`${basePath}/favicon-32x32.png`}
+          href={withBasePath('/favicon-32x32.png')}
           sizes="32x32"
           type="image/png"
         />
         <link
           rel="apple-touch-icon"
-          href={`${basePath}/apple-touch-icon.png`}
+          href={withBasePath('/apple-touch-icon.png')}
         />
-        <link rel="shortcut icon" href={`${basePath}/favicon.ico`} />
+        <link rel="shortcut icon" href={withBasePath('/favicon.ico')} />
         {/* One per OS scheme: a meta tag can only follow the OS, not the in-app toggle. */}
         {THEME_COLORS.map(({ media, color }) => (
           <meta key={media} name="theme-color" content={color} media={media} />
