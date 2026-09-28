@@ -126,7 +126,7 @@
     "tags_placeholder": "Enter tags… (Enter/Comma)",
     "tags_count": "{count} tags",
     "tags_count_one": "{count} tag",
-    "tags_limit": "50 tags at most – remove one to add another",
+    "tags_limit": "{max} tags at most – remove one to add another",
     "add": "Add",
     "search_error": "Place search failed. Please try again.",
     "save_error": "Could not save this entry. Please try again.",

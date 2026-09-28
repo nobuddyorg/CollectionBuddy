@@ -126,7 +126,7 @@
     "tags_placeholder": "Tags eingeben… (Enter/Komma)",
     "tags_count": "{count} Tags",
     "tags_count_one": "{count} Tag",
-    "tags_limit": "Höchstens 50 Tags – entferne einen, um einen weiteren hinzuzufügen",
+    "tags_limit": "Höchstens {max} Tags – entferne einen, um einen weiteren hinzuzufügen",
     "add": "Hinzufügen",
     "search_error": "Ortssuche fehlgeschlagen. Bitte erneut versuchen.",
     "save_error": "Eintrag konnte nicht gespeichert werden. Bitte erneut versuchen.",
