@@ -1,16 +1,21 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  ExportCancelledError,
-  exportCategory,
-  PHOTO_FETCH_TIMEOUT_MS,
-} from './exportCategory';
+import { ExportCancelledError } from './exportCancellation';
+import { exportCategory } from './exportCategory';
+import { PHOTO_FETCH_TIMEOUT_MS } from './exportPhotos';
 import {
   item,
+  onePhotoExport,
   paginatedListItems,
   fakeSignUrls,
   okResponse,
 } from './exportCategory.test-support';
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('exportCategory, timeout and cancellation', () => {
   it('bounds every photograph fetch with a fresh per-attempt timeout signal', async () => {
@@ -19,19 +24,8 @@ describe('exportCategory, timeout and cancellation', () => {
       'fetch',
       vi.fn(async () => okResponse([1])),
     );
-    try {
-      await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })], {
-          'item-1': ['1.webp'],
-        }),
-        signUrls: fakeSignUrls(),
-      });
-      expect(timeoutSpy).toHaveBeenCalledWith(PHOTO_FETCH_TIMEOUT_MS);
-    } finally {
-      vi.unstubAllGlobals();
-      timeoutSpy.mockRestore();
-    }
+    await exportCategory(onePhotoExport());
+    expect(timeoutSpy).toHaveBeenCalledWith(PHOTO_FETCH_TIMEOUT_MS);
   });
 
   // The signal handed to `fetch` must be linked to the caller's own, not merely a look-alike timeout.
@@ -45,22 +39,11 @@ describe('exportCategory, timeout and cancellation', () => {
         return okResponse([1]);
       }),
     );
-    try {
-      await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })], {
-          'item-1': ['1.webp'],
-        }),
-        signUrls: fakeSignUrls(),
-        signal: controller.signal,
-      });
-      expect(capturedSignal).toBeDefined();
-      expect(capturedSignal!.aborted).toBe(false);
-      controller.abort();
-      expect(capturedSignal!.aborted).toBe(true);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    await exportCategory({ ...onePhotoExport(), signal: controller.signal });
+    expect(capturedSignal).toBeDefined();
+    expect(capturedSignal!.aborted).toBe(false);
+    controller.abort();
+    expect(capturedSignal!.aborted).toBe(true);
   });
 
   it('retries a fetch that aborts on its own timeout, the same as any other transient failure', async () => {
@@ -76,22 +59,11 @@ describe('exportCategory, timeout and cancellation', () => {
         return okResponse([9]);
       }),
     );
-    try {
-      const promise = exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })], {
-          'item-1': ['1.webp'],
-        }),
-        signUrls: fakeSignUrls(),
-      });
-      await vi.advanceTimersByTimeAsync(10_000);
-      const result = await promise;
-      expect(calls).toBe(2);
-      expect(result.skippedPhotoCount).toBe(0);
-    } finally {
-      vi.useRealTimers();
-      vi.unstubAllGlobals();
-    }
+    const promise = exportCategory(onePhotoExport());
+    await vi.advanceTimersByTimeAsync(10_000);
+    const result = await promise;
+    expect(calls).toBe(2);
+    expect(result.skippedPhotoCount).toBe(0);
   });
 
   it('rejects immediately with ExportCancelledError when the signal is already aborted, before any I/O', async () => {
@@ -124,24 +96,20 @@ describe('exportCategory, timeout and cancellation', () => {
         return okResponse([1]);
       }),
     );
-    try {
-      const items = Array.from({ length: 10 }, (_, i) =>
-        item({ id: `item-${i}` }),
-      );
-      const photos = Object.fromEntries(
-        items.map((entry) => [entry.id, ['1.webp']]),
-      );
-      const failure = exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems(items, photos),
-        signUrls: fakeSignUrls(),
-        signal: controller.signal,
-      });
-      await expect(failure).rejects.toBeInstanceOf(ExportCancelledError);
-      expect(fetchCalls).toBeLessThan(items.length);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    const items = Array.from({ length: 10 }, (_, i) =>
+      item({ id: `item-${i}` }),
+    );
+    const photos = Object.fromEntries(
+      items.map((entry) => [entry.id, ['1.webp']]),
+    );
+    const failure = exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems(items, photos),
+      signUrls: fakeSignUrls(),
+      signal: controller.signal,
+    });
+    await expect(failure).rejects.toBeInstanceOf(ExportCancelledError);
+    expect(fetchCalls).toBeLessThan(items.length);
   });
 
   // Without a check after the last failed retry, a cancel landing there surfaces as the network error.
@@ -157,24 +125,15 @@ describe('exportCategory, timeout and cancellation', () => {
         throw new Error('network error');
       }),
     );
-    try {
-      const promise = exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })], {
-          'item-1': ['1.webp'],
-        }),
-        signUrls: fakeSignUrls(),
-        signal: controller.signal,
-      });
-      // Attached before the timers advance, or Node flags the rejection as unhandled in between.
-      const assertion =
-        expect(promise).rejects.toBeInstanceOf(ExportCancelledError);
-      await vi.advanceTimersByTimeAsync(10_000);
-      await assertion;
-      expect(calls).toBe(3);
-    } finally {
-      vi.useRealTimers();
-      vi.unstubAllGlobals();
-    }
+    const promise = exportCategory({
+      ...onePhotoExport(),
+      signal: controller.signal,
+    });
+    // Attached before the timers advance, or Node flags the rejection as unhandled in between.
+    const assertion =
+      expect(promise).rejects.toBeInstanceOf(ExportCancelledError);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await assertion;
+    expect(calls).toBe(3);
   });
 });

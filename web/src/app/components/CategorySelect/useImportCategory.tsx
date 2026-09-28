@@ -82,7 +82,6 @@ export function importPartialMessage(
 export function useImportCategory(existingCategoryNames: string[]) {
   const { t } = useI18n();
   const toast = useToast();
-  // Null means not importing; a separate boolean would be a second source of truth.
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   // One controller per run, so Cancel always aborts the import actually in flight.
   const controllerRef = useRef<AbortController | null>(null);
@@ -146,7 +145,6 @@ export function useImportCategory(existingCategoryNames: string[]) {
   useBeforeUnloadGuard(progress !== null);
 
   return {
-    progress,
     isImporting: progress !== null,
     message: importProgressMessage(progress, t),
     runImport,

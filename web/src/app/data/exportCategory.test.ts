@@ -1,10 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { exportCategory, type ExportProgress } from './exportCategory';
 import { CSV_NAME, MANIFEST_NAME } from './exportFormat';
 import {
   type ListItems,
-  type SignUrls,
   item,
   paginatedListItems,
   fakeSignUrls,
@@ -12,6 +11,10 @@ import {
   readZipEntries,
   rootFolderOf,
 } from './exportCategory.test-support';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('exportCategory', () => {
   it('throws when the item listing fails, rather than exporting an incomplete collection', async () => {
@@ -30,42 +33,38 @@ describe('exportCategory', () => {
     await expect(failure).rejects.toHaveProperty('name', 'ExportError');
   });
 
-  it('signs and fetches in batches larger than one page of items, and assembles a readable archive', async () => {
+  it('counts every entry and photograph, names the archive by category and date, and assembles it readable', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => okResponse([7])),
     );
-    try {
-      const items = [
-        item({ id: 'a', title: 'Coin A' }),
-        item({ id: 'b', title: 'Coin B' }),
-      ];
-      const now = () => new Date(2026, 0, 15, 12, 0, 0);
-      const result = await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        now,
-        listItems: paginatedListItems(items, {
-          a: ['1.webp'],
-          b: ['1.webp'],
-        }),
-        signUrls: fakeSignUrls(),
-      });
+    const items = [
+      item({ id: 'a', title: 'Coin A' }),
+      item({ id: 'b', title: 'Coin B' }),
+    ];
+    const now = () => new Date(2026, 0, 15, 12, 0, 0);
+    const result = await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      now,
+      listItems: paginatedListItems(items, {
+        a: ['1.webp'],
+        b: ['1.webp'],
+      }),
+      signUrls: fakeSignUrls(),
+    });
 
-      expect(result.itemCount).toBe(2);
-      expect(result.photoCount).toBe(2);
-      expect(result.skippedPhotoCount).toBe(0);
-      expect(result.filename).toBe('CollectionBuddy-coins-2026-01-15.zip');
+    expect(result.itemCount).toBe(2);
+    expect(result.photoCount).toBe(2);
+    expect(result.skippedPhotoCount).toBe(0);
+    expect(result.filename).toBe('CollectionBuddy-coins-2026-01-15.zip');
 
-      const entries = await readZipEntries(result.blob);
-      const root = rootFolderOf(result);
-      expect(root).toBe('CollectionBuddy-coins-2026-01-15');
-      expect(entries.has(`${root}/${MANIFEST_NAME}`)).toBe(true);
-      expect(entries.has(`${root}/${CSV_NAME}`)).toBe(true);
-      expect(entries.has(`${root}/photos/001-coin-a/1.webp`)).toBe(true);
-      expect(entries.has(`${root}/photos/002-coin-b/1.webp`)).toBe(true);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    const entries = await readZipEntries(result.blob);
+    const root = rootFolderOf(result);
+    expect(root).toBe('CollectionBuddy-coins-2026-01-15');
+    expect(entries.has(`${root}/${MANIFEST_NAME}`)).toBe(true);
+    expect(entries.has(`${root}/${CSV_NAME}`)).toBe(true);
+    expect(entries.has(`${root}/photos/001-coin-a/1.webp`)).toBe(true);
+    expect(entries.has(`${root}/photos/002-coin-b/1.webp`)).toBe(true);
   });
 
   it('wraps every entry -- manifest, spreadsheet and every photograph -- in one root folder', async () => {
@@ -73,20 +72,16 @@ describe('exportCategory', () => {
       'fetch',
       vi.fn(async () => okResponse([1])),
     );
-    try {
-      const result = await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'a' })], { a: ['1.webp'] }),
-        signUrls: fakeSignUrls(),
-      });
-      const entries = await readZipEntries(result.blob);
-      const root = rootFolderOf(result);
-      expect(entries.size).toBeGreaterThan(0);
-      for (const name of entries.keys()) {
-        expect(name.startsWith(`${root}/`)).toBe(true);
-      }
-    } finally {
-      vi.unstubAllGlobals();
+    const result = await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'a' })], { a: ['1.webp'] }),
+      signUrls: fakeSignUrls(),
+    });
+    const entries = await readZipEntries(result.blob);
+    const root = rootFolderOf(result);
+    expect(entries.size).toBeGreaterThan(0);
+    for (const name of entries.keys()) {
+      expect(name.startsWith(`${root}/`)).toBe(true);
     }
   });
 
@@ -95,30 +90,26 @@ describe('exportCategory', () => {
       'fetch',
       vi.fn(async () => okResponse([1])),
     );
-    try {
-      const onProgress = vi.fn<(progress: ExportProgress) => void>();
-      await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        onProgress,
-        listItems: paginatedListItems([item({ id: 'a' }), item({ id: 'b' })], {
-          a: ['1.webp'],
-          b: ['1.webp'],
-        }),
-        signUrls: fakeSignUrls(),
-      });
+    const onProgress = vi.fn<(progress: ExportProgress) => void>();
+    await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      onProgress,
+      listItems: paginatedListItems([item({ id: 'a' }), item({ id: 'b' })], {
+        a: ['1.webp'],
+        b: ['1.webp'],
+      }),
+      signUrls: fakeSignUrls(),
+    });
 
-      // Exact sequence, not just membership: `done` counts up one at a time.
-      expect(onProgress.mock.calls.map(([progress]) => progress)).toEqual([
-        { phase: 'items', done: 0, total: 0 },
-        { phase: 'items', done: 2, total: 0 },
-        { phase: 'photos', done: 0, total: 2 },
-        { phase: 'photos', done: 1, total: 2 },
-        { phase: 'photos', done: 2, total: 2 },
-        { phase: 'packing', done: 2, total: 2 },
-      ]);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    // Exact sequence, not just membership: `done` counts up one at a time.
+    expect(onProgress.mock.calls.map(([progress]) => progress)).toEqual([
+      { phase: 'items', done: 0, total: 0 },
+      { phase: 'items', done: 2, total: 0 },
+      { phase: 'photos', done: 0, total: 2 },
+      { phase: 'photos', done: 1, total: 2 },
+      { phase: 'photos', done: 2, total: 2 },
+      { phase: 'packing', done: 2, total: 2 },
+    ]);
   });
 
   it('signs with a multi-hour TTL, so a slow download outlives the signed URL', async () => {
@@ -126,19 +117,12 @@ describe('exportCategory', () => {
       'fetch',
       vi.fn(async () => okResponse([1])),
     );
-    const signUrls = vi.fn(async (paths: string[]) => ({
-      data: paths.map((path) => ({ path, signedUrl: `signed://${path}` })),
-      error: null,
-    }));
-    try {
-      await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'a' })], { a: ['1.webp'] }),
-        signUrls: signUrls as unknown as SignUrls,
-      });
-      expect(signUrls).toHaveBeenCalledWith(expect.any(Array), 6 * 3600);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    const signUrls = fakeSignUrls();
+    await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'a' })], { a: ['1.webp'] }),
+      signUrls,
+    });
+    expect(signUrls).toHaveBeenCalledWith(expect.any(Array), 6 * 3600);
   });
 });

@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { exportCategory, type ExportResult } from './exportCategory';
 import { MANIFEST_NAME, type ExportManifest } from './exportFormat';
 import {
   type SignUrls,
   item,
+  onePhotoExport,
   paginatedListItems,
   fakeSignUrls,
   okResponse,
@@ -20,6 +21,11 @@ async function manifestOf(result: ExportResult): Promise<ExportManifest> {
   return JSON.parse(new TextDecoder().decode(bytes)) as ExportManifest;
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
 describe('exportCategory, a photograph that cannot be fetched', () => {
   it('is left out of the archive but still named in the manifest, and the export still resolves', async () => {
     let permanentFailureCalls = 0;
@@ -34,36 +40,32 @@ describe('exportCategory, a photograph that cannot be fetched', () => {
         return okResponse([1, 2, 3]);
       }),
     );
-    try {
-      const result = await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })], {
-          'item-1': ['1.webp', '2.webp'],
-        }),
-        signUrls: fakeSignUrls(),
-      });
+    const result = await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'item-1' })], {
+        'item-1': ['1.webp', '2.webp'],
+      }),
+      signUrls: fakeSignUrls(),
+    });
 
-      expect(result.skippedPhotoCount).toBe(1);
-      expect(result.photoCount).toBe(1);
-      expect(permanentFailureCalls).toBe(1);
+    expect(result.skippedPhotoCount).toBe(1);
+    expect(result.photoCount).toBe(1);
+    expect(permanentFailureCalls).toBe(1);
 
-      const entries = await readZipEntries(result.blob);
-      const root = rootFolderOf(result);
-      expect(entries.has(`${root}/photos/001-item/1.webp`)).toBe(true);
-      expect(entries.get(`${root}/photos/001-item/1.webp`)).toEqual(
-        new Uint8Array([1, 2, 3]),
-      );
-      expect(entries.has(`${root}/photos/001-item/2.webp`)).toBe(false);
+    const entries = await readZipEntries(result.blob);
+    const root = rootFolderOf(result);
+    expect(entries.has(`${root}/photos/001-item/1.webp`)).toBe(true);
+    expect(entries.get(`${root}/photos/001-item/1.webp`)).toEqual(
+      new Uint8Array([1, 2, 3]),
+    );
+    expect(entries.has(`${root}/photos/001-item/2.webp`)).toBe(false);
 
-      // The manifest still names the photograph the archive is missing.
-      const manifest = await manifestOf(result);
-      expect(manifest.items[0].photos).toEqual([
-        'photos/001-item/1.webp',
-        'photos/001-item/2.webp',
-      ]);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    // The manifest still names the photograph the archive is missing.
+    const manifest = await manifestOf(result);
+    expect(manifest.items[0].photos).toEqual([
+      'photos/001-item/1.webp',
+      'photos/001-item/2.webp',
+    ]);
   });
 
   it('skips a photograph whose signing came back with no usable URL', async () => {
@@ -79,24 +81,20 @@ describe('exportCategory, a photograph that cannot be fetched', () => {
       ),
       error: null,
     })) as unknown as SignUrls;
-    try {
-      const result = await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })], {
-          'item-1': ['1.webp', '2.webp'],
-        }),
-        signUrls,
-      });
+    const result = await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'item-1' })], {
+        'item-1': ['1.webp', '2.webp'],
+      }),
+      signUrls,
+    });
 
-      expect(result.skippedPhotoCount).toBe(1);
-      expect(result.photoCount).toBe(1);
-      const entries = await readZipEntries(result.blob);
-      const root = rootFolderOf(result);
-      expect(entries.has(`${root}/photos/001-item/1.webp`)).toBe(false);
-      expect(entries.has(`${root}/photos/001-item/2.webp`)).toBe(true);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    expect(result.skippedPhotoCount).toBe(1);
+    expect(result.photoCount).toBe(1);
+    const entries = await readZipEntries(result.blob);
+    const root = rootFolderOf(result);
+    expect(entries.has(`${root}/photos/001-item/1.webp`)).toBe(false);
+    expect(entries.has(`${root}/photos/001-item/2.webp`)).toBe(true);
   });
 
   it('logs which photograph it skipped and why', async () => {
@@ -107,25 +105,14 @@ describe('exportCategory, a photograph that cannot be fetched', () => {
       'fetch',
       vi.fn(async () => statusResponse(404)),
     );
-    try {
-      await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })], {
-          'item-1': ['1.webp'],
-        }),
-        signUrls: fakeSignUrls(),
-      });
-      expect(consoleError).toHaveBeenCalledWith(
-        'Skipping photograph',
-        'uid/item-1/1.webp',
-        expect.anything(),
-      );
-      const [, , error] = consoleError.mock.calls[0] as unknown[];
-      expect(String(error)).toContain('HTTP 404');
-    } finally {
-      consoleError.mockRestore();
-      vi.unstubAllGlobals();
-    }
+    await exportCategory(onePhotoExport());
+    expect(consoleError).toHaveBeenCalledWith(
+      'Skipping photograph',
+      'uid/item-1/1.webp',
+      expect.anything(),
+    );
+    const [, , error] = consoleError.mock.calls[0] as unknown[];
+    expect(String(error)).toContain('HTTP 404');
   });
 
   it('names the bucket in the error for a photograph with no signed URL at all', async () => {
@@ -136,18 +123,8 @@ describe('exportCategory, a photograph that cannot be fetched', () => {
       data: [],
       error: null,
     })) as unknown as SignUrls;
-    try {
-      await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })], {
-          'item-1': ['1.webp'],
-        }),
-        signUrls,
-      });
-      const [, , error] = consoleError.mock.calls[0] as unknown[];
-      expect(String(error)).toContain('Unsigned path in');
-    } finally {
-      consoleError.mockRestore();
-    }
+    await exportCategory({ ...onePhotoExport(), signUrls });
+    const [, , error] = consoleError.mock.calls[0] as unknown[];
+    expect(String(error)).toContain('Unsigned path in');
   });
 });

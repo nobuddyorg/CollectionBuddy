@@ -45,7 +45,7 @@ export async function readAllKeysetPages<T>(
   return { data: rows, error: null };
 }
 
-// Bounded like the photo pools in exportCategory.ts and importCategory.ts.
+// Bounded like the photo pools in exportPhotos.ts and importCategory.ts.
 const CHUNK_READ_CONCURRENCY = 6;
 
 /** Chunked reads a few at a time, joined in chunk order; the first failure ends it with no partial data. */

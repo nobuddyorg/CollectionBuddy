@@ -136,13 +136,8 @@ describe('useImportCategory', () => {
     });
 
     await waitFor(() =>
-      expect(result.current.progress).toEqual({
-        phase: 'reading',
-        done: 0,
-        total: 0,
-      }),
+      expect(result.current.message).toBe('Reading archive…'),
     );
-    expect(result.current.message).toBe('Reading archive…');
     await act(async () => {
       release?.();
     });

@@ -3,11 +3,8 @@ import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  ExportCancelledError,
-  exportCategory,
-  type ExportProgress,
-} from '../../data/exportCategory';
+import { ExportCancelledError } from '../../data/exportCancellation';
+import { exportCategory, type ExportProgress } from '../../data/exportCategory';
 import { ZipLimitError } from '../../data/zip';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
@@ -75,7 +72,7 @@ describe('useExportCategory', () => {
       'CollectionBuddy-coins.zip',
     );
     expect(result.current.isExporting).toBe(false);
-    expect(result.current.progress).toBeNull();
+    expect(result.current.message).toBeNull();
     // Nothing was left out, so nothing is reported as left out.
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -95,14 +92,9 @@ describe('useExportCategory', () => {
     });
 
     await waitFor(() =>
-      expect(result.current.progress).toEqual({
-        phase: 'items',
-        done: 0,
-        total: 0,
-      }),
+      expect(result.current.message).toBe('Reading entries…'),
     );
     expect(result.current.isExporting).toBe(true);
-    expect(result.current.message).toBe('Reading entries…');
 
     await act(async () => {
       release?.();

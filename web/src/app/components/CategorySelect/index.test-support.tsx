@@ -15,7 +15,6 @@ export function exportState(
   overrides: Partial<ReturnType<typeof useExportCategory>> = {},
 ) {
   return {
-    progress: null,
     isExporting: false,
     message: null,
     runExport: vi.fn(),
@@ -28,7 +27,6 @@ export function importState(
   overrides: Partial<ReturnType<typeof useImportCategory>> = {},
 ) {
   return {
-    progress: null,
     isImporting: false,
     message: null,
     runImport: vi.fn(),

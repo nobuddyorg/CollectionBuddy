@@ -50,6 +50,8 @@ export const MUTATE_TARGETS = [
   'src/app/data/importPhoto.ts',
   'src/app/data/photoType.ts',
   'src/app/data/importCancellation.ts',
+  'src/app/data/exportCancellation.ts',
+  'src/app/data/exportPhotos.ts',
   'src/app/components/CategorySelect/selection.ts',
   'src/app/components/CategorySelect/useImportCategory.tsx',
   'src/app/components/ItemList/searchStatus.ts',
