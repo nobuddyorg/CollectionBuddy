@@ -1,9 +1,4 @@
--- The branches of the write-path triggers that the happy paths never
--- reach: the "not found" guards, the fields a client may try to set for
--- itself, and the one place a trigger deliberately writes a row belonging
--- to somebody else. 050_functions_triggers_test.sql covers the pure
--- functions and the normal path through each trigger; this file is the
--- rest of each trigger body.
+-- The trigger branches 050's normal paths never reach: not-found guards, client-set fields, and the one cross-owner write.
 begin;
 select no_plan();
 
@@ -13,10 +8,7 @@ select gen_random_uuid() as owner_id, gen_random_uuid() as editor_id \gset
 
 select pg_temp.auth_as(:'owner_id'::uuid, 'edge-owner@collectionbuddy.test');
 
--- enforce_user_id is wired onto categories as well as items, and only the
--- items half is covered (010_ownership_rls_test.sql). Same trigger
--- function, but a separate wiring in 0004_triggers.sql that could be
--- dropped on its own.
+-- enforce_user_id's categories wiring (0004) is separate from the items one 010 covers, so it could be dropped alone.
 insert into public.categories (user_id, name) values (:'editor_id'::uuid, 'Addressed elsewhere')
 returning id as category_id, user_id as planted_owner \gset
 
@@ -29,10 +21,7 @@ returning user_id as after_update_owner \gset
 select is(:'after_update_owner'::uuid, :'owner_id'::uuid,
   'and an existing collection cannot be handed to another owner either');
 
--- tg_set_updated_at: the column is the server's to write, not the
--- client's. now() is fixed for the whole transaction, so "it moved
--- forward" is untestable here -- what is testable, and what actually
--- matters, is that a value supplied by the caller is discarded.
+-- now() is fixed per transaction, so tg_set_updated_at is proved by discarding a caller's value, not by moving forward.
 update public.categories set name = 'Renamed', updated_at = timestamptz '2000-01-01'
 where id = :'category_id'::uuid;
 
@@ -54,10 +43,7 @@ select ok(
   'and so is one on an entry'
 );
 
--- tg_item_categories_enforce's first guard. A mapping row references both
--- sides by foreign key, so a missing row would be refused either way --
--- but the trigger runs first, and its message is what a client actually
--- sees. Both directions, since the function looks each up separately.
+-- tg_item_categories_enforce runs before the foreign keys, so its message is what a client sees; it looks up each side separately.
 select throws_ok(
   format(
     'insert into public.item_categories (item_id, category_id) values (%L, %L)',
@@ -78,10 +64,7 @@ select throws_ok(
   'and so is filing one into a collection that does not exist'
 );
 
--- tg_images_enforce's own "not found" guard, which is what stops a
--- photograph record being written against an item id nobody owns. The
--- foreign key would refuse it too; the trigger is what refuses it first,
--- and with a message rather than a constraint violation.
+-- tg_images_enforce refuses before the foreign key would, with a message rather than a constraint violation.
 select throws_ok(
   format(
     'insert into public.images (item_id, path_full) values (%L, %L)',
@@ -92,12 +75,7 @@ select throws_ok(
   'a photograph record for an item that does not exist is refused'
 );
 
--- The one place a trigger deliberately writes a row owned by someone other
--- than the caller: an editor photographing the owner's entry. user_id
--- follows the *item*, not the uploader, so the photograph belongs to the
--- collection's entry rather than to whoever happened to take it -- and
--- therefore survives the editor's grant being revoked. Only the right to
--- *insert* it is widened by the grant.
+-- The one cross-owner trigger write: user_id follows the item, not the uploader, so the photograph outlives the editor's grant.
 insert into public.category_shares (category_id, invited_email, role)
 values (:'category_id'::uuid, 'edge-editor@collectionbuddy.test', 'editor')
 returning id as share_id \gset
@@ -119,13 +97,7 @@ select is(
   'and it stays with the entry once the editor''s grant is revoked'
 );
 
--- delete_item_if_orphan runs as its owner, so the sweep is not filtered by
--- the deleting user's own visibility: an entry an editor filed into a
--- shared collection is removed along with the collection, exactly like the
--- owner's own entries, even though the owner can neither see nor delete
--- that entry directly (030_editor_role_rls_test.sql). Leaving it behind
--- would strand a row its owner could no longer reach through any
--- collection.
+-- The sweep runs as its owner, so a collection's delete also removes an editor-filed entry its owner cannot see.
 insert into public.categories (name) values ('Sweep (pgTAP)')
 returning id as sweep_category_id \gset
 insert into public.category_shares (category_id, invited_email, role)
@@ -146,9 +118,7 @@ select is(
 
 delete from public.categories where id = :'sweep_category_id'::uuid;
 
--- Read back with no identity in the way: an RLS-scoped read could not tell
--- "removed" from "invisible to the owner", and invisible is exactly what
--- this row was a moment ago.
+-- Read as postgres: an RLS-scoped read cannot tell removed from invisible.
 reset role;
 select is(
   (select count(*) from public.items where id = :'editor_item_id'::uuid),
@@ -156,9 +126,7 @@ select is(
   'deleting the collection sweeps away the editor''s orphaned entry too, not only the owner''s'
 );
 
--- The sweep is a no-op when nothing is actually orphaned, which is what
--- makes it safe to fire on every mapping delete: an entry filed in two
--- collections, which only predates 0020, survives losing one of them.
+-- A sweep with no orphan deletes nothing, so it is safe on every mapping delete; filing in two collections predates 0020.
 select pg_temp.auth_as(:'owner_id'::uuid, 'edge-owner@collectionbuddy.test');
 insert into public.categories (name) values ('Kept A')
 returning id as kept_a \gset
@@ -178,9 +146,7 @@ select is(
   'an entry filed in two collections survives losing one of them'
 );
 
--- Deleting the entry itself, rather than its last mapping: the mappings go
--- by foreign key cascade, and the sweep that then fires must not fault on
--- an item row that is already gone.
+-- The entry's own delete cascades its mappings, and the sweep that then fires must not fault on the missing item.
 delete from public.items where id = :'kept_item'::uuid;
 select is(
   (select count(*) from public.item_categories where item_id = :'kept_item'::uuid),
@@ -188,18 +154,12 @@ select is(
   'deleting the entry directly cascades its mappings away without the sweep faulting on the missing row'
 );
 
--- caller_email() with no email claim, asserted directly here as well as
--- through its consequences in 025_category_shares_lifecycle_test.sql: this
--- is the value every sharing predicate compares against, and NULL is what
--- makes them all fail closed.
+-- Every sharing predicate compares against caller_email(), and NULL is what makes them all fail closed (025).
 select pg_temp.auth_as(:'owner_id'::uuid, null);
 select is(public.caller_email(), null,
   'caller_email answers NULL for a token carrying no email claim');
 
--- storage_item_id's remaining non-parsing shapes. Each has to answer NULL
--- rather than raise: the function is called from inside an RLS USING
--- clause, where a raised error takes down the whole statement instead of
--- failing to match one row.
+-- storage_item_id runs inside an RLS USING clause, so each shape must answer NULL rather than raise.
 select is(public.storage_item_id('uid//file.webp'), null,
   'an empty second segment answers NULL');
 select is(public.storage_item_id(''), null,
@@ -225,14 +185,11 @@ select is(
 select is(public.storage_item_id('uid/3f2504e0-4f89-11d3-9a0c-0305e82c330g/file.webp'), null,
   'a uuid-shaped segment with a non-hex digit answers NULL');
 
--- join_tags on the empty array, the shape every entry with no tags
--- actually has -- the NULL case (050_functions_triggers_test.sql) is the
--- one that cannot occur, since tags is NOT NULL.
+-- The empty array is what an untagged entry holds; tags is NOT NULL, so 050's NULL case never occurs.
 select is(public.join_tags(array[]::text[]), '',
   'an empty tag array joins to an empty string');
 
--- normalize_text collapses every kind of whitespace, not just the space
--- character -- a title pasted out of a spreadsheet arrives full of tabs.
+-- A title pasted out of a spreadsheet arrives full of tabs.
 select is(public.normalize_text(E'a\t\tb\nc'), 'a b c',
   'tabs and newlines collapse to single spaces like any other whitespace');
 

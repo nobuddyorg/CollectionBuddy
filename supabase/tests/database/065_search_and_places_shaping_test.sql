@@ -1,13 +1,10 @@
--- Shaping of the two read RPCs once authorization is settled: matched columns, page window, total, and each seen through a grant.
--- search_category_items queries with RLS bypassed (0002_functions.sql), so nothing downstream re-checks a lost ILIKE branch.
+-- Shaping of both read RPCs once authorization is settled; search bypasses RLS (definer), so nothing re-checks a lost ILIKE branch.
 begin;
 select no_plan();
 
 \ir _helpers.psql
 
--- The function's own `order by created_at desc` is only observable through
--- WITH ORDINALITY -- aggregating its output without it would re-sort the
--- rows and assert nothing about the order they arrived in.
+-- WITH ORDINALITY keeps the function's own row order; aggregating without it would re-sort.
 create or replace function pg_temp.search_page(
   p_category_id uuid, p_term text, p_from int, p_to int
 )
@@ -47,8 +44,7 @@ returning id as category_id \gset
 insert into public.categories (name) values ('Shaping, other (pgTAP)')
 returning id as other_category_id \gset
 
--- Five matching entries with distinct creation times, plus one in the
--- other collection that must never appear.
+-- Five matches with distinct creation times, plus one in the other collection that must never appear.
 insert into public.items (title, created_at) values
   ('Probe one', now() - interval '5 hours'),
   ('Probe two', now() - interval '4 hours'),
@@ -88,18 +84,14 @@ select is(
   'and a window entirely past the end returns nothing'
 );
 
--- total_count is the whole match count, not the page's -- it is what the
--- pager renders, so a window-sized value would silently cap navigation at
--- page one.
+-- The pager renders total_count, so a window-sized value would silently cap navigation at page one.
 select is(
   pg_temp.search_total(:'category_id'::uuid, 'Probe', 0, 1),
   5::bigint,
   'total_count counts every match in the collection, not the rows in the page'
 );
 
--- Each row carries its own entry's photographs, oldest first, as the
--- unsearched page's embed does (0030); inserted newest first, so the order
--- comes from the function rather than from insertion.
+-- Inserted newest first, so the oldest-first order, as the unsearched embed has it (0030), comes from the function.
 select i.id as five_id from public.items i where i.title = 'Probe five' \gset
 select i.id as four_id from public.items i where i.title = 'Probe four' \gset
 insert into public.images (item_id, path_full, created_at) values
@@ -132,19 +124,14 @@ select is(
   'a carried photograph names its row and paths, and nothing else of the row'
 );
 
--- Scoping, restated against a satisfiable filter: an entry with a matching
--- title in another of the caller's own collections is still not in this
--- collection's results (TEST_STRATEGY.md §7 rule 4).
+-- Scoping against a satisfiable filter: a match in another of the caller's collections stays out (TEST_STRATEGY.md §7 rule 4).
 select is(
   pg_temp.search_page(:'category_id'::uuid, 'elsewhere', 0, 9),
   array[]::text[],
   'a matching entry in another collection of the caller''s own is not returned'
 );
 
--- All four ILIKE branches. Each one is a separate OR in the function body
--- with its own trigram index behind it, and losing one shows up only as
--- "search stopped finding things by place" -- a shape no authorization
--- test would ever notice.
+-- Each ILIKE branch is its own OR with its own trigram index; losing one is invisible to every authorization test.
 insert into public.items (title, description, place, tags) values
   ('Branch entry', E'Eine Beschreibung\nmit Silberglanz', 'Kölnisch Wasser', array['Reichsmark', 'silber'])
 returning id as branch_item \gset
@@ -172,19 +159,14 @@ select is(
   'and against the tags, through the generated tags_text column'
 );
 
--- Matching is case-insensitive on every branch -- ILIKE is the whole point
--- of the trigram indexes, and a `like` slipping in would still pass every
--- test above, which all search with the stored casing.
+-- Every case above searches with the stored casing, so a like in place of ILIKE would pass them all.
 select is(
   pg_temp.search_page(:'category_id'::uuid, 'sILBERGLANZ', 0, 9),
   array['Branch entry'],
   'matching ignores case'
 );
 
--- An editor grant opens reading, exactly like a viewer grant: the read
--- predicate is has_category_read_access, which does not look at the role
--- at all. 060 covers the viewer; this is the other role reaching the same
--- rows through the same RPC.
+-- has_category_read_access ignores the role, so an editor grant reads as a viewer grant (060) does.
 insert into public.category_shares (category_id, invited_email, role)
 values (:'category_id'::uuid, 'shaping-grantee@collectionbuddy.test', 'editor');
 
@@ -195,20 +177,7 @@ select is(
   'an editor grant opens search on the shared collection, the same as a viewer grant does'
 );
 
--- Expiry is deliberately not re-tested through search here.
--- 020_category_shares_rls_test.sql proves an expired grant opens nothing,
--- and 060_search_category_items_rls_test.sql proves a closed grant closes
--- search -- both go through the same granted_category_ids(), so a third
--- assertion of the composition would cost a fixture and catch nothing the
--- other two miss (TEST_STRATEGY.md §3.9).
-
--- list_category_places through a grant. It is `security invoker`, so the
--- grantee's own RLS is what decides -- which is the claim 0014 makes and
--- nothing asserted: the owner's path is covered in
--- 050_functions_triggers_test.sql, and a bystander getting nothing is too,
--- but the case in between, an actual grantee, is the one the map's shared
--- view depends on. Re-issued as a plain viewer grant, since the editor
--- grant above is what the search cases left in place.
+-- list_category_places is security invoker (0026), so a grantee's own RLS decides; re-issued as a viewer grant, since the search cases left an editor grant.
 select pg_temp.auth_as(:'owner_id'::uuid, 'shaping-owner@collectionbuddy.test');
 delete from public.category_shares where category_id = :'category_id'::uuid;
 insert into public.category_shares (category_id, invited_email)
@@ -222,9 +191,7 @@ select is(
   'a grantee sees the places of the shared collection through the map RPC'
 );
 
--- The map's own search box narrows by the same four columns the catalogue
--- search does, on the invoker side of the fence -- so the two views agree
--- about what a term matches.
+-- The map's search narrows by the same four columns as the catalogue's, invoker-side, so both views agree on a match.
 select is(
   (select array_agg(place order by place)
    from public.list_category_places(:'category_id'::uuid, '%Reichsmark%')),

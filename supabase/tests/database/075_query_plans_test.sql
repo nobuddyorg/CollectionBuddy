@@ -287,8 +287,7 @@ select pg_temp.plan_uses_index(
   'preferred: deleting a category cascades to its links through idx_item_categories_cat_created'
 );
 
--- tg_images_quota()'s per-owner sum reads both sizes from the index alone, never the owner's heap rows (#718, 0025).
--- 50 rows with nothing stored count 250 MiB, inside the owner's 256 MiB.
+-- tg_images_quota()'s per-owner sum is index-only (#718, 0025); 50 unstored rows count 250 MiB, inside 256 MiB.
 select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
 insert into public.images (item_id, path_full)
 select i.id, :'owner_id'::text || '/' || i.id::text || '/plan.webp'

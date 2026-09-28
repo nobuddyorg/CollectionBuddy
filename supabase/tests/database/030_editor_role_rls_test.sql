@@ -1,10 +1,4 @@
--- has_category_write_access() is the widest predicate in the schema: an
--- active grant at role 'editor' lets a non-owner edit item *content*
--- inside someone else's category. Everything in 020_category_shares_rls_test.sql
--- tests a viewer, whose grant stops at reading, so none of it says
--- anything about this path -- the same reasoning
--- web/e2e/signed-in/rls/editor-share.spec.ts gives for testing it
--- separately, on its own collection.
+-- The editor role, the widest predicate: content writes inside another's collection; rls/editor-share.spec.ts is the PostgREST half.
 begin;
 select no_plan();
 
@@ -24,7 +18,6 @@ insert into public.category_shares (category_id, invited_email, role)
 values (:'category_id'::uuid, 'editor@collectionbuddy.test', 'editor')
 returning id as share_id \gset
 
--- An editor edits and deletes the owner's entries in the shared collection.
 select pg_temp.auth_as(:'editor_id'::uuid, 'editor@collectionbuddy.test');
 update public.items set title = 'edited by the editor' where id = :'owner_entry_id'::uuid;
 
@@ -63,8 +56,7 @@ select is(
   'and unlink the owner''s entry from the shared collection'
 );
 
--- An editor files an entry of its own into the shared collection --
--- tg_item_categories_enforce, not a bare RLS predicate.
+-- Filing goes through tg_item_categories_enforce, not a bare RLS predicate.
 insert into public.items (title) values ('Editor''s own entry')
 returning id as editor_entry_id \gset
 insert into public.item_categories (item_id, category_id)
@@ -74,12 +66,7 @@ returning user_id as link_owner \gset
 select is(:'link_owner'::uuid, :'editor_id'::uuid,
   'the filed entry stays the editor''s own, not the category owner''s');
 
--- The deliberate asymmetry, asserted so it stays a decision rather than a
--- surprise: has_category_write_access() bundles category ownership in,
--- has_category_read_access() does not, so owning the collection does not
--- reveal an entry the editor merely filed into it -- the owner never held
--- a grant on that entry, and holding the collection is not one
--- (0006_policies.sql).
+-- Owning the collection reveals no entry an editor filed into it: write access bundles ownership, read access does not (0006).
 select pg_temp.auth_as(:'owner_id'::uuid, 'editor-test-owner@collectionbuddy.test');
 select is(
   (select count(*) from public.items where id = :'editor_entry_id'::uuid),
@@ -87,8 +74,7 @@ select is(
   'the owner does not see an entry the editor filed into their own collection'
 );
 
--- The line the role is supposed to stop at: item content, never the
--- collection itself.
+-- The role stops at item content, never the collection itself.
 select pg_temp.auth_as(:'editor_id'::uuid, 'editor@collectionbuddy.test');
 select is(
   pg_temp.rows_written(format('update public.categories set name = %L where id = %L returning id', 'taken over', :'category_id')),
@@ -102,7 +88,6 @@ select is(
   'an editor cannot delete the collection'
 );
 
--- Cannot promote another grant on the collection...
 select pg_temp.auth_as(:'owner_id'::uuid, 'editor-test-owner@collectionbuddy.test');
 insert into public.category_shares (category_id, invited_email)
 values (:'category_id'::uuid, 'bystander@collectionbuddy.test')
@@ -115,9 +100,7 @@ select is(
   'an editor cannot promote another grant on the collection'
 );
 
--- ...nor issue a grant of its own -- tg_category_shares_enforce re-derives
--- owner_user_id from the category itself, so a forged value in the
--- payload never reaches the policy.
+-- tg_category_shares_enforce re-derives owner_user_id from the category, so a forged owner never reaches the policy.
 select throws_ok(
   format(
     'insert into public.category_shares (category_id, owner_user_id, invited_email, role) values (%L, %L, %L, %L)',
@@ -128,7 +111,6 @@ select throws_ok(
   'an editor cannot issue a grant of its own on the collection'
 );
 
--- An editor reaches no further than the one collection granted.
 select pg_temp.auth_as(:'owner_id'::uuid, 'editor-test-owner@collectionbuddy.test');
 insert into public.categories (name) values ('Owner''s other category (pgTAP)')
 returning id as other_category_id \gset
@@ -140,9 +122,7 @@ select is(
   'an editor reaches no further than the one collection it was granted'
 );
 
--- A revoked editor can no longer write, with the entry still there -- so
--- this is the revocation itself being tested, not a row that stopped
--- existing.
+-- The entry stays, so the refusal is the revocation itself, not a row that stopped existing.
 select pg_temp.auth_as(:'owner_id'::uuid, 'editor-test-owner@collectionbuddy.test');
 insert into public.items (title) values ('Revocation probe')
 returning id as revocation_item_id \gset
@@ -164,7 +144,6 @@ select is(
   'and the entry is still there, untouched -- revocation is what closed it'
 );
 
--- An expired editor grant writes no more than no grant at all.
 insert into public.category_shares (category_id, invited_email, role, created_at, expires_at)
 values (
   :'category_id'::uuid, 'editor@collectionbuddy.test', 'editor',
@@ -186,9 +165,7 @@ select is(
   'read and write agree on an expired editor grant: neither is open'
 );
 
--- An editor may leave the share, which ends its own access and nobody
--- else's -- "delete own or invited category_shares" deliberately covers
--- both the owner revoking and the grantee leaving.
+-- One policy, "delete own or invited category_shares", covers both the owner revoking and the grantee leaving.
 select pg_temp.auth_as(:'owner_id'::uuid, 'editor-test-owner@collectionbuddy.test');
 delete from public.category_shares
 where category_id = :'category_id'::uuid and invited_email = 'editor@collectionbuddy.test';

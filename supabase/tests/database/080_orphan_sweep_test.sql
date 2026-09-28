@@ -1,5 +1,4 @@
--- The daily orphan sweep's selection (0022, cleanup-orphaned-photos.yml): what it may delete is exactly what these seeded objects allow (#751).
--- TEST_STRATEGY.md §12: every derived path matched, no uuid cast, the 48 h grace, and a ceiling on how much one run may take.
+-- orphan_sweep_plan (0022, cleanup-orphaned-photos.yml): both path_full and path_thumb, no uuid cast, 48 h grace, and the mass-deletion ceiling (TEST_STRATEGY.md §12).
 begin;
 select no_plan();
 

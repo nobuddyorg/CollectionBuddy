@@ -104,7 +104,6 @@ with attempt as (
 select is((select count(*) from attempt), 1::bigint,
   'promoted back to editor, it edits the entry again');
 
--- Revoked.
 select pg_temp.auth_as(:'owner_id'::uuid, 'filed-owner@collectionbuddy.test');
 delete from public.category_shares where id = :'share_id'::uuid;
 

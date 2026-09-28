@@ -1,30 +1,15 @@
--- The photograph bucket and the policy surface on storage.objects.
---
--- Deliberately catalog-level, not behavioural: storage is the one boundary
--- where the bytes, the Storage API's own guards and the policies only meet
--- in a running stack, so the `-photographs` specs in `web/e2e/signed-in/rls/`
--- are where a grantee actually reads an owner's object and an editor
--- actually fails to plant one (TEST_STRATEGY.md §7 rule 6). What this
--- file adds is the half that is invisible from there: that the *capability*
--- two separate security fixes removed is still absent, which no passing
--- end-to-end test can demonstrate.
+-- Catalog-level: the storage capabilities two security fixes removed stay absent; behaviour is in the rls/*-photographs specs.
 begin;
 select no_plan();
 
--- The bucket is private. Flipping it to public serves every photograph in
--- the app to anyone with a URL, past RLS entirely, and nothing in the
--- client would look any different -- the app reads through signed URLs
--- either way.
+-- A public bucket serves every photograph past RLS, and the client, reading through signed URLs either way, would not show it.
 select is(
   (select public from storage.buckets where id = 'item-images'),
   false,
   'the photograph bucket is private -- nothing is served without a signed URL'
 );
 
--- The size cap and the MIME allowlist are the only thing standing between
--- a signed-in user calling the Storage API directly and arbitrary content
--- at arbitrary size: the file picker's `accept` and the browser-side WebP
--- compression are both trivially bypassed.
+-- Size cap and MIME allowlist are the server-side limits; the picker's accept and client compression are bypassable.
 select is(
   (select allowed_mime_types from storage.buckets where id = 'item-images'),
   array['image/webp', 'image/jpeg', 'image/png'],
@@ -65,9 +50,7 @@ select is(
   'the own-prefix and shared read/delete policies are all present'
 );
 
--- Every one of them names `authenticated`. A policy with no role named
--- applies to PUBLIC, which would put `anon` inside whichever predicate it
--- carries rather than outside it.
+-- A policy that names no role applies to PUBLIC, which would put anon inside its predicate.
 select is(
   (select array_agg(policyname::text order by policyname)
    from pg_catalog.pg_policies
@@ -77,9 +60,7 @@ select is(
   'no policy on storage.objects reaches past the authenticated role'
 );
 
--- The older hand-written dashboard policies 0007_storage.sql dropped, by
--- name: they were verified redundant before removal, and a dashboard edit
--- is exactly how one of them would come back without a migration.
+-- The dashboard policies 0007 dropped, by name: a dashboard edit would bring one back without a migration.
 select is(
   (select array_agg(policyname::text order by policyname)
    from pg_catalog.pg_policies
