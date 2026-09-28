@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { createClient } from '@supabase/supabase-js';
-
 // Not './test': clearing the session afterwards asks Auth to log out a user it no longer has, whose 403 the browser logs.
 import { expect, test as base } from '../fixture';
 
 import { SEED } from './fixtures';
 import {
+  BUCKET,
+  adminApi,
   browserState,
   ensureUser,
   mintSession,
@@ -15,7 +15,6 @@ import {
   type MintedSession,
 } from './collectors';
 
-const BUCKET = 'item-images';
 // A real image, so the card renders it rather than logging a decode failure.
 const PHOTO = readFileSync(resolve(process.cwd(), 'public/logo.png'));
 
@@ -60,13 +59,8 @@ test.use({ locale: 'en-GB' });
 
 /** Storage as the project sees it, since the deleted collector has no session left to look with. */
 async function stored(path: string) {
-  const admin = createClient(
-    process.env.E2E_SUPABASE_URL!,
-    process.env.E2E_SUPABASE_SERVICE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
   const folder = path.slice(0, path.lastIndexOf('/'));
-  const { data, error } = await admin.storage.from(BUCKET).list(folder);
+  const { data, error } = await adminApi().storage.from(BUCKET).list(folder);
   if (error) throw error;
   return data.some((object) => `${folder}/${object.name}` === path);
 }

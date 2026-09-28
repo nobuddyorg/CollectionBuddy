@@ -1,27 +1,23 @@
-import { createClient } from '@supabase/supabase-js';
-
 import { expect, test } from '../test';
 import { SEED } from '../fixtures';
-import { clearCollection, ensureUser, mintSession } from '../collectors';
-import { apiAs, share } from './helpers';
+import {
+  BUCKET,
+  adminApi,
+  clearCollection,
+  freshCollector,
+  mintSession,
+} from '../collectors';
+import {
+  anonApi,
+  apiAs,
+  entryFiledBy,
+  probeObject,
+  share,
+  unshare,
+} from './helpers';
 
-const BUCKET = 'item-images';
-const probe = () => new Blob(['probe'], { type: 'image/webp' });
-
-/** The operator's client: the secret key, which reaches Auth's admin API and every Storage prefix. */
-const admin = () =>
-  createClient(
-    process.env.E2E_SUPABASE_URL!,
-    process.env.E2E_SUPABASE_SERVICE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
-
-async function collector(email: string) {
-  const userId = await ensureUser(email, SEED.accountDeletion.password);
-  const session = await mintSession(email, SEED.accountDeletion.password);
-  await clearCollection(session.client, userId);
-  return { email, userId, token: session.token, client: session.client };
-}
+const collector = (email: string) =>
+  freshCollector(email, SEED.accountDeletion.password);
 
 /** A collection of one entry, created as `token`. */
 async function collectionWithEntry(token: string, name: string) {
@@ -54,7 +50,7 @@ async function photograph(
   const api = apiAs(token);
   const { error: uploadError } = await api.storage
     .from(BUCKET)
-    .upload(path, probe());
+    .upload(path, probeObject());
   if (uploadError) throw uploadError;
   const { error } = await api
     .from('images')
@@ -66,12 +62,7 @@ async function photograph(
 // Two collectors of their own per parallel slot: one deletes its account, the other must keep everything of its own.
 test.describe('deleting one’s own account', () => {
   test('anon cannot call it', async () => {
-    const anon = createClient(
-      process.env.E2E_SUPABASE_URL!,
-      process.env.E2E_SUPABASE_ANON_KEY!,
-      { auth: { persistSession: false, autoRefreshToken: false } },
-    );
-    const { error } = await anon.rpc('delete_own_account');
+    const { error } = await anonApi().rpc('delete_own_account');
     expect(error).toMatchObject({
       code: '42501',
       message: 'permission denied for function delete_own_account',
@@ -91,14 +82,12 @@ test.describe('deleting one’s own account', () => {
 
     try {
       const kept = await collectionWithEntry(keeper.token, 'rls-kept');
-      const { error: shareError } = await apiAs(keeper.token)
-        .from('category_shares')
-        .insert({
-          category_id: kept.categoryId,
-          invited_email: leaver.email,
-          role: 'editor',
-        });
-      if (shareError) throw shareError;
+      await share({
+        token: keeper.token,
+        categoryId: kept.categoryId,
+        invitedEmail: leaver.email,
+        role: 'editor',
+      });
 
       const own = await collectionWithEntry(leaver.token, 'rls-leaving');
       const ownPhoto = await photograph(leaver.token, {
@@ -177,37 +166,23 @@ test.describe('deleting one’s own account', () => {
 
     try {
       const kept = await collectionWithEntry(keeper.token, 'rls-stranding');
-      const { data: grant, error: shareError } = await apiAs(keeper.token)
-        .from('category_shares')
-        .insert({
-          category_id: kept.categoryId,
-          invited_email: leaver.email,
-          role: 'editor',
-        })
-        .select('id')
-        .single();
-      if (shareError) throw shareError;
+      const grantId = await share({
+        token: keeper.token,
+        categoryId: kept.categoryId,
+        invitedEmail: leaver.email,
+        role: 'editor',
+      });
 
-      const { data: filed, error: filedError } = await apiAs(leaver.token)
-        .from('items')
-        .insert({ title: 'rls-stranded' })
-        .select('id')
-        .single();
-      if (filedError) throw filedError;
-      const { error: linkError } = await apiAs(leaver.token)
-        .from('item_categories')
-        .insert({ item_id: filed.id, category_id: kept.categoryId });
-      if (linkError) throw linkError;
+      const filedId = await entryFiledBy(
+        { token: leaver.token, categoryId: kept.categoryId },
+        'rls-stranded',
+      );
       strandedPhoto = await photograph(leaver.token, {
         uploaderId: leaver.userId,
-        itemId: filed.id,
+        itemId: filedId,
         name: 'stranded',
       });
-      const { error: revokeError } = await apiAs(keeper.token)
-        .from('category_shares')
-        .delete()
-        .eq('id', grant.id);
-      if (revokeError) throw revokeError;
+      await unshare(keeper.token, grantId);
 
       const { data: rows } = await apiAs(leaver.token)
         .from('images')
@@ -228,7 +203,7 @@ test.describe('deleting one’s own account', () => {
     } finally {
       // Left for the daily sweep in production; nobody's token reaches it now.
       if (strandedPhoto) {
-        await admin().storage.from(BUCKET).remove([strandedPhoto]);
+        await adminApi().storage.from(BUCKET).remove([strandedPhoto]);
       }
       await clearCollection(keeper.client, keeper.userId);
     }
@@ -266,7 +241,7 @@ test.describe('an operator deleting the Auth user', () => {
         .eq('id', left.categoryId);
       expect(sharedBefore).toHaveLength(1);
 
-      const operator = admin();
+      const operator = adminApi();
       const { error: removeError } = await operator.storage
         .from(BUCKET)
         .remove([ownPhoto]);

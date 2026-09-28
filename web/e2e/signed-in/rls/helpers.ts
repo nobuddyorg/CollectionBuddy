@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { createClient } from '@supabase/supabase-js';
 
+import { fileEntry } from '../collectors';
 import { CONTEXT_PATH, SEED, type SeedContext } from '../fixtures';
 
 export const context = () =>
@@ -16,6 +17,10 @@ export const UPLOAD_REFUSED = {
 /** Storage's answer for an object no policy lets the caller sign or move; only a stored-object control tells it from absence. */
 export const OBJECT_HIDDEN = { statusCode: '404', message: 'Object not found' };
 
+// Typed: the bucket restricts allowed_mime_types, so an untyped Blob is refused on that alone.
+export const probeObject = (content: BlobPart = 'probe') =>
+  new Blob([content], { type: 'image/webp' });
+
 /** A PostgREST client carrying one user's access token, and nothing more. */
 export function apiAs(token: string) {
   return createClient(
@@ -25,6 +30,15 @@ export function apiAs(token: string) {
       auth: { persistSession: false, autoRefreshToken: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     },
+  );
+}
+
+/** A client with no user token, only the anon key. */
+export function anonApi() {
+  return createClient(
+    process.env.E2E_SUPABASE_URL!,
+    process.env.E2E_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
   );
 }
 
@@ -53,6 +67,15 @@ export async function share(grant: {
   return data.id;
 }
 
+// The check constraint only demands expires_at > created_at, so an already-expired grant is a legal row.
+export function expiredWindow() {
+  const hour = 60 * 60 * 1000;
+  return {
+    createdAt: new Date(Date.now() - 2 * hour).toISOString(),
+    expiresAt: new Date(Date.now() - hour).toISOString(),
+  };
+}
+
 /** Throws, so a revoke that failed surfaces here, not as the next share()'s unique-constraint clash. */
 export async function unshare(token: string, shareId: string) {
   const { error } = await apiAs(token)
@@ -77,6 +100,22 @@ export async function ownedCategoryId(owner: {
   return data.id;
 }
 
+/** A seeded entry's id, read as `token`; throws, so a missing row fails here, not as a null id. */
+export async function seededEntryId(entry: {
+  token: string;
+  ownerId: string;
+  title: string;
+}): Promise<string> {
+  const { data, error } = await apiAs(entry.token)
+    .from('items')
+    .select('id')
+    .eq('user_id', entry.ownerId)
+    .eq('title', entry.title)
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
 /** One of the owner's seeded categories, plus a throwaway entry of the owner's inside it. */
 export async function ownerEntryIn(entry: {
   token: string;
@@ -86,19 +125,15 @@ export async function ownerEntryIn(entry: {
 }): Promise<{ categoryId: string; itemId: string }> {
   const { token, userId, category, title } = entry;
   const categoryId = await ownedCategoryId({ token, userId, name: category });
-  const { data: item, error: itemError } = await apiAs(token)
-    .from('items')
-    .insert({ user_id: userId, title })
-    .select('id')
-    .single();
-  if (itemError) throw itemError;
+  const itemId = await fileEntry(apiAs(token), {
+    categoryId,
+    fields: { user_id: userId, title },
+  });
+  return { categoryId, itemId };
+}
 
-  const { error: linkError } = await apiAs(token)
-    .from('item_categories')
-    .insert({ item_id: item!.id, category_id: categoryId });
-  if (linkError) throw linkError;
-
-  return { categoryId, itemId: item!.id };
+export async function viewerShare(token: string, categoryId: string) {
+  return share({ token, categoryId, invitedEmail: SEED.other.email });
 }
 
 export async function editorShare(token: string, categoryId: string) {
@@ -115,18 +150,10 @@ export async function entryFiledBy(
   grantee: { token: string; categoryId: string },
   title: string,
 ): Promise<string> {
-  const { data: item, error: itemError } = await apiAs(grantee.token)
-    .from('items')
-    .insert({ title })
-    .select('id')
-    .single();
-  if (itemError) throw itemError;
-
-  const { error: linkError } = await apiAs(grantee.token)
-    .from('item_categories')
-    .insert({ item_id: item!.id, category_id: grantee.categoryId });
-  if (linkError) throw linkError;
-  return item!.id;
+  return fileEntry(apiAs(grantee.token), {
+    categoryId: grantee.categoryId,
+    fields: { title },
+  });
 }
 
 /** Grants edit access again for as long as the grantee takes to remove its entry and photographs. */

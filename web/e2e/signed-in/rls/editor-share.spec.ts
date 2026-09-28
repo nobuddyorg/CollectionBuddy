@@ -5,8 +5,11 @@ import {
   apiAs,
   context,
   editorShare,
+  entryFiledBy,
   ownedCategoryId,
   ownerEntryIn,
+  probeObject,
+  removeFiledEntry,
   unshare,
 } from './helpers';
 
@@ -88,7 +91,13 @@ test.describe('a category shared at the editor role', () => {
       expect(link!.user_id).toBe(otherUserId);
     } finally {
       await unshare(token, shareId);
-      await apiAs(otherToken).from('items').delete().eq('id', mine!.id);
+      await removeFiledEntry({
+        token,
+        otherToken,
+        categoryId,
+        itemId: mine!.id,
+        paths: [],
+      });
     }
   });
 
@@ -101,49 +110,40 @@ test.describe('a category shared at the editor role', () => {
       name: SEED.editorCategory,
     });
     const shareId = await editorShare(token, categoryId);
-
-    const { data: mine, error: insertError } = await apiAs(otherToken)
-      .from('items')
-      .insert({ user_id: otherUserId, title: 'rls-editor-invisible-entry' })
-      .select('id')
-      .single();
-    expect(insertError).toBeNull();
-    const photo = `${otherUserId}/${mine!.id}/rls-editor-invisible.webp`;
+    const itemId = await entryFiledBy(
+      { token: otherToken, categoryId },
+      'rls-editor-invisible-entry',
+    );
+    const photo = `${otherUserId}/${itemId}/rls-editor-invisible.webp`;
 
     try {
-      // Checked, or a refused link would leave the entry unfiled and the owner's empty reads below would prove nothing.
-      const { error: linkError } = await apiAs(otherToken)
-        .from('item_categories')
-        .insert({ item_id: mine!.id, category_id: categoryId });
-      expect(linkError).toBeNull();
-
       // Satisfiable filter: the row exists and is linked here, so only the policy makes this empty.
       const { data: seen } = await apiAs(token)
         .from('items')
         .select('id')
-        .eq('id', mine!.id);
+        .eq('id', itemId);
       expect(seen).toEqual([]);
 
       // Nor its link, its photograph record, or the photograph's bytes.
       const { data: link } = await apiAs(token)
         .from('item_categories')
         .select('item_id')
-        .eq('item_id', mine!.id);
+        .eq('item_id', itemId);
       expect(link).toEqual([]);
 
       const { error: uploadError } = await apiAs(otherToken)
         .storage.from('item-images')
-        .upload(photo, new Blob(['probe'], { type: 'image/webp' }));
+        .upload(photo, probeObject());
       expect(uploadError).toBeNull();
       const { error: rowError } = await apiAs(otherToken)
         .from('images')
-        .insert({ item_id: mine!.id, path_full: photo });
+        .insert({ item_id: itemId, path_full: photo });
       expect(rowError).toBeNull();
 
       const { data: record } = await apiAs(token)
         .from('images')
         .select('id')
-        .eq('item_id', mine!.id);
+        .eq('item_id', itemId);
       expect(record).toEqual([]);
       const { data: signed, error: signError } = await apiAs(token)
         .storage.from('item-images')
@@ -151,9 +151,14 @@ test.describe('a category shared at the editor role', () => {
       expect(signed).toBeNull();
       expect(signError).toMatchObject(OBJECT_HIDDEN);
     } finally {
-      await apiAs(otherToken).storage.from('item-images').remove([photo]);
       await unshare(token, shareId);
-      await apiAs(otherToken).from('items').delete().eq('id', mine!.id);
+      await removeFiledEntry({
+        token,
+        otherToken,
+        categoryId,
+        itemId,
+        paths: [photo],
+      });
     }
   });
 });

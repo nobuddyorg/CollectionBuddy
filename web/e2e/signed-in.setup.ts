@@ -8,6 +8,7 @@ import {
   browserState,
   clearCollection,
   ensureUser,
+  fileEntry,
   mintSession,
   reseedSingle,
   type MintedSession,
@@ -38,19 +39,10 @@ async function reseed(as: SupabaseClient, userId: string) {
   // One at a time, oldest first: a batch insert can share a timestamp and leave the order to chance.
   for (const item of SEED.items) {
     const { category, ...fields } = item;
-    const { data: inserted, error: itemError } = await as
-      .from('items')
-      .insert({ user_id: userId, ...fields })
-      .select('id')
-      .single();
-    if (itemError) throw itemError;
-
-    const { error: linkError } = await as.from('item_categories').insert({
-      item_id: inserted.id,
-      category_id: idOf(category),
-      user_id: userId,
+    await fileEntry(as, {
+      categoryId: idOf(category),
+      fields: { user_id: userId, ...fields },
     });
-    if (linkError) throw linkError;
   }
 }
 

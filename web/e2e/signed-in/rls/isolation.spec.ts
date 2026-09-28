@@ -1,24 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
-
 import { expect, test } from '../test';
 import { SEED } from '../fixtures';
 import { visibleTitles } from '../helpers';
-import { apiAs, context } from './helpers';
+import { anonApi, apiAs, context, seededEntryId } from './helpers';
 
 // A broken policy would look identical in the interface, so most cases here ask Postgres directly.
 test.use({ locale: 'en-GB' });
-
-/** The other collector's seeded entry, read as its owner; other specs never write it. */
-async function seededEntryOf(otherToken: string, otherUserId: string) {
-  const { data, error } = await apiAs(otherToken)
-    .from('items')
-    .select('id,title')
-    .eq('user_id', otherUserId)
-    .eq('title', SEED.other.item)
-    .single();
-  if (error) throw error;
-  return data as { id: string; title: string };
-}
 
 test.describe('one collection cannot reach another', () => {
   test('the interface shows nothing of the other collector', async ({
@@ -61,28 +47,34 @@ test.describe('one collection cannot reach another', () => {
   // Read back as the owner: a write let through but hidden on read would be the worst of both.
   test('their entries cannot be edited', async () => {
     const { token, otherToken, otherUserId } = context();
-
-    const target = await seededEntryOf(otherToken, otherUserId);
+    const targetId = await seededEntryId({
+      token: otherToken,
+      ownerId: otherUserId,
+      title: SEED.other.item,
+    });
 
     const { data: updated } = await apiAs(token)
       .from('items')
       .update({ title: 'taken over' })
-      .eq('id', target.id)
+      .eq('id', targetId)
       .select('id');
     expect(updated).toEqual([]);
 
-    // And it really is untouched, read back as its owner.
     const { data: after } = await apiAs(otherToken)
       .from('items')
       .select('title')
-      .eq('id', target.id)
+      .eq('id', targetId)
       .single();
-    expect(after!.title).toBe(target.title);
+    expect(after!.title).toBe(SEED.other.item);
   });
 
   test('their entries cannot be deleted', async () => {
     const { token, otherToken, otherUserId } = context();
-    const target = await seededEntryOf(otherToken, otherUserId);
+    const targetId = await seededEntryId({
+      token: otherToken,
+      ownerId: otherUserId,
+      title: SEED.other.item,
+    });
 
     const { data: deleted } = await apiAs(token)
       .from('items')
@@ -95,8 +87,8 @@ test.describe('one collection cannot reach another', () => {
     const { data: after } = await apiAs(otherToken)
       .from('items')
       .select('id')
-      .eq('id', target.id);
-    expect(after).toEqual([{ id: target.id }]);
+      .eq('id', targetId);
+    expect(after).toEqual([{ id: targetId }]);
   });
 
   // Ignored rather than refused: enforce_user_id() is a BEFORE trigger that overwrites the claimed owner.
@@ -113,7 +105,6 @@ test.describe('one collection cannot reach another', () => {
       expect(planted!.user_id).toBe(userId);
       expect(planted!.user_id).not.toBe(otherUserId);
 
-      // And their collection never saw it.
       const { data: theirs } = await apiAs(otherToken)
         .from('items')
         .select('title')
@@ -151,13 +142,7 @@ test.describe('one collection cannot reach another', () => {
   // anon holds no grant on these tables, so the refusal is 42501 before any policy runs; asserted on the code.
   for (const table of ['items', 'categories', 'category_shares']) {
     test(`a visitor with no session is refused ${table} outright`, async () => {
-      const anon = createClient(
-        process.env.E2E_SUPABASE_URL!,
-        process.env.E2E_SUPABASE_ANON_KEY!,
-        { auth: { persistSession: false } },
-      );
-
-      const { data, error, status } = await anon.from(table).select('id');
+      const { data, error, status } = await anonApi().from(table).select('id');
       expect(data).toBeNull();
       expect(error).not.toBeNull();
       expect(error!.code).toBe('42501');
@@ -243,7 +228,6 @@ test.describe('one collection cannot reach another', () => {
       .select('id');
     expect(deleted).toEqual([]);
 
-    // Untouched, read back as its owner.
     const { data: after } = await apiAs(otherToken)
       .from('categories')
       .select('name')

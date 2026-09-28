@@ -1,7 +1,14 @@
 import { expect, test } from '../test';
 import { SEED } from '../fixtures';
-import { clearCollection, ensureUser, mintSession } from '../collectors';
-import { apiAs, context, ownedCategoryId, share, unshare } from './helpers';
+import { clearCollection, freshCollector } from '../collectors';
+import {
+  apiAs,
+  context,
+  ownedCategoryId,
+  seededEntryId,
+  share,
+  unshare,
+} from './helpers';
 
 // Each over-the-limit write is one statement refused whole, so nothing persists for parallel specs to see.
 test.describe('per-owner quotas', () => {
@@ -23,10 +30,7 @@ test.describe('per-owner quotas', () => {
     const { password } = SEED.entryQuota;
     const collector = async (role: string) => {
       const email = `e2e-entry-quota-${role}-${testInfo.parallelIndex}@collectionbuddy.test`;
-      const userId = await ensureUser(email, password);
-      const { token, client } = await mintSession(email, password);
-      await clearCollection(client, userId);
-      return { email, userId, token, client };
+      return freshCollector(email, password);
     };
     const owner = await collector('owner');
     const editor = await collector('editor');
@@ -94,19 +98,19 @@ test.describe('per-owner quotas', () => {
 
   test('photographs that would pass 256 MiB are refused, however small the client says they are', async () => {
     const { otherToken, otherUserId } = context();
-    const { data: item } = await apiAs(otherToken)
-      .from('items')
-      .select('id')
-      .eq('title', SEED.other.item)
-      .single();
+    const itemId = await seededEntryId({
+      token: otherToken,
+      ownerId: otherUserId,
+      title: SEED.other.item,
+    });
 
     // A row with nothing stored behind it counts as the bucket's 5 MiB cap, so 52 pass 256 MiB.
     const { error } = await apiAs(otherToken)
       .from('images')
       .insert(
         Array.from({ length: 52 }, (_, i) => ({
-          item_id: item!.id,
-          path_full: `${otherUserId}/${item!.id}/quota-probe-${i}.webp`,
+          item_id: itemId,
+          path_full: `${otherUserId}/${itemId}/quota-probe-${i}.webp`,
           size_bytes: 1,
         })),
       );

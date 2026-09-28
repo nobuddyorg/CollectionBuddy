@@ -5,11 +5,14 @@ import {
   context,
   editorShare,
   entryFiledBy,
+  expiredWindow,
   ownedCategoryId,
   ownerEntryIn,
   removeFiledEntry,
+  seededEntryId,
   share,
   unshare,
+  viewerShare,
 } from './helpers';
 
 // Where the editor role stops: the collection itself, other collections, and a grant that has ended.
@@ -58,11 +61,7 @@ test.describe('a category shared at the editor role', () => {
       name: SEED.editorLimitsCategory,
     });
     // Issued as a viewer, so a successful self-promotion shows as a role change, not a no-op.
-    const shareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-    });
+    const shareId = await viewerShare(token, categoryId);
 
     try {
       const { data: promoted } = await apiAs(otherToken)
@@ -114,17 +113,16 @@ test.describe('a category shared at the editor role', () => {
     const shareId = await editorShare(token, categoryId);
 
     try {
-      const { data: elsewhere } = await apiAs(token)
-        .from('items')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('title', itemsIn('Münzen')[0].title)
-        .single();
+      const elsewhereId = await seededEntryId({
+        token,
+        ownerId: userId,
+        title: itemsIn('Münzen')[0].title,
+      });
 
       const { data: updated } = await apiAs(otherToken)
         .from('items')
         .update({ title: 'taken over' })
-        .eq('id', elsewhere!.id)
+        .eq('id', elsewhereId)
         .select('id');
       expect(updated).toEqual([]);
 
@@ -298,14 +296,12 @@ test.describe('a category shared at the editor role', () => {
       category: SEED.editorLimitsCategory,
       title: 'rls-editor-expired-probe',
     });
-    const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    const expiresAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const shareId = await share({
       token,
       categoryId,
       invitedEmail: SEED.other.email,
       role: 'editor',
-      window: { createdAt, expiresAt },
+      window: expiredWindow(),
     });
 
     try {
@@ -337,11 +333,7 @@ test.describe('a category shared at the editor role', () => {
       category: SEED.editorLimitsCategory,
       title: 'rls-viewer-beside-editor-probe',
     });
-    const viewerShareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-    });
+    const viewerShareId = await viewerShare(token, categoryId);
     const editorShareId = await share({
       token,
       categoryId,

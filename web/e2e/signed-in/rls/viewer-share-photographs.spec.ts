@@ -5,10 +5,14 @@ import {
   UPLOAD_REFUSED,
   apiAs,
   context,
+  expiredWindow,
   ownedCategoryId,
   ownerEntryIn,
+  probeObject,
+  seededEntryId,
   share,
   unshare,
+  viewerShare,
 } from './helpers';
 
 // The viewer grant extended to photographs, on both surfaces, and withdrawn with it.
@@ -21,25 +25,20 @@ test.describe('a category shared with another collector', () => {
       userId,
       name: SEED.viewerPhotoCategory,
     });
-    const { data: item } = await apiAs(token)
-      .from('items')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('title', itemsIn(SEED.viewerPhotoCategory)[0].title)
-      .single();
-    const path = `${userId}/${item!.id}/rls-share-probe.webp`;
+    const itemId = await seededEntryId({
+      token,
+      ownerId: userId,
+      title: itemsIn(SEED.viewerPhotoCategory)[0].title,
+    });
+    const path = `${userId}/${itemId}/rls-share-probe.webp`;
 
     const { error: uploadError } = await apiAs(token)
       .storage.from('item-images')
-      .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+      .upload(path, probeObject());
     expect(uploadError).toBeNull();
 
     try {
-      const shareId = await share({
-        token,
-        categoryId,
-        invitedEmail: SEED.other.email,
-      });
+      const shareId = await viewerShare(token, categoryId);
       try {
         const { data, error } = await apiAs(otherToken)
           .storage.from('item-images')
@@ -68,23 +67,21 @@ test.describe('a category shared with another collector', () => {
       userId,
       name: SEED.viewerPhotoCategory,
     });
-    const idOf = async (title: string) => {
-      const { data } = await apiAs(token)
-        .from('items')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('title', title)
-        .single();
-      return data!.id;
-    };
-    const shared = `${userId}/${await idOf(itemsIn(SEED.viewerPhotoCategory)[0].title)}/rls-expiry-probe.webp`;
-    const sibling = `${userId}/${await idOf(itemsIn('Briefmarken')[0].title)}/rls-sibling-probe.webp`;
+    const sharedId = await seededEntryId({
+      token,
+      ownerId: userId,
+      title: itemsIn(SEED.viewerPhotoCategory)[0].title,
+    });
+    const siblingId = await seededEntryId({
+      token,
+      ownerId: userId,
+      title: itemsIn('Briefmarken')[0].title,
+    });
+    const shared = `${userId}/${sharedId}/rls-expiry-probe.webp`;
+    const sibling = `${userId}/${siblingId}/rls-sibling-probe.webp`;
     const storage = apiAs(token).storage.from('item-images');
     for (const path of [shared, sibling]) {
-      const { error } = await storage.upload(
-        path,
-        new Blob(['probe'], { type: 'image/webp' }),
-      );
+      const { error } = await storage.upload(path, probeObject());
       expect(error).toBeNull();
     }
     const sign = (path: string) =>
@@ -95,10 +92,7 @@ test.describe('a category shared with another collector', () => {
         token,
         categoryId,
         invitedEmail: SEED.other.email,
-        window: {
-          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          expiresAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-        },
+        window: expiredWindow(),
       });
       try {
         const { data, error } = await sign(shared);
@@ -108,11 +102,7 @@ test.describe('a category shared with another collector', () => {
         await unshare(token, expiredId);
       }
 
-      const activeId = await share({
-        token,
-        categoryId,
-        invitedEmail: SEED.other.email,
-      });
+      const activeId = await viewerShare(token, categoryId);
       try {
         // The grant is live, so the refusal below is its scope, not its absence.
         expect((await sign(shared)).error).toBeNull();
@@ -135,29 +125,24 @@ test.describe('a category shared with another collector', () => {
       userId,
       name: SEED.viewerPhotoCategory,
     });
-    const { data: item } = await apiAs(token)
-      .from('items')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('title', itemsIn(SEED.viewerPhotoCategory)[0].title)
-      .single();
+    const itemId = await seededEntryId({
+      token,
+      ownerId: userId,
+      title: itemsIn(SEED.viewerPhotoCategory)[0].title,
+    });
 
     const { data: planted, error: insertError } = await apiAs(token)
       .from('images')
       .insert({
-        item_id: item!.id,
-        path_full: `${userId}/${item!.id}/rls-share-images-probe.webp`,
+        item_id: itemId,
+        path_full: `${userId}/${itemId}/rls-share-images-probe.webp`,
       })
       .select('id')
       .single();
     expect(insertError).toBeNull();
 
     try {
-      const shareId = await share({
-        token,
-        categoryId,
-        invitedEmail: SEED.other.email,
-      });
+      const shareId = await viewerShare(token, categoryId);
       try {
         const { data } = await apiAs(otherToken)
           .from('images')
@@ -231,7 +216,7 @@ test.describe('a category shared with another collector', () => {
     try {
       const { error: uploadError } = await owner.storage
         .from('item-images')
-        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+        .upload(path, probeObject());
       expect(uploadError).toBeNull();
       const { error: recordError } = await owner
         .from('images')
@@ -240,11 +225,7 @@ test.describe('a category shared with another collector', () => {
 
       await removalsRefused();
 
-      shareId = await share({
-        token,
-        categoryId,
-        invitedEmail: SEED.other.email,
-      });
+      shareId = await viewerShare(token, categoryId);
       // Satisfiable: the viewer reads the record, the link and the bytes, so an empty delete is the delete policy.
       const { data: seen } = await other
         .from('items')
@@ -277,11 +258,7 @@ test.describe('a category shared with another collector', () => {
     });
     const path = `${otherUserId}/${itemId}/rls-viewer-add-probe.webp`;
     const viewer = apiAs(otherToken);
-    const shareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-    });
+    const shareId = await viewerShare(token, categoryId);
 
     try {
       const { data: seen } = await viewer
@@ -292,7 +269,7 @@ test.describe('a category shared with another collector', () => {
 
       const { error: uploadError } = await viewer.storage
         .from('item-images')
-        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+        .upload(path, probeObject());
       expect(uploadError).toMatchObject(UPLOAD_REFUSED);
 
       const { data: record, error: recordError } = await viewer

@@ -9,7 +9,9 @@ import {
   entryFiledBy,
   ownedCategoryId,
   ownerEntryIn,
+  probeObject,
   removeFiledEntry,
+  seededEntryId,
   unshare,
 } from './helpers';
 
@@ -25,12 +27,11 @@ test.describe('a category shared at the editor role', () => {
       title: 'rls-editor-thumb-probe',
     });
     const shareId = await editorShare(token, categoryId);
-    const { data: elsewhere } = await apiAs(token)
-      .from('items')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('title', itemsIn('Münzen')[0].title)
-      .single();
+    const elsewhereId = await seededEntryId({
+      token,
+      ownerId: userId,
+      title: itemsIn('Münzen')[0].title,
+    });
 
     try {
       const { data, error } = await apiAs(otherToken)
@@ -38,7 +39,7 @@ test.describe('a category shared at the editor role', () => {
         .insert({
           item_id: itemId,
           path_full: `${otherUserId}/${itemId}/rls-thumb-plant.webp`,
-          path_thumb: `${userId}/${elsewhere!.id}/victim.webp`,
+          path_thumb: `${userId}/${elsewhereId}/victim.webp`,
         })
         .select('id');
       expect(data).toBeNull();
@@ -69,7 +70,7 @@ test.describe('a category shared at the editor role', () => {
     try {
       const { error: uploadError } = await apiAs(otherToken)
         .storage.from('item-images')
-        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+        .upload(path, probeObject());
       expect(uploadError).toBeNull();
 
       const { data: signed, error: signError } = await apiAs(otherToken)
@@ -119,7 +120,7 @@ test.describe('a category shared at the editor role', () => {
       for (const upload of [path, unrecorded]) {
         const { error } = await editor.storage
           .from('item-images')
-          .upload(upload, new Blob(['probe'], { type: 'image/webp' }));
+          .upload(upload, probeObject());
         expect(error).toBeNull();
       }
       const { error: rowError } = await editor
@@ -164,7 +165,7 @@ test.describe('a category shared at the editor role', () => {
     try {
       const { error: uploadError } = await editor.storage
         .from('item-images')
-        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+        .upload(path, probeObject());
       expect(uploadError).toBeNull();
       // The second record names bytes not stored yet, a path the editor could fill later.
       const { error: rowError } = await editor.from('images').insert([
@@ -182,7 +183,7 @@ test.describe('a category shared at the editor role', () => {
       expect(removed).toEqual([]);
       const { error: fillError } = await editor.storage
         .from('item-images')
-        .upload(pending, new Blob(['swapped'], { type: 'image/webp' }));
+        .upload(pending, probeObject('swapped'));
       expect(fillError).toMatchObject(UPLOAD_REFUSED);
 
       // Signing proves the bytes are still there; the owner's record names them.
@@ -213,10 +214,7 @@ test.describe('a category shared at the editor role', () => {
 
     try {
       for (const path of [full, thumb]) {
-        const { error } = await bucket.upload(
-          path,
-          new Blob(['small'], { type: 'image/webp' }),
-        );
+        const { error } = await bucket.upload(path, probeObject('small'));
         expect(error).toBeNull();
       }
       const { error: rowError } = await editor
@@ -230,7 +228,7 @@ test.describe('a category shared at the editor role', () => {
       for (const path of [full, thumb]) {
         const { error } = await bucket.upload(
           path,
-          new Blob([new Uint8Array(100_000)], { type: 'image/webp' }),
+          probeObject(new Uint8Array(100_000)),
         );
         expect(error).toMatchObject(UPLOAD_REFUSED);
       }
@@ -269,7 +267,7 @@ test.describe('a category shared at the editor role', () => {
     try {
       const { error: uploadError } = await owner.storage
         .from('item-images')
-        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+        .upload(path, probeObject());
       expect(uploadError).toBeNull();
       const { error: recordError } = await owner
         .from('images')
@@ -331,7 +329,7 @@ test.describe('a category shared at the editor role', () => {
     try {
       const { error: uploadError } = await editor.storage
         .from('item-images')
-        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+        .upload(path, probeObject());
       expect(uploadError).toBeNull();
       const { data: row, error: rowError } = await editor
         .from('images')
@@ -345,7 +343,7 @@ test.describe('a category shared at the editor role', () => {
       await editor.storage.from('item-images').remove([path]);
       const { error: replaceError } = await editor.storage
         .from('item-images')
-        .upload(replacement, new Blob(['swapped'], { type: 'image/webp' }));
+        .upload(replacement, probeObject('swapped'));
       expect(replaceError).toMatchObject(UPLOAD_REFUSED);
 
       const { data: removedRow } = await editor
@@ -399,7 +397,7 @@ test.describe('a category shared at the editor role', () => {
     try {
       const { error: uploadError } = await apiAs(token)
         .storage.from('item-images')
-        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+        .upload(path, probeObject());
       expect(uploadError).toBeNull();
 
       const { error: moveError } = await apiAs(otherToken)
@@ -444,7 +442,7 @@ test.describe('a category shared at the editor role', () => {
     try {
       const { error: plantError } = await apiAs(otherToken)
         .storage.from('item-images')
-        .upload(planted, new Blob(['hostile'], { type: 'image/webp' }));
+        .upload(planted, probeObject('hostile'));
       expect(plantError).toMatchObject(UPLOAD_REFUSED);
 
       // Satisfiable read: the owner sees her own prefix, so an empty listing is the write refused, not hidden.
@@ -476,7 +474,7 @@ test.describe('a category shared at the editor role', () => {
     try {
       const { error: uploadError } = await apiAs(token)
         .storage.from('item-images')
-        .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+        .upload(path, probeObject());
       expect(uploadError).toBeNull();
 
       const { error: moveError } = await apiAs(token)
