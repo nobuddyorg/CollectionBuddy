@@ -13,30 +13,25 @@ export default function CenteredModal({
   onOpenChange,
   title,
   description,
-  closeLabel = 'Close',
   children,
-  closeOnBackdrop = true,
-  closeOnEsc = true,
   initialFocusRef,
   size = 'default',
   role = 'dialog',
 }: CenteredModalProps) {
+  const close = () => onOpenChange(false);
   useLockBodyScroll(open);
-  useEscapeToClose(open && closeOnEsc, () => onOpenChange(false));
+  useEscapeToClose(open, close);
   useInertBackground(open);
 
-  if (typeof document === 'undefined' || !open) return null;
+  if (!open) return null;
 
   return (
     <Portal>
-      <Backdrop
-        onClick={closeOnBackdrop ? () => onOpenChange(false) : undefined}
-      />
+      <Backdrop onClick={close} />
       <Dialog
         title={title}
         description={description}
-        closeLabel={closeLabel}
-        onClose={() => onOpenChange(false)}
+        onClose={close}
         initialFocusRef={initialFocusRef}
         size={size}
         role={role}

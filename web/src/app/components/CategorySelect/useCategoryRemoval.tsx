@@ -26,7 +26,7 @@ export function useCategoryRemoval({
   shares: UseShares;
   onSelect: (id: string | null) => void;
 }) {
-  const { t } = useI18n();
+  const { t, tCount } = useI18n();
   const confirm = useConfirm();
   const { deleteCategory, optimisticRemove } = categories;
 
@@ -70,7 +70,7 @@ export function useCategoryRemoval({
         name: categoryName,
       });
     } else if (count > 0) {
-      message = t('category_select.confirm_delete_with_entries', {
+      message = tCount('category_select.confirm_delete_with_entries', {
         name: categoryName,
         count,
       });
@@ -92,6 +92,7 @@ export function useCategoryRemoval({
     onSelect,
     sortedCategories,
     t,
+    tCount,
     confirm,
   ]);
 

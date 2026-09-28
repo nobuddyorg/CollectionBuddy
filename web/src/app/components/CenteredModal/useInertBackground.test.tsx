@@ -2,6 +2,7 @@
 import { render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { appRoot, mountAppRoot, removeAppRoot } from './appRoot.test-support';
 import { useInertBackground } from './useInertBackground';
 
 function Harness({ active }: { active: boolean }) {
@@ -9,19 +10,9 @@ function Harness({ active }: { active: boolean }) {
   return <div>dialog</div>;
 }
 
-function appRoot() {
-  return document.getElementById('app-root') as HTMLElement;
-}
+beforeEach(mountAppRoot);
 
-beforeEach(() => {
-  const root = document.createElement('div');
-  root.id = 'app-root';
-  document.body.appendChild(root);
-});
-
-afterEach(() => {
-  appRoot()?.remove();
-});
+afterEach(removeAppRoot);
 
 describe('useInertBackground', () => {
   it('marks the app root inert while active', () => {

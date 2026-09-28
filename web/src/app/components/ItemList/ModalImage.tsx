@@ -105,7 +105,7 @@ export function ModalImage({
 
   const alt = t('item_list.image_alt', {
     title: itemTitle,
-    idx: clampedIndex + 1,
+    position: clampedIndex + 1,
   });
 
   return ReactDOM.createPortal(
@@ -114,7 +114,7 @@ export function ModalImage({
       role="dialog"
       data-testid="image-viewer"
       aria-modal="true"
-      aria-label={t('item_list.full_size_image_alt')}
+      aria-label={t('item_list.image_viewer_label')}
       className="fixed inset-0 z-modal bg-background/95 backdrop-blur"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
@@ -124,8 +124,8 @@ export function ModalImage({
         data-testid="close-image"
         onClick={onClose}
         className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
-        title={t('item_list.close_modal')}
-        aria-label={t('item_list.close_modal')}
+        title={t('common.close')}
+        aria-label={t('common.close')}
       >
         <Icon icon={IconType.Close} className="w-5 h-5" />
       </button>

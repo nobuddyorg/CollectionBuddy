@@ -187,13 +187,11 @@ function RoleModal({
     className: string,
   ) => React.ReactNode;
 }) {
-  const { t } = useI18n();
   return (
     <CenteredModal
       open={!!share}
       onOpenChange={onOpenChange}
       title={share?.invited_email ?? ''}
-      closeLabel={t('common.close')}
     >
       {share && renderCheckbox(share, 'flex items-center gap-1.5')}
     </CenteredModal>

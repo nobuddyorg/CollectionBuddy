@@ -92,18 +92,18 @@ export function usePlaces({
   search,
   enabled,
   canEdit,
-  locale,
+  language,
 }: {
   categoryId: string;
   search: string;
   enabled: boolean;
   canEdit: boolean;
-  locale?: string;
+  language?: string;
 }) {
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const lang = photonLang(locale);
+  const lang = photonLang(language);
 
   useEffect(() => {
     if (!enabled) return;

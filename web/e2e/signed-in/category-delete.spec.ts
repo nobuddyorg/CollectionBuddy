@@ -78,7 +78,7 @@ test.describe('deleting a collection that still holds things', () => {
       await app.categories.do.delete();
       // Named and counted, not a bare "are you sure".
       await expect(app.confirm.locators.message).toContainText(
-        `Delete "${name}"? Its 1 entries`,
+        `Delete "${name}"? Its one entry`,
       );
       await app.confirm.do.accept();
 

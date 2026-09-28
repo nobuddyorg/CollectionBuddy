@@ -55,7 +55,6 @@ export function EditItemModal({
       open={open}
       onOpenChange={guardedClose}
       title={t('item_list.edit_item')}
-      closeLabel={t('common.close')}
     >
       <section className="relative">
         <ItemForm

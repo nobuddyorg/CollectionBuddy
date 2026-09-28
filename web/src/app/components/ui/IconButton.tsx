@@ -2,6 +2,8 @@
 
 import type { ButtonHTMLAttributes } from 'react';
 
+import { FILL_CLASSES } from './buttonClasses';
+
 const SIZE_CLASSES = {
   sm: 'w-8 h-8',
   md: 'w-9 h-9 max-sm:w-11 max-sm:h-11',
@@ -15,8 +17,7 @@ const OUTLINE_BASE =
   'bg-card text-muted-foreground ring-1 ring-control-border/60 [@media(hover:hover)]:ring-transparent';
 
 const VARIANT_CLASSES = {
-  primary: 'bg-primary text-primary-foreground hover:opacity-90',
-  destructive: 'bg-destructive text-destructive-foreground hover:opacity-90',
+  ...FILL_CLASSES,
   outline: `${OUTLINE_BASE} hover:bg-muted hover:text-foreground [@media(hover:hover)]:hover:ring-control-border`,
   outlineDestructive: `${OUTLINE_BASE} hover:bg-destructive/10 hover:text-destructive [@media(hover:hover)]:hover:ring-destructive/40`,
 } as const;

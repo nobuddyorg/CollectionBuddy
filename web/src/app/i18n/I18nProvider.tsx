@@ -83,8 +83,11 @@ type I18nContextType = {
   locale: string;
   setLanguage: (language: Language) => void;
   t: Translate;
-  /** Picks `${baseKey}_one` by the locale's plural rule (German and English disagree), else `baseKey`. */
-  tCount: (baseKey: TranslationKey, count: number) => string;
+  /** Picks `${baseKey}_one` when the locale's plural rule says 'one', else `baseKey`. */
+  tCount: (
+    baseKey: TranslationKey,
+    values: TranslationValues & { count: number },
+  ) => string;
 };
 
 export const I18nContext = createContext<I18nContextType | undefined>(
@@ -176,9 +179,11 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
     [],
   );
 
-  const tCount = useCallback((baseKey: TranslationKey, count: number) => {
+  const tCount = useCallback<I18nContextType['tCount']>((baseKey, values) => {
     const dictionary = translations[languageRef.current];
-    const category = new Intl.PluralRules(languageRef.current).select(count);
+    const category = new Intl.PluralRules(languageRef.current).select(
+      values.count,
+    );
     const template =
       (category === 'one'
         ? resolveTranslationKey(dictionary, `${baseKey}_one`)
@@ -187,7 +192,7 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
       baseKey;
     return interpolate(
       template,
-      formatNumbers({ count }, numberFormatRef.current),
+      formatNumbers(values, numberFormatRef.current),
     );
   }, []);
 

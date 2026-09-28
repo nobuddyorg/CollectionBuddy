@@ -1,13 +1,13 @@
 'use client';
 
 import { useId, useRef } from 'react';
+import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
 import { useFocusTrap } from './useFocusTrap';
 
 export function Dialog({
   title,
   description,
-  closeLabel,
   onClose,
   children,
   initialFocusRef,
@@ -15,15 +15,14 @@ export function Dialog({
   role = 'dialog',
 }: {
   title: string;
-  /** Rendered above `children` and wired to `aria-describedby`, e.g. a confirm's question. */
   description?: string;
-  closeLabel: string;
   onClose: () => void;
   children: React.ReactNode;
   initialFocusRef?: React.RefObject<HTMLElement | null>;
   size?: 'default' | 'full';
   role?: 'dialog' | 'alertdialog';
 }) {
+  const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement>(null);
   // Not a constant id: a confirm raised inside another modal would label the wrong dialog.
   const titleId = useId();
@@ -62,7 +61,7 @@ export function Dialog({
             data-testid="dialog-close"
             className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-card-foreground/10"
             onClick={onClose}
-            aria-label={closeLabel}
+            aria-label={t('common.close')}
           >
             <Icon icon={IconType.Close} className="w-5 h-5" />
           </button>

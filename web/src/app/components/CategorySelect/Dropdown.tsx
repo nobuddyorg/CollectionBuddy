@@ -58,7 +58,7 @@ export function CategorySelectDropdown({
       onSelect={onSelect}
       sortedCategories={sortedCategories}
       onCollapse={onCollapse}
-      ariaLabel={t('category_select.select_placeholder')}
+      ariaLabel={t('category_select.tablist_label')}
       userId={userId}
     />
   );

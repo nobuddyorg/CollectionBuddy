@@ -1,5 +1,6 @@
 'use client';
 
+import { filledButtonClasses } from '../ui/buttonClasses';
 import { Spinner } from '../ui/Spinner';
 
 // Always shows its label; a bare icon gave no indication of what confirming would do.
@@ -19,7 +20,10 @@ export function Submit({
       data-testid="item-submit"
       disabled={disabled}
       aria-busy={submitting}
-      className="min-h-11 px-4 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
+      className={filledButtonClasses(
+        'primary',
+        'disabled:opacity-50 transition-opacity flex items-center justify-center gap-2',
+      )}
     >
       {submitting && <Spinner size="sm" />}
       {label}

@@ -4,6 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
+import {
+  appRoot,
+  mountAppRoot,
+  removeAppRoot,
+} from '../CenteredModal/appRoot.test-support';
 import { useEscapeToClose } from '../CenteredModal/useEscapeToClose';
 import { ModalImage } from './ModalImage';
 import type { ImageEntry } from './types';
@@ -42,23 +47,11 @@ function renderModal(
   };
 }
 
-function appRoot() {
-  return document.getElementById('app-root') as HTMLElement;
-}
-
-function mountAppRoot() {
-  window.localStorage.setItem('lang', 'en');
-  const root = document.createElement('div');
-  root.id = 'app-root';
-  document.body.appendChild(root);
-}
-
-function removeAppRoot() {
-  appRoot()?.remove();
-}
-
 describe('ModalImage', () => {
-  beforeEach(mountAppRoot);
+  beforeEach(() => {
+    window.localStorage.setItem('lang', 'en');
+    mountAppRoot();
+  });
 
   afterEach(removeAppRoot);
 

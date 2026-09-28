@@ -24,6 +24,7 @@ import Icon, { IconType } from '../Icon';
 import type { ItemFormValues } from '../ItemForm';
 import { prefetchItemForm } from '../ItemForm/load';
 import type { ImageEntry, ItemLite } from './types';
+import { filledButtonClasses } from '../ui/buttonClasses';
 
 // Stable identity: a fresh [] per render would defeat ItemCard's reference-equality memo.
 const EMPTY_IMAGES: ImageEntry[] = [];
@@ -159,10 +160,9 @@ export default function ItemList({
   let searchAnnouncement = '';
   if (!loading) {
     if (searchStatus.kind === 'active') {
-      searchAnnouncement = tCount(
-        'item_list.results_count',
-        searchStatus.total,
-      );
+      searchAnnouncement = tCount('item_list.results_count', {
+        count: searchStatus.total,
+      });
     } else if (searchStatus.kind === 'tooShort') {
       searchAnnouncement = t('item_list.search_too_short');
     }
@@ -187,7 +187,10 @@ export default function ItemList({
             title={
               canEdit ? undefined : t('item_create.new_entry_disabled_shared')
             }
-            className="flex-1 sm:flex-none min-h-11 px-4 flex items-center justify-center gap-2 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 disabled:opacity-40 disabled:hover:opacity-40 disabled:cursor-not-allowed transition-opacity"
+            className={filledButtonClasses(
+              'primary',
+              'flex-1 sm:flex-none flex items-center justify-center gap-2 disabled:opacity-40 disabled:hover:opacity-40 disabled:cursor-not-allowed transition-opacity',
+            )}
           >
             <Icon icon={IconType.Plus} className="w-4 h-4" aria-hidden="true" />
             {t('item_create.new_entry')}
@@ -237,7 +240,7 @@ export default function ItemList({
                 className="font-display text-lg text-foreground"
               >
                 {searchStatus.kind === 'active'
-                  ? t('item_list.no_results_title', { q: debouncedQuery })
+                  ? t('item_list.no_results_title', { query: debouncedQuery })
                   : t('item_list.no_items_title')}
               </h3>
               <p className="text-sm text-muted-foreground">
@@ -326,7 +329,6 @@ export default function ItemList({
         open={isCreateOpen}
         onOpenChange={guardedCloseCreate}
         title={t('item_create.new_entry')}
-        closeLabel={t('common.close')}
       >
         <ItemCreate
           categoryId={categoryId}

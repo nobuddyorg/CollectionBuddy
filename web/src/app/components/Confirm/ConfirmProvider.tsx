@@ -10,7 +10,7 @@ import {
 
 import { useI18n } from '../../i18n/useI18n';
 import CenteredModal from '../CenteredModal';
-import { buttonClasses } from '../ui/buttonClasses';
+import { buttonClasses, filledButtonClasses } from '../ui/buttonClasses';
 
 type ConfirmFunction = (message: string) => Promise<boolean>;
 
@@ -52,7 +52,6 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         title={t('common.confirm')}
         description={message ?? ''}
         role="alertdialog"
-        closeLabel={t('common.close')}
         initialFocusRef={cancelRef}
       >
         <div className="flex justify-end gap-2">
@@ -69,7 +68,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             type="button"
             data-testid="confirm-accept"
             onClick={() => settle(true)}
-            className="min-h-11 px-4 rounded-sm font-label text-xs bg-destructive text-destructive-foreground hover:opacity-90"
+            className={filledButtonClasses('destructive')}
           >
             {t('common.confirm')}
           </button>

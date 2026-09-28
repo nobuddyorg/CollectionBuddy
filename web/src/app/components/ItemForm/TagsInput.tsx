@@ -99,7 +99,7 @@ export function TagsInput({
         className="flex-1 min-w-[100px] bg-transparent py-1 text-sm"
       />
       <span role="status" className="sr-only">
-        {tCount('item_create.tags_count', tags.length)}
+        {tCount('item_create.tags_count', { count: tags.length })}
       </span>
     </div>
   );

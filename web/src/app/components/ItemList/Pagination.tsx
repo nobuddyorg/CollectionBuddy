@@ -79,7 +79,7 @@ export function Pagination({
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted')
               }
-              aria-label={t('item_list.page', { n: item })}
+              aria-label={t('item_list.page', { page: item })}
               aria-current={item === page ? 'page' : undefined}
             >
               {item}
@@ -97,7 +97,7 @@ export function Pagination({
       >
         {previousButton}
         <span className="font-label text-xs text-muted-foreground">
-          {t('item_list.page_of', { n: page, total: totalPages })}
+          {t('item_list.page_of', { page, total: totalPages })}
         </span>
         {nextButton}
       </nav>

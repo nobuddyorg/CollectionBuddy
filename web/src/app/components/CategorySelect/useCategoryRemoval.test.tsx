@@ -190,6 +190,22 @@ describe('useCategoryRemoval deleting a category you own', () => {
     ).toBeInTheDocument();
   });
 
+  it('warns about a single entry in the singular', async () => {
+    vi.mocked(countItemsForCategory).mockResolvedValue({
+      count: 1,
+      error: null,
+    } as never);
+    const { result } = setUp({});
+
+    void result.current.onDelete();
+
+    expect(
+      await screen.findByText(
+        'Delete "Coins"? Its one entry and all its photographs will be permanently deleted.',
+      ),
+    ).toBeInTheDocument();
+  });
+
   // String.replace read "$$" as "$" and "$'" as the rest of the sentence, misstating what goes.
   it('names a category whose name holds $ sequences exactly as it is spelled', async () => {
     const name = "US$$ coins $'";

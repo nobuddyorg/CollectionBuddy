@@ -259,7 +259,7 @@ describe('usePlaces geocoding', () => {
         search: '',
         enabled: true,
         canEdit: true,
-        locale: 'de',
+        language: 'de',
       }),
     );
     await act(async () => {

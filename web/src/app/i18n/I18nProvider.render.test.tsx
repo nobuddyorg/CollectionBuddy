@@ -16,12 +16,20 @@ function Probe() {
       <span data-testid="missing">
         {t('nope.not.a.real.key' as TranslationKey)}
       </span>
-      <span data-testid="tags-0">{tCount('item_create.tags_count', 0)}</span>
-      <span data-testid="tags-1">{tCount('item_create.tags_count', 1)}</span>
-      <span data-testid="tags-2">{tCount('item_create.tags_count', 2)}</span>
-      <span data-testid="no-plural-variant">{tCount('common.close', 1)}</span>
+      <span data-testid="tags-0">
+        {tCount('item_create.tags_count', { count: 0 })}
+      </span>
+      <span data-testid="tags-1">
+        {tCount('item_create.tags_count', { count: 1 })}
+      </span>
+      <span data-testid="tags-2">
+        {tCount('item_create.tags_count', { count: 2 })}
+      </span>
+      <span data-testid="no-plural-variant">
+        {tCount('common.close', { count: 1 })}
+      </span>
       <span data-testid="no-key-at-all">
-        {tCount('nope.not.real' as TranslationKey, 1)}
+        {tCount('nope.not.real' as TranslationKey, { count: 1 })}
       </span>
       <button type="button" onClick={() => setLanguage('en')}>
         English
@@ -212,19 +220,33 @@ describe('I18nProvider', () => {
     });
     const { result } = renderHook(() => useI18n(), { wrapper: I18nProvider });
 
-    expect(result.current.tCount('item_list.results_count', 1000)).toBe(
-      '1,000 results',
-    );
     expect(
-      result.current.t('item_list.page_of', { n: 1000, total: 2000 }),
+      result.current.tCount('item_list.results_count', { count: 1000 }),
+    ).toBe('1,000 results');
+    expect(
+      result.current.t('item_list.page_of', { page: 1000, total: 2000 }),
     ).toBe('1,000 / 2,000');
 
     await act(async () => {
       result.current.setLanguage('de');
     });
 
-    expect(result.current.tCount('item_list.results_count', 1000)).toBe(
-      "1'000 Treffer",
+    expect(
+      result.current.tCount('item_list.results_count', { count: 1000 }),
+    ).toBe("1'000 Treffer");
+  });
+
+  it('fills every other placeholder of a counted template too', () => {
+    localStorage.setItem('lang', 'en');
+    const { result } = renderHook(() => useI18n(), { wrapper: I18nProvider });
+
+    expect(
+      result.current.tCount('category_select.confirm_delete_with_entries', {
+        name: 'Coins',
+        count: 2,
+      }),
+    ).toBe(
+      'Delete "Coins"? Its 2 entries and all their photographs will be permanently deleted.',
     );
   });
 
