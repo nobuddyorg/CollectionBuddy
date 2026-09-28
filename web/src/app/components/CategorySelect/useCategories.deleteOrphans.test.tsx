@@ -191,4 +191,25 @@ describe('useCategories deleteCategory orphan detection', () => {
     expect(listImagePathsForCategory).not.toHaveBeenCalled();
     expect(removeImageObjects).not.toHaveBeenCalled();
   });
+
+  it('reads no photographs when every item is still linked elsewhere', async () => {
+    vi.mocked(deleteCategoryRow).mockResolvedValue({ error: null } as never);
+    vi.mocked(listItemIdsLinkedElsewhere).mockResolvedValue({
+      data: ['i1', 'i2'],
+      error: null,
+    });
+    const { result } = await renderLoadedCategories();
+
+    act(() => {
+      result.current.deleteCategory('cat-1');
+    });
+    await commitDeferredDelete();
+
+    await waitFor(() =>
+      expect(deleteCategoryRow).toHaveBeenCalledWith('cat-1'),
+    );
+    await waitFor(() => expect(result.current.isDeleting).toBe(false));
+    expect(listImagePathsForCategory).not.toHaveBeenCalled();
+    expect(removeImageObjects).not.toHaveBeenCalled();
+  });
 });

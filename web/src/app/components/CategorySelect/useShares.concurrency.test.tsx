@@ -69,9 +69,7 @@ describe('useShares one request at a time', () => {
     });
     await waitFor(() => expect(result.current.isUpdatingRole).toBe(true));
     await act(async () => {
-      await expect(
-        result.current.updateShareRole('share-1', 'viewer'),
-      ).resolves.toBe(false);
+      await result.current.updateShareRole('share-1', 'viewer');
     });
 
     expect(updateShareRoleRow).toHaveBeenCalledTimes(1);

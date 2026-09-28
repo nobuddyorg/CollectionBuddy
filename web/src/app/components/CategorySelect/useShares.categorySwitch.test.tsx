@@ -256,12 +256,10 @@ describe('useShares across a category switch', () => {
   it('refuses to change the role of a grant of the category switched away from', async () => {
     const { result } = await renderCoinsThenSwitchToStamps();
 
-    let changed: boolean | undefined;
     await act(async () => {
-      changed = await result.current.updateShareRole('share-coins', 'editor');
+      await result.current.updateShareRole('share-coins', 'editor');
     });
 
-    expect(changed).toBe(false);
     expect(updateShareRoleRow).not.toHaveBeenCalled();
   });
 

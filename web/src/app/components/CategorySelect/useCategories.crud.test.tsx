@@ -218,9 +218,7 @@ describe('useCategories', () => {
       const { result } = await renderLoadedCategories();
 
       await act(async () => {
-        await expect(
-          result.current.renameCategory('cat-1', '  coins & medals  '),
-        ).resolves.toBe(true);
+        await result.current.renameCategory('cat-1', '  coins & medals  ');
       });
 
       expect(renameCategory).toHaveBeenCalledWith('cat-1', 'coins & medals');
@@ -232,9 +230,7 @@ describe('useCategories', () => {
       const { result } = await renderLoadedCategories();
 
       await act(async () => {
-        await expect(
-          result.current.renameCategory('cat-1', '   '),
-        ).resolves.toBe(false);
+        await result.current.renameCategory('cat-1', '   ');
       });
 
       expect(renameCategory).not.toHaveBeenCalled();
@@ -248,9 +244,7 @@ describe('useCategories', () => {
       const { result } = await renderLoadedCategories();
 
       await act(async () => {
-        await expect(
-          result.current.renameCategory('cat-1', 'Münzen'),
-        ).resolves.toBe(false);
+        await result.current.renameCategory('cat-1', 'Münzen');
       });
 
       expect(await screen.findByRole('alert')).toBeVisible();
@@ -265,12 +259,13 @@ describe('useCategories', () => {
       const { result } = await renderLoadedCategories();
 
       await act(async () => {
-        await expect(
-          result.current.renameCategory('cat-1', 'Münzen'),
-        ).resolves.toBe(true);
+        await result.current.renameCategory('cat-1', 'Münzen');
       });
 
       expect(result.current.categories).toEqual([COINS, STAMPS]);
+      expect(await screen.findByTestId('toast')).toHaveTextContent(
+        'Collection renamed.',
+      );
     });
   });
 

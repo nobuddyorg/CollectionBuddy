@@ -33,12 +33,10 @@ describe('useShares', () => {
     it('does nothing and clears the list when there is no category', async () => {
       const { result } = renderHook(() => useShares(null), { wrapper });
 
-      let list: unknown;
       await act(async () => {
-        list = await result.current.reload();
+        await result.current.reload();
       });
 
-      expect(list).toEqual([]);
       expect(result.current.shares).toEqual([]);
       expect(listSharesForCategory).not.toHaveBeenCalled();
     });
@@ -105,12 +103,10 @@ describe('useShares', () => {
       } as never);
       const { result } = renderHook(() => useShares('cat-1'), { wrapper });
 
-      let list: unknown;
       await act(async () => {
-        list = await result.current.reload();
+        await result.current.reload();
       });
 
-      expect(list).toEqual([]);
       expect(result.current.shares).toEqual([]);
     });
 
@@ -125,12 +121,10 @@ describe('useShares', () => {
         .mockImplementation(() => {});
       const { result } = renderHook(() => useShares('cat-1'), { wrapper });
 
-      let list: unknown;
       await act(async () => {
-        list = await result.current.reload();
+        await result.current.reload();
       });
 
-      expect(list).toEqual([]);
       expect(result.current.shares).toEqual([]);
       expect(result.current.isLoading).toBe(false);
       expect(await screen.findByRole('alert')).toHaveTextContent(

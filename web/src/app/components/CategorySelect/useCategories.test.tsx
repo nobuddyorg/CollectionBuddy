@@ -285,12 +285,10 @@ describe('useCategories renameCategory', () => {
     } as never);
     const { result } = await renderLoadedCategories();
 
-    let renamed: unknown;
     await act(async () => {
-      renamed = await result.current.renameCategory('cat-a', 'Renamed A');
+      await result.current.renameCategory('cat-a', 'Renamed A');
     });
 
-    expect(renamed).toBe(true);
     expect(result.current.categories).toEqual([
       { id: 'cat-a', name: 'Renamed A', user_id: 'owner-1' },
       CAT_B,
@@ -339,12 +337,10 @@ describe('useCategories renameCategory', () => {
     });
     await waitFor(() => expect(result.current.isRenaming).toBe(true));
 
-    let secondResult: unknown;
     await act(async () => {
-      secondResult = await result.current.renameCategory('cat-a', 'Again');
+      await result.current.renameCategory('cat-a', 'Again');
     });
 
-    expect(secondResult).toBe(false);
     expect(renameCategory).toHaveBeenCalledTimes(1);
     await act(async () => {
       release({
@@ -364,12 +360,11 @@ describe('useCategories renameCategory', () => {
       .mockImplementation(() => {});
     const { result } = await renderLoadedCategories();
 
-    let renamed: unknown;
     await act(async () => {
-      renamed = await result.current.renameCategory('cat-a', 'Renamed A');
+      await result.current.renameCategory('cat-a', 'Renamed A');
     });
 
-    expect(renamed).toBe(false);
+    expect(result.current.categories).toEqual([CAT_A, CAT_B]);
     expect(result.current.isRenaming).toBe(false);
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not rename this collection. Please try again.',

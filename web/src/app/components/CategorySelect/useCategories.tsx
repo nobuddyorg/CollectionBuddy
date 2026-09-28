@@ -21,6 +21,45 @@ import type { CategorySummary } from '../../data/categories';
 
 export type UseCategories = ReturnType<typeof useCategories>;
 
+async function listOrphanedImagePaths(categoryId: string): Promise<string[]> {
+  // Which items the delete orphans must be read before the row goes: the cascade takes item_categories.
+  const { data: links, error: linksError } =
+    await listItemIdsForCategory(categoryId);
+  if (linksError) {
+    throw new Error('Could not list items for category', {
+      cause: linksError,
+    });
+  }
+  const itemIds = Array.from(new Set(links ?? []));
+  if (itemIds.length === 0) return [];
+
+  const { data: stillLinked, error: linkedError } =
+    await listItemIdsLinkedElsewhere({
+      itemIds,
+      excludingCategoryId: categoryId,
+    });
+  if (linkedError) {
+    // An incomplete answer must abort the whole delete, not read as "nothing else links these".
+    throw new Error('Could not check items linked elsewhere', {
+      cause: linkedError,
+    });
+  }
+  const keep = new Set(stillLinked);
+  const orphaned = new Set(itemIds.filter((itemId) => !keep.has(itemId)));
+  if (orphaned.size === 0) return [];
+
+  // Read before the row delete: the cascade would drop these rows and the paths with them.
+  const listed = await listImagePathsForCategory(categoryId);
+  if (listed.error !== null) {
+    throw new Error('Could not read images for orphaned items', {
+      cause: listed.error,
+    });
+  }
+  return listed.data
+    .filter((row) => orphaned.has(row.item_id))
+    .flatMap(objectPathsOf);
+}
+
 // Owned by the page, which decides what renders below the strip once the categories have arrived.
 export function useCategories() {
   const { t } = useI18n();
@@ -89,7 +128,7 @@ export function useCategories() {
   const renameCategory = useCallback(
     async (id: string, name: string) => {
       const trimmed = name.trim();
-      if (!id || !trimmed || isRenaming) return false;
+      if (!id || !trimmed || isRenaming) return;
       setIsRenaming(true);
       try {
         const { data, error } = await renameCategoryRow(id, trimmed);
@@ -101,14 +140,12 @@ export function useCategories() {
           ),
         );
         toast.success(t('category_select.rename_success'));
-        return true;
       } catch (error) {
         toast.reportError(
           'rename category',
           error,
           t('category_select.rename_error'),
         );
-        return false;
       } finally {
         setIsRenaming(false);
       }
@@ -148,50 +185,9 @@ export function useCategories() {
         onExpire: async () => {
           setIsDeleting(true);
           try {
-            // Which items the delete orphans must be read before the row goes: the cascade takes item_categories.
-            const { data: links, error: linksError } =
-              await listItemIdsForCategory(id);
-            if (linksError) {
-              throw new Error('Could not list items for category', {
-                cause: linksError,
-              });
-            }
-
-            const itemIds = Array.from(new Set(links ?? []));
-            let orphanedItemIds = itemIds;
-            if (itemIds.length) {
-              const { data: stillLinked, error: linkedError } =
-                await listItemIdsLinkedElsewhere({
-                  itemIds,
-                  excludingCategoryId: id,
-                });
-              if (linkedError) {
-                // An incomplete answer must abort the whole delete, not read as "nothing else links these".
-                throw new Error('Could not check items linked elsewhere', {
-                  cause: linkedError,
-                });
-              }
-              const keep = new Set(stillLinked);
-              orphanedItemIds = itemIds.filter((itemId) => !keep.has(itemId));
-            }
-
-            // Read before the row delete: the cascade would drop these rows and the paths with them.
-            let orphanedPaths: string[] = [];
-            if (orphanedItemIds.length) {
-              const listed = await listImagePathsForCategory(id);
-              if (listed.error !== null) {
-                throw new Error('Could not read images for orphaned items', {
-                  cause: listed.error,
-                });
-              }
-              const orphaned = new Set(orphanedItemIds);
-              orphanedPaths = listed.data
-                .filter((row) => orphaned.has(row.item_id))
-                .flatMap(objectPathsOf);
-            }
-
+            const paths = await listOrphanedImagePaths(id);
             const { error } = await removeObjectsThenRows({
-              paths: orphanedPaths,
+              paths,
               deleteRows: () => deleteCategoryRow(id),
             });
             if (error) throw error;
