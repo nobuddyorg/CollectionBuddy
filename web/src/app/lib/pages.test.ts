@@ -127,7 +127,7 @@ describe('readAllKeysetPages', () => {
     expect(readPage).toHaveBeenCalledTimes(2);
   });
 
-  // Regression (#766): an offset read of page two after row 1 went would start at row 4, skipping row 3.
+  // An offset read of page two after row 1 goes would start at row 4, skipping row 3.
   it('skips no row when a row already read disappears between pages', async () => {
     const { table, readPage } = keysetTable([1, 2, 3, 4, 5], 2);
     const read = readPage.getMockImplementation()!;

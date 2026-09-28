@@ -159,7 +159,7 @@ describe('listItemIdsForCategory', () => {
     ]);
   });
 
-  // Regression (#766): offset pages shifted when a link went mid-walk, so an entry's photographs outlived its delete.
+  // A link leaving mid-walk must not shift later pages, or an entry's photographs outlive its delete.
   it('misses no link when an entry leaves the category between pages', async () => {
     const table = Array.from({ length: 1001 }, (_, i) => link(i));
     const listPage = vi
@@ -402,7 +402,7 @@ describe('uniqueCategoryName', () => {
     );
   });
 
-  // QA-28: a 200-character name plus " (2)" used to fail the database's length check on every re-import.
+  // A 200-character name plus " (2)" would exceed the database's length check.
   describe('at the 200-character limit', () => {
     const longest = 'x'.repeat(200);
 
