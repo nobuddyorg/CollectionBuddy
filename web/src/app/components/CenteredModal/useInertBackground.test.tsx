@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { render } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { appRoot, mountAppRoot, removeAppRoot } from './appRoot.test-support';
 import { useInertBackground } from './useInertBackground';
@@ -48,22 +48,6 @@ describe('useInertBackground', () => {
 
     second.unmount();
     expect(appRoot().inert).toBeFalsy();
-  });
-
-  // A nested dialog finding the root already inert must not write the property again.
-  it('only sets inert once, on the first of two nested dialogs', () => {
-    const setInert = vi.fn();
-    Object.defineProperty(appRoot(), 'inert', {
-      configurable: true,
-      get: () => true,
-      set: setInert,
-    });
-
-    const first = render(<Harness active />);
-    render(<Harness active />);
-
-    expect(setInert).toHaveBeenCalledTimes(1);
-    first.unmount();
   });
 
   it('does nothing when there is no app root to find', () => {

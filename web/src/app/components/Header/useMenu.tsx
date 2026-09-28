@@ -8,19 +8,17 @@ export function useMenu() {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef(false);
 
-  // Not memoized: nothing downstream memoizes them or lists them in an effect.
   const close = () => setOpen(false);
   const toggle = () => setOpen((value) => !value);
 
   useEffect(() => {
     if (!open) return;
-    // Captured once: the anchor is always rendered, so a later unmount cannot clear it mid-handler.
+    // Captured once: both are mounted while open, so a later unmount cannot clear them mid-handler.
     const anchor = anchorRef.current!;
+    const panel = panelRef.current!;
     const onDocumentClick = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (anchor.contains(target)) return;
-      // The panel exists only while open, so it stays a guarded ref read.
-      if (panelRef.current && panelRef.current.contains(target)) return;
+      if (anchor.contains(target) || panel.contains(target)) return;
       setOpen(false);
     };
     document.addEventListener('mousedown', onDocumentClick);
