@@ -1,5 +1,7 @@
 import { expect, test } from '../fixture';
 
+import { createPageTree } from '../pages';
+
 // What sw.test.ts cannot reach from source: registration, scope, cache, offline.
 test.use({ locale: 'en-GB' });
 
@@ -29,6 +31,13 @@ async function cachedUrls(page: Page) {
 
 function cacheNames(page: Page) {
   return page.evaluate(() => caches.keys());
+}
+
+/** The first visit predates the worker, so the reload is what fills its cache. */
+async function openWithCachedShell(page: Page) {
+  await createPageTree(page).login.do.open();
+  await waitForController(page);
+  await page.reload({ waitUntil: 'networkidle' });
 }
 
 test.describe('the service worker', () => {
@@ -67,10 +76,7 @@ test.describe('the service worker', () => {
   test('keeps the hashed bundle, and nothing from anywhere else', async ({
     page,
   }) => {
-    await page.goto('login/', { waitUntil: 'networkidle' });
-    await waitForController(page);
-    // The first visit predates the worker, so this reload fills the cache.
-    await page.reload({ waitUntil: 'networkidle' });
+    await openWithCachedShell(page);
 
     const urls = await cachedUrls(page);
     expect(urls.some((url) => url.includes('/_next/static/'))).toBe(true);
@@ -100,10 +106,7 @@ test.describe('the service worker', () => {
     on,
     page,
   }) => {
-    await page.goto('login/', { waitUntil: 'networkidle' });
-    await waitForController(page);
-    // The first visit predates the worker, so this reload caches the shell.
-    await page.reload({ waitUntil: 'networkidle' });
+    await openWithCachedShell(page);
     const replaced = await page.evaluate(async () => {
       let count = 0;
       for (const name of await caches.keys()) {
@@ -130,9 +133,7 @@ test.describe('the service worker', () => {
     page,
     baseURL,
   }) => {
-    await page.goto('login/', { waitUntil: 'networkidle' });
-    await waitForController(page);
-    await page.reload({ waitUntil: 'networkidle' });
+    await openWithCachedShell(page);
     const previous = await currentCacheName(page);
     await page.evaluate(async () => {
       await caches.open('collectionbuddy-shell-v1');
@@ -158,9 +159,7 @@ test.describe('the service worker', () => {
     page,
     context,
   }) => {
-    await page.goto('login/', { waitUntil: 'networkidle' });
-    await waitForController(page);
-    await page.reload({ waitUntil: 'networkidle' });
+    await openWithCachedShell(page);
 
     await context.setOffline(true);
     try {

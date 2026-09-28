@@ -1,6 +1,6 @@
 import { expect, test } from '../fixture';
 
-import { horizontalOverflow } from '../helpers';
+import { documentWidths } from '../helpers';
 
 // Pinned so the assertions can name what is on screen; i18n.spec.ts covers language selection.
 test.use({ locale: 'en-GB' });
@@ -60,7 +60,7 @@ test.describe('the login page', () => {
   });
 
   test('does not scroll sideways', async ({ page }) => {
-    const { scrollWidth, clientWidth } = await horizontalOverflow(page);
+    const { scrollWidth, clientWidth } = await documentWidths(page);
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
   });
 

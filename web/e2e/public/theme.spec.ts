@@ -1,14 +1,9 @@
-import type { Page } from '@playwright/test';
-
 import { expect, test } from '../fixture';
 
-import { cssVariable } from '../helpers';
+import { rootComputedStyle, themeAttribute } from '../helpers';
 
 const PAPER = 'rgb(244, 243, 239)';
 const CHARCOAL = 'rgb(25, 24, 21)';
-
-const themeAttribute = (page: Page) =>
-  page.evaluate(() => document.documentElement.getAttribute('data-theme'));
 
 // The pre-React half: an inline script sets the theme before hydration, or the wrong one flashes.
 test.describe('the theme a page arrives in', () => {
@@ -65,7 +60,7 @@ test.describe('the theme a page arrives in', () => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.goto('login/');
     // Drives the scrollbars and any native control the app does not style.
-    expect(await cssVariable(page, 'color-scheme')).toBe('dark');
+    expect(await rootComputedStyle(page, 'color-scheme')).toBe('dark');
   });
 
   // Browser chrome around an installed app is the one surface CSS can't reach.

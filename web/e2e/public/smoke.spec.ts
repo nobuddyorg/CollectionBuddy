@@ -14,7 +14,7 @@ test.describe('the deployed bundle', () => {
   });
 
   // A chunk or font missing under a wrong base path 404s without throwing.
-  test('asks for nothing the host cannot serve', async ({ page }) => {
+  test('asks for nothing the host cannot serve', async ({ on, page }) => {
     const refused: string[] = [];
     page.on('response', (response) => {
       if (response.status() >= 400) {
@@ -22,7 +22,7 @@ test.describe('the deployed bundle', () => {
       }
     });
 
-    await page.goto('login/', { waitUntil: 'networkidle' });
+    await on(page).login.do.open();
     expect(refused, 'requests the host refused').toEqual([]);
   });
 
@@ -59,11 +59,10 @@ test.describe('the deployed bundle', () => {
     // Rendered in the app's own layout, not as a bare error document.
     await expect(page.locator('link[rel="manifest"]')).toHaveCount(1);
     // A cold entry point, so the head scripts have to run here too.
-    expect(
-      await page.evaluate(() =>
-        document.documentElement.getAttribute('data-theme'),
-      ),
-    ).toMatch(/^(light|dark)$/);
+    await expect(page.locator('html')).toHaveAttribute(
+      'data-theme',
+      /^(light|dark)$/,
+    );
     await expect(page.locator('html')).toHaveAttribute('lang', /^(de|en)$/);
 
     expectNoPageProblems(problems);

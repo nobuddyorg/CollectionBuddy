@@ -18,20 +18,24 @@ export function expectNoPageProblems(problems: PageProblems) {
   expect(problems.console, 'console errors').toEqual([]);
 }
 
-/** Whether the document is wider than the window that has to show it (sideways scroll). */
-export async function horizontalOverflow(page: Page) {
+/** The document's scroll width beside the window's client width, for a sideways-scroll check. */
+export async function documentWidths(page: Page) {
   return page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
     clientWidth: document.documentElement.clientWidth,
   }));
 }
 
-export function cssVariable(page: Page, name: string) {
+export function rootComputedStyle(page: Page, property: string) {
   return page.evaluate(
-    (property) =>
-      getComputedStyle(document.documentElement)
-        .getPropertyValue(property)
-        .trim(),
-    name,
+    (name) =>
+      getComputedStyle(document.documentElement).getPropertyValue(name).trim(),
+    property,
+  );
+}
+
+export function themeAttribute(page: Page) {
+  return page.evaluate(() =>
+    document.documentElement.getAttribute('data-theme'),
   );
 }
