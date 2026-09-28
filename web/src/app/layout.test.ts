@@ -18,13 +18,10 @@ describe('the framebusting script in layout.tsx', () => {
     expect(script).toContain('window.top.location=window.self.location');
   });
 
-  it('is declared and rendered before the theme script, so it runs first', () => {
-    const declared = layout.indexOf('const FRAMEBUST_SCRIPT');
-    const themeDeclared = layout.indexOf('const THEME_INIT_SCRIPT');
+  it('is rendered before the theme script, so it runs first', () => {
     const rendered = layout.indexOf('FRAMEBUST_SCRIPT }}');
     const themeRendered = layout.indexOf('THEME_INIT_SCRIPT }}');
-    expect(declared).toBeGreaterThan(-1);
-    expect(themeDeclared).toBeGreaterThan(-1);
+    expect(rendered).toBeGreaterThan(-1);
     expect(rendered).toBeLessThan(themeRendered);
   });
 });
