@@ -84,7 +84,7 @@ describe('ModalImage', () => {
     expect(screen.getByRole('img')).toHaveAttribute('crossorigin', 'anonymous');
   });
 
-  // Regression: below a max-h-full image, the close button was pushed past the bottom of the overlay.
+  // The close button sits outside the image wrapper, so a tall photo cannot push it offscreen.
   it('keeps the close button outside the image wrapper so it cannot be pushed offscreen', () => {
     renderModal();
     const closeButton = screen.getByRole('button', { name: 'Close' });
@@ -99,20 +99,20 @@ describe('ModalImage', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  // A near-miss on Previous/Next used to fall through to a backdrop click and close the modal.
   it('closes on Escape', async () => {
     const { onClose } = renderModal();
     await userEvent.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  // A near-miss on Previous/Next lands on the backdrop, which must not close the viewer.
   it('does not close on a backdrop click away from the image', async () => {
     const { onClose } = renderModal();
     await userEvent.click(screen.getByRole('dialog'));
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  // Regression: stopPropagation once made the photo the one place that never dismissed the modal.
+  // A stopPropagation on the photograph would make it the one spot that never dismisses the viewer.
   it('closes when the photograph itself is clicked', async () => {
     const { onClose } = renderModal();
     await userEvent.click(screen.getByRole('img'));
@@ -133,7 +133,7 @@ describe('ModalImage', () => {
     expect(appRoot().inert).toBeFalsy();
   });
 
-  // A photograph past the strip's limit had no Plate, so the modal is its only delete control.
+  // A photograph past the strip's limit has no Plate, so the viewer is its only delete control.
   describe('deleting the current photograph', () => {
     it('passes the photograph currently shown to onDelete', async () => {
       const { onDelete } = renderModal({
@@ -227,7 +227,7 @@ describe('ModalImage', () => {
       expect(screen.getByText('2 / 3')).toBeInTheDocument();
     });
 
-    // The buttons used to hide on touch screens, leaving no click alternative to swiping.
+    // Hidden on touch screens, the buttons would leave swiping as the only way to page.
     it('keeps the previous/next buttons visible regardless of pointer type', () => {
       renderModal({ images, index: 1 });
       const previous = screen.getByRole('button', { name: 'Previous image' });
@@ -302,7 +302,7 @@ describe('ModalImage', () => {
       expect(onIndexChange).toHaveBeenCalledWith(0);
     });
 
-    // A photograph past the strip's limit was previously never rendered by anything.
+    // Nothing but the viewer renders a photograph past the strip's limit.
     it('reaches a photograph beyond the strip limit by index alone', () => {
       const many = [
         photo('a'),

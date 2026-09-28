@@ -8,17 +8,7 @@ import ItemList from './index';
 import type { ItemLite } from './types';
 import type { useItems } from './useItems';
 
-export function item(id: string): ItemLite {
-  return {
-    id,
-    title: `Item ${id}`,
-    description: null,
-    place: null,
-    place_lat: null,
-    place_lng: null,
-    tags: [],
-  };
-}
+export { item } from './item.test-support';
 
 export function defaultItemsState() {
   return {

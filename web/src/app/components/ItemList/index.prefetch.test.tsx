@@ -3,12 +3,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 
-import {
-  defaultImagesState,
-  defaultMutationsState,
-  itemsState,
-  renderList,
-} from './index.test-support';
+import { itemsState, renderList, resetHookMocks } from './index.test-support';
 import type { useItems } from './useItems';
 import type { useItemImages } from './useItemImages';
 import type { useItemMutations } from './useItemMutations';
@@ -43,10 +38,8 @@ describe('ItemList prefetch failures', () => {
   let onUnhandledRejection: Mock<() => void>;
 
   beforeEach(() => {
-    window.localStorage.setItem('lang', 'en');
+    resetHookMocks({ useItemsMock, useItemImagesMock, useItemMutationsMock });
     useItemsMock.mockReturnValue(itemsState());
-    useItemImagesMock.mockReturnValue(defaultImagesState());
-    useItemMutationsMock.mockReturnValue(defaultMutationsState());
     onUnhandledRejection = vi.fn();
     window.addEventListener('unhandledrejection', onUnhandledRejection);
   });

@@ -3,17 +3,16 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import ItemList from './index';
 import {
   defaultImagesState,
   defaultMutationsState,
+  item,
   itemsState,
+  listTree,
   renderList,
+  resetHookMocks,
 } from './index.test-support';
-import type { ItemLite, ImageEntry } from './types';
+import type { ImageEntry } from './types';
 import type { useItems } from './useItems';
 import type { useItemImages } from './useItemImages';
 import type { useItemMutations } from './useItemMutations';
@@ -40,15 +39,7 @@ vi.mock('../Map/usePlaces', () => ({
   usePlaces: () => ({ places: [], loading: false, error: false }),
 }));
 
-const ITEM: ItemLite = {
-  id: 'item-1',
-  title: 'Seated Dime',
-  description: null,
-  place: null,
-  place_lat: null,
-  place_lng: null,
-  tags: [],
-};
+const ITEM = item('item-1', { title: 'Seated Dime' });
 
 const PHOTO: ImageEntry = {
   id: 'img-1',
@@ -74,11 +65,9 @@ async function heroLoads() {
 
 describe('the catalogue grid', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    window.localStorage.setItem('lang', 'en');
+    resetHookMocks({ useItemsMock, useItemImagesMock, useItemMutationsMock });
     useItemsMock.mockReturnValue(itemsState({ items: [ITEM], total: 1 }));
     useItemImagesMock.mockReturnValue(imagesState());
-    useItemMutationsMock.mockReturnValue(defaultMutationsState());
   });
 
   it('hands a picked photograph to the entry it was picked for', async () => {
@@ -145,15 +134,7 @@ describe('the catalogue grid', () => {
     ).toBeVisible();
 
     useItemsMock.mockReturnValue(itemsState({ items: [], total: 0 }));
-    rerender(
-      <I18nProvider>
-        <ToastProvider>
-          <ConfirmProvider>
-            <ItemList categoryId="cat-1" canEdit={true} />
-          </ConfirmProvider>
-        </ToastProvider>
-      </I18nProvider>,
-    );
+    rerender(listTree());
 
     expect(screen.getByAltText(', image 1')).toBeInTheDocument();
   });
