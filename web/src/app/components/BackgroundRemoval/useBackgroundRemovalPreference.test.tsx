@@ -41,7 +41,7 @@ describe('useBackgroundRemovalPreference', () => {
 
     act(() => {
       localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
-      window.dispatchEvent(new StorageEvent('storage'));
+      window.dispatchEvent(new Event('storage'));
     });
 
     expect(result.current.enabled).toBe(true);

@@ -59,7 +59,7 @@ async function serveStandInModel(page: Page): Promise<string[]> {
 
 async function turnOnBackgroundRemoval(app: PageTree, page: Page) {
   await app.account.do.open();
-  await app.account.do.toggleCutout();
+  await app.account.do.toggleBackgroundRemoval();
   await expect(app.account.locators.backgroundRemoval.toggle).toBeChecked();
   await page.keyboard.press('Escape');
 }

@@ -6,7 +6,7 @@ interface AccountMenu {
     chooseLanguage(language: 'de' | 'en'): Promise<void>;
     chooseTheme(theme: 'system' | 'light' | 'dark'): Promise<void>;
     downloadModel(): Promise<void>;
-    toggleCutout(): Promise<void>;
+    toggleBackgroundRemoval(): Promise<void>;
     deleteAccount(): Promise<void>;
     open(): Promise<void>;
     openHelp(): Promise<void>;
@@ -65,7 +65,7 @@ export function initAccountMenu(page: Page): AccountMenu {
     downloadModel: async () => {
       await locators.backgroundRemoval.download.click();
     },
-    toggleCutout: async () => {
+    toggleBackgroundRemoval: async () => {
       await locators.backgroundRemoval.toggle.click();
     },
     // Only starts it: the confirmation decides.

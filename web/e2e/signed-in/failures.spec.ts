@@ -34,10 +34,10 @@ test.describe('when something outside the app fails', () => {
         route.fulfill({ status: 404, body: '' }),
       );
     await app.account.do.open();
-    await app.account.do.toggleCutout();
+    await app.account.do.toggleBackgroundRemoval();
     await page.keyboard.press('Escape');
 
-    const title = uniqueTitle('Ohne Modell');
+    const title = uniqueTitle('Ohne Download');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);

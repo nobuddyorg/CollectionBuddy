@@ -20,7 +20,7 @@ interface CutoutReview {
 }
 
 /** The review that stands between picking a photo and uploading it, once "Remove backgrounds" is on. */
-export function initCutoutReview(page: Page): CutoutReview {
+export function initBackgroundRemovalReview(page: Page): CutoutReview {
   const root = page.getByTestId('background-removal-review');
   const locators = {
     buttons: {

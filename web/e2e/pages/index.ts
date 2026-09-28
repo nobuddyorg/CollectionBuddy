@@ -4,7 +4,7 @@ import { initAccountMenu } from './account-menu';
 import { initAppError } from './app-error';
 import { initCatalogue } from './catalogue';
 import { initCategoryPanel } from './category-panel';
-import { initCutoutReview } from './background-removal';
+import { initBackgroundRemovalReview } from './background-removal';
 import { initConfirm, initImageViewer, initToast } from './dialogs';
 import { initEntryForm } from './entry-form';
 import { initHelp } from './help';
@@ -32,7 +32,7 @@ export function createPageTree(page: Page) {
       return initCategoryPanel(page);
     },
     get backgroundRemoval() {
-      return initCutoutReview(page);
+      return initBackgroundRemovalReview(page);
     },
     get confirm() {
       return initConfirm(page);
