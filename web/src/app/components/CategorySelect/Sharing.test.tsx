@@ -6,24 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import { ToastProvider } from '../Toast/ToastProvider';
+import { grant, sharesState } from './shares.test-support';
 import { SharingSection } from './Sharing';
 import type { UseShares } from './useShares';
-
-function sharesState(overrides: Partial<UseShares> = {}): UseShares {
-  return {
-    shares: [],
-    isLoading: false,
-    isSharing: false,
-    isRevoking: false,
-    isUpdatingRole: false,
-    reload: vi.fn().mockResolvedValue([]),
-    createShare: vi.fn().mockResolvedValue(true),
-    revokeShare: vi.fn().mockResolvedValue(undefined),
-    leaveShare: vi.fn().mockResolvedValue(true),
-    updateShareRole: vi.fn().mockResolvedValue(true),
-    ...overrides,
-  };
-}
 
 function renderSection(shares: UseShares) {
   render(
@@ -146,7 +131,7 @@ describe('SharingSection invite', () => {
     expect(createShare).not.toHaveBeenCalled();
   });
 
-  it('shows a spinner instead of the share icon while sharing is in flight', () => {
+  it('marks Share busy while sharing is in flight', () => {
     renderSection(sharesState({ isSharing: true }));
     expect(screen.getByRole('button', { name: 'Share' })).toHaveAttribute(
       'aria-busy',
@@ -252,16 +237,8 @@ describe('SharingSection list', () => {
     germanAppOnAmericanBrowser();
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            // Midday, so every timezone the suite may run in reads the same day.
-            expires_at: '2099-12-31T12:00:00.000Z',
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        // Midday, so every timezone the suite may run in reads the same day.
+        shares: [{ ...grant, expires_at: '2099-12-31T12:00:00.000Z' }],
       }),
     );
 
@@ -270,18 +247,10 @@ describe('SharingSection list', () => {
   });
 
   it('lists an existing grant with its expiry', () => {
-    const expiresAt = '2026-12-31T23:59:59.000Z';
+    const expiresAt = '2099-06-30T12:00:00.000Z';
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: expiresAt,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [{ ...grant, expires_at: expiresAt }],
       }),
     );
     // The expiry sits in a nested span, so aggregate text is read rather than one node's.
@@ -295,15 +264,7 @@ describe('SharingSection list', () => {
     const expiresAt = '2020-01-01T00:00:00.000Z';
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: expiresAt,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [{ ...grant, expires_at: expiresAt }],
       }),
     );
     const row = screen.getByText('grantee@example.com').closest('li')!;
@@ -318,15 +279,7 @@ describe('SharingSection list', () => {
   it("reflects an existing grant's role in its checkbox", () => {
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'editor',
-          },
-        ],
+        shares: [{ ...grant, role: 'editor' }],
       }),
     );
     const row = screen.getByText('grantee@example.com').closest('li')!;
@@ -337,15 +290,7 @@ describe('SharingSection list', () => {
     const updateShareRole = vi.fn().mockResolvedValue(true);
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
         updateShareRole,
       }),
     );
@@ -367,15 +312,7 @@ describe('SharingSection list', () => {
     const updateShareRole = vi.fn().mockResolvedValue(true);
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
         updateShareRole,
       }),
     );
@@ -391,15 +328,7 @@ describe('SharingSection list', () => {
     const updateShareRole = vi.fn().mockResolvedValue(true);
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'editor',
-          },
-        ],
+        shares: [{ ...grant, role: 'editor' }],
         updateShareRole,
       }),
     );
@@ -414,15 +343,7 @@ describe('SharingSection list', () => {
     const updateShareRole = vi.fn().mockResolvedValue(true);
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
         updateShareRole,
       }),
     );
@@ -447,15 +368,7 @@ describe('SharingSection list', () => {
     const updateShareRole = vi.fn().mockResolvedValue(true);
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
         updateShareRole,
       }),
     );
@@ -474,15 +387,7 @@ describe('SharingSection list', () => {
     const revokeShare = vi.fn<UseShares['revokeShare']>();
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
         revokeShare,
       }),
     );
@@ -504,15 +409,7 @@ describe('SharingSection list', () => {
     const revokeShare = vi.fn<UseShares['revokeShare']>();
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
         revokeShare,
       }),
     );
@@ -529,15 +426,7 @@ describe('SharingSection list', () => {
     renderSection(
       sharesState({
         isLoading: true,
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
       }),
     );
 

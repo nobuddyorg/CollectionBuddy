@@ -11,8 +11,8 @@ import {
   installHookStates,
   openPanel,
   renderSelect,
-  sharesState,
 } from './index.test-support';
+import { sharesState } from './shares.test-support';
 
 vi.mock('../../data/categories', () => ({
   countItemsForCategory: vi.fn(),
@@ -75,7 +75,7 @@ describe('CategorySelect with a shared category', () => {
     ).not.toBeInTheDocument();
   });
 
-  // Owners-only by product decision: a full copy of a collection is the owner's to hand out.
+  // A full copy of a collection is the owner's to hand out.
   it('keeps export to the owner', async () => {
     renderSelect({ categories: categories({ categories: sharedCategories }) });
     await openPanel();

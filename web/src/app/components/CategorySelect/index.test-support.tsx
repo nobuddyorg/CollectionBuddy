@@ -2,10 +2,9 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
+import { ToastConfirmWrapper } from '../providers.test-support';
 import CategorySelect from './index';
+import { sharesState } from './shares.test-support';
 import type { UseCategories } from './useCategories';
 import { useExportCategory } from './useExportCategory';
 import { useImportCategory } from './useImportCategory';
@@ -35,24 +34,6 @@ export function importState(
   };
 }
 
-export function sharesState(
-  overrides: Partial<ReturnType<typeof useShares>> = {},
-) {
-  return {
-    shares: [],
-    isLoading: false,
-    isSharing: false,
-    isRevoking: false,
-    isUpdatingRole: false,
-    reload: vi.fn().mockResolvedValue([]),
-    createShare: vi.fn(),
-    revokeShare: vi.fn(),
-    leaveShare: vi.fn(),
-    updateShareRole: vi.fn(),
-    ...overrides,
-  };
-}
-
 // user_id 'owner-1' matches renderSelect's default userId, so both read as owned by the viewer.
 export const CATEGORIES = [
   { id: 'a', name: 'Coins', user_id: 'owner-1' },
@@ -78,25 +59,27 @@ export function categories(
   };
 }
 
+export function selectTree(
+  props: Partial<Parameters<typeof CategorySelect>[0]> = {},
+) {
+  return (
+    <ToastConfirmWrapper>
+      <CategorySelect
+        selectedCategoryId="a"
+        onSelect={vi.fn()}
+        categories={categories()}
+        userId="owner-1"
+        {...props}
+      />
+    </ToastConfirmWrapper>
+  );
+}
+
 export function renderSelect(
   props: Partial<Parameters<typeof CategorySelect>[0]> = {},
 ) {
   const onSelect = vi.fn();
-  const view = render(
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <CategorySelect
-            selectedCategoryId="a"
-            onSelect={onSelect}
-            categories={categories()}
-            userId="owner-1"
-            {...props}
-          />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>,
-  );
+  const view = render(selectTree({ onSelect, ...props }));
   return { onSelect, view };
 }
 

@@ -12,14 +12,12 @@ import type { UseShares } from './useShares';
 
 /** Owner: the trash destroys the category; grantee: it only ends this viewer's own access. */
 export function useCategoryRemoval({
-  selectedCategoryId,
   selected,
   sortedCategories,
   categories,
   shares,
   onSelect,
 }: {
-  selectedCategoryId: string | null;
   selected: Category | null;
   sortedCategories: Category[];
   categories: UseCategories;
@@ -32,22 +30,21 @@ export function useCategoryRemoval({
 
   // shares.shares[0] is the one category_shares row RLS ever hands back to a non-owner.
   const onLeave = useCallback(async () => {
-    if (!selectedCategoryId || !selected) return;
+    if (!selected) return;
     const myShareId = shares.shares[0]?.id;
     if (!myShareId) return;
 
     const message = t('category_select.confirm_leave', { name: selected.name });
     if (!(await confirm(message))) return;
 
-    const restoreCategory = optimisticRemove(selectedCategoryId);
+    const restoreCategory = optimisticRemove(selected.id);
     if (!restoreCategory) return;
-    onSelect(nextAfterRemoving(sortedCategories, selectedCategoryId));
+    onSelect(nextAfterRemoving(sortedCategories, selected.id));
 
     if (await shares.leaveShare(myShareId)) return;
     restoreCategory();
-    onSelect(selectedCategoryId);
+    onSelect(selected.id);
   }, [
-    selectedCategoryId,
     selected,
     shares,
     t,
@@ -58,35 +55,34 @@ export function useCategoryRemoval({
   ]);
 
   const onDelete = useCallback(async () => {
-    if (!selectedCategoryId) return;
-    const categoryName = selected?.name ?? '';
+    if (!selected) return;
 
-    const { count, error: countError } =
-      await countItemsForCategory(selectedCategoryId);
+    const { count, error: countError } = await countItemsForCategory(
+      selected.id,
+    );
     if (countError) console.error(countError);
     let message;
     if (countError || count == null) {
       message = t('category_select.confirm_delete_generic', {
-        name: categoryName,
+        name: selected.name,
       });
     } else if (count > 0) {
       message = tCount('category_select.confirm_delete_with_entries', {
-        name: categoryName,
+        name: selected.name,
         count,
       });
     } else {
       message = t('category_select.confirm_delete_empty', {
-        name: categoryName,
+        name: selected.name,
       });
     }
 
     if (!(await confirm(message))) return;
-    onSelect(nextAfterRemoving(sortedCategories, selectedCategoryId));
-    deleteCategory(selectedCategoryId, {
-      onRestore: () => onSelect(selectedCategoryId),
+    onSelect(nextAfterRemoving(sortedCategories, selected.id));
+    deleteCategory(selected.id, {
+      onRestore: () => onSelect(selected.id),
     });
   }, [
-    selectedCategoryId,
     selected,
     deleteCategory,
     onSelect,

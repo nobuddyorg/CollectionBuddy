@@ -4,10 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { countItemsForCategory } from '../../data/categories';
-import { I18nProvider } from '../../i18n/I18nProvider';
 import type { Category } from '../../types';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
+import {
+  acceptConfirmation,
+  ToastConfirmWrapper,
+} from '../providers.test-support';
+import { CATEGORIES, categories } from './index.test-support';
+import { sharesState } from './shares.test-support';
 import type { UseCategories } from './useCategories';
 import { useCategoryRemoval } from './useCategoryRemoval';
 import type { UseShares } from './useShares';
@@ -16,62 +19,20 @@ vi.mock('../../data/categories', () => ({
   countItemsForCategory: vi.fn(),
 }));
 
-const CATEGORIES: Category[] = [
-  { id: 'a', name: 'Coins', user_id: 'owner-1' },
-  { id: 'b', name: 'Stamps', user_id: 'owner-1' },
-];
-
-function categories(overrides: Partial<UseCategories> = {}): UseCategories {
-  return {
-    categories: CATEGORIES,
-    isLoading: false,
-    loadFailed: false,
-    isCreating: false,
-    isDeleting: false,
-    isRenaming: false,
-    reload: vi.fn().mockResolvedValue(CATEGORIES),
-    createCategory: vi.fn(),
-    renameCategory: vi.fn(),
-    deleteCategory: vi.fn(),
-    // Hands back a restore function, as the real one does.
-    optimisticRemove: vi.fn(() => vi.fn()),
-    ...overrides,
-  };
-}
-
-function shares(overrides: Partial<UseShares> = {}): UseShares {
-  return {
-    shares: [],
-    isLoading: false,
-    isSharing: false,
-    isRevoking: false,
-    isUpdatingRole: false,
-    reload: vi.fn().mockResolvedValue([]),
-    createShare: vi.fn(),
-    revokeShare: vi.fn(),
-    leaveShare: vi.fn().mockResolvedValue(true),
-    updateShareRole: vi.fn(),
-    ...overrides,
-  };
-}
-
 function setUp({
-  selectedCategoryId = 'a' as string | null,
   selected = CATEGORIES[0] as Category | null,
   categoriesState = categories(),
-  sharesState = shares(),
+  sharesState: shares = sharesState(),
 }) {
   const onSelect = vi.fn();
   // The confirm dialog renders through the provider, so the hook needs a real tree around it.
   const { result, rerender } = renderHook(
     (props: {
-      selectedCategoryId: string | null;
       selected: Category | null;
       categoriesState: UseCategories;
       sharesState: UseShares;
     }) =>
       useCategoryRemoval({
-        selectedCategoryId: props.selectedCategoryId,
         selected: props.selected,
         sortedCategories: CATEGORIES,
         categories: props.categoriesState,
@@ -79,19 +40,8 @@ function setUp({
         onSelect,
       }),
     {
-      initialProps: {
-        selectedCategoryId,
-        selected,
-        categoriesState,
-        sharesState,
-      },
-      wrapper: ({ children }) => (
-        <I18nProvider>
-          <ToastProvider>
-            <ConfirmProvider>{children}</ConfirmProvider>
-          </ToastProvider>
-        </I18nProvider>
-      ),
+      initialProps: { selected, categoriesState, sharesState: shares },
+      wrapper: ToastConfirmWrapper,
     },
   );
   return { result, onSelect, rerender };
@@ -116,7 +66,7 @@ describe('useCategoryRemoval deleting a category you own', () => {
     });
 
     void result.current.onDelete();
-    await userEvent.click(await screen.findByTestId('confirm-accept'));
+    await acceptConfirmation();
 
     // The selection moves before the delete, so the catalogue never shows a category on its way out.
     expect(onSelect).toHaveBeenCalledWith('b');
@@ -237,17 +187,14 @@ describe('useCategoryRemoval deleting a category you own', () => {
     });
 
     void result.current.onDelete();
-    await userEvent.click(await screen.findByTestId('confirm-accept'));
+    await acceptConfirmation();
 
     deleteCategory.mock.calls[0]?.[1]?.onRestore?.();
     expect(onSelect).toHaveBeenLastCalledWith('a');
   });
 
   it('does nothing at all without a selection', async () => {
-    const { result, onSelect } = setUp({
-      selectedCategoryId: null,
-      selected: null,
-    });
+    const { result, onSelect } = setUp({ selected: null });
 
     await result.current.onDelete();
 
@@ -262,30 +209,15 @@ describe('useCategoryRemoval deleting a category you own', () => {
     });
 
     rerender({
-      selectedCategoryId: 'b',
       selected: CATEGORIES[1],
       categoriesState: categories({ deleteCategory }),
-      sharesState: shares(),
+      sharesState: sharesState(),
     });
 
     void result.current.onDelete();
-    await userEvent.click(await screen.findByTestId('confirm-accept'));
+    await acceptConfirmation();
 
     expect(deleteCategory).toHaveBeenCalledWith('b', expect.anything());
-  });
-
-  it('falls back to an empty name when the category is gone from the list', async () => {
-    const deleteCategory = vi.fn<UseCategories['deleteCategory']>();
-    const { result } = setUp({
-      selected: null,
-      categoriesState: categories({ deleteCategory }),
-    });
-
-    void result.current.onDelete();
-
-    expect(await screen.findByText('Delete ""?')).toBeInTheDocument();
-    await userEvent.click(screen.getByTestId('confirm-cancel'));
-    expect(deleteCategory).not.toHaveBeenCalled();
   });
 });
 
@@ -305,11 +237,11 @@ describe('useCategoryRemoval leaving a category shared with you', () => {
     const deleteCategory = vi.fn<UseCategories['deleteCategory']>();
     const { result, onSelect } = setUp({
       categoriesState: categories({ deleteCategory }),
-      sharesState: shares({ shares: [myGrant], leaveShare }),
+      sharesState: sharesState({ shares: [myGrant], leaveShare }),
     });
 
     void result.current.onLeave();
-    await userEvent.click(await screen.findByTestId('confirm-accept'));
+    await acceptConfirmation();
 
     expect(leaveShare).toHaveBeenCalledWith('share-1');
     expect(deleteCategory).not.toHaveBeenCalled();
@@ -320,19 +252,18 @@ describe('useCategoryRemoval leaving a category shared with you', () => {
     const leaveShare = vi.fn<UseShares['leaveShare']>().mockResolvedValue(true);
     const { result, rerender } = setUp({
       categoriesState: categories(),
-      sharesState: shares({ shares: [myGrant], leaveShare }),
+      sharesState: sharesState({ shares: [myGrant], leaveShare }),
     });
 
     const otherGrant = { ...myGrant, id: 'share-2' };
     rerender({
-      selectedCategoryId: 'b',
       selected: CATEGORIES[1],
       categoriesState: categories(),
-      sharesState: shares({ shares: [otherGrant], leaveShare }),
+      sharesState: sharesState({ shares: [otherGrant], leaveShare }),
     });
 
     void result.current.onLeave();
-    await userEvent.click(await screen.findByTestId('confirm-accept'));
+    await acceptConfirmation();
 
     expect(leaveShare).toHaveBeenCalledWith('share-2');
   });
@@ -346,11 +277,11 @@ describe('useCategoryRemoval leaving a category shared with you', () => {
       categoriesState: categories({
         optimisticRemove: vi.fn(() => restoreCategory),
       }),
-      sharesState: shares({ shares: [myGrant], leaveShare }),
+      sharesState: sharesState({ shares: [myGrant], leaveShare }),
     });
 
     const leaving = result.current.onLeave();
-    await userEvent.click(await screen.findByTestId('confirm-accept'));
+    await acceptConfirmation();
     await leaving;
 
     expect(restoreCategory).toHaveBeenCalled();
@@ -364,11 +295,11 @@ describe('useCategoryRemoval leaving a category shared with you', () => {
       categoriesState: categories({
         optimisticRemove: vi.fn(() => restoreCategory),
       }),
-      sharesState: shares({ shares: [myGrant], leaveShare }),
+      sharesState: sharesState({ shares: [myGrant], leaveShare }),
     });
 
     const leaving = result.current.onLeave();
-    await userEvent.click(await screen.findByTestId('confirm-accept'));
+    await acceptConfirmation();
     await leaving;
 
     expect(restoreCategory).not.toHaveBeenCalled();
@@ -379,7 +310,7 @@ describe('useCategoryRemoval leaving a category shared with you', () => {
   it('does nothing when no grant row has loaded yet', async () => {
     const leaveShare = vi.fn<UseShares['leaveShare']>().mockResolvedValue(true);
     const { result, onSelect } = setUp({
-      sharesState: shares({ leaveShare }),
+      sharesState: sharesState({ leaveShare }),
     });
 
     await result.current.onLeave();
@@ -392,7 +323,7 @@ describe('useCategoryRemoval leaving a category shared with you', () => {
   it('stops short of a confirmation when the category is gone from the list', async () => {
     const { result } = setUp({
       selected: null,
-      sharesState: shares({ shares: [myGrant] }),
+      sharesState: sharesState({ shares: [myGrant] }),
     });
 
     await result.current.onLeave();
@@ -403,7 +334,7 @@ describe('useCategoryRemoval leaving a category shared with you', () => {
   it('does not end the grant when the leave confirmation is declined', async () => {
     const leaveShare = vi.fn<UseShares['leaveShare']>().mockResolvedValue(true);
     const { result, onSelect } = setUp({
-      sharesState: shares({ shares: [myGrant], leaveShare }),
+      sharesState: sharesState({ shares: [myGrant], leaveShare }),
     });
 
     void result.current.onLeave();
@@ -420,11 +351,11 @@ describe('useCategoryRemoval leaving a category shared with you', () => {
       categoriesState: categories({
         optimisticRemove: vi.fn(() => null),
       }),
-      sharesState: shares({ shares: [myGrant], leaveShare }),
+      sharesState: sharesState({ shares: [myGrant], leaveShare }),
     });
 
     void result.current.onLeave();
-    await userEvent.click(await screen.findByTestId('confirm-accept'));
+    await acceptConfirmation();
 
     expect(leaveShare).not.toHaveBeenCalled();
   });

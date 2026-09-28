@@ -7,7 +7,7 @@ import CategorySelect from './components/CategorySelect';
 import {
   CATEGORY_TABPANEL_ID,
   categoryTabId,
-} from './components/CategorySelect/Dropdown';
+} from './components/CategorySelect/CategoryTabs';
 import EmptyState from './components/EmptyState';
 import Header from './components/Header';
 import HelpDialog from './components/Help';
@@ -97,7 +97,7 @@ export default function Page() {
           selectedCategoryId={selectedCategoryId}
           onSelect={selectCategory}
           categories={categories}
-          userId={userId ?? null}
+          userId={user.id}
           ready={catalogueReady}
         />
 

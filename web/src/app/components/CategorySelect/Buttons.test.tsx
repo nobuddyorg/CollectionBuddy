@@ -7,9 +7,9 @@ import {
   AddButton,
   CancelExportButton,
   CollapseButton,
-  DeleteButtonWithLabel,
   ExpandButton,
   ExportButton,
+  RemoveCategoryButton,
   RenameButton,
 } from './Buttons';
 
@@ -25,10 +25,9 @@ describe('AddButton', () => {
     );
     const button = screen.getByRole('button', { name: 'Add' });
     expect(button).toHaveAttribute('aria-busy', 'true');
-    expect(button.querySelector('.animate-spin')).toBeInTheDocument();
   });
 
-  it('shows its icon and fires onClick when not creating', async () => {
+  it('is not busy, and fires onClick, when not creating', async () => {
     const onClick = vi.fn();
     render(
       <AddButton
@@ -39,7 +38,7 @@ describe('AddButton', () => {
       />,
     );
     const button = screen.getByRole('button', { name: 'Add' });
-    expect(button.querySelector('.animate-spin')).not.toBeInTheDocument();
+    expect(button).toHaveAttribute('aria-busy', 'false');
     await userEvent.click(button);
     expect(onClick).toHaveBeenCalledOnce();
   });
@@ -80,14 +79,10 @@ describe('CollapseButton', () => {
   });
 });
 
-describe('DeleteButtonWithLabel', () => {
+describe('RemoveCategoryButton', () => {
   it('disables the button when disabled is true', () => {
     render(
-      <DeleteButtonWithLabel
-        onClick={vi.fn()}
-        disabled={true}
-        label="Delete"
-      />,
+      <RemoveCategoryButton onClick={vi.fn()} disabled={true} label="Delete" />,
     );
     expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
   });
@@ -95,7 +90,7 @@ describe('DeleteButtonWithLabel', () => {
   it('fires onClick when enabled and clicked', async () => {
     const onClick = vi.fn();
     render(
-      <DeleteButtonWithLabel
+      <RemoveCategoryButton
         onClick={onClick}
         disabled={false}
         label="Delete"

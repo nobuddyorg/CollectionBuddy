@@ -5,8 +5,10 @@ import { useCallback, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import CenteredModal from '../CenteredModal';
 import { useConfirm } from '../Confirm/ConfirmProvider';
-import Icon, { IconType } from '../Icon';
+import { IconType } from '../Icon';
 import type { CategoryShareSummary, ShareRole } from '../../data/shares';
+import { GhostIconButton, HEADER_TOGGLE_BOX } from './Buttons';
+import { isShareExpired } from './shareExpiry';
 import type { UseShares } from './useShares';
 import { labelClasses } from '../ui/labelClasses';
 
@@ -67,6 +69,8 @@ export function ShareList({ shares }: { shares: UseShares }) {
     [confirm, t, revokeShare],
   );
 
+  const now = new Date();
+
   return (
     <>
       {!isLoading && list.length === 0 && (
@@ -83,7 +87,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
           {list.map((share) => {
             const isExpired =
               !!share.expires_at &&
-              new Date(share.expires_at).getTime() <= new Date().getTime();
+              isShareExpired({ expiresAt: share.expires_at, now });
             let expiryLabel = t('category_select.share_no_expiry');
             if (share.expires_at) {
               const date = new Date(share.expires_at).toLocaleDateString(
@@ -127,37 +131,28 @@ export function ShareList({ shares }: { shares: UseShares }) {
 
                   <div className="flex shrink-0 items-center gap-1 sm:gap-2">
                     {roleCheckbox(share, 'hidden items-center gap-1.5 sm:flex')}
-                    <button
-                      type="button"
+                    <GhostIconButton
+                      testId="share-edit-access"
                       onClick={() => setRoleModalShareId(share.id)}
                       disabled={isLoading}
-                      aria-label={t('category_select.share_edit_access')}
-                      title={t('category_select.share_edit_access')}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40 sm:hidden sm:h-9 sm:w-9"
-                    >
-                      <Icon
-                        icon={IconType.Edit}
-                        className="w-4 h-4"
-                        aria-hidden="true"
-                      />
-                    </button>
-                    <button
-                      type="button"
-                      data-testid="share-revoke"
+                      label={t('category_select.share_edit_access')}
+                      icon={IconType.Edit}
+                      iconClassName="w-4 h-4"
+                      boxClassName={HEADER_TOGGLE_BOX}
+                      className="sm:hidden"
+                    />
+                    <GhostIconButton
+                      testId="share-revoke"
                       onClick={() =>
                         void onRevoke(share.id, share.invited_email)
                       }
                       disabled={isRevoking || isLoading}
-                      aria-label={t('category_select.share_revoke')}
-                      title={t('category_select.share_revoke')}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-40 sm:h-9 sm:w-9"
-                    >
-                      <Icon
-                        icon={IconType.Trash}
-                        className="w-4 h-4"
-                        aria-hidden="true"
-                      />
-                    </button>
+                      label={t('category_select.share_revoke')}
+                      icon={IconType.Trash}
+                      iconClassName="w-4 h-4"
+                      boxClassName={HEADER_TOGGLE_BOX}
+                      tone="destructive"
+                    />
                   </div>
                 </div>
               </li>

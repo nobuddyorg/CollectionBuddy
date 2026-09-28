@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { localDateStamp } from './localDate';
+import { endOfLocalDayIso, localDateStamp } from './localDate';
 
 /** 01:00 UTC on the 24th, read by a browser in California, where it is still the 23rd. */
 function lateEveningInCalifornia(): Date {
@@ -19,5 +19,13 @@ describe('localDateStamp', () => {
 
   it('reads the date the browser is having, not the one in UTC', () => {
     expect(localDateStamp(lateEveningInCalifornia())).toBe('2026-09-23');
+  });
+});
+
+describe('endOfLocalDayIso', () => {
+  it("names the day's last second in the browser's own timezone", () => {
+    expect(endOfLocalDayIso('2099-12-31')).toBe(
+      new Date(2099, 11, 31, 23, 59, 59).toISOString(),
+    );
   });
 });
