@@ -140,7 +140,6 @@
   "item_list": {
     "confirm_delete": "Diesen Eintrag löschen? Er und alle zugehörigen Fotos werden endgültig gelöscht.",
     "confirm_delete_image": "Dieses Foto löschen?",
-    "no_user_session": "Keine Benutzersitzung",
     "previous": "Zurück",
     "next": "Weiter",
     "previous_image": "Vorheriges Bild",

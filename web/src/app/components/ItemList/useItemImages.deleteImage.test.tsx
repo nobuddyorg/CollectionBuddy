@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   afterEach,
@@ -11,15 +11,22 @@ import {
   type MockInstance,
 } from 'vitest';
 
-import { deleteImageRow, removeImageObjects } from '../../data/images';
+import {
+  createSignedUrls,
+  deleteImageRow,
+  listImagesForItems,
+  removeImageObjects,
+} from '../../data/images';
 import {
   acceptConfirmation,
   commitDeferredDelete,
 } from '../providers.test-support';
+import { clearImageCache } from './imageCache';
 import {
   entry,
   installDefaultImageMocks,
   renderItemImages,
+  row,
   withOnePhotograph,
 } from './useItemImages.test-support';
 
@@ -67,6 +74,7 @@ describe('useItemImages deleteImage', () => {
     });
     await acceptConfirmation();
     expect(result.current.images['item-1']).toEqual([]);
+    expect(createSignedUrls).not.toHaveBeenCalled();
 
     await commitDeferredDelete();
     expect(deleteImageRow).toHaveBeenCalledWith({
@@ -216,5 +224,108 @@ describe('useItemImages deleteImage', () => {
     expect(await screen.findByTestId('toast')).toHaveTextContent(
       'Image deleted.',
     );
+  });
+
+  describe('when the delete moves a photograph up onto the plates', () => {
+    // Signing covers only the first five plates, so a sixth photograph starts out unsigned.
+    async function withPhotographs(count: number) {
+      vi.mocked(listImagesForItems).mockResolvedValue({
+        data: Array.from({ length: count }, (_, i) =>
+          row(`img-${i}`, 'item-1'),
+        ),
+        error: null,
+      });
+      const hook = renderItemImages();
+      await act(async () => {
+        await hook.result.current.refreshAllImages(['item-1']);
+      });
+      vi.mocked(createSignedUrls).mockClear();
+      return hook;
+    }
+
+    function signed(count: number) {
+      return Array.from({ length: count }, (_, i) =>
+        entry(`img-${i}`, 'item-1'),
+      );
+    }
+
+    it('signs the photograph that moves up onto the last plate', async () => {
+      const { result } = await withPhotographs(6);
+      expect(result.current.images['item-1'][5].urlFull).toBeUndefined();
+
+      act(() => {
+        void result.current.deleteImage('item-1', entry('img-0', 'item-1'));
+      });
+      await acceptConfirmation();
+
+      await waitFor(() =>
+        expect(result.current.images['item-1']).toEqual(signed(6).slice(1)),
+      );
+      expect(createSignedUrls).toHaveBeenCalledExactlyOnceWith([
+        'uid/item-1/img-5.webp',
+      ]);
+    });
+
+    it('asks for no signature when the photograph deleted was past the plates', async () => {
+      const { result } = await withPhotographs(7);
+      const seventh = result.current.images['item-1'][6];
+      // Emptied, so a signing the delete asked for would have to reach Storage.
+      clearImageCache();
+
+      act(() => {
+        void result.current.deleteImage('item-1', seventh);
+      });
+      await acceptConfirmation();
+      await screen.findByTestId('toast');
+
+      expect(result.current.images['item-1']).toHaveLength(6);
+      expect(createSignedUrls).not.toHaveBeenCalled();
+    });
+
+    it('asks for no signature when every plate left is signed', async () => {
+      const { result } = await withPhotographs(5);
+      // Emptied, so a signing the delete asked for would have to reach Storage.
+      clearImageCache();
+
+      act(() => {
+        void result.current.deleteImage('item-1', entry('img-0', 'item-1'));
+      });
+      await acceptConfirmation();
+      await screen.findByTestId('toast');
+
+      expect(result.current.images['item-1']).toEqual(signed(5).slice(1));
+      expect(createSignedUrls).not.toHaveBeenCalled();
+    });
+
+    it('keeps a photograph put back by Undo while the one moving up is signed', async () => {
+      const { result } = await withPhotographs(6);
+      let finishSigning = () => {};
+      vi.mocked(createSignedUrls).mockImplementationOnce(
+        (paths: string[]) =>
+          new Promise((resolve) => {
+            finishSigning = () =>
+              resolve({
+                data: paths.map((path) => ({
+                  path,
+                  signedUrl: `signed://${path}`,
+                })),
+                error: null,
+              });
+          }) as never,
+      );
+
+      act(() => {
+        void result.current.deleteImage('item-1', entry('img-0', 'item-1'));
+      });
+      await acceptConfirmation();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Undo' }),
+      );
+      act(() => finishSigning());
+
+      await waitFor(() =>
+        expect(result.current.images['item-1']).toEqual(signed(6)),
+      );
+    });
   });
 });

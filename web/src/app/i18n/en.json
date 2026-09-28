@@ -140,7 +140,6 @@
   "item_list": {
     "confirm_delete": "Delete this entry? It and every one of its photographs will be permanently deleted.",
     "confirm_delete_image": "Delete this photograph?",
-    "no_user_session": "No user session",
     "previous": "Previous",
     "next": "Next",
     "previous_image": "Previous image",

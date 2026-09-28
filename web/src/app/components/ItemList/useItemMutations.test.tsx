@@ -124,6 +124,35 @@ describe('useItemMutations removeItem', () => {
     expect(consoleError).toHaveBeenCalledWith('delete item', expect.anything());
     consoleError.mockRestore();
   });
+
+  // ItemCard's memo can keep a card's older onDeleteItem, so a captured removeItem must read the latest list.
+  it('puts an entry back at its place in the latest list when an older removeItem deleted it', async () => {
+    const { result } = renderHook(
+      () =>
+        useHarness({
+          initial: [item('a'), item('b'), item('c')],
+          ...noopCollaborators(),
+        }),
+      { wrapper },
+    );
+    const capturedRemoveItem = result.current.removeItem;
+
+    act(() => {
+      void result.current.removeItem('a');
+    });
+    await acceptConfirmation();
+    act(() => {
+      void capturedRemoveItem('b');
+    });
+    await acceptConfirmation();
+    expect(result.current.items.map((entry) => entry.id)).toEqual(['c']);
+
+    const undoButtons = await screen.findAllByRole('button', { name: 'Undo' });
+    await userEvent.click(undoButtons[1]);
+
+    expect(result.current.items.map((entry) => entry.id)).toEqual(['b', 'c']);
+  });
+
   it('removes the photographs before the row, and restores the entry without deleting the row when that fails', async () => {
     vi.mocked(deleteItem).mockResolvedValue({ error: null } as never);
     const capturedPaths = [{ path_full: 'b/a.webp', path_thumb: null }];

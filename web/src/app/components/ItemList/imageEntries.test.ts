@@ -7,6 +7,7 @@ import {
 } from './imageCache';
 import {
   entryDataOf,
+  entryPaths,
   groupImageRows,
   pageImageRowsFor,
   RENDERABLE_PLATES,
@@ -192,6 +193,18 @@ describe('entryDataOf', () => {
       ['a', { id: 'a', pathFull: 'p/a.webp', pathThumb: 'p/a.thumb.webp' }],
       ['b', { id: 'b', pathFull: 'p/b.webp', pathThumb: undefined }],
     ]);
+  });
+});
+
+describe('entryPaths', () => {
+  it("names a photograph's full size and its thumbnail", () => {
+    expect(
+      entryPaths({ pathFull: 'p/a.webp', pathThumb: 'p/a.thumb.webp' }),
+    ).toEqual(['p/a.webp', 'p/a.thumb.webp']);
+  });
+
+  it('names only the full size of a photograph without a thumbnail', () => {
+    expect(entryPaths({ pathFull: 'p/a.webp' })).toEqual(['p/a.webp']);
   });
 });
 

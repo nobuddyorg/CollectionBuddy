@@ -9,6 +9,7 @@ import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { restoreAt } from '../../lib/optimistic';
+import { useSyncedRef } from '../../lib/useSyncedRef';
 import type { ItemFormValues } from '../ItemForm';
 import type { ItemLite } from './types';
 
@@ -32,6 +33,7 @@ export function useItemMutations({
   const toast = useToast();
   const confirm = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
+  const itemsRef = useSyncedRef(items);
   // Removed optimistically, deleted only after the undo window; kept out of `items` across a reload.
   const pendingDeleteIds = useRef<Set<string>>(new Set());
 
@@ -75,9 +77,10 @@ export function useItemMutations({
     async (id: string) => {
       if (!(await confirm(t('item_list.confirm_delete')))) return;
 
-      // From the rendered list, not inside the state updater: updaters can run more than once.
-      const index = items.findIndex((item) => item.id === id);
-      const snapshot = items[index];
+      // From the latest committed list, not inside the state updater: updaters can run more than once.
+      const list = itemsRef.current;
+      const index = list.findIndex((item) => item.id === id);
+      const snapshot = list[index];
       pendingDeleteIds.current.add(id);
       setItems(excludePendingDeletes);
 
@@ -115,7 +118,7 @@ export function useItemMutations({
       });
     },
     [
-      items,
+      itemsRef,
       setItems,
       excludePendingDeletes,
       confirm,
