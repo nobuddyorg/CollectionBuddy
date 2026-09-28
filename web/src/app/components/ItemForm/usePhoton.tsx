@@ -4,12 +4,14 @@ import { SEARCH_MIN_LENGTH } from '../../data/itemSearch';
 import {
   coordsFromFeature,
   photonLang,
-  photonSearchUrl,
+  searchPhotonFeatures,
+  type PhotonFeature,
 } from '../../data/photon';
-import type { PhotonFeature, PlaceChoice } from './types';
+import type { PlaceChoice } from './types';
 
 // Not the shared useDebouncedValue: refocusing must restart the wait even when the query is unchanged.
 const SEARCH_DEBOUNCE_MS = 300;
+const PLACE_SUGGESTION_LIMIT = 5;
 
 type RegionNames = Intl.DisplayNames | null;
 
@@ -63,7 +65,7 @@ export function isQueryLongEnough(query: string): boolean {
   return query.trim().length >= SEARCH_MIN_LENGTH;
 }
 
-export function usePhotonSearch(locale?: string) {
+export function usePhotonSearch(language?: string) {
   const [query, setQuery] = useState('');
   const [focus, setFocus] = useState(false);
   const [results, setResults] = useState<PhotonFeature[]>([]);
@@ -78,7 +80,7 @@ export function usePhotonSearch(locale?: string) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const lang = useMemo(() => photonLang(locale), [locale]);
+  const lang = useMemo(() => photonLang(language), [language]);
 
   const DisplayNamesConstructor = (
     Intl as { DisplayNames?: typeof Intl.DisplayNames }
@@ -119,13 +121,14 @@ export function usePhotonSearch(locale?: string) {
         try {
           setLoading(true);
           setError(false);
-          const url = photonSearchUrl(trimmedQuery, { limit: 5, lang });
-          const response = await fetch(url, { signal: controller.signal });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const data = (await response.json()) as { features: PhotonFeature[] };
+          const features = await searchPhotonFeatures(trimmedQuery, {
+            limit: PLACE_SUGGESTION_LIMIT,
+            lang,
+            signal: controller.signal,
+          });
           if (abortRef.current !== controller) return;
 
-          setResults(dedupePhotonFeatures(data.features, regionNames));
+          setResults(dedupePhotonFeatures(features, regionNames));
           setActiveIndex(-1);
         } catch (error) {
           // A newer keystroke aborting this request is not a failure; the newer request owns the state.

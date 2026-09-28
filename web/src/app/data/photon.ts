@@ -1,10 +1,26 @@
 import { isRetryableStatus, retryWithBackoff } from '../lib/backoff';
+import type { Coordinates } from '../lib/coordinates';
 
 const PHOTON_ENDPOINT = 'https://photon.komoot.io/api/';
 
-// Photon only recognises a couple of the app's locales; anything else falls back to English.
-export function photonLang(locale?: string): 'de' | 'en' {
-  return locale === 'de' ? 'de' : 'en';
+export type PhotonFeature = {
+  properties: {
+    osm_id: number;
+    name?: string;
+    city?: string;
+    town?: string;
+    village?: string;
+    municipality?: string;
+    state?: string;
+    country?: string;
+    countrycode?: string;
+  };
+  geometry: { type: 'Point'; coordinates: [number, number] };
+};
+
+// Photon only recognises a couple of the app's languages; anything else falls back to English.
+export function photonLang(language?: string): 'de' | 'en' {
+  return language === 'de' ? 'de' : 'en';
 }
 
 export function photonSearchUrl(
@@ -18,10 +34,20 @@ export function photonSearchUrl(
   return url.toString();
 }
 
+/** An abort rejects with fetch's own DOMException, untouched: callers tell a superseded search from a failure by it. */
+export async function searchPhotonFeatures(
+  query: string,
+  { limit, lang, signal }: { limit: number; lang: string; signal: AbortSignal },
+): Promise<PhotonFeature[]> {
+  const response = await fetch(photonSearchUrl(query, { limit, lang }), {
+    signal,
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return ((await response.json()) as { features: PhotonFeature[] }).features;
+}
+
 /** GeoJSON orders coordinates lng-first; a non-finite value yields null rather than a pin nowhere. */
-export function coordsFromFeature(
-  feature: unknown,
-): { lat: number; lng: number } | null {
+export function coordsFromFeature(feature: unknown): Coordinates | null {
   const coordinates = (feature as { geometry?: { coordinates?: unknown } })
     ?.geometry?.coordinates;
   if (!Array.isArray(coordinates)) return null;
@@ -31,9 +57,7 @@ export function coordsFromFeature(
 }
 
 /** The first feature's coordinates, via the same validator the form's autocomplete uses. */
-export function coordsFromPhotonResponse(
-  data: unknown,
-): { lat: number; lng: number } | null {
+export function coordsFromPhotonResponse(data: unknown): Coordinates | null {
   const features = (data as { features?: unknown })?.features;
   if (!Array.isArray(features)) return null;
   return coordsFromFeature(features[0]);
@@ -51,7 +75,7 @@ export function geocodePlace(
     signal,
     awaitTurn,
   }: { lang: string; signal: AbortSignal; awaitTurn: () => Promise<void> },
-): Promise<{ lat: number; lng: number } | null> {
+): Promise<Coordinates | null> {
   return retryWithBackoff({
     maxAttempts: GEOCODE_ATTEMPTS,
     baseMs: GEOCODE_RETRY_BASE_MS,

@@ -2,7 +2,7 @@
 import { useEffect, useId, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import { isQueryLongEnough, usePhotonSearch } from './usePhoton';
-import type { PlaceCoords } from './types';
+import type { Coordinates } from '../../lib/coordinates';
 import { fieldClasses } from '../ui/fieldClasses';
 import { MAX_PLACE_LENGTH } from '../../lib/textLimits';
 
@@ -14,7 +14,7 @@ export function PlaceAutocomplete({
 }: {
   id?: string;
   value: string;
-  onChange: (value: string, coords: PlaceCoords | null) => void;
+  onChange: (value: string, coords: Coordinates | null) => void;
 }) {
   const { t, language } = useI18n();
   const {

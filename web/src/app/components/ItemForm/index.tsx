@@ -5,7 +5,8 @@ import { useI18n } from '../../i18n/useI18n';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { Submit } from './Submit';
 import { TagsInput } from './TagsInput';
-import type { ItemFormProps, PlaceCoords } from './types';
+import type { ItemFormProps } from './types';
+import type { Coordinates } from '../../lib/coordinates';
 import { fieldClasses } from '../ui/fieldClasses';
 import { MAX_DESCRIPTION_LENGTH, MAX_TITLE_LENGTH } from '../../lib/textLimits';
 import { buttonClasses } from '../ui/buttonClasses';
@@ -31,7 +32,7 @@ export default function ItemForm({
   const [description, setDescription] = useState(initial.description ?? '');
   const [place, setPlace] = useState(initial.place ?? '');
   // Carried through untouched unless the field is edited, so editing a title keeps the place's coordinates.
-  const [placeCoords, setPlaceCoords] = useState<PlaceCoords | null>(
+  const [placeCoords, setPlaceCoords] = useState<Coordinates | null>(
     initial.place_lat != null && initial.place_lng != null
       ? { lat: initial.place_lat, lng: initial.place_lng }
       : null,
@@ -82,7 +83,7 @@ export default function ItemForm({
   );
 
   const handlePlaceChange = useCallback(
-    (value: string, coords: PlaceCoords | null) => {
+    (value: string, coords: Coordinates | null) => {
       setPlace(value);
       setPlaceCoords(coords);
     },

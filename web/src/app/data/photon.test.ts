@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   coordsFromFeature,
   coordsFromPhotonResponse,
   photonLang,
   photonSearchUrl,
+  searchPhotonFeatures,
+  type PhotonFeature,
 } from './photon';
 
 describe('photonLang', () => {
@@ -35,6 +37,64 @@ describe('photonSearchUrl', () => {
   it('includes lang when given', () => {
     const url = new URL(photonSearchUrl('Cologne', { limit: 1, lang: 'de' }));
     expect(url.searchParams.get('lang')).toBe('de');
+  });
+});
+
+describe('searchPhotonFeatures', () => {
+  const cologne: PhotonFeature = {
+    properties: { osm_id: 1, city: 'Cologne' },
+    geometry: { type: 'Point', coordinates: [6.96, 50.94] },
+  };
+
+  function stubFetch(respond: () => Promise<unknown>) {
+    const fetchMock = vi
+      .fn<(url: string, init: RequestInit) => Promise<unknown>>()
+      .mockImplementation(respond);
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  const search = (signal = new AbortController().signal) =>
+    searchPhotonFeatures('Col', { limit: 5, lang: 'de', signal });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns the features Photon found for the query, limit and language', async () => {
+    const fetchMock = stubFetch(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ features: [cologne] }),
+    }));
+    const controller = new AbortController();
+
+    const features = await search(controller.signal);
+
+    expect(features).toEqual([cologne]);
+    const [url, init] = fetchMock.mock.calls[0];
+    const params = new URL(url).searchParams;
+    expect(params.get('q')).toBe('Col');
+    expect(params.get('limit')).toBe('5');
+    expect(params.get('lang')).toBe('de');
+    expect(init.signal).toBe(controller.signal);
+  });
+
+  it('rejects with the status of a refused request, never reading its body', async () => {
+    const json = vi.fn().mockResolvedValue({ features: [cologne] });
+    stubFetch(async () => ({ ok: false, status: 503, json }));
+
+    await expect(search()).rejects.toThrow(new Error('HTTP 503'));
+    expect(json).not.toHaveBeenCalled();
+  });
+
+  it("passes fetch's abort through unchanged, so a superseded search reads as one", async () => {
+    const abort = new DOMException('Aborted', 'AbortError');
+    stubFetch(async () => {
+      throw abort;
+    });
+
+    await expect(search()).rejects.toBe(abort);
   });
 });
 

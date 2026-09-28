@@ -1,4 +1,5 @@
 import type { Icon } from 'leaflet';
+import type { Coordinates } from '../../lib/coordinates';
 
 export type Leaflet = typeof import('leaflet');
 
@@ -6,9 +7,7 @@ export type IconDefaultPrivate = Icon.Default & {
   _getIconUrl?: () => string;
 };
 
-export interface MarkerInput {
-  lat: number;
-  lng: number;
+export interface MarkerInput extends Coordinates {
   popupText: string;
   /** The entries catalogued at this place, named under it in the popup. */
   titles?: string[];
@@ -26,15 +25,13 @@ export interface MapCommand {
 
 export interface MapProps {
   markers: MarkerInput[];
-  currentLocation?: { lat: number; lng: number; popupText?: string };
+  currentLocation?: Coordinates & { popupText?: string };
   command?: MapCommand | null;
 }
 
 /** Exactly what the geocode cache holds: coordinates stay true whatever entries are catalogued there. */
-export interface PlaceCoords {
+export interface PlaceCoords extends Coordinates {
   name: string;
-  lat: number;
-  lng: number;
 }
 
 /** A located place together with the entries catalogued there. */

@@ -2,7 +2,8 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { useCurrentLocation, type Coords } from './useCurrentLocation';
+import type { Coordinates } from '../../lib/coordinates';
+import { useCurrentLocation } from './useCurrentLocation';
 
 const POSITION: GeolocationPosition = {
   coords: {
@@ -181,7 +182,7 @@ describe('useCurrentLocation mount tracking', () => {
       geolocation.watches.get(watchId)!.success(POSITION);
     });
 
-    expect(result.current.location).toEqual<Coords>({
+    expect(result.current.location).toEqual<Coordinates>({
       lat: 50.94,
       lng: 6.96,
     });
@@ -199,7 +200,7 @@ describe('useCurrentLocation mount tracking', () => {
       geolocation.lastFix.success?.(POSITION);
     });
 
-    expect(result.current.location).toEqual<Coords>({
+    expect(result.current.location).toEqual<Coordinates>({
       lat: 50.94,
       lng: 6.96,
     });

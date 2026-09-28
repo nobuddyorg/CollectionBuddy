@@ -1,13 +1,10 @@
-import type { PhotonFeature } from './types';
+import type { PhotonFeature } from '../../data/photon';
 
 export function props(
   partial: Partial<PhotonFeature['properties']> = {},
 ): PhotonFeature['properties'] {
   return {
     osm_id: 1,
-    osm_type: 'N',
-    osm_key: 'place',
-    osm_value: 'city',
     ...partial,
   };
 }

@@ -5,15 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
-import type { PhotonFeature } from './types';
+import type { PhotonFeature } from '../../data/photon';
 
 function feature(osm_id: number, city: string): PhotonFeature {
   return {
     properties: {
       osm_id,
-      osm_type: 'N',
-      osm_key: 'place',
-      osm_value: 'city',
       city,
       country: 'Germany',
     },
@@ -134,9 +131,6 @@ describe('PlaceAutocomplete options', () => {
             {
               properties: {
                 osm_id: 3,
-                osm_type: 'N',
-                osm_key: 'place',
-                osm_value: 'city',
                 city: 'Strasbourg',
                 countrycode: 'FR',
               },

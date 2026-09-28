@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 import { usePhotonSearch } from './usePhoton';
 import { feature } from './usePhoton.test-support';
-import type { PhotonFeature, PlaceChoice } from './types';
+import type { PhotonFeature } from '../../data/photon';
+import type { PlaceChoice } from './types';
 
 describe('usePhotonSearch choose', () => {
   // `focus` stays `false`: set true first, the search effect's own focus reset would mask choose()'s work.
@@ -39,10 +40,10 @@ describe('usePhotonSearch choose', () => {
     expect(choice?.label).toBe('Cologne, Germany');
   });
 
-  it('uses whichever locale is current when picked, not the one active when the hook first mounted', () => {
+  it('uses whichever language is current when picked, not the one active when the hook first mounted', () => {
     const { result, rerender } = renderHook(
-      ({ locale }) => usePhotonSearch(locale),
-      { initialProps: { locale: 'de' } },
+      ({ language }) => usePhotonSearch(language),
+      { initialProps: { language: 'de' } },
     );
 
     let germanChoice: PlaceChoice | undefined;
@@ -52,7 +53,7 @@ describe('usePhotonSearch choose', () => {
       );
     });
 
-    rerender({ locale: 'en' });
+    rerender({ language: 'en' });
 
     let englishChoice: PlaceChoice | undefined;
     act(() => {

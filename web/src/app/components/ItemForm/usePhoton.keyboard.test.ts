@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { usePhotonSearch } from './usePhoton';
 import { feature } from './usePhoton.test-support';
-import type { PhotonFeature, PlaceChoice } from './types';
+import type { PhotonFeature } from '../../data/photon';
+import type { PlaceChoice } from './types';
 
 function keyEvent(key: string) {
   const preventDefault = vi.fn();
