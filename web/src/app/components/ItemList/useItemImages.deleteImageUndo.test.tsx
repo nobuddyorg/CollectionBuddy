@@ -8,8 +8,8 @@ import {
   listImagesForItems,
   removeImageObjects,
 } from '../../data/images';
+import { acceptConfirmation } from '../providers.test-support';
 import {
-  acceptConfirmation,
   entry,
   renderItemImages,
   resetImageTestState,
@@ -30,7 +30,6 @@ vi.mock('../../data/images', async () => {
     createImageRow: vi.fn(),
     createSignedUrls: vi.fn(),
     deleteImageRow: vi.fn(),
-    listImagePathsForItems: vi.fn(),
     listImagesForItems: vi.fn(),
     removeImageObjects: vi.fn(),
     uploadImageObject: vi.fn(),

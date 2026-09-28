@@ -14,6 +14,9 @@ import {
 import { deleteImageRow, removeImageObjects } from '../../data/images';
 import {
   acceptConfirmation,
+  commitDeferredDelete,
+} from '../providers.test-support';
+import {
   entry,
   installDefaultImageMocks,
   renderItemImages,
@@ -32,18 +35,11 @@ vi.mock('../../data/images', async () => {
     createImageRow: vi.fn(),
     createSignedUrls: vi.fn(),
     deleteImageRow: vi.fn(),
-    listImagePathsForItems: vi.fn(),
     listImagesForItems: vi.fn(),
     removeImageObjects: vi.fn(),
     uploadImageObject: vi.fn(),
   };
 });
-
-// The delete waits out the toast's undo window; closing the toast commits it, the same as expiry.
-async function commitDeferredDelete() {
-  await screen.findByTestId('toast');
-  await userEvent.click(screen.getByRole('button', { name: 'Close' }));
-}
 
 describe('useItemImages deleteImage', () => {
   const image = entry('img-1', 'item-1');

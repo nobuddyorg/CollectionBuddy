@@ -66,6 +66,19 @@ describe('listItems', () => {
     });
   });
 
+  it('counts a missing head count as zero', async () => {
+    const rawIds = idsPage('a');
+    const rawItems = vi.fn().mockResolvedValue({
+      data: [itemRow('a')],
+      error: null,
+    });
+    const rawCount = vi.fn().mockResolvedValue({ count: null, error: null });
+
+    const { count } = await listItems(params, { rawIds, rawItems, rawCount });
+
+    expect(count).toBe(0);
+  });
+
   it('keeps the id page order, whatever order the by-id read answers in', async () => {
     const rawIds = idsPage('c', 'a', 'b');
     const rawItems = vi.fn().mockResolvedValue({

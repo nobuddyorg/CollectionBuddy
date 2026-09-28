@@ -1,17 +1,10 @@
 'use client';
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type RefObject,
-} from 'react';
+import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { verifiedUserId } from '../../data/auth';
 import {
   createImageRow,
   deleteImageRow,
   imagePrefix,
-  listImagePathsForItems,
   listImagesForItems,
   uploadImageObject,
   type ImageListRow,
@@ -35,6 +28,7 @@ import {
 import { extensionForType } from '../../data/photoType';
 import { compressPhoto } from '../../lib/imageCompression';
 import { restoreAt } from '../../lib/optimistic';
+import { useSyncedRef } from '../../lib/useSyncedRef';
 
 // Re-signs each shown photograph before its own 1h signature expires, so a long-lived tab keeps its thumbnails.
 function useSignedUrlRefresh(
@@ -83,11 +77,7 @@ export function useItemImages() {
   const [images, setImages] = useState<Record<string, ImageEntry[]>>({});
   // Distinct from "has no images", so a card doesn't grow an image region once pictures arrive.
   const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
-  const imagesRef = useRef(images);
-
-  useEffect(() => {
-    imagesRef.current = images;
-  }, [images]);
+  const imagesRef = useSyncedRef(images);
 
   // Hands entries back rather than storing them, so the caller can settle its own state in one render.
   const fetchItemImages = useCallback(async (itemId: string) => {
@@ -146,11 +136,14 @@ export function useItemImages() {
   );
 
   // The carousel's top-up: signs the photographs past the card's plates only once someone opens them.
-  const signAllFor = useCallback(async (itemId: string) => {
-    const entries = imagesRef.current[itemId] ?? [];
-    const signed = await signAllEntries([[itemId, entryDataOf(entries)]]);
-    setImages((previous) => ({ ...previous, ...signed }));
-  }, []);
+  const signAllFor = useCallback(
+    async (itemId: string) => {
+      const entries = imagesRef.current[itemId] ?? [];
+      const signed = await signAllEntries([[itemId, entryDataOf(entries)]]);
+      setImages((previous) => ({ ...previous, ...signed }));
+    },
+    [imagesRef],
+  );
 
   useSignedUrlRefresh(imagesRef, refreshAllImages);
 
@@ -239,7 +232,7 @@ export function useItemImages() {
       };
 
       toast.success(t('item_list.delete_image_success'), {
-        action: { label: t('common.undo'), onClick: restore },
+        onUndo: restore,
         onExpire: async () => {
           const { error } = await removeObjectsThenRows({
             paths: [
@@ -264,7 +257,7 @@ export function useItemImages() {
 
   // The item row's cascade takes the images rows with it, so their paths are read before the delete.
   const captureItemImagePaths = useCallback(async (itemId: string) => {
-    const listed = await listImagePathsForItems([itemId]);
+    const listed = await listImagesForItems([itemId]);
     if (listed.error !== null) {
       throw new Error('Could not read image paths before delete', {
         cause: listed.error,

@@ -9,10 +9,10 @@ import {
   useRef,
   useState,
 } from 'react';
-import ReactDOM from 'react-dom';
 
 import { useI18n } from '../../i18n/useI18n';
 import { useBeforeUnloadGuard } from '../../lib/useBeforeUnloadGuard';
+import { Portal } from '../CenteredModal/Portal';
 import Icon, { IconType } from '../Icon';
 import {
   type Countdown,
@@ -25,12 +25,11 @@ import { createPendingToasts } from './pendingToasts';
 import { isUndoShortcut } from './undoShortcut';
 
 type ToastKind = 'error' | 'success';
-type ToastAction = { label: string; onClick: () => void };
 type ToastEntry = {
   id: number;
   message: string;
   kind: ToastKind;
-  action?: ToastAction;
+  onUndo?: () => void;
   onExpire?: () => void | Promise<void>;
 };
 type PendingToast = {
@@ -40,8 +39,8 @@ type PendingToast = {
   timer?: ReturnType<typeof setTimeout>;
 };
 type SuccessOptions = {
-  /** A second button that cancels `onExpire` and runs its own `onClick`: the toast's undo, also on Ctrl+Z. */
-  action?: ToastAction;
+  /** Cancels onExpire and runs instead: the toast's Undo button, also on Ctrl+Z. */
+  onUndo?: () => void;
   /** Runs once, on auto-dismiss or the close button; the deferred destructive step goes here. */
   onExpire?: () => void | Promise<void>;
 };
@@ -95,7 +94,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [pending],
   );
 
-  // Auto-dismiss and the close button both commit; only the action button (undo) skips onExpire.
+  // Auto-dismiss and the close button both commit; only Undo skips onExpire.
   const expire = useCallback(
     async (id: number) => {
       await settle(id)?.onExpire?.();
@@ -105,7 +104,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const undo = useCallback(
     (id: number) => {
-      settle(id)?.action?.onClick();
+      settle(id)?.onUndo?.();
     },
     [settle],
   );
@@ -158,7 +157,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         id,
         message,
         kind,
-        action: options?.action,
+        onUndo: options?.onUndo,
         onExpire: options?.onExpire,
       };
       const countdown = startCountdown(AUTO_DISMISS_MS, Date.now());
@@ -171,7 +170,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   // The toasts sit last in the tab order; the shortcut reaches Undo from wherever focus is.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const newest = toasts.findLast((entry) => entry.action);
+      const newest = toasts.findLast((entry) => entry.onUndo);
       if (!newest || !isUndoShortcut(event)) return;
       event.preventDefault();
       undo(newest.id);
@@ -193,7 +192,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     (message: string, options?: SuccessOptions) => {
       post('success', message, options);
       announce(
-        options?.action
+        options?.onUndo
           ? `${message} ${t('common.undo_shortcut_hint')}`
           : message,
       );
@@ -221,8 +220,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <span className="sr-only" aria-live="polite">
         <span key={announcement.key}>{announcement.message}</span>
       </span>
-      {mounted &&
-        ReactDOM.createPortal(
+      {mounted && (
+        <Portal>
           <div className="fixed inset-x-0 bottom-4 z-overlay flex flex-col items-center gap-2 px-4 pointer-events-none">
             {toasts.map((entry) => (
               // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- hover and focus only hold the timer; the buttons inside carry every interaction
@@ -242,7 +241,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 }`}
               >
                 <span className="flex-1 text-sm">{entry.message}</span>
-                {entry.action && (
+                {entry.onUndo && (
                   <>
                     <button
                       type="button"
@@ -251,7 +250,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                       aria-keyshortcuts="Control+Z Meta+Z"
                       className="shrink-0 -my-1 px-1 py-1 text-sm font-medium underline underline-offset-2"
                     >
-                      {entry.action.label}
+                      {t('common.undo')}
                     </button>
                     <kbd
                       aria-hidden="true"
@@ -272,9 +271,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 </button>
               </div>
             ))}
-          </div>,
-          document.body,
-        )}
+          </div>
+        </Portal>
+      )}
     </ToastContext.Provider>
   );
 }

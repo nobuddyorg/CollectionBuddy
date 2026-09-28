@@ -144,7 +144,7 @@ export function useCategories() {
       };
 
       toast.success(t('category_select.delete_success'), {
-        action: { label: t('common.undo'), onClick: restoreAndNotify },
+        onUndo: restoreAndNotify,
         onExpire: async () => {
           setIsDeleting(true);
           try {

@@ -7,6 +7,7 @@ import { useToast } from '../Toast/ToastProvider';
 import { listItems } from '../../data/itemPage';
 import { clampPage, pageCount, pageRange } from './paging';
 import { takePrefetchedFirstPage } from './firstPagePrefetch';
+import { useSyncedRef } from '../../lib/useSyncedRef';
 import type { PageImages } from './imageEntries';
 import type { ItemLite } from './types';
 
@@ -23,7 +24,7 @@ export function useItems(categoryId: string, query: string) {
   const [loadFailed, setLoadFailed] = useState(false);
   // Aborted when superseded or unmounted, so the response stops downloading and its answer is dropped.
   const abortRef = useRef<AbortController | null>(null);
-  // Non-silent requests in flight: one superseded by a silent request used to leave `loading` stuck true.
+  // Counts non-silent loads in flight, so a superseding silent load cannot leave `loading` stuck true.
   const pendingNonSilent = useRef(0);
 
   const totalPages = useMemo(() => pageCount(total), [total]);
@@ -72,7 +73,7 @@ export function useItems(categoryId: string, query: string) {
 
         // postgrest-js resolves an aborted fetch with an AbortError `error`: not a failure worth a toast.
         if (controller.signal.aborted) return;
-        if (error) {
+        if (error !== null) {
           setLoadFailed(true);
           toast.reportError(
             'load items',
@@ -82,23 +83,12 @@ export function useItems(categoryId: string, query: string) {
           return;
         }
 
-        const loaded = (data ?? []).map((row) => ({
-          id: row.id,
-          title: row.title,
-          description: row.description,
-          place: row.place ?? null,
-          place_lat: row.place_lat ?? null,
-          place_lng: row.place_lng ?? null,
-          tags: row.tags ?? [],
-        }));
-        setItems(loaded);
-        setPageImages(
-          imageRows && {
-            itemIdsKey: loaded.map((item) => item.id).join(','),
-            rows: imageRows,
-          },
-        );
-        setTotal(count || 0);
+        setItems(data);
+        setPageImages({
+          itemIdsKey: data.map((item) => item.id).join(','),
+          rows: imageRows,
+        });
+        setTotal(count);
         setLoadFailed(false);
       } finally {
         // Runs for a discarded request too, so `loading` ends false whichever request resolves last.
@@ -118,14 +108,11 @@ export function useItems(categoryId: string, query: string) {
   }, [load]);
 
   // One stable identity dispatching through a ref, so a late `reload` resyncs against what is current then.
-  const loadRef = useRef(load);
-  useEffect(() => {
-    loadRef.current = load;
-  }, [load]);
+  const loadRef = useSyncedRef(load);
 
   const reload = useCallback(
     (options?: { silent?: boolean }) => loadRef.current(options),
-    [],
+    [loadRef],
   );
 
   return {

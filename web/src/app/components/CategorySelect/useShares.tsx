@@ -199,7 +199,7 @@ export function useShares(categoryId: string | null) {
         );
       };
       toast.success(t('category_select.share_revoke_success'), {
-        action: { label: t('common.undo'), onClick: () => void reinstate() },
+        onUndo: () => void reinstate(),
       });
     },
     [categoryId, removeShare, shares, t, toast],

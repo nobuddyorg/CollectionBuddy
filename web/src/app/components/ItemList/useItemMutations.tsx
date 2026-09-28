@@ -90,7 +90,7 @@ export function useItemMutations({
       };
 
       toast.success(t('item_list.entry_deleted'), {
-        action: { label: t('common.undo'), onClick: restore },
+        onUndo: restore,
         onExpire: async () => {
           try {
             const imagePaths = await captureItemImagePaths(id);

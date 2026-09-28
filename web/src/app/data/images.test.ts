@@ -9,7 +9,6 @@ import {
   imagePrefix,
   isTransientStorageError,
   listImagePathsForCategory,
-  listImagePathsForItems,
   listImagesForItems,
   removeImageObjects,
   uploadImageObject,
@@ -349,18 +348,6 @@ describe('listImagesForItems', () => {
         limit: 1000,
       },
     ]);
-  });
-});
-
-describe('listImagePathsForItems', () => {
-  it('selects path columns without the row id', async () => {
-    const { calls, columns } = mockImagesQuery(() => ({
-      data: [],
-      error: null,
-    }));
-    await listImagePathsForItems(['item-1']);
-    expect(calls).toEqual([firstPage(['item-1'])]);
-    expect(columns()).toBe('item_id, path_full, path_thumb, created_at, id');
   });
 });
 

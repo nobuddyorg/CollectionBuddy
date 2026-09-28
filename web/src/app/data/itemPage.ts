@@ -128,12 +128,19 @@ function inIdOrder<T extends { id: string }>(
   return ids.flatMap((id) => byId.get(id) ?? []);
 }
 
-type PageRead = {
-  data: ItemFields[] | null;
-  error: unknown;
-  count: number | null;
-  imageRows: ImageListRow[] | null;
-};
+type PageRead =
+  | {
+      data: ItemFields[];
+      count: number;
+      imageRows: ImageListRow[];
+      error: null;
+    }
+  | {
+      data: null;
+      count: null;
+      imageRows: null;
+      error: NonNullable<unknown>;
+    };
 
 /** The searched page, its photographs, and its total, read off the first row whichever page that is. */
 async function searchedPage(
@@ -187,7 +194,7 @@ type ListItemsCalls = {
   rawSearch?: typeof rawSearchCategoryItems;
 };
 
-/** The catalogue page, newest first, with its photograph rows on both paths; `imageRows` is null only with an error. */
+/** The catalogue page, newest first, with its photograph rows on both paths. */
 export async function listItems(
   params: {
     categoryId: string;
@@ -206,12 +213,13 @@ export async function listItems(
   const likePattern = likePatternFor(params.search);
   if (likePattern) return searchedPage({ ...params, likePattern }, rawSearch);
 
-  const [{ data: links, error }, { count, error: countError }] =
+  const [{ data: links, error }, { count: headCount, error: countError }] =
     await Promise.all([rawIds(params), rawCount(params)]);
   if (error) return { data: null, error, count: null, imageRows: null };
   if (countError) {
     return { data: null, error: countError, count: null, imageRows: null };
   }
+  const count = headCount ?? 0;
   const ids = (links ?? []).map((link) => link.item_id);
   if (ids.length === 0) return { data: [], error: null, count, imageRows: [] };
 

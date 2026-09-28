@@ -51,12 +51,6 @@ export type ImageListRow = Pick<
   'id' | 'item_id' | 'path_full' | 'path_thumb'
 >;
 
-/** No `id`: capture-before-cascade readers act on a whole item's photographs, never one photo. */
-export type ImagePathRow = Pick<
-  ImageRow,
-  'item_id' | 'path_full' | 'path_thumb'
->;
-
 /** No `path_thumb`: an export's manifest is only ever built from full-size paths. */
 export type ExportImageRow = Pick<
   ImageRow,
@@ -175,28 +169,13 @@ export function listImagesForItems(
   );
 }
 
-// Captures photo paths before a delete cascades the rows away; runs before that delete, never after.
-export function listImagePathsForItems(
-  itemIds: string[],
-): Promise<
-  | { data: ImagePathRow[]; error: null }
-  | { data: null; error: NonNullable<unknown> }
-> {
-  return selectImagesForItems<ImagePathRow>(
-    itemIds,
-    'item_id, path_full, path_thumb',
-  );
-}
-
-type CategoryImagePathRow = ImagePathRow & Pick<ImageRow, 'id'>;
-
 // Keyset-paged down images_pkey, each row kept via items_pkey and item_categories_pkey; the empty embeds only filter.
 function rawListImagePathsForCategory({
   categoryId,
   after,
 }: {
   categoryId: string;
-  after: CategoryImagePathRow | null;
+  after: ImageListRow | null;
 }) {
   let query = supabase
     .from('images')
@@ -208,17 +187,17 @@ function rawListImagePathsForCategory({
   return query
     .order('id')
     .limit(ROW_PAGE_SIZE)
-    .overrideTypes<CategoryImagePathRow[], { merge: false }>();
+    .overrideTypes<ImageListRow[], { merge: false }>();
 }
 
 /** Every photograph of every entry filed in the category, walked a page at a time; runs before the category delete, never after. */
 export function listImagePathsForCategory(
   categoryId: string,
 ): Promise<
-  | { data: CategoryImagePathRow[]; error: null }
+  | { data: ImageListRow[]; error: null }
   | { data: null; error: NonNullable<unknown> }
 > {
-  return readAllKeysetPages<CategoryImagePathRow>(ROW_PAGE_SIZE, (after) =>
+  return readAllKeysetPages<ImageListRow>(ROW_PAGE_SIZE, (after) =>
     rawListImagePathsForCategory({ categoryId, after }),
   );
 }

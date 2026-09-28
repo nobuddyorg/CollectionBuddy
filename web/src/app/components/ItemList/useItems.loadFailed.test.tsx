@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import type { ReactNode } from 'react';
 import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import {
   afterEach,
@@ -11,8 +10,7 @@ import {
   type MockInstance,
 } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
+import { ToastWrapper as wrapper } from '../providers.test-support';
 import { takePrefetchedFirstPage } from './firstPagePrefetch';
 import { useItems } from './useItems';
 import type { listItems } from '../../data/itemPage';
@@ -24,19 +22,27 @@ vi.mock('../../data/itemPage', () => ({
     listItemsMock(...args) as ReturnType<typeof listItems>,
 }));
 
-function wrapper({ children }: { children: ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>{children}</ToastProvider>
-    </I18nProvider>
-  );
-}
-
-const FAILED = { data: null, error: new Error('offline'), count: null };
+const FAILED = {
+  data: null,
+  error: new Error('offline'),
+  count: null,
+  imageRows: null,
+};
 const ONE_ENTRY = {
-  data: [{ id: 'coin', title: 'Denarius', description: null, tags: [] }],
+  data: [
+    {
+      id: 'coin',
+      title: 'Denarius',
+      description: null,
+      place: null,
+      place_lat: null,
+      place_lng: null,
+      tags: [],
+    },
+  ],
   error: null,
   count: 1,
+  imageRows: [],
 };
 
 // What postgrest-js does: an aborted fetch resolves with an AbortError `error` instead of rejecting.
@@ -45,7 +51,12 @@ function resolvesWithAbortErrorOnAbort({
 }: Parameters<typeof listItems>[0]) {
   return new Promise((resolve) => {
     signal!.addEventListener('abort', () =>
-      resolve({ data: null, error: { message: 'AbortError' }, count: null }),
+      resolve({
+        data: null,
+        error: { message: 'AbortError' },
+        count: null,
+        imageRows: null,
+      }),
     );
   });
 }

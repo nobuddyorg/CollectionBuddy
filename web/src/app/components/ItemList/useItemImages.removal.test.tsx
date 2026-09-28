@@ -2,7 +2,7 @@
 import { act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { listImagePathsForItems, listImagesForItems } from '../../data/images';
+import { listImagesForItems } from '../../data/images';
 import {
   renderItemImages,
   resetImageTestState,
@@ -22,7 +22,6 @@ vi.mock('../../data/images', async () => {
     createImageRow: vi.fn(),
     createSignedUrls: vi.fn(),
     deleteImageRow: vi.fn(),
-    listImagePathsForItems: vi.fn(),
     listImagesForItems: vi.fn(),
     removeImageObjects: vi.fn(),
     uploadImageObject: vi.fn(),
@@ -36,11 +35,11 @@ describe('useItemImages when an entry is deleted', () => {
   });
 
   it('reads the paths a cascade is about to take with it', async () => {
-    const paths = [{ path_full: 'uid/item-1/a.webp', path_thumb: null }];
-    vi.mocked(listImagePathsForItems).mockResolvedValue({
+    const paths = [row('a', 'item-1')];
+    vi.mocked(listImagesForItems).mockResolvedValue({
       data: paths,
       error: null,
-    } as never);
+    });
     const { result } = renderItemImages();
 
     await expect(
@@ -49,7 +48,7 @@ describe('useItemImages when an entry is deleted', () => {
   });
 
   it('treats an empty answer as no paths to clean up', async () => {
-    vi.mocked(listImagePathsForItems).mockResolvedValue({
+    vi.mocked(listImagesForItems).mockResolvedValue({
       data: [],
       error: null,
     });
@@ -61,7 +60,7 @@ describe('useItemImages when an entry is deleted', () => {
   });
 
   it('reads paths for exactly the entry being deleted', async () => {
-    vi.mocked(listImagePathsForItems).mockResolvedValue({
+    vi.mocked(listImagesForItems).mockResolvedValue({
       data: [],
       error: null,
     });
@@ -69,12 +68,12 @@ describe('useItemImages when an entry is deleted', () => {
 
     await result.current.captureItemImagePaths('item-1');
 
-    expect(listImagePathsForItems).toHaveBeenCalledWith(['item-1']);
+    expect(listImagesForItems).toHaveBeenCalledWith(['item-1']);
   });
 
   it('refuses to answer when those paths cannot be read, so no delete proceeds blind', async () => {
     const pathsError = new Error('nope');
-    vi.mocked(listImagePathsForItems).mockResolvedValue({
+    vi.mocked(listImagesForItems).mockResolvedValue({
       data: null,
       error: pathsError,
     });
@@ -87,6 +86,7 @@ describe('useItemImages when an entry is deleted', () => {
       cause: pathsError,
     });
   });
+
   it('forgets the deleted entry without disturbing any other', async () => {
     vi.mocked(listImagesForItems).mockResolvedValue({
       data: [row('img-1', 'item-1'), row('img-2', 'item-2')],
