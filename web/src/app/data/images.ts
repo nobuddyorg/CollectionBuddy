@@ -108,21 +108,19 @@ const ROW_PAGE_SIZE = 1000;
 // Ids per `.in()` filter; a few thousand UUIDs would hit a URL length limit before the row cap.
 const ID_FILTER_CHUNK_SIZE = 100;
 
-type ImageKey = Pick<ImageRow, 'created_at' | 'id'>;
+type ImagePageRow = ImageListRow & Pick<ImageRow, 'created_at'>;
 
 // Keyset-paged oldest-first, so a photograph deleted mid-walk shifts none past a page; the key rides along on every row.
-function rawSelectImagesPage<T>({
+function rawSelectImagesPage({
   itemIds,
-  select,
   after,
 }: {
   itemIds: string[];
-  select: string;
-  after: (T & ImageKey) | null;
+  after: ImagePageRow | null;
 }) {
   let query = supabase
     .from('images')
-    .select(`${select}, created_at, id`)
+    .select('item_id, path_full, path_thumb, created_at, id')
     .in('item_id', itemIds);
   if (after) {
     query = query
@@ -138,21 +136,7 @@ function rawSelectImagesPage<T>({
     .order('created_at', { ascending: true })
     .order('id', { ascending: true })
     .limit(ROW_PAGE_SIZE)
-    .overrideTypes<(T & ImageKey)[], { merge: false }>();
-}
-
-// Chunks the id list (URL length), pages each chunk (row cap), and reads a few chunks at once.
-function selectImagesForItems<T>(
-  itemIds: string[],
-  select: string,
-): Promise<
-  { data: T[]; error: null } | { data: null; error: NonNullable<unknown> }
-> {
-  return readAllChunks(chunk(itemIds, ID_FILTER_CHUNK_SIZE), (ids) =>
-    readAllKeysetPages<T & ImageKey>(ROW_PAGE_SIZE, (after) =>
-      rawSelectImagesPage<T>({ itemIds: ids, select, after }),
-    ),
-  );
+    .overrideTypes<ImagePageRow[], { merge: false }>();
 }
 
 // Oldest-first, `id` breaking a same-instant tie, matching idx_images_item_created_at.
@@ -162,10 +146,10 @@ export function listImagesForItems(
   | { data: ImageListRow[]; error: null }
   | { data: null; error: NonNullable<unknown> }
 > {
-  // `id` arrives with the sort key.
-  return selectImagesForItems<ImageListRow>(
-    itemIds,
-    'item_id, path_full, path_thumb',
+  return readAllChunks(chunk(itemIds, ID_FILTER_CHUNK_SIZE), (ids) =>
+    readAllKeysetPages<ImagePageRow>(ROW_PAGE_SIZE, (after) =>
+      rawSelectImagesPage({ itemIds: ids, after }),
+    ),
   );
 }
 
