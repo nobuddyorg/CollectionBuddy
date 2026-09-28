@@ -1,13 +1,6 @@
 # Sourced by serve-demo.sh and sw-deploy.sh: demo-mode exports of the working tree, built outside the repo (only read), and their server.
 
-# Sets api_url and anon_key from the running local stack.
-read_stack() {
-  local status
-  status=$(cd "$repo" && supabase status -o json) || { echo 'supabase start first' >&2; return 1; }
-  api_url=$(node -e 'console.log(JSON.parse(process.argv[1]).API_URL ?? "")' "$status")
-  anon_key=$(node -e 'console.log(JSON.parse(process.argv[1]).ANON_KEY ?? "")' "$status")
-  [[ $api_url == http* && -n $anon_key ]] || { echo 'cannot read API_URL/ANON_KEY from supabase status' >&2; return 1; }
-}
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/stack.sh"
 
 # build_export <dir> [sed expression for components/ItemForm/index.tsx]: the working tree (uncommitted fixes included) into <dir>/web/out.
 build_export() {

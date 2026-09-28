@@ -4,12 +4,10 @@ set -uo pipefail
 [[ -z ${PROOF_VARIANT:-} ]] || { echo 'run-all.sh names its own reports: copy load-results/ aside between the before and after runs instead' >&2; exit 1; }
 here=$(cd "$(dirname "$0")" && pwd)
 repo=${REPO:-$(git rev-parse --show-toplevel)}
-status=$(cd "$repo" && supabase status -o json) || { echo 'supabase start first' >&2; exit 1; }
-url=$(node -e 'console.log(JSON.parse(process.argv[1]).API_URL ?? "")' "$status")
-key=$(node -e 'console.log(JSON.parse(process.argv[1]).ANON_KEY ?? "")' "$status")
-db=$(node -e 'console.log(JSON.parse(process.argv[1]).DB_URL ?? "")' "$status")
-[[ $url == http* && -n $key && $key != undefined ]] || { echo 'cannot read API_URL/ANON_KEY from supabase status' >&2; exit 1; }
-export LOAD_SUPABASE_URL=$url LOAD_SUPABASE_ANON_KEY=$key LOAD_TARGET=local-stack LOAD_PROFILE=${LOAD_PROFILE:-normal} K6_WEB_DASHBOARD=false
+source "$here/lib/stack.sh"
+read_stack || exit 1
+db=$db_url
+export LOAD_SUPABASE_URL=$api_url LOAD_SUPABASE_ANON_KEY=$anon_key LOAD_TARGET=local-stack LOAD_PROFILE=${LOAD_PROFILE:-normal} K6_WEB_DASHBOARD=false
 mkdir -p load-results
 
 red=()
