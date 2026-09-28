@@ -177,10 +177,10 @@ export function clearAccount(session) {
     last;
     last = entrySliceEnd(session, ENTRY_SLICE)
   ) {
-    deleteOwnRows(session, 'items', { id: `lte.${last}` });
+    deleteOwnRows({ session, table: 'items', filters: { id: `lte.${last}` } });
   }
-  deleteOwnRows(session, 'categories');
-  deleteOwnRows(session, 'items');
+  deleteOwnRows({ session, table: 'categories' });
+  deleteOwnRows({ session, table: 'items' });
 }
 
 export function teardown({ owner, writer }) {

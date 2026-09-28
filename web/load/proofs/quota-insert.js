@@ -17,6 +17,7 @@ import {
 import {
   PROOF_TREND_STATS,
   measured,
+  probeScenario,
   probeThresholds,
   proofSummary,
 } from './lib/report.js';
@@ -41,12 +42,7 @@ export const options = {
   batchPerHost: WARM_CALLS,
   summaryTrendStats: PROOF_TREND_STATS,
   scenarios: {
-    probe: {
-      executor: 'per-vu-iterations',
-      vus: 1,
-      iterations: 1,
-      exec: 'probe',
-    },
+    probe: probeScenario(1),
   },
   thresholds: {
     ...probeThresholds(['batch_first', 'batch', 'batch_last'], {

@@ -45,9 +45,14 @@ export function thresholdsFor(scenarios) {
 }
 
 /** The profile's stages for a scenario whose normal load is `vus`. */
-export function rampTo(vus) {
+function rampTo(vus) {
   return PROFILE.stages.map(([duration, fraction]) => ({
     duration,
     target: Math.ceil(vus * PROFILE.vusScale * fraction),
   }));
+}
+
+/** A scenario ramping to the profile's share of `vus`. */
+export function rampingScenario(exec, vus) {
+  return { executor: 'ramping-vus', exec, stages: rampTo(vus) };
 }

@@ -344,7 +344,7 @@ export function entrySliceEnd(session, size) {
 }
 
 /** `filters` narrows the delete further, as PostgREST filter params (`{ id: 'lte.<uuid>' }`). */
-export function deleteOwnRows(session, table, filters = {}) {
+export function deleteOwnRows({ session, table, filters = {} }) {
   const params = query({ user_id: `eq.${session.userId}`, ...filters });
   return expectOk(
     send({
