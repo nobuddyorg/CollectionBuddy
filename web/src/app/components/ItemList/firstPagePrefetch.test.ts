@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { listItems } from '../../data/itemPage';
 import {
@@ -19,6 +19,8 @@ function fakeRead() {
 }
 
 describe('prefetchFirstPage', () => {
+  beforeEach(forgetPrefetchedFirstPage);
+
   it('reads the unsearched first page of the category', () => {
     const { read } = fakeRead();
 
@@ -30,7 +32,6 @@ describe('prefetchFirstPage', () => {
       from: 0,
       to: PAGE_SIZE - 1,
     });
-    void takePrefetchedFirstPage('cat-1');
   });
 
   it('hands the read to the category it was started for, exactly once', () => {

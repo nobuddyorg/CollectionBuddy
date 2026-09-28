@@ -10,8 +10,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ToastWrapper as wrapper } from '../providers.test-support';
 import {
+  forgetPrefetchedFirstPage,
   prefetchFirstPage,
-  takePrefetchedFirstPage,
 } from './firstPagePrefetch';
 import { useItems } from './useItems';
 import type { listItems } from '../../data/itemPage';
@@ -43,7 +43,7 @@ function page(items: { id: string }[] = [], count = items.length) {
 function resetItemsTestState() {
   window.localStorage.setItem('lang', 'en');
   listItemsMock.mockReset();
-  void takePrefetchedFirstPage('');
+  forgetPrefetchedFirstPage();
 }
 
 const staleRead = () =>
@@ -197,7 +197,7 @@ describe('useItems', () => {
     expect(result.current.page).toBe(2);
   });
 
-  // Unwritten, the clamp lifted once the total grew again, and a new entry jumped the grid to page 2.
+  // The clamp must be written back to the page: one derived at render lifts once the total grows again.
   it('stays on the page a delete clamped it to when the total grows again', async () => {
     let ids = Array.from({ length: 10 }, (_, index) => `item-${10 - index}`);
     listItemsMock.mockImplementation(

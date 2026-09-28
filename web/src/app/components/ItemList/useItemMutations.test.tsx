@@ -116,7 +116,7 @@ describe('useItemMutations removeItem', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Could not delete this entry. Please try again.',
     );
-    // The objects went first; the row is still there, so the restore shows what the database has.
+    // The row delete failed, so the restore shows what the database still has.
     expect(collaborators.captureItemImagePaths).toHaveBeenCalledWith('b');
     expect(removeImageObjects).not.toHaveBeenCalled();
     expect(collaborators.forgetItemImages).not.toHaveBeenCalled();

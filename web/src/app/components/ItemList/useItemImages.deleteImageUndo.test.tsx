@@ -128,7 +128,7 @@ describe('useItemImages deleteImage undo', () => {
     });
   });
 
-  // #784: the entry's own delete can commit inside the photograph's undo window, taking the row with it.
+  // The entry's own delete can commit inside the photograph's undo window, taking the row with it.
   describe('once its entry was deleted inside the undo window', () => {
     async function deletedWithItsEntry() {
       const hook = await withOnePhotograph();

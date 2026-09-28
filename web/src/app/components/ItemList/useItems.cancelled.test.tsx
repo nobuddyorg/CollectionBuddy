@@ -11,7 +11,7 @@ import {
 } from 'vitest';
 
 import { ToastWrapper } from '../providers.test-support';
-import { takePrefetchedFirstPage } from './firstPagePrefetch';
+import { forgetPrefetchedFirstPage } from './firstPagePrefetch';
 import { useItems } from './useItems';
 import type { listItems } from '../../data/itemPage';
 
@@ -51,7 +51,7 @@ describe('useItems when its load is cancelled', () => {
   beforeEach(() => {
     window.localStorage.setItem('lang', 'en');
     listItemsMock.mockReset();
-    void takePrefetchedFirstPage('');
+    forgetPrefetchedFirstPage();
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 

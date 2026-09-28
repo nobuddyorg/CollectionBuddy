@@ -171,7 +171,7 @@ describe('what a card can render', () => {
 describe('toImageEntries past the plates', () => {
   it('keeps an unsigned photograph past the plates, so it still counts', () => {
     const result = toImageEntries(sevenPhotos(), new Map());
-    // The first five are dropped unsigned, as before; the last two are kept.
+    // The first five are dropped unsigned; the last two are kept.
     expect(result.map((entry) => entry.id)).toEqual(['img-5', 'img-6']);
     expect(result[0].urlFull).toBeUndefined();
   });

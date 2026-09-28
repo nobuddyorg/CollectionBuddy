@@ -11,7 +11,7 @@ import {
 } from 'vitest';
 
 import { ToastWrapper as wrapper } from '../providers.test-support';
-import { takePrefetchedFirstPage } from './firstPagePrefetch';
+import { forgetPrefetchedFirstPage } from './firstPagePrefetch';
 import { useItems } from './useItems';
 import type { listItems } from '../../data/itemPage';
 
@@ -67,7 +67,7 @@ describe('useItems load failure', () => {
   beforeEach(() => {
     window.localStorage.setItem('lang', 'en');
     listItemsMock.mockReset();
-    void takePrefetchedFirstPage('');
+    forgetPrefetchedFirstPage();
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -124,7 +124,7 @@ describe('useItems load failure', () => {
     expect(result.current.loadFailed).toBe(true);
   });
 
-  // #776: a superseded load answers with an AbortError, which is not a failure the collector should see.
+  // A superseded load answers with an AbortError, which is not a failure the collector should see.
   it('stays silent about a load a newer one aborted', async () => {
     listItemsMock
       .mockImplementationOnce(resolvesWithAbortErrorOnAbort)
