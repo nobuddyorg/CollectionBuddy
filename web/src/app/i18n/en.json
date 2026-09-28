@@ -20,6 +20,8 @@
     "help_shortcut": "Ctrl+/",
     "sign_out_error": "Sign-out didn't fully complete, but you've been signed out on this device. Please try again.",
     "language": "Language",
+    "language_de": "Deutsch",
+    "language_en": "English",
     "theme": "Appearance",
     "theme_system": "System",
     "theme_light": "Light",

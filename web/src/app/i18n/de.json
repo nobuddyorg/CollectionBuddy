@@ -20,6 +20,8 @@
     "help_shortcut": "Strg+/",
     "sign_out_error": "Abmeldung nicht vollständig abgeschlossen, du wurdest aber auf diesem Gerät abgemeldet. Bitte erneut versuchen.",
     "language": "Sprache",
+    "language_de": "Deutsch",
+    "language_en": "English",
     "theme": "Darstellung",
     "theme_system": "System",
     "theme_light": "Hell",

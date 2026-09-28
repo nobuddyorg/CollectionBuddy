@@ -4,6 +4,7 @@ import Link from 'next/link';
 
 import { useI18n } from '../../i18n/useI18n';
 import CenteredModal from '../CenteredModal';
+import { linkClasses } from '../ui/linkClasses';
 
 export default function HelpDialog({
   open,
@@ -82,7 +83,7 @@ export default function HelpDialog({
           href="/privacy"
           data-testid="help-privacy-link"
           onClick={() => onOpenChange(false)}
-          className="underline underline-offset-2 hover:text-accent"
+          className={linkClasses()}
         >
           {t('privacy.link')}
         </Link>
