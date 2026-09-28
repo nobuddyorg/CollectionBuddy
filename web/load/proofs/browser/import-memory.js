@@ -10,7 +10,6 @@ import {
   envInt,
   insertEntries,
   newCategory,
-  seedOrClear,
 } from '../lib/fixtures.js';
 import { PROOF_TREND_STATS, measured, proofSummary } from '../lib/report.js';
 import { browserScenario, openAsDemoUser, reloadCatalogue } from './lib/app.js';
@@ -58,26 +57,24 @@ export default async function importOwnExport() {
   let session;
   try {
     session = await openAsDemoUser(page);
-    seedOrClear([session], () => {
-      const itemIds = insertEntries({
-        session,
-        categoryId: newCategory(session, ARCHIVE_NAME),
-        count: PHOTOS,
-        fields: (n) => ({
-          title: `Aufnahme ${n}`,
-          description: 'Seeded for the import proof',
-          place: 'Prag',
-          tags: ['proof'],
-        }),
-      });
-      attachPhotos({
-        session,
-        itemIds,
-        photosEach: 1,
-        bytes: PHOTO,
-        // The export carries only full sizes, so seeded thumbnails need not weigh on the quota.
-        thumbBytes: TINY_WEBP,
-      });
+    const itemIds = insertEntries({
+      session,
+      categoryId: newCategory(session, ARCHIVE_NAME),
+      count: PHOTOS,
+      fields: (n) => ({
+        title: `Aufnahme ${n}`,
+        description: 'Seeded for the import proof',
+        place: 'Prag',
+        tags: ['proof'],
+      }),
+    });
+    attachPhotos({
+      session,
+      itemIds,
+      photosEach: 1,
+      bytes: PHOTO,
+      // The export carries only full sizes, so seeded thumbnails need not weigh on the quota.
+      thumbBytes: TINY_WEBP,
     });
     await reloadCatalogue(page);
 

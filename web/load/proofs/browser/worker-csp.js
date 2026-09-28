@@ -5,7 +5,7 @@ import encoding from 'k6/encoding';
 import { Counter, Trend } from 'k6/metrics';
 
 import { clearAccount } from '../../lib/seed.js';
-import { insertEntries, newCategory, seedOrClear } from '../lib/fixtures.js';
+import { insertEntries, newCategory } from '../lib/fixtures.js';
 import { PROOF_TREND_STATS, measured, proofSummary } from '../lib/report.js';
 import {
   browserScenario,
@@ -56,24 +56,21 @@ export default async function uploadCameraPhoto() {
   let session;
   try {
     session = await openAsDemoUser(page);
-    seedOrClear([session], () =>
-      insertEntries({
-        session,
-        categoryId: newCategory(session, 'Proof: worker'),
-        count: 1,
-        fields: () => ({
-          title: 'Kamera',
-          description: 'Bild aus der Kamera',
-          place: 'Rom',
-          tags: ['kamera'],
-        }),
+    insertEntries({
+      session,
+      categoryId: newCategory(session, 'Proof: worker'),
+      count: 1,
+      fields: () => ({
+        title: 'Kamera',
+        description: 'Bild aus der Kamera',
+        place: 'Rom',
+        tags: ['kamera'],
       }),
-    );
+    });
     await reloadCatalogue(page);
 
     await watchLongTasks(page);
-    // The images row is written after both uploads; waiting for it keeps teardown from orphaning the objects.
-    // The insert's own POST: a URL match alone would catch the cross-origin CORS preflight first.
+    // The images POST follows both uploads (teardown then orphans nothing); matching its method skips the CORS preflight.
     const recorded = page.waitForEvent('response', {
       predicate: (response) =>
         response.request().method() === 'POST' &&
