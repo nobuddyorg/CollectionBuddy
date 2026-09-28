@@ -1,5 +1,5 @@
 // Renders public/'s icons from public/logo.png (414px wide, so every icon scales down, never up); run by hand, results committed.
-import { chromium } from 'playwright';
+import { chromium } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const publicDirectory = new URL('../public/', import.meta.url);

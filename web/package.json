@@ -57,7 +57,6 @@
     "knip": "^6.37.0",
     "monocart-coverage-reports": "^2.13.0",
     "mutation-testing-metrics": "^3.9.0",
-    "playwright": "^1.62.0",
     "prettier": "^3.9.8",
     "serve": "^14.2.6",
     "typescript-eslint": "^8.70.0",
