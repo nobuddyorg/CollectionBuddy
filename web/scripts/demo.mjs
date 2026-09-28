@@ -1,33 +1,9 @@
 // Demo mode against the local stack: every visitor is signed in as a fresh anonymous user, so no OAuth is needed.
-import { spawn, execFileSync } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 
-const webDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const repositoryRoot = resolve(webDirectory, '..');
+import { localStack, webDirectory } from './local-stack.mjs';
 
-function status() {
-  try {
-    return JSON.parse(
-      execFileSync('supabase', ['status', '-o', 'json'], {
-        cwd: repositoryRoot,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }),
-    );
-  } catch {
-    console.error(
-      'Could not read the local Supabase stack. Start it first:\n\n  supabase start\n  supabase db reset\n',
-    );
-    process.exit(1);
-  }
-}
-
-const { API_URL, PUBLISHABLE_KEY } = status();
-if (!API_URL || !PUBLISHABLE_KEY) {
-  console.error('The local stack reported no API URL or publishable key.');
-  process.exit(1);
-}
+const { API_URL, PUBLISHABLE_KEY } = localStack(['API_URL', 'PUBLISHABLE_KEY']);
 
 const environment = {
   ...process.env,

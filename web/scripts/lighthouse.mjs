@@ -1,36 +1,16 @@
 // Lighthouse CI against the production export, signed out and signed in to a photographed collection, served as GitHub Pages serves it.
 import { execFileSync } from 'node:child_process';
 import { readFileSync, rmSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { chromium } from '@playwright/test';
 
-const webDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const repositoryRoot = resolve(webDirectory, '..');
+import { localStack, webDirectory } from './local-stack.mjs';
 
-function status() {
-  try {
-    return JSON.parse(
-      execFileSync('supabase', ['status', '-o', 'json'], {
-        cwd: repositoryRoot,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }),
-    );
-  } catch {
-    console.error(
-      'Could not read the local Supabase stack. Start it first:\n\n  supabase start\n',
-    );
-    process.exit(1);
-  }
-}
-
-const { API_URL, PUBLISHABLE_KEY, SECRET_KEY } = status();
-if (!API_URL || !PUBLISHABLE_KEY || !SECRET_KEY) {
-  console.error('The local stack reported no API URL or keys.');
-  process.exit(1);
-}
+const { API_URL, PUBLISHABLE_KEY, SECRET_KEY } = localStack([
+  'API_URL',
+  'PUBLISHABLE_KEY',
+  'SECRET_KEY',
+]);
 
 // lighthouserc.signed-in.json's --user-data-dir and upload.outputDir.
 const PROFILE_DIRECTORY = '.lighthouse-profile';
