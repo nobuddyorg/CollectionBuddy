@@ -66,6 +66,7 @@ export const MUTATE_TARGETS = [
   'src/app/lib/useDebouncedValue.ts',
   'src/app/lib/useGuardedModalClose.ts',
   'src/app/lib/useBeforeUnloadGuard.ts',
+  'src/app/lib/prefetchOnIntent.ts',
   'src/app/useCatalogue.ts',
   'src/app/catalogueView.ts',
   'src/app/useServiceWorker.ts',

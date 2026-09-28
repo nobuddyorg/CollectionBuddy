@@ -22,7 +22,7 @@ function valuesFor(item: ItemLite | null): ItemFormValues {
     // Round-tripped, so only an edit of the place field itself replaces the existing pin.
     place_lat: item.place_lat,
     place_lng: item.place_lng,
-    tags: item.tags ?? [],
+    tags: item.tags,
   };
 }
 

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { Spinner } from './Spinner';
+import { Spinner, StatusSpinner } from './Spinner';
 
 describe('Spinner', () => {
   it('renders at the default md size', () => {
@@ -34,5 +34,20 @@ describe('Spinner', () => {
       'border-t-current',
     );
     expect(container.firstChild).not.toHaveClass('border-white/40');
+  });
+});
+
+describe('StatusSpinner', () => {
+  it('announces the spinner as a status named by its label', () => {
+    render(<StatusSpinner size="lg" label="Loading…" />);
+
+    const status = screen.getByRole('status', { name: 'Loading…' });
+    expect(status.firstChild).toHaveClass('w-8', 'h-8', 'animate-spin');
+  });
+
+  it('falls back to the md spinner when no size is given', () => {
+    render(<StatusSpinner label="Loading…" />);
+
+    expect(screen.getByRole('status').firstChild).toHaveClass('w-5', 'h-5');
   });
 });

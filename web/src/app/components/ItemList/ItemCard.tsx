@@ -43,8 +43,9 @@ function ItemCardComponent({
   const busy = pendingUploads > 0;
   const dropDisabled = readOnly || busy;
 
+  const hasNoPhotographs = !images.length && !imagesLoading;
   // An upload in flight counts as something coming, so the empty mount doesn't invite a second one.
-  const awaitingPhoto = !images.length && !imagesLoading && !busy;
+  const awaitingPhoto = hasNoPhotographs && !busy;
 
   // Counts enter/leave pairs: each child fires its own leave+enter as the pointer crosses it.
   const dragDepth = useRef(0);
@@ -81,8 +82,7 @@ function ItemCardComponent({
 
   // Deliberately one-way: a later photo swap fades in on its own rather than hiding the label again.
   const [heroLoaded, setHeroLoaded] = useState(false);
-  const captionReady =
-    awaitingPhoto || (busy && !images.length && !imagesLoading) || heroLoaded;
+  const captionReady = hasNoPhotographs || heroLoaded;
 
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- drag-to-upload is a pointer-only enhancement; AddPhotoPlate's file input is the accessible path

@@ -7,11 +7,25 @@ const SIZE_CLASSES = {
 
 export type SpinnerSize = keyof typeof SIZE_CLASSES;
 
-// currentColor, not a fixed white: a fixed white was invisible on every pale surface.
+// currentColor: it must stay visible on pale and dark surfaces alike.
 export function Spinner({ size = 'md' }: { size?: SpinnerSize }) {
   return (
     <div
       className={`${SIZE_CLASSES[size]} border-2 border-current/40 border-t-current rounded-full animate-spin`}
     />
+  );
+}
+
+export function StatusSpinner({
+  size,
+  label,
+}: {
+  size?: SpinnerSize;
+  label: string;
+}) {
+  return (
+    <span role="status" aria-label={label}>
+      <Spinner size={size} />
+    </span>
   );
 }
