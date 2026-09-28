@@ -1,5 +1,4 @@
-# Rule overrides for both passes of ci.yml's zap_baseline job. Format: <rule id><TAB><threshold><TAB># <comment>; thresholds FAIL, WARN, INFO, IGNORE.
-# Unlisted rules default to WARN and never fail the job (`-I`); only FAIL blocks. What a passive scan proves: TEST_STRATEGY.md §6.
+# ci.yml zap_baseline overrides: <rule id>\t<FAIL|WARN|INFO|IGNORE>\t# <comment>; unlisted rules WARN and only FAIL blocks (TEST_STRATEGY.md §6).
 
 # GitHub Pages sends no custom headers, so the CSP is a <meta> tag and frame-ancestors cannot be enforced; layout.tsx frame-busts instead (#334).
 10020	IGNORE	# X-Frame-Options Header Not Set -- static host; mitigated by the framebust script in layout.tsx
