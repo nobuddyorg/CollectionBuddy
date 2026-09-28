@@ -1,4 +1,4 @@
--- The orphan sweep's shape and every data-model constraint, each refusal attempted as a real write; grants and RLS are 001's.
+-- The orphan sweep's shape and every data-model constraint, each refusal attempted as a real write; grants and RLS-enabled are 001's.
 begin;
 select no_plan();
 
@@ -211,7 +211,7 @@ select throws_ok(
   'nor may a grant be addressed to nothing at all'
 );
 
--- Already-expired grants stay legal (020 relies on it); only an expiry before the grant's own creation is refused.
+-- Already-expired grants stay legal (020 relies on it); only an expiry at or before the grant's own creation is refused.
 select throws_ok(
   format(
     $q$insert into public.category_shares (category_id, invited_email, created_at, expires_at)
