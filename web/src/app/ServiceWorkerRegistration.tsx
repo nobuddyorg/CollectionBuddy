@@ -2,7 +2,6 @@
 
 import { useServiceWorker } from './useServiceWorker';
 
-/** Renders nothing; registers the service worker on mount. */
 export function ServiceWorkerRegistration() {
   useServiceWorker();
   return null;

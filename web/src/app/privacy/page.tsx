@@ -4,11 +4,10 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 
 import { labelClasses } from '../components/ui/labelClasses';
+import { linkClasses } from '../components/ui/linkClasses';
 import { useI18n } from '../i18n/useI18n';
 
 const CONTACT_EMAIL = 'info@nobuddy.org';
-
-const linkClasses = 'underline underline-offset-2 hover:text-accent';
 
 function Section({
   heading,
@@ -55,7 +54,7 @@ export default function PrivacyPage() {
       id="main-content"
       className="mx-auto max-w-3xl px-4 py-8 sm:py-12 pt-[calc(2rem+env(safe-area-inset-top))] pb-[calc(3rem+env(safe-area-inset-bottom))] min-h-[100dvh] bg-background text-foreground text-sm sm:text-base leading-relaxed space-y-4"
     >
-      <Link href="/" data-testid="privacy-back" className={linkClasses}>
+      <Link href="/" data-testid="privacy-back" className={linkClasses()}>
         {t('privacy.back')}
       </Link>
       <h1 data-testid="privacy-title" className="font-display text-3xl pt-2">
@@ -73,7 +72,7 @@ export default function PrivacyPage() {
           <a
             data-testid="privacy-contact"
             href={`mailto:${CONTACT_EMAIL}`}
-            className={linkClasses}
+            className={linkClasses()}
           >
             {CONTACT_EMAIL}
           </a>

@@ -8,6 +8,7 @@ import {
   CATEGORY_TABPANEL_ID,
   categoryTabId,
 } from './components/CategorySelect/Dropdown';
+import EmptyState from './components/EmptyState';
 import Header from './components/Header';
 import HelpDialog from './components/Help';
 import { useHelp } from './components/Help/useHelp';
@@ -49,7 +50,7 @@ export default function Page() {
   const help = useHelp();
 
   if (loading)
-    return <LoadingOverlay label={t('item_list.loading')} theme="auto" />;
+    return <LoadingOverlay label={t('common.loading')} theme="auto" />;
   if (!user) return null;
 
   const view = catalogueViewFor({
@@ -86,7 +87,6 @@ export default function Page() {
         <LoadingOverlay label={t('account.deleting')} />
       )}
 
-      {/* No wrapper panels: cards nested in bordered trays ate the width on a 390px screen. */}
       <main
         id="main-content"
         // Focusable so a closing dialog can land focus here when its opener is gone (useFocusTrap's fallback).
@@ -101,10 +101,7 @@ export default function Page() {
           ready={catalogueReady}
         />
 
-        {view === 'skeleton' && (
-          // Holds the shape of the entries about to appear, so the page fills in rather than assembling in steps.
-          <ItemListSkeleton />
-        )}
+        {view === 'skeleton' && <ItemListSkeleton />}
 
         {view === 'entries' && (
           <section
@@ -136,29 +133,20 @@ export default function Page() {
 
         {view === 'empty' && (
           // Only reachable for a collection with no categories at all.
-          <section className="py-16 grid place-items-center text-center">
-            <div className="flex flex-col items-center gap-4 max-w-xs">
-              <div className="h-16 w-16 bg-card ring-1 ring-border grid place-items-center text-3xl">
-                🧺
-              </div>
-              <div className="space-y-1.5">
-                <h3 className="font-display text-lg">
-                  {t('page.no_categories')}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {t('page.name_first_category')}
-                </p>
-              </div>
-              <button
-                type="button"
-                data-testid="empty-open-help"
-                onClick={help.show}
-                className="min-h-11 px-3 font-label text-xs text-foreground underline underline-offset-4"
-              >
-                {t('page.open_help')}
-              </button>
-            </div>
-          </section>
+          <EmptyState
+            symbol="🧺"
+            title={t('page.no_categories')}
+            hint={t('page.name_first_category')}
+          >
+            <button
+              type="button"
+              data-testid="empty-open-help"
+              onClick={help.show}
+              className="min-h-11 px-3 font-label text-xs text-foreground underline underline-offset-4"
+            >
+              {t('page.open_help')}
+            </button>
+          </EmptyState>
         )}
       </main>
 

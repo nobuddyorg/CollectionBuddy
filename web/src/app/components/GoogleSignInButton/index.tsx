@@ -77,9 +77,7 @@ export default function GoogleSignInButton({
         )}
       </button>
 
-      {loading && (
-        <LoadingOverlay label={t('item_list.loading')} theme="auto" />
-      )}
+      {loading && <LoadingOverlay label={t('common.loading')} theme="auto" />}
     </>
   );
 }

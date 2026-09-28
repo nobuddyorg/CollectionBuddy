@@ -147,7 +147,6 @@
     "image_alt": "{title}, image {idx}",
     "full_size_image_alt": "Full size image",
     "close_modal": "Close",
-    "loading": "Loading…",
     "no_images": "No images",
     "uploading": "Uploading image…",
     "edit": "Edit",

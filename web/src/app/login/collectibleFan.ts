@@ -13,9 +13,9 @@ const LOBE_HALF_ANGLE = Math.PI / 4;
 
 export type FanPosition = {
   /** Horizontal offset from the coin's centre, in coin diameters. */
-  ux: number;
+  x: number;
   /** Vertical offset from the coin's centre, in coin diameters. */
-  uy: number;
+  y: number;
 };
 
 function seededRandom(seed: number) {
@@ -39,22 +39,22 @@ export function fanPositions(count: number, seed = 1337): FanPosition[] {
       (perSide > 1 ? -LOBE_HALF_ANGLE + step * slot : 0) +
       (random() - 0.5) * step * 0.5;
 
-    // The smaller radius sets the real clearance (an ellipse is closest on its minor axis); ry stays tight.
-    const rx = MIN_ORBIT + random() * 0.22;
-    const ry = MIN_ORBIT + random() * 0.08;
+    // The smaller radius sets the real clearance (an ellipse is closest on its minor axis); radiusY stays tight.
+    const radiusX = MIN_ORBIT + random() * 0.22;
+    const radiusY = MIN_ORBIT + random() * 0.08;
 
     return {
-      ux: side * Math.cos(angle) * rx,
-      uy: Math.sin(angle) * ry,
+      x: side * Math.cos(angle) * radiusX,
+      y: Math.sin(angle) * radiusY,
     };
   });
 }
 
 /** CSS length against --coin-size, clamped to the viewport so a wide chip is pulled inward, never cropped. */
-export function fanOffsetX(ux: number) {
-  return `clamp(-42vw, calc(var(--coin-size) * ${ux.toFixed(4)}), 42vw)`;
+export function fanOffsetX(x: number) {
+  return `clamp(-42vw, calc(var(--coin-size) * ${x.toFixed(4)}), 42vw)`;
 }
 
-export function fanOffsetY(uy: number) {
-  return `calc(var(--coin-size) * ${uy.toFixed(4)})`;
+export function fanOffsetY(y: number) {
+  return `calc(var(--coin-size) * ${y.toFixed(4)})`;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, type CSSProperties } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 import Link from 'next/link';
 
 import Coin from '../components/Coin';
@@ -9,6 +9,7 @@ import Collectible from '../components/Collectible';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { labelClasses } from '../components/ui/labelClasses';
+import { linkClasses } from '../components/ui/linkClasses';
 import { useToast } from '../components/Toast/ToastProvider';
 import { useI18n } from '../i18n/useI18n';
 import { fanOffsetX, fanOffsetY, fanPositions } from './collectibleFan';
@@ -17,6 +18,8 @@ import { isDemoMode, useDemoSignIn } from './useDemoSignIn';
 import { useGoogleSignIn } from './useGoogleSignIn';
 
 const EMOJIS = ['🪙', '📮', '🎟️', '🐚', '🎖️', '🧩', '📀'] as const;
+
+const FAN_POSITIONS = fanPositions(EMOJIS.length);
 
 const COIN_SIZE = 420;
 
@@ -32,7 +35,6 @@ export default function LoginPage() {
   const signIn = useGoogleSignIn();
   const demoMode = isDemoMode();
   const { error: demoError } = useDemoSignIn(demoMode && !checking);
-  const positions = useMemo(() => fanPositions(EMOJIS.length), []);
 
   const handleSignInError = (error: unknown) => {
     toast.reportError('google sign-in', error, t('login_page.sign_in_error'));
@@ -50,7 +52,7 @@ export default function LoginPage() {
 
   // A failed demo sign-in (e.g. anonymous sign-ins off) falls back to the Google button, not an endless overlay.
   if (checking || (demoMode && !demoError))
-    return <LoadingOverlay label={t('item_list.loading')} theme="auto" />;
+    return <LoadingOverlay label={t('common.loading')} theme="auto" />;
 
   return (
     <main className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden px-6 bg-background text-foreground pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
@@ -88,13 +90,13 @@ export default function LoginPage() {
 
         {/* Below `sm` there is no width to fan into without clipping; the medallion carries the page alone. */}
         <div className="hidden sm:contents">
-          {positions.map((position, i) => (
+          {FAN_POSITIONS.map((position, i) => (
             <Collectible
               key={i}
               delay={i * 0.35}
-              emoji={EMOJIS[i % EMOJIS.length]}
-              x={fanOffsetX(position.ux)}
-              y={fanOffsetY(position.uy)}
+              emoji={EMOJIS[i]}
+              x={fanOffsetX(position.x)}
+              y={fanOffsetY(position.y)}
             />
           ))}
         </div>
@@ -107,7 +109,9 @@ export default function LoginPage() {
       <Link
         href="/privacy"
         data-testid="login-privacy-link"
-        className="mt-4 inline-flex items-center min-h-11 px-2 text-sm text-muted-foreground underline underline-offset-2 hover:text-accent"
+        className={linkClasses(
+          'mt-4 inline-flex items-center min-h-11 px-2 text-sm text-muted-foreground',
+        )}
       >
         {t('privacy.link')}
       </Link>
