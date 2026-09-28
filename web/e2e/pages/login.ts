@@ -19,8 +19,10 @@ interface LoginPage {
   };
 }
 
+export const LOGIN_URL = /\/login\/?$/;
+
 export function initLoginPage(page: Page): LoginPage {
-  const root = page.locator('#app-root');
+  const root = page.getByTestId('app-root');
   const locators = {
     buttons: {
       signIn: root.getByTestId('google-sign-in'),

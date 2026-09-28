@@ -43,7 +43,7 @@ interface CategoryPanel {
 }
 
 export function initCategoryPanel(page: Page): CategoryPanel {
-  const root = page.locator('#app-root');
+  const root = page.getByTestId('app-root');
   const locators = {
     buttons: {
       add: root.getByTestId('add-category'),

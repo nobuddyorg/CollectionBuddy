@@ -1,32 +1,27 @@
-import { resolve } from 'node:path';
-
 import { expect, test } from './test';
 
 import { removeEntriesTitled, removeGranteeWrites } from './cleanup';
 import { AUTH_STATE_PATH, OTHER_AUTH_STATE_PATH, SEED } from './fixtures';
-import { apiAs, context, editorShare, ownerEntryIn } from './rls/helpers';
+import { PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
+import {
+  apiAs,
+  context,
+  editorShare,
+  ownerEntryIn,
+  storedObjects,
+} from './rls/helpers';
 
 // The editor's side, in their own session; rls/editor-share*.spec.ts has what the policies allow.
 test.use({ storageState: OTHER_AUTH_STATE_PATH, locale: 'en-GB' });
 
 // Two real uploads and a second browser do not reliably fit the default 30s under parallel load.
 test.describe.configure({ timeout: 120_000 });
-// Below the test timeout, so a slow upload fails with its own message instead of a bare timeout.
-const ARRIVES = 45_000;
-
-// A real photograph: the compressor decodes what it is given, and a canvas cannot draw a fake PNG.
-const PHOTO = resolve(process.cwd(), 'public/logo.png');
-
-const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
 
 /** What the grantee stored under one entry: its uploads land under its own prefix, whoever owns the entry. */
 async function granteeObjects(itemId: string) {
   const { otherToken, otherUserId } = context();
-  const { data, error } = await apiAs(otherToken)
-    .storage.from('item-images')
-    .list(`${otherUserId}/${itemId}`);
-  if (error) throw error;
-  return data.map((object) => object.name);
+  const objects = await storedObjects(otherToken, `${otherUserId}/${itemId}`);
+  return objects.map((object) => object.name);
 }
 
 async function granteeItemId(title: string) {
@@ -49,9 +44,9 @@ test.describe('a collection shared with you to edit', () => {
   }) => {
     const app = on(page);
     const { token, userId } = context();
-    const ownerTitle = uniqueTitle('Tauschobjekt');
+    const ownerTitle = uniqueName('Tauschobjekt');
     const renamed = `${ownerTitle} (edited)`;
-    const filedTitle = uniqueTitle('Mitgebracht');
+    const filedTitle = uniqueName('Mitgebracht');
     const { categoryId, itemId } = await ownerEntryIn({
       token,
       userId,
@@ -67,7 +62,9 @@ test.describe('a collection shared with you to edit', () => {
       await app.catalogue.do.addEntry(filedTitle);
       const filed = app.catalogue.card(filedTitle);
       await filed.do.uploadPhoto(PHOTO);
-      await expect(filed.locators.images).toBeVisible({ timeout: ARRIVES });
+      await expect(filed.locators.images).toBeVisible({
+        timeout: PHOTO_ARRIVES,
+      });
       const filedId = await granteeItemId(filedTitle);
       expect(await granteeObjects(filedId)).toHaveLength(2);
 
@@ -78,7 +75,9 @@ test.describe('a collection shared with you to edit', () => {
       const edited = app.catalogue.card(renamed);
       await expect(edited.locators.title).toHaveText(renamed);
       await edited.do.uploadPhoto(PHOTO);
-      await expect(edited.locators.images).toBeVisible({ timeout: ARRIVES });
+      await expect(edited.locators.images).toBeVisible({
+        timeout: PHOTO_ARRIVES,
+      });
       expect(await granteeObjects(itemId)).toHaveLength(2);
 
       const ownerContext = await browser.newContext({
@@ -90,7 +89,7 @@ test.describe('a collection shared with you to edit', () => {
         await owner.categories.do.open(SEED.editorJourneyCategory);
         const ownersCard = owner.catalogue.card(renamed);
         await expect(ownersCard.locators.images).toBeVisible({
-          timeout: ARRIVES,
+          timeout: PHOTO_ARRIVES,
         });
         await expect(ownersCard.locators.images).toHaveAttribute(
           'src',
@@ -113,7 +112,9 @@ test.describe('a collection shared with you to edit', () => {
 
       // UX only, on the next load; rls/editor-share.spec.ts shows the writes refused.
       await app.categories.do.open(SEED.editorJourneyCategory);
-      await expect(edited.locators.images).toBeVisible({ timeout: ARRIVES });
+      await expect(edited.locators.images).toBeVisible({
+        timeout: PHOTO_ARRIVES,
+      });
       await expect(app.catalogue.locators.buttons.newEntry).toBeDisabled();
       await expect(edited.locators.buttons.edit).toHaveCount(0);
       await expect(edited.locators.buttons.delete).toHaveCount(0);

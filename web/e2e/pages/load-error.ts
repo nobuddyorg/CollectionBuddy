@@ -20,7 +20,7 @@ export function initLoadError(
 ): LoadError {
   const testId =
     list === 'collections' ? 'catalogue-load-error' : 'entries-load-error';
-  const root = page.locator('#app-root').getByTestId(testId);
+  const root = page.getByTestId('app-root').getByTestId(testId);
   const locators = {
     buttons: {
       retry: root.getByTestId('load-error-retry'),

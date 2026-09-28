@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { createClient } from '@supabase/supabase-js';
 
-import { fileEntry } from '../collectors';
+import { BUCKET, fileEntry } from '../collectors';
 import { CONTEXT_PATH, SEED, type SeedContext } from '../fixtures';
 
 export const context = () =>
@@ -31,6 +31,13 @@ export function apiAs(token: string) {
       global: { headers: { Authorization: `Bearer ${token}` } },
     },
   );
+}
+
+/** One prefix's stored objects; throws, so a failed listing never reads as an empty one. */
+export async function storedObjects(token: string, prefix: string) {
+  const { data, error } = await apiAs(token).storage.from(BUCKET).list(prefix);
+  if (error) throw error;
+  return data;
 }
 
 /** A client with no user token, only the anon key. */
@@ -116,6 +123,20 @@ export async function seededEntryId(entry: {
   return data.id;
 }
 
+/** The id of the uniquely titled entry a test just created; throws, so a missing row fails here, not as a null id. */
+export async function itemIdTitled(
+  token: string,
+  title: string,
+): Promise<string> {
+  const { data, error } = await apiAs(token)
+    .from('items')
+    .select('id')
+    .eq('title', title)
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
 /** One of the owner's seeded categories, plus a throwaway entry of the owner's inside it. */
 export async function ownerEntryIn(entry: {
   token: string;
@@ -169,7 +190,7 @@ export async function removeFiledEntry(entry: {
     const grantee = apiAs(entry.otherToken);
     if (entry.paths.length) {
       const { error: removeError } = await grantee.storage
-        .from('item-images')
+        .from(BUCKET)
         .remove(entry.paths);
       if (removeError) throw removeError;
     }

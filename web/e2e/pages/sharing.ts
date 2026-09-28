@@ -56,7 +56,7 @@ function initRow(root: Locator): ShareRow {
 }
 
 export function initSharingPanel(page: Page): SharingPanel {
-  const root = page.locator('#app-root');
+  const root = page.getByTestId('app-root');
   const locators = {
     buttons: {
       clearExpiry: root.getByTestId('share-expiry-clear'),

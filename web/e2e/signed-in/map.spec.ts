@@ -1,7 +1,13 @@
 import { expect, test } from './test';
 
 import { removeCategoryNamed } from './cleanup';
-import { expectTitles } from './helpers';
+import {
+  answerGeocoder,
+  expectTitles,
+  GEOCODER,
+  photonFeature,
+  uniqueName,
+} from './helpers';
 
 // Pin coordinates come from the seed data, so no run depends on a public geocoder being up.
 test.use({ locale: 'en-GB' });
@@ -71,11 +77,9 @@ test.describe('a map whose places are still being looked up', () => {
     page,
   }) => {
     const app = on(page);
-    const name = `E2E Landkarte ${Date.now()}`;
+    const name = uniqueName('E2E Landkarte');
     // No suggestions while typing, so each place is stored as typed.
-    await page.route('https://photon.komoot.io/**', (route) =>
-      route.fulfill({ json: { features: [] } }),
-    );
+    await answerGeocoder(page, []);
 
     await app.categories.do.load();
     await app.categories.do.create(name);
@@ -91,21 +95,14 @@ test.describe('a map whose places are still being looked up', () => {
         );
       }
 
-      await page.unroute('https://photon.komoot.io/**');
-      await page.route('https://photon.komoot.io/**', (route) => {
+      await page.unroute(GEOCODER);
+      await page.route(GEOCODER, (route) => {
         const query =
           new URL(route.request().url()).searchParams.get('q') ?? '';
         const coordinates = LOOKED_UP[query];
         return route.fulfill({
           json: {
-            features: coordinates
-              ? [
-                  {
-                    properties: { name: query },
-                    geometry: { type: 'Point', coordinates },
-                  },
-                ]
-              : [],
+            features: coordinates ? [photonFeature(query, coordinates)] : [],
           },
         });
       });

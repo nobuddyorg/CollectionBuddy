@@ -98,7 +98,7 @@ function initCard(root: Locator): CatalogueCard {
 }
 
 export function initCatalogue(page: Page): Catalogue {
-  const root = page.locator('#app-root');
+  const root = page.getByTestId('app-root');
   const pagination = root.getByTestId('pagination');
   const locators = {
     buttons: {

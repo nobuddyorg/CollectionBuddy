@@ -15,7 +15,7 @@ interface PrivacyPage {
 }
 
 export function initPrivacyPage(page: Page): PrivacyPage {
-  const root = page.locator('#app-root');
+  const root = page.getByTestId('app-root');
   const locators = {
     back: root.getByTestId('privacy-back'),
     contact: root.getByTestId('privacy-contact'),

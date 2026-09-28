@@ -5,17 +5,16 @@ import { expect, test } from './test';
 import { repackContentsLikeZipTool, repackLikeZipTool } from './archives';
 import { removeCategoryNamed, removeEntriesTitled } from './cleanup';
 import { SEED, titlesIn } from './fixtures';
-import { expectTitles } from './helpers';
-import { apiAs, context } from './rls/helpers';
+import { expectTitles, PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
+import { apiAs, context, storedObjects } from './rls/helpers';
+import type { PageTree } from '../pages';
 
 // The half fake I/O cannot reach: a real download, handed to a real input.
 test.use({ locale: 'en-GB' });
 
 // Two real round trips, past the 30s default under parallel load.
 test.describe.configure({ timeout: 120_000 });
-const ARRIVES = 45_000;
 
-const PHOTO = resolve(process.cwd(), 'public/logo.png');
 const DETAIL = resolve(process.cwd(), 'public/icon-192.png');
 
 /** Every entry titled `title` the caller can read: the original and, after an import, its copy. */
@@ -43,6 +42,28 @@ async function photographsOf(token: string, itemId: string) {
   return data as { size_bytes: number; path_full: string }[];
 }
 
+// Named the way a filesystem names a second copy, never overwriting.
+const IMPORTED_COPY = `${SEED.importCategory} (2)`;
+
+/** Importing selects the new collection, which collapses the panel. */
+async function importAndAwait(app: PageTree, archive: string) {
+  await app.categories.do.importArchive(archive);
+  await expect(app.categories.locators.selected).toHaveText(IMPORTED_COPY, {
+    timeout: 60_000,
+  });
+}
+
+/** A fresh entry in the import collection, holding one stored photograph. */
+async function photographedOriginal(app: PageTree, title: string) {
+  await app.categories.do.open(SEED.importCategory);
+  await app.catalogue.do.addEntry(title);
+  const original = app.catalogue.card(title);
+  await original.do.uploadPhoto(PHOTO);
+  await expect(original.locators.images).toBeVisible({
+    timeout: PHOTO_ARRIVES,
+  });
+}
+
 test.describe('importing an exported archive', () => {
   test('reads a collection back as a copy beside the original', async ({
     on,
@@ -53,15 +74,8 @@ test.describe('importing an exported archive', () => {
 
     const archive = await app.categories.do.downloadExport();
 
-    // Named the way a filesystem names a second copy, never overwriting.
-    const copy = `${SEED.importCategory} (2)`;
     try {
-      await app.categories.do.importArchive(archive);
-
-      // Importing selects the new collection, which collapses the panel.
-      await expect(app.categories.locators.selected).toHaveText(copy, {
-        timeout: 60_000,
-      });
+      await importAndAwait(app, archive);
       await expectTitles(page, titlesIn(SEED.importCategory));
 
       // Not just the titles: an entry arrives with what was around it.
@@ -70,7 +84,7 @@ test.describe('importing an exported archive', () => {
       await expect(card.locators.tags).toHaveText(['umzug']);
     } finally {
       // In `finally`, so a failed assertion leaves no copy for the next test to number past.
-      await removeCategoryNamed(copy);
+      await removeCategoryNamed(IMPORTED_COPY);
     }
   });
 
@@ -85,32 +99,23 @@ test.describe('importing an exported archive', () => {
   ]) {
     test(`reads an export ${packed}`, async ({ on, page }, testInfo) => {
       const app = on(page);
-      await app.categories.do.open(SEED.importCategory);
+      const title = uniqueName('Neu gepackt');
+      await photographedOriginal(app, title);
 
-      const title = `Neu gepackt ${Date.now()}`;
-      await app.catalogue.do.addEntry(title);
-      const original = app.catalogue.card(title);
-      await original.do.uploadPhoto(PHOTO);
-      await expect(original.locators.images).toBeVisible({ timeout: ARRIVES });
-
-      const copy = `${SEED.importCategory} (2)`;
       try {
         const archive = await app.categories.do.downloadExport();
         const repacked = testInfo.outputPath('repacked.zip');
         repack(archive, repacked);
 
-        await app.categories.do.importArchive(repacked);
-        await expect(app.categories.locators.selected).toHaveText(copy, {
-          timeout: 60_000,
-        });
+        await importAndAwait(app, repacked);
         const imported = app.catalogue.card(title);
         await expect(imported.locators.images).toBeVisible({
-          timeout: ARRIVES,
+          timeout: PHOTO_ARRIVES,
         });
         await expect(imported.locators.images).toHaveAttribute('src', /token=/);
       } finally {
         await removeEntriesTitled(title);
-        await removeCategoryNamed(copy);
+        await removeCategoryNamed(IMPORTED_COPY);
       }
     });
   }
@@ -118,29 +123,22 @@ test.describe('importing an exported archive', () => {
   // The archive carries only the full-size file; the import compresses a thumbnail and uploads both.
   test('brings a photograph back with its entry', async ({ on, page }) => {
     const app = on(page);
-    await app.categories.do.open(SEED.importCategory);
+    const title = uniqueName('Fotostück');
+    await photographedOriginal(app, title);
 
-    const title = `Fotostück ${Date.now()}`;
-    await app.catalogue.do.addEntry(title);
-    const original = app.catalogue.card(title);
-    await original.do.uploadPhoto(PHOTO);
-    await expect(original.locators.images).toBeVisible({ timeout: ARRIVES });
-
-    const copy = `${SEED.importCategory} (2)`;
     try {
       const archive = await app.categories.do.downloadExport();
 
-      await app.categories.do.importArchive(archive);
-      await expect(app.categories.locators.selected).toHaveText(copy, {
-        timeout: 60_000,
-      });
+      await importAndAwait(app, archive);
       const imported = app.catalogue.card(title);
       await expect(imported()).toBeVisible();
-      await expect(imported.locators.images).toBeVisible({ timeout: ARRIVES });
+      await expect(imported.locators.images).toBeVisible({
+        timeout: PHOTO_ARRIVES,
+      });
       await expect(imported.locators.images).toHaveAttribute('src', /token=/);
     } finally {
       await removeEntriesTitled(title);
-      await removeCategoryNamed(copy);
+      await removeCategoryNamed(IMPORTED_COPY);
     }
   });
 
@@ -153,13 +151,17 @@ test.describe('importing an exported archive', () => {
     const { token } = context();
     await app.categories.do.open(SEED.importCategory);
 
-    const title = `Titelbildstück ${Date.now()}`;
+    const title = uniqueName('Titelbildstück');
     await app.catalogue.do.addEntry(title);
     const original = app.catalogue.card(title);
     await original.do.uploadPhoto(PHOTO);
-    await expect(original.locators.images).toHaveCount(1, { timeout: ARRIVES });
+    await expect(original.locators.images).toHaveCount(1, {
+      timeout: PHOTO_ARRIVES,
+    });
     await original.do.uploadPhoto(DETAIL);
-    await expect(original.locators.images).toHaveCount(2, { timeout: ARRIVES });
+    await expect(original.locators.images).toHaveCount(2, {
+      timeout: PHOTO_ARRIVES,
+    });
     const [originalId] = await itemIdsFor(token, title);
     const sizes = (await photographsOf(token, originalId)).map(
       (photo) => photo.size_bytes,
@@ -168,7 +170,6 @@ test.describe('importing an exported archive', () => {
     expect(new Set(sizes).size).toBe(2);
 
     const inserts = (url: URL) => url.pathname.endsWith('/rest/v1/images');
-    const copy = `${SEED.importCategory} (2)`;
     try {
       const archive = await app.categories.do.downloadExport();
 
@@ -191,10 +192,7 @@ test.describe('importing an exported archive', () => {
         detailRecorded();
       });
 
-      await app.categories.do.importArchive(archive);
-      await expect(app.categories.locators.selected).toHaveText(copy, {
-        timeout: 60_000,
-      });
+      await importAndAwait(app, archive);
       const [importedId] = (await itemIdsFor(token, title)).filter(
         (id) => id !== originalId,
       );
@@ -203,7 +201,7 @@ test.describe('importing an exported archive', () => {
 
       const imported = app.catalogue.card(title);
       await expect(imported.locators.images).toHaveCount(2, {
-        timeout: ARRIVES,
+        timeout: PHOTO_ARRIVES,
       });
       await expect
         .poll(() => imported.locators.images.first().getAttribute('src'))
@@ -211,7 +209,7 @@ test.describe('importing an exported archive', () => {
     } finally {
       await page.unroute(inserts);
       await removeEntriesTitled(title);
-      await removeCategoryNamed(copy);
+      await removeCategoryNamed(IMPORTED_COPY);
     }
   });
 
@@ -222,16 +220,10 @@ test.describe('importing an exported archive', () => {
   }) => {
     const app = on(page);
     const { token } = context();
-    await app.categories.do.open(SEED.importCategory);
-
-    const title = `Abbruchstück ${Date.now()}`;
-    await app.catalogue.do.addEntry(title);
-    const original = app.catalogue.card(title);
-    await original.do.uploadPhoto(PHOTO);
-    await expect(original.locators.images).toBeVisible({ timeout: ARRIVES });
+    const title = uniqueName('Abbruchstück');
+    await photographedOriginal(app, title);
 
     const uploads = '**/storage/v1/object/item-images/**';
-    const copy = `${SEED.importCategory} (2)`;
     try {
       const archive = await app.categories.do.downloadExport();
 
@@ -258,28 +250,22 @@ test.describe('importing an exported archive', () => {
       release();
       await landed;
       await expect(app.categories.locators.buttons.cancelImport).toBeHidden({
-        timeout: ARRIVES,
+        timeout: PHOTO_ARRIVES,
       });
       const [userId, itemId] = uploadPath
         .split('/storage/v1/object/item-images/')[1]
         .split('/');
       await expect
-        .poll(
-          async () => {
-            const { data } = await apiAs(token)
-              .storage.from('item-images')
-              .list(`${userId}/${itemId}`);
-            return data;
-          },
-          { timeout: 15_000 },
-        )
+        .poll(() => storedObjects(token, `${userId}/${itemId}`), {
+          timeout: 15_000,
+        })
         .toEqual([]);
       await app.categories.do.openPanel();
-      await expect(app.categories.tab(copy)).toHaveCount(0);
+      await expect(app.categories.tab(IMPORTED_COPY)).toHaveCount(0);
     } finally {
       await page.unroute(uploads);
       await removeEntriesTitled(title);
-      await removeCategoryNamed(copy);
+      await removeCategoryNamed(IMPORTED_COPY);
     }
   });
 });

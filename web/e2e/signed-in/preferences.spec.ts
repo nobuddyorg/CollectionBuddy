@@ -7,8 +7,7 @@ test.use({ locale: 'en-GB' });
 
 test.describe('the account menu', () => {
   test.beforeEach(async ({ on, page }) => {
-    await page.goto('', { waitUntil: 'networkidle' });
-    await expect(on(page).categories.locators.selected).not.toBeEmpty();
+    await on(page).categories.do.load();
     await on(page).account.do.open();
   });
 

@@ -14,6 +14,7 @@ import {
   reseedSingle,
   type MintedSession,
 } from './collectors';
+import { LOGIN_URL } from '../pages/login';
 
 // A real image, so the card renders it rather than logging a decode failure.
 const PHOTO = readFileSync(resolve(process.cwd(), 'public/logo.png'));
@@ -89,14 +90,14 @@ test.describe('deleting one’s account', () => {
       'Delete your account?',
     );
     await app.confirm.do.cancel();
-    await expect(page).not.toHaveURL(/\/login\/?$/);
+    await expect(page).not.toHaveURL(LOGIN_URL);
     expect(await stored(collector.photo)).toBe(true);
 
     await app.account.do.open();
     await app.account.do.deleteAccount();
     await app.confirm.do.accept();
 
-    await expect(page).toHaveURL(/\/login\/?$/);
+    await expect(page).toHaveURL(LOGIN_URL);
     await expect(app.toast()).toContainText('Your account has been deleted.');
     expect(await stored(collector.photo)).toBe(false);
     await expect(
@@ -105,7 +106,7 @@ test.describe('deleting one’s account', () => {
 
     // No session survives a reload: the one in this browser was cleared, and the server's went with the user.
     await page.reload({ waitUntil: 'networkidle' });
-    await expect(page).toHaveURL(/\/login\/?$/);
+    await expect(page).toHaveURL(LOGIN_URL);
     expect(problems, 'the page threw or logged errors').toEqual([]);
   });
 });

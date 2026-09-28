@@ -10,6 +10,8 @@ import {
   mintSession,
   reseedSingle,
 } from './collectors';
+import { answerGeocoder, photonFeature, uniqueName } from './helpers';
+import { LOGIN_URL } from '../pages/login';
 
 // The global sign-out revokes every session of its user, so it signs out a collector no other spec shares.
 const test = base.extend<{ collector: { email: string; userId: string } }>({
@@ -54,14 +56,14 @@ test.describe('signing out', () => {
     collector,
   }) => {
     const app = on(page);
-    const title = `Beim Abmelden ${Date.now()}`;
+    const title = uniqueName('Beim Abmelden');
     await app.categories.do.open(SEED.signOut.category);
     await app.catalogue.do.addEntry(title);
     await app.catalogue.do.removeEntry(title);
 
     await app.account.do.open();
     await app.account.do.signOut();
-    await expect(page).toHaveURL(/\/login\/?$/);
+    await expect(page).toHaveURL(LOGIN_URL);
 
     // Left to its timer, the delete would run signed out, fail, and leave the entry standing.
     const reader = await mintSession(collector.email, SEED.signOut.password);
@@ -74,7 +76,7 @@ test.describe('signing out', () => {
 
     // Confirms the session itself is gone, not just a client-side navigation.
     await page.reload({ waitUntil: 'networkidle' });
-    await expect(page).toHaveURL(/\/login\/?$/);
+    await expect(page).toHaveURL(LOGIN_URL);
   });
 
   test('leaves the next person none of its collection or looked-up places, and keeps the appearance', async ({
@@ -82,18 +84,7 @@ test.describe('signing out', () => {
     page,
   }) => {
     const app = on(page);
-    await page.route('https://photon.komoot.io/**', (route) =>
-      route.fulfill({
-        json: {
-          features: [
-            {
-              properties: { name: 'Garmisch' },
-              geometry: { type: 'Point', coordinates: [11.08, 47.49] },
-            },
-          ],
-        },
-      }),
-    );
+    await answerGeocoder(page, [photonFeature('Garmisch', [11.08, 47.49])]);
     await app.categories.do.open(SEED.signOut.category);
     await app.map.do.open();
     await expect(app.map.locators.pins).toHaveCount(1);
@@ -105,7 +96,7 @@ test.describe('signing out', () => {
     await app.account.do.chooseTheme('dark');
 
     await app.account.do.signOut();
-    await expect(page).toHaveURL(/\/login\/?$/);
+    await expect(page).toHaveURL(LOGIN_URL);
 
     const left = await storedKeys(page);
     expect(left).toContain('theme');

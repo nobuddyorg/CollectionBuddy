@@ -1,67 +1,32 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { expect, test } from './test';
-import { createClient } from '@supabase/supabase-js';
 
 import { removeEntriesTitled } from './cleanup';
-import { CONTEXT_PATH, SEED, type SeedContext } from './fixtures';
+import { SEED } from './fixtures';
+import { PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
+import { context, itemIdTitled, storedObjects } from './rls/helpers';
 import type { PageTree } from '../pages';
 // Decode, resize, upload, list and sign all happen in the browser; rls/ covers what the policies allow.
 test.use({ locale: 'en-GB' });
 
 // The default 30s does not reliably cover two real uploads under parallel load.
 test.describe.configure({ timeout: 120_000 });
-// Below the test timeout, so a slow upload fails with its own message instead of a bare timeout.
-const ARRIVES = 45_000;
-
-// A real photograph: the compressor decodes what it is given, and a canvas cannot draw a fake PNG.
-const PHOTO = resolve(process.cwd(), 'public/logo.png');
-
-const context = () =>
-  JSON.parse(readFileSync(CONTEXT_PATH, 'utf8')) as SeedContext;
-
-function apiAs(token: string) {
-  return createClient(
-    process.env.E2E_SUPABASE_URL!,
-    process.env.E2E_SUPABASE_ANON_KEY!,
-    {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    },
-  );
-}
-
-function storageAs(token: string) {
-  return apiAs(token).storage.from('item-images');
-}
-
-/** The id of the (uniquely-titled) item a test just created through the UI. */
-async function itemIdFor(token: string, title: string) {
-  const { data, error } = await apiAs(token)
-    .from('items')
-    .select('id')
-    .eq('title', title)
-    .single();
-  if (error) throw error;
-  return data.id as string;
-}
 
 type StoredItem = { token: string; userId: string; itemId: string };
 
 /** Scoped to the item, not the account: other specs write under the same owner concurrently. */
 async function storedFiles(item: StoredItem) {
-  const { data } = await storageAs(item.token).list(
+  const objects = await storedObjects(
+    item.token,
     `${item.userId}/${item.itemId}`,
   );
-  return (data ?? []).map((object) => ({
+  return objects.map((object) => ({
     name: object.name,
     type: (object.metadata?.mimetype ?? '') as string,
     bytes: (object.metadata?.size ?? 0) as number,
   }));
 }
 
-async function storedObjects(item: StoredItem) {
+async function storedNames(item: StoredItem) {
   return (await storedFiles(item)).map((file) => file.name);
 }
 
@@ -109,8 +74,6 @@ function countCompressionWorkerAnswers() {
   };
 }
 
-const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
-
 test.describe('photographs', () => {
   test.beforeEach(async ({ on, page }) => {
     await on(page).categories.do.open(SEED.photoCategory);
@@ -121,7 +84,7 @@ test.describe('photographs', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueTitle('Fotografiert');
+    const title = uniqueName('Fotografiert');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
@@ -129,7 +92,9 @@ test.describe('photographs', () => {
       await card.do.uploadPhoto(PHOTO);
 
       // Waits for the real picture, not the placeholder that stood in for it.
-      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+      await expect(card.locators.images).toBeVisible({
+        timeout: PHOTO_ARRIVES,
+      });
       await expect(card.locators.images).toHaveAttribute('src', /token=/);
       // Both sizes signed and offered, so a plate that needs no more than 600px fetches the thumbnail.
       await expect(card.locators.images).toHaveAttribute(
@@ -137,7 +102,6 @@ test.describe('photographs', () => {
         /\.thumb\.\w+\?token=\S+ 600w, \S+\?token=\S+ 1000w$/,
       );
     } finally {
-      // In finally, objects and row both: a leaked entry would orphan its upload.
       await removeEntriesTitled(title);
     }
   });
@@ -147,17 +111,17 @@ test.describe('photographs', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueTitle('Bleibt');
+    const title = uniqueName('Bleibt');
     try {
       await app.catalogue.do.addEntry(title);
       await app.catalogue.card(title).do.uploadPhoto(PHOTO);
       await expect(app.catalogue.card(title).locators.images).toBeVisible({
-        timeout: ARRIVES,
+        timeout: PHOTO_ARRIVES,
       });
 
       await app.categories.do.open(SEED.photoCategory);
       await expect(app.catalogue.card(title).locators.images).toBeVisible({
-        timeout: ARRIVES,
+        timeout: PHOTO_ARRIVES,
       });
     } finally {
       await removeEntriesTitled(title);
@@ -169,13 +133,15 @@ test.describe('photographs', () => {
     const app = on(page);
     const { token, userId } = context();
 
-    const title = uniqueTitle('Paarweise');
+    const title = uniqueName('Paarweise');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
-      const itemId = await itemIdFor(token, title);
+      const itemId = await itemIdTitled(token, title);
       await card.do.uploadPhoto(PHOTO);
-      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+      await expect(card.locators.images).toBeVisible({
+        timeout: PHOTO_ARRIVES,
+      });
 
       const stored = await storedFiles({ token, userId, itemId });
       expect(stored).toHaveLength(2);
@@ -203,12 +169,14 @@ test.describe('photographs', () => {
     await page.addInitScript(countCompressionWorkerAnswers);
     await app.categories.do.open(SEED.photoCategory);
 
-    const title = uniqueTitle('Im Worker');
+    const title = uniqueName('Im Worker');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
       await card.do.uploadPhoto(PHOTO);
-      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+      await expect(card.locators.images).toBeVisible({
+        timeout: PHOTO_ARRIVES,
+      });
 
       const answers = await page.evaluate(
         () =>
@@ -231,13 +199,15 @@ test.describe('photographs', () => {
     await page.addInitScript(emulateSafariCanvas);
     await app.categories.do.open(SEED.photoCategory);
 
-    const title = uniqueTitle('Safari');
+    const title = uniqueName('Safari');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
-      const itemId = await itemIdFor(token, title);
+      const itemId = await itemIdTitled(token, title);
       await card.do.uploadPhoto(PHOTO);
-      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+      await expect(card.locators.images).toBeVisible({
+        timeout: PHOTO_ARRIVES,
+      });
 
       const stored = await storedFiles({ token, userId, itemId });
       expect(stored.map(({ name }) => name).sort()).toEqual([
@@ -258,16 +228,20 @@ test.describe('photographs', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueTitle('Zwei');
+    const title = uniqueName('Zwei');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
 
       await card.do.uploadPhoto(PHOTO);
-      await expect(card.locators.images).toHaveCount(1, { timeout: ARRIVES });
+      await expect(card.locators.images).toHaveCount(1, {
+        timeout: PHOTO_ARRIVES,
+      });
 
       await card.do.uploadPhoto(PHOTO);
-      await expect(card.locators.images).toHaveCount(2, { timeout: ARRIVES });
+      await expect(card.locators.images).toHaveCount(2, {
+        timeout: PHOTO_ARRIVES,
+      });
     } finally {
       await removeEntriesTitled(title);
     }
@@ -281,13 +255,15 @@ test.describe('photographs', () => {
     const app = on(page);
     const { token, userId } = context();
 
-    const title = uniqueTitle('Wieder weg');
+    const title = uniqueName('Wieder weg');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
-      const itemId = await itemIdFor(token, title);
+      const itemId = await itemIdTitled(token, title);
       await card.do.uploadPhoto(PHOTO);
-      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+      await expect(card.locators.images).toBeVisible({
+        timeout: PHOTO_ARRIVES,
+      });
 
       await card.locators.buttons.deleteImage.click();
       await app.confirm.do.accept();
@@ -298,7 +274,7 @@ test.describe('photographs', () => {
       await expect(app.catalogue.card(title)()).toBeVisible();
       await expect(app.catalogue.card(title).locators.images).toHaveCount(0);
       await expect
-        .poll(() => storedObjects({ token, userId, itemId }), {
+        .poll(() => storedNames({ token, userId, itemId }), {
           timeout: 15_000,
         })
         .toEqual([]);
@@ -315,20 +291,22 @@ test.describe('photographs', () => {
     const app = on(page);
     const { token, userId } = context();
 
-    const title = uniqueTitle('Mit Aufräumen');
+    const title = uniqueName('Mit Aufräumen');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
-      const itemId = await itemIdFor(token, title);
+      const itemId = await itemIdTitled(token, title);
       await card.do.uploadPhoto(PHOTO);
-      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+      await expect(card.locators.images).toBeVisible({
+        timeout: PHOTO_ARRIVES,
+      });
 
-      const during = await storedObjects({ token, userId, itemId });
+      const during = await storedNames({ token, userId, itemId });
       expect(during.length).toBeGreaterThan(0);
 
       await app.catalogue.do.removeEntry(title);
       await app.toast.do.commitDeletion('items');
-      expect(await storedObjects({ token, userId, itemId })).toEqual([]);
+      expect(await storedNames({ token, userId, itemId })).toEqual([]);
     } finally {
       await removeEntriesTitled(title);
     }
@@ -342,9 +320,11 @@ test.describe('photographs', () => {
     ): Promise<string> {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
-      const itemId = await itemIdFor(context().token, title);
+      const itemId = await itemIdTitled(context().token, title);
       await card.do.uploadPhoto(PHOTO);
-      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+      await expect(card.locators.images).toBeVisible({
+        timeout: PHOTO_ARRIVES,
+      });
 
       await card.locators.buttons.deleteImage.click();
       await app.confirm.do.accept();
@@ -360,7 +340,7 @@ test.describe('photographs', () => {
       page,
     }) => {
       const app = on(page);
-      const title = uniqueTitle('Mit Eintrag weg');
+      const title = uniqueName('Mit Eintrag weg');
       try {
         await photographThenEntryDeleted(app, title);
 
@@ -380,7 +360,7 @@ test.describe('photographs', () => {
       page,
     }) => {
       const app = on(page);
-      const title = uniqueTitle('Schon mitgenommen');
+      const title = uniqueName('Schon mitgenommen');
       try {
         const itemId = await photographThenEntryDeleted(app, title);
         // After the row delete finds nothing, the app asks whether the entry went too.

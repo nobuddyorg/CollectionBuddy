@@ -2,6 +2,7 @@ import { expect, test } from './test';
 
 import { expectNoSeriousA11yViolations } from '../axe';
 import { removeCategoryNamed } from './cleanup';
+import { uniqueName } from './helpers';
 
 // A throwaway category, unique per run, so no other spec's collection is touched.
 test.use({ locale: 'en-GB' });
@@ -11,7 +12,7 @@ test.describe('managing categories', () => {
     on,
     page,
   }) => {
-    const name = `E2E Category ${Date.now()}`;
+    const name = uniqueName('E2E Category');
     const renamed = `${name} (renamed)`;
     const categories = on(page).categories;
 
@@ -51,7 +52,7 @@ test.describe('managing categories', () => {
     on,
     page,
   }) => {
-    const name = `E2E US$$ $' $& ${Date.now()}`;
+    const name = uniqueName("E2E US$$ $' $&");
     const app = on(page);
 
     await app.categories.do.load();

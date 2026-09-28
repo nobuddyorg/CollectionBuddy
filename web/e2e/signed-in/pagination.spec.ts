@@ -2,7 +2,7 @@ import { expect, test } from './test';
 
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
-import { expectTitles, visibleTitles } from './helpers';
+import { expectTitles, uniqueName, visibleTitles } from './helpers';
 
 // paging.ts has the arithmetic; this is that the grid asks a page at a time.
 test.use({ locale: 'en-GB' });
@@ -57,7 +57,7 @@ test.describe('a delete that empties the last page', () => {
     page,
   }) => {
     const app = on(page);
-    const title = `Neuzugang ${Date.now()}`;
+    const title = uniqueName('Neuzugang');
     await app.categories.do.open(SEED.sortingCategory);
     const secondPage = app.catalogue.locators.buttons.pageNumbers.filter({
       hasText: /^2$/,
