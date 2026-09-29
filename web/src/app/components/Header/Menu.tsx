@@ -62,7 +62,7 @@ export default function Menu({
     <div
       id={menuId}
       aria-labelledby="user-menu-button"
-      className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-sm border bg-card text-card-foreground backdrop-blur p-1 shadow-lg"
+      className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-sm border bg-card text-card-foreground backdrop-blur p-1 shadow-lg"
     >
       <div className={labelClasses('px-3 py-2 truncate')}>{user.email}</div>
 
