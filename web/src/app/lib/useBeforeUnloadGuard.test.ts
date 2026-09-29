@@ -3,13 +3,7 @@ import { renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { useBeforeUnloadGuard } from './useBeforeUnloadGuard';
-
-/** Dispatches a cancelable beforeunload and reports whether anything asked the browser to hold it. */
-function leavingIsHeld() {
-  const event = new Event('beforeunload', { cancelable: true });
-  window.dispatchEvent(event);
-  return event.defaultPrevented;
-}
+import { leavingIsHeld } from './useBeforeUnloadGuard.test-support';
 
 describe('useBeforeUnloadGuard', () => {
   let unmount = () => {};

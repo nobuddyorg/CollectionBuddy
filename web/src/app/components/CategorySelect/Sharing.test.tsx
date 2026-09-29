@@ -3,23 +3,16 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
+import {
+  acceptConfirmation,
+  ToastConfirmWrapper,
+} from '../providers.test-support';
 import { grant, sharesState } from './shares.test-support';
 import { SharingSection } from './Sharing';
 import type { UseShares } from './useShares';
 
 function renderSection(shares: UseShares) {
-  render(
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <SharingSection shares={shares} />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>,
-  );
+  render(<SharingSection shares={shares} />, { wrapper: ToastConfirmWrapper });
 }
 
 /** A German app language on an American browser, so a date written the browser's way would give itself away. */
@@ -287,7 +280,7 @@ describe('SharingSection list', () => {
   });
 
   it('warns before granting edit access, and only applies it once accepted', async () => {
-    const updateShareRole = vi.fn().mockResolvedValue(true);
+    const updateShareRole = vi.fn<UseShares['updateShareRole']>();
     renderSection(
       sharesState({
         shares: [grant],
@@ -303,13 +296,13 @@ describe('SharingSection list', () => {
         'Give grantee@example.com full edit access to this collection, including adding, changing and deleting entries and photographs?',
       ),
     ).toBeVisible();
-    await userEvent.click(screen.getByTestId('confirm-accept'));
+    await acceptConfirmation();
 
     expect(updateShareRole).toHaveBeenCalledWith('share-1', 'editor');
   });
 
   it('does not grant edit access if the warning is declined', async () => {
-    const updateShareRole = vi.fn().mockResolvedValue(true);
+    const updateShareRole = vi.fn<UseShares['updateShareRole']>();
     renderSection(
       sharesState({
         shares: [grant],
@@ -325,7 +318,7 @@ describe('SharingSection list', () => {
   });
 
   it('revokes edit access with no warning', async () => {
-    const updateShareRole = vi.fn().mockResolvedValue(true);
+    const updateShareRole = vi.fn<UseShares['updateShareRole']>();
     renderSection(
       sharesState({
         shares: [{ ...grant, role: 'editor' }],
@@ -340,7 +333,7 @@ describe('SharingSection list', () => {
 
   // "Can edit" has no room on a narrow screen; the pen icon opens the same checkbox in a modal.
   it('opens the role toggle in a modal from the mobile pen button', async () => {
-    const updateShareRole = vi.fn().mockResolvedValue(true);
+    const updateShareRole = vi.fn<UseShares['updateShareRole']>();
     renderSection(
       sharesState({
         shares: [grant],
@@ -359,13 +352,13 @@ describe('SharingSection list', () => {
         'Give grantee@example.com full edit access to this collection, including adding, changing and deleting entries and photographs?',
       ),
     ).toBeVisible();
-    await userEvent.click(screen.getByTestId('confirm-accept'));
+    await acceptConfirmation();
 
     expect(updateShareRole).toHaveBeenCalledWith('share-1', 'editor');
   });
 
   it('closes the role modal again, leaving the row as it was', async () => {
-    const updateShareRole = vi.fn().mockResolvedValue(true);
+    const updateShareRole = vi.fn<UseShares['updateShareRole']>();
     renderSection(
       sharesState({
         shares: [grant],
@@ -400,7 +393,7 @@ describe('SharingSection list', () => {
         'Stop sharing with grantee@example.com? They will no longer be able to see this collection.',
       ),
     ).toBeVisible();
-    await userEvent.click(screen.getByTestId('confirm-accept'));
+    await acceptConfirmation();
 
     expect(revokeShare).toHaveBeenCalledWith('share-1');
   });

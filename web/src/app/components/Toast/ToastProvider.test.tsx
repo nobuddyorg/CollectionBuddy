@@ -9,6 +9,7 @@ import {
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { leavingIsHeld } from '../../lib/useBeforeUnloadGuard.test-support';
 import { ToastWrapper } from '../providers.test-support';
 import { useToast } from './ToastProvider';
 
@@ -118,13 +119,6 @@ function renderUndoable(handlers: {
       <CommitTrigger onCommitted={handlers.onCommitted ?? vi.fn()} />
     </>,
   );
-}
-
-/** Dispatches a cancelable beforeunload and reports whether anything asked the browser to hold it. */
-function leavingIsHeld() {
-  const event = new Event('beforeunload', { cancelable: true });
-  window.dispatchEvent(event);
-  return event.defaultPrevented;
 }
 
 function renderProvider(messages: string[]) {

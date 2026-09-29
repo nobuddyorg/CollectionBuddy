@@ -7,7 +7,7 @@ import CenteredModal from '../CenteredModal';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { IconType } from '../Icon';
 import type { CategoryShareSummary, ShareRole } from '../../data/shares';
-import { GhostIconButton, HEADER_TOGGLE_BOX } from './Buttons';
+import { GhostIconButton, TOUCH_ICON_BOX } from './Buttons';
 import { isShareExpired } from './shareExpiry';
 import type { UseShares } from './useShares';
 import { labelClasses } from '../ui/labelClasses';
@@ -138,7 +138,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
                       label={t('category_select.share_edit_access')}
                       icon={IconType.Edit}
                       iconClassName="w-4 h-4"
-                      boxClassName={HEADER_TOGGLE_BOX}
+                      boxClassName={TOUCH_ICON_BOX}
                       className="sm:hidden"
                     />
                     <GhostIconButton
@@ -150,7 +150,7 @@ export function ShareList({ shares }: { shares: UseShares }) {
                       label={t('category_select.share_revoke')}
                       icon={IconType.Trash}
                       iconClassName="w-4 h-4"
-                      boxClassName={HEADER_TOGGLE_BOX}
+                      boxClassName={TOUCH_ICON_BOX}
                       tone="destructive"
                     />
                   </div>

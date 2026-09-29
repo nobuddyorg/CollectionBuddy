@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExportCancelledError } from '../../data/exportCancellation';
 import { exportCategory, type ExportProgress } from '../../data/exportCategory';
 import { ZipLimitError } from '../../data/zip';
+import { leavingIsHeld } from '../../lib/useBeforeUnloadGuard.test-support';
 import { ToastConfirmWrapper as wrapper } from '../providers.test-support';
 import { downloadBlob } from './downloadBlob';
 import { useExportCategory } from './useExportCategory';
@@ -55,12 +56,6 @@ function asksBeforeLargeExport() {
     if (!go) throw new ExportCancelledError();
     return exported();
   }) as never);
-}
-
-function tabCloseIsHeldBack(): boolean {
-  const event = new Event('beforeunload', { cancelable: true });
-  window.dispatchEvent(event);
-  return event.defaultPrevented;
 }
 
 function installExportMocks() {
@@ -337,17 +332,17 @@ describe('useExportCategory cancel and in-flight guards', () => {
   it('guards against closing the tab only while an export is running', async () => {
     const releaseExport = holdExport();
     const { result } = renderHook(() => useExportCategory(), { wrapper });
-    expect(tabCloseIsHeldBack()).toBe(false);
+    expect(leavingIsHeld()).toBe(false);
 
     act(() => {
       void result.current.runExport(CATEGORY);
     });
     await waitFor(() => expect(result.current.isExporting).toBe(true));
-    expect(tabCloseIsHeldBack()).toBe(true);
+    expect(leavingIsHeld()).toBe(true);
 
     await act(async () => {
       releaseExport();
     });
-    expect(tabCloseIsHeldBack()).toBe(false);
+    expect(leavingIsHeld()).toBe(false);
   });
 });

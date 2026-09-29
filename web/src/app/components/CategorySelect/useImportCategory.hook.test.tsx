@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ImportCancelledError } from '../../data/importCancellation';
 import { importCategory } from '../../data/importCategory';
 import { ImportFormatError } from '../../data/importFormat';
+import { leavingIsHeld } from '../../lib/useBeforeUnloadGuard.test-support';
 import { ToastWrapper as wrapper } from '../providers.test-support';
 import { useImportCategory } from './useImportCategory';
 
@@ -329,15 +330,11 @@ describe('useImportCategory cancel and in-flight guards', () => {
     });
     await waitFor(() => expect(result.current.isImporting).toBe(true));
 
-    const event = new Event('beforeunload', { cancelable: true });
-    window.dispatchEvent(event);
-    expect(event.defaultPrevented).toBe(true);
+    expect(leavingIsHeld()).toBe(true);
 
     await act(async () => {
       held.release();
     });
-    const afterwards = new Event('beforeunload', { cancelable: true });
-    window.dispatchEvent(afterwards);
-    expect(afterwards.defaultPrevented).toBe(false);
+    expect(leavingIsHeld()).toBe(false);
   });
 });

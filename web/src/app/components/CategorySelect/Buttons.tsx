@@ -169,8 +169,8 @@ export function GhostIconButton({
   );
 }
 
-// Sizes down at sm, unlike CANCEL_BOX: the header's neighbours do too.
-export const HEADER_TOGGLE_BOX = 'w-11 h-11 sm:w-9 sm:h-9';
+// A 44px touch target that shrinks to 36px at sm, as its neighbours do, unlike CANCEL_BOX.
+export const TOUCH_ICON_BOX = 'w-11 h-11 sm:w-9 sm:h-9';
 
 // Same box as ExpandButton, so the toggle does not move between open and closed.
 export function CollapseButton({
@@ -190,7 +190,7 @@ export function CollapseButton({
       label={label}
       icon={IconType.Close}
       iconClassName="w-5 h-5"
-      boxClassName={HEADER_TOGGLE_BOX}
+      boxClassName={TOUCH_ICON_BOX}
       // Close's own default draws a square cap.
       strokeLinecap="round"
     />
@@ -214,12 +214,12 @@ export function ExpandButton({
       label={label}
       icon={IconType.Edit}
       iconClassName="w-5 h-5"
-      boxClassName={HEADER_TOGGLE_BOX}
+      boxClassName={TOUCH_ICON_BOX}
     />
   );
 }
 
-// Fixed, unlike HEADER_TOGGLE_BOX: sits inline with a status line that has no room to grow at sm.
+// Fixed, unlike TOUCH_ICON_BOX: sits inline with a status line that has no room to grow at sm.
 const CANCEL_BOX = 'w-9 h-9';
 
 export function CancelExportButton({

@@ -12,6 +12,7 @@ import {
 
 import { ToastWrapper as wrapper } from '../providers.test-support';
 import { forgetPrefetchedFirstPage } from './firstPagePrefetch';
+import { item } from './item.test-support';
 import { useItems } from './useItems';
 import type { listItems } from '../../data/itemPage';
 
@@ -29,17 +30,7 @@ const FAILED = {
   imageRows: null,
 };
 const ONE_ENTRY = {
-  data: [
-    {
-      id: 'coin',
-      title: 'Denarius',
-      description: null,
-      place: null,
-      place_lat: null,
-      place_lng: null,
-      tags: [],
-    },
-  ],
+  data: [item('coin', { title: 'Denarius' })],
   error: null,
   count: 1,
   imageRows: [],
