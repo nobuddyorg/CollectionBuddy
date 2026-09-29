@@ -236,6 +236,7 @@
   "background_removal": {
     "setting_label": "Hintergründe entfernen",
     "setting_hint": "Vor dem Hochladen wird der Hintergrund um das Objekt entfernt, nur auf diesem Gerät. Beim ersten Mal wird einmalig ein Modell von etwa 90 MB geladen.",
+    "info_label": "Mehr zu „Hintergründe entfernen“",
     "preload": "Modell jetzt laden (etwa 90 MB)",
     "preload_progress": "Modell wird geladen: {percent} %",
     "preload_ready": "Modell geladen",

@@ -7,6 +7,7 @@ interface AccountMenu {
     chooseTheme(theme: 'system' | 'light' | 'dark'): Promise<void>;
     downloadModel(): Promise<void>;
     toggleBackgroundRemoval(): Promise<void>;
+    toggleBackgroundRemovalHint(): Promise<void>;
     deleteAccount(): Promise<void>;
     open(): Promise<void>;
     openHelp(): Promise<void>;
@@ -15,6 +16,8 @@ interface AccountMenu {
   locators: {
     backgroundRemoval: {
       toggle: Locator;
+      info: Locator;
+      hint: Locator;
       download: Locator;
       progress: Locator;
     };
@@ -35,6 +38,8 @@ export function initAccountMenu(page: Page): AccountMenu {
   const locators = {
     backgroundRemoval: {
       toggle: page.getByTestId('background-removal-toggle'),
+      info: page.getByTestId('background-removal-info'),
+      hint: page.getByTestId('background-removal-hint'),
       download: page.getByTestId('model-preload'),
       progress: page.getByTestId('model-status'),
     },
@@ -64,6 +69,9 @@ export function initAccountMenu(page: Page): AccountMenu {
     },
     downloadModel: async () => {
       await locators.backgroundRemoval.download.click();
+    },
+    toggleBackgroundRemovalHint: async () => {
+      await locators.backgroundRemoval.info.click();
     },
     toggleBackgroundRemoval: async () => {
       await locators.backgroundRemoval.toggle.click();

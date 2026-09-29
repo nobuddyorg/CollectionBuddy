@@ -1,6 +1,7 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, useState } from 'react';
+import Icon, { IconType } from '../Icon';
 import { useI18n } from '../../i18n/useI18n';
 import { preloadModel, usePreloadState } from './modelPreload';
 import { useBackgroundRemovalPreference } from './useBackgroundRemovalPreference';
@@ -50,20 +51,39 @@ export function BackgroundRemovalSetting() {
   const { t } = useI18n();
   const { enabled, setEnabled } = useBackgroundRemovalPreference();
   const hintId = useId();
+  const [hintOpen, setHintOpen] = useState(false);
   return (
     <div className="px-3 py-2 space-y-1.5">
-      <label className="flex items-center gap-2 min-h-9 text-sm cursor-pointer">
-        <input
-          type="checkbox"
-          data-testid="background-removal-toggle"
-          checked={enabled}
-          onChange={(event) => setEnabled(event.target.checked)}
-          aria-describedby={hintId}
-          className="h-4 w-4 accent-primary"
-        />
-        {t('background_removal.setting_label')}
-      </label>
-      <p id={hintId} className="text-xs text-muted-foreground">
+      <div className="flex items-center gap-2">
+        <label className="flex flex-1 items-center gap-2 min-h-9 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            data-testid="background-removal-toggle"
+            checked={enabled}
+            onChange={(event) => setEnabled(event.target.checked)}
+            aria-describedby={hintId}
+            className="h-4 w-4 accent-primary"
+          />
+          {t('background_removal.setting_label')}
+        </label>
+        <button
+          type="button"
+          data-testid="background-removal-info"
+          aria-label={t('background_removal.info_label')}
+          aria-expanded={hintOpen}
+          aria-controls={hintId}
+          onClick={() => setHintOpen((open) => !open)}
+          className="flex h-9 w-9 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted transition-colors"
+        >
+          <Icon icon={IconType.Info} className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+      <p
+        id={hintId}
+        hidden={!hintOpen}
+        data-testid="background-removal-hint"
+        className="text-xs text-muted-foreground"
+      >
         {t('background_removal.setting_hint')}
       </p>
       {enabled && <PreloadControl />}

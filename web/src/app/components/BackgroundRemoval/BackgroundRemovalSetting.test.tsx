@@ -43,6 +43,24 @@ describe('BackgroundRemovalSetting', () => {
     expect(screen.queryByTestId('model-preload')).toBeNull();
   });
 
+  it('shows its explanation only after the info button is pressed', async () => {
+    const user = userEvent.setup();
+    renderSetting();
+    const info = screen.getByRole('button', {
+      name: 'About removing backgrounds',
+    });
+
+    expect(info).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('background-removal-hint')).not.toBeVisible();
+
+    await user.click(info);
+    expect(info).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('background-removal-hint')).toBeVisible();
+
+    await user.click(info);
+    expect(screen.getByTestId('background-removal-hint')).not.toBeVisible();
+  });
+
   it('turns the opt-in on and off from the keyboard', async () => {
     const user = userEvent.setup();
     renderSetting();
