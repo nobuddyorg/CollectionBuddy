@@ -63,7 +63,7 @@ export function BackgroundRemovalSetting() {
         />
         {t('background_removal.setting_label')}
       </label>
-      <p id={hintId} className="text-xs text-muted-foreground">
+      <p id={hintId} className="text-[11px] leading-snug text-muted-foreground">
         {t('background_removal.setting_hint')}
       </p>
       {enabled && <PreloadControl />}
