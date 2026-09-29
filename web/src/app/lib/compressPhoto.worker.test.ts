@@ -7,6 +7,8 @@ const answers: CompressionAnswer[] = [];
 const listeners = new Map<string, (event: { data: unknown }) => void>();
 const convertToBlob = vi.fn<(options: ImageEncodeOptions) => Promise<Blob>>();
 const canvasSizes: number[][] = [];
+const close = vi.fn();
+let hasContext = true;
 
 /** Just enough of an OffscreenCanvas for drawFitted to draw on and this worker to encode. */
 class FakeOffscreenCanvas {
@@ -14,7 +16,9 @@ class FakeOffscreenCanvas {
     canvasSizes.push([width, height]);
   }
   getContext() {
-    return { drawImage: vi.fn(), fillRect: vi.fn(), canvas: this };
+    return hasContext
+      ? { drawImage: vi.fn(), fillRect: vi.fn(), canvas: this }
+      : null;
   }
   convertToBlob(options: ImageEncodeOptions) {
     return convertToBlob(options);
@@ -40,6 +44,8 @@ beforeEach(async () => {
   canvasSizes.length = 0;
   listeners.clear();
   convertToBlob.mockReset();
+  close.mockClear();
+  hasContext = true;
   vi.stubGlobal('self', {
     addEventListener: (type: string, listener: () => void) =>
       listeners.set(type, listener),
@@ -47,7 +53,7 @@ beforeEach(async () => {
   });
   vi.stubGlobal(
     'createImageBitmap',
-    vi.fn(async () => ({ width: 3000, height: 2000, close: vi.fn() })),
+    vi.fn(async () => ({ width: 3000, height: 2000, close })),
   );
   vi.stubGlobal('OffscreenCanvas', FakeOffscreenCanvas);
   vi.resetModules();
@@ -66,6 +72,15 @@ describe('the photo compression worker', () => {
       type: 'image/webp',
       quality: 0.8,
     });
+  });
+
+  it('decodes the file itself, so the browser applies its EXIF orientation, and releases the bitmap', async () => {
+    convertToBlob.mockResolvedValue(new Blob([], { type: 'image/webp' }));
+
+    await send(request);
+
+    expect(createImageBitmap).toHaveBeenCalledWith(request.file);
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it('encodes JPEG at the quality asked when that is what the page asks for', async () => {
@@ -87,6 +102,17 @@ describe('the photo compression worker', () => {
     expect(await send(request)).toEqual([
       { error: 'EncodingError: The canvas is too large.' },
     ]);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('answers with the reason when it has no 2D canvas to draw on, and still releases the bitmap', async () => {
+    hasContext = false;
+
+    expect(await send(request)).toEqual([
+      { error: 'Error: This browser has no 2D canvas to draw on' },
+    ]);
+    expect(close).toHaveBeenCalledOnce();
+    expect(convertToBlob).not.toHaveBeenCalled();
   });
 
   it('answers with the reason when the photograph cannot be decoded', async () => {

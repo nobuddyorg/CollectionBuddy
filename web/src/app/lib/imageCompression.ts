@@ -39,12 +39,35 @@ function compressInWorker(request: CompressionRequest): Promise<Blob> {
   return answered.finally(() => worker.terminate());
 }
 
+function dataUrlOf(file: Blob): Promise<string> {
+  const reader = new FileReader();
+  return new Promise((resolve, reject) => {
+    reader.addEventListener('load', () => resolve(reader.result as string));
+    reader.addEventListener('error', () => {
+      reject(
+        new Error('The photograph could not be read', { cause: reader.error }),
+      );
+    });
+    reader.readAsDataURL(file);
+  });
+}
+
+// Not createImageBitmap: Safari 14 lacks it and 15 ignores EXIF orientation there; img-src admits data:, not blob:.
+async function decodeUpright(file: Blob): Promise<HTMLImageElement> {
+  const image = new Image();
+  image.src = await dataUrlOf(file);
+  await image.decode();
+  return image;
+}
+
 async function compressOnMainThread(
   request: CompressionRequest,
 ): Promise<Blob> {
-  const canvas = await drawFitted(request, (size) =>
-    Object.assign(document.createElement('canvas'), size).getContext('2d'),
-  );
+  const canvas = drawFitted(await decodeUpright(request.file), {
+    ...request,
+    contextOfSize: (size) =>
+      Object.assign(document.createElement('canvas'), size).getContext('2d'),
+  });
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) =>

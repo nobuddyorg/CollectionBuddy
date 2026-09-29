@@ -52,6 +52,11 @@ function removeOffscreenCanvas() {
   Object.defineProperty(window, 'OffscreenCanvas', { value: undefined });
 }
 
+// Safari 14 has no createImageBitmap and 15's ignores EXIF orientation, so the main-thread path must decode without it.
+function removeCreateImageBitmap() {
+  Object.defineProperty(window, 'createImageBitmap', { value: undefined });
+}
+
 type WorkerAnswers = { photographs: number; errors: number };
 
 // The compression worker posts back {blob}, or {error} when it cannot compress.
@@ -204,7 +209,11 @@ test.describe('photographs', () => {
     },
     {
       safari: 'Safari before 16.4, on the main thread',
-      emulations: [emulateSafariCanvas, removeOffscreenCanvas],
+      emulations: [
+        emulateSafariCanvas,
+        removeOffscreenCanvas,
+        removeCreateImageBitmap,
+      ],
       workers: 0,
     },
   ]) {

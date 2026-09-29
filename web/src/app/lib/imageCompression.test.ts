@@ -207,17 +207,33 @@ describe('compressPhoto, where a worker can draw', () => {
 });
 
 describe('compressPhoto, where no worker can draw (no OffscreenCanvas)', () => {
-  const close = vi.fn();
   const drawImage = vi.fn();
+  const decoded: HTMLImageElement[] = [];
+
+  /** jsdom never decodes an `<img>`; this records each one decoded and settles it as `decode` says. */
+  function imagesDecode(decode: (image: HTMLImageElement) => Promise<void>) {
+    Object.defineProperty(HTMLImageElement.prototype, 'decode', {
+      configurable: true,
+      value: function (this: HTMLImageElement) {
+        decoded.push(this);
+        return decode(this);
+      },
+    });
+  }
+  const asPhotograph = async (image: HTMLImageElement) => {
+    Object.defineProperties(image, {
+      width: { value: 3000 },
+      height: { value: 2000 },
+    });
+  };
 
   beforeEach(() => {
-    close.mockClear();
+    decoded.length = 0;
     drawImage.mockClear();
     vi.stubGlobal('OffscreenCanvas', undefined);
-    vi.stubGlobal(
-      'createImageBitmap',
-      vi.fn(async () => ({ width: 3000, height: 2000, close })),
-    );
+    // Safari 14 has none, and Safari 15's ignores EXIF orientation, so the fallback must not need it.
+    vi.stubGlobal('createImageBitmap', undefined);
+    imagesDecode(asPhotograph);
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
       function (this: HTMLCanvasElement) {
         return {
@@ -226,6 +242,26 @@ describe('compressPhoto, where no worker can draw (no OffscreenCanvas)', () => {
           canvas: this,
         } as unknown as CanvasRenderingContext2D;
       },
+    );
+  });
+  afterEach(() => {
+    Reflect.deleteProperty(HTMLImageElement.prototype, 'decode');
+  });
+
+  it('decodes the photograph in an <img> from a data: URL, which applies its EXIF orientation', async () => {
+    canvasEncodes(encodesAsAsked);
+    const compressPhoto = await freshCompressPhoto();
+
+    await compressPhoto(photo(), 1000);
+
+    expect(decoded).toHaveLength(1);
+    expect(decoded[0].src).toBe('data:image/jpeg;base64,eA==');
+    expect(drawImage).toHaveBeenCalledExactlyOnceWith(
+      decoded[0],
+      0,
+      0,
+      1000,
+      667,
     );
   });
 
@@ -243,8 +279,6 @@ describe('compressPhoto, where no worker can draw (no OffscreenCanvas)', () => {
     );
     const canvas = toBlob.mock.contexts[1] as HTMLCanvasElement;
     expect([canvas.width, canvas.height]).toEqual([1000, 667]);
-    expect(drawImage).toHaveBeenCalledOnce();
-    expect(close).toHaveBeenCalledOnce();
     expect(output.name).toBe('photo.jpg');
     expect(output.type).toBe('image/webp');
   });
@@ -271,6 +305,36 @@ describe('compressPhoto, where no worker can draw (no OffscreenCanvas)', () => {
     await expect(compressPhoto(photo(), 1000)).rejects.toThrow(
       'The canvas encoded nothing',
     );
-    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('rejects when the photograph cannot be decoded, drawing nothing', async () => {
+    canvasEncodes(encodesAsAsked);
+    imagesDecode(async () => {
+      throw new DOMException(
+        'The source image cannot be decoded.',
+        'EncodingError',
+      );
+    });
+    const compressPhoto = await freshCompressPhoto();
+
+    await expect(compressPhoto(photo(), 1000)).rejects.toThrow(
+      'The source image cannot be decoded.',
+    );
+    expect(drawImage).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the file cannot be read, decoding nothing', async () => {
+    canvasEncodes(encodesAsAsked);
+    vi.spyOn(FileReader.prototype, 'readAsDataURL').mockImplementation(
+      function (this: FileReader) {
+        this.dispatchEvent(new ProgressEvent('error'));
+      },
+    );
+    const compressPhoto = await freshCompressPhoto();
+
+    await expect(compressPhoto(photo(), 1000)).rejects.toThrow(
+      'The photograph could not be read',
+    );
+    expect(decoded).toEqual([]);
   });
 });

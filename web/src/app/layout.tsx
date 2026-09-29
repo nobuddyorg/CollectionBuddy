@@ -49,11 +49,11 @@ const CONTENT_SECURITY_POLICY = [
   `default-src 'self'`,
   `script-src 'self' 'unsafe-inline'`,
   `style-src 'self' 'unsafe-inline'`,
-  // data: is for Leaflet's default icon, a 1x1 GIF loaded as a data URI.
+  // data: is for Leaflet's default icon (a 1x1 GIF) and for decoding a photo to compress on Safari before 16.4.
   `img-src 'self' data: ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org`,
   `connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io`,
   `font-src 'self'`,
-  // Set apart from script-src: the one worker, photo compression, is a chunk of the export, never a blob: URL.
+  // Workers (photo compression, the service worker) start from the export's own files, never a blob: URL.
   `worker-src 'self'`,
   `object-src 'none'`,
   `base-uri 'self'`,

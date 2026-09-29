@@ -1,10 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { type CompressionRequest, drawFitted } from './drawPhoto';
+import { drawFitted } from './drawPhoto';
 import type { Dimensions } from './photoDimensions';
 
-const close = vi.fn();
-const bitmap = { width: 3000, height: 2000, close };
+const photo = { width: 3000, height: 2000 } as ImageBitmap;
 const canvas = {} as OffscreenCanvas;
 
 /** Records every call and property write on the 2D context, in order; its `canvas` is `canvas`. */
@@ -33,72 +32,50 @@ function contextFor(context: unknown) {
   );
 }
 
-const request = (type: string): CompressionRequest => ({
-  file: new Blob(['photo']),
-  maxWidthOrHeight: 1000,
-  type,
-  quality: 0.8,
-});
-
-beforeEach(() => {
-  close.mockClear();
-  vi.stubGlobal(
-    'createImageBitmap',
-    vi.fn(async () => bitmap),
-  );
-  return () => vi.unstubAllGlobals();
-});
-
 describe('drawFitted', () => {
-  it('decodes the file itself, so the browser applies its EXIF orientation', async () => {
-    const { context } = recordingContext();
-    const { file } = request('image/webp');
-
-    await drawFitted({ ...request('image/webp'), file }, contextFor(context));
-
-    expect(createImageBitmap).toHaveBeenCalledWith(file);
-  });
-
-  it('draws the whole photograph, smoothed at high quality, onto a canvas fitted within the longest side', async () => {
+  it('draws the whole photograph, smoothed at high quality, onto a canvas fitted within the longest side', () => {
     const { calls, context } = recordingContext();
     const contextOfSize = contextFor(context);
 
-    const drawn = await drawFitted(request('image/webp'), contextOfSize);
+    const drawn = drawFitted(photo, {
+      maxWidthOrHeight: 1000,
+      type: 'image/webp',
+      contextOfSize,
+    });
 
     expect(contextOfSize).toHaveBeenCalledWith({ width: 1000, height: 667 });
     expect(drawn).toBe(canvas);
     expect(calls).toEqual([
       ['imageSmoothingQuality', 'high'],
-      ['drawImage', bitmap, 0, 0, 1000, 667],
+      ['drawImage', photo, 0, 0, 1000, 667],
     ]);
   });
 
   // JPEG has no alpha: without the fill, a transparent PNG's background would come out black.
-  it('lays the photograph on white first when it will be encoded as JPEG', async () => {
+  it('lays the photograph on white first when it will be encoded as JPEG', () => {
     const { calls, context } = recordingContext();
 
-    await drawFitted(request('image/jpeg'), contextFor(context));
+    drawFitted(photo, {
+      maxWidthOrHeight: 600,
+      type: 'image/jpeg',
+      contextOfSize: contextFor(context),
+    });
 
     expect(calls).toEqual([
       ['imageSmoothingQuality', 'high'],
       ['fillStyle', 'white'],
-      ['fillRect', 0, 0, 1000, 667],
-      ['drawImage', bitmap, 0, 0, 1000, 667],
+      ['fillRect', 0, 0, 600, 400],
+      ['drawImage', photo, 0, 0, 600, 400],
     ]);
   });
 
-  it('releases the decoded bitmap once drawn', async () => {
-    const { context } = recordingContext();
-
-    await drawFitted(request('image/webp'), contextFor(context));
-
-    expect(close).toHaveBeenCalledOnce();
-  });
-
-  it('rejects where the browser has no 2D canvas, and still releases the bitmap', async () => {
-    await expect(
-      drawFitted(request('image/webp'), contextFor(null)),
-    ).rejects.toThrow('This browser has no 2D canvas to draw on');
-    expect(close).toHaveBeenCalledOnce();
+  it('throws where the browser has no 2D canvas', () => {
+    expect(() =>
+      drawFitted(photo, {
+        maxWidthOrHeight: 1000,
+        type: 'image/webp',
+        contextOfSize: contextFor(null),
+      }),
+    ).toThrow('This browser has no 2D canvas to draw on');
   });
 });

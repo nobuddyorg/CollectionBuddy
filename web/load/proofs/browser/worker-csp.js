@@ -1,4 +1,4 @@
-// #771: a CSP that refuses the compression worker, or a chunk it imports, fails every compression worker.
+// #771: a CSP whose worker-src refuses the compression worker fails every compression worker.
 import { browser } from 'k6/browser';
 import { check } from 'k6';
 import encoding from 'k6/encoding';
@@ -123,7 +123,7 @@ export function handleSummary(data) {
     proof: 'worker-csp',
     issue: 771,
     claim:
-      'a CSP that refuses the compression worker (worker-src) or a chunk it imports fails every compression worker, and the upload with it.',
+      'a CSP whose worker-src refuses the compression worker fails every compression worker, and the upload with it.',
     notes: [
       'Input: a 12 MP JPEG (an upscale; pixel count is what drives compression CPU).',
       'Long tasks are for the record: headless desktop Chromium may compress fast enough that none is long.',

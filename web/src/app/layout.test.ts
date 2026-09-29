@@ -49,7 +49,7 @@ describe('the Content-Security-Policy meta tag in layout.tsx', () => {
     expect(policy).toContain("`script-src 'self' 'unsafe-inline'`,");
   });
 
-  it('allows a data: URI image, which Leaflet loads internally', () => {
+  it('allows a data: URI image, which Leaflet and the photo compression on older Safari load', () => {
     expect(policy).toMatch(/img-src[^;]*\bdata:/);
   });
 

@@ -4,10 +4,21 @@ import { type CompressionRequest, drawFitted } from './drawPhoto';
 export type CompressionAnswer = { blob: Blob } | { error: string };
 
 async function compress(request: CompressionRequest): Promise<Blob> {
-  const canvas = await drawFitted(request, ({ width, height }) =>
-    new OffscreenCanvas(width, height).getContext('2d'),
-  );
-  return canvas.convertToBlob({ type: request.type, quality: request.quality });
+  // Upright as EXIF says: every browser with OffscreenCanvas in workers (Safari from 16.4) applies it here.
+  const bitmap = await createImageBitmap(request.file);
+  try {
+    const canvas = drawFitted(bitmap, {
+      ...request,
+      contextOfSize: ({ width, height }) =>
+        new OffscreenCanvas(width, height).getContext('2d'),
+    });
+    return await canvas.convertToBlob({
+      type: request.type,
+      quality: request.quality,
+    });
+  } finally {
+    bitmap.close();
+  }
 }
 
 function answer(message: CompressionAnswer): void {
