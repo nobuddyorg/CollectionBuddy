@@ -2,6 +2,11 @@
 import { Counter } from 'k6/metrics';
 
 import { PAGE_SIZE, listPage, query, signUrlsRequest } from '../lib/api.js';
+import {
+  ID_FILTER_CHUNK_SIZE,
+  POSTGREST_MAX_ROWS,
+  SIGN_URLS_BATCH_SIZE,
+} from '../lib/clientLimits.js';
 import { RENDERABLE_PLATES, platePaths } from '../lib/flows.js';
 import { LIFECYCLE_TIMEOUTS } from '../lib/options.js';
 import { clearAccount } from '../lib/seed.js';
@@ -26,10 +31,6 @@ import {
 // The issue's walk: about 28 pages of a large category, two photographs per entry, full size plus thumbnail each.
 const PAGES = envInt('PROOF_PAGES', 28);
 const PHOTOS_EACH = envInt('PROOF_PHOTOS_EACH', 2);
-// data/postgrestLimits.ts ID_FILTER_CHUNK_SIZE and POSTGREST_MAX_ROWS; images.ts SIGN_URLS_BATCH_SIZE.
-const ID_CHUNK = 100;
-const ROW_PAGE = 1000;
-const SIGN_BATCH = 1000;
 // The claim needs more than Storage's 1,000-path cap in the refresh; a smaller seed would pass with the defect present.
 if (PAGES * PAGE_SIZE * Math.min(PHOTOS_EACH, RENDERABLE_PLATES) * 2 <= 1000) {
   throw new Error(
@@ -101,14 +102,14 @@ function signedPaths({ session, paths, probe }) {
 /** images.ts listImagesForItems: 100 ids per request, paged at 1,000 rows. */
 function listImagesForItems({ session, itemIds }) {
   const rows = [];
-  for (let start = 0; start < itemIds.length; start += ID_CHUNK) {
-    for (let offset = 0; ; offset += ROW_PAGE) {
+  for (let start = 0; start < itemIds.length; start += ID_FILTER_CHUNK_SIZE) {
+    for (let offset = 0; ; offset += POSTGREST_MAX_ROWS) {
       const params = query({
         select: 'id,item_id,path_full,path_thumb',
-        item_id: inList(itemIds.slice(start, start + ID_CHUNK)),
+        item_id: inList(itemIds.slice(start, start + ID_FILTER_CHUNK_SIZE)),
         order: 'created_at.asc,id.asc',
         offset,
-        limit: ROW_PAGE,
+        limit: POSTGREST_MAX_ROWS,
       });
       const page = call({
         path: `/rest/v1/images?${params}`,
@@ -116,7 +117,7 @@ function listImagesForItems({ session, itemIds }) {
         probe: 'refresh_list',
       }).json();
       rows.push(...page);
-      if (page.length < ROW_PAGE) break;
+      if (page.length < POSTGREST_MAX_ROWS) break;
     }
   }
   return rows;
@@ -140,8 +141,8 @@ export function probe({ owner, categoryId }) {
   const wanted = [...byItem.values()].flatMap(platePaths);
   pathsPerRefresh.add(wanted.length);
   const signed = new Set();
-  for (let start = 0; start < wanted.length; start += SIGN_BATCH) {
-    const batch = wanted.slice(start, start + SIGN_BATCH);
+  for (let start = 0; start < wanted.length; start += SIGN_URLS_BATCH_SIZE) {
+    const batch = wanted.slice(start, start + SIGN_URLS_BATCH_SIZE);
     for (const path of signedPaths({
       session: owner,
       paths: batch,

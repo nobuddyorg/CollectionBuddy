@@ -2,19 +2,19 @@
 import http from 'k6/http';
 
 import { ITEM_FIELDS, query } from '../../lib/api.js';
+import {
+  CHUNK_READ_CONCURRENCY,
+  EXPORT_ITEM_PAGE_SIZE,
+  EXPORT_SIGNED_URL_TTL_SECONDS,
+  ID_FILTER_CHUNK_SIZE,
+  POSTGREST_MAX_ROWS,
+  SIGN_BATCH_SIZE,
+  SIGN_CONCURRENCY,
+} from '../../lib/clientLimits.js';
 import { authHeaders, expectOk } from '../../lib/http.js';
 import { SUPABASE_URL } from '../../lib/target.js';
 import { BUCKET, call, inList, probeMs } from './fixtures.js';
 
-// exportCategory.ts ITEM_PAGE_SIZE, SIGN_BATCH_SIZE, SIGN_CONCURRENCY; data/postgrestLimits.ts ID_FILTER_CHUNK_SIZE, POSTGREST_MAX_ROWS; pages.ts CHUNK_READ_CONCURRENCY.
-export const ITEM_PAGE = 500;
-export const SIGN_BATCH = 100;
-const CONCURRENCY = 6;
-export const ID_CHUNK = 100;
-export const ROW_PAGE = 1000;
-
-// exportItemPages.ts EXPORT_ITEM_SELECT: the client's read, photographs embedded since #780.
-export const CLIENT_EXPORT_INNER = `${ITEM_FIELDS},created_at,images(item_id,path_full,size_bytes)`;
 // The suggested fix's read, which the budget is taken from.
 export const EMBEDDED_INNER = `${ITEM_FIELDS},created_at,images(path_full,size_bytes)`;
 
@@ -36,7 +36,7 @@ export function exportPages({ session, categoryId, inner, probe }) {
       category_id: `eq.${categoryId}`,
       order: 'created_at.asc,item_id.asc',
       'items.images.order': 'created_at.asc,id.asc',
-      limit: ITEM_PAGE,
+      limit: EXPORT_ITEM_PAGE_SIZE,
     };
     if (after) {
       const linkedAt = `"${after.created_at}"`;
@@ -50,7 +50,8 @@ export function exportPages({ session, categoryId, inner, probe }) {
     }).json();
     requests += 1;
     items.push(...rows.map((row) => row.items));
-    after = rows.length === ITEM_PAGE ? rows[rows.length - 1] : null;
+    after =
+      rows.length === EXPORT_ITEM_PAGE_SIZE ? rows[rows.length - 1] : null;
   } while (after);
   return {
     paths: items.flatMap((item) => item.images.map((image) => image.path_full)),
@@ -62,23 +63,24 @@ export function exportPages({ session, categoryId, inner, probe }) {
 function chunkedReads({ session, ids, probe, pathFor }) {
   const rows = [];
   let requests = 0;
-  for (let start = 0; start < ids.length; start += ID_CHUNK * CONCURRENCY) {
+  const idsPerBatch = ID_FILTER_CHUNK_SIZE * CHUNK_READ_CONCURRENCY;
+  for (let start = 0; start < ids.length; start += idsPerBatch) {
     const batch = [];
     for (
       let chunk = start;
-      chunk < Math.min(ids.length, start + ID_CHUNK * CONCURRENCY);
-      chunk += ID_CHUNK
+      chunk < Math.min(ids.length, start + idsPerBatch);
+      chunk += ID_FILTER_CHUNK_SIZE
     ) {
       batch.push({
         method: 'GET',
-        url: `${SUPABASE_URL}${pathFor(ids.slice(chunk, chunk + ID_CHUNK))}`,
+        url: `${SUPABASE_URL}${pathFor(ids.slice(chunk, chunk + ID_FILTER_CHUNK_SIZE))}`,
         params: authorized({ session, probe }),
       });
     }
     for (const response of http.batch(batch)) {
       probeMs.add(response.timings.duration, { probe });
       const page = expectOk(response, probe).json();
-      if (page.length >= ROW_PAGE)
+      if (page.length >= POSTGREST_MAX_ROWS)
         throw new Error(
           `${probe}: a chunk filled a whole page; the mirror would need a second page`,
         );
@@ -93,16 +95,16 @@ function chunkedReads({ session, ids, probe, pathFor }) {
 function listCategoryItemIds({ session, categoryId }) {
   const itemIds = [];
   let requests = 0;
-  for (let offset = 0; ; offset += ROW_PAGE) {
+  for (let offset = 0; ; offset += POSTGREST_MAX_ROWS) {
     const response = call({
-      path: `/rest/v1/item_categories?${query({ select: 'item_id', category_id: `eq.${categoryId}`, offset, limit: ROW_PAGE })}`,
+      path: `/rest/v1/item_categories?${query({ select: 'item_id', category_id: `eq.${categoryId}`, offset, limit: POSTGREST_MAX_ROWS })}`,
       session,
       probe: 'delete_current',
     });
     const page = expectOk(response, 'delete_current').json();
     requests += 1;
     itemIds.push(...page.map((row) => row.item_id));
-    if (page.length < ROW_PAGE) return { itemIds, requests };
+    if (page.length < POSTGREST_MAX_ROWS) return { itemIds, requests };
   }
 }
 
@@ -116,7 +118,7 @@ function countImagePathPages({ session, categoryId }) {
         'id,item_id,path_full,path_thumb,items!inner(item_categories!inner())',
       'items.item_categories.category_id': `eq.${categoryId}`,
       order: 'id.asc',
-      limit: ROW_PAGE,
+      limit: POSTGREST_MAX_ROWS,
     };
     if (after) params.id = `gt.${after}`;
     const response = call({
@@ -126,7 +128,7 @@ function countImagePathPages({ session, categoryId }) {
     });
     const page = expectOk(response, 'delete_current').json();
     requests += 1;
-    if (page.length < ROW_PAGE) return requests;
+    if (page.length < POSTGREST_MAX_ROWS) return requests;
     after = page[page.length - 1].id;
   }
 }
@@ -139,7 +141,7 @@ export function deleteMetadata({ session, categoryId }) {
     ids: itemIds,
     probe: 'delete_current',
     pathFor: (ids) =>
-      `/rest/v1/item_categories?${query({ select: 'item_id', item_id: inList(ids), category_id: `neq.${categoryId}`, offset: 0, limit: ROW_PAGE })}`,
+      `/rest/v1/item_categories?${query({ select: 'item_id', item_id: inList(ids), category_id: `neq.${categoryId}`, offset: 0, limit: POSTGREST_MAX_ROWS })}`,
   });
   return (
     requests + linked.requests + countImagePathPages({ session, categoryId })
@@ -149,16 +151,19 @@ export function deleteMetadata({ session, categoryId }) {
 /** exportCategory.ts signAll: 100 paths per call, six calls at a time. */
 export function signBatches({ session, paths, probe }) {
   const batches = [];
-  for (let start = 0; start < paths.length; start += SIGN_BATCH)
-    batches.push(paths.slice(start, start + SIGN_BATCH));
+  for (let start = 0; start < paths.length; start += SIGN_BATCH_SIZE)
+    batches.push(paths.slice(start, start + SIGN_BATCH_SIZE));
   let requests = 0;
-  for (let start = 0; start < batches.length; start += CONCURRENCY) {
+  for (let start = 0; start < batches.length; start += SIGN_CONCURRENCY) {
     const requestsNow = batches
-      .slice(start, start + CONCURRENCY)
+      .slice(start, start + SIGN_CONCURRENCY)
       .map((batch) => ({
         method: 'POST',
         url: `${SUPABASE_URL}/storage/v1/object/sign/${BUCKET}`,
-        body: JSON.stringify({ expiresIn: 21600, paths: batch }),
+        body: JSON.stringify({
+          expiresIn: EXPORT_SIGNED_URL_TTL_SECONDS,
+          paths: batch,
+        }),
         params: authorized({
           session,
           probe,

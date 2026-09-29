@@ -13,6 +13,12 @@ import {
   signedUrlsOf,
   uploadObject,
 } from './api.js';
+import {
+  EXPORT_SIGNED_URL_TTL_SECONDS,
+  PHOTO_DOWNLOAD_CONCURRENCY,
+  SIGN_BATCH_SIZE,
+  SIGN_CONCURRENCY,
+} from './clientLimits.js';
 import { sendAll } from './http.js';
 import { TINY_WEBP, photoPaths } from './photos.js';
 import { SEARCH_TERMS } from './seed.js';
@@ -22,10 +28,6 @@ const THINK_SECONDS = 1;
 
 // components/ItemList/imageEntries.ts RENDERABLE_PLATES: a card signs full size and thumbnail of its first five photographs.
 export const RENDERABLE_PLATES = 5;
-// data/exportCategory.ts SIGN_BATCH_SIZE, SIGN_CONCURRENCY (= data/exportPhotos.ts PHOTO_DOWNLOAD_CONCURRENCY) and EXPORT_SIGNED_URL_TTL_SECONDS.
-const EXPORT_SIGN_BATCH = 100;
-const EXPORT_CONCURRENCY = 6;
-const EXPORT_URL_TTL_SECONDS = 6 * 3600;
 
 function pick(values) {
   return values[Math.floor(Math.random() * values.length)];
@@ -98,21 +100,21 @@ export function exportArchive(session, categoryId) {
     after = page.next;
   } while (after);
 
-  const urls = slices(slices(paths, EXPORT_SIGN_BATCH), EXPORT_CONCURRENCY)
+  const urls = slices(slices(paths, SIGN_BATCH_SIZE), SIGN_CONCURRENCY)
     .flatMap((batches) =>
       sendAll(
         batches.map((batch) =>
           signUrlsRequest({
             session,
             paths: batch,
-            expiresIn: EXPORT_URL_TTL_SECONDS,
+            expiresIn: EXPORT_SIGNED_URL_TTL_SECONDS,
             name: 'export sign',
           }),
         ),
       ),
     )
     .flatMap(signedUrlsOf);
-  for (const downloads of slices(urls, EXPORT_CONCURRENCY)) {
+  for (const downloads of slices(urls, PHOTO_DOWNLOAD_CONCURRENCY)) {
     sendAll(downloads.map((url) => ({ url, name: 'export photo' })));
   }
   sleep(THINK_SECONDS);

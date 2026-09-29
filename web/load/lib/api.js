@@ -1,4 +1,5 @@
 // The requests web/src/app/data/*.ts sends through supabase-js, spelled out as HTTP; keep the two in step.
+import { EXPORT_ITEM_PAGE_SIZE, POSTGREST_MAX_ROWS } from './clientLimits.js';
 import {
   countedTotal,
   expectOk,
@@ -16,12 +17,10 @@ export const ITEM_FIELDS =
   'id,title,description,place,place_lat,place_lng,tags';
 // data/itemPage.ts ITEM_WITH_IMAGES_SELECT.
 const ITEM_WITH_IMAGES_SELECT = `${ITEM_FIELDS},images(id,item_id,path_full,path_thumb)`;
+// data/exportItemPages.ts EXPORT_ITEM_SELECT, inside its items!inner().
+export const EXPORT_ITEM_INNER = `${ITEM_FIELDS},created_at,images(item_id,path_full,size_bytes)`;
 // components/ItemList/paging.ts PAGE_SIZE.
 export const PAGE_SIZE = 9;
-// data/postgrestLimits.ts POSTGREST_MAX_ROWS.
-const PLACE_PAGE_SIZE = 1000;
-// data/exportCategory.ts ITEM_PAGE_SIZE.
-const EXPORT_PAGE_SIZE = 500;
 
 // Local stacks confirm email sign-ups instantly; the hosted project has no password sign-in to call.
 export function signUp(email, password) {
@@ -147,8 +146,8 @@ export function searchPage({ session, categoryId, term, page }) {
 
 /** data/items.ts listCategoryPlaces: the map's places, narrowed like the list, page by page until a short one. */
 export function listPlaces({ session, categoryId, term }) {
-  for (let offset = 0; ; offset += PLACE_PAGE_SIZE) {
-    const page = { offset, limit: PLACE_PAGE_SIZE };
+  for (let offset = 0; ; offset += POSTGREST_MAX_ROWS) {
+    const page = { offset, limit: POSTGREST_MAX_ROWS };
     const params = query(
       term
         ? { cat_id: categoryId, like_pattern: `%${term}%`, ...page }
@@ -161,7 +160,7 @@ export function listPlaces({ session, categoryId, term }) {
       name: 'map places',
     });
     const rows = response.status === 200 ? response.json() : [];
-    if (rows.length < PLACE_PAGE_SIZE) return;
+    if (rows.length < POSTGREST_MAX_ROWS) return;
   }
 }
 
@@ -198,11 +197,11 @@ export function signedUrlsOf(response) {
 /** data/exportItemPages.ts rawListItemsForExport: one keyset page of links, each entry with its full-size photographs. */
 export function exportPage({ session, categoryId, after }) {
   const params = {
-    select: `created_at,item_id,items!inner(${ITEM_FIELDS},created_at,images(item_id,path_full,size_bytes))`,
+    select: `created_at,item_id,items!inner(${EXPORT_ITEM_INNER})`,
     category_id: `eq.${categoryId}`,
     order: 'created_at.asc,item_id.asc',
     'items.images.order': 'created_at.asc,id.asc',
-    limit: EXPORT_PAGE_SIZE,
+    limit: EXPORT_ITEM_PAGE_SIZE,
   };
   if (after) {
     // data/keyset.ts rowsAfterFilter.
@@ -221,7 +220,7 @@ export function exportPage({ session, categoryId, after }) {
     paths: rows.flatMap((row) =>
       row.items.images.map((image) => image.path_full),
     ),
-    next: rows.length === EXPORT_PAGE_SIZE ? rows[rows.length - 1] : null,
+    next: rows.length === EXPORT_ITEM_PAGE_SIZE ? rows[rows.length - 1] : null,
   };
 }
 

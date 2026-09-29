@@ -2,21 +2,23 @@
 import { Trend } from 'k6/metrics';
 
 import {
+  EXPORT_ITEM_INNER,
   countItems,
   listPage,
   searchPage,
   signUrlsRequest,
 } from '../lib/api.js';
+import {
+  EXPORT_ITEM_PAGE_SIZE,
+  ID_FILTER_CHUNK_SIZE,
+  POSTGREST_MAX_ROWS,
+  SIGN_BATCH_SIZE,
+} from '../lib/clientLimits.js';
 import { platePaths } from '../lib/flows.js';
 import { LIFECYCLE_TIMEOUTS } from '../lib/options.js';
 import { NOUNS, clearAccount } from '../lib/seed.js';
 import {
-  CLIENT_EXPORT_INNER,
   EMBEDDED_INNER,
-  ID_CHUNK,
-  ITEM_PAGE,
-  ROW_PAGE,
-  SIGN_BATCH,
   deleteMetadata,
   exportPages,
   signBatches,
@@ -30,6 +32,7 @@ import { call, envInt, probeMs } from './lib/fixtures.js';
 import {
   PROOF_TREND_STATS,
   measured,
+  probeScenario,
   probeThresholds,
   proofSummary,
 } from './lib/report.js';
@@ -38,13 +41,15 @@ const SAMPLES = envInt('PROOF_SAMPLES', 3);
 const PHOTOS = PHOTO_EVERY ? Math.ceil(ENTRIES / PHOTO_EVERY) : 0;
 // What the suggested fix costs: keyset pages with photos embedded (plus the short last page), then the same sign batches.
 const EMBEDDED_BUDGET =
-  Math.floor(ENTRIES / ITEM_PAGE) + 1 + Math.ceil(PHOTOS / SIGN_BATCH);
+  Math.floor(ENTRIES / EXPORT_ITEM_PAGE_SIZE) +
+  1 +
+  Math.ceil(PHOTOS / SIGN_BATCH_SIZE);
 // The delete fix reads paths with one keyset-paged images query joined to the category; the linked-elsewhere chunks may stay.
 const DELETE_BUDGET =
-  Math.floor(ENTRIES / ROW_PAGE) +
+  Math.floor(ENTRIES / POSTGREST_MAX_ROWS) +
   1 +
-  Math.ceil(ENTRIES / ID_CHUNK) +
-  Math.floor(PHOTOS / ROW_PAGE) +
+  Math.ceil(ENTRIES / ID_FILTER_CHUNK_SIZE) +
+  Math.floor(PHOTOS / POSTGREST_MAX_ROWS) +
   1;
 
 const exportRequests = new Trend('export_metadata_requests');
@@ -58,20 +63,11 @@ export const options = {
   summaryTrendStats: PROOF_TREND_STATS,
   // One after the other, so neither measurement competes with the other's requests.
   scenarios: {
-    searchPhotos: {
-      executor: 'per-vu-iterations',
-      vus: 1,
-      iterations: 20,
+    searchPhotos: probeScenario(20, {
       maxDuration: '50s',
       exec: 'searchPhotos',
-    },
-    metadata: {
-      executor: 'per-vu-iterations',
-      vus: 1,
-      iterations: SAMPLES,
-      startTime: '1m',
-      exec: 'bulkMetadata',
-    },
+    }),
+    metadata: probeScenario(SAMPLES, { startTime: '1m', exec: 'bulkMetadata' }),
   },
   thresholds: {
     ...probeThresholds(
@@ -111,7 +107,7 @@ export function bulkMetadata({ owner, categoryId }) {
   const current = exportPages({
     session: owner,
     categoryId,
-    inner: CLIENT_EXPORT_INNER,
+    inner: EXPORT_ITEM_INNER,
     probe: 'export_current',
   });
   const currentSigns = signBatches({
