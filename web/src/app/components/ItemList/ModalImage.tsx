@@ -1,16 +1,16 @@
 'use client';
 
 import { useCallback, useRef } from 'react';
-import ReactDOM from 'react-dom';
 
 import { useI18n } from '../../i18n/useI18n';
+import { Portal } from '../CenteredModal/Portal';
 import { useFocusTrap } from '../CenteredModal/useFocusTrap';
 import { useInertBackground } from '../CenteredModal/useInertBackground';
 import { useLockBodyScroll } from '../CenteredModal/useLockBodyScroll';
 import { useTopmostKeydown } from '../CenteredModal/useTopmostKeydown';
 import Icon, { IconType } from '../Icon';
 import type { ImageEntry } from './types';
-import { Spinner } from '../ui/Spinner';
+import { StatusSpinner } from '../ui/Spinner';
 
 export function ModalImage({
   images,
@@ -100,120 +100,117 @@ export function ModalImage({
     else if (count > 1 && event.key === 'ArrowRight') goTo(clampedIndex! + 1);
   });
 
-  if (!current || clampedIndex === null || typeof document === 'undefined')
-    return null;
+  if (!current || clampedIndex === null) return null;
 
   const alt = t('item_list.image_alt', {
     title: itemTitle,
-    idx: clampedIndex + 1,
+    position: clampedIndex + 1,
   });
 
-  return ReactDOM.createPortal(
-    <div
-      ref={panelRef}
-      role="dialog"
-      data-testid="image-viewer"
-      aria-modal="true"
-      aria-label={t('item_list.full_size_image_alt')}
-      className="fixed inset-0 z-modal bg-background/95 backdrop-blur"
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
-    >
-      {/* Pinned to the corner: stacked under a max-h-full image it landed past the bottom of the overlay. */}
-      <button
-        data-testid="close-image"
-        onClick={onClose}
-        className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
-        title={t('item_list.close_modal')}
-        aria-label={t('item_list.close_modal')}
+  return (
+    <Portal>
+      <div
+        ref={panelRef}
+        role="dialog"
+        data-testid="image-viewer"
+        aria-modal="true"
+        aria-label={t('item_list.image_viewer_label')}
+        className="fixed inset-0 z-modal bg-background/95 backdrop-blur"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
       >
-        <Icon icon={IconType.Close} className="w-5 h-5" />
-      </button>
-
-      {/* The only delete control for photographs past the strip; trash, not a second X beside Close. */}
-      {!readOnly && (
+        {/* Pinned to the corner: stacked under a max-h-full image it landed past the bottom of the overlay. */}
         <button
-          data-testid="delete-image"
-          onClick={() => onDelete(current)}
-          disabled={busy}
-          className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-60 transition-colors"
-          title={t('item_list.delete_image')}
-          aria-label={t('item_list.delete_image')}
+          data-testid="close-image"
+          onClick={onClose}
+          className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
+          title={t('common.close')}
+          aria-label={t('common.close')}
         >
-          <Icon icon={IconType.Trash} className="w-5 h-5" />
+          <Icon icon={IconType.Close} className="w-5 h-5" />
         </button>
-      )}
 
-      {count > 1 && (
-        // One bar on every pointer type: hover-only edge buttons sat over the photograph on touch screens.
-        <div
-          aria-live="polite"
-          className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 flex items-center gap-3"
-        >
+        {/* The only delete control for photographs past the strip; trash, not a second X beside Close. */}
+        {!readOnly && (
           <button
-            data-testid="previous-image"
-            onClick={() => goTo(clampedIndex - 1)}
-            className="min-w-11 min-h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
-            title={t('item_list.previous_image')}
-            aria-label={t('item_list.previous_image')}
+            data-testid="delete-image"
+            onClick={() => onDelete(current)}
+            disabled={busy}
+            className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-60 transition-colors"
+            title={t('item_list.delete_image')}
+            aria-label={t('item_list.delete_image')}
           >
-            <Icon icon={IconType.ChevronLeft} className="w-4 h-4" />
+            <Icon icon={IconType.Trash} className="w-5 h-5" />
           </button>
+        )}
 
-          <span
-            data-testid="image-position"
-            className="font-label text-xs text-muted-foreground"
+        {count > 1 && (
+          // One bar on every pointer type: hover-only edge buttons sat over the photograph on touch screens.
+          <div
+            aria-live="polite"
+            className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 flex items-center gap-3"
           >
-            {t('item_list.image_position', {
-              current: clampedIndex + 1,
-              total: count,
-            })}
-          </span>
+            <button
+              data-testid="previous-image"
+              onClick={() => goTo(clampedIndex - 1)}
+              className="min-w-11 min-h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
+              title={t('item_list.previous_image')}
+              aria-label={t('item_list.previous_image')}
+            >
+              <Icon icon={IconType.ChevronLeft} className="w-4 h-4" />
+            </button>
 
-          <button
-            data-testid="next-image"
-            onClick={() => goTo(clampedIndex + 1)}
-            className="min-w-11 min-h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
-            title={t('item_list.next_image')}
-            aria-label={t('item_list.next_image')}
-          >
-            <Icon icon={IconType.ChevronRight} className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+            <span
+              data-testid="image-position"
+              className="font-label text-xs text-muted-foreground"
+            >
+              {t('item_list.image_position', {
+                current: clampedIndex + 1,
+                total: count,
+              })}
+            </span>
 
-      {/* pb reserves the bottom bar's row plus safe area, so a tall photo's edge sits above the bar. */}
-      <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
-        {current.urlFull ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- the static export is unoptimized, and tap-to-close is pointer-only: the Close button and Escape cover the keyboard */}
-            <img
-              key={current.pathFull}
-              data-testid="viewer-photo"
-              src={current.urlFull}
-              alt={alt}
-              decoding="async"
-              // Same reasoning as the grid: see the note in ImageGrid.tsx.
-              crossOrigin="anonymous"
-              className="w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg"
-              // A tap closes, except the synthetic click after a swipe that just paged (flagged in onTouchEnd).
-              onClick={() => {
-                if (suppressImageClickRef.current) {
-                  suppressImageClickRef.current = false;
-                  return;
-                }
-                onClose();
-              }}
-            />
-          </>
-        ) : (
-          // Past the card's plates, this photograph is signed only now.
-          <div role="status" aria-label={t('common.loading')}>
-            <Spinner size="lg" />
+            <button
+              data-testid="next-image"
+              onClick={() => goTo(clampedIndex + 1)}
+              className="min-w-11 min-h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
+              title={t('item_list.next_image')}
+              aria-label={t('item_list.next_image')}
+            >
+              <Icon icon={IconType.ChevronRight} className="w-4 h-4" />
+            </button>
           </div>
         )}
+
+        {/* pb reserves the bottom bar's row plus safe area, so a tall photo's edge sits above the bar. */}
+        <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
+          {current.urlFull ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- the static export is unoptimized, and tap-to-close is pointer-only: the Close button and Escape cover the keyboard */}
+              <img
+                key={current.pathFull}
+                data-testid="viewer-photo"
+                src={current.urlFull}
+                alt={alt}
+                decoding="async"
+                // Same reasoning as the grid: see the note in ImageGrid.tsx.
+                crossOrigin="anonymous"
+                className="w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg"
+                onClick={() => {
+                  if (suppressImageClickRef.current) {
+                    suppressImageClickRef.current = false;
+                    return;
+                  }
+                  onClose();
+                }}
+              />
+            </>
+          ) : (
+            // Past the card's plates, this photograph is signed only now.
+            <StatusSpinner size="lg" label={t('common.loading')} />
+          )}
+        </div>
       </div>
-    </div>,
-    document.body,
+    </Portal>
   );
 }

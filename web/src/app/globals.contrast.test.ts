@@ -14,10 +14,12 @@ function tokensIn(selector: string): Record<string, string> {
   );
 }
 
+function channelsOf(hex: string): number[] {
+  return [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16));
+}
+
 function relativeLuminance(hex: string): number {
-  const channels = [1, 3, 5].map(
-    (i) => parseInt(hex.slice(i, i + 2), 16) / 255,
-  );
+  const channels = channelsOf(hex).map((channel) => channel / 255);
   const [red, green, blue] = channels.map((channel) =>
     channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
   );
@@ -41,8 +43,8 @@ function withAlpha({
   alpha: number;
   background: string;
 }): string {
-  const top = [1, 3, 5].map((i) => parseInt(foreground.slice(i, i + 2), 16));
-  const under = [1, 3, 5].map((i) => parseInt(background.slice(i, i + 2), 16));
+  const top = channelsOf(foreground);
+  const under = channelsOf(background);
   const blended = top.map((channel, i) =>
     Math.round(alpha * channel + (1 - alpha) * under[i]),
   );

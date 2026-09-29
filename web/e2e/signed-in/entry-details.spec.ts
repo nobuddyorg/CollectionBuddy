@@ -2,12 +2,9 @@ import { expect, test } from './test';
 
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
+import { answerGeocoder, uniqueName } from './helpers';
 // The geocoder is always faked; what is real is that its coordinates survive the round trip to Postgres.
 test.use({ locale: 'en-GB' });
-
-type Page = import('@playwright/test').Page;
-
-const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
 
 /** One hit, shaped the way Photon answers, with coordinates to keep. */
 const BREMEN = {
@@ -24,15 +21,9 @@ const BREMEN = {
   ],
 };
 
-async function fakeGeocoder(page: Page) {
-  await page.route('https://photon.komoot.io/**', (route) =>
-    route.fulfill({ json: BREMEN }),
-  );
-}
-
 test.describe('an entry with a place and tags', () => {
   test.beforeEach(async ({ on, page }) => {
-    await fakeGeocoder(page);
+    await answerGeocoder(page, BREMEN.features);
     await on(page).categories.do.open(SEED.detailCategory);
   });
 
@@ -41,7 +32,7 @@ test.describe('an entry with a place and tags', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueTitle('Beschriftet');
+    const title = uniqueName('Beschriftet');
     try {
       await app.catalogue.do.openEntryForm();
       await app.form.do.fill({ title });
@@ -81,7 +72,7 @@ test.describe('an entry with a place and tags', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueTitle('Rückwärts');
+    const title = uniqueName('Rückwärts');
     try {
       await app.catalogue.do.openEntryForm();
       await app.form.do.fill({ title });
@@ -127,7 +118,7 @@ test.describe('an entry with a place and tags', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueTitle('Unverändert');
+    const title = uniqueName('Unverändert');
     try {
       await app.catalogue.do.addEntry(title);
 

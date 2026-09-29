@@ -1,13 +1,10 @@
 import React from 'react';
 
-import { CoinIcon } from './CoinIcon';
-
 export enum IconType {
   Google,
   Check,
   Trash,
   Edit,
-  Coin,
   Close,
   ChevronLeft,
   ChevronRight,
@@ -26,11 +23,22 @@ export enum IconType {
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   icon: IconType;
-  children?: React.ReactNode;
-  rimId?: string;
 }
 
-const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
+const OUTLINE_SVG = {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2,
+} as const;
+
+const ROUNDED_SVG = {
+  ...OUTLINE_SVG,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+} as const;
+
+const Icon: React.FC<IconProps> = ({ icon, ...props }) => {
   switch (icon) {
     case IconType.Google:
       return (
@@ -55,28 +63,13 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
       );
     case IconType.Check:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
+        <svg {...ROUNDED_SVG} {...props}>
           <path d="M20 6L9 17l-5-5" />
         </svg>
       );
     case IconType.Trash:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-          strokeLinecap="round"
-          {...props}
-        >
+        <svg {...OUTLINE_SVG} strokeLinecap="round" {...props}>
           <path d="M3 6h18" />
           <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
           <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
@@ -85,101 +78,46 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
       );
     case IconType.Edit:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-          strokeLinecap="round"
-          {...props}
-        >
+        <svg {...OUTLINE_SVG} strokeLinecap="round" {...props}>
           <path d="M12 20h9" />
           <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
         </svg>
       );
-    case IconType.Coin:
-      return (
-        <CoinIcon rimId={rimId} {...props}>
-          {children}
-        </CoinIcon>
-      );
     case IconType.Close:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-          {...props}
-        >
+        <svg {...OUTLINE_SVG} {...props}>
           <path d="M18 6L6 18M6 6l12 12" />
         </svg>
       );
     case IconType.ChevronLeft:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-          {...props}
-        >
+        <svg {...OUTLINE_SVG} {...props}>
           <path d="M15 18l-6-6 6-6" />
         </svg>
       );
     case IconType.ChevronRight:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-          {...props}
-        >
+        <svg {...OUTLINE_SVG} {...props}>
           <path d="M9 18l6-6-6-6" />
         </svg>
       );
     case IconType.Plus:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
+        <svg {...ROUNDED_SVG} {...props}>
           <line x1="12" y1="5" x2="12" y2="19" />
           <line x1="5" y1="12" x2="19" y2="12" />
         </svg>
       );
     case IconType.Search:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
+        <svg {...ROUNDED_SVG} {...props}>
           <circle cx="11" cy="11" r="8" />
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
       );
     case IconType.Map:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
+        <svg {...ROUNDED_SVG} {...props}>
           <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
           <line x1="8" y1="2" x2="8" y2="18" />
           <line x1="16" y1="6" x2="16" y2="22" />
@@ -187,15 +125,7 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
       );
     case IconType.Gps:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
+        <svg {...ROUNDED_SVG} {...props}>
           <circle cx="12" cy="12" r="10" />
           <line x1="22" x2="18" y1="12" y2="12" />
           <line x1="6" x2="2" y1="12" y2="12" />
@@ -205,15 +135,7 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
       );
     case IconType.Frame:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
+        <svg {...ROUNDED_SVG} {...props}>
           <path d="m21 21-6-6m6 6v-4m0 4h-4" />
           <path d="M3 3l6 6m-6-6v4m0-4h4" />
           <path d="M21 3l-6 6m6-6v4m0-4h-4" />
@@ -223,15 +145,7 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
       );
     case IconType.Photo:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
+        <svg {...ROUNDED_SVG} strokeWidth="1.5" {...props}>
           <rect x="3" y="4" width="18" height="16" rx="1.5" />
           <circle cx="8.5" cy="9.5" r="1.5" />
           <path d="M3 16.5 8.5 12l4 3.5L16 13l5 4" />
@@ -239,15 +153,7 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
       );
     case IconType.Download:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
+        <svg {...ROUNDED_SVG} {...props}>
           <path d="M12 3v11" />
           <path d="m7 10 5 5 5-5" />
           <path d="M4 19h16" />
@@ -255,15 +161,7 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
       );
     case IconType.Upload:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
+        <svg {...ROUNDED_SVG} {...props}>
           <path d="M12 14V3" />
           <path d="m7 8 5-5 5 5" />
           <path d="M4 19h16" />
@@ -271,15 +169,7 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
       );
     case IconType.Share:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
+        <svg {...ROUNDED_SVG} {...props}>
           <circle cx="18" cy="5" r="3" />
           <circle cx="6" cy="12" r="3" />
           <circle cx="18" cy="19" r="3" />
@@ -289,15 +179,7 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
       );
     case IconType.Calendar:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
+        <svg {...ROUNDED_SVG} {...props}>
           <rect x="3" y="4" width="18" height="18" rx="2" />
           <line x1="16" y1="2" x2="16" y2="6" />
           <line x1="8" y1="2" x2="8" y2="6" />
@@ -306,15 +188,7 @@ const Icon: React.FC<IconProps> = ({ icon, rimId, children, ...props }) => {
       );
     case IconType.Info:
       return (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
+        <svg {...ROUNDED_SVG} {...props}>
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="16" x2="12" y2="12" />
           <line x1="12" y1="8" x2="12.01" y2="8" />

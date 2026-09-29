@@ -59,7 +59,7 @@ describe('parseManifest', () => {
     );
   });
 
-  // ARCH-06: a manifest item without `photos` used to pass here and throw a TypeError after the category was made.
+  // A manifest item without `photos` must fail here, before the category is made.
   describe('the fields the import reads', () => {
     const entry = {
       id: 'x',
@@ -133,7 +133,11 @@ describe('parseManifest', () => {
 
   it('names its errors and keeps the reason and the cause', () => {
     const cause = new Error('zip');
-    const error = new ImportFormatError('too_large', 'x', { cause });
+    const error = new ImportFormatError({
+      reason: 'too_large',
+      message: 'x',
+      cause,
+    });
     expect(error.name).toBe('ImportFormatError');
     expect(error).toBeInstanceOf(Error);
     expect(error.reason).toBe('too_large');
@@ -271,7 +275,7 @@ describe('importPhotoTasks', () => {
     expect(importPhotoTasks([], now)).toEqual([]);
   });
 
-  // SEC-17: one photograph named 200 times would otherwise upload 200 copies into the quota.
+  // One photograph named 200 times would otherwise upload 200 copies into the quota.
   it('uploads a photograph the manifest names more than once only for its first mention', () => {
     expect(
       importPhotoTasks(

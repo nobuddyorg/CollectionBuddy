@@ -19,14 +19,12 @@ function renderActions(overrides: Partial<Parameters<typeof Actions>[0]> = {}) {
     busy: false,
     ...overrides,
   };
-  const { container } = render(
+  render(
     <I18nProvider>
       <Actions {...props} />
     </I18nProvider>,
   );
-  const input = container.querySelector(
-    'input[type="file"]',
-  ) as HTMLInputElement;
+  const input = screen.getByTestId<HTMLInputElement>('upload-photo');
   return { ...props, input };
 }
 
@@ -49,7 +47,7 @@ describe('Actions', () => {
     expect(screen.getAllByRole('button')).toHaveLength(2);
   });
 
-  // Regression: spelled-out labels overflowed the card in German and were clipped.
+  // Spelled-out labels overflow the card in German, so each control is an icon with a title.
   it('gives each control a title so the icon is not the only cue', () => {
     renderActions();
     expect(screen.getByTitle('Add image')).toBeInTheDocument();
@@ -112,14 +110,12 @@ function renderPlate(
   overrides: Partial<Parameters<typeof AddPhotoPlate>[0]> = {},
 ) {
   const props = { onUpload: vi.fn(), busy: false, ...overrides };
-  const { container } = render(
+  render(
     <I18nProvider>
       <AddPhotoPlate {...props} />
     </I18nProvider>,
   );
-  const input = container.querySelector(
-    'input[type="file"]',
-  ) as HTMLInputElement;
+  const input = screen.getByTestId<HTMLInputElement>('upload-photo');
   return { props, input };
 }
 

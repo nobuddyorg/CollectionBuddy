@@ -166,12 +166,7 @@ test.describe('importing into a full photo quota', () => {
   }) => {
     const app = on(page);
     await app.categories.do.open(SEED.photoQuota.category);
-    const [download] = await Promise.all([
-      page.waitForEvent('download'),
-      app.categories.do.exportCollection(),
-    ]);
-    const archive = await download.path();
-    if (!archive) throw new Error('the export did not save a file to disk');
+    const archive = await app.categories.do.downloadExport();
 
     await fillPhotoQuota(collector);
     const uploads: string[] = [];

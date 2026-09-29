@@ -25,7 +25,6 @@ describe('importCategory, cleaning up after a failure', () => {
 
     const failure = importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       createItemRows,
@@ -57,7 +56,6 @@ describe('importCategory, cleaning up after a failure', () => {
 
     const failure = importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       createItemRows,

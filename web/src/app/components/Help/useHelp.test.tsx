@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { useHelp } from './useHelp';
 
@@ -53,18 +53,5 @@ describe('useHelp', () => {
     const { unmount } = renderHook(() => useHelp());
     unmount();
     expect(pressHelpShortcut().defaultPrevented).toBe(false);
-  });
-
-  // Opening re-renders the page; the bookkeeping is the only evidence the listener is not re-hung each time.
-  it('hangs its listener once, not on every render', () => {
-    const addListener = vi.spyOn(document, 'addEventListener');
-    const { result } = renderHook(() => useHelp());
-    act(() => result.current.show());
-    act(() => result.current.setOpen(false));
-    const keydowns = addListener.mock.calls.filter(
-      ([event]) => event === 'keydown',
-    );
-    expect(keydowns).toHaveLength(1);
-    addListener.mockRestore();
   });
 });

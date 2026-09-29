@@ -2,10 +2,11 @@
 import http from 'k6/http';
 import { Rate, Trend } from 'k6/metrics';
 
-import { query } from '../lib/api.js';
+import { countRequest } from '../lib/api.js';
+import { authHeaders, countedTotal, expectOk } from '../lib/http.js';
 import { LIFECYCLE_TIMEOUTS } from '../lib/options.js';
 import { NOUNS, clearAccount } from '../lib/seed.js';
-import { ANON_KEY, SUPABASE_URL } from '../lib/target.js';
+import { SUPABASE_URL } from '../lib/target.js';
 import {
   call,
   envInt,
@@ -16,6 +17,7 @@ import {
 import {
   PROOF_TREND_STATS,
   measured,
+  probeScenario,
   probeThresholds,
   proofSummary,
 } from './lib/report.js';
@@ -40,12 +42,7 @@ export const options = {
   batchPerHost: WARM_CALLS,
   summaryTrendStats: PROOF_TREND_STATS,
   scenarios: {
-    probe: {
-      executor: 'per-vu-iterations',
-      vus: 1,
-      iterations: 1,
-      exec: 'probe',
-    },
+    probe: probeScenario(1),
   },
   thresholds: {
     ...probeThresholds(['batch_first', 'batch', 'batch_last'], {
@@ -69,8 +66,7 @@ function createByHand(session, categoryId, n) {
     }),
     params: {
       headers: {
-        apikey: ANON_KEY,
-        Authorization: `Bearer ${session.token}`,
+        ...authHeaders(session),
         'Content-Type': 'application/json',
       },
       tags: { name: 'warm create by hand' },
@@ -87,10 +83,7 @@ function createFirstEntries(session) {
         createByHand(session, categoryId, round * WARM_CALLS + n),
       ),
     );
-    const failed = responses.filter((response) => response.status !== 204);
-    if (failed.length) {
-      throw new Error(`warming: HTTP ${failed[0].status} ${failed[0].body}`);
-    }
+    for (const response of responses) expectOk(response, 'warming');
   }
 }
 
@@ -145,15 +138,9 @@ function median(values) {
 }
 
 function entriesIn(session, categoryId) {
-  const response = call({
-    method: 'HEAD',
-    path: `/rest/v1/item_categories?${query({ select: 'item_id', category_id: `eq.${categoryId}` })}`,
-    session,
-    headers: { Prefer: 'count=exact' },
-    probe: 'count_imported',
-  });
-  const range = response.headers['Content-Range'] ?? '';
-  return Number.parseInt(range.split('/')[1], 10);
+  return countedTotal(
+    call({ ...countRequest(session, categoryId), probe: 'count_imported' }),
+  );
 }
 
 export function probe({ importer, categoryId }) {

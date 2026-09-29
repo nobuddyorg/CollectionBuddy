@@ -1,7 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
-import { SearchInput } from './SearchInput';
 import ItemCreate from '../ItemCreate';
 import { Pagination } from './Pagination';
 import { ItemCard } from './ItemCard';
@@ -16,14 +15,14 @@ import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { useSyncedRef } from '../../lib/useSyncedRef';
 import { useGuardedModalClose } from '../../lib/useGuardedModalClose';
 import { EditItemModal } from './EditItemModal';
-import { MapModal, prefetchMap } from './MapModal';
+import { MapModal } from './MapModal';
 import CenteredModal from '../CenteredModal';
+import EmptyState from '../EmptyState';
 import LoadError from '../LoadError';
 import { listViewFor } from './listView';
-import Icon, { IconType } from '../Icon';
 import type { ItemFormValues } from '../ItemForm';
-import { prefetchItemForm } from '../ItemForm/load';
 import type { ImageEntry, ItemLite } from './types';
+import { Toolbar } from './Toolbar';
 import { useBackgroundRemovalUpload } from '../BackgroundRemoval/useBackgroundRemovalUpload';
 import { BackgroundRemovalDialog } from '../BackgroundRemoval/BackgroundRemovalDialog';
 
@@ -113,7 +112,6 @@ export default function ItemList({
     forgetItemImages,
   });
 
-  const [editOpen, setEditOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ItemLite | null>(null);
   // An index into the entry's images, not a URL: the carousel reaches photographs the strip never showed.
   const [modalState, setModalState] = useState<{
@@ -132,21 +130,10 @@ export default function ItemList({
     ? (items.find((item) => item.id === modalState.itemId)?.title ?? '')
     : '';
 
-  const openEdit = (item: ItemLite) => {
-    setEditingItem(item);
-    setEditOpen(true);
+  const closeEdit = () => setEditingItem(null);
+  const handleEditSubmit = async (values: ItemFormValues) => {
+    if (await saveEdit(editingItem!.id, values)) closeEdit();
   };
-
-  const handleEditSubmit = useCallback(
-    async (values: ItemFormValues) => {
-      const ok = await saveEdit(editingItem!.id, values);
-      if (ok) {
-        setEditOpen(false);
-        setEditingItem(null);
-      }
-    },
-    [editingItem, saveEdit, setEditOpen, setEditingItem],
-  );
 
   const view = listViewFor({
     itemCount: items.length,
@@ -162,10 +149,9 @@ export default function ItemList({
   let searchAnnouncement = '';
   if (!loading) {
     if (searchStatus.kind === 'active') {
-      searchAnnouncement = tCount(
-        'item_list.results_count',
-        searchStatus.total,
-      );
+      searchAnnouncement = tCount('item_list.results_count', {
+        count: searchStatus.total,
+      });
     } else if (searchStatus.kind === 'tooShort') {
       searchAnnouncement = t('item_list.search_too_short');
     }
@@ -173,44 +159,13 @@ export default function ItemList({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex-1">
-          <SearchInput value={query} onChange={setQuery} />
-        </div>
-
-        <div className="flex gap-2 sm:shrink-0">
-          <button
-            type="button"
-            data-testid="new-entry"
-            onClick={() => setCreateOpen(true)}
-            onPointerEnter={canEdit ? prefetchItemForm : undefined}
-            onPointerDown={canEdit ? prefetchItemForm : undefined}
-            onFocus={canEdit ? prefetchItemForm : undefined}
-            disabled={!canEdit}
-            title={
-              canEdit ? undefined : t('item_create.new_entry_disabled_shared')
-            }
-            className="flex-1 sm:flex-none min-h-11 px-4 flex items-center justify-center gap-2 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 disabled:opacity-40 disabled:hover:opacity-40 disabled:cursor-not-allowed transition-opacity"
-          >
-            <Icon icon={IconType.Plus} className="w-4 h-4" aria-hidden="true" />
-            {t('item_create.new_entry')}
-          </button>
-
-          <button
-            type="button"
-            data-testid="open-map"
-            onClick={() => setMapOpen(true)}
-            onPointerEnter={prefetchMap}
-            onPointerDown={prefetchMap}
-            onFocus={prefetchMap}
-            className="min-h-11 w-11 shrink-0 flex items-center justify-center rounded-sm ring-1 ring-inset ring-control-border text-foreground hover:bg-muted transition-colors"
-            aria-label={t('item_list.open_map')}
-            title={t('item_list.open_map')}
-          >
-            <Icon icon={IconType.Map} className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
+      <Toolbar
+        query={query}
+        onQueryChange={setQuery}
+        canEdit={canEdit}
+        onNewEntry={() => setCreateOpen(true)}
+        onOpenMap={() => setMapOpen(true)}
+      />
 
       {/* A too-short term earns no filter, so its count would pass off the whole category as results. */}
       <span data-testid="search-status" className="sr-only" aria-live="polite">
@@ -229,38 +184,31 @@ export default function ItemList({
       )}
 
       {view === 'empty' && (
-        <section className="py-16 grid place-items-center text-center">
-          <div className="flex flex-col items-center gap-4 max-w-xs">
-            <div className="h-16 w-16 bg-card ring-1 ring-border grid place-items-center text-3xl">
-              {debouncedQuery ? '🔍' : '🧺'}
-            </div>
-            <div className="space-y-1.5">
-              <h3
-                data-testid="empty-title"
-                className="font-display text-lg text-foreground"
-              >
-                {searchStatus.kind === 'active'
-                  ? t('item_list.no_results_title', { q: debouncedQuery })
-                  : t('item_list.no_items_title')}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {searchStatus.kind === 'active'
-                  ? t('item_list.no_results_hint')
-                  : noItemsHint}
-              </p>
-            </div>
-            {debouncedQuery && (
-              <button
-                type="button"
-                data-testid="empty-clear-search"
-                onClick={() => setQuery('')}
-                className="min-h-11 px-3 font-label text-xs text-foreground underline underline-offset-4"
-              >
-                {t('item_list.search_clear')}
-              </button>
-            )}
-          </div>
-        </section>
+        <EmptyState
+          symbol={debouncedQuery ? '🔍' : '🧺'}
+          title={
+            searchStatus.kind === 'active'
+              ? t('item_list.no_results_title', { query: debouncedQuery })
+              : t('item_list.no_items_title')
+          }
+          hint={
+            searchStatus.kind === 'active'
+              ? t('item_list.no_results_hint')
+              : noItemsHint
+          }
+          titleTestId="empty-title"
+        >
+          {debouncedQuery && (
+            <button
+              type="button"
+              data-testid="empty-clear-search"
+              onClick={() => setQuery('')}
+              className="min-h-11 px-3 font-label text-xs text-foreground underline underline-offset-4"
+            >
+              {t('item_list.search_clear')}
+            </button>
+          )}
+        </EmptyState>
       )}
 
       {view === 'grid' && (
@@ -277,7 +225,7 @@ export default function ItemList({
               pendingUploads={pendingUploads[item.id] ?? 0}
               imagesLoading={loadingItems.has(item.id)}
               onUpload={(file) => backgroundRemoval.pickPhoto(item.id, file)}
-              onEditItem={() => openEdit(item)}
+              onEditItem={() => setEditingItem(item)}
               onDeleteItem={() => void removeItem(item.id)}
               onDeleteImage={(image) => void deleteImage(item.id, image)}
               onOpenModal={(imageIndex) =>
@@ -312,13 +260,10 @@ export default function ItemList({
       />
 
       <EditItemModal
-        open={editOpen}
+        open={editingItem !== null}
         item={editingItem}
         isSaving={isSaving}
-        onOpenChange={() => {
-          setEditOpen(false);
-          setEditingItem(null);
-        }}
+        onOpenChange={closeEdit}
         onSubmit={(values) => void handleEditSubmit(values)}
       />
 
@@ -334,7 +279,6 @@ export default function ItemList({
         open={isCreateOpen}
         onOpenChange={guardedCloseCreate}
         title={t('item_create.new_entry')}
-        closeLabel={t('common.close')}
       >
         <ItemCreate
           categoryId={categoryId}

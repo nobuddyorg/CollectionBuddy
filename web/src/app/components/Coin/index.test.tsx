@@ -25,12 +25,12 @@ describe('Coin', () => {
     expect(screen.getByRole('button', { name: 'Go' })).toBeInTheDocument();
   });
 
-  it('applies an extra className alongside the relative wrapper class', () => {
-    const { container } = render(
-      <Coin text="Login" cta={null} className="extra-class" />,
+  it('sets the ring text on the rim path the coin draws', () => {
+    const { container } = render(<Coin text="Login" cta={null} />);
+    const rimId = container.querySelector('defs path')?.getAttribute('id');
+    expect(container.querySelector('textPath')).toHaveAttribute(
+      'href',
+      `#${rimId}`,
     );
-    const wrapper = container.firstElementChild as HTMLElement;
-    expect(wrapper.className).toContain('relative');
-    expect(wrapper.className).toContain('extra-class');
   });
 });

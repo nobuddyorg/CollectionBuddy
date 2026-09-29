@@ -1,79 +1,93 @@
 // @vitest-environment jsdom
 import { act, render, renderHook } from '@testing-library/react';
 import { createElement } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { usePhotonSearch } from './usePhoton';
+import { renderPhotonSearch } from './usePhoton.hook.test-support';
 import { feature } from './usePhoton.test-support';
-import type { PhotonFeature, PlaceChoice } from './types';
+import type { PhotonFeature } from '../../data/photon';
 
 describe('usePhotonSearch choose', () => {
   // `focus` stays `false`: set true first, the search effect's own focus reset would mask choose()'s work.
   it('clears results, resets the active index, and closes focus after picking', () => {
-    const { result } = renderHook(() => usePhotonSearch('en'));
+    const { result, onPick } = renderPhotonSearch();
 
-    let choice: PlaceChoice | undefined;
     act(() => {
-      choice = result.current.choose(feature(1, { city: 'Cologne' }));
+      result.current.choose(feature(1, { city: 'Cologne' }));
     });
 
     expect(result.current.results).toEqual([]);
     expect(result.current.activeIndex).toBe(-1);
     expect(result.current.focus).toBe(false);
-    expect(choice).toEqual({
+    expect(onPick).toHaveBeenCalledExactlyOnceWith({
       label: 'Cologne',
       coords: { lat: 0, lng: 0 },
     });
   });
 
-  it('keeps just the country from a state+country line2, not the whole thing', () => {
-    const { result } = renderHook(() => usePhotonSearch('en'));
+  it('keeps just the country from a state and country, not the whole second line', () => {
+    const { result, onPick } = renderPhotonSearch();
 
-    let choice: PlaceChoice | undefined;
     act(() => {
-      choice = result.current.choose(
+      result.current.choose(
         feature(1, { city: 'Cologne', state: 'NRW', country: 'Germany' }),
       );
     });
 
-    expect(choice?.label).toBe('Cologne, Germany');
+    expect(onPick).toHaveBeenCalledWith(
+      expect.objectContaining({ label: 'Cologne, Germany' }),
+    );
   });
 
-  it('uses whichever locale is current when picked, not the one active when the hook first mounted', () => {
+  it('uses whichever language is current when picked, not the one active when the hook first mounted', () => {
+    const onPick = vi.fn();
     const { result, rerender } = renderHook(
-      ({ locale }) => usePhotonSearch(locale),
-      { initialProps: { locale: 'de' } },
+      ({ language }) => usePhotonSearch({ language, onPick }),
+      { initialProps: { language: 'de' } },
     );
 
-    let germanChoice: PlaceChoice | undefined;
     act(() => {
-      germanChoice = result.current.choose(
-        feature(1, { city: 'Cologne', countrycode: 'fr' }),
-      );
+      result.current.choose(feature(1, { city: 'Cologne', countrycode: 'fr' }));
     });
 
-    rerender({ locale: 'en' });
+    rerender({ language: 'en' });
 
-    let englishChoice: PlaceChoice | undefined;
     act(() => {
-      englishChoice = result.current.choose(
-        feature(1, { city: 'Cologne', countrycode: 'fr' }),
-      );
+      result.current.choose(feature(1, { city: 'Cologne', countrycode: 'fr' }));
     });
 
-    expect(germanChoice?.label).not.toBe(englishChoice?.label);
+    expect(onPick).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ label: 'Cologne, Frankreich' }),
+    );
+    expect(onPick).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ label: 'Cologne, France' }),
+    );
+  });
+
+  it('reports a pick to the latest onPick it was given, not the one it mounted with', () => {
+    const firstOnPick = vi.fn();
+    const latestOnPick = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ onPick }) => usePhotonSearch({ language: 'en', onPick }),
+      { initialProps: { onPick: firstOnPick } },
+    );
+
+    rerender({ onPick: latestOnPick });
+    act(() => {
+      result.current.choose(feature(1, { city: 'Cologne' }));
+    });
+
+    expect(firstOnPick).not.toHaveBeenCalled();
+    expect(latestOnPick).toHaveBeenCalledOnce();
   });
 });
 
 describe('usePhotonSearch initial state', () => {
-  it('starts with an empty query', () => {
-    const { result } = renderHook(() => usePhotonSearch('en'));
-
-    expect(result.current.query).toBe('');
-  });
-
   it('starts with nothing found, nothing loading, nothing failed, and nothing selected', () => {
-    const { result } = renderHook(() => usePhotonSearch('en'));
+    const { result } = renderPhotonSearch();
 
     expect(result.current.results).toEqual([]);
     expect(result.current.loading).toBe(false);
@@ -91,9 +105,10 @@ describe('usePhotonSearch initial state', () => {
       searched: boolean;
       activeIndex: number;
     }[] = [];
+    const onPick = vi.fn();
     function Probe() {
       const { results, loading, error, searched, activeIndex } =
-        usePhotonSearch('en');
+        usePhotonSearch({ language: 'en', onPick });
       passes.push({ results, loading, error, searched, activeIndex });
       return null;
     }

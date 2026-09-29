@@ -1,18 +1,17 @@
 import { resolve } from 'node:path';
 
+const AUTH_DIRECTORY = resolve(process.cwd(), '.e2e-auth');
+
 /** Where signed-in.setup.ts leaves the session for the browser to pick up. */
-export const AUTH_STATE_PATH = resolve(
-  process.cwd(),
-  '.e2e-auth/signed-in.json',
-);
+export const AUTH_STATE_PATH = resolve(AUTH_DIRECTORY, 'signed-in.json');
 
 /** Ids and access tokens of both users, for tests that check cross-user RLS directly. */
-export const CONTEXT_PATH = resolve(process.cwd(), '.e2e-auth/context.json');
+export const CONTEXT_PATH = resolve(AUTH_DIRECTORY, 'context.json');
 
 /** Where signed-in.setup.ts leaves the second collector's session. */
 export const OTHER_AUTH_STATE_PATH = resolve(
-  process.cwd(),
-  '.e2e-auth/signed-in-other.json',
+  AUTH_DIRECTORY,
+  'signed-in-other.json',
 );
 
 export type SeedContext = {
@@ -32,6 +31,8 @@ type SeedItem = {
   tags: readonly string[];
 };
 
+const UNPLACED = { place: null, place_lat: null, place_lng: null } as const;
+
 /** One entry apiece, so opening a collection has a card to wait for. */
 const BASELINE_ITEMS: SeedItem[] = [
   'Etikett',
@@ -46,9 +47,7 @@ const BASELINE_ITEMS: SeedItem[] = [
   category,
   title: `${category}stück`,
   description: 'Bleibt liegen, damit die Sammlung nie leer ist.',
-  place: null,
-  place_lat: null,
-  place_lng: null,
+  ...UNPLACED,
   tags: [],
 }));
 
@@ -57,9 +56,7 @@ const PAGING_ITEMS: SeedItem[] = Array.from({ length: 11 }, (_, index) => ({
   category: 'Schaukasten',
   title: `Schaustück ${String(index + 1).padStart(2, '0')}`,
   description: 'Füllt den Schaukasten über eine Seite hinaus.',
-  place: null,
-  place_lat: null,
-  place_lng: null,
+  ...UNPLACED,
   tags: [],
 }));
 
@@ -68,13 +65,10 @@ const SORTING_ITEMS: SeedItem[] = Array.from({ length: 10 }, (_, index) => ({
   category: 'Sortierkasten',
   title: `Sortierstück ${String(index + 1).padStart(2, '0')}`,
   description: 'Füllt den Sortierkasten um eines über eine Seite hinaus.',
-  place: null,
-  place_lat: null,
-  place_lng: null,
+  ...UNPLACED,
   tags: [],
 }));
 
-/** Each search term below matches exactly one entry through a different column, so a broken column shows. */
 export const SEED = {
   email: 'e2e@collectionbuddy.test',
   password: 'e2e-password-not-a-secret',
@@ -143,7 +137,7 @@ export const SEED = {
     category: 'Garderobe',
     item: 'Garderobenstück',
   },
-  /** For help.spec.ts's first run, as a collector of its own per parallel slot who owns nothing. */
+  /** For first-run.spec.ts, as a collector of its own per parallel slot who owns nothing. */
   firstRun: {
     password: 'first-run-password-not-a-secret',
   },
@@ -179,6 +173,7 @@ export const SEED = {
 
   // Oldest first; the list sorts newest first, so the last one here is the first card on the page.
   items: [
+    // The Münzen entries: search.spec.ts's title, description, place and tag cases each match through that column alone.
     {
       category: 'Münzen',
       title: 'Silberdenar',
@@ -202,9 +197,7 @@ export const SEED = {
       // No place: the map should leave this one out while the list keeps it.
       title: 'Notgeld',
       description: 'Papiernotgeld aus der Inflationszeit.',
-      place: null,
-      place_lat: null,
-      place_lng: null,
+      ...UNPLACED,
       tags: ['papier'],
     },
     {
@@ -221,45 +214,35 @@ export const SEED = {
       category: 'Werkstatt',
       title: 'Werkstattstück',
       description: 'Bleibt liegen, damit die Werkstatt nie leer bleibt.',
-      place: null,
-      place_lat: null,
-      place_lng: null,
+      ...UNPLACED,
       tags: [],
     },
     {
       category: 'Fotostudio',
       title: 'Studiostück',
       description: 'Bleibt liegen, damit das Studio nie leer bleibt.',
-      place: null,
-      place_lat: null,
-      place_lng: null,
+      ...UNPLACED,
       tags: [],
     },
     {
       category: 'Exportarchiv',
       title: 'Archivstück',
       description: 'Bleibt liegen, damit das Archiv nie leer bleibt.',
-      place: null,
-      place_lat: null,
-      place_lng: null,
+      ...UNPLACED,
       tags: [],
     },
     {
       category: 'Leihgabe',
       title: 'Leihstück',
       description: 'Bleibt liegen, damit die Leihgabe nie leer bleibt.',
-      place: null,
-      place_lat: null,
-      place_lng: null,
+      ...UNPLACED,
       tags: [],
     },
     {
       category: 'Vitrine',
       title: 'Vitrinenstück',
       description: 'Bleibt liegen, damit die Vitrine nie leer bleibt.',
-      place: null,
-      place_lat: null,
-      place_lng: null,
+      ...UNPLACED,
       tags: [],
     },
     {
@@ -267,9 +250,7 @@ export const SEED = {
       category: 'Schatulle',
       title: 'Schatullenstück',
       description: 'Bleibt liegen, damit die Schatulle nie leer bleibt.',
-      place: null,
-      place_lat: null,
-      place_lng: null,
+      ...UNPLACED,
       tags: [],
     },
     {
@@ -287,9 +268,7 @@ export const SEED = {
       category: 'Bibliothek',
       title: 'Erstausgabe',
       description: 'Gebunden in Leinen, mit Widmung des Verfassers.',
-      place: null,
-      place_lat: null,
-      place_lng: null,
+      ...UNPLACED,
       tags: ['buch'],
     },
     ...BASELINE_ITEMS,
@@ -301,4 +280,8 @@ export const SEED = {
 /** The seeded items that belong to a category, newest first as the list shows them. */
 export function itemsIn(category: string) {
   return SEED.items.filter((item) => item.category === category).toReversed();
+}
+
+export function titlesIn(category: string) {
+  return itemsIn(category).map((item) => item.title);
 }

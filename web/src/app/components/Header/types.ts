@@ -14,5 +14,4 @@ export type MenuProps = {
   onDeleteAccount: () => void;
   onClose: () => void;
   onOpenHelp: () => void;
-  labelSignOut: string;
 };

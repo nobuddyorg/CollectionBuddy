@@ -1,33 +1,14 @@
 // @vitest-environment jsdom
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import Header from './index';
+import { renderHeader } from './index.test-support';
 
 // jsdom keeps localStorage across a file's tests; reset so each starts from the detected language.
 beforeEach(() => {
   localStorage.clear();
 });
-
-function renderHeader(
-  onSignOut = vi.fn(),
-  onOpenHelp = vi.fn(),
-  onDeleteAccount = vi.fn(),
-) {
-  const rendered = render(
-    <I18nProvider>
-      <Header
-        user={{ email: 'collector@example.com' }}
-        onSignOut={onSignOut}
-        onDeleteAccount={onDeleteAccount}
-        onOpenHelp={onOpenHelp}
-      />
-    </I18nProvider>,
-  );
-  return { ...rendered, onSignOut, onOpenHelp, onDeleteAccount };
-}
 
 async function openMenu() {
   const user = userEvent.setup();
@@ -84,11 +65,7 @@ describe('Menu', () => {
   it('switches theme preference when a segment is clicked', async () => {
     const { user } = await openMenu();
     const menu = document.getElementById('user-menu') as HTMLElement;
-    const dark = within(menu)
-      .getAllByRole('button')
-      .find((b) =>
-        ['Dark', 'Dunkel'].includes(b.textContent ?? ''),
-      ) as HTMLElement;
+    const dark = within(menu).getByRole('button', { name: 'Dark' });
     await user.click(dark);
     expect(dark).toHaveAttribute('aria-pressed', 'true');
   });
@@ -108,12 +85,10 @@ describe('Menu', () => {
   it('signs out and closes the menu when sign out is clicked', async () => {
     const onSignOut = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
-    renderHeader(onSignOut);
+    renderHeader({ onSignOut });
     await user.click(screen.getByRole('button', { name: 'Account menu' }));
     const menu = document.getElementById('user-menu') as HTMLElement;
-    const signOut = within(menu).getByRole('button', {
-      name: /sign out|abmelden/i,
-    });
+    const signOut = within(menu).getByRole('button', { name: 'Sign out' });
     await user.click(signOut);
     expect(onSignOut).toHaveBeenCalledTimes(1);
     await vi.waitFor(() => {
@@ -124,7 +99,7 @@ describe('Menu', () => {
   it('opens help, closes the menu and leaves focus on the trigger for the dialog to return to', async () => {
     const onOpenHelp = vi.fn();
     const user = userEvent.setup();
-    renderHeader(vi.fn(), onOpenHelp);
+    renderHeader({ onOpenHelp });
     const trigger = screen.getByRole('button', { name: 'Account menu' });
     await user.click(trigger);
     const menu = document.getElementById('user-menu') as HTMLElement;
@@ -137,7 +112,7 @@ describe('Menu', () => {
   it('starts the account deletion, closes the menu and leaves focus on the trigger for the confirmation to return to', async () => {
     const onDeleteAccount = vi.fn();
     const user = userEvent.setup();
-    renderHeader(vi.fn(), vi.fn(), onDeleteAccount);
+    renderHeader({ onDeleteAccount });
     const trigger = screen.getByRole('button', { name: 'Account menu' });
     await user.click(trigger);
     const menu = document.getElementById('user-menu') as HTMLElement;

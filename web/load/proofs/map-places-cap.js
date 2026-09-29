@@ -2,6 +2,7 @@
 import { Counter } from 'k6/metrics';
 
 import { query } from '../lib/api.js';
+import { expectOk } from '../lib/http.js';
 import { LIFECYCLE_TIMEOUTS } from '../lib/options.js';
 import { clearAccount } from '../lib/seed.js';
 import {
@@ -15,6 +16,7 @@ import {
 import {
   PROOF_TREND_STATS,
   measured,
+  probeScenario,
   probeThresholds,
   proofSummary,
 } from './lib/report.js';
@@ -22,7 +24,7 @@ import {
 // The issue's example is 5,000 free-text find spots; 1,500 is enough to cross supabase/config.toml's max_rows = 1000.
 const PLACES = envInt('PROOF_PLACES', 1500);
 const SAMPLES = envInt('PROOF_SAMPLES', 5);
-// data/items.ts PLACE_PAGE_SIZE; 0 replays the unranged read from before #756's fix.
+// data/postgrestLimits.ts POSTGREST_MAX_ROWS; 0 replays the unranged read from before #756's fix.
 const CLIENT_PAGE_SIZE = envInt('PROOF_CLIENT_PAGE_SIZE', 1000);
 
 const placesMissing = new Counter('places_missing');
@@ -32,12 +34,7 @@ export const options = {
   ...LIFECYCLE_TIMEOUTS,
   summaryTrendStats: PROOF_TREND_STATS,
   scenarios: {
-    probe: {
-      executor: 'per-vu-iterations',
-      vus: 1,
-      iterations: SAMPLES,
-      exec: 'probe',
-    },
+    probe: probeScenario(SAMPLES),
   },
   thresholds: {
     ...probeThresholds(['map_places']),
@@ -82,9 +79,7 @@ function readPlaces({ session, categoryId }) {
       probe: 'map_places',
     });
     // A failed request ends the iteration before its verdict (INCONCLUSIVE), never reads as missing places.
-    if (response.status !== 200)
-      throw new Error(`map RPC: HTTP ${response.status} ${response.body}`);
-    const body = response.json();
+    const body = expectOk(response, 'map RPC').json();
     const page = Array.isArray(body) ? body : [];
     rows.push(...page);
     if (__ITER === 0 && offset === 0) {

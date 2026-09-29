@@ -17,7 +17,6 @@ import { afterZoomAnimation, removeMidZoom } from './afterZoomAnimation';
 import { diffMarkers } from './markerDiff';
 import {
   type CopyRange,
-  WORLD_WIDTH_DEG,
   copyOffsets,
   sameRange,
   visibleCopyRange,
@@ -31,6 +30,7 @@ import {
   MarkerInput,
 } from './types';
 
+// Typed as StaticImageData, but Turbopack hands a node_modules image over as its URL string.
 const toUrl = (imported: unknown): string => {
   if (typeof imported === 'string') return imported;
   const withSrc = imported as { src?: string };
@@ -39,6 +39,13 @@ const toUrl = (imported: unknown): string => {
 };
 
 const BOUNDS_PAD_RATIO = 0.015;
+
+type LoadedMap = {
+  L: Leaflet;
+  map: LeafletMap;
+  pinLayer: LayerGroup;
+  currentLocationLayer: LayerGroup;
+};
 
 /** The pins on the map across effect runs: their copy range, and each marker's pins under its key. */
 type DrawnMarkers = {
@@ -59,9 +66,7 @@ const drawPins = (
   return offsets.map((offset) =>
     L.marker([marker.lat, marker.lng + offset])
       .addTo(layer)
-      .bindPopup(() =>
-        popupContent(marker.popupText, marker.titles, marker.countLabel),
-      ),
+      .bindPopup(() => popupContent(marker)),
   );
 };
 
@@ -80,6 +85,7 @@ const CURRENT_LOCATION_SPAN_M = 100000;
 const CURRENT_LOCATION_DIAMETER = 16;
 const CURRENT_LOCATION_STROKE = '#b91c1c';
 const CURRENT_LOCATION_FILL = '#ef4444';
+const CURRENT_LOCATION_PANE_Z_INDEX = '650'; // Between Leaflet's marker (600) and popup (700) panes.
 
 // A 25x41 icon rises above its anchor, and the top must also clear the map's 36px controls.
 const MARKER_ICON_HEIGHT = 41;
@@ -96,9 +102,8 @@ const FIT_OPTIONS: FitBoundsOptions = {
 };
 
 const fitToPoints = (
-  map: LeafletMap,
-  L: Leaflet,
-  points: Array<LatLngExpression>,
+  { L, map }: Pick<LoadedMap, 'L' | 'map'>,
+  points: LatLngExpression[],
 ): void => {
   if (points.length === 0) return;
   const bounds = L.latLngBounds(points).pad(BOUNDS_PAD_RATIO);
@@ -107,23 +112,29 @@ const fitToPoints = (
 
 // Reports whether it framed anything, as a fit with no points is a no-op.
 const runCommand = (
-  map: LeafletMap,
-  L: Leaflet,
-  command: MapCommandKind,
-  markers: MarkerInput[],
-  currentLocation: MapProps['currentLocation'],
+  loaded: Pick<LoadedMap, 'L' | 'map'>,
+  {
+    command,
+    markers,
+    currentLocation,
+  }: {
+    command: MapCommandKind;
+    markers: MarkerInput[];
+    currentLocation: MapProps['currentLocation'];
+  },
 ): boolean => {
   if (command === 'fitAll') {
-    const points: Array<LatLngExpression> = markers.map((marker) => [
+    const points: LatLngExpression[] = markers.map((marker) => [
       marker.lat,
       marker.lng,
     ]);
     if (currentLocation)
       points.push([currentLocation.lat, currentLocation.lng]);
-    fitToPoints(map, L, points);
+    fitToPoints(loaded, points);
     return points.length > 0;
   }
   if (!currentLocation) return false;
+  const { L, map } = loaded;
   const { lat, lng } = currentLocation;
   map.fitBounds(
     L.latLng(lat, lng).toBounds(CURRENT_LOCATION_SPAN_M),
@@ -132,30 +143,30 @@ const runCommand = (
   return true;
 };
 
-const MapView: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const leafletRef = useRef<Leaflet | null>(null);
-  const mapInstance = useRef<LeafletMap | null>(null);
-  const layersRef = useRef<LayerGroup | null>(null);
-  const currentLocationLayerRef = useRef<LayerGroup | null>(null);
-
+const MapView: React.FC<MapProps> = ({
+  markers,
+  currentLocation,
+  command,
+  labels,
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const drawnMarkersRef = useRef<DrawnMarkers>(noDrawnMarkers());
   const markersRef = useSyncedRef(markers);
   const currentLocationRef = useSyncedRef(currentLocation);
+  const labelsRef = useSyncedRef(labels);
 
-  const [ready, setReady] = useState(false);
+  const [loaded, setLoaded] = useState<LoadedMap | null>(null);
   const hasInitialFit = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     let sizeFrame = 0;
+    let map: LeafletMap | undefined;
     void (async () => {
-      if (!mapRef.current || mapInstance.current) return;
-      if (typeof window === 'undefined') return;
+      if (!containerRef.current) return;
 
       const L = (await import('leaflet')).default;
       if (cancelled) return;
-      leafletRef.current = L;
 
       delete (L.Icon.Default.prototype as IconDefaultPrivate)._getIconUrl;
       L.Icon.Default.mergeOptions({
@@ -165,51 +176,47 @@ const MapView: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       });
 
       // A world view fetches no tiles the fit would discard; worldCopyJump keeps pins on the primary copy.
-      const map = L.map(mapRef.current, { worldCopyJump: true }).setView(
-        [20, 0],
-        2,
-      );
-      mapInstance.current = map;
+      map = L.map(containerRef.current, {
+        worldCopyJump: true,
+        zoomControl: false,
+      }).setView([20, 0], 2);
+      map.createPane('currentLocation').style.zIndex =
+        CURRENT_LOCATION_PANE_Z_INDEX;
 
-      map.createPane('currentLocation');
-      const currentLocationPane = map.getPane('currentLocation');
-      if (currentLocationPane) currentLocationPane.style.zIndex = '650';
-
+      const { zoomIn, zoomOut, attribution } = labelsRef.current;
+      L.control.zoom({ zoomInTitle: zoomIn, zoomOutTitle: zoomOut }).addTo(map);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        attribution: `&copy; <a href="https://www.openstreetmap.org/copyright">${attribution}</a>`,
       }).addTo(map);
 
-      layersRef.current = L.layerGroup().addTo(map);
-      currentLocationLayerRef.current = L.layerGroup().addTo(map);
-
-      setReady(true);
-      sizeFrame = requestAnimationFrame(() => map.invalidateSize());
+      const loadedMap: LoadedMap = {
+        L,
+        map,
+        pinLayer: L.layerGroup().addTo(map),
+        currentLocationLayer: L.layerGroup().addTo(map),
+      };
+      setLoaded(loadedMap);
+      sizeFrame = requestAnimationFrame(() => loadedMap.map.invalidateSize());
     })();
     return () => {
       cancelled = true;
       cancelAnimationFrame(sizeFrame);
-      if (mapInstance.current) removeMidZoom(mapInstance.current);
-      mapInstance.current = null;
-      layersRef.current = null;
-      currentLocationLayerRef.current = null;
+      if (map) removeMidZoom(map);
       drawnMarkersRef.current = noDrawnMarkers();
-      setReady(false);
+      setLoaded(null);
     };
-  }, []);
+  }, [labelsRef]);
 
   useEffect(() => {
-    const L = leafletRef.current;
-    const map = mapInstance.current;
-    const layer = layersRef.current;
-    if (!ready || !L || !map || !layer) return;
+    if (!loaded) return;
+    const { L, map, pinLayer } = loaded;
 
     const drawn = drawnMarkersRef.current;
     const render = () => {
       const range = visibleCopyRange(map.getBounds());
       // A new copy range redraws every pin; otherwise only what changed.
       if (!sameRange(drawn.range, range)) {
-        layer.clearLayers();
+        pinLayer.clearLayers();
         drawn.byKey.clear();
         drawn.range = range;
       }
@@ -218,13 +225,13 @@ const MapView: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
         markers,
       );
       for (const key of removeKeys) {
-        drawn.byKey.get(key)!.forEach((pin) => layer.removeLayer(pin));
+        drawn.byKey.get(key)!.forEach((pin) => pinLayer.removeLayer(pin));
         drawn.byKey.delete(key);
       }
       const [copyMin, copyMax] = range;
       const offsets = copyOffsets(copyMin, copyMax);
       for (const [key, marker] of add) {
-        drawn.byKey.set(key, drawPins(L, { layer, marker, offsets }));
+        drawn.byKey.set(key, drawPins(L, { layer: pinLayer, marker, offsets }));
       }
     };
 
@@ -233,28 +240,26 @@ const MapView: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     return () => {
       map.off('moveend zoomend', render);
     };
-  }, [markers, ready]);
+  }, [markers, loaded]);
 
   useEffect(() => {
-    const L = leafletRef.current;
-    const map = mapInstance.current;
-    const layer = currentLocationLayerRef.current;
-    if (!ready || !L || !map || !layer) return;
+    if (!loaded) return;
+    const { L, map, currentLocationLayer } = loaded;
 
-    const copyRangeRef = { current: null as CopyRange | null };
+    let drawnRange: CopyRange | null = null;
 
     const render = () => {
       const range = visibleCopyRange(map.getBounds());
-      if (sameRange(copyRangeRef.current, range)) return;
-      copyRangeRef.current = range;
+      if (sameRange(drawnRange, range)) return;
+      drawnRange = range;
 
-      layer.clearLayers();
+      currentLocationLayer.clearLayers();
       if (!currentLocation) return;
 
       const { lat, lng, popupText } = currentLocation;
       const [copyMin, copyMax] = range;
-      for (let copy = copyMin; copy <= copyMax; copy++) {
-        const here = L.marker([lat, lng + copy * WORLD_WIDTH_DEG], {
+      for (const offset of copyOffsets(copyMin, copyMax)) {
+        L.marker([lat, lng + offset], {
           // className: '' strips Leaflet's default divIcon box so only the dot below is drawn.
           icon: L.divIcon({
             className: '',
@@ -266,9 +271,9 @@ const MapView: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
             ],
           }),
           pane: 'currentLocation',
-        }).addTo(layer);
-        // A local const: TS cannot carry the guard's narrowing of `popupText` into the closure.
-        if (popupText) here.bindPopup(() => popupContent(popupText));
+        })
+          .addTo(currentLocationLayer)
+          .bindPopup(() => popupContent({ popupText }));
       }
     };
 
@@ -277,41 +282,28 @@ const MapView: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
     return () => {
       map.off('moveend zoomend', render);
     };
-  }, [currentLocation, ready]);
+  }, [currentLocation, loaded]);
 
   // Waits for a pin: framing the location dot alone drops the viewer on their own doorstep.
   useEffect(() => {
-    const L = leafletRef.current;
-    if (!ready || !L || !mapInstance.current || hasInitialFit.current) return;
-    if (markers.length === 0) return;
-
-    const points: Array<LatLngExpression> = markers.map((marker) => [
-      marker.lat,
-      marker.lng,
-    ]);
-    if (currentLocation)
-      points.push([currentLocation.lat, currentLocation.lng]);
-
-    fitToPoints(mapInstance.current, L, points);
+    if (!loaded || hasInitialFit.current || markers.length === 0) return;
+    runCommand(loaded, { command: 'fitAll', markers, currentLocation });
     hasInitialFit.current = true;
-  }, [markers, currentLocation, ready]);
+  }, [markers, currentLocation, loaded]);
 
-  // Also runs on becoming ready, so a command issued before Leaflet loaded is still carried out.
+  // Also runs once the map has loaded, so a command issued before that is still carried out.
   useEffect(() => {
-    const L = leafletRef.current;
-    const map = mapInstance.current;
-    if (!ready || !L || !map || !command) return;
+    if (!loaded || !command) return;
+    const { map } = loaded;
 
     const framing = () => {
       // A fit against a container Leaflet has not sized yet frames the wrong box.
       map.invalidateSize();
-      const framed = runCommand(
-        map,
-        L,
-        command.kind,
-        markersRef.current,
-        currentLocationRef.current,
-      );
+      const framed = runCommand(loaded, {
+        command: command.kind,
+        markers: markersRef.current,
+        currentLocation: currentLocationRef.current,
+      });
       // A command that framed the view outranks the one-shot fit on the first pin.
       if (framed) hasInitialFit.current = true;
     };
@@ -323,21 +315,19 @@ const MapView: React.FC<MapProps> = ({ markers, currentLocation, command }) => {
       cancelAnimationFrame(frame);
       cancelWait();
     };
-  }, [command, ready, markersRef, currentLocationRef]);
+  }, [command, loaded, markersRef, currentLocationRef]);
 
   // Leaflet caches the container size, so a resize while mounted leaves grey tiles until re-measured.
   useEffect(() => {
-    if (!ready) return;
-    const element = mapRef.current;
-    const map = mapInstance.current;
-    if (!element || !map) return;
+    const element = containerRef.current;
+    if (!loaded || !element) return;
 
-    const observer = new ResizeObserver(() => map.invalidateSize());
+    const observer = new ResizeObserver(() => loaded.map.invalidateSize());
     observer.observe(element);
     return () => observer.disconnect();
-  }, [ready]);
+  }, [loaded]);
 
-  return <div ref={mapRef} style={{ height: '100%', width: '100%' }} />;
+  return <div ref={containerRef} style={{ height: '100%', width: '100%' }} />;
 };
 
 export default MapView;

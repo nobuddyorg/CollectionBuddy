@@ -34,7 +34,7 @@ interface AccountMenu {
 }
 
 export function initAccountMenu(page: Page): AccountMenu {
-  const root = page.locator('#user-menu');
+  const root = page.getByTestId('user-menu');
   const locators = {
     backgroundRemoval: {
       toggle: page.getByTestId('background-removal-toggle'),

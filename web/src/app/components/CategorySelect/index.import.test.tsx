@@ -134,7 +134,7 @@ describe('CategorySelect import', () => {
       expect(screen.getByText('Photographs 3 of 9…')).toBeVisible();
     });
 
-    it('offers a Cancel affordance, absent while nothing is running', async () => {
+    it('cancels the running import from its Cancel button', async () => {
       const cancelImport = vi.fn();
       vi.mocked(useImportCategory).mockReturnValue(
         importState({
@@ -151,5 +151,13 @@ describe('CategorySelect import', () => {
       await userEvent.click(cancel);
       expect(cancelImport).toHaveBeenCalledOnce();
     });
+  });
+
+  it('does not offer Cancel while no import is running', async () => {
+    renderSelect();
+    await openPanel();
+    expect(
+      screen.queryByRole('button', { name: 'Cancel import' }),
+    ).not.toBeInTheDocument();
   });
 });

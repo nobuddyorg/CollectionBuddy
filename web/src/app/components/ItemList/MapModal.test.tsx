@@ -11,16 +11,21 @@ import {
   type LocationResult,
 } from '../Map/useCurrentLocation';
 import { MapModal, prefetchMap } from './MapModal';
-import type { MapCommand } from '../Map/types';
+import type { MapCommand, MapProps } from '../Map/types';
 
 vi.mock('../Map/usePlaces', () => ({ usePlaces: vi.fn() }));
 vi.mock('../Map/useCurrentLocation', () => ({ useCurrentLocation: vi.fn() }));
 
-// Leaflet needs a real layout engine; this stand-in records the markers and the last command.
-const drawn: { markers: unknown[]; command: MapCommand | null }[] = [];
+// Leaflet needs a real layout engine; this stand-in records the markers, the last command and the labels.
+type DrawnFrame = {
+  markers: unknown[];
+  command: MapCommand | null;
+  labels: MapProps['labels'];
+};
+const drawn: DrawnFrame[] = [];
 vi.mock('../Map', () => ({
-  default: (props: { markers: unknown[]; command: MapCommand | null }) => {
-    drawn.push({ markers: props.markers, command: props.command });
+  default: ({ markers, command, labels }: DrawnFrame) => {
+    drawn.push({ markers, command, labels });
     return <div data-testid="map" />;
   },
 }));
@@ -131,6 +136,20 @@ describe('MapModal', () => {
     expect(markers[1]?.countLabel).toBeUndefined();
   });
 
+  // Leaflet draws its zoom buttons and attribution itself, in English unless handed the words.
+  it("hands the map its zoom and attribution labels in the app's language", async () => {
+    placesState({ places: [place('Bonn', ['a'])] });
+    renderModal();
+
+    await waitFor(() =>
+      expect(drawn.at(-1)?.labels).toEqual({
+        zoomIn: 'Zoom in',
+        zoomOut: 'Zoom out',
+        attribution: 'OpenStreetMap contributors',
+      }),
+    );
+  });
+
   it('shows the map while places are still resolving, with a progress chip', async () => {
     placesState({ places: [place('Bonn', ['a'])], loading: true });
     renderModal();
@@ -177,10 +196,6 @@ describe('MapModal', () => {
     await waitFor(() =>
       expect(drawn.at(-1)?.command).toMatchObject({ kind: 'fitCurrent' }),
     );
-    const marker = drawn.at(-1) as unknown as {
-      markers: unknown[];
-    };
-    expect(marker).toBeDefined();
   });
 
   // The fix resolving after a later "show all" tap must not undo it.

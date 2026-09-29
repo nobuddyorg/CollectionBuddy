@@ -4,13 +4,17 @@ import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider, useToast } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
+import { useToast } from '../Toast/ToastProvider';
 import { deleteItem, updateItem } from '../../data/items';
 import { removeImageObjects } from '../../data/images';
 import { useItemMutations } from './useItemMutations';
 import { EMPTY_ITEM_FORM_VALUES } from '../ItemForm/types';
+import {
+  acceptConfirmation,
+  commitDeferredDelete,
+  ToastConfirmWrapper as wrapper,
+} from '../providers.test-support';
+import { item } from './item.test-support';
 import type { ItemLite } from './types';
 
 vi.mock('../../data/items', () => ({
@@ -22,39 +26,6 @@ vi.mock('../../data/images', () => ({
   removeImageObjects: vi.fn(),
   REMOVE_OBJECTS_BATCH_SIZE: 1000,
 }));
-
-function item(id: string): ItemLite {
-  return {
-    id,
-    title: `Item ${id}`,
-    description: null,
-    place: null,
-    place_lat: null,
-    place_lng: null,
-    tags: [],
-  };
-}
-
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>{children}</ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>
-  );
-}
-
-// A real ConfirmProvider, not a mock: the index-capture-before-removal ordering lives past that await.
-async function acceptDeleteConfirmation() {
-  await userEvent.click(await screen.findByTestId('confirm-accept'));
-}
-
-// deleteItem is deferred to the toast's undo window; closing the toast commits it, the same as expiry.
-async function commitDeferredDelete() {
-  await screen.findByTestId('toast');
-  await userEvent.click(screen.getByRole('button', { name: 'Close' }));
-}
 
 type Collaborators = Omit<
   Parameters<typeof useItemMutations>[0],
@@ -79,6 +50,7 @@ function noopCollaborators(): Collaborators {
   };
 }
 
+// A real ConfirmProvider, not a mock: the index-capture-before-removal ordering lives past the confirmation's await.
 describe('useItemMutations removeItem', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -101,7 +73,7 @@ describe('useItemMutations removeItem', () => {
       ),
     ).toBeInTheDocument();
 
-    await acceptDeleteConfirmation();
+    await acceptConfirmation();
 
     expect(await screen.findByText('Entry deleted.')).toBeInTheDocument();
   });
@@ -132,7 +104,7 @@ describe('useItemMutations removeItem', () => {
     act(() => {
       void result.current.removeItem('b');
     });
-    await acceptDeleteConfirmation();
+    await acceptConfirmation();
     await commitDeferredDelete();
 
     await screen.findByRole('alert');
@@ -144,7 +116,7 @@ describe('useItemMutations removeItem', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Could not delete this entry. Please try again.',
     );
-    // The objects went first; the row is still there, so the restore shows what the database has.
+    // The row delete failed, so the restore shows what the database still has.
     expect(collaborators.captureItemImagePaths).toHaveBeenCalledWith('b');
     expect(removeImageObjects).not.toHaveBeenCalled();
     expect(collaborators.forgetItemImages).not.toHaveBeenCalled();
@@ -152,6 +124,35 @@ describe('useItemMutations removeItem', () => {
     expect(consoleError).toHaveBeenCalledWith('delete item', expect.anything());
     consoleError.mockRestore();
   });
+
+  // ItemCard's memo can keep a card's older onDeleteItem, so a captured removeItem must read the latest list.
+  it('puts an entry back at its place in the latest list when an older removeItem deleted it', async () => {
+    const { result } = renderHook(
+      () =>
+        useHarness({
+          initial: [item('a'), item('b'), item('c')],
+          ...noopCollaborators(),
+        }),
+      { wrapper },
+    );
+    const capturedRemoveItem = result.current.removeItem;
+
+    act(() => {
+      void result.current.removeItem('a');
+    });
+    await acceptConfirmation();
+    act(() => {
+      void capturedRemoveItem('b');
+    });
+    await acceptConfirmation();
+    expect(result.current.items.map((entry) => entry.id)).toEqual(['c']);
+
+    const undoButtons = await screen.findAllByRole('button', { name: 'Undo' });
+    await userEvent.click(undoButtons[1]);
+
+    expect(result.current.items.map((entry) => entry.id)).toEqual(['b', 'c']);
+  });
+
   it('removes the photographs before the row, and restores the entry without deleting the row when that fails', async () => {
     vi.mocked(deleteItem).mockResolvedValue({ error: null } as never);
     const capturedPaths = [{ path_full: 'b/a.webp', path_thumb: null }];
@@ -180,7 +181,7 @@ describe('useItemMutations removeItem', () => {
     act(() => {
       void result.current.removeItem('b');
     });
-    await acceptDeleteConfirmation();
+    await acceptConfirmation();
     await commitDeferredDelete();
 
     await screen.findByRole('alert');
@@ -228,7 +229,7 @@ describe('useItemMutations removeItem', () => {
     act(() => {
       void result.current.removeItem('b');
     });
-    await acceptDeleteConfirmation();
+    await acceptConfirmation();
     await commitDeferredDelete();
 
     await waitFor(() => expect(deleteItem).toHaveBeenCalledWith('b'));
@@ -272,7 +273,7 @@ describe('useItemMutations removeItem', () => {
     act(() => {
       void result.current.removeItem('a');
     });
-    await acceptDeleteConfirmation();
+    await acceptConfirmation();
     await screen.findByTestId('toast');
     const committed = vi.fn();
     act(() => {
@@ -309,7 +310,7 @@ describe('useItemMutations removeItem', () => {
     act(() => {
       void result.current.removeItem('a');
     });
-    await acceptDeleteConfirmation();
+    await acceptConfirmation();
     await commitDeferredDelete();
 
     await vi.waitFor(() =>
@@ -352,7 +353,7 @@ describe('useItemMutations removeItem', () => {
     act(() => {
       void result.current.removeItem('a');
     });
-    await acceptDeleteConfirmation();
+    await acceptConfirmation();
     expect(result.current.items.map((entry) => entry.id)).toEqual(['b']);
 
     // Stands in for useItems' own load() overwriting `items` with a response that still has the row.
@@ -382,7 +383,7 @@ describe('useItemMutations removeItem', () => {
     act(() => {
       void result.current.removeItem('missing');
     });
-    await acceptDeleteConfirmation();
+    await acceptConfirmation();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Undo' }));
     expect(result.current.items.map((entry) => entry.id)).toEqual(['a']);
@@ -409,15 +410,7 @@ describe('useItemMutations saveEdit', () => {
   }
 
   it('merges the row the server returns into the matching item and reports success', async () => {
-    const updated = {
-      id: 'b',
-      title: 'Updated title',
-      description: null,
-      place: null,
-      place_lat: null,
-      place_lng: null,
-      tags: [],
-    };
+    const updated = { ...item('b'), title: 'Updated title' };
     vi.mocked(updateItem).mockResolvedValue({
       data: updated,
       error: null,

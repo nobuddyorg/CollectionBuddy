@@ -27,7 +27,6 @@ export function CategoryInput({
       onKeyDown={(event) => {
         if (event.key === 'Enter') createCategory();
         if (event.key === 'Escape') {
-          // First Escape clears the name; a second one (nothing left to clear) collapses the panel.
           if (name !== '') {
             setName('');
           } else {

@@ -4,12 +4,7 @@ import { check } from 'k6';
 import { Counter, Trend } from 'k6/metrics';
 
 import { clearAccount } from '../../lib/seed.js';
-import {
-  attachPhotos,
-  insertEntries,
-  newCategory,
-  seedOrClear,
-} from '../lib/fixtures.js';
+import { attachPhotos, insertEntries, newCategory } from '../lib/fixtures.js';
 import { PROOF_TREND_STATS, measured, proofSummary } from '../lib/report.js';
 import {
   APP_URL,
@@ -20,7 +15,8 @@ import {
 
 // String literals the minifier keeps, one per module that should load only on an Export or Import click.
 const ON_DEMAND_MARKERS = {
-  'data/zip.ts (read)': 'Not a ZIP archive: no end-of-central-directory record',
+  'data/zipDirectory.ts':
+    'Not a ZIP archive: no end-of-central-directory record',
   'data/zip.ts (write)': 'Archive would exceed 65535 ZIP entries',
   'data/exportCategory.ts': 'Could not sign photograph URLs',
   'data/importPhoto.ts': 'Could not record photograph',
@@ -69,28 +65,26 @@ export default async function firstPaintThenMap() {
   let session;
   try {
     session = await openAsDemoUser(page);
-    seedOrClear([session], () => {
-      const itemIds = insertEntries({
-        session,
-        categoryId: newCategory(session, 'Proof: first paint'),
-        count: 9,
-        // Located, so opening the map needs no geocode and never reaches photon.komoot.io.
-        fields: (n) => ({
-          title: `Plakette ${n}`,
-          description: 'mit Bild',
-          place: 'Wien',
-          place_lat: 48.21,
-          place_lng: 16.37,
-          tags: ['bild'],
-        }),
-      });
-      attachPhotos({
-        session,
-        itemIds,
-        photosEach: 1,
-        bytes: PHOTO,
-        thumbBytes: THUMB,
-      });
+    const itemIds = insertEntries({
+      session,
+      categoryId: newCategory(session, 'Proof: first paint'),
+      count: 9,
+      // Located, so opening the map needs no geocode and never reaches photon.komoot.io.
+      fields: (n) => ({
+        title: `Plakette ${n}`,
+        description: 'mit Bild',
+        place: 'Wien',
+        place_lat: 48.21,
+        place_lng: 16.37,
+        tags: ['bild'],
+      }),
+    });
+    attachPhotos({
+      session,
+      itemIds,
+      photosEach: 1,
+      bytes: PHOTO,
+      thumbBytes: THUMB,
     });
 
     // First paint: a fresh load of the seeded catalogue, before any click.

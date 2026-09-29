@@ -79,17 +79,19 @@ export const test = base.extend<{ autoCoverage: void }>({
 export async function generateCoverageReport() {
   if (!COLLECT) return;
   const results = await coverageReports.generate();
-  if (!results) return;
+  if (!results)
+    throw new Error('e2e coverage was enabled but nothing was collected');
 
-  const failures = Object.entries(COVERAGE_THRESHOLDS)
-    .map(([metric, floor]) => {
+  const failures = Object.entries(COVERAGE_THRESHOLDS).flatMap(
+    ([metric, floor]) => {
       const percentage =
         results.summary[metric as keyof typeof COVERAGE_THRESHOLDS]?.pct;
-      return typeof percentage === 'number' && percentage < floor
-        ? `${metric}: ${percentage.toFixed(2)}% is below the ${floor}% floor`
-        : null;
-    })
-    .filter((failure) => failure !== null);
+      if (typeof percentage !== 'number') return [`${metric}: not reported`];
+      return percentage < floor
+        ? [`${metric}: ${percentage.toFixed(2)}% is below the ${floor}% floor`]
+        : [];
+    },
+  );
 
   if (failures.length > 0) {
     throw new Error(

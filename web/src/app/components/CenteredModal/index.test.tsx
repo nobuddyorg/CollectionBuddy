@@ -3,21 +3,13 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { I18nProvider } from '../../i18n/I18nProvider';
+import { appRoot, mountAppRoot, removeAppRoot } from './appRoot.test-support';
 import CenteredModal from './index';
 
-function appRoot() {
-  return document.getElementById('app-root') as HTMLElement;
-}
+beforeEach(mountAppRoot);
 
-beforeEach(() => {
-  const root = document.createElement('div');
-  root.id = 'app-root';
-  document.body.appendChild(root);
-});
-
-afterEach(() => {
-  appRoot()?.remove();
-});
+afterEach(removeAppRoot);
 
 describe('CenteredModal', () => {
   it('renders nothing while closed', () => {
@@ -25,6 +17,7 @@ describe('CenteredModal', () => {
       <CenteredModal open={false} onOpenChange={vi.fn()} title="Edit entry">
         content
       </CenteredModal>,
+      { wrapper: I18nProvider },
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
@@ -34,6 +27,7 @@ describe('CenteredModal', () => {
       <CenteredModal open onOpenChange={vi.fn()} title="Edit entry">
         content
       </CenteredModal>,
+      { wrapper: I18nProvider },
     );
     expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal', 'true');
   });
@@ -44,16 +38,18 @@ describe('CenteredModal', () => {
       <CenteredModal open onOpenChange={vi.fn()} title="Edit entry">
         content
       </CenteredModal>,
+      { wrapper: I18nProvider },
     );
     expect(appRoot().inert).toBe(true);
   });
 
-  it('closes on a backdrop click by default', async () => {
+  it('closes on a backdrop click', async () => {
     const onOpenChange = vi.fn();
     render(
       <CenteredModal open onOpenChange={onOpenChange} title="Edit entry">
         content
       </CenteredModal>,
+      { wrapper: I18nProvider },
     );
     const backdrop = document.querySelector('.z-backdrop') as HTMLElement;
 
@@ -73,6 +69,7 @@ describe('CenteredModal', () => {
       >
         content
       </CenteredModal>,
+      { wrapper: I18nProvider },
     );
     const backdrop = document.querySelector('.z-backdrop') as HTMLElement;
 
@@ -86,6 +83,7 @@ describe('CenteredModal', () => {
       <CenteredModal open onOpenChange={vi.fn()} title="Edit entry">
         content
       </CenteredModal>,
+      { wrapper: I18nProvider },
     );
     expect(appRoot().inert).toBe(true);
 

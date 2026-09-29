@@ -22,7 +22,7 @@ function valuesFor(item: ItemLite | null): ItemFormValues {
     // Round-tripped, so only an edit of the place field itself replaces the existing pin.
     place_lat: item.place_lat,
     place_lng: item.place_lng,
-    tags: item.tags ?? [],
+    tags: item.tags,
   };
 }
 
@@ -55,7 +55,6 @@ export function EditItemModal({
       open={open}
       onOpenChange={guardedClose}
       title={t('item_list.edit_item')}
-      closeLabel={t('common.close')}
     >
       <section className="relative">
         <ItemForm

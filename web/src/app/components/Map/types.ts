@@ -1,4 +1,5 @@
 import type { Icon } from 'leaflet';
+import type { Coordinates } from '../../lib/coordinates';
 
 export type Leaflet = typeof import('leaflet');
 
@@ -6,12 +7,10 @@ export type IconDefaultPrivate = Icon.Default & {
   _getIconUrl?: () => string;
 };
 
-export interface MarkerInput {
-  lat: number;
-  lng: number;
+export interface MarkerInput extends Coordinates {
   popupText: string;
   /** The entries catalogued at this place, named under it in the popup. */
-  titles?: string[];
+  titles: string[];
   /** Already translated: the map draws Leaflet layers, not React, and has no i18n of its own. */
   countLabel?: string;
 }
@@ -26,15 +25,15 @@ export interface MapCommand {
 
 export interface MapProps {
   markers: MarkerInput[];
-  currentLocation?: { lat: number; lng: number; popupText?: string };
+  currentLocation?: Coordinates & { popupText: string };
   command?: MapCommand | null;
+  /** Already translated, read once at mount; attribution is set as HTML, so never user text. */
+  labels: { zoomIn: string; zoomOut: string; attribution: string };
 }
 
 /** Exactly what the geocode cache holds: coordinates stay true whatever entries are catalogued there. */
-export interface PlaceCoords {
+export interface PlaceCoords extends Coordinates {
   name: string;
-  lat: number;
-  lng: number;
 }
 
 /** A located place together with the entries catalogued there. */

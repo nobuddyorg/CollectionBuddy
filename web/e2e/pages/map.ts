@@ -10,12 +10,12 @@ interface MapView {
     zoomIn(): Promise<void>;
     zoomToLocation(): Promise<void>;
   };
-  /** The pins and the popup are Leaflet's own DOM, the one place reached by class rather than a test id. */
   locators: {
     buttons: {
       close: Locator;
       frameAll: Locator;
       zoomIn: Locator;
+      zoomOut: Locator;
       zoomToLocation: Locator;
     };
     pins: Locator;
@@ -27,12 +27,14 @@ interface MapView {
 }
 
 export function initMap(page: Page): MapView {
+  // Leaflet's own DOM (container, zoom control, pins, popup) is reached by class; everything else by test id.
   const root = page.locator('.leaflet-container');
   const locators = {
     buttons: {
       close: page.getByTestId('dialog-close'),
       frameAll: page.getByTestId('frame-all-pins'),
       zoomIn: page.locator('.leaflet-control-zoom-in'),
+      zoomOut: page.locator('.leaflet-control-zoom-out'),
       zoomToLocation: page.getByTestId('zoom-to-location'),
     },
     pins: page.locator('.leaflet-marker-icon'),

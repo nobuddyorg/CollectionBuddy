@@ -3,8 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { importCategory, PHOTO_UPLOAD_CONCURRENCY } from './importCategory';
 import {
   type CreateImage,
-  item,
-  buildArchive,
+  archiveWithOnePhotoPerEntry,
   baseFakes,
   fakeUploadImage,
 } from './importCategory.test-support';
@@ -28,18 +27,6 @@ const APP_FULL: Refusal = {
   error: { code: 'PT507', details: 'project', message: 'storage is full' },
 };
 
-/** An archive of `count` entries, one photograph each: more than the pool runs at once. */
-function manyPhotos(count = PHOTO_UPLOAD_CONCURRENCY * 2) {
-  const photosByItemId = Object.fromEntries(
-    Array.from({ length: count }, (_, i) => [
-      `item-${i}`,
-      [new Uint8Array([i])],
-    ]),
-  );
-  const items = Object.keys(photosByItemId).map((id) => item({ id }));
-  return buildArchive({ items, photosByItemId });
-}
-
 function refusingAfter(
   recorded: number,
   refusal: Refusal = OWNER_QUOTA,
@@ -52,7 +39,9 @@ function refusingAfter(
 
 describe('importCategory, when the photo quota is reached', () => {
   it('stops uploading photographs once the quota refuses one, keeping what was imported', async () => {
-    const archive = await manyPhotos();
+    const archive = await archiveWithOnePhotoPerEntry(
+      PHOTO_UPLOAD_CONCURRENCY * 2,
+    );
     const fakes = baseFakes();
     const uploadImage = fakeUploadImage();
     const createImage = refusingAfter(0);
@@ -62,7 +51,6 @@ describe('importCategory, when the photo quota is reached', () => {
 
     const result = await importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...fakes,
       uploadImage,
       createImage,
@@ -85,11 +73,12 @@ describe('importCategory, when the photo quota is reached', () => {
   });
 
   it('counts the photographs recorded before the refusal as imported', async () => {
-    const archive = await manyPhotos(PHOTO_UPLOAD_CONCURRENCY * 3);
+    const archive = await archiveWithOnePhotoPerEntry(
+      PHOTO_UPLOAD_CONCURRENCY * 3,
+    );
 
     const result = await importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       createImage: refusingAfter(PHOTO_UPLOAD_CONCURRENCY + 1),
     });
@@ -100,11 +89,10 @@ describe('importCategory, when the photo quota is reached', () => {
   });
 
   it("names the app's whole photo storage when that is what is full", async () => {
-    const archive = await manyPhotos(2);
+    const archive = await archiveWithOnePhotoPerEntry(2);
 
     const result = await importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       createImage: refusingAfter(1, APP_FULL),
     });
@@ -115,11 +103,10 @@ describe('importCategory, when the photo quota is reached', () => {
   });
 
   it('reports no quota when every photograph was recorded', async () => {
-    const archive = await manyPhotos(2);
+    const archive = await archiveWithOnePhotoPerEntry(2);
 
     const result = await importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
     });
 
@@ -129,7 +116,9 @@ describe('importCategory, when the photo quota is reached', () => {
 
   // Any other refusal of a row is one photograph's problem, not the rest's.
   it('keeps importing past a row refused for any other reason', async () => {
-    const archive = await manyPhotos();
+    const archive = await archiveWithOnePhotoPerEntry(
+      PHOTO_UPLOAD_CONCURRENCY * 2,
+    );
     const createImage = vi.fn(async () => ({
       data: null,
       error: { code: '42501', message: 'denied' },
@@ -140,7 +129,6 @@ describe('importCategory, when the photo quota is reached', () => {
 
     const result = await importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       createImage,
     });

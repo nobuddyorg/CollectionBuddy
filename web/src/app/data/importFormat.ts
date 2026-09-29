@@ -11,11 +11,15 @@ export type ImportFormatReason = 'not_export' | 'unreadable' | 'too_large';
 export class ImportFormatError extends Error {
   readonly reason: ImportFormatReason;
 
-  constructor(
-    reason: ImportFormatReason,
-    message: string,
-    options?: { cause?: unknown },
-  ) {
+  constructor({
+    reason,
+    message,
+    ...options
+  }: {
+    reason: ImportFormatReason;
+    message: string;
+    cause?: unknown;
+  }) {
     super(message, options);
     this.name = 'ImportFormatError';
     this.reason = reason;
@@ -62,7 +66,7 @@ function isManifestItem(value: unknown): value is ManifestItem {
 }
 
 function notAnExport(message: string): ImportFormatError {
-  return new ImportFormatError('not_export', message);
+  return new ImportFormatError({ reason: 'not_export', message });
 }
 
 /** Checks the format tag, the version and the shape of every field the import goes on to read. */
@@ -130,13 +134,11 @@ export function importPhotoTasks(
 ): PhotoTask[] {
   // An export names each photograph once; a repeat would only upload the same bytes into the quota again.
   const seen = new Set<string>();
-  const firstMention = (archivePath: string) => {
-    if (seen.has(archivePath)) return false;
-    seen.add(archivePath);
-    return true;
-  };
   return items.flatMap(({ id, item }) => {
-    const photos = item.photos.filter(firstMention);
+    const photos = [...new Set(item.photos)].filter(
+      (archivePath) => !seen.has(archivePath),
+    );
+    photos.forEach((archivePath) => seen.add(archivePath));
     const createdAts = importTimestamps(photos.length, now);
     return photos.map((archivePath, i) => ({
       itemId: id,

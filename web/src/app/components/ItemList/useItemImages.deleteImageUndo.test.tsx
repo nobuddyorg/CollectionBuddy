@@ -8,8 +8,8 @@ import {
   listImagesForItems,
   removeImageObjects,
 } from '../../data/images';
+import { acceptConfirmation } from '../providers.test-support';
 import {
-  acceptConfirmation,
   entry,
   renderItemImages,
   resetImageTestState,
@@ -30,7 +30,6 @@ vi.mock('../../data/images', async () => {
     createImageRow: vi.fn(),
     createSignedUrls: vi.fn(),
     deleteImageRow: vi.fn(),
-    listImagePathsForItems: vi.fn(),
     listImagesForItems: vi.fn(),
     removeImageObjects: vi.fn(),
     uploadImageObject: vi.fn(),
@@ -104,9 +103,32 @@ describe('useItemImages deleteImage undo', () => {
 
       expect(result.current.images['item-1']).toEqual([imageA, imageB, imageC]);
     });
+
+    // ItemCard's memo can keep a card's older onDeleteImage, so a captured deleteImage must read the latest list.
+    it('puts a photograph back at its place in the latest list when an older deleteImage deleted it', async () => {
+      const { result } = await withThreePhotographs();
+      const capturedDeleteImage = result.current.deleteImage;
+
+      act(() => {
+        void result.current.deleteImage('item-1', imageA);
+      });
+      await acceptConfirmation();
+      act(() => {
+        void capturedDeleteImage('item-1', imageB);
+      });
+      await acceptConfirmation();
+      expect(result.current.images['item-1']).toEqual([imageC]);
+
+      const undoButtons = await screen.findAllByRole('button', {
+        name: 'Undo',
+      });
+      await userEvent.click(undoButtons[1]);
+
+      expect(result.current.images['item-1']).toEqual([imageB, imageC]);
+    });
   });
 
-  // #784: the entry's own delete can commit inside the photograph's undo window, taking the row with it.
+  // The entry's own delete can commit inside the photograph's undo window, taking the row with it.
   describe('once its entry was deleted inside the undo window', () => {
     async function deletedWithItsEntry() {
       const hook = await withOnePhotograph();

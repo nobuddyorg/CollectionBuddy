@@ -3,10 +3,9 @@ import { expect, test } from './test';
 import { expectNoSeriousA11yViolations } from '../axe';
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
+import { uniqueName } from './helpers';
 // The undo window is the one place the interface and the database deliberately disagree for a while.
 test.use({ locale: 'en-GB' });
-
-const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
 
 test.describe('taking a deletion back', () => {
   test.beforeEach(async ({ on, page }) => {
@@ -18,7 +17,7 @@ test.describe('taking a deletion back', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueTitle('Doch nicht');
+    const title = uniqueName('Doch nicht');
     try {
       await app.catalogue.do.addEntry(title);
       await app.catalogue.do.removeEntry(title);
@@ -40,7 +39,7 @@ test.describe('taking a deletion back', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueTitle('Per Tastatur');
+    const title = uniqueName('Per Tastatur');
     try {
       await app.catalogue.do.addEntry(title);
       await app.catalogue.do.removeEntryByKeyboard(title);
@@ -62,17 +61,13 @@ test.describe('taking a deletion back', () => {
     page,
   }, testInfo) => {
     const app = on(page);
-    const title = uniqueTitle('Barrierefrei');
+    const title = uniqueName('Barrierefrei');
     try {
       await app.catalogue.do.addEntry(title);
       await app.catalogue.do.removeEntry(title);
       // Held, so the delete cannot go out while axe runs.
       await app.toast.do.hold();
-      // Cards fade in (.fade-up, 500ms); axe samples contrast mid-fade as a false positive unless settled.
-      await expect(app.catalogue.locators.cards.first()).toHaveCSS(
-        'opacity',
-        '1',
-      );
+      await app.catalogue.do.waitForCardsSettled();
       await expectNoSeriousA11yViolations(page, testInfo);
       await app.toast.do.undo();
     } finally {
@@ -86,7 +81,7 @@ test.describe('taking a deletion back', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueTitle('Bleibt weg');
+    const title = uniqueName('Bleibt weg');
     try {
       await app.catalogue.do.addEntry(title);
       await app.catalogue.do.removeEntry(title);

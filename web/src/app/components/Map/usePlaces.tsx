@@ -7,25 +7,37 @@ import {
 } from '../../data/items';
 import { geocodePlace, photonLang } from '../../data/photon';
 import { startSpacer } from '../../lib/backoff';
+import { readStoredValue, writeStoredValue } from '../../lib/browserStorage';
+import type { Coordinates } from '../../lib/coordinates';
+import { runPool } from '../../lib/pool';
 import { GEOCODE_CACHE_KEY, storageOwner } from '../../userDataKeys';
 import { Place, PlaceCoords } from './types';
 
 function readGeocodeCache(): Record<string, PlaceCoords> {
   try {
-    return JSON.parse(
-      localStorage.getItem(GEOCODE_CACHE_KEY) ?? '{}',
-    ) as Record<string, PlaceCoords>;
+    return JSON.parse(readStoredValue(GEOCODE_CACHE_KEY) ?? '{}') as Record<
+      string,
+      PlaceCoords
+    >;
   } catch {
+    // A corrupt cache counts as none.
     return {};
   }
 }
 
 function writeGeocodeCache(cache: Record<string, PlaceCoords>) {
-  try {
-    localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache));
-  } catch {
-    // Best-effort: geocoding still works without a cache.
-  }
+  writeStoredValue(GEOCODE_CACHE_KEY, JSON.stringify(cache));
+}
+
+async function storeGeocodedPlace(
+  ids: string[],
+  coords: Coordinates,
+): Promise<void> {
+  const { error } = await updateItemsPlace({
+    ids,
+    payload: { place_lat: coords.lat, place_lng: coords.lng },
+  });
+  if (error) console.error('Could not store a geocoded place:', error);
 }
 
 /** `list_category_places` already yields one row per distinct place, so nothing is deduplicated here. */
@@ -92,18 +104,18 @@ export function usePlaces({
   search,
   enabled,
   canEdit,
-  locale,
+  language,
 }: {
   categoryId: string;
   search: string;
   enabled: boolean;
   canEdit: boolean;
-  locale?: string;
+  language?: string;
 }) {
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const lang = photonLang(locale);
+  const lang = photonLang(language);
 
   useEffect(() => {
     if (!enabled) return;
@@ -145,21 +157,17 @@ export function usePlaces({
         const awaitTurn = startSpacer(GEOCODE_START_GAP_MS);
         const { signal } = controller;
 
-        // Drained by a few workers rather than let loose at once; pins still appear as each lookup lands.
-        const queue = [...pending];
-        const worker = async () => {
-          // Drained in the loop header: the walk ends when the queue does or the map closes.
-          for (
-            let place = queue.shift();
-            place !== undefined && !cancelled;
-            place = queue.shift()
-          ) {
+        await runPool({
+          items: pending,
+          concurrency: GEOCODE_CONCURRENCY,
+          worker: async (place) => {
+            if (cancelled) return;
             const coords = await geocodePlace(place, {
               lang,
               signal,
               awaitTurn,
             });
-            if (!coords) continue;
+            if (!coords) return;
 
             const entry = { name: place, ...coords };
             cache[place] = entry;
@@ -168,21 +176,11 @@ export function usePlaces({
             if (!cancelled) setPlaces(appendPlace(withTitles(entry, titles)));
 
             // A viewer's write-back is a no-op under RLS; the local cache still spares its next lookup.
-            if (!canEdit) continue;
-            // Fire-and-forget; `ids` came from the same rows as `unlocated`, so the key exists.
-            void updateItemsPlace({
-              ids: ids.get(place)!,
-              payload: { place_lat: entry.lat, place_lng: entry.lng },
-            });
-          }
-        };
-
-        await Promise.all(
-          Array.from(
-            { length: Math.min(GEOCODE_CONCURRENCY, queue.length) },
-            worker,
-          ),
-        );
+            if (!canEdit) return;
+            // Non-blocking; `ids` came from the same rows as `unlocated`, so the key exists.
+            void storeGeocodedPlace(ids.get(place)!, entry);
+          },
+        });
 
         // A sign-out mid-lookup forgot this cache; writing it back would hand it to the next account.
         if (cacheDirty && storageOwner() === owner) writeGeocodeCache(cache);

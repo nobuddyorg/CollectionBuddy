@@ -1,8 +1,15 @@
 import { expect, test } from '../test';
 import { itemsIn } from '../fixtures';
-import { apiAs, context, editorShare, ownerEntryIn, unshare } from './helpers';
+import {
+  apiAs,
+  context,
+  editorShare,
+  ownerEntryIn,
+  seededEntryId,
+  unshare,
+} from './helpers';
 
-/** A throwaway collection of the owner's, deleted with its entries once the test is done. */
+/** A fresh collection of the owner's, named `name`. */
 async function probeCollection(token: string, name: string) {
   const { data, error } = await apiAs(token)
     .from('categories')
@@ -32,13 +39,12 @@ test.describe('entries an editor leaves in no collection', () => {
         category: name,
         title: 'rls-orphan-bulk-second',
       });
-      const { data: elsewhere } = await apiAs(token)
-        .from('items')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('title', itemsIn('Münzen')[0].title)
-        .single();
-      const probed = [first.itemId, second.itemId, elsewhere!.id];
+      const elsewhereId = await seededEntryId({
+        token,
+        ownerId: userId,
+        title: itemsIn('Münzen')[0].title,
+      });
+      const probed = [first.itemId, second.itemId, elsewhereId];
 
       const shareId = await editorShare(token, categoryId);
       try {
@@ -60,11 +66,11 @@ test.describe('entries an editor leaves in no collection', () => {
         .from('items')
         .select('id')
         .in('id', probed);
-      expect(left).toEqual([{ id: elsewhere!.id }]);
+      expect(left).toEqual([{ id: elsewhereId }]);
       const { data: stillFiled } = await apiAs(token)
         .from('item_categories')
         .select('category_id')
-        .eq('item_id', elsewhere!.id);
+        .eq('item_id', elsewhereId);
       expect(stillFiled).toHaveLength(1);
     } finally {
       await apiAs(token).from('categories').delete().eq('id', categoryId);

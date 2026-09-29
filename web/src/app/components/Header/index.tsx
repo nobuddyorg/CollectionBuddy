@@ -1,14 +1,10 @@
 'use client';
 import { useI18n } from '../../i18n/useI18n';
+import { withBasePath } from '../../lib/env';
 import Icon, { IconType } from '../Icon';
 import { HeaderProps } from './types';
 import { useMenu } from './useMenu';
 import Menu from './Menu';
-
-const withBasePath = (path: `/${string}`): string => {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  return `${basePath}${path}`;
-};
 
 export default function Header({
   user,
@@ -18,7 +14,6 @@ export default function Header({
 }: HeaderProps) {
   const { open: menuOpen, toggle, close, anchorRef, panelRef } = useMenu();
   const { t } = useI18n();
-  const displayEmail = user.email;
 
   const deleteAccount = () => {
     // The item unmounts with the menu, so the trigger is what the confirmation returns focus to.
@@ -74,24 +69,23 @@ export default function Header({
             aria-controls="user-menu"
             aria-expanded={menuOpen ? 'true' : 'false'}
             aria-label={t('header.account_menu')}
-            title={displayEmail || t('header.title')}
+            title={user.email || t('header.title')}
           >
             <Icon icon={IconType.Google} className="w-5 h-5" />
             <span className="text-sm text-muted-foreground max-sm:hidden">
-              {displayEmail}
+              {user.email}
             </span>
             <span className="text-xs text-muted-foreground">▾</span>
           </button>
 
           <div ref={panelRef}>
             <Menu
-              user={{ email: displayEmail }}
+              user={user}
               open={menuOpen}
               onSignOut={onSignOut}
               onDeleteAccount={deleteAccount}
               onClose={close}
               onOpenHelp={openHelp}
-              labelSignOut={t('header.sign_out')}
             />
           </div>
         </div>

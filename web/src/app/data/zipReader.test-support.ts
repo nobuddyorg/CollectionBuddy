@@ -1,5 +1,8 @@
 import { crc32 as zlibCrc32, deflateRawSync } from 'node:zlib';
 
+import { ZIP_READ_LIMITS, type ZipReadLimits } from './zipDirectory';
+import { openZip } from './zipReader';
+
 const encoder = new TextEncoder();
 
 type HeaderFields = {
@@ -184,6 +187,23 @@ export function craftZip({
 export async function textOf(blob: Blob): Promise<string> {
   return new TextDecoder().decode(await blob.arrayBuffer());
 }
+
+export async function bytesOf(blob: Blob): Promise<Uint8Array<ArrayBuffer>> {
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+export function open(bytes: Uint8Array<ArrayBuffer>, limits?: ZipReadLimits) {
+  return openZip(new Blob([bytes]), limits);
+}
+
+export function limits(overrides: Partial<ZipReadLimits>): ZipReadLimits {
+  return { ...ZIP_READ_LIMITS, ...overrides };
+}
+
+export const JSON_TEXT = JSON.stringify({
+  items: Array(40).fill({ tags: ['a'] }),
+});
+export const JSON_BYTES = encoder.encode(JSON_TEXT);
 
 /** `zip -qr - Coins | cat` (Info-ZIP 3.0, piped): deflated, data descriptors, directory entries, timestamp and uid extras. */
 export const INFO_ZIP_STREAMED = Uint8Array.from(

@@ -20,7 +20,7 @@ const PHOTO_UPLOAD_RETRY_BASE_MS = 500;
 export function realCompressThumb(photo: Blob): Promise<Blob> {
   return compressPhoto(
     new File([photo], 'photo.webp', { type: 'image/webp' }),
-    600,
+    { maxWidthOrHeight: 600 },
   );
 }
 
@@ -62,12 +62,12 @@ export type PhotoImportCalls = {
 export async function importPhoto({
   task,
   readPhoto,
-  uid,
+  userId,
   calls: { uploadImage, createImage, compressThumb, signal },
 }: {
   task: PhotoTask;
   readPhoto: ZipEntryReader | undefined;
-  uid: string;
+  userId: string;
   calls: PhotoImportCalls;
 }): Promise<boolean> {
   if (!readPhoto) {
@@ -81,7 +81,7 @@ export async function importPhoto({
     const photo = await readPhoto();
     const thumb = await compressThumb(photo);
     const base = crypto.randomUUID();
-    const pathBase = `${imagePrefix(uid, task.itemId)}/${base}`;
+    const pathBase = `${imagePrefix(userId, task.itemId)}/${base}`;
     const pathFull = `${pathBase}${extensionForType(fullType)}`;
     const pathThumb = `${pathBase}.thumb${extensionForType(thumb.type)}`;
     const fullError = await uploadWithRetry({

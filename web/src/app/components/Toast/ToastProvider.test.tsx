@@ -9,8 +9,9 @@ import {
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider, useToast } from './ToastProvider';
+import { leavingIsHeld } from '../../lib/useBeforeUnloadGuard.test-support';
+import { ToastWrapper } from '../providers.test-support';
+import { useToast } from './ToastProvider';
 
 // One button per message so a test fires one or several through userEvent, and so inside act().
 function Trigger({ messages }: { messages: string[] }) {
@@ -61,12 +62,7 @@ function UndoableSuccessTrigger({
   return (
     <button
       type="button"
-      onClick={() =>
-        toast.success(message, {
-          action: { label: 'Undo', onClick: onUndo },
-          onExpire,
-        })
-      }
+      onClick={() => toast.success(message, { onUndo, onExpire })}
     >
       {message}
     </button>
@@ -103,41 +99,30 @@ function CommitTrigger({ onCommitted }: { onCommitted: () => void }) {
   );
 }
 
+function renderWithToasts(ui: React.ReactNode) {
+  return render(ui, { wrapper: ToastWrapper });
+}
+
 function renderUndoable(handlers: {
   onExpire: () => void | Promise<void>;
   onUndo?: () => void;
   onCommitted?: () => void;
 }) {
-  render(
-    <I18nProvider>
-      <ToastProvider>
-        <UndoableSuccessTrigger
-          message="Entry deleted."
-          onExpire={handlers.onExpire}
-          onUndo={handlers.onUndo ?? vi.fn()}
-        />
-        <SuccessTrigger message="Entry added." />
-        <CommitTrigger onCommitted={handlers.onCommitted ?? vi.fn()} />
-      </ToastProvider>
-    </I18nProvider>,
+  return renderWithToasts(
+    <>
+      <UndoableSuccessTrigger
+        message="Entry deleted."
+        onExpire={handlers.onExpire}
+        onUndo={handlers.onUndo ?? vi.fn()}
+      />
+      <SuccessTrigger message="Entry added." />
+      <CommitTrigger onCommitted={handlers.onCommitted ?? vi.fn()} />
+    </>,
   );
-}
-
-/** Dispatches a cancelable beforeunload and reports whether anything asked the browser to hold it. */
-function leavingIsHeld() {
-  const event = new Event('beforeunload', { cancelable: true });
-  window.dispatchEvent(event);
-  return event.defaultPrevented;
 }
 
 function renderProvider(messages: string[]) {
-  return render(
-    <I18nProvider>
-      <ToastProvider>
-        <Trigger messages={messages} />
-      </ToastProvider>
-    </I18nProvider>,
-  );
+  return renderWithToasts(<Trigger messages={messages} />);
 }
 
 const liveRegion = (container: HTMLElement) =>
@@ -198,12 +183,8 @@ describe('ToastProvider', () => {
   });
 
   it('shows a success toast and speaks it through the polite live region, never as an assertive alert', async () => {
-    const { container } = render(
-      <I18nProvider>
-        <ToastProvider>
-          <SuccessTrigger message="Category deleted." />
-        </ToastProvider>
-      </I18nProvider>,
+    const { container } = renderWithToasts(
+      <SuccessTrigger message="Category deleted." />,
     );
 
     await userEvent.click(
@@ -217,17 +198,7 @@ describe('ToastProvider', () => {
   });
 
   it('tells a screen reader how to undo, and marks the shortcut on the Undo button', async () => {
-    const { container } = render(
-      <I18nProvider>
-        <ToastProvider>
-          <UndoableSuccessTrigger
-            message="Entry deleted."
-            onExpire={vi.fn()}
-            onUndo={vi.fn()}
-          />
-        </ToastProvider>
-      </I18nProvider>,
-    );
+    const { container } = renderUndoable({ onExpire: vi.fn() });
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Entry deleted.' }),
@@ -260,15 +231,8 @@ describe('ToastProvider', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
     const error = new Error('boom');
-    render(
-      <I18nProvider>
-        <ToastProvider>
-          <ReportErrorTrigger
-            message="Could not save this entry."
-            error={error}
-          />
-        </ToastProvider>
-      </I18nProvider>,
+    renderWithToasts(
+      <ReportErrorTrigger message="Could not save this entry." error={error} />,
     );
 
     await userEvent.click(
@@ -282,13 +246,7 @@ describe('ToastProvider', () => {
   });
 
   it('error() posts an assertive alert on its own, without going through reportError', async () => {
-    render(
-      <I18nProvider>
-        <ToastProvider>
-          <ErrorTrigger message="Could not load collections." />
-        </ToastProvider>
-      </I18nProvider>,
-    );
+    renderWithToasts(<ErrorTrigger message="Could not load collections." />);
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Could not load collections.' }),
@@ -301,20 +259,10 @@ describe('ToastProvider', () => {
 
   it('dismissing a toast from its own close button still commits onExpire, same as auto-dismiss', async () => {
     const onExpire = vi.fn();
-    render(
-      <I18nProvider>
-        <ToastProvider>
-          <UndoableSuccessTrigger
-            message="Collection deleted."
-            onExpire={onExpire}
-            onUndo={vi.fn()}
-          />
-        </ToastProvider>
-      </I18nProvider>,
-    );
+    renderUndoable({ onExpire });
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Collection deleted.' }),
+      screen.getByRole('button', { name: 'Entry deleted.' }),
     );
     const status = await screen.findByTestId('toast');
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
@@ -326,21 +274,9 @@ describe('ToastProvider', () => {
   it('auto-dismisses a toast on its own after the timeout, running onExpire', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const onExpire = vi.fn();
-    render(
-      <I18nProvider>
-        <ToastProvider>
-          <UndoableSuccessTrigger
-            message="Collection deleted."
-            onExpire={onExpire}
-            onUndo={vi.fn()}
-          />
-        </ToastProvider>
-      </I18nProvider>,
-    );
+    renderUndoable({ onExpire });
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Collection deleted.' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Entry deleted.' }));
     expect(screen.getByTestId('toast')).toBeInTheDocument();
 
     await act(async () => {
@@ -349,26 +285,15 @@ describe('ToastProvider', () => {
 
     expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
     expect(onExpire).toHaveBeenCalledTimes(1);
-    vi.useRealTimers();
   });
 
-  it("runs the action's own onClick and skips onExpire when its undo is used", async () => {
+  it('runs onUndo instead of onExpire when Undo is used', async () => {
     const onExpire = vi.fn();
     const onUndo = vi.fn();
-    render(
-      <I18nProvider>
-        <ToastProvider>
-          <UndoableSuccessTrigger
-            message="Collection deleted."
-            onExpire={onExpire}
-            onUndo={onUndo}
-          />
-        </ToastProvider>
-      </I18nProvider>,
-    );
+    renderUndoable({ onExpire, onUndo });
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Collection deleted.' }),
+      screen.getByRole('button', { name: 'Entry deleted.' }),
     );
     const status = await screen.findByTestId('toast');
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));

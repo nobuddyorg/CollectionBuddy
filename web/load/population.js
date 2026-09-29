@@ -3,7 +3,7 @@ import { browse, search, write } from './lib/flows.js';
 import {
   LIFECYCLE_TIMEOUTS,
   SUMMARY_TREND_STATS,
-  rampTo,
+  rampingScenario,
   thresholdsFor,
 } from './lib/options.js';
 import { COLLECTORS, ENTRIES_EACH, NOUNS_SEARCHED } from './lib/population.js';
@@ -15,22 +15,10 @@ export const options = {
   ...LIFECYCLE_TIMEOUTS,
   summaryTrendStats: SUMMARY_TREND_STATS,
   scenarios: {
-    own_browse: {
-      executor: 'ramping-vus',
-      exec: 'browseOwn',
-      stages: rampTo(10),
-    },
-    own_search: {
-      executor: 'ramping-vus',
-      exec: 'searchOwn',
-      stages: rampTo(5),
-    },
-    lent_browse: {
-      executor: 'ramping-vus',
-      exec: 'browseLent',
-      stages: rampTo(5),
-    },
-    write: { executor: 'ramping-vus', exec: 'writeOwn', stages: rampTo(3) },
+    own_browse: rampingScenario('browseOwn', 10),
+    own_search: rampingScenario('searchOwn', 5),
+    lent_browse: rampingScenario('browseLent', 5),
+    write: rampingScenario('writeOwn', 3),
   },
   thresholds: thresholdsFor([
     'own_browse',

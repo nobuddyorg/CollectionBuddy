@@ -3,32 +3,19 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
 import { countItemsForCategory } from '../../data/categories';
-import CategorySelect from './index';
+import type CategorySelect from './index';
 import type { UseCategories } from './useCategories';
 import {
   categories as categoriesState,
   openPanel,
   renderSelect as renderCategorySelect,
+  selectTree,
 } from './index.test-support';
+import { sharesState } from './shares.test-support';
+import { useShares } from './useShares';
 
-vi.mock('./useShares', () => ({
-  useShares: vi.fn().mockReturnValue({
-    shares: [],
-    isLoading: false,
-    isSharing: false,
-    isRevoking: false,
-    isUpdatingRole: false,
-    reload: vi.fn().mockResolvedValue([]),
-    createShare: vi.fn(),
-    revokeShare: vi.fn(),
-    leaveShare: vi.fn(),
-    updateShareRole: vi.fn(),
-  }),
-}));
+vi.mock('./useShares', () => ({ useShares: vi.fn() }));
 
 vi.mock('../../data/categories', () => ({ countItemsForCategory: vi.fn() }));
 
@@ -48,6 +35,7 @@ function renderSelect(
 describe('the category panel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useShares).mockReturnValue(sharesState());
     window.localStorage.setItem('lang', 'en');
   });
 
@@ -217,20 +205,7 @@ describe('the category panel', () => {
     const { view } = renderSelect({ selectedCategoryId: null });
     expect(screen.getByLabelText('New collection')).toBeVisible();
 
-    view.rerender(
-      <I18nProvider>
-        <ToastProvider>
-          <ConfirmProvider>
-            <CategorySelect
-              selectedCategoryId="a"
-              onSelect={vi.fn()}
-              categories={categories()}
-              userId="owner-1"
-            />
-          </ConfirmProvider>
-        </ToastProvider>
-      </I18nProvider>,
-    );
+    view.rerender(selectTree({ categories: categories() }));
 
     expect(screen.queryByLabelText('New collection')).not.toBeInTheDocument();
     // Nobody pressed anything inside the panel, so focus stays where it was.

@@ -7,9 +7,9 @@ covers each check in depth, and everything past the checklist.
 ## Run the checks CI runs, locally
 
 The checklist in [CONTRIBUTING.md](../../CONTRIBUTING.md#before-opening-a-pull-request)
-is CI's `build_and_test` job step for step, plus `mutation_test`. The
-stack-dependent jobs — `e2e_local_stack`, `opengrep`, `lighthouse`,
-`zap_baseline` — each have a section below.
+is CI's `build_and_test` job step for step, plus `mutation_test`. The other
+test jobs — `e2e_local_stack`, `opengrep`, `lighthouse`, `zap_baseline` — each
+have a section below.
 
 On a pull request, CI's `changes` job skips `build_and_test`, `mutation_test`,
 `lighthouse` and `zap_baseline` unless `web/**` or `.zap/rules.tsv` changed,
@@ -67,8 +67,9 @@ bypass the interface almost entirely: they ask Postgres, with a real token, the
 questions the app never would, one file per boundary (`isolation`,
 `viewer-share`, `editor-share`, each with a `-photographs` half for Storage,
 and `editor-share` a `-limits` one, plus `search-rpc`, `create-rpc`,
-`orphan-sweep-rpc`, `orphan-entries`, `quotas` and `account-deletion`; shared helpers in `rls/helpers.ts`). Change a
-policy and these files say whether it holds.
+`orphan-sweep-rpc`, `orphan-entries`, `quotas` and `account-deletion`; shared
+helpers in `rls/helpers.ts` and `collectors.ts`). Change a policy and these
+files say whether it holds.
 
 ```bash
 supabase start     # repository root
@@ -86,13 +87,16 @@ OAuth. `e2e/signed-in.setup.ts` creates a user through the auth admin API
 `localStorage` as Playwright storage state. Before adding tests here:
 
 - **Seeding runs as the user, not as `service_role`.** That role holds no
-  `SELECT`, `INSERT`, `UPDATE` or `DELETE` on the app's tables; its key opens
-  one door, creating the user. Everything else goes
-  through the same policies the app does, so a fixture cannot reach a state
-  the app could not.
-- **Spec files run in parallel against one database.** Tests that write use
-  `SEED.scratchCategory`; the collections the reading tests describe are never
-  touched.
+  `SELECT`, `INSERT`, `UPDATE` or `DELETE` on the app's tables; its key
+  (`adminApi()` in `collectors.ts`) creates users and, in the account-deletion
+  specs, lists and removes Storage objects and deletes an Auth user, as an
+  operator would. Everything else goes through the same policies the app does,
+  so a fixture cannot reach a state the app could not.
+- **Spec files run in parallel against one database.** Each writing spec has a
+  scratch collection of its own: a named key in `SEED` (`scratchCategory` for
+  `entries.spec.ts`, `photoCategory`, `exportCategory`, …) that is also listed
+  in `SEED.categories`, or a collector of its own where it must own the whole
+  account. The collections the reading tests describe are never touched.
 - **Clean up in `finally` through `e2e/signed-in/cleanup.ts`**, as the owner
   over the API: objects first, then rows, throwing on any error. A delete in
   the interface waits out its undo window and is never sent if the test ends
@@ -110,6 +114,14 @@ OAuth. `e2e/signed-in.setup.ts` creates a user through the auth admin API
 - **Poll, don't read once.** `expectTitles(page, [...])` waits for the
   debounced search round trip; an assertion straight after typing reads the
   previous answer.
+- **Reuse the shared helpers.** `helpers.ts` holds `uniqueName()`, the `PHOTO`
+  file with its `PHOTO_ARRIVES` timeout, and the Photon fake
+  (`answerGeocoder()`, `photonFeature()`); `rls/helpers.ts` the API clients,
+  grants and lookups the UI specs share with the RLS suite (`apiAs()`,
+  `viewerShare()`, `unshare()`, `storedObjects()`, `itemIdTitled()`, …);
+  `collectors.ts` the service-key client (`adminApi()`), an emptied collector
+  of a spec's own (`freshCollector()`) and an entry filed in one step
+  (`fileEntry()`); `e2e/pages/login.ts` `LOGIN_URL`.
 
 ### How a spec addresses the app
 
@@ -121,17 +133,22 @@ reads as the journey it is. [TEST_STRATEGY.md](../../TEST_STRATEGY.md) §9 has
 the shape and the rules; the screens are:
 
 - `catalogue` — grid, search box, pagination; `card(title)` for one entry and
-  its photos
-- `categories` — the collection strip, the panel behind it, `tab(name)`
+  its photos; `do.waitForCardsSettled()` before an axe scan
+- `categories` — the collection strip, the panel behind it, `tab(name)`;
+  `do.load()` to open the app, `do.downloadExport()` for an archive on disk
 - `form` — the entry form, tag chips, place autocomplete
 - `sharing` — the invite box; `row(email)` for a grant's role, expiry, revoke
-- `map`, `viewer`, `confirm`, `toast`, `account`, `login`, `appError`
+- `map`, `viewer`, `confirm`, `toast`, `account`, `login`, `appError`, `help`,
+  `privacy`, and `collectionsLoadError` / `entriesLoadError` (a list's
+  load-error state with its **Try again** button)
 
-Leaflet's pins and popups are the one thing reached by class name, inside
-`e2e/pages/map.ts`: that markup is the library's. A new case that needs an
-element with no id adds the id to the component and a locator to the page
-object. The grep that keeps this honest should return only `html`, `body`,
-`meta` and `link` assertions:
+Leaflet's own DOM (container, zoom control, pins, popups) is the one thing
+reached by class name, inside `e2e/pages/map.ts`: that markup is the library's.
+Every other element, a page object's root included (`app-root`, `user-menu`),
+is found by its `data-testid`. A new case that needs an element with no
+`data-testid` adds one to the component and a locator to the page object. The
+grep that keeps this honest should return only `html`, `body`, `meta` and
+`link` assertions:
 
 ```bash
 grep -rn 'getByTestId\|getByRole\|locator(' web/e2e --include=*.spec.ts
@@ -139,11 +156,11 @@ grep -rn 'getByTestId\|getByRole\|locator(' web/e2e --include=*.spec.ts
 
 ### The e2e coverage report
 
-`npm run e2e` and `npm run e2e:local` collect JS/CSS coverage through
-Playwright's own `page.coverage` (Chromium CDP, no instrumentation step);
+`npm run e2e:local` collects JS/CSS coverage through Playwright's own
+`page.coverage` (Chromium CDP, no instrumentation step);
 `e2e/global-teardown.ts` merges every worker's data into
-`web/coverage-e2e/index.html`. `i18n.spec.ts` (own browser context) and the
-`firefox` project (no CDP) do not contribute. V8 discards a document's counts
+`web/coverage-e2e/index.html`. The `firefox` project (no CDP) does not
+contribute. V8 discards a document's counts
 on a full navigation, whatever `resetOnNavigation` says, so the fixture
 flushes them before every `page.goto` and `page.reload`; a navigation the
 app triggers itself (the OAuth redirect) still loses what ran before it.
@@ -151,7 +168,10 @@ app triggers itself (the OAuth redirect) still loses what ran before it.
 Only `npm run e2e:local` collects, and it is gated by the floor in
 `e2e/coverage.ts`: it runs every Chromium-based project (`chromium`, `mobile`,
 `signed-in`) against a source-mapped build, so its report is the one complete
-picture. `npm run e2e` collects nothing: its job is Firefox and the
+picture. With collection on, a run that collected nothing, or whose report
+lacks a metric, fails like one below the floor, so a subset run
+(`e2e/signed-in/rls/` alone, say) fails the gate even when every test passes.
+`npm run e2e` collects nothing: its job is Firefox and the
 production-config bundle, and a build without `E2E_COVERAGE_SOURCEMAPS=true`
 (the deploy the smoke test runs against) has no `src/app/**` paths to map to,
 so its "lines" would be a few dozen minified ones.
@@ -175,9 +195,11 @@ supabase test db
 | `002_function_hardening_test.sql` | `search_path` pinning; which functions run as their owner |
 | `005_impersonation_sanity_test.sql` | That the impersonation the suite relies on works |
 | `010`, `020`, `025`, `030` | Ownership, viewer grants, a grant's lifecycle, the editor role |
+| `015_create_items_in_category_test.sql` | `create_items_in_category()`: entries and their links in one transaction, as the caller, so a refused link takes its entries with it |
 | `032`, `034` | What an editor keeps once its grant ends: the entries it filed, and the photographs it added to the owner's entries |
 | `040_storage_policy_surface_test.sql` | Bucket configuration; the storage verbs two security fixes removed |
 | `050`, `055` | The SQL functions and every branch of the write-path triggers |
+| `057_orphan_cleanup_test.sql` | `delete_item_if_orphan()`: an entry goes exactly when its last link does, one link or a collection's worth at a time |
 | `060`, `065` | The two read RPCs: who may call them, what they return |
 | `070_quotas_test.sql` | The quotas: photographs and thumbnails per owner, the bucket's ceilings at record and upload time, and entries, categories, shares, links and text |
 | `075_query_plans_test.sql` | That every index-backed query can reach its index, and picks it at a realistic size |
@@ -185,7 +207,9 @@ supabase test db
 | `085_delete_own_account_test.sql` | Deleting one's own account: the objects-first guard, what goes (rows, grants to its email, the Auth user) and what another account keeps |
 | `090_owned_rows_follow_the_auth_user_test.sql` | Deleting the Auth user as the dashboard does: every owner key cascades and is validated, what goes and what another account keeps, what the sweep may then take, and a leftover token's refused write |
 
-`_helpers.psql` holds the shared fixtures; it is `.psql` because
+`_helpers.psql` holds the shared fixtures and probes (`auth_as()`,
+`auth_as_anon()`, `upload_statement()`, `rows_written()`,
+`file_as_before_0020()`, `is_extension_member()`); it is `.psql` because
 `supabase test db` collects every `.sql` file as a test. Its `auth_as()` also
 creates the `auth.users` row it names, if missing, since every owner column
 references one (`0034`). pgTAP proves the
@@ -227,9 +251,10 @@ or `ERROR`: RLS disabled, a mutable `search_path`, an unindexed foreign key, a
 `SECURITY DEFINER` function the API roles can execute. CI runs it right after
 pgTAP. The script pins Splinter by commit and checksum and lists what it
 excuses, each with its reason: `unused_index`, which reads runtime statistics
-a freshly reset database does not have, and `search_category_items`, the one
-deliberate `SECURITY DEFINER` RPC. A new excuse is a design decision and goes
-into that list with its reason, never into a broader filter.
+a freshly reset database does not have, and the three deliberate
+`SECURITY DEFINER` functions `authenticated` may call: `search_category_items`,
+`photo_upload_has_room` and `delete_own_account`. A new excuse is a design
+decision and goes into that list with its reason, never into a broader filter.
 
 ## Run mutation testing
 
@@ -330,8 +355,8 @@ supabase start   # repository root
 cd web && npm run lighthouse
 ```
 
-Thresholds and the baseline they were measured against are in
-`web/lighthouserc.signed-out.json` and `.signed-in.json`. Performance is gated
+Thresholds are in `web/lighthouserc.signed-out.json` and `.signed-in.json`;
+the signed-in pass's measured baseline is below. Performance is gated
 against a measured baseline; accessibility must score exactly 1.0 on both
 flows, a second, weighted lens on the pages `@axe-core/playwright` already
 checks in the e2e suite. A finding fixed for Lighthouse gets an axe or
@@ -403,15 +428,16 @@ hand, in a reviewed PR:
 
 | Tool | Pinned in | Pin |
 | --- | --- | --- |
-| gitleaks | `ci.yml` (`prek`) | `GITLEAKS_VERSION`, `GITLEAKS_SHA256`: the `linux_x64` line of the release's `gitleaks_<version>_checksums.txt`. Keep it equal to the hook's `rev` in `.pre-commit-config.yaml`. |
+| gitleaks | `ci.yml` (`prek`) | `GITLEAKS_VERSION`, `GITLEAKS_SHA256`: the `linux_x64` line of the release's `gitleaks_<version>_checksums.txt`. Keep it equal to the gitleaks hook's `# frozen:` tag in `.pre-commit-config.yaml`. |
 | Opengrep | `ci.yml` (`opengrep`) | `OPENGREP_VERSION`, `OPENGREP_SHA256`: `sha256sum` of the release's `opengrep_manylinux_x86` asset (the release publishes no checksum file), once `cosign verify-blob --cert <asset>.cert --signature <asset>.sig --certificate-identity-regexp 'https://github.com/opengrep/opengrep/.+' --certificate-oidc-issuer https://token.actions.githubusercontent.com <asset>` accepts it. Also the version in [Run Opengrep](#run-opengrep). |
 | prek | `ci.yml` (`prek`) | `prek-version` on `j178/prek-action`. |
 | ZAP | `ci.yml` (`zap_baseline`) | `ZAP_IMAGE`: a release tag plus its digest, from `docker buildx imagetools inspect ghcr.io/zaproxy/zaproxy:<tag>`. Also the tag in [Run the OWASP ZAP baseline scan](#run-the-owasp-zap-baseline-scan). |
 | Supabase CLI | `.github/actions/setup-supabase-cli` | `version`: the one CLI for CI's stack and production's `db push`. |
 | k6 | `k6-load-test.yml` | `k6-version`. |
 
-The hook revisions in `.pre-commit-config.yaml` are tags, which Dependabot's
-`pre-commit` ecosystem bumps but upstream could repoint.
+The hook revisions in `.pre-commit-config.yaml` are pinned by commit SHA, with
+the tag in a `# frozen:` comment; Dependabot's `pre-commit` ecosystem resolves
+the next tag and rewrites both.
 
 Every job carries a `timeout-minutes` of roughly three times its observed
 duration, and every `curl` a `--connect-timeout` and `--max-time`, so a hung
@@ -604,8 +630,8 @@ One-time setup for a fork:
    and those three again as **Dependabot** secrets, since a Dependabot PR's
    run reads no other — what each is and why the DB URL must be the session
    pooler: [Configuration](../reference/configuration.md#github-actions-secrets).
-   The two tokens are scoped to the project, with exactly the [permissions
-   listed there](../reference/configuration.md#management-api-tokens). A pull
+   `SUPABASE_ACCESS_TOKEN` is scoped to the project, with exactly the
+   [permissions listed there](../reference/configuration.md#management-api-tokens). A pull
    request from another fork gets no secrets, so its `build_and_test` fails:
    push the branch to the repository itself.
 4. Nothing to change for another repository name or a custom domain: the

@@ -3,6 +3,7 @@ import { check } from 'k6';
 import { Trend } from 'k6/metrics';
 
 import { searchPage } from '../lib/api.js';
+import { expectOk } from '../lib/http.js';
 import { LIFECYCLE_TIMEOUTS } from '../lib/options.js';
 import { NOUNS, clearAccount } from '../lib/seed.js';
 import {
@@ -16,6 +17,7 @@ import {
 import {
   PROOF_TREND_STATS,
   measured,
+  probeScenario,
   probeThresholds,
   proofSummary,
 } from './lib/report.js';
@@ -27,10 +29,10 @@ const OTHER_ENTRIES = envInt('PROOF_OTHER_ENTRIES', 150000);
 // Owner quota is 50,000 entries, so larger tables need more collectors.
 const OTHER_COLLECTORS = Math.max(1, Math.ceil(OTHER_ENTRIES / 45000));
 const SAMPLES = envInt('PROOF_SAMPLES', 30);
-// Passed the app's former two-character non-ASCII floor, yet holds no trigram.
+// Two characters, no trigram: under the app's floor.
 const SHORT_TERM = 'Öl';
-// data/itemSearch.ts SEARCH_MIN_LENGTH, 3 since #779 (was 2 for non-ASCII): the app no longer sends 'Öl'.
-const SEARCH_MIN_LENGTH = 3;
+// data/itemSearch.ts SEARCH_MIN_LENGTH; 2 replays the floor before #779's fix.
+const SEARCH_MIN_LENGTH = envInt('PROOF_SEARCH_MIN_LENGTH', 3);
 // Matches exactly the same entries and carries trigrams: the cost a category-local answer should have.
 const TRIGRAM_TERM = 'Öllampe';
 
@@ -41,13 +43,7 @@ export const options = {
   summaryTrendStats: PROOF_TREND_STATS,
   scenarios: {
     // Autovacuum (naptime 60 s) must ANALYZE the fresh rows first: the defect is a planner choice made from statistics.
-    probe: {
-      executor: 'per-vu-iterations',
-      vus: 1,
-      iterations: SAMPLES,
-      exec: 'probe',
-      startTime: '2m',
-    },
+    probe: probeScenario(SAMPLES, { startTime: '2m' }),
   },
   thresholds: {
     // Below the floor the app sends no short request, so there is no short_term probe to report.
@@ -109,9 +105,7 @@ export function setup() {
 
 // A failed request ends the iteration before its verdict, so the report says INCONCLUSIVE rather than counting 0 matches.
 function totalOf(response) {
-  if (response.status !== 200)
-    throw new Error(`search RPC: HTTP ${response.status} ${response.body}`);
-  const rows = response.json();
+  const rows = expectOk(response, 'search RPC').json();
   return rows.length ? rows[0].total_count : 0;
 }
 

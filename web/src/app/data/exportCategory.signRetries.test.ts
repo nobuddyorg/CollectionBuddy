@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ExportCancelledError, ExportError, signAll } from './exportCategory';
+import { ExportCancelledError } from './exportCancellation';
+import { ExportError, signAll } from './exportCategory';
 import type { SignUrls } from './exportCategory.test-support';
 
 /** Answers each call in turn from `outcomes`: an error, or `ok` to sign the batch. */
@@ -28,7 +29,7 @@ describe('signAll, retrying a sign call', () => {
     vi.useRealTimers();
   });
 
-  // One 503 early in an export used to end it with nothing to show.
+  // A transient 503 must not end an export.
   it('retries a sign call Storage could not serve right now, and signs the batch', async () => {
     const signUrls = scriptedSignUrls([unavailable]);
 

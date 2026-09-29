@@ -1,21 +1,14 @@
 import { expect, test as base } from './test';
 
 import { SEED } from './fixtures';
-import {
-  browserState,
-  clearCollection,
-  ensureUser,
-  mintSession,
-} from './collectors';
+import { browserState, freshCollector } from './collectors';
 
 // A collector of its own per parallel slot: the first-run page needs an account that owns nothing.
 const test = base.extend({
   storageState: async ({ baseURL }, provide, testInfo) => {
     const email = `e2e-first-run-${testInfo.parallelIndex}@collectionbuddy.test`;
-    const userId = await ensureUser(email, SEED.firstRun.password);
-    const session = await mintSession(email, SEED.firstRun.password);
-    await clearCollection(session.client, userId);
-    await provide(browserState(new URL(baseURL!).origin, session));
+    const collector = await freshCollector(email, SEED.firstRun.password);
+    await provide(browserState(new URL(baseURL!).origin, collector));
   },
 });
 

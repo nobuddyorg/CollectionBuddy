@@ -62,7 +62,7 @@ describe('SearchInput', () => {
     expect(clearButton()).toHaveAccessibleName(/clear/i);
   });
 
-  // Regression: the icon sat off-centre within its button, so the × sat off the field's centre.
+  // An icon off-centre within its button puts the × off the field's centre line.
   it('centres the clear icon within its button', () => {
     renderSearch('coin');
     for (const className of ['items-center', 'justify-center']) {

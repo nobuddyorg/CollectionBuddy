@@ -3,21 +3,11 @@
 import React, { useId, useMemo } from 'react';
 
 import type { CoinProps } from './types';
-import Icon, { IconType } from '../Icon';
+import { CoinIcon } from './CoinIcon';
 import { coinSizeCss } from './size';
 import { TextRing } from './TextRing';
 
-export default function Coin({
-  text,
-  cta,
-  size = 420,
-  className,
-  textClassName = 'fill-muted-foreground',
-  fontFamily = 'var(--font-label-family), monospace',
-  fontSize = 15,
-  letterSpacing = 4,
-  opacity = 1,
-}: CoinProps) {
+export default function Coin({ text, cta, size = 420 }: CoinProps) {
   const rimId = useId();
 
   const style = useMemo<React.CSSProperties>(() => {
@@ -26,27 +16,10 @@ export default function Coin({
   }, [size]);
 
   return (
-    <div
-      data-testid="coin"
-      className={`relative ${className ?? ''}`}
-      style={style}
-    >
-      <Icon
-        icon={IconType.Coin}
-        className="w-full h-full"
-        rimId={rimId}
-        aria-hidden="true"
-      >
-        <TextRing
-          rimId={rimId}
-          text={text}
-          fontFamily={fontFamily}
-          fontSize={fontSize}
-          letterSpacing={letterSpacing}
-          opacity={opacity}
-          className={textClassName}
-        />
-      </Icon>
+    <div data-testid="coin" className="relative" style={style}>
+      <CoinIcon rimId={rimId} className="w-full h-full" aria-hidden="true">
+        <TextRing rimId={rimId} text={text} />
+      </CoinIcon>
 
       <div className="absolute inset-0 grid place-items-center z-30">{cta}</div>
     </div>

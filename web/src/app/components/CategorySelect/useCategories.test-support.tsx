@@ -1,9 +1,6 @@
-import { act, renderHook, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, renderHook } from '@testing-library/react';
 import { vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
 import {
   createCategory,
   listCategories,
@@ -15,17 +12,17 @@ import {
   listImagePathsForCategory,
   removeImageObjects,
 } from '../../data/images';
+import { ToastWrapper } from '../providers.test-support';
 import { useCategories } from './useCategories';
 
-export function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>{children}</ToastProvider>
-    </I18nProvider>
-  );
-}
+export {
+  ToastWrapper as wrapper,
+  commitDeferredDelete,
+} from '../providers.test-support';
 
 export const CATEGORY_ONE = { id: 'cat-1', name: 'Cat 1', user_id: 'owner-1' };
+
+export const CATEGORY_TWO = { id: 'cat-2', name: 'Cat 2', user_id: 'owner-1' };
 
 export const IMAGE_ROWS = [
   { id: 'p1', item_id: 'i1', path_full: 'u/i1/a.webp', path_thumb: null },
@@ -45,17 +42,11 @@ export function listCategoriesReturns(categories: (typeof CATEGORY_ONE)[]) {
 }
 
 export async function renderLoadedCategories() {
-  const hook = renderHook(() => useCategories(), { wrapper });
+  const hook = renderHook(() => useCategories(), { wrapper: ToastWrapper });
   await act(async () => {
     await hook.result.current.reload();
   });
   return hook;
-}
-
-// Commits the deferred delete by closing the toast, the same as letting it auto-dismiss would.
-export async function commitDeferredDelete() {
-  await screen.findByTestId('toast');
-  await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 }
 
 // One category holding two items whose deletion orphans both, with every data call answering.

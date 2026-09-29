@@ -12,7 +12,7 @@ type Props = {
   sortedCategories: CategoryTab[];
   isLoading: boolean;
   onCollapse: () => void;
-  userId: string | null;
+  userId: string;
 };
 
 // Shared with page.tsx, which owns the one panel this tablist controls.
@@ -21,7 +21,7 @@ export const CATEGORY_TABPANEL_ID = 'category-entries-panel';
 export const categoryTabId = (id: string) => `category-tab-${id}`;
 
 // No per-category colour or fill -- colour is reserved for the photographs.
-export function CategorySelectDropdown({
+export function CategoryTabs({
   selectedCategoryId,
   onSelect,
   sortedCategories,
@@ -58,7 +58,6 @@ export function CategorySelectDropdown({
       onSelect={onSelect}
       sortedCategories={sortedCategories}
       onCollapse={onCollapse}
-      ariaLabel={t('category_select.select_placeholder')}
       userId={userId}
     />
   );
@@ -69,8 +68,7 @@ type TablistProps = {
   onSelect: (id: string | null) => void;
   sortedCategories: CategoryTab[];
   onCollapse: () => void;
-  ariaLabel: string;
-  userId: string | null;
+  userId: string;
 };
 
 // Manual activation: arrows/Home/End only move focus (wrapping); Enter/Space selects, as each selection loads.
@@ -79,7 +77,6 @@ function CategoryTablist({
   onSelect,
   sortedCategories,
   onCollapse,
-  ariaLabel,
   userId,
 }: TablistProps) {
   const { t } = useI18n();
@@ -126,7 +123,7 @@ function CategoryTablist({
   return (
     <div
       role="tablist"
-      aria-label={ariaLabel}
+      aria-label={t('category_select.tablist_label')}
       className="-mx-4 px-4 flex gap-5 overflow-x-auto border-b border-border sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {sortedCategories.map((category, index) => {

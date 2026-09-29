@@ -8,9 +8,8 @@ import LoadingOverlay from '../LoadingOverlay';
 import { Spinner } from '../ui/Spinner';
 import type { GoogleSignInButtonProps } from './types';
 
-function joinClasses(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(' ');
-}
+const BUTTON_CLASSES =
+  'relative flex items-center justify-center h-12 px-4 rounded-md border border-[#747775] dark:border-[#8e918f] bg-white hover:bg-[#f8f9fa] active:bg-[#f1f3f4] dark:bg-[#131314] dark:hover:bg-[#1e1f20] dark:active:bg-[#282a2c] shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed';
 
 export default function GoogleSignInButton({
   onClick,
@@ -36,7 +35,7 @@ export default function GoogleSignInButton({
       await onClick();
     } catch (error) {
       setLoading(false);
-      onError?.(error);
+      onError(error);
     }
   }, [onClick, onError]);
 
@@ -49,14 +48,7 @@ export default function GoogleSignInButton({
         disabled={loading}
         aria-label={label}
         aria-busy={loading ? 'true' : 'false'}
-        className={joinClasses(
-          'relative flex items-center justify-center h-12 px-4 rounded-md',
-          'border border-[#747775] dark:border-[#8e918f]',
-          'bg-white hover:bg-[#f8f9fa] active:bg-[#f1f3f4]',
-          'dark:bg-[#131314] dark:hover:bg-[#1e1f20] dark:active:bg-[#282a2c]',
-          'shadow-sm hover:shadow-md transition-all duration-200',
-          'disabled:opacity-60 disabled:cursor-not-allowed',
-        )}
+        className={BUTTON_CLASSES}
         style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 500 }}
       >
         {loading ? (
@@ -77,9 +69,7 @@ export default function GoogleSignInButton({
         )}
       </button>
 
-      {loading && (
-        <LoadingOverlay label={t('item_list.loading')} theme="auto" />
-      )}
+      {loading && <LoadingOverlay label={t('common.loading')} theme="auto" />}
     </>
   );
 }

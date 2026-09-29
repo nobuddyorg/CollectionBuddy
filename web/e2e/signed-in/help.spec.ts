@@ -4,8 +4,7 @@ test.use({ locale: 'en-GB' });
 
 test.describe('help', () => {
   test.beforeEach(async ({ on, page }) => {
-    await page.goto('', { waitUntil: 'networkidle' });
-    await expect(on(page).categories.locators.selected).not.toBeEmpty();
+    await on(page).categories.do.load();
   });
 
   test('opens from the account menu, explains a topic, and hands focus back to the menu button', async ({

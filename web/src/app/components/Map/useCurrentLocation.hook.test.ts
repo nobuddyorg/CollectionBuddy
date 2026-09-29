@@ -2,7 +2,8 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { useCurrentLocation, type Coords } from './useCurrentLocation';
+import type { Coordinates } from '../../lib/coordinates';
+import { useCurrentLocation } from './useCurrentLocation';
 
 const POSITION: GeolocationPosition = {
   coords: {
@@ -53,11 +54,8 @@ function mockGeolocation() {
 }
 
 // vi.fn() records every argument a call passed, including the PositionOptions the typed signature omits.
-function thirdArgument(
-  mocked: { mock: { calls: unknown[][] } },
-  callIndex = 0,
-) {
-  return mocked.mock.calls[callIndex]?.[2] as PositionOptions | undefined;
+function thirdArgument(mocked: { mock: { calls: unknown[][] } }) {
+  return mocked.mock.calls[0]?.[2] as PositionOptions | undefined;
 }
 
 function stubNavigator(
@@ -181,7 +179,7 @@ describe('useCurrentLocation mount tracking', () => {
       geolocation.watches.get(watchId)!.success(POSITION);
     });
 
-    expect(result.current.location).toEqual<Coords>({
+    expect(result.current.location).toEqual<Coordinates>({
       lat: 50.94,
       lng: 6.96,
     });
@@ -199,7 +197,7 @@ describe('useCurrentLocation mount tracking', () => {
       geolocation.lastFix.success?.(POSITION);
     });
 
-    expect(result.current.location).toEqual<Coords>({
+    expect(result.current.location).toEqual<Coordinates>({
       lat: 50.94,
       lng: 6.96,
     });

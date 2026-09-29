@@ -1,19 +1,26 @@
 // Real Storage objects behind images rows, for seeds that need photographs: uploaded in parallel, rows written set-based.
+import encoding from 'k6/encoding';
 import http from 'k6/http';
 
-import { insertRows, removeObjects } from './api.js';
-import { ANON_KEY, SUPABASE_URL } from './target.js';
+import { BUCKET, SEED_BATCH, insertRows, removeObjects } from './api.js';
+import { authHeaders, expectOk } from './http.js';
+import { SUPABASE_URL } from './target.js';
 
-const BUCKET = 'item-images';
-// Same batch as lib/seed.js: one INSERT per request.
-const SEED_BATCH = 10000;
 // Parallel uploads per http.batch call; k6 sends at most batchPerHost (default 6) at once, so this only sizes each call.
 const UPLOAD_PARALLELISM = 25;
 // Storage's bulk delete refuses more than 1,000 prefixes per request.
 const REMOVE_BATCH = 1000;
 // A 1x1 WebP: for seeds and writes that need photo rows, not photo bytes.
-export const TINY_WEBP_BASE64 =
-  'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA';
+export const TINY_WEBP = encoding.b64decode(
+  'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA',
+  'std',
+);
+
+export function photoPaths(image) {
+  return image.path_thumb
+    ? [image.path_full, image.path_thumb]
+    : [image.path_full];
+}
 
 function uploadRequest({ session, path, bytes, contentType }) {
   return {
@@ -21,11 +28,7 @@ function uploadRequest({ session, path, bytes, contentType }) {
     url: `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`,
     body: bytes,
     params: {
-      headers: {
-        apikey: ANON_KEY,
-        Authorization: `Bearer ${session.token}`,
-        'Content-Type': contentType,
-      },
+      headers: { ...authHeaders(session), 'Content-Type': contentType },
       tags: { name: 'seed upload' },
     },
   };
@@ -40,11 +43,7 @@ export function uploadAll({ session, uploads, contentType = 'image/webp' }) {
         uploadRequest({ session, path, bytes, contentType }),
       );
     for (const [index, response] of http.batch(batch).entries()) {
-      if (response.status < 200 || response.status >= 300) {
-        throw new Error(
-          `seed upload of ${uploads[start + index].path} failed: HTTP ${response.status} ${response.body}`,
-        );
-      }
+      expectOk(response, `seed upload of ${uploads[start + index].path}`);
     }
   }
 }
@@ -54,7 +53,7 @@ export function attachPhotos({
   session,
   itemIds,
   photosEach,
-  bytes,
+  bytes = TINY_WEBP,
   thumbBytes = bytes,
 }) {
   const rows = itemIds.flatMap((itemId) =>

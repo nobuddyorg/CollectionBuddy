@@ -31,12 +31,10 @@ describe('useShares updateShareRole', () => {
     } as never);
     const { result } = await renderLoadedShares();
 
-    let ok: boolean | undefined;
     await act(async () => {
-      ok = await result.current.updateShareRole('share-1', 'editor');
+      await result.current.updateShareRole('share-1', 'editor');
     });
 
-    expect(ok).toBe(true);
     expect(updateShareRoleRow).toHaveBeenCalledWith('share-1', 'editor');
     expect(result.current.shares).toEqual([updated]);
   });
@@ -49,13 +47,13 @@ describe('useShares updateShareRole', () => {
     } as never);
     const { result } = await renderLoadedShares();
 
-    let ok: boolean | undefined;
     await act(async () => {
-      ok = await result.current.updateShareRole('share-1', 'editor');
+      await result.current.updateShareRole('share-1', 'editor');
     });
 
-    expect(ok).toBe(true);
+    expect(updateShareRoleRow).toHaveBeenCalledWith('share-1', 'editor');
     expect(result.current.shares).toEqual([grant]);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('replaces only the targeted grant, leaving the others as they were', async () => {
@@ -91,12 +89,10 @@ describe('useShares updateShareRole', () => {
       .mockImplementation(() => {});
     const { result } = await renderLoadedShares();
 
-    let ok: boolean | undefined;
     await act(async () => {
-      ok = await result.current.updateShareRole('share-1', 'editor');
+      await result.current.updateShareRole('share-1', 'editor');
     });
 
-    expect(ok).toBe(false);
     expect(result.current.shares).toEqual([grant]);
     expect(result.current.isUpdatingRole).toBe(false);
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -110,12 +106,11 @@ describe('useShares updateShareRole', () => {
     listSharesReturns([grant]);
     const { result } = await renderLoadedShares();
 
-    let ok: boolean | undefined;
     await act(async () => {
-      ok = await result.current.updateShareRole('share-elsewhere', 'editor');
+      await result.current.updateShareRole('share-elsewhere', 'editor');
     });
 
-    expect(ok).toBe(false);
     expect(updateShareRoleRow).not.toHaveBeenCalled();
+    expect(result.current.shares).toEqual([grant]);
   });
 });

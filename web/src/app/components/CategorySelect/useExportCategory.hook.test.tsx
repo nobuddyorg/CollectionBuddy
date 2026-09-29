@@ -3,15 +3,11 @@ import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  ExportCancelledError,
-  exportCategory,
-  type ExportProgress,
-} from '../../data/exportCategory';
+import { ExportCancelledError } from '../../data/exportCancellation';
+import { exportCategory, type ExportProgress } from '../../data/exportCategory';
 import { ZipLimitError } from '../../data/zip';
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
+import { leavingIsHeld } from '../../lib/useBeforeUnloadGuard.test-support';
+import { ToastConfirmWrapper as wrapper } from '../providers.test-support';
 import { downloadBlob } from './downloadBlob';
 import { useExportCategory } from './useExportCategory';
 
@@ -23,16 +19,6 @@ vi.mock('../../data/exportCategory', async () => {
 });
 
 vi.mock('./downloadBlob', () => ({ downloadBlob: vi.fn() }));
-
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>{children}</ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>
-  );
-}
 
 const CATEGORY = { id: 'cat-1', name: 'Coins' };
 
@@ -51,6 +37,25 @@ type ExportArgs = Parameters<typeof exportCategory>[0];
 /** The argument object the hook handed `exportCategory` on its last call. */
 function lastCall(): ExportArgs {
   return vi.mocked(exportCategory).mock.calls.at(-1)![0];
+}
+
+function holdExport(): () => void {
+  let release: (() => void) | undefined;
+  vi.mocked(exportCategory).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve(exported());
+      }) as never,
+  );
+  return () => release?.();
+}
+
+function asksBeforeLargeExport() {
+  vi.mocked(exportCategory).mockImplementation((async (args: ExportArgs) => {
+    const go = await args.confirmLargeExport!(2.5 * 1024 ** 3);
+    if (!go) throw new ExportCancelledError();
+    return exported();
+  }) as never);
 }
 
 function installExportMocks() {
@@ -75,19 +80,13 @@ describe('useExportCategory', () => {
       'CollectionBuddy-coins.zip',
     );
     expect(result.current.isExporting).toBe(false);
-    expect(result.current.progress).toBeNull();
+    expect(result.current.message).toBeNull();
     // Nothing was left out, so nothing is reported as left out.
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('starts on the reading phase, so the button says something before the first page lands', async () => {
-    let release: (() => void) | undefined;
-    vi.mocked(exportCategory).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(exported());
-        }) as never,
-    );
+    const releaseExport = holdExport();
     const { result } = renderHook(() => useExportCategory(), { wrapper });
 
     act(() => {
@@ -95,17 +94,12 @@ describe('useExportCategory', () => {
     });
 
     await waitFor(() =>
-      expect(result.current.progress).toEqual({
-        phase: 'items',
-        done: 0,
-        total: 0,
-      }),
+      expect(result.current.message).toBe('Reading entries…'),
     );
     expect(result.current.isExporting).toBe(true);
-    expect(result.current.message).toBe('Reading entries…');
 
     await act(async () => {
-      release?.();
+      releaseExport();
     });
     expect(result.current.isExporting).toBe(false);
   });
@@ -137,11 +131,7 @@ describe('useExportCategory', () => {
   });
 
   it('asks before exporting an archive big enough to lose, and reports the size', async () => {
-    vi.mocked(exportCategory).mockImplementation((async (args: ExportArgs) => {
-      const go = await args.confirmLargeExport!(2.5 * 1024 ** 3);
-      if (!go) throw new ExportCancelledError();
-      return exported();
-    }) as never);
+    asksBeforeLargeExport();
     const { result } = renderHook(() => useExportCategory(), { wrapper });
 
     let done: Promise<void>;
@@ -160,11 +150,7 @@ describe('useExportCategory', () => {
 
   it('reports that size the way the app language writes numbers', async () => {
     window.localStorage.setItem('lang', 'de');
-    vi.mocked(exportCategory).mockImplementation((async (args: ExportArgs) => {
-      const go = await args.confirmLargeExport!(2.5 * 1024 ** 3);
-      if (!go) throw new ExportCancelledError();
-      return exported();
-    }) as never);
+    asksBeforeLargeExport();
     const { result } = renderHook(() => useExportCategory(), { wrapper });
 
     let done: Promise<void>;
@@ -183,11 +169,7 @@ describe('useExportCategory', () => {
   });
 
   it('treats declining that confirmation as a cancellation, not a failure', async () => {
-    vi.mocked(exportCategory).mockImplementation((async (args: ExportArgs) => {
-      const go = await args.confirmLargeExport!(2.5 * 1024 ** 3);
-      if (!go) throw new ExportCancelledError();
-      return exported();
-    }) as never);
+    asksBeforeLargeExport();
     const { result } = renderHook(() => useExportCategory(), { wrapper });
 
     let done: Promise<void>;
@@ -283,15 +265,8 @@ describe('useExportCategory', () => {
 describe('useExportCategory cancel and in-flight guards', () => {
   beforeEach(installExportMocks);
 
-  // A second click while one export is running must not start a second run.
   it('ignores a second request while one export is still in flight', async () => {
-    let release: (() => void) | undefined;
-    vi.mocked(exportCategory).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(exported());
-        }) as never,
-    );
+    const releaseExport = holdExport();
     const { result } = renderHook(() => useExportCategory(), { wrapper });
 
     act(() => {
@@ -305,18 +280,12 @@ describe('useExportCategory cancel and in-flight guards', () => {
 
     expect(exportCategory).toHaveBeenCalledTimes(1);
     await act(async () => {
-      release?.();
+      releaseExport();
     });
   });
 
   it('cancels the export actually in flight', async () => {
-    let release: (() => void) | undefined;
-    vi.mocked(exportCategory).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(exported());
-        }) as never,
-    );
+    const releaseExport = holdExport();
     const { result } = renderHook(() => useExportCategory(), { wrapper });
 
     act(() => {
@@ -331,7 +300,7 @@ describe('useExportCategory cancel and in-flight guards', () => {
 
     expect(lastCall().signal!.aborted).toBe(true);
     await act(async () => {
-      release?.();
+      releaseExport();
     });
   });
 
@@ -361,39 +330,19 @@ describe('useExportCategory cancel and in-flight guards', () => {
 
   // Closing the tab mid-run would discard minutes of work, so the browser asks, but only then.
   it('guards against closing the tab only while an export is running', async () => {
-    const addSpy = vi.spyOn(window, 'addEventListener');
-    const removeSpy = vi.spyOn(window, 'removeEventListener');
-    let release: (() => void) | undefined;
-    vi.mocked(exportCategory).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(exported());
-        }) as never,
-    );
+    const releaseExport = holdExport();
     const { result } = renderHook(() => useExportCategory(), { wrapper });
-
-    const beforeUnloadCalls = () =>
-      addSpy.mock.calls.filter(([event]) => event === 'beforeunload');
-    // Nothing to lose yet, so nothing is listening yet.
-    expect(beforeUnloadCalls()).toHaveLength(0);
+    expect(leavingIsHeld()).toBe(false);
 
     act(() => {
       void result.current.runExport(CATEGORY);
     });
     await waitFor(() => expect(result.current.isExporting).toBe(true));
-
-    expect(beforeUnloadCalls()).toHaveLength(1);
-    const handler = beforeUnloadCalls()[0][1] as EventListener;
-    const event = new Event('beforeunload', { cancelable: true });
-    handler(event);
-    expect(event.defaultPrevented).toBe(true);
+    expect(leavingIsHeld()).toBe(true);
 
     await act(async () => {
-      release?.();
+      releaseExport();
     });
-
-    expect(removeSpy).toHaveBeenCalledWith('beforeunload', handler);
-    addSpy.mockRestore();
-    removeSpy.mockRestore();
+    expect(leavingIsHeld()).toBe(false);
   });
 });

@@ -32,7 +32,7 @@ Click **+** above the empty item grid.
 - **Title** — required.
 - **Description** — optional.
 - **Place** — type three or more characters of a real place name and pick one
-  of the suggestions. Picking a suggestion is what puts the item on the map.
+  of the suggestions, which pins the item exactly there on the map.
 - **Tags** — type a word and press Enter or comma to add it as a chip.
 
 Save. Items sort newest first, and the list jumps to page 1 so you see it.

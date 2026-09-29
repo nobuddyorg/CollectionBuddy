@@ -43,7 +43,7 @@ export function initHelp(page: Page): Help {
       await locators.buttons.emptyState.click();
     },
     openTopic: async (name: HelpTopic) => {
-      await topic(name).locator('summary').click();
+      await topic(name).getByTestId('help-topic-toggle').click();
     },
   };
   return Object.assign(() => root, { locators, do: interactions });

@@ -3,38 +3,16 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
+import {
+  acceptConfirmation,
+  ToastConfirmWrapper,
+} from '../providers.test-support';
+import { grant, sharesState } from './shares.test-support';
 import { SharingSection } from './Sharing';
 import type { UseShares } from './useShares';
 
-function sharesState(overrides: Partial<UseShares> = {}): UseShares {
-  return {
-    shares: [],
-    isLoading: false,
-    isSharing: false,
-    isRevoking: false,
-    isUpdatingRole: false,
-    reload: vi.fn().mockResolvedValue([]),
-    createShare: vi.fn().mockResolvedValue(true),
-    revokeShare: vi.fn().mockResolvedValue(undefined),
-    leaveShare: vi.fn().mockResolvedValue(true),
-    updateShareRole: vi.fn().mockResolvedValue(true),
-    ...overrides,
-  };
-}
-
 function renderSection(shares: UseShares) {
-  render(
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <SharingSection shares={shares} />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>,
-  );
+  render(<SharingSection shares={shares} />, { wrapper: ToastConfirmWrapper });
 }
 
 /** A German app language on an American browser, so a date written the browser's way would give itself away. */
@@ -146,7 +124,7 @@ describe('SharingSection invite', () => {
     expect(createShare).not.toHaveBeenCalled();
   });
 
-  it('shows a spinner instead of the share icon while sharing is in flight', () => {
+  it('marks Share busy while sharing is in flight', () => {
     renderSection(sharesState({ isSharing: true }));
     expect(screen.getByRole('button', { name: 'Share' })).toHaveAttribute(
       'aria-busy',
@@ -252,16 +230,8 @@ describe('SharingSection list', () => {
     germanAppOnAmericanBrowser();
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            // Midday, so every timezone the suite may run in reads the same day.
-            expires_at: '2099-12-31T12:00:00.000Z',
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        // Midday, so every timezone the suite may run in reads the same day.
+        shares: [{ ...grant, expires_at: '2099-12-31T12:00:00.000Z' }],
       }),
     );
 
@@ -270,18 +240,10 @@ describe('SharingSection list', () => {
   });
 
   it('lists an existing grant with its expiry', () => {
-    const expiresAt = '2026-12-31T23:59:59.000Z';
+    const expiresAt = '2099-06-30T12:00:00.000Z';
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: expiresAt,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [{ ...grant, expires_at: expiresAt }],
       }),
     );
     // The expiry sits in a nested span, so aggregate text is read rather than one node's.
@@ -295,15 +257,7 @@ describe('SharingSection list', () => {
     const expiresAt = '2020-01-01T00:00:00.000Z';
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: expiresAt,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [{ ...grant, expires_at: expiresAt }],
       }),
     );
     const row = screen.getByText('grantee@example.com').closest('li')!;
@@ -318,15 +272,7 @@ describe('SharingSection list', () => {
   it("reflects an existing grant's role in its checkbox", () => {
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'editor',
-          },
-        ],
+        shares: [{ ...grant, role: 'editor' }],
       }),
     );
     const row = screen.getByText('grantee@example.com').closest('li')!;
@@ -334,18 +280,10 @@ describe('SharingSection list', () => {
   });
 
   it('warns before granting edit access, and only applies it once accepted', async () => {
-    const updateShareRole = vi.fn().mockResolvedValue(true);
+    const updateShareRole = vi.fn<UseShares['updateShareRole']>();
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
         updateShareRole,
       }),
     );
@@ -358,24 +296,16 @@ describe('SharingSection list', () => {
         'Give grantee@example.com full edit access to this collection, including adding, changing and deleting entries and photographs?',
       ),
     ).toBeVisible();
-    await userEvent.click(screen.getByTestId('confirm-accept'));
+    await acceptConfirmation();
 
     expect(updateShareRole).toHaveBeenCalledWith('share-1', 'editor');
   });
 
   it('does not grant edit access if the warning is declined', async () => {
-    const updateShareRole = vi.fn().mockResolvedValue(true);
+    const updateShareRole = vi.fn<UseShares['updateShareRole']>();
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
         updateShareRole,
       }),
     );
@@ -388,18 +318,10 @@ describe('SharingSection list', () => {
   });
 
   it('revokes edit access with no warning', async () => {
-    const updateShareRole = vi.fn().mockResolvedValue(true);
+    const updateShareRole = vi.fn<UseShares['updateShareRole']>();
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'editor',
-          },
-        ],
+        shares: [{ ...grant, role: 'editor' }],
         updateShareRole,
       }),
     );
@@ -411,18 +333,10 @@ describe('SharingSection list', () => {
 
   // "Can edit" has no room on a narrow screen; the pen icon opens the same checkbox in a modal.
   it('opens the role toggle in a modal from the mobile pen button', async () => {
-    const updateShareRole = vi.fn().mockResolvedValue(true);
+    const updateShareRole = vi.fn<UseShares['updateShareRole']>();
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
         updateShareRole,
       }),
     );
@@ -438,24 +352,16 @@ describe('SharingSection list', () => {
         'Give grantee@example.com full edit access to this collection, including adding, changing and deleting entries and photographs?',
       ),
     ).toBeVisible();
-    await userEvent.click(screen.getByTestId('confirm-accept'));
+    await acceptConfirmation();
 
     expect(updateShareRole).toHaveBeenCalledWith('share-1', 'editor');
   });
 
   it('closes the role modal again, leaving the row as it was', async () => {
-    const updateShareRole = vi.fn().mockResolvedValue(true);
+    const updateShareRole = vi.fn<UseShares['updateShareRole']>();
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
         updateShareRole,
       }),
     );
@@ -474,15 +380,7 @@ describe('SharingSection list', () => {
     const revokeShare = vi.fn<UseShares['revokeShare']>();
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
         revokeShare,
       }),
     );
@@ -495,7 +393,7 @@ describe('SharingSection list', () => {
         'Stop sharing with grantee@example.com? They will no longer be able to see this collection.',
       ),
     ).toBeVisible();
-    await userEvent.click(screen.getByTestId('confirm-accept'));
+    await acceptConfirmation();
 
     expect(revokeShare).toHaveBeenCalledWith('share-1');
   });
@@ -504,15 +402,7 @@ describe('SharingSection list', () => {
     const revokeShare = vi.fn<UseShares['revokeShare']>();
     renderSection(
       sharesState({
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
         revokeShare,
       }),
     );
@@ -529,15 +419,7 @@ describe('SharingSection list', () => {
     renderSection(
       sharesState({
         isLoading: true,
-        shares: [
-          {
-            id: 'share-1',
-            invited_email: 'grantee@example.com',
-            expires_at: null,
-            owner_user_id: 'owner-1',
-            role: 'viewer',
-          },
-        ],
+        shares: [grant],
       }),
     );
 

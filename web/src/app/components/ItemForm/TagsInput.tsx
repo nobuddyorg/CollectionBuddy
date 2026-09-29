@@ -94,12 +94,16 @@ export function TagsInput({
         onChange={(event) => setTagInput(event.target.value)}
         onKeyDown={onKeyDown}
         aria-label={t('item_create.tags_placeholder')}
-        placeholder={atLimit ? t('item_create.tags_limit') : emptyPlaceholder}
+        placeholder={
+          atLimit
+            ? t('item_create.tags_limit', { max: MAX_TAGS })
+            : emptyPlaceholder
+        }
         enterKeyHint="done"
         className="flex-1 min-w-[100px] bg-transparent py-1 text-sm"
       />
       <span role="status" className="sr-only">
-        {tCount('item_create.tags_count', tags.length)}
+        {tCount('item_create.tags_count', { count: tags.length })}
       </span>
     </div>
   );

@@ -1,15 +1,11 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-
-export interface Coords {
-  lat: number;
-  lng: number;
-}
+import type { Coordinates } from '../../lib/coordinates';
 
 export type LocationFailure = 'denied' | 'unavailable';
 
 export type LocationResult =
-  { ok: true; location: Coords } | { ok: false; reason: LocationFailure };
+  { ok: true; location: Coordinates } | { ok: false; reason: LocationFailure };
 
 const FIX_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
@@ -33,17 +29,17 @@ const WATCH_OPTIONS: PositionOptions = {
 // How long the first fix keeps refining; the pin stops visibly improving well before this.
 const WATCH_MS = 10000;
 
-const coordsOf = (position: GeolocationPosition): Coords => ({
+const coordsOf = (position: GeolocationPosition): Coordinates => ({
   lat: position.coords.latitude,
   lng: position.coords.longitude,
 });
 
 /** "You said no" gets different advice from every other failure, and only it can be undone. */
-export function classifyLocationError(error: {
-  code?: number;
-}): LocationFailure {
+export function classifyLocationError(
+  error: Pick<GeolocationPositionError, 'code'>,
+): LocationFailure {
   // GeolocationPositionError.PERMISSION_DENIED, spelled out: the constant lives on an instance jsdom lacks.
-  return error?.code === 1 ? 'denied' : 'unavailable';
+  return error.code === 1 ? 'denied' : 'unavailable';
 }
 
 /** Reads the permission without prompting: an unprompted dialog gets dismissed, and dismissals add up to a block. */
@@ -59,7 +55,7 @@ export async function isGeolocationGranted(): Promise<boolean> {
 
 /** `request` is a user-gesture fix, the only reliable moment to raise a permission prompt in a PWA. */
 export function useCurrentLocation(active: boolean) {
-  const [location, setLocation] = useState<Coords | null>(null);
+  const [location, setLocation] = useState<Coordinates | null>(null);
   const [locating, setLocating] = useState(false);
 
   useEffect(() => {

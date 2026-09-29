@@ -65,20 +65,14 @@ insert into public.items (title) values ('Filed twice')
 returning id as twice_id \gset
 
 -- Filed in both collections, a shape only rows from before 0020 have.
-reset role;
-alter table public.item_categories disable trigger trg_item_categories_quota;
-select pg_temp.auth_as(:'editor_id'::uuid, 'filed-editor@collectionbuddy.test');
-insert into public.item_categories (item_id, category_id)
-values (:'twice_id'::uuid, :'own_category_id'::uuid), (:'twice_id'::uuid, :'category_id'::uuid);
-reset role;
-alter table public.item_categories enable trigger trg_item_categories_quota;
-select pg_temp.auth_as(:'editor_id'::uuid, 'filed-editor@collectionbuddy.test');
+select pg_temp.file_as_before_0020(:'twice_id'::uuid, :'own_category_id'::uuid);
+select pg_temp.file_as_before_0020(:'twice_id'::uuid, :'category_id'::uuid);
 
-with attempt as (
-  update public.items set title = 'edited while granted' where id = :'filed_id'::uuid returning id
-)
-select is((select count(*) from attempt), 1::bigint,
-  'an editor edits the entry it filed while the grant is active');
+select is(
+  pg_temp.rows_written(format('update public.items set title = %L where id = %L returning id', 'edited while granted', :'filed_id')),
+  1::bigint,
+  'an editor edits the entry it filed while the grant is active'
+);
 
 select set_config('t.filed', :'filed_id', true) as t_filed,
   set_config('t.editor', :'editor_id', true) as t_editor \gset
@@ -110,7 +104,6 @@ with attempt as (
 select is((select count(*) from attempt), 1::bigint,
   'promoted back to editor, it edits the entry again');
 
--- Revoked.
 select pg_temp.auth_as(:'owner_id'::uuid, 'filed-owner@collectionbuddy.test');
 delete from public.category_shares where id = :'share_id'::uuid;
 
@@ -140,26 +133,26 @@ select is(
 
 -- The revocation reaches only what is in the shared collection.
 select pg_temp.auth_as(:'editor_id'::uuid, 'filed-editor@collectionbuddy.test');
-with attempt as (
-  update public.items set title = 'still mine' where id = :'own_entry_id'::uuid returning id
-)
-select is((select count(*) from attempt), 1::bigint,
-  'the ex-editor still edits an entry in its own collection');
+select is(
+  pg_temp.rows_written(format('update public.items set title = %L where id = %L returning id', 'still mine', :'own_entry_id')),
+  1::bigint,
+  'the ex-editor still edits an entry in its own collection'
+);
 
 insert into public.images (item_id, path_full)
 values (:'unfiled_id'::uuid, :'editor_id'::text || '/' || :'unfiled_id'::text || '/c.webp');
-with attempt as (
-  delete from public.items where id = :'unfiled_id'::uuid returning id
-)
-select is((select count(*) from attempt), 1::bigint,
-  'and photographs and deletes an entry in no collection, which is its owner''s alone');
+select is(
+  pg_temp.rows_written(format('delete from public.items where id = %L returning id', :'unfiled_id')),
+  1::bigint,
+  'and photographs and deletes an entry in no collection, which is its owner''s alone'
+);
 
 -- One collection the caller can no longer write is enough, even with the caller's own collection holding the entry too.
-with attempt as (
-  update public.items set title = 'rewritten through my own collection' where id = :'twice_id'::uuid returning id
-)
-select is((select count(*) from attempt), 0::bigint,
-  'an entry also filed in a collection the caller lost is refused, even through the caller''s own collection');
+select is(
+  pg_temp.rows_written(format('update public.items set title = %L where id = %L returning id', 'rewritten through my own collection', :'twice_id')),
+  0::bigint,
+  'an entry also filed in a collection the caller lost is refused, even through the caller''s own collection'
+);
 
 -- The owner's side is unchanged: the asymmetry of 0006 still hides the entry, and the collection's delete still sweeps it (055).
 select pg_temp.auth_as(:'owner_id'::uuid, 'filed-owner@collectionbuddy.test');

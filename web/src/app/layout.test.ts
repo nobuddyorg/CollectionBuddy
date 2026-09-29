@@ -18,13 +18,10 @@ describe('the framebusting script in layout.tsx', () => {
     expect(script).toContain('window.top.location=window.self.location');
   });
 
-  it('is declared and rendered before the theme script, so it runs first', () => {
-    const declared = layout.indexOf('const FRAMEBUST_SCRIPT');
-    const themeDeclared = layout.indexOf('const THEME_INIT_SCRIPT');
+  it('is rendered before the theme script, so it runs first', () => {
     const rendered = layout.indexOf('FRAMEBUST_SCRIPT }}');
     const themeRendered = layout.indexOf('THEME_INIT_SCRIPT }}');
-    expect(declared).toBeGreaterThan(-1);
-    expect(themeDeclared).toBeGreaterThan(-1);
+    expect(rendered).toBeGreaterThan(-1);
     expect(rendered).toBeLessThan(themeRendered);
   });
 });
@@ -54,16 +51,15 @@ describe('the Content-Security-Policy meta tag in layout.tsx', () => {
     expect(layout).toContain('new URL(modelPath).origin');
   });
 
-  it('allows a worker to be created from a blob: URL', () => {
-    expect(policy).toContain(`worker-src 'self' blob:`);
+  it("starts workers from the app's own files only, never a blob: URL", () => {
+    expect(policy).toContain("`worker-src 'self'`,");
   });
 
-  // A blob: worker inherits this policy, so a CDN here would run third-party code over every photo uploaded.
-  it("loads scripts, a worker's imports included, from the app's own origin only", () => {
+  it("loads scripts from the app's own origin only", () => {
     expect(policy).toContain("`script-src 'self' 'unsafe-inline'`,");
   });
 
-  it('allows a data: URI image, which Leaflet loads internally', () => {
+  it('allows a data: URI image, which Leaflet and the photo compression on older Safari load', () => {
     expect(policy).toMatch(/img-src[^;]*\bdata:/);
   });
 

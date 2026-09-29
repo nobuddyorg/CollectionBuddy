@@ -2,7 +2,6 @@ import { chunk } from '../lib/chunk';
 import {
   createSignedUrls,
   isTransientStorageError,
-  ITEM_IMAGES_BUCKET,
   type ExportImageRow,
 } from './images';
 import { listItemsForExport, type ExportCursor } from './exportItemPages';
@@ -14,11 +13,18 @@ import {
   CSV_NAME,
   exportEntries,
   MANIFEST_NAME,
+  type ExportEntry,
   type ExportItem,
 } from './exportFormat';
-import { createZipWriter, ZipLimitError } from './zip';
+import { createZipWriter, type ZipWriter } from './zip';
+import { checkCancelled, ExportCancelledError } from './exportCancellation';
+import {
+  downloadPhotosInto,
+  RETRY_ATTEMPTS,
+  RETRY_BASE_MS,
+} from './exportPhotos';
 import { runPool } from '../lib/pool';
-import { isRetryableStatus, retryWithBackoff } from '../lib/backoff';
+import { retryWithBackoff } from '../lib/backoff';
 
 /** How far an export has got. `total` is 0 until items and photos are counted. */
 export type ExportProgress = {
@@ -59,19 +65,6 @@ export class ExportError extends Error {
   }
 }
 
-/** Thrown when the caller's `signal` aborts: a user-requested cancel, not a failure. */
-export class ExportCancelledError extends Error {
-  constructor() {
-    super('Export cancelled');
-    this.name = 'ExportCancelledError';
-  }
-}
-
-function checkCancelled(signal?: AbortSignal): void {
-  if (signal?.aborted) throw new ExportCancelledError();
-}
-
-/** Walks every page of a category's items with their photographs, reporting the running count. */
 async function fetchAllPages({
   categoryId,
   listItems,
@@ -114,59 +107,6 @@ function photoPathsOf(photos: ExportImageRow[]): {
     totalBytes += row.size_bytes ?? 0;
   }
   return { photoPathsByItemId, totalBytes };
-}
-
-// A sign call and a photo download each get three attempts; PostgREST reads are retried by postgrest-js itself.
-const RETRY_ATTEMPTS = 3;
-const RETRY_BASE_MS = 500;
-
-/** Bounded so only a handful of response Blobs are ever held in memory at once. */
-export const PHOTO_DOWNLOAD_CONCURRENCY = 6;
-
-/** Browser `fetch` has no response timeout of its own, so a stalled response would hang forever. */
-export const PHOTO_FETCH_TIMEOUT_MS = 30_000;
-
-/** The caller's cancellation OR'd with a fresh per-attempt timeout. */
-function fetchSignal(signal?: AbortSignal): AbortSignal {
-  const timeout = AbortSignal.timeout(PHOTO_FETCH_TIMEOUT_MS);
-  return signal ? AbortSignal.any([timeout, signal]) : timeout;
-}
-
-async function fetchPhotoBytes({
-  url,
-  signal,
-  jitter,
-}: {
-  url: string;
-  signal?: AbortSignal;
-  jitter: () => number;
-}): Promise<Uint8Array<ArrayBuffer>> {
-  const outcome = await retryWithBackoff<
-    { bytes: Uint8Array<ArrayBuffer> } | { error: unknown }
-  >({
-    maxAttempts: RETRY_ATTEMPTS,
-    baseMs: RETRY_BASE_MS,
-    jitter,
-    run: async () => {
-      checkCancelled(signal);
-      try {
-        const response = await fetch(url, { signal: fetchSignal(signal) });
-        if (response.ok) {
-          const bytes = new Uint8Array(await response.arrayBuffer());
-          return { value: { bytes }, retry: false };
-        }
-        // A 404 is a 404 three times over.
-        const error = new Error(`HTTP ${response.status}`);
-        return { value: { error }, retry: isRetryableStatus(response.status) };
-      } catch (error) {
-        // A cancel and a per-attempt timeout both abort the fetch; only the caller's signal stops.
-        checkCancelled(signal);
-        return { value: { error }, retry: true };
-      }
-    },
-  });
-  if ('error' in outcome) throw outcome.error;
-  return outcome.bytes;
 }
 
 /** One batch's sign call, retried while Storage's refusal is one a retry may pass. */
@@ -229,6 +169,33 @@ export async function signAll({
   return signed;
 }
 
+function addManifestAndCsv({
+  writer,
+  archiveRoot,
+  category,
+  entries,
+  exportedAt,
+}: {
+  writer: ZipWriter;
+  archiveRoot: string;
+  category: { id: string; name: string };
+  entries: ExportEntry[];
+  exportedAt: Date;
+}): void {
+  const encoder = new TextEncoder();
+  const manifest = buildManifest({ category, entries, exportedAt });
+  writer.add({
+    path: `${archiveRoot}/${MANIFEST_NAME}`,
+    bytes: encoder.encode(JSON.stringify(manifest, null, 2)),
+    modified: exportedAt,
+  });
+  writer.add({
+    path: `${archiveRoot}/${CSV_NAME}`,
+    bytes: encoder.encode(buildCsv(entries)),
+    modified: exportedAt,
+  });
+}
+
 /** Builds the archive; a photograph unfetchable after retrying is skipped and counted, never silent. */
 export async function exportCategory({
   category,
@@ -286,56 +253,21 @@ export async function exportCategory({
   const exportedAt = now();
   const archiveRoot = archiveRootFolder(category.name, exportedAt);
   const writer = createZipWriter();
-  let done = 0;
-  let skipped = 0;
-
   const tasks = entries.flatMap((entry) => entry.photos);
   const total = tasks.length;
-  onProgress?.({ phase: 'photos', done, total });
-
-  // A ZipLimitError or a cancellation fails the whole export, not one more skipped photograph.
-  await runPool({
-    items: tasks,
-    concurrency: PHOTO_DOWNLOAD_CONCURRENCY,
-    worker: async (task) => {
-      checkCancelled(signal);
-      const url = signed.get(task.storagePath);
-      try {
-        if (!url) throw new Error(`Unsigned path in ${ITEM_IMAGES_BUCKET}`);
-        const bytes = await fetchPhotoBytes({ url, signal, jitter });
-        writer.add({
-          path: `${archiveRoot}/${task.archivePath}`,
-          bytes,
-          modified: exportedAt,
-        });
-      } catch (error) {
-        if (
-          error instanceof ZipLimitError ||
-          error instanceof ExportCancelledError
-        ) {
-          throw error;
-        }
-        console.error('Skipping photograph', task.storagePath, error);
-        skipped++;
-      }
-      onProgress?.({ phase: 'photos', done: ++done, total });
-    },
+  const skipped = await downloadPhotosInto({
+    writer,
+    tasks,
+    signed,
+    archiveRoot,
+    exportedAt,
+    signal,
+    jitter,
+    onProgress,
   });
 
   onProgress?.({ phase: 'packing', done: total, total });
-
-  const encoder = new TextEncoder();
-  const manifest = buildManifest({ category, entries, exportedAt });
-  writer.add({
-    path: `${archiveRoot}/${MANIFEST_NAME}`,
-    bytes: encoder.encode(JSON.stringify(manifest, null, 2)),
-    modified: exportedAt,
-  });
-  writer.add({
-    path: `${archiveRoot}/${CSV_NAME}`,
-    bytes: encoder.encode(buildCsv(entries)),
-    modified: exportedAt,
-  });
+  addManifestAndCsv({ writer, archiveRoot, category, entries, exportedAt });
 
   return {
     blob: writer.finish(),

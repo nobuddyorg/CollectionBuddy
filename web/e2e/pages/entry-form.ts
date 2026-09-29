@@ -30,7 +30,7 @@ interface EntryForm {
       placeError: Locator;
     };
   };
-  /** One tag chip's remove button, by the tag it carries. */
+  /** One tag chip, by the tag it carries. */
   tag(tag: string): Locator;
 }
 
@@ -55,9 +55,10 @@ export function initEntryForm(page: Page): EntryForm {
       placeError: page.getByTestId('place-error'),
     },
   };
+  const tag = (name: string) => locators.tags.filter({ hasText: name });
   const interactions = {
-    addTag: async (tag: string, key: 'Enter' | ',' = 'Enter') => {
-      await locators.inputs.tags.fill(tag);
+    addTag: async (name: string, key: 'Enter' | ',' = 'Enter') => {
+      await locators.inputs.tags.fill(name);
       await locators.inputs.tags.press(key);
     },
     cancel: async () => {
@@ -81,19 +82,12 @@ export function initEntryForm(page: Page): EntryForm {
     removeLastTag: async () => {
       await locators.inputs.tags.press('Backspace');
     },
-    removeTag: async (tag: string) => {
-      await locators.tags
-        .filter({ hasText: tag })
-        .getByTestId('remove-tag')
-        .click();
+    removeTag: async (name: string) => {
+      await tag(name).getByTestId('remove-tag').click();
     },
     submit: async () => {
       await locators.buttons.submit.click();
     },
   };
-  return Object.assign(() => root, {
-    locators,
-    do: interactions,
-    tag: (tag: string) => locators.tags.filter({ hasText: tag }),
-  });
+  return Object.assign(() => root, { locators, do: interactions, tag });
 }

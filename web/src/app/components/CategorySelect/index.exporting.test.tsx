@@ -67,7 +67,7 @@ describe('CategorySelect export', () => {
       expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
     });
 
-    it('offers a Cancel affordance next to the progress line, absent while nothing is running', async () => {
+    it('cancels the running export from its Cancel button', async () => {
       const cancelExport = vi.fn();
       vi.mocked(useExportCategory).mockReturnValue(
         exportState({

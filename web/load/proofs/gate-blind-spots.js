@@ -1,23 +1,28 @@
 // #781: the k6 gate's browse flow never reaches the paths that grow with data (deep pages, signed photo URLs), so it stays green while they are slow.
 import { sleep } from 'k6';
 
-import { countItems, listPage } from '../lib/api.js';
+import { countItems, listPage, signUrlsRequest } from '../lib/api.js';
 import { browse } from '../lib/flows.js';
 import {
   LIFECYCLE_TIMEOUTS,
   SUMMARY_TREND_STATS,
   correctnessThresholds,
 } from '../lib/options.js';
+import { photoPaths } from '../lib/photos.js';
 import { clearAccount } from '../lib/seed.js';
-import { summarize } from '../lib/summary.js';
-import { BUCKET, call } from './lib/fixtures.js';
+import { reportFiles, summarize } from '../lib/summary.js';
+import { call } from './lib/fixtures.js';
 import {
   ENTRIES,
   LAST_PAGE,
   PHOTO_EVERY,
   seedDeepCatalogue,
 } from './lib/deepCatalogue.js';
-import { inconclusiveReasons, measured } from './lib/report.js';
+import {
+  inconclusiveBanner,
+  inconclusiveReasons,
+  measured,
+} from './lib/report.js';
 
 // catalogue.js's browse load and think time; each scenario runs alone, so none measures another's queueing.
 const VUS = 10;
@@ -47,8 +52,7 @@ export const options = {
   thresholds: {
     // No latency verdict here: slow deep pages are #758's to prove, slow signing #757's. These rows are the evidence.
     ...correctnessThresholds(['browse', 'deep_browse', 'photo_browse']),
-    // The verdict is coverage: the gate's own flow must send the requests that grow with data. An unsent name counts 0.
-    // `name:` first: lib/summary.js reads any sub-metric starting with `scenario:` as a scenario row.
+    // Coverage verdict (an unsent name counts 0); `name:` first, since lib/summary.js reads a sub-metric starting with `scenario:` as a scenario row.
     [`http_reqs{name:${LAST_PAGE_NAME},scenario:browse}`]: ['count>0'],
     [`http_reqs{name:${SIGN_NAME},scenario:browse}`]: ['count>0'],
     proof_measured: ['count>0'],
@@ -80,20 +84,10 @@ export function photoBrowse({ owner, categoryId }) {
   const page = 1 + Math.floor(Math.random() * 20);
   const { items } = listPage({ session: owner, categoryId, page });
   countItems(owner, categoryId);
-  const paths = items.flatMap((item) =>
-    item.images.flatMap((image) =>
-      image.path_thumb
-        ? [image.path_full, image.path_thumb]
-        : [image.path_full],
-    ),
-  );
+  const paths = items.flatMap((item) => item.images.flatMap(photoPaths));
   if (paths.length) {
     call({
-      method: 'POST',
-      path: `/storage/v1/object/sign/${BUCKET}`,
-      session: owner,
-      body: JSON.stringify({ expiresIn: 3600, paths }),
-      headers: { 'Content-Type': 'application/json' },
+      ...signUrlsRequest({ session: owner, paths }),
       probe: 'photo_sign',
     });
   }
@@ -112,21 +106,16 @@ export function handleSummary(data) {
     data,
     seeded: `${ENTRIES} entries in one category, every ${PHOTO_EVERY || 'no'}th with a photograph (#781: \`browse\` is the gate's own flow, \`deep_browse\` and \`photo_browse\` the paths it skips; the verdict is whether \`browse\` sends \`${LAST_PAGE_NAME}\` and \`${SIGN_NAME}\` requests)`,
   });
-  const reasons = inconclusiveReasons(
+  const reasons = inconclusiveReasons({
     data,
-    [],
-    [
+    guards: [
       'http_req_timeouts',
       'http_reqs{scenario:browse}',
       'http_reqs{scenario:deep_browse}',
       'http_reqs{scenario:photo_browse}',
     ],
-  );
+  });
   if (!reasons.length) return report;
-  const markdown = `**INCONCLUSIVE:** ${reasons.join('; ')}. Empty metrics pass their thresholds, so the verdicts below mean nothing.\n\n${report.stdout}`;
-  return {
-    ...report,
-    stdout: markdown,
-    'load-results/proof-gate-blind-spots.md': markdown,
-  };
+  const markdown = `${inconclusiveBanner(reasons)}\n\n${report.stdout}`;
+  return reportFiles({ name: 'proof-gate-blind-spots', markdown, data });
 }

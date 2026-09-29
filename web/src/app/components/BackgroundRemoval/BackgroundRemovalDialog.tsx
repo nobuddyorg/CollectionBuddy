@@ -35,7 +35,6 @@ export function BackgroundRemovalDialog({
       open={pending !== null}
       onOpenChange={() => onChoose({ kind: 'cancel' })}
       title={t('background_removal.title')}
-      closeLabel={t('common.close')}
       closeOnBackdrop={false}
     >
       {pending && <CutoutReview file={pending.file} onChoose={onChoose} />}

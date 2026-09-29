@@ -41,10 +41,10 @@ function runInWorker(
 ): Promise<CutoutReply> {
   return new Promise((resolve, reject) => {
     signal?.throwIfAborted();
-    const worker = new Worker(
-      new URL('./backgroundRemoval.worker.ts', import.meta.url),
-      { type: 'module' },
-    );
+    // Turbopack passes a worker's chunks in its URL fragment, which Chrome reuses across workers of one bootstrap, so every photo job shares one entry.
+    const worker = new Worker(new URL('./photo.worker.ts', import.meta.url), {
+      type: 'module',
+    });
     const abort = () => {
       worker.terminate();
       const reason: unknown = signal!.reason;

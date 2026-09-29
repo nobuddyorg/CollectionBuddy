@@ -1,18 +1,10 @@
--- Direct, fast tests of the pure and near-pure SQL functions and triggers
--- underneath the RLS layer -- normalization, path parsing, and the
--- set-based orphan cleanup trigger (delete_item_if_orphan). Most of this needs
--- no identity at all; the parts that do use the same impersonation as the
--- rest of this suite (see 005_impersonation_sanity_test.sql).
+-- The functions and triggers under the RLS layer, called directly; the few that need an identity impersonate as 005 does.
 begin;
 select no_plan();
 
 \ir _helpers.psql
 
--- normalize_text: collapses internal whitespace, trims the ends, and turns
--- a whitespace-only input into NULL rather than an empty string -- so the
--- "blank after normalization" constraints (categories_name_not_blank,
--- items_title_not_blank) catch it via NOT NULL rather than needing their
--- own blank-string check.
+-- normalize_text turns whitespace-only into NULL, so the *_not_blank constraints catch a blank through NOT NULL.
 select is(public.normalize_text('  a   b  '), 'a b',
   'internal whitespace collapses to one space, ends trimmed');
 select is(public.normalize_text('   '), null,
@@ -41,11 +33,7 @@ select is(public.longest_tag_length(array['ab', 'äöüß', 'x']), 4,
 select is(public.longest_tag_length(array[]::text[]), 0, 'no tags measure 0, not NULL');
 select is(public.longest_tag_length(null), 0, 'a NULL array measures 0 too');
 
--- storage_item_id: parses the item id out of a well-formed path, and
--- answers NULL rather than raising on one that does not parse -- the same
--- reasoning as images_path_full_matches_item (0003): a raised error inside
--- an RLS predicate would abort the whole query, not just fail to match one
--- row.
+-- storage_item_id answers NULL rather than raising: an error inside an RLS predicate aborts the whole query.
 select gen_random_uuid() as probe_item_id \gset
 select is(
   public.storage_item_id('some-uid/' || :'probe_item_id'::text || '/path.webp'),
@@ -62,9 +50,6 @@ select pg_temp.auth_as(gen_random_uuid(), '  MiXed.Case@Collectionbuddy.TEST  ')
 select is(public.caller_email(), 'mixed.case@collectionbuddy.test',
   'caller_email lowercases and trims the JWT email claim');
 
--- Normalization triggers, exercised through an actual insert:
--- tg_items_normalize dedupes and sorts tags after normalizing each one,
--- and blanks out an all-whitespace description rather than storing it.
 select gen_random_uuid() as owner_id \gset
 select pg_temp.auth_as(:'owner_id'::uuid, 'functions-test@collectionbuddy.test');
 
@@ -101,12 +86,7 @@ select is(
   'tags are deduplicated, normalized and sorted'
 );
 
--- delete_item_if_orphan: a set-based, statement-level cleanup (see
--- 000_schema_test.sql for the direct catalog assertion that the trigger
--- stays FOR EACH STATEMENT). This is the behavioural half: a single DELETE
--- removing several categories' worth of links at once orphans and removes
--- every affected item in that same one statement, and leaves an item still
--- linked elsewhere untouched.
+-- delete_item_if_orphan is FOR EACH STATEMENT (000), so one DELETE across collections must remove every orphan it makes.
 insert into public.categories (name) values ('Orphan test A')
 returning id as category_a \gset
 insert into public.categories (name) values ('Orphan test B')
@@ -125,17 +105,9 @@ insert into public.item_categories (item_id, category_id) values
   (:'item_b'::uuid, :'category_b'::uuid),
   (:'item_c'::uuid, :'category_a'::uuid);
 
--- A second collection can only predate 0020 now; seeded past its trigger, which the rollback restores.
-reset role;
-alter table public.item_categories disable trigger trg_item_categories_quota;
-select pg_temp.auth_as(:'owner_id'::uuid, 'functions-test@collectionbuddy.test');
-insert into public.item_categories (item_id, category_id) values (:'item_c'::uuid, :'category_c'::uuid);
-reset role;
-alter table public.item_categories enable trigger trg_item_categories_quota;
-select pg_temp.auth_as(:'owner_id'::uuid, 'functions-test@collectionbuddy.test');
+-- A second collection can only predate 0020 now.
+select pg_temp.file_as_before_0020(:'item_c'::uuid, :'category_c'::uuid);
 
--- One statement, deleting mappings across both category_a and category_b
--- at once.
 delete from public.item_categories where category_id in (:'category_a'::uuid, :'category_b'::uuid);
 
 select is(
@@ -163,9 +135,7 @@ insert into public.items (title, place, place_lat, place_lng, created_at) values
   ('Only entry, unlocated', 'Nowhere Yet', null, null, now()),
   ('Stored NaN', 'Broken Coordinates', 'NaN', 6.96, now());
 
--- Fetched back by title, one \gset per row, rather than off the INSERT's
--- own RETURNING: \gset accepts exactly one row, and the insert above wrote
--- four.
+-- \gset takes exactly one row, so each id is fetched back by title.
 select id as oldest_id from public.items where title = 'Oldest at Cologne' \gset
 select id as middle_id from public.items where title = 'Middle at Cologne, no coords' \gset
 select id as newest_id from public.items where title = 'Newest at Cologne' \gset
@@ -248,8 +218,7 @@ select is(
   'two pages of 1,000 read back all 1,001 places, each once, in place order'
 );
 
--- SECURITY INVOKER: a bystander gets nothing back, not an error, the same
--- as an ordinary RLS-scoped read would deny them.
+-- SECURITY INVOKER: a bystander gets nothing back, not an error, as from an RLS-scoped read.
 select gen_random_uuid() as places_bystander \gset
 select pg_temp.auth_as(:'places_bystander'::uuid, 'places-bystander@collectionbuddy.test');
 select is(

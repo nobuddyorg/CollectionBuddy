@@ -187,7 +187,7 @@ describe('itemsDueForResigning', () => {
     ).toEqual([]);
   });
 
-  // The issue's case: a page re-shown from the cache carries its old signatures, and they come due on their own clock.
+  // A page re-shown from the cache carries its old signatures, and they come due on their own clock.
   it('names only the items whose own signatures come due', () => {
     cacheSignedUrls([['p/page-1.webp', 'u']], T0);
     cacheSignedUrls([['p/page-2.webp', 'u']], T0 + 50 * 60_000);

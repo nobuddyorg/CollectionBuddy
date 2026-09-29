@@ -6,8 +6,9 @@ interface CategoryPanel {
     cancelImport(): Promise<void>;
     create(name: string): Promise<void>;
     delete(): Promise<void>;
-    exportCollection(): Promise<void>;
+    downloadExport(): Promise<string>;
     importArchive(file: string): Promise<void>;
+    load(): Promise<void>;
     open(name: string): Promise<void>;
     openPanel(): Promise<void>;
     rename(name: string): Promise<void>;
@@ -42,7 +43,7 @@ interface CategoryPanel {
 }
 
 export function initCategoryPanel(page: Page): CategoryPanel {
-  const root = page.locator('#app-root');
+  const root = page.getByTestId('app-root');
   const locators = {
     buttons: {
       add: root.getByTestId('add-category'),
@@ -74,6 +75,12 @@ export function initCategoryPanel(page: Page): CategoryPanel {
         .and(page.getByText(name, { exact: true })),
     });
 
+  const load = async () => {
+    await page.goto('', { waitUntil: 'networkidle' });
+    // isVisible() answers immediately, so the strip has to have loaded before openPanel asks about it.
+    await expect(locators.selected).not.toBeEmpty();
+  };
+
   const openPanel = async () => {
     // The strip collapses on every selection, so whether the expand button is there depends on the last action.
     if (await locators.buttons.expand.isVisible()) {
@@ -95,18 +102,23 @@ export function initCategoryPanel(page: Page): CategoryPanel {
       await openPanel();
       await locators.buttons.delete.click();
     },
-    exportCollection: async () => {
-      await openPanel();
-      await locators.buttons.export.click();
+    downloadExport: async () => {
+      const [download] = await Promise.all([
+        page.waitForEvent('download'),
+        (async () => {
+          await openPanel();
+          await locators.buttons.export.click();
+        })(),
+      ]);
+      return download.path();
     },
     importArchive: async (file: string) => {
       await openPanel();
       await locators.inputs.importFile.setInputFiles(file);
     },
+    load,
     open: async (name: string) => {
-      await page.goto('', { waitUntil: 'networkidle' });
-      // isVisible() answers immediately, so the strip has to have loaded before openPanel asks about it.
-      await expect(locators.selected).not.toBeEmpty();
+      await load();
       await openPanel();
       await tab(name).click();
       // Selecting collapses the strip, so the heading confirms the choice; every seeded collection has a card.

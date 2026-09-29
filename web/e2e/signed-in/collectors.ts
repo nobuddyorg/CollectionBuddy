@@ -12,17 +12,21 @@ export type MintedSession = {
   client: SupabaseClient;
 };
 
+export const BUCKET = 'item-images';
+
+/** The service-key client, for Auth's admin API and Storage only; seed rows go through the user's own session, so RLS has to permit them. */
+export function adminApi() {
+  return createClient(SUPABASE_URL, process.env.E2E_SUPABASE_SERVICE_KEY!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 /** A user of the local stack, created if this run is the first to want it. */
 export async function ensureUser(
   email: string,
   password: string,
 ): Promise<string> {
-  // The service key only creates users; seed rows go through the user's own session, so RLS has to permit them.
-  const admin = createClient(
-    SUPABASE_URL,
-    process.env.E2E_SUPABASE_SERVICE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
+  const admin = adminApi();
   const { data, error } = await admin.auth.admin.createUser({
     email,
     password,
@@ -83,7 +87,7 @@ export function browserState(origin: string, minted: MintedSession) {
 
 /** SQL cannot reach object storage, so a test that failed mid-upload leaves objects a row delete would miss. */
 async function sweepStorage(as: SupabaseClient, userId: string) {
-  const bucket = as.storage.from('item-images');
+  const bucket = as.storage.from(BUCKET);
   const { data: itemPrefixes, error } = await bucket.list(userId);
   if (error) throw error;
   const paths: string[] = [];
@@ -131,17 +135,35 @@ export async function reseedSingle(
     .single();
   if (categoryError) throw categoryError;
 
+  await fileEntry(as, {
+    categoryId: created.id,
+    fields: { user_id: userId, title, place },
+  });
+}
+
+/** An entry of the caller's with `fields`, filed into `categoryId`; throws on either step. */
+export async function fileEntry(
+  as: SupabaseClient,
+  entry: { categoryId: string; fields: Record<string, unknown> },
+): Promise<string> {
   const { data: item, error: itemError } = await as
     .from('items')
-    .insert({ user_id: userId, title, place })
+    .insert(entry.fields)
     .select('id')
     .single();
   if (itemError) throw itemError;
 
-  const { error: linkError } = await as.from('item_categories').insert({
-    item_id: item.id,
-    category_id: created.id,
-    user_id: userId,
-  });
+  const { error: linkError } = await as
+    .from('item_categories')
+    .insert({ item_id: item.id, category_id: entry.categoryId });
   if (linkError) throw linkError;
+  return item.id;
+}
+
+/** A collector created if needed, signed in, and emptied. */
+export async function freshCollector(email: string, password: string) {
+  const userId = await ensureUser(email, password);
+  const session = await mintSession(email, password);
+  await clearCollection(session.client, userId);
+  return { ...session, email, userId };
 }

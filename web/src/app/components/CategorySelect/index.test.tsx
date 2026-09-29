@@ -4,9 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
+import { ToastConfirmWrapper } from '../providers.test-support';
 import CategorySelect from './index';
 import {
   categories,
@@ -56,15 +54,7 @@ function SelectWithState() {
 }
 
 function renderWithSelectionState() {
-  render(
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <SelectWithState />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>,
-  );
+  render(<SelectWithState />, { wrapper: ToastConfirmWrapper });
 }
 
 // The header's name line, as distinct from the same name on a tab or in the rename field.

@@ -1,14 +1,4 @@
--- A grant's life after it is issued: promotion, demotion, what may still
--- be edited on it, and who can see it.
---
--- 020_category_shares_rls_test.sql and 030_editor_role_rls_test.sql both
--- take a grant's role as given at insert time, so neither exercises
--- tg_category_shares_enforce's UPDATE branch -- the one place a role
--- changes hands on a live grant, and the only write path on this table
--- that is not simply "issue" or "revoke". A promotion is the cheapest
--- privilege escalation in the whole model if the surrounding fields are
--- not pinned: re-pointing an existing grant at another category, or at
--- another address, would hand out access the owner never issued.
+-- A live grant's lifecycle: promotion, demotion, the fields that must not move, and who sees it.
 begin;
 select no_plan();
 
@@ -32,15 +22,13 @@ insert into public.category_shares (category_id, invited_email)
 values (:'category_id'::uuid, 'lifecycle-grantee@collectionbuddy.test')
 returning id as share_id \gset
 
--- Promotion: the owner moves a live grant from viewer to editor, and the
--- grantee's write access follows immediately -- there is no accept step
--- and nothing cached, the predicate is re-evaluated per request.
+-- Promotion takes effect at once: no accept step and nothing cached, the predicate is re-evaluated per request.
 select pg_temp.auth_as(:'grantee_id'::uuid, 'lifecycle-grantee@collectionbuddy.test');
-with attempt as (
-  update public.items set title = 'edited as a viewer' where id = :'item_id'::uuid returning id
-)
-select is((select count(*) from attempt), 0::bigint,
-  'the grantee cannot write while the grant is still at viewer');
+select is(
+  pg_temp.rows_written(format('update public.items set title = %L where id = %L returning id', 'edited as a viewer', :'item_id')),
+  0::bigint,
+  'the grantee cannot write while the grant is still at viewer'
+);
 
 select pg_temp.auth_as(:'owner_id'::uuid, 'lifecycle-owner@collectionbuddy.test');
 update public.category_shares set role = 'editor' where id = :'share_id'::uuid;
@@ -52,9 +40,7 @@ with attempt as (
 select is((select count(*) from attempt), 1::bigint,
   'promoting the grant to editor opens writing straight away');
 
--- ...and demotion closes it again, with the entry still there, so this is
--- the role change being tested rather than a row that stopped existing
--- (TEST_STRATEGY.md §7 rule 7).
+-- Demotion closes writing with the entry still present (TEST_STRATEGY.md §7 rule 7).
 select pg_temp.auth_as(:'owner_id'::uuid, 'lifecycle-owner@collectionbuddy.test');
 update public.category_shares set role = 'viewer' where id = :'share_id'::uuid;
 
@@ -72,11 +58,7 @@ select is(
   'and the entry is still there, untouched -- the demotion is what closed it'
 );
 
--- Role is the only field that may move on a live grant. Every other one
--- would silently re-aim an existing grant at something the owner never
--- issued it for -- a different category, a different person, or a longer
--- life than they agreed to -- so each is refused outright rather than
--- ignored.
+-- Role is the only field that may move on a live grant; any other would re-aim it, so each is refused, not ignored.
 select throws_ok(
   format(
     'update public.category_shares set invited_email = %L where id = %L',
@@ -127,10 +109,7 @@ select throws_ok(
   'nor handed to a different owner'
 );
 
--- The grantee is not the one who may promote it. Refused by the policy
--- rather than the trigger, so it affects no rows instead of raising --
--- both denials matter, and they fail differently (TEST_STRATEGY.md §7
--- rule 3).
+-- The policy refuses the grantee's update with zero rows rather than the trigger raising (TEST_STRATEGY.md §7 rule 3).
 select pg_temp.auth_as(:'grantee_id'::uuid, 'lifecycle-grantee@collectionbuddy.test');
 with attempt as (
   update public.category_shares set role = 'editor' where id = :'share_id'::uuid returning id
@@ -145,10 +124,7 @@ select is(
   'and the grant is still a viewer grant, read back as its owner'
 );
 
--- Issuing a grant on a collection that is not yours, or on one that does
--- not exist. Both are the trigger's own checks: the insert policy only
--- tests owner_user_id, which the trigger has already re-derived from the
--- category by the time the policy sees it.
+-- The trigger's own checks: the insert policy tests only owner_user_id, which the trigger re-derives from the category first.
 select pg_temp.auth_as(:'bystander_id'::uuid, 'lifecycle-bystander@collectionbuddy.test');
 -- A third party's address, as the self-share check would refuse the bystander's own.
 select throws_ok(
@@ -171,8 +147,7 @@ select throws_ok(
   'nor on a collection that does not exist'
 );
 
--- Visibility of the grant row itself. Both parties can see it -- the owner
--- to revoke, the grantee to leave -- and nobody else can.
+-- Both parties see the grant row, the owner to revoke and the grantee to leave; nobody else does.
 select is(
   (select count(*) from public.category_shares where id = :'share_id'::uuid),
   0::bigint,
@@ -186,10 +161,7 @@ select is(
   'the grantee can see the grant addressed to them'
 );
 
--- An expired grant stays visible to both sides even though it opens
--- nothing: deliberate, so the owner can find it dangling and clean it up
--- and the grantee can leave it (0006_policies.sql -- the select and delete
--- policies carry no expiry check, only the access predicates do).
+-- Expired grants stay visible so they can be cleaned up or left: the select and delete policies carry no expiry check.
 select pg_temp.auth_as(:'owner_id'::uuid, 'lifecycle-owner@collectionbuddy.test');
 insert into public.category_shares (category_id, invited_email, created_at, expires_at)
 values (
@@ -210,10 +182,7 @@ select is(
   'even though it opens nothing'
 );
 
--- A caller whose token carries no email claim at all. caller_email()
--- answers NULL, and `invited_email = NULL` is never true, so every grant
--- predicate fails closed rather than matching broadly -- the one outcome
--- that would be catastrophic here.
+-- No email claim: caller_email() is NULL and every grant predicate fails closed.
 select pg_temp.auth_as(:'grantee_id'::uuid, null);
 select is(
   (select count(*) from public.category_shares),
@@ -226,9 +195,7 @@ select is(
   'and reaches none of the collections those grants were for'
 );
 
--- Revoking by deleting the collection: the grants go with it, so a
--- recreated collection of the same name never inherits the old one's
--- access list.
+-- Deleting a collection takes its grants, so a recreated one of the same name never inherits the old access list.
 select pg_temp.auth_as(:'owner_id'::uuid, 'lifecycle-owner@collectionbuddy.test');
 delete from public.categories where id = :'category_id'::uuid;
 select is(

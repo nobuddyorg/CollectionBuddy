@@ -1,10 +1,8 @@
-import { readAllKeysetPages } from '../lib/pages';
+import { readAllKeysetPages, type ReadResult } from '../lib/pages';
 import { supabase } from '../supabase';
 import { objectPathsOf, removeObjectsThenRows } from './imageRemoval';
 import type { ImageListRow } from './images';
-
-// PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.
-const ROW_PAGE_SIZE = 1000;
+import { POSTGREST_MAX_ROWS } from './postgrestLimits';
 
 type OwnImagePathRow = Omit<ImageListRow, 'item_id'>;
 
@@ -23,16 +21,16 @@ function rawListOwnImagePaths({
   if (after) query = query.gt('id', after.id);
   return query
     .order('id')
-    .limit(ROW_PAGE_SIZE)
+    .limit(POSTGREST_MAX_ROWS)
     .overrideTypes<OwnImagePathRow[], { merge: false }>();
 }
 
 /** Every Storage path the user's own photograph rows name, the ones editors added to its entries included. */
 export async function listOwnImagePaths(
   userId: string,
-): Promise<{ data: string[]; error: null } | { data: null; error: unknown }> {
+): Promise<ReadResult<string[]>> {
   const listed = await readAllKeysetPages<OwnImagePathRow>(
-    ROW_PAGE_SIZE,
+    POSTGREST_MAX_ROWS,
     (after) => rawListOwnImagePaths({ userId, after }),
   );
   if (listed.error !== null) return { data: null, error: listed.error };

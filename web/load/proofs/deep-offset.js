@@ -2,13 +2,12 @@
 import { check } from 'k6';
 import { Trend } from 'k6/metrics';
 
-import { listPage, query } from '../lib/api.js';
+import { ITEM_FIELDS, PAGE_SIZE, listPage, query } from '../lib/api.js';
 import { LIFECYCLE_TIMEOUTS } from '../lib/options.js';
 import { clearAccount } from '../lib/seed.js';
 import {
   ENTRIES,
   LAST_PAGE,
-  PAGE_SIZE,
   PHOTO_EVERY,
   seedDeepCatalogue,
 } from './lib/deepCatalogue.js';
@@ -16,12 +15,12 @@ import { call, envInt, inList, probeMs } from './lib/fixtures.js';
 import {
   PROOF_TREND_STATS,
   measured,
+  probeScenario,
   probeThresholds,
   proofSummary,
 } from './lib/report.js';
 
 const SAMPLES = envInt('PROOF_SAMPLES', 30);
-const ITEM_FIELDS = 'id,title,description,place,place_lat,place_lng,tags';
 // The repo's own p95 budget for a browse request (lib/options.js P95_MS.browse).
 const BROWSE_P95_MS = 150;
 
@@ -31,12 +30,7 @@ export const options = {
   ...LIFECYCLE_TIMEOUTS,
   summaryTrendStats: PROOF_TREND_STATS,
   scenarios: {
-    probe: {
-      executor: 'per-vu-iterations',
-      vus: 1,
-      iterations: SAMPLES,
-      exec: 'probe',
-    },
+    probe: probeScenario(SAMPLES),
   },
   thresholds: {
     ...probeThresholds(

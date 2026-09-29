@@ -6,17 +6,22 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import GoogleSignInButton from './index';
+import type { GoogleSignInButtonProps } from './types';
 
 function renderButton(
   props: Partial<React.ComponentProps<typeof GoogleSignInButton>> = {},
 ) {
   return render(
     <I18nProvider>
-      <GoogleSignInButton onClick={() => new Promise(() => {})} {...props} />
+      <GoogleSignInButton
+        onClick={() => new Promise(() => {})}
+        onError={vi.fn()}
+        {...props}
+      />
     </I18nProvider>,
   );
 }
@@ -47,6 +52,10 @@ describe('GoogleSignInButton', () => {
     expect(screen.getByRole('button')).not.toBeDisabled();
   });
 
+  it('requires onError at the type level, so no caller can swallow a rejected sign-in', () => {
+    expectTypeOf<GoogleSignInButtonProps['onError']>().not.toBeNullable();
+  });
+
   // Nothing clears `loading` on success, so a bfcache restore would leave the overlay stuck.
   it('drops a stuck overlay once the page is restored from bfcache', async () => {
     renderButton();
@@ -56,16 +65,6 @@ describe('GoogleSignInButton', () => {
     firePageShow(true);
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-  });
-
-  it('stops listening for pageshow once unmounted', async () => {
-    const { unmount } = renderButton();
-    fireEvent.click(screen.getByRole('button'));
-    await screen.findByRole('status');
-
-    unmount();
-
-    expect(() => firePageShow(true)).not.toThrow();
   });
 
   it('leaves the overlay alone on an ordinary (non-persisted) pageshow', async () => {

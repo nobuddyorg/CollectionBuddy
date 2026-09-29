@@ -3,15 +3,18 @@ import { MAX_CATEGORY_NAME_LENGTH } from '../lib/textLimits';
 import { readAllChunks, readAllKeysetPages } from '../lib/pages';
 import { supabase } from '../supabase';
 import type { Database } from './database.types';
-import { rowsAfterFilter } from './keyset';
+import { afterKeyset } from './keyset';
+import { ID_FILTER_CHUNK_SIZE, POSTGREST_MAX_ROWS } from './postgrestLimits';
 import type { ShareRole } from './shares';
 
 type CategoryRow = Database['public']['Tables']['categories']['Row'];
+const CATEGORY_KEYS = ['id', 'name', 'user_id'] as const;
+type CategoryCore = Pick<CategoryRow, (typeof CATEGORY_KEYS)[number]>;
+const CATEGORY_SELECT = CATEGORY_KEYS.join(',');
 // category_shares is RLS-scoped to the caller's own role; a missing array reads as empty.
-export type CategorySummary = Pick<CategoryRow, 'id' | 'name' | 'user_id'> & {
+export type CategorySummary = CategoryCore & {
   category_shares?: { role: ShareRole }[];
 };
-type CategoryCore = Pick<CategoryRow, 'id' | 'name' | 'user_id'>;
 
 /** UX only, RLS decides: the owner, or a grantee whose own share row says `editor`. */
 export function canEditCategory(
@@ -49,7 +52,7 @@ export function uniqueCategoryName(
 export function listCategories() {
   return supabase
     .from('categories')
-    .select('id,name,user_id,category_shares(role)')
+    .select(`${CATEGORY_SELECT},category_shares(role)`)
     .overrideTypes<CategorySummary[], { merge: false }>();
 }
 
@@ -59,7 +62,7 @@ export function createCategory(name: string) {
       .from('categories')
       // user_id is never sent: enforce_user_id() fills it from the JWT, so no row changes hands.
       .insert({ name } as Database['public']['Tables']['categories']['Insert'])
-      .select('id,name,user_id')
+      .select(CATEGORY_SELECT)
       .single<CategoryCore>()
   );
 }
@@ -70,19 +73,13 @@ export function renameCategory(id: string, name: string) {
     .from('categories')
     .update({ name })
     .eq('id', id)
-    .select('id,name,user_id')
+    .select(CATEGORY_SELECT)
     .single<CategoryCore>();
 }
 
 export function deleteCategory(id: string) {
   return supabase.from('categories').delete().eq('id', id);
 }
-
-// PostgREST caps an unranged request at max_rows (supabase/config.toml) and truncates silently.
-const ITEM_LINK_PAGE_SIZE = 1000;
-
-// Ids per `.in()` filter; more risks a URL length limit before the row cap.
-const ID_FILTER_CHUNK_SIZE = 100;
 
 type CategoryLink = { item_id: string; created_at: string };
 
@@ -99,17 +96,12 @@ function rawListItemIdsForCategory({
     .select('item_id,created_at')
     .eq('category_id', categoryId);
   if (after) {
-    // The gte lets the index scan start at the key; the or=() drops the ties already read.
-    query = query
-      .gte('created_at', after.created_at)
-      .or(
-        rowsAfterFilter(
-          { column: 'created_at', value: after.created_at },
-          { column: 'item_id', value: after.item_id },
-        ),
-      );
+    query = afterKeyset(query, {
+      first: { column: 'created_at', value: after.created_at },
+      second: { column: 'item_id', value: after.item_id },
+    });
   }
-  return query.order('created_at').order('item_id').limit(ITEM_LINK_PAGE_SIZE);
+  return query.order('created_at').order('item_id').limit(POSTGREST_MAX_ROWS);
 }
 
 /** Every item id linked to this category, paged past the row cap; `listPage` exists for the test. */
@@ -118,14 +110,13 @@ export async function listItemIdsForCategory(
   listPage: typeof rawListItemIdsForCategory = rawListItemIdsForCategory,
 ): Promise<{ data: string[] | null; error: unknown }> {
   const paged = await readAllKeysetPages<CategoryLink>(
-    ITEM_LINK_PAGE_SIZE,
+    POSTGREST_MAX_ROWS,
     (after) => listPage({ categoryId, after }),
   );
   if (paged.error !== null) return { data: null, error: paged.error };
   return { data: paged.data.map((row) => row.item_id), error: null };
 }
 
-// Exact count with no rows fetched, for the confirmation dialog.
 export function countItemsForCategory(categoryId: string) {
   return supabase
     .from('item_categories')
@@ -151,16 +142,12 @@ function rawListItemIdsLinkedElsewhere({
     .in('item_id', itemIds)
     .neq('category_id', excludingCategoryId);
   if (after) {
-    query = query
-      .gte('item_id', after.item_id)
-      .or(
-        rowsAfterFilter(
-          { column: 'item_id', value: after.item_id },
-          { column: 'category_id', value: after.category_id },
-        ),
-      );
+    query = afterKeyset(query, {
+      first: { column: 'item_id', value: after.item_id },
+      second: { column: 'category_id', value: after.category_id },
+    });
   }
-  return query.order('item_id').order('category_id').limit(ITEM_LINK_PAGE_SIZE);
+  return query.order('item_id').order('category_id').limit(POSTGREST_MAX_ROWS);
 }
 
 /** Which items would NOT be orphaned; on `error` abort the deletion rather than act on a partial set. */
@@ -174,7 +161,7 @@ export async function listItemIdsLinkedElsewhere(
   const rows = await readAllChunks(
     chunk(itemIds, ID_FILTER_CHUNK_SIZE),
     (ids) =>
-      readAllKeysetPages<ItemLink>(ITEM_LINK_PAGE_SIZE, (after) =>
+      readAllKeysetPages<ItemLink>(POSTGREST_MAX_ROWS, (after) =>
         listPage({ itemIds: ids, excludingCategoryId, after }),
       ),
   );

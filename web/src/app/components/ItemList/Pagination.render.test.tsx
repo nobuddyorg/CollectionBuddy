@@ -6,20 +6,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { Pagination } from './Pagination';
 
-function renderPagination({
-  page,
-  totalPages,
-}: {
-  page: number;
-  totalPages: number;
-}) {
+type PagePosition = { page: number; totalPages: number };
+
+function renderPagination(position: PagePosition) {
   const setPage = vi.fn();
-  const view = render(
+  const tree = (next: PagePosition) => (
     <I18nProvider>
-      <Pagination page={page} setPage={setPage} totalPages={totalPages} />
-    </I18nProvider>,
+      <Pagination {...next} setPage={setPage} />
+    </I18nProvider>
   );
-  return { setPage, rerender: view.rerender };
+  const view = render(tree(position));
+  return {
+    setPage,
+    container: view.container,
+    rerender: (next: PagePosition) => view.rerender(tree(next)),
+  };
 }
 
 describe('Pagination', () => {
@@ -39,21 +40,8 @@ describe('Pagination', () => {
     expect(screen.getAllByTestId('page-number')).toHaveLength(3);
   });
 
-  it('renders nothing when there is only one page', () => {
-    const { container } = render(
-      <I18nProvider>
-        <Pagination page={1} setPage={vi.fn()} totalPages={1} />
-      </I18nProvider>,
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('renders nothing for zero pages', () => {
-    const { container } = render(
-      <I18nProvider>
-        <Pagination page={1} setPage={vi.fn()} totalPages={0} />
-      </I18nProvider>,
-    );
+  it.each([1, 0])('renders nothing for %i pages', (totalPages) => {
+    const { container } = renderPagination({ page: 1, totalPages });
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -150,11 +138,7 @@ describe('Pagination', () => {
       screen.queryByRole('button', { name: 'Page 8' }),
     ).not.toBeInTheDocument();
 
-    rerender(
-      <I18nProvider>
-        <Pagination page={10} setPage={vi.fn()} totalPages={10} />
-      </I18nProvider>,
-    );
+    rerender({ page: 10, totalPages: 10 });
 
     expect(screen.getByRole('button', { name: 'Page 8' })).toBeInTheDocument();
     expect(

@@ -1,8 +1,14 @@
-import { createClient } from '@supabase/supabase-js';
-
 import { expect, test } from '../test';
 import { SEED, itemsIn } from '../fixtures';
-import { OBJECT_HIDDEN, UPLOAD_REFUSED, apiAs, context } from './helpers';
+import {
+  OBJECT_HIDDEN,
+  UPLOAD_REFUSED,
+  anonApi,
+  apiAs,
+  context,
+  probeObject,
+  seededEntryId,
+} from './helpers';
 
 // A photograph is two surfaces, the images row and the object's bytes; neither of another collector's is reachable.
 test.describe('one collection cannot reach another', () => {
@@ -29,12 +35,11 @@ test.describe('one collection cannot reach another', () => {
     const own = `${userId}/${item!.id}/rls-prefix-probe.webp`;
     const theirs = `${otherUserId}/${item!.id}/rls-prefix-probe.webp`;
     const storage = apiAs(token).storage.from('item-images');
-    const photo = () => new Blob(['x'], { type: 'image/webp' });
 
     try {
-      expect((await storage.upload(own, photo())).error).toBeNull();
+      expect((await storage.upload(own, probeObject('x'))).error).toBeNull();
 
-      const { error } = await storage.upload(theirs, photo());
+      const { error } = await storage.upload(theirs, probeObject('x'));
       expect(error).toMatchObject(UPLOAD_REFUSED);
 
       // Their own prefix, so listable to them: empty is the refused upload, not a hidden object.
@@ -63,10 +68,7 @@ test.describe('one collection cannot reach another', () => {
     const other = apiAs(otherToken).storage.from('item-images');
 
     try {
-      const { error: uploadError } = await owner.upload(
-        path,
-        new Blob(['probe'], { type: 'image/webp' }),
-      );
+      const { error: uploadError } = await owner.upload(path, probeObject());
       expect(uploadError).toBeNull();
 
       const { data: ownList } = await owner.list(folder);
@@ -88,7 +90,7 @@ test.describe('one collection cannot reach another', () => {
       expect(theirRemoved).toEqual([]);
       const { error: theirUploadError } = await other.upload(
         `${folder}/planted.webp`,
-        new Blob(['x'], { type: 'image/webp' }),
+        probeObject('x'),
       );
       expect(theirUploadError).toMatchObject(UPLOAD_REFUSED);
 
@@ -102,25 +104,22 @@ test.describe('one collection cannot reach another', () => {
 
   // An object needs an entry its uploader may write (0023): a known entry id of someone else's is not one.
   test('nothing can be uploaded under their entry, not even to your own prefix', async () => {
-    const { token, userId, otherToken } = context();
-    const { data: theirItem } = await apiAs(otherToken)
-      .from('items')
-      .select('id')
-      .eq('title', SEED.other.item)
-      .single();
-    const planted = `${userId}/${theirItem!.id}/rls-planted-probe.webp`;
+    const { token, userId, otherToken, otherUserId } = context();
+    const theirItemId = await seededEntryId({
+      token: otherToken,
+      ownerId: otherUserId,
+      title: SEED.other.item,
+    });
+    const planted = `${userId}/${theirItemId}/rls-planted-probe.webp`;
     const storage = apiAs(token).storage.from('item-images');
 
     try {
-      const { error } = await storage.upload(
-        planted,
-        new Blob(['x'], { type: 'image/webp' }),
-      );
+      const { error } = await storage.upload(planted, probeObject('x'));
       expect(error).toMatchObject(UPLOAD_REFUSED);
 
       // Own prefix, so listable: empty is the refused upload, not a hidden object.
       const { data, error: listError } = await storage.list(
-        `${userId}/${theirItem!.id}`,
+        `${userId}/${theirItemId}`,
       );
       expect(listError).toBeNull();
       expect(data).toEqual([]);
@@ -133,17 +132,17 @@ test.describe('one collection cannot reach another', () => {
   test('their photograph records cannot be listed', async () => {
     const { token, otherToken, otherUserId } = context();
 
-    const { data: theirItem } = await apiAs(otherToken)
-      .from('items')
-      .select('id')
-      .eq('title', SEED.other.item)
-      .single();
+    const theirItemId = await seededEntryId({
+      token: otherToken,
+      ownerId: otherUserId,
+      title: SEED.other.item,
+    });
 
     const { data: planted, error: insertError } = await apiAs(otherToken)
       .from('images')
       .insert({
-        item_id: theirItem!.id,
-        path_full: `${otherUserId}/${theirItem!.id}/rls-images-probe.webp`,
+        item_id: theirItemId,
+        path_full: `${otherUserId}/${theirItemId}/rls-images-probe.webp`,
       })
       .select('id')
       .single();
@@ -153,7 +152,7 @@ test.describe('one collection cannot reach another', () => {
       const { data } = await apiAs(token)
         .from('images')
         .select('id')
-        .eq('item_id', theirItem!.id);
+        .eq('item_id', theirItemId);
       expect(data).toEqual([]);
     } finally {
       await apiAs(otherToken).from('images').delete().eq('id', planted!.id);
@@ -162,19 +161,19 @@ test.describe('one collection cannot reach another', () => {
 
   // tg_images_enforce re-derives ownership from the item, so this is refused outright, not refiled.
   test('an images row cannot be inserted for their item', async () => {
-    const { token, otherToken } = context();
+    const { token, otherToken, otherUserId } = context();
 
-    const { data: theirItem } = await apiAs(otherToken)
-      .from('items')
-      .select('id')
-      .eq('title', SEED.other.item)
-      .single();
+    const theirItemId = await seededEntryId({
+      token: otherToken,
+      ownerId: otherUserId,
+      title: SEED.other.item,
+    });
 
     // A conforming path (item id as second segment), so the trigger is the only thing left to refuse this.
-    const plantedPath = `planted/${theirItem!.id}/planted.webp`;
+    const plantedPath = `planted/${theirItemId}/planted.webp`;
     const { data, error } = await apiAs(token)
       .from('images')
-      .insert({ item_id: theirItem!.id, path_full: plantedPath })
+      .insert({ item_id: theirItemId, path_full: plantedPath })
       .select('id');
     expect(data).toBeNull();
     expect(error).toMatchObject({
@@ -201,17 +200,16 @@ test.describe('one collection cannot reach another', () => {
     test(`a photograph record cannot claim a path ${shape}`, async () => {
       const { token, userId } = context();
 
-      const { data: mine } = await apiAs(token)
-        .from('items')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('title', itemsIn('Münzen')[0].title)
-        .single();
+      const itemId = await seededEntryId({
+        token,
+        ownerId: userId,
+        title: itemsIn('Münzen')[0].title,
+      });
 
       const { data, error } = await apiAs(token)
         .from('images')
         .insert({
-          item_id: mine!.id,
+          item_id: itemId,
           path_full: path.replace('{uid}', userId),
         })
         .select('id');
@@ -226,18 +224,17 @@ test.describe('one collection cannot reach another', () => {
     test(`a photograph record cannot claim a thumbnail ${shape}`, async () => {
       const { token, userId } = context();
 
-      const { data: mine } = await apiAs(token)
-        .from('items')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('title', itemsIn('Münzen')[0].title)
-        .single();
+      const itemId = await seededEntryId({
+        token,
+        ownerId: userId,
+        title: itemsIn('Münzen')[0].title,
+      });
 
       const { data, error } = await apiAs(token)
         .from('images')
         .insert({
-          item_id: mine!.id,
-          path_full: `${userId}/${mine!.id}/rls-thumb-probe.webp`,
+          item_id: itemId,
+          path_full: `${userId}/${itemId}/rls-thumb-probe.webp`,
           path_thumb: path.replace('{uid}', userId),
         })
         .select('id');
@@ -253,15 +250,12 @@ test.describe('one collection cannot reach another', () => {
   // EXECUTE is revoked from PUBLIC, so anon is refused before the body runs; signed in, it still parses.
   test('a visitor with no session cannot call storage_item_id', async () => {
     const { token } = context();
-    const anon = createClient(
-      process.env.E2E_SUPABASE_URL!,
-      process.env.E2E_SUPABASE_ANON_KEY!,
-      { auth: { persistSession: false } },
-    );
     const itemId = '00000000-0000-4000-8000-000000000000';
     const path = `owner/${itemId}/photo.webp`;
 
-    const { data, error, status } = await anon.rpc('storage_item_id', { path });
+    const { data, error, status } = await anonApi().rpc('storage_item_id', {
+      path,
+    });
     expect(data).toBeNull();
     expect(error!.code).toBe('42501');
     expect(status).toBe(401);
@@ -273,14 +267,9 @@ test.describe('one collection cannot reach another', () => {
 
   test('a visitor with no session can list no photographs', async () => {
     const { otherUserId } = context();
-    const anon = createClient(
-      process.env.E2E_SUPABASE_URL!,
-      process.env.E2E_SUPABASE_ANON_KEY!,
-      { auth: { persistSession: false } },
-    );
 
-    const { data, error } = await anon.storage
-      .from('item-images')
+    const { data, error } = await anonApi()
+      .storage.from('item-images')
       .list(otherUserId);
     expect(error).toBeNull();
     expect(data).toEqual([]);
@@ -290,17 +279,16 @@ test.describe('one collection cannot reach another', () => {
   test('a photograph record cannot be updated, not even your own', async () => {
     const { token, userId } = context();
 
-    const { data: item } = await apiAs(token)
-      .from('items')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('title', itemsIn('Münzen')[0].title)
-      .single();
+    const itemId = await seededEntryId({
+      token,
+      ownerId: userId,
+      title: itemsIn('Münzen')[0].title,
+    });
     const { data: planted } = await apiAs(token)
       .from('images')
       .insert({
-        item_id: item!.id,
-        path_full: `${userId}/${item!.id}/rls-images-update-probe.webp`,
+        item_id: itemId,
+        path_full: `${userId}/${itemId}/rls-images-update-probe.webp`,
       })
       .select('id')
       .single();
@@ -322,17 +310,16 @@ test.describe('one collection cannot reach another', () => {
   // Signing a path known to exist proves the policy refuses it; list() returning [] would not.
   test('a known photograph of theirs cannot be signed', async () => {
     const { token, otherToken, otherUserId } = context();
-    const { data: theirItem } = await apiAs(otherToken)
-      .from('items')
-      .select('id')
-      .eq('title', SEED.other.item)
-      .single();
+    const theirItemId = await seededEntryId({
+      token: otherToken,
+      ownerId: otherUserId,
+      title: SEED.other.item,
+    });
 
-    const path = `${otherUserId}/${theirItem!.id}/rls-signed-url-probe.webp`;
-    // Typed Blob: the bucket restricts allowed_mime_types, and an untyped one would be refused on that alone.
+    const path = `${otherUserId}/${theirItemId}/rls-signed-url-probe.webp`;
     const { error: uploadError } = await apiAs(otherToken)
       .storage.from('item-images')
-      .upload(path, new Blob(['probe'], { type: 'image/webp' }));
+      .upload(path, probeObject());
     expect(uploadError).toBeNull();
 
     try {

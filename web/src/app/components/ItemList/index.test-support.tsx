@@ -1,24 +1,12 @@
 import { render } from '@testing-library/react';
 import { vi, type Mock } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
+import { ToastConfirmWrapper } from '../providers.test-support';
 import ItemList from './index';
 import type { ItemLite } from './types';
 import type { useItems } from './useItems';
 
-export function item(id: string): ItemLite {
-  return {
-    id,
-    title: `Item ${id}`,
-    description: null,
-    place: null,
-    place_lat: null,
-    place_lng: null,
-    tags: [],
-  };
-}
+export { item } from './item.test-support';
 
 export function defaultItemsState() {
   return {
@@ -83,13 +71,9 @@ export function resetHookMocks({
 /** The rendered tree, for a test that re-renders it after changing what a hook mock returns. */
 export function listTree(props: Partial<Parameters<typeof ItemList>[0]> = {}) {
   return (
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <ItemList categoryId="cat-1" canEdit={true} {...props} />
-        </ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>
+    <ToastConfirmWrapper>
+      <ItemList categoryId="cat-1" canEdit={true} {...props} />
+    </ToastConfirmWrapper>
   );
 }
 

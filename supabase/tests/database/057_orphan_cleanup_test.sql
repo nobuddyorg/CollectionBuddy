@@ -19,14 +19,8 @@ insert into public.item_categories (item_id, category_id) select id, :'bulk_id':
 select array_agg(id order by title) filter (where title in ('Bulk 1', 'Bulk 2')) as twice_filed
 from public.items where user_id = :'owner_id'::uuid \gset
 
-reset role;
-alter table public.item_categories disable trigger trg_item_categories_quota;
-select pg_temp.auth_as(:'owner_id'::uuid, 'orphan-cleanup@collectionbuddy.test');
-insert into public.item_categories (item_id, category_id)
-select unnest(:'twice_filed'::uuid[]) as item_id, :'elsewhere_id'::uuid as category_id;
-reset role;
-alter table public.item_categories enable trigger trg_item_categories_quota;
-select pg_temp.auth_as(:'owner_id'::uuid, 'orphan-cleanup@collectionbuddy.test');
+select pg_temp.file_as_before_0020((:'twice_filed'::uuid[])[1], :'elsewhere_id'::uuid);
+select pg_temp.file_as_before_0020((:'twice_filed'::uuid[])[2], :'elsewhere_id'::uuid);
 
 -- A statement that unlinks nothing deletes nothing.
 delete from public.categories where id = :'empty_id'::uuid;
@@ -63,14 +57,7 @@ select is(
 
 -- One statement naming the same entry twice (both its links) removes it once, without error.
 insert into public.categories (name) values ('Bulk again') returning id as again_id \gset
-reset role;
-alter table public.item_categories disable trigger trg_item_categories_quota;
-select pg_temp.auth_as(:'owner_id'::uuid, 'orphan-cleanup@collectionbuddy.test');
-insert into public.item_categories (item_id, category_id)
-values ((:'twice_filed'::uuid[])[2], :'again_id'::uuid);
-reset role;
-alter table public.item_categories enable trigger trg_item_categories_quota;
-select pg_temp.auth_as(:'owner_id'::uuid, 'orphan-cleanup@collectionbuddy.test');
+select pg_temp.file_as_before_0020((:'twice_filed'::uuid[])[2], :'again_id'::uuid);
 
 delete from public.item_categories where item_id = (:'twice_filed'::uuid[])[2];
 select is(

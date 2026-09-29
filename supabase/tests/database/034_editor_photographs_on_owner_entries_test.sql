@@ -67,7 +67,6 @@ select throws_ok(pg_temp.upload_statement(:'stranger_id'::text || '/' || :'item_
   'new row violates row-level security policy for table "objects"',
   'a stranger cannot upload under the owner''s entry, not even to its own prefix');
 
--- Revoked.
 select pg_temp.auth_as(:'owner_id'::uuid, 'photo-owner@collectionbuddy.test');
 delete from public.category_shares where id = :'share_id'::uuid;
 

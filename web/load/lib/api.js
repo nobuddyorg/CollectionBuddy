@@ -1,19 +1,26 @@
 // The requests web/src/app/data/*.ts sends through supabase-js, spelled out as HTTP; keep the two in step.
-import { expectOk, query, send, sendAll, sendJson } from './http.js';
+import { EXPORT_ITEM_PAGE_SIZE, POSTGREST_MAX_ROWS } from './clientLimits.js';
+import {
+  countedTotal,
+  expectOk,
+  query,
+  send,
+  sendAll,
+  sendJson,
+} from './http.js';
 import { SUPABASE_URL } from './target.js';
 
 export { query } from './http.js';
 
-const BUCKET = 'item-images';
-const ITEM_FIELDS = 'id,title,description,place,place_lat,place_lng,tags';
+export const BUCKET = 'item-images';
+export const ITEM_FIELDS =
+  'id,title,description,place,place_lat,place_lng,tags';
 // data/itemPage.ts ITEM_WITH_IMAGES_SELECT.
 const ITEM_WITH_IMAGES_SELECT = `${ITEM_FIELDS},images(id,item_id,path_full,path_thumb)`;
+// data/exportItemPages.ts EXPORT_ITEM_SELECT, inside its items!inner().
+export const EXPORT_ITEM_INNER = `${ITEM_FIELDS},created_at,images(item_id,path_full,size_bytes)`;
 // components/ItemList/paging.ts PAGE_SIZE.
-const PAGE_SIZE = 9;
-// data/items.ts PLACE_PAGE_SIZE.
-const PLACE_PAGE_SIZE = 1000;
-// data/exportCategory.ts ITEM_PAGE_SIZE.
-const EXPORT_PAGE_SIZE = 500;
+export const PAGE_SIZE = 9;
 
 // Local stacks confirm email sign-ups instantly; the hosted project has no password sign-in to call.
 export function signUp(email, password) {
@@ -47,7 +54,7 @@ function pageIdsRequest({ session, categoryId, page, name }) {
   };
 }
 
-function countRequest(session, categoryId) {
+export function countRequest(session, categoryId) {
   const params = query({
     select: 'item_id',
     category_id: `eq.${categoryId}`,
@@ -109,8 +116,7 @@ export function readPage({
     pageIdsRequest({ session, categoryId, page, name }),
     countRequest(session, categoryId),
   ]);
-  // PostgREST answers a counted HEAD with `Content-Range: */<total>`.
-  const total = Number((counted.headers['Content-Range'] ?? '').split('/')[1]);
+  const total = countedTotal(counted);
   return {
     ...pageItems(session, idPage),
     lastPage: Math.max(1, Math.ceil((total || 0) / PAGE_SIZE)),
@@ -140,8 +146,8 @@ export function searchPage({ session, categoryId, term, page }) {
 
 /** data/items.ts listCategoryPlaces: the map's places, narrowed like the list, page by page until a short one. */
 export function listPlaces({ session, categoryId, term }) {
-  for (let offset = 0; ; offset += PLACE_PAGE_SIZE) {
-    const page = { offset, limit: PLACE_PAGE_SIZE };
+  for (let offset = 0; ; offset += POSTGREST_MAX_ROWS) {
+    const page = { offset, limit: POSTGREST_MAX_ROWS };
     const params = query(
       term
         ? { cat_id: categoryId, like_pattern: `%${term}%`, ...page }
@@ -154,7 +160,7 @@ export function listPlaces({ session, categoryId, term }) {
       name: 'map places',
     });
     const rows = response.status === 200 ? response.json() : [];
-    if (rows.length < PLACE_PAGE_SIZE) return;
+    if (rows.length < POSTGREST_MAX_ROWS) return;
   }
 }
 
@@ -191,11 +197,11 @@ export function signedUrlsOf(response) {
 /** data/exportItemPages.ts rawListItemsForExport: one keyset page of links, each entry with its full-size photographs. */
 export function exportPage({ session, categoryId, after }) {
   const params = {
-    select: `created_at,item_id,items!inner(${ITEM_FIELDS},created_at,images(item_id,path_full,size_bytes))`,
+    select: `created_at,item_id,items!inner(${EXPORT_ITEM_INNER})`,
     category_id: `eq.${categoryId}`,
     order: 'created_at.asc,item_id.asc',
     'items.images.order': 'created_at.asc,id.asc',
-    limit: EXPORT_PAGE_SIZE,
+    limit: EXPORT_ITEM_PAGE_SIZE,
   };
   if (after) {
     // data/keyset.ts rowsAfterFilter.
@@ -214,7 +220,7 @@ export function exportPage({ session, categoryId, after }) {
     paths: rows.flatMap((row) =>
       row.items.images.map((image) => image.path_full),
     ),
-    next: rows.length === EXPORT_PAGE_SIZE ? rows[rows.length - 1] : null,
+    next: rows.length === EXPORT_ITEM_PAGE_SIZE ? rows[rows.length - 1] : null,
   };
 }
 
@@ -250,6 +256,9 @@ export function createImageRow(session, row) {
     name: 'create image row',
   });
 }
+
+// One INSERT per request, set-based, at a body size no proxy in front of PostgREST refuses.
+export const SEED_BATCH = 10000;
 
 /** Bulk writes for setup: one request, so one INSERT statement, per call. */
 export function insertRows({ session, table, rows }) {
@@ -334,7 +343,7 @@ export function entrySliceEnd(session, size) {
 }
 
 /** `filters` narrows the delete further, as PostgREST filter params (`{ id: 'lte.<uuid>' }`). */
-export function deleteOwnRows(session, table, filters = {}) {
+export function deleteOwnRows({ session, table, filters = {} }) {
   const params = query({ user_id: `eq.${session.userId}`, ...filters });
   return expectOk(
     send({

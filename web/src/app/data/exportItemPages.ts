@@ -1,7 +1,8 @@
+import type { ReadResult } from '../lib/pages';
 import { supabase } from '../supabase';
 import type { ExportImageRow } from './images';
 import { ITEM_FIELDS_SELECT, type ItemFields } from './items';
-import { rowsAfterFilter } from './keyset';
+import { afterKeyset } from './keyset';
 
 export type ExportItemRow = ItemFields & { created_at: string };
 
@@ -23,13 +24,6 @@ type ExportLinkRow = {
 // Full size only: an export never wants thumbnails, and `size_bytes` sums to its size estimate.
 const EXPORT_ITEM_SELECT = `created_at,item_id,items!inner(${ITEM_FIELDS_SELECT},created_at,images(item_id,path_full,size_bytes))`;
 
-export function exportCursorFilter(cursor: ExportCursor): string {
-  return rowsAfterFilter(
-    { column: 'created_at', value: cursor.linkedAt },
-    { column: 'item_id', value: cursor.itemId },
-  );
-}
-
 // Keyset-paged from item_categories, oldest-first, walking idx_item_categories_cat_created; photos ride along per item.
 export function rawListItemsForExport({
   categoryId,
@@ -41,10 +35,10 @@ export function rawListItemsForExport({
     .select(EXPORT_ITEM_SELECT)
     .eq('category_id', categoryId);
   if (after) {
-    // The gte lets the index scan start at the cursor; the or=() drops the ties already read.
-    query = query
-      .gte('created_at', after.linkedAt)
-      .or(exportCursorFilter(after));
+    query = afterKeyset(query, {
+      first: { column: 'created_at', value: after.linkedAt },
+      second: { column: 'item_id', value: after.itemId },
+    });
   }
   return (
     query
@@ -68,16 +62,12 @@ type ExportPage = {
 export async function listItemsForExport(
   page: ExportPageRequest,
   rawList: typeof rawListItemsForExport = rawListItemsForExport,
-): Promise<
-  | { data: ExportPage; error: null }
-  | { data: null; error: NonNullable<unknown> }
-> {
+): Promise<ReadResult<ExportPage>> {
   const { data, error } = await rawList(page);
   if (error) return { data: null, error };
-  const rows = data ?? [];
-  const last = rows.at(-1);
+  const last = data.at(-1);
   const next =
-    last && rows.length === page.size
+    last && data.length === page.size
       ? { linkedAt: last.created_at, itemId: last.item_id }
       : null;
   const items: ExportItemRow[] = [];
@@ -85,7 +75,7 @@ export async function listItemsForExport(
   // Split off, since the manifest spreads an item whole and must not carry its storage paths.
   for (const {
     items: { images, ...item },
-  } of rows) {
+  } of data) {
     items.push(item);
     photos.push(...images);
   }

@@ -4,7 +4,7 @@ import {
   LIFECYCLE_TIMEOUTS,
   SUMMARY_TREND_STATS,
   correctnessThresholds,
-  rampTo,
+  rampingScenario,
   thresholdsFor,
 } from './lib/options.js';
 import { summarize } from './lib/summary.js';
@@ -15,14 +15,10 @@ export const options = {
   ...LIFECYCLE_TIMEOUTS,
   summaryTrendStats: SUMMARY_TREND_STATS,
   scenarios: {
-    browse: { executor: 'ramping-vus', exec: 'browseOwn', stages: rampTo(10) },
-    search: { executor: 'ramping-vus', exec: 'searchOwn', stages: rampTo(5) },
+    browse: rampingScenario('browseOwn', 10),
+    search: rampingScenario('searchOwn', 5),
     // One collector exporting at a time: every page, sign call and photograph of the category, back to back.
-    export: {
-      executor: 'ramping-vus',
-      exec: 'exportOwn',
-      stages: rampTo(1),
-    },
+    export: rampingScenario('exportOwn', 1),
   },
   // No p95 for export yet: it has no calibrated baseline (docs/how-to/load-testing.md).
   thresholds: {

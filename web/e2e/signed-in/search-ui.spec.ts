@@ -1,12 +1,12 @@
 import { expect, test } from './test';
 
-import { itemsIn } from './fixtures';
+import { titlesIn } from './fixtures';
 import { expectTitles } from './helpers';
 
 // search.spec.ts asks what a term matches; this is the interface around the box.
 test.use({ locale: 'en-GB' });
 
-const allCoins = itemsIn('Münzen').map((item) => item.title);
+const allCoins = titlesIn('Münzen');
 
 test.describe('the search box', () => {
   test.beforeEach(async ({ on, page }) => {

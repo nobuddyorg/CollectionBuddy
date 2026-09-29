@@ -1,5 +1,7 @@
 // lhci's manifest.json per target, as a markdown table reading the metrics lighthouserc.*.json asserts on.
-import { readFile, appendFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
+
+import { publishSummary } from './step-summary.mjs';
 
 // Must match the `assert` blocks in lighthouserc.signed-out.json / .signed-in.json.
 const TARGETS = [
@@ -38,7 +40,8 @@ async function summarizeTarget({ label, manifest, minPerformance, maxCls }) {
   let entries;
   try {
     entries = JSON.parse(await readFile(manifest, 'utf8'));
-  } catch {
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
     return `| ${label} | _no report found_ | | | | | | |`;
   }
   // lhci marks one representative run per URL once numberOfRuns > 1; a single-run override has none.
@@ -86,14 +89,4 @@ async function buildSummary() {
   ].join('\n');
 }
 
-async function main() {
-  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
-  const summary = await buildSummary();
-  if (summaryPath) {
-    await appendFile(summaryPath, summary);
-  } else {
-    console.log(summary);
-  }
-}
-
-await main();
+await publishSummary(await buildSummary());

@@ -18,13 +18,10 @@ export function useCreateItem(categoryId: string) {
       if (isCreating) return false;
       // The DB normalizes everything else; only a blank title is worth refusing client-side.
       if (!values.title.trim()) return false;
-      const tags = Array.isArray(values.tags) ? values.tags : [];
 
       setIsCreating(true);
       try {
-        const { error } = await createItemsInCategory(categoryId, [
-          { ...values, tags },
-        ]);
+        const { error } = await createItemsInCategory(categoryId, [values]);
         if (error) throw error;
 
         toast.announce(t('item_create.entry_added'));

@@ -7,13 +7,9 @@ import {
   rawSearchCategoryItems,
 } from './itemPage';
 import { likePatternFor } from './itemSearch';
+import { paramsOf, requestOf } from './postgrestRequest.test-support';
 
-// A PostgREST builder holds its URL and only hits the network when awaited.
 describe('the queries behind the catalogue page', () => {
-  type Request = { url: URL; method: string; headers: Headers };
-  const requestOf = (builder: unknown) => builder as Request;
-  const paramsOf = (builder: unknown) => requestOf(builder).url.searchParams;
-
   const idsQuery = (from = 0, to = 8) =>
     paramsOf(rawListItemIds({ categoryId: 'cat-1', from, to }));
   const byIdsRequest = () => requestOf(rawListItemsByIds({ ids: ['a', 'b'] }));
@@ -61,18 +57,19 @@ describe('the queries behind the catalogue page', () => {
   it('carries an abort signal through to each cancellable query', () => {
     const controller = new AbortController();
     const { signal } = controller;
-    const signalOf = (builder: unknown) =>
-      (builder as { signal?: AbortSignal }).signal;
 
     expect(
-      signalOf(rawListItemIds({ categoryId: 'cat-1', from: 0, to: 8, signal })),
+      requestOf(rawListItemIds({ categoryId: 'cat-1', from: 0, to: 8, signal }))
+        .signal,
     ).toBe(signal);
-    expect(signalOf(rawListItemsByIds({ ids: ['a'], signal }))).toBe(signal);
-    expect(signalOf(rawCountItems({ categoryId: 'cat-1', signal }))).toBe(
+    expect(requestOf(rawListItemsByIds({ ids: ['a'], signal })).signal).toBe(
       signal,
     );
     expect(
-      signalOf(
+      requestOf(rawCountItems({ categoryId: 'cat-1', signal })).signal,
+    ).toBe(signal);
+    expect(
+      requestOf(
         rawSearchCategoryItems({
           categoryId: 'cat-1',
           likePattern: '%coin%',
@@ -80,17 +77,15 @@ describe('the queries behind the catalogue page', () => {
           to: 8,
           signal,
         }),
-      ),
+      ).signal,
     ).toBe(signal);
   });
 
   it('leaves a query with nothing to cancel without a signal', () => {
-    const signalOf = (builder: unknown) =>
-      (builder as { signal?: AbortSignal }).signal;
     expect(
-      signalOf(rawListItemIds({ categoryId: 'cat-1', from: 0, to: 8 })),
+      requestOf(rawListItemIds({ categoryId: 'cat-1', from: 0, to: 8 })).signal,
     ).toBeUndefined();
-    expect(signalOf(rawListItemsByIds({ ids: ['a'] }))).toBeUndefined();
+    expect(requestOf(rawListItemsByIds({ ids: ['a'] })).signal).toBeUndefined();
   });
 
   const searchParamsOf = (search: string) =>

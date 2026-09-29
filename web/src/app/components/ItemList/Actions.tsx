@@ -1,9 +1,10 @@
 'use client';
 
 import { useI18n } from '../../i18n/useI18n';
+import { prefetchOnIntent } from '../../lib/prefetchOnIntent';
 import Icon, { IconType } from '../Icon';
 import { IconButton, iconButtonClasses } from '../ui/IconButton';
-import { Spinner } from '../ui/Spinner';
+import { StatusSpinner } from '../ui/Spinner';
 import { prefetchItemForm } from '../ItemForm/load';
 
 function UploadInput({
@@ -67,9 +68,7 @@ export function AddPhotoPlate({
       {/* text-foreground/80: text-muted-foreground falls under the 4.5:1 AA floor on `--mount` in light mode. */}
       <span className="relative flex flex-col items-center gap-2.5 text-foreground/80 transition-colors group-hover/plate:text-foreground">
         {busy && !readOnly ? (
-          <span role="status" aria-label={t('common.loading')}>
-            <Spinner size="xl" />
-          </span>
+          <StatusSpinner size="xl" label={t('common.loading')} />
         ) : (
           <Icon icon={IconType.Photo} className="w-8 h-8" aria-hidden="true" />
         )}
@@ -122,9 +121,7 @@ export function Actions({
           label={t('item_list.add_image')}
         />
         {busy ? (
-          <span role="status" aria-label={t('common.loading')}>
-            <Spinner size="sm" />
-          </span>
+          <StatusSpinner size="sm" label={t('common.loading')} />
         ) : (
           <Icon icon={IconType.Plus} className="w-4 h-4" aria-hidden="true" />
         )}
@@ -134,9 +131,7 @@ export function Actions({
         variant="outline"
         data-testid="edit-entry"
         onClick={onEdit}
-        onPointerEnter={prefetchItemForm}
-        onPointerDown={prefetchItemForm}
-        onFocus={prefetchItemForm}
+        {...prefetchOnIntent(prefetchItemForm)}
         aria-label={t('item_list.edit')}
         title={t('item_list.edit')}
       >

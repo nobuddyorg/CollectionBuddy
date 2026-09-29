@@ -1,10 +1,10 @@
 import { type SupabaseClient } from '@supabase/supabase-js';
 
+import { BUCKET } from './collectors';
 import { SEED } from './fixtures';
 import { apiAs, context, editorShare, unshare } from './rls/helpers';
 
 // Cleanup goes through the API as the owner: a delete in the interface waits out its undo window, past the test.
-const BUCKET = 'item-images';
 
 async function removeObjectsUnder(api: SupabaseClient, prefix: string) {
   const { data: objects, error } = await api.storage.from(BUCKET).list(prefix);

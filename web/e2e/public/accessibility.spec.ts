@@ -7,9 +7,10 @@ test.use({ locale: 'en-GB' });
 
 test.describe('accessibility -- signed out', () => {
   test('the sign-in screen has no serious or critical violations', async ({
+    on,
     page,
   }, testInfo) => {
-    await page.goto('login/', { waitUntil: 'networkidle' });
+    await on(page).login.do.open();
     await expectNoSeriousA11yViolations(page, testInfo);
   });
 

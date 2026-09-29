@@ -1,49 +1,18 @@
-import { readFileSync } from 'node:fs';
-
-import { createClient } from '@supabase/supabase-js';
-
 import { expect, test } from './test';
-import {
-  CONTEXT_PATH,
-  OTHER_AUTH_STATE_PATH,
-  SEED,
-  type SeedContext,
-} from './fixtures';
+import { OTHER_AUTH_STATE_PATH, SEED } from './fixtures';
 import { removeCategoryNamed } from './cleanup';
-import { share } from './rls/helpers';
+import { fileEntry } from './collectors';
+import { answerGeocoder, photonFeature, uniqueName } from './helpers';
+import {
+  apiAs,
+  context,
+  ownedCategoryId,
+  unshare,
+  viewerShare,
+} from './rls/helpers';
 
 // The grantee's side, in their own session; rls/viewer-share.spec.ts has what it reaches.
 test.use({ storageState: OTHER_AUTH_STATE_PATH, locale: 'en-GB' });
-
-const context = () =>
-  JSON.parse(readFileSync(CONTEXT_PATH, 'utf8')) as SeedContext;
-
-/** A PostgREST client carrying one user's access token, and nothing more. */
-function apiAs(token: string) {
-  return createClient(
-    process.env.E2E_SUPABASE_URL!,
-    process.env.E2E_SUPABASE_ANON_KEY!,
-    {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    },
-  );
-}
-
-async function ownedCategoryId(owner: {
-  token: string;
-  userId: string;
-  name: string;
-}) {
-  const { data, error } = await apiAs(owner.token)
-    .from('categories')
-    .select('id')
-    .eq('user_id', owner.userId)
-    .eq('name', owner.name)
-    .single();
-  if (error) throw error;
-  return data.id as string;
-}
 
 test.describe('a collection shared with you', () => {
   test('is marked as someone else, refuses the owner controls, and can be left', async ({
@@ -59,16 +28,10 @@ test.describe('a collection shared with you', () => {
       userId,
       name: SEED.grantedCategory,
     });
-    const { data: grant, error } = await apiAs(token)
-      .from('category_shares')
-      .insert({ category_id: categoryId, invited_email: SEED.other.email })
-      .select('id')
-      .single();
-    if (error) throw error;
+    const shareId = await viewerShare(token, categoryId);
 
     try {
-      await page.goto('', { waitUntil: 'networkidle' });
-      await expect(app.categories.locators.selected).not.toBeEmpty();
+      await app.categories.do.load();
       await app.categories.do.openPanel();
 
       await expect(
@@ -115,11 +78,11 @@ test.describe('a collection shared with you', () => {
       const { data: left } = await apiAs(token)
         .from('category_shares')
         .select('id')
-        .eq('id', grant.id);
+        .eq('id', shareId);
       expect(left).toEqual([]);
     } finally {
       // Cleanup for a run that failed before leaving.
-      await apiAs(token).from('category_shares').delete().eq('id', grant.id);
+      await unshare(token, shareId);
     }
   });
 });
@@ -137,7 +100,7 @@ test.describe('the map of a collection shared with you', () => {
   }) => {
     const app = on(page);
     const { token, userId } = context();
-    const name = `E2E Geteilte Karte ${Date.now()}`;
+    const name = uniqueName('E2E Geteilte Karte');
     const owner = apiAs(token);
     const { data: category, error } = await owner
       .from('categories')
@@ -147,41 +110,19 @@ test.describe('the map of a collection shared with you', () => {
     if (error) throw error;
 
     try {
-      const { data: item, error: itemError } = await owner
-        .from('items')
-        .insert({ user_id: userId, title: 'Kartenstück', place: 'Aachen' })
-        .select('id')
-        .single();
-      if (itemError) throw itemError;
-      const { error: linkError } = await owner
-        .from('item_categories')
-        .insert({ item_id: item.id, category_id: category.id });
-      if (linkError) throw linkError;
-      await share({
-        token,
+      await fileEntry(owner, {
         categoryId: category.id,
-        invitedEmail: SEED.other.email,
+        fields: { user_id: userId, title: 'Kartenstück', place: 'Aachen' },
       });
-      await page.route('https://photon.komoot.io/**', (route) =>
-        route.fulfill({
-          json: {
-            features: [
-              {
-                properties: { name: 'Aachen' },
-                geometry: { type: 'Point', coordinates: [6.0839, 50.7753] },
-              },
-            ],
-          },
-        }),
-      );
+      await viewerShare(token, category.id);
+      await answerGeocoder(page, [photonFeature('Aachen', [6.0839, 50.7753])]);
 
       // The map stays open for the whole listening window, so its tiles come from here, not the network.
       await page.route('https://*.tile.openstreetmap.org/**', (route) =>
         route.fulfill({ contentType: 'image/png', body: BLANK_TILE }),
       );
 
-      await page.goto('', { waitUntil: 'networkidle' });
-      await expect(app.categories.locators.selected).not.toBeEmpty();
+      await app.categories.do.load();
       await app.categories.do.openPanel();
       await app.categories.tab(name).click();
       await expect(app.catalogue.card('Kartenstück')()).toBeVisible();

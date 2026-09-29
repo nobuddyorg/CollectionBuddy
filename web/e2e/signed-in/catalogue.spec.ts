@@ -1,6 +1,6 @@
 import { expect, test } from './test';
 
-import { SEED, itemsIn } from './fixtures';
+import { SEED, titlesIn } from './fixtures';
 import { expectTitles, visibleTitles } from './helpers';
 
 // Runs against the real Postgres and real row-level security, not a mock.
@@ -57,10 +57,7 @@ test.describe('the catalogue', () => {
 
   test('shows a category exactly, newest first', async ({ on, page }) => {
     await on(page).categories.do.open('Münzen');
-    await expectTitles(
-      page,
-      itemsIn('Münzen').map((item) => item.title),
-    );
+    await expectTitles(page, titlesIn('Münzen'));
   });
 
   // postgrest-js resolves an aborted read with an error; a switch mid-load must not call that a failed search.
@@ -91,10 +88,7 @@ test.describe('the catalogue', () => {
       await app.categories.do.openPanel();
       await app.categories.tab('Münzen').click();
 
-      await expectTitles(
-        page,
-        itemsIn('Münzen').map((item) => item.title),
-      );
+      await expectTitles(page, titlesIn('Münzen'));
       await expect(app.toast()).toHaveCount(0);
     } finally {
       await page.unrouteAll({ behavior: 'ignoreErrors' });

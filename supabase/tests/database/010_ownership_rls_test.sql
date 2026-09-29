@@ -1,14 +1,4 @@
--- "Your own vs. a stranger's" -- the core matrix for categories, items,
--- item_categories and images with no sharing involved. TEST_STRATEGY.md
--- §4's "cross-tenant read/write" risk: a wrong policy here is a silent,
--- total confidentiality failure, and the interface would look identical
--- while showing somebody else's collection.
---
--- Complements web/e2e/signed-in/rls/isolation.spec.ts rather than
--- duplicating it: that suite proves
--- the same properties through a real PostgREST request carrying a real
--- JWT; this file proves them at the SQL surface directly, in a rolled-back
--- transaction, without a browser or a running application stack.
+-- Own vs a stranger's rows, no sharing, at the SQL surface; rls/isolation.spec.ts proves the same through PostgREST.
 begin;
 select no_plan();
 
@@ -16,10 +6,7 @@ select no_plan();
 
 select gen_random_uuid() as owner_id, gen_random_uuid() as stranger_id \gset
 
--- Fixtures, each created by its own identity through the ordinary insert
--- path -- the same trigger-plus-RLS pipeline PostgREST drives, never a
--- service_role bypass (TEST_STRATEGY.md §8: "seed as the user, never as
--- service_role").
+-- Seeded as each identity through the ordinary insert path, never service_role (TEST_STRATEGY.md §8).
 select pg_temp.auth_as(:'owner_id'::uuid, 'owner@collectionbuddy.test');
 insert into public.categories (name) values ('Owner''s category')
 returning id as owner_category_id \gset
@@ -35,8 +22,7 @@ select pg_temp.auth_as(:'stranger_id'::uuid, 'stranger@collectionbuddy.test');
 insert into public.categories (name) values ('Stranger''s category')
 returning id as stranger_category_id \gset
 
--- A plain read, satisfiable: only the policy can make this come back
--- empty (TEST_STRATEGY.md §7 rule 4).
+-- A satisfiable filter, so only the policy can make it come back empty (TEST_STRATEGY.md §7 rule 4).
 select is(
   (select count(*) from public.categories where user_id = :'owner_id'::uuid),
   0::bigint,
@@ -63,19 +49,14 @@ select is(
   'the owner can read their own item'
 );
 
--- Write-side: an update against a stranger's row is accepted syntactically
--- but affects zero rows -- the policy filters it out of the update
--- target, it does not error.
+-- The policy filters a stranger's row out of the update target: zero rows, not an error.
 select pg_temp.auth_as(:'stranger_id'::uuid, 'stranger@collectionbuddy.test');
 
-with attempt as (
-  update public.categories
-  set name = 'taken over'
-  where id = :'owner_category_id'::uuid
-  returning id
-)
-select is((select count(*) from attempt), 0::bigint,
-  'a stranger''s update against the owner''s category affects no rows');
+select is(
+  pg_temp.rows_written(format('update public.categories set name = %L where id = %L returning id', 'taken over', :'owner_category_id')),
+  0::bigint,
+  'a stranger''s update against the owner''s category affects no rows'
+);
 
 with attempt as (
   update public.items
@@ -94,8 +75,7 @@ with attempt as (
 select is((select count(*) from attempt), 0::bigint,
   'a stranger cannot delete the owner''s item');
 
--- Read back as the owner: a write accepted but hidden from its owner
--- would be the worst outcome of all (TEST_STRATEGY.md §7 rule 5).
+-- Read back as the owner: a write accepted but hidden from its owner is the worst outcome (TEST_STRATEGY.md §7 rule 5).
 select pg_temp.auth_as(:'owner_id'::uuid, 'owner@collectionbuddy.test');
 select is(
   (select title from public.items where id = :'owner_item_id'::uuid),
@@ -103,10 +83,7 @@ select is(
   'the item is untouched, read back as its owner'
 );
 
--- item_categories: a stranger cannot file the owner's item into their own
--- category. Refused by tg_item_categories_enforce, a trigger rather than a
--- bare RLS predicate, since the insert policy alone only checks
--- user_id = auth.uid() and user_id is set by that same trigger.
+-- tg_item_categories_enforce refuses it: the insert policy checks only user_id = auth.uid(), and that trigger sets user_id.
 select pg_temp.auth_as(:'stranger_id'::uuid, 'stranger@collectionbuddy.test');
 select throws_ok(
   format(
@@ -118,9 +95,7 @@ select throws_ok(
   'a stranger cannot file the owner''s item into their own category'
 );
 
--- images: a separate authorization surface from storage.objects (a row
--- naming an object, versus the object's own bytes) -- TEST_STRATEGY.md §7
--- rule 6 requires both mirrored surfaces covered; this is the row side.
+-- The row side of the images/storage.objects mirror; TEST_STRATEGY.md §7 rule 6 needs both surfaces covered.
 select is(
   (select count(*) from public.images where id = :'owner_image_id'::uuid),
   0::bigint,
@@ -138,9 +113,7 @@ select throws_ok(
   'an images row cannot be inserted for the owner''s item, even with a conforming path'
 );
 
--- enforce_user_id (0002_functions.sql): not refused, ignored -- a BEFORE
--- trigger overwrites the claimed owner with auth.uid(), so there is no
--- request that can land a row in someone else's collection at all.
+-- enforce_user_id (0002) ignores rather than refuses: a BEFORE trigger overwrites the claimed owner with auth.uid().
 select pg_temp.auth_as(:'stranger_id'::uuid, 'stranger@collectionbuddy.test');
 insert into public.items (user_id, title) values (:'owner_id'::uuid, 'planted')
 returning user_id as planted_owner \gset
@@ -148,8 +121,7 @@ returning user_id as planted_owner \gset
 select is(:'planted_owner'::uuid, :'stranger_id'::uuid,
   'an item addressed to someone else''s collection lands in the caller''s own');
 
--- Nor can an existing row change hands: on update the trigger restores the
--- old owner rather than accepting the new one.
+-- On update the trigger restores the old owner rather than accepting the new one.
 select pg_temp.auth_as(:'owner_id'::uuid, 'owner@collectionbuddy.test');
 update public.items set user_id = :'stranger_id'::uuid
 where id = :'owner_item_id'::uuid
@@ -184,9 +156,7 @@ select throws_ok(
   'a stranger cannot file an item of its own into the owner''s category'
 );
 
--- anon: refused outright (no grant at all) before any policy predicate
--- runs -- not shown an empty result, which would instead mean the grant
--- existed and RLS was doing the work (TEST_STRATEGY.md trust boundary 3).
+-- No grant, so anon is refused before any policy runs; an empty result would mean RLS did the work (TEST_STRATEGY.md trust boundary 3).
 select pg_temp.auth_as_anon();
 
 select throws_ok(

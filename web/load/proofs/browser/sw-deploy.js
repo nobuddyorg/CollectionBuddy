@@ -5,7 +5,7 @@ import http from 'k6/http';
 import { Counter, Rate, Trend } from 'k6/metrics';
 
 import { clearAccount } from '../../lib/seed.js';
-import { insertEntries, newCategory, seedOrClear } from '../lib/fixtures.js';
+import { insertEntries, newCategory } from '../lib/fixtures.js';
 import { PROOF_TREND_STATS, measured, proofSummary } from '../lib/report.js';
 import {
   APP_URL,
@@ -83,19 +83,17 @@ export default async function firstVisitAfterDeploy() {
   try {
     // Build A: sign in, let the worker take control, and let it cache A's HTML. New entry is never hovered or opened.
     session = await openAsDemoUser(page);
-    seedOrClear([session], () =>
-      insertEntries({
-        session,
-        categoryId: newCategory(session, 'Proof: deploy'),
-        count: 3,
-        fields: (n) => ({
-          title: `Eintrag ${n}`,
-          description: 'for dem Deploy',
-          place: 'Rom',
-          tags: ['sw'],
-        }),
+    insertEntries({
+      session,
+      categoryId: newCategory(session, 'Proof: deploy'),
+      count: 3,
+      fields: (n) => ({
+        title: `Eintrag ${n}`,
+        description: 'for dem Deploy',
+        place: 'Rom',
+        tags: ['sw'],
       }),
-    );
+    });
     await page.waitForFunction(
       () => Boolean(navigator.serviceWorker.controller),
       { timeout: 30000 },

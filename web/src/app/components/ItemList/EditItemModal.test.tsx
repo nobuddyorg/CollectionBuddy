@@ -6,17 +6,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import { EditItemModal } from './EditItemModal';
-import type { ItemLite } from './types';
+import { item } from './item.test-support';
 
-const item: ItemLite = {
-  id: 'item-1',
-  title: 'Roman coin',
-  description: null,
-  place: null,
-  place_lat: null,
-  place_lng: null,
-  tags: [],
-};
+const ITEM = item('item-1', { title: 'Roman coin' });
 
 function renderModal(onOpenChange = vi.fn()) {
   render(
@@ -24,7 +16,7 @@ function renderModal(onOpenChange = vi.fn()) {
       <ConfirmProvider>
         <EditItemModal
           open
-          item={item}
+          item={ITEM}
           isSaving={false}
           onOpenChange={onOpenChange}
           onSubmit={vi.fn()}
@@ -34,27 +26,6 @@ function renderModal(onOpenChange = vi.fn()) {
   );
   return { onOpenChange };
 }
-
-describe('EditItemModal', () => {
-  // Nothing stops a stored row from holding null tags despite the type; the form must still start empty.
-  it('starts with no tags when the item has none', async () => {
-    render(
-      <I18nProvider>
-        <ConfirmProvider>
-          <EditItemModal
-            open
-            item={{ ...item, tags: null as unknown as string[] }}
-            isSaving={false}
-            onOpenChange={vi.fn()}
-            onSubmit={vi.fn()}
-          />
-        </ConfirmProvider>
-      </I18nProvider>,
-    );
-    await screen.findByTestId('item-title');
-    expect(screen.getByText('0 tags')).toBeInTheDocument();
-  });
-});
 
 // The dialog's X and the form's Cancel share one guard, so Escape and Cancel cover all four paths.
 describe('EditItemModal — discarding unsaved changes', () => {

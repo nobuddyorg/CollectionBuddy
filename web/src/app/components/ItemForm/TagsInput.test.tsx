@@ -16,6 +16,10 @@ function renderTags(tags: string[] = []) {
   return { setTags, field: screen.getByRole('textbox') };
 }
 
+function numberedTags(count: number) {
+  return Array.from({ length: count }, (_, index) => `tag${index}`);
+}
+
 describe('TagsInput', () => {
   beforeEach(() => {
     window.localStorage.setItem('lang', 'en');
@@ -188,8 +192,7 @@ describe('TagsInput', () => {
   // The database refuses a 51st tag (0016_bound_row_volume.sql); the field stops taking one first.
   it('takes no more typing at 50 tags, and says why', async () => {
     const user = userEvent.setup();
-    const fifty = Array.from({ length: 50 }, (_, i) => `tag${i}`);
-    const { setTags, field } = renderTags(fifty);
+    const { setTags, field } = renderTags(numberedTags(50));
 
     expect(field).toHaveAttribute('readonly');
     expect(field).toHaveAttribute(
@@ -200,9 +203,19 @@ describe('TagsInput', () => {
     expect(setTags).not.toHaveBeenCalled();
   });
 
+  it('says why in German too', () => {
+    window.localStorage.setItem('lang', 'de');
+    const { field } = renderTags(numberedTags(50));
+
+    expect(field).toHaveAttribute(
+      'placeholder',
+      'Höchstens 50 Tags – entferne einen, um einen weiteren hinzuzufügen',
+    );
+  });
+
   it('still removes the last tag with Backspace at the limit', async () => {
     const user = userEvent.setup();
-    const fifty = Array.from({ length: 50 }, (_, i) => `tag${i}`);
+    const fifty = numberedTags(50);
     const { setTags, field } = renderTags(fifty);
 
     await user.type(field, '{Backspace}');
@@ -211,7 +224,7 @@ describe('TagsInput', () => {
 
   it('keeps taking tags one below the limit', async () => {
     const user = userEvent.setup();
-    const fortyNine = Array.from({ length: 49 }, (_, i) => `tag${i}`);
+    const fortyNine = numberedTags(49);
     const { setTags, field } = renderTags(fortyNine);
 
     expect(field).not.toHaveAttribute('readonly');

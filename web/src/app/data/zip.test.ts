@@ -15,12 +15,9 @@ import {
   ZipLimitError,
   type ZipEntry,
 } from './zip';
+import { bytesOf } from './zipReader.test-support';
 
 const encoder = new TextEncoder();
-
-async function bytesOf(blob: Blob): Promise<Uint8Array<ArrayBuffer>> {
-  return new Uint8Array(await blob.arrayBuffer());
-}
 
 function uint32(bytes: Uint8Array, at: number): number {
   return new DataView(bytes.buffer, bytes.byteOffset).getUint32(at, true);
@@ -52,7 +49,7 @@ describe('crc32', () => {
     expect(crc32(new Uint8Array(0))).toBe(0);
   });
 
-  it('known vectors', () => {
+  it('matches the published CRC-32 of short inputs', () => {
     expect(crc32(encoder.encode('a'))).toBe(0xe8b7be43);
     expect(crc32(encoder.encode('hello'))).toBe(0x3610a686);
   });

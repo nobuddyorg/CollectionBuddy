@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteCategory as deleteCategoryRow } from '../../data/categories';
 import {
   CATEGORY_ONE,
+  CATEGORY_TWO,
   commitDeferredDelete,
   installDeleteMocks,
   listCategoriesReturns,
@@ -54,8 +55,7 @@ describe('useCategories deleteCategory', () => {
   });
 
   it('ignores a second delete of a different category while one is still deferred', async () => {
-    const CAT_2 = { id: 'cat-2', name: 'Cat 2', user_id: 'owner-1' };
-    listCategoriesReturns([CATEGORY_ONE, CAT_2]);
+    listCategoriesReturns([CATEGORY_ONE, CATEGORY_TWO]);
     let release: (() => void) | undefined;
     vi.mocked(deleteCategoryRow).mockReturnValue(
       new Promise((resolve) => {
@@ -74,7 +74,7 @@ describe('useCategories deleteCategory', () => {
       result.current.deleteCategory('cat-2');
     });
 
-    expect(result.current.categories).toEqual([CAT_2]);
+    expect(result.current.categories).toEqual([CATEGORY_TWO]);
     expect(deleteCategoryRow).toHaveBeenCalledTimes(1);
     await act(async () => {
       release?.();
@@ -121,8 +121,7 @@ describe('useCategories deleteCategory', () => {
     await commitDeferredDelete();
     await waitFor(() => expect(result.current.isDeleting).toBe(false));
 
-    const CAT_2 = { id: 'cat-2', name: 'Cat 2', user_id: 'owner-1' };
-    listCategoriesReturns([CAT_2]);
+    listCategoriesReturns([CATEGORY_TWO]);
     await act(async () => {
       await result.current.reload();
     });

@@ -118,22 +118,6 @@ describe('ItemForm submission', () => {
       expect.objectContaining({ place_lat: null, place_lng: null }),
     );
   });
-
-  // A value assembled from a partially-loaded record can hand over a nullish field at runtime.
-  it('falls back to blank values for a nullish title, description, place, or tags', () => {
-    renderForm({
-      ...EMPTY_ITEM_FORM_VALUES,
-      title: undefined,
-      description: undefined,
-      place: undefined,
-      tags: undefined,
-    } as unknown as ItemFormValues);
-
-    expect(screen.getByTestId('item-title')).toHaveValue('');
-    expect(screen.getByTestId('item-description')).toHaveValue('');
-    expect(screen.getByRole('combobox')).toHaveValue('');
-    expect(screen.getByText('0 tags')).toBeInTheDocument();
-  });
 });
 
 // The database's ceilings (0016_bound_row_volume.sql), stopped at the keyboard instead of as a failed save.

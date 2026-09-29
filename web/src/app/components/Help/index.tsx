@@ -4,6 +4,7 @@ import Link from 'next/link';
 
 import { useI18n } from '../../i18n/useI18n';
 import CenteredModal from '../CenteredModal';
+import { linkClasses } from '../ui/linkClasses';
 
 export default function HelpDialog({
   open,
@@ -52,7 +53,6 @@ export default function HelpDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={t('help.title')}
-      closeLabel={t('common.close')}
     >
       <div data-testid="help" className="divide-y divide-border">
         {topics.map((topic) => (
@@ -62,7 +62,10 @@ export default function HelpDialog({
             className="group"
           >
             {/* The WebKit marker needs its own rule; list-none only hides Firefox's. */}
-            <summary className="min-h-11 flex items-center justify-between gap-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden text-sm font-medium">
+            <summary
+              data-testid="help-topic-toggle"
+              className="min-h-11 flex items-center justify-between gap-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden text-sm font-medium"
+            >
               {topic.title}
               <span
                 aria-hidden="true"
@@ -80,7 +83,7 @@ export default function HelpDialog({
           href="/privacy"
           data-testid="help-privacy-link"
           onClick={() => onOpenChange(false)}
-          className="underline underline-offset-2 hover:text-accent"
+          className={linkClasses()}
         >
           {t('privacy.link')}
         </Link>

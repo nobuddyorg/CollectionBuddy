@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ImportCancelledError } from '../../data/importCancellation';
 import { importCategory } from '../../data/importCategory';
 import { ImportFormatError } from '../../data/importFormat';
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
+import { leavingIsHeld } from '../../lib/useBeforeUnloadGuard.test-support';
+import { ToastWrapper as wrapper } from '../providers.test-support';
 import { useImportCategory } from './useImportCategory';
 
 vi.mock('../../data/importCategory', async () => {
@@ -15,14 +15,6 @@ vi.mock('../../data/importCategory', async () => {
   >('../../data/importCategory');
   return { ...actual, importCategory: vi.fn() };
 });
-
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>{children}</ToastProvider>
-    </I18nProvider>
-  );
-}
 
 function imported(overrides: Record<string, unknown> = {}) {
   return {
@@ -41,6 +33,21 @@ const FILE = new File(['zip'], 'coins.zip');
 function namedFromArchive(archivedName: string): string {
   const [[{ nameCategory }]] = vi.mocked(importCategory).mock.calls;
   return nameCategory(archivedName);
+}
+
+function holdImport(): {
+  release: () => void;
+  signal: () => AbortSignal | undefined;
+} {
+  let signal: AbortSignal | undefined;
+  let release: (() => void) | undefined;
+  vi.mocked(importCategory).mockImplementation((args) => {
+    signal = args.signal;
+    return new Promise((resolve) => {
+      release = () => resolve(imported());
+    });
+  });
+  return { release: () => release?.(), signal: () => signal };
 }
 
 // An import of one item with one photograph.
@@ -122,13 +129,7 @@ describe('useImportCategory', () => {
   });
 
   it('says what it is doing while the archive is still being read', async () => {
-    let release: (() => void) | undefined;
-    vi.mocked(importCategory).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(imported());
-        }),
-    );
+    const held = holdImport();
     const { result } = renderHook(() => useImportCategory([]), { wrapper });
 
     act(() => {
@@ -136,15 +137,10 @@ describe('useImportCategory', () => {
     });
 
     await waitFor(() =>
-      expect(result.current.progress).toEqual({
-        phase: 'reading',
-        done: 0,
-        total: 0,
-      }),
+      expect(result.current.message).toBe('Reading archive…'),
     );
-    expect(result.current.message).toBe('Reading archive…');
     await act(async () => {
-      release?.();
+      held.release();
     });
   });
 
@@ -153,10 +149,10 @@ describe('useImportCategory', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
     vi.mocked(importCategory).mockRejectedValue(
-      new ImportFormatError(
-        'not_export',
-        'Not a CollectionBuddy export archive',
-      ),
+      new ImportFormatError({
+        reason: 'not_export',
+        message: 'Not a CollectionBuddy export archive',
+      }),
     );
     const { result } = renderHook(() => useImportCategory([]), { wrapper });
 
@@ -175,7 +171,7 @@ describe('useImportCategory', () => {
     consoleError.mockRestore();
   });
 
-  // #787: a damaged or oversized archive fails the same way every time, so the message says why instead of "try again".
+  // A damaged or oversized archive fails the same way every time, so the message says why, not "try again".
   it.each([
     [
       'unreadable',
@@ -192,7 +188,7 @@ describe('useImportCategory', () => {
         .spyOn(console, 'error')
         .mockImplementation(() => {});
       vi.mocked(importCategory).mockRejectedValue(
-        new ImportFormatError(reason, 'refused'),
+        new ImportFormatError({ reason, message: 'refused' }),
       );
       const { result } = renderHook(() => useImportCategory([]), { wrapper });
 
@@ -272,62 +268,42 @@ describe('useImportCategory cancel and in-flight guards', () => {
 
   // What the controller ref buys: a cancel captured before the run began still reaches it.
   it('aborts the current run even when cancelled through a reference taken before it started', async () => {
-    let signal: AbortSignal | undefined;
-    let release: (() => void) | undefined;
-    vi.mocked(importCategory).mockImplementation((args) => {
-      signal = args.signal;
-      return new Promise((resolve) => {
-        release = () => resolve(imported());
-      });
-    });
+    const held = holdImport();
     const { result } = renderHook(() => useImportCategory([]), { wrapper });
     const cancelFromBefore = result.current.cancelImport;
 
     act(() => {
       void result.current.runImport(FILE);
     });
-    await waitFor(() => expect(signal).toBeDefined());
+    await waitFor(() => expect(held.signal()).toBeDefined());
     act(() => {
       cancelFromBefore();
     });
 
-    expect(signal!.aborted).toBe(true);
+    expect(held.signal()?.aborted).toBe(true);
     await act(async () => {
-      release?.();
+      held.release();
     });
   });
 
   it('aborts the run in flight when cancelled', async () => {
-    let signal: AbortSignal | undefined;
-    let release: (() => void) | undefined;
-    vi.mocked(importCategory).mockImplementation((args) => {
-      signal = args.signal;
-      return new Promise((resolve) => {
-        release = () => resolve(imported());
-      });
-    });
+    const held = holdImport();
     const { result } = renderHook(() => useImportCategory([]), { wrapper });
 
     act(() => {
       void result.current.runImport(FILE);
     });
-    await waitFor(() => expect(signal).toBeDefined());
+    await waitFor(() => expect(held.signal()).toBeDefined());
     act(() => result.current.cancelImport());
 
-    expect(signal?.aborted).toBe(true);
+    expect(held.signal()?.aborted).toBe(true);
     await act(async () => {
-      release?.();
+      held.release();
     });
   });
 
   it('refuses to start a second import while one is running', async () => {
-    let release: (() => void) | undefined;
-    vi.mocked(importCategory).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(imported());
-        }),
-    );
+    const held = holdImport();
     const { result } = renderHook(() => useImportCategory([]), { wrapper });
 
     act(() => {
@@ -340,19 +316,13 @@ describe('useImportCategory cancel and in-flight guards', () => {
 
     expect(importCategory).toHaveBeenCalledTimes(1);
     await act(async () => {
-      release?.();
+      held.release();
     });
   });
 
   // Closing the tab mid-import would leave a half-built category behind.
   it('warns before the tab is closed while an import is running', async () => {
-    let release: (() => void) | undefined;
-    vi.mocked(importCategory).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(imported());
-        }),
-    );
+    const held = holdImport();
     const { result } = renderHook(() => useImportCategory([]), { wrapper });
 
     act(() => {
@@ -360,15 +330,11 @@ describe('useImportCategory cancel and in-flight guards', () => {
     });
     await waitFor(() => expect(result.current.isImporting).toBe(true));
 
-    const event = new Event('beforeunload', { cancelable: true });
-    window.dispatchEvent(event);
-    expect(event.defaultPrevented).toBe(true);
+    expect(leavingIsHeld()).toBe(true);
 
     await act(async () => {
-      release?.();
+      held.release();
     });
-    const afterwards = new Event('beforeunload', { cancelable: true });
-    window.dispatchEvent(afterwards);
-    expect(afterwards.defaultPrevented).toBe(false);
+    expect(leavingIsHeld()).toBe(false);
   });
 });

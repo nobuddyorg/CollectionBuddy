@@ -96,7 +96,7 @@ describe('removeBackground', () => {
 
     await expect(pending).resolves.toBe(cutout);
     expect(worker.options).toEqual({ type: 'module' });
-    expect(worker.url.pathname).toMatch(/backgroundRemoval\.worker\.ts$/);
+    expect(worker.url.pathname).toMatch(/\/photo\.worker\.ts$/);
     expect(worker.requests).toEqual([
       {
         kind: 'cut-out',

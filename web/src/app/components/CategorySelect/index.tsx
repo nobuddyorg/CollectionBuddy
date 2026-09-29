@@ -7,12 +7,12 @@ import type { Category } from '../../types';
 import {
   AddButton,
   CollapseButton,
-  DeleteButtonWithLabel,
   ExpandButton,
+  RemoveCategoryButton,
   RenameButton,
 } from './Buttons';
+import { CategoryTabs } from './CategoryTabs';
 import { CategoryText } from './CategoryText';
-import { CategorySelectDropdown } from './Dropdown';
 import { CategoryInput } from './Input';
 import { sortCategories } from './selection';
 import { SharingSection } from './Sharing';
@@ -30,7 +30,7 @@ type Props = {
   selectedCategoryId: string | null;
   onSelect: (id: string | null) => void;
   categories: UseCategories;
-  userId: string | null;
+  userId: string;
   /** False until the page's initial load resolves: the header holds a placeholder and the panel stays shut. */
   ready?: boolean;
 };
@@ -76,11 +76,14 @@ export default function CategorySelect({
   const toggleTakesFocus = useRef(false);
 
   // Toggling swaps the header button and closing unmounts the focused control, so the new toggle takes focus.
-  const toggleExpanded = useCallback((next: boolean) => {
+  const expand = useCallback(() => {
     toggleTakesFocus.current = true;
-    setExpanded(next);
+    setExpanded(true);
   }, []);
-  const collapse = useCallback(() => toggleExpanded(false), [toggleExpanded]);
+  const collapse = useCallback(() => {
+    toggleTakesFocus.current = true;
+    setExpanded(false);
+  }, []);
   useEffect(() => {
     if (!toggleTakesFocus.current) return;
     toggleTakesFocus.current = false;
@@ -112,7 +115,7 @@ export default function CategorySelect({
   );
 
   // listCategories() returns owned and shared rows alike; user_id is what tells them apart.
-  const isShared = !!selected && !!userId && selected.user_id !== userId;
+  const isShared = !!selected && selected.user_id !== userId;
 
   // For an owned category every grant; for a shared one the viewer's own single row, which onLeave needs.
   const shares = useShares(selectedCategoryId);
@@ -160,7 +163,6 @@ export default function CategorySelect({
   );
 
   const { onDelete, onLeave } = useCategoryRemoval({
-    selectedCategoryId,
     selected,
     sortedCategories,
     categories,
@@ -189,7 +191,7 @@ export default function CategorySelect({
           ) : (
             <ExpandButton
               ref={toggleRef}
-              onClick={() => toggleExpanded(true)}
+              onClick={expand}
               label={t('category_select.open_category')}
             />
           ))}
@@ -198,7 +200,7 @@ export default function CategorySelect({
       {/* Not before ready: nothing is selected yet, so the panel would open on create/import, then snap shut. */}
       {expanded && ready && (
         <>
-          <CategorySelectDropdown
+          <CategoryTabs
             selectedCategoryId={selectedCategoryId}
             onSelect={onSelect}
             sortedCategories={sortedCategories}
@@ -233,7 +235,6 @@ export default function CategorySelect({
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') void onRename();
                     if (event.key === 'Escape') {
-                      // First Escape discards the edit; a second one (nothing left to discard) closes the panel.
                       if (renameValue !== selected.name) {
                         setRenameValue(selected.name);
                       } else {
@@ -251,7 +252,7 @@ export default function CategorySelect({
                   label={t('category_select.rename_confirm')}
                 />
                 {/* Disabled during an export (it still reads the objects) and until a grantee's share row has loaded. */}
-                <DeleteButtonWithLabel
+                <RemoveCategoryButton
                   onClick={() => void (isShared ? onLeave() : onDelete())}
                   disabled={
                     isDeleting ||

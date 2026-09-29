@@ -1,14 +1,13 @@
-import { createClient } from '@supabase/supabase-js';
-
 import { expect, test } from '../test';
 import { SEED } from '../fixtures';
 import {
+  anonApi,
   apiAs,
   context,
   editorShare,
   ownedCategoryId,
-  share,
   unshare,
+  viewerShare,
 } from './helpers';
 
 // Entries and their link in one transaction, as the caller: a refused link must take its entry with it.
@@ -113,11 +112,7 @@ test.describe('create_items_in_category (creating an entry)', () => {
     const { token, otherToken } = context();
     const categoryId = await ownerCategory();
     const title = 'rls-create-viewer-entry';
-    const shareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-    });
+    const shareId = await viewerShare(token, categoryId);
 
     try {
       const { error } = await createIn({
@@ -164,13 +159,8 @@ test.describe('create_items_in_category (creating an entry)', () => {
   // EXECUTE is revoked from anon, so the refusal comes before the body runs.
   test('a visitor with no session cannot call it at all', async () => {
     const categoryId = await ownerCategory();
-    const anon = createClient(
-      process.env.E2E_SUPABASE_URL!,
-      process.env.E2E_SUPABASE_ANON_KEY!,
-      { auth: { persistSession: false, autoRefreshToken: false } },
-    );
 
-    const { error } = await anon.rpc('create_items_in_category', {
+    const { error } = await anonApi().rpc('create_items_in_category', {
       target_category_id: categoryId,
       entries: [{ title: 'rls-create-anon-entry' }],
     });

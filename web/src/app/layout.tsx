@@ -3,20 +3,15 @@ import { Archivo, IBM_Plex_Mono, Inter } from 'next/font/google';
 import './globals.css';
 import { ConfirmProvider } from './components/Confirm/ConfirmProvider';
 import { ToastProvider } from './components/Toast/ToastProvider';
+import de from './i18n/de.json';
 import { I18nProvider } from './i18n/I18nProvider';
+import { requireEnv, withBasePath } from './lib/env';
 import { ServiceWorkerRegistration } from './ServiceWorkerRegistration';
 import { SupabaseWarmup } from './SupabaseWarmup';
 
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
-
-// Read as a literal `process.env.X` expression, the only form Next's static export inlines.
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-if (!supabaseUrl) {
-  throw new Error(
-    'Missing NEXT_PUBLIC_SUPABASE_URL -- copy web/.env.example to web/.env.local and fill it in.',
-  );
-}
-const SUPABASE_ORIGIN = new URL(supabaseUrl).origin;
+const SUPABASE_ORIGIN = new URL(
+  requireEnv('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL),
+).origin;
 
 // Only a model served from another origin (docs/reference/configuration.md) adds to connect-src; a path on this site adds nothing.
 const modelPath = process.env.NEXT_PUBLIC_SEGMENTATION_MODEL_PATH ?? '';
@@ -58,12 +53,12 @@ const CONTENT_SECURITY_POLICY = [
   `default-src 'self'`,
   `script-src 'self' 'unsafe-inline'`,
   `style-src 'self' 'unsafe-inline'`,
-  // data: is Leaflet's default icon, a 1x1 GIF; blob: is the background removal's side-by-side preview, which never leaves the device.
+  // data: is Leaflet's default icon and the photo decode Safari before 16.4 falls back to; blob: is the background removal's on-device preview.
   `img-src 'self' data: blob: ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org`,
   `connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io ${MODEL_ORIGIN}`.trimEnd(),
   `font-src 'self'`,
-  // browser-image-compression always starts its worker from a blob: URL; script-src 'self' governs what that worker imports.
-  `worker-src 'self' blob:`,
+  // Workers (photo compression, the service worker) start from the export's own files, never a blob: URL.
+  `worker-src 'self'`,
   `object-src 'none'`,
   `base-uri 'self'`,
   `form-action 'self'`,
@@ -84,20 +79,20 @@ export default function RootLayout({
       <head>
         <title>CollectionBuddy</title>
         {/* I18nProvider updates this via a `meta[name="description"]` selector that must keep matching. */}
-        <meta name="description" content="Sammeln • Ordnen • Behalten" />
-        <link rel="manifest" href={`${basePath}/site.webmanifest`} />
-        <link rel="icon" href={`${basePath}/favicon.ico`} />
+        <meta name="description" content={de.page.footer} />
+        <link rel="manifest" href={withBasePath('/site.webmanifest')} />
+        <link rel="icon" href={withBasePath('/favicon.ico')} />
         <link
           rel="icon"
-          href={`${basePath}/favicon-32x32.png`}
+          href={withBasePath('/favicon-32x32.png')}
           sizes="32x32"
           type="image/png"
         />
         <link
           rel="apple-touch-icon"
-          href={`${basePath}/apple-touch-icon.png`}
+          href={withBasePath('/apple-touch-icon.png')}
         />
-        <link rel="shortcut icon" href={`${basePath}/favicon.ico`} />
+        <link rel="shortcut icon" href={withBasePath('/favicon.ico')} />
         {/* One per OS scheme: a meta tag can only follow the OS, not the in-app toggle. */}
         {THEME_COLORS.map(({ media, color }) => (
           <meta key={media} name="theme-color" content={color} media={media} />
@@ -115,7 +110,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         {/* Dialogs portal to document.body, so useInertBackground can mark this wrapper inert without them. */}
-        <div id="app-root">
+        <div id="app-root" data-testid="app-root">
           <SupabaseWarmup />
           <ServiceWorkerRegistration />
           <I18nProvider>

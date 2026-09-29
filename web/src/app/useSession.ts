@@ -9,15 +9,9 @@ import type { User } from '@supabase/supabase-js';
 
 type SessionState = { user: SessionUser | null; loading: boolean };
 
-// user_metadata is an untyped bag from the auth provider, so `name` is narrowed rather than trusted.
 function sessionUserFrom(user: User | undefined): SessionUser | null {
   if (!user) return null;
-  const name: unknown = user.user_metadata?.name;
-  return {
-    id: user.id,
-    email: user.email ?? null,
-    name: typeof name === 'string' ? name : null,
-  };
+  return { id: user.id, email: user.email ?? null };
 }
 
 export function useSession(): SessionState {
@@ -34,7 +28,8 @@ export function useSession(): SessionState {
     };
     const load = async () => {
       // getSession() reads the persisted session locally; getUser() would revalidate and block first paint.
-      const { data } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.getSession();
+      if (error) console.error('Restoring the session failed:', error);
       adopt(data.session?.user);
       setLoading(false);
     };

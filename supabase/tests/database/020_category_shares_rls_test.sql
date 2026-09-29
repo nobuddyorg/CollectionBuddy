@@ -1,9 +1,4 @@
--- Sharing at the default 'viewer' role: an active grant opens exactly the
--- shared category, its items, their links, and their photograph records --
--- read-only, scoped to that one category, and closed again the moment it
--- expires or is revoked. Complements web/e2e/signed-in/rls/viewer-share.spec.ts
--- the same way 010_ownership_rls_test.sql complements isolation.spec.ts: same
--- properties, proven at the SQL surface instead of through PostgREST.
+-- A viewer grant opens exactly its category's rows, read-only, until revoked or expired; rls/viewer-share.spec.ts is the PostgREST half.
 begin;
 select no_plan();
 
@@ -32,7 +27,6 @@ insert into public.images (item_id, path_full)
 values (:'sibling_item_id'::uuid, :'owner_id'::text || '/' || :'sibling_item_id'::text || '/sibling.webp')
 returning id as sibling_image_id \gset
 
--- An active grant.
 insert into public.category_shares (category_id, invited_email)
 values (:'category_id'::uuid, 'share-grantee@collectionbuddy.test')
 returning id as share_id \gset
@@ -77,18 +71,17 @@ select is(
   'nor to an entry, link or photograph record filed only in the owner''s unshared category'
 );
 
--- A viewer grant does not extend to writing.
-with attempt as (
-  update public.categories set name = 'taken over' where id = :'category_id'::uuid returning id
-)
-select is((select count(*) from attempt), 0::bigint,
-  'a viewer grant does not extend to renaming the category');
+select is(
+  pg_temp.rows_written(format('update public.categories set name = %L where id = %L returning id', 'taken over', :'category_id')),
+  0::bigint,
+  'a viewer grant does not extend to renaming the category'
+);
 
-with attempt as (
-  update public.items set title = 'taken over' where id = :'item_id'::uuid returning id
-)
-select is((select count(*) from attempt), 0::bigint,
-  'a viewer grant does not extend to editing an item inside it');
+select is(
+  pg_temp.rows_written(format('update public.items set title = %L where id = %L returning id', 'taken over', :'item_id')),
+  0::bigint,
+  'a viewer grant does not extend to editing an item inside it'
+);
 
 -- Nor to removing: the viewer reads each row above, so only a delete policy can refuse it. An unlink would also sweep the entry.
 select is(
@@ -124,8 +117,7 @@ select throws_ok(
   'nor to filing an entry of its own into the collection'
 );
 
--- Revoke, then it is gone -- with the row still there, so this is the
--- revocation itself being tested, not a row that stopped existing.
+-- Revoked with the category still present, so the revocation is what closes it (TEST_STRATEGY.md §7 rule 7).
 select pg_temp.auth_as(:'owner_id'::uuid, 'share-owner@collectionbuddy.test');
 delete from public.category_shares where id = :'share_id'::uuid;
 
@@ -144,10 +136,7 @@ select is(
   'and its entry, link and photograph record with it'
 );
 
--- An expired grant is refused exactly like no grant at all -- the check
--- constraint only demands expires_at > created_at, not that either sits
--- in the future, so this is a legal row and the question is whether the
--- policy re-checks the clock.
+-- An expired grant is a legal row (the check only orders its dates), so the policy must re-check the clock.
 select pg_temp.auth_as(:'owner_id'::uuid, 'share-owner@collectionbuddy.test');
 insert into public.category_shares (category_id, invited_email, created_at, expires_at)
 values (
@@ -171,8 +160,7 @@ select is(
   'not the entry, link or photograph record either'
 );
 
--- A grant addressed to someone else does not open the category to a
--- bystander.
+-- The expired grant is dropped first so its (category, email) can be granted again below.
 select pg_temp.auth_as(:'owner_id'::uuid, 'share-owner@collectionbuddy.test');
 delete from public.category_shares where id = :'expired_share_id'::uuid;
 insert into public.category_shares (category_id, invited_email)

@@ -1,15 +1,22 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { exportCategory, PHOTO_DOWNLOAD_CONCURRENCY } from './exportCategory';
+import { exportCategory } from './exportCategory';
+import { PHOTO_DOWNLOAD_CONCURRENCY } from './exportPhotos';
 import * as zipModule from './zip';
 import {
   item,
+  onePhotoExport,
   paginatedListItems,
   fakeSignUrls,
   okResponse,
   readZipEntries,
   rootFolderOf,
 } from './exportCategory.test-support';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('exportCategory, downloading through the pool', () => {
   it('downloads photographs through a bounded pool, not one at a time or all at once', async () => {
@@ -31,35 +38,31 @@ describe('exportCategory, downloading through the pool', () => {
           }),
       ),
     );
-    try {
-      const promise = exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })], {
-          'item-1': Array.from({ length: photoCount }, (_, i) => `${i}.webp`),
-        }),
-        signUrls: fakeSignUrls(),
-      });
+    const promise = exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'item-1' })], {
+        'item-1': Array.from({ length: photoCount }, (_, i) => `${i}.webp`),
+      }),
+      signUrls: fakeSignUrls(),
+    });
 
-      await vi.waitFor(() =>
-        expect(release.length).toBe(PHOTO_DOWNLOAD_CONCURRENCY),
-      );
-      expect(maxInFlight).toBe(PHOTO_DOWNLOAD_CONCURRENCY);
+    await vi.waitFor(() =>
+      expect(release.length).toBe(PHOTO_DOWNLOAD_CONCURRENCY),
+    );
+    expect(maxInFlight).toBe(PHOTO_DOWNLOAD_CONCURRENCY);
 
-      for (let released = 0; released < photoCount; released++) {
-        await vi.waitFor(() => expect(release.length).toBeGreaterThan(0));
-        release.shift()!();
-      }
+    for (let released = 0; released < photoCount; released++) {
+      await vi.waitFor(() => expect(release.length).toBeGreaterThan(0));
+      release.shift()!();
+    }
 
-      const result = await promise;
-      expect(result.photoCount).toBe(photoCount);
-      expect(result.skippedPhotoCount).toBe(0);
-      const entries = await readZipEntries(result.blob);
-      const root = rootFolderOf(result);
-      for (let i = 1; i <= photoCount; i++) {
-        expect(entries.has(`${root}/photos/001-item/${i}.webp`)).toBe(true);
-      }
-    } finally {
-      vi.unstubAllGlobals();
+    const result = await promise;
+    expect(result.photoCount).toBe(photoCount);
+    expect(result.skippedPhotoCount).toBe(0);
+    const entries = await readZipEntries(result.blob);
+    const root = rootFolderOf(result);
+    for (let i = 1; i <= photoCount; i++) {
+      expect(entries.has(`${root}/photos/001-item/${i}.webp`)).toBe(true);
     }
   });
 });
@@ -80,19 +83,8 @@ describe('exportCategory, a ZipLimitError from the writer', () => {
       'fetch',
       vi.fn(async () => okResponse([1])),
     );
-    try {
-      const failure = exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })], {
-          'item-1': ['1.webp'],
-        }),
-        signUrls: fakeSignUrls(),
-      });
-      await expect(failure).rejects.toBeInstanceOf(zipModule.ZipLimitError);
-    } finally {
-      vi.unstubAllGlobals();
-      vi.restoreAllMocks();
-    }
+    const failure = exportCategory(onePhotoExport());
+    await expect(failure).rejects.toBeInstanceOf(zipModule.ZipLimitError);
   });
 
   it('stops the pool from starting further downloads once the limit trips', async () => {
@@ -117,22 +109,17 @@ describe('exportCategory, a ZipLimitError from the writer', () => {
         return okResponse([1]);
       }),
     );
-    try {
-      // More photographs than the pool runs at once, so a tripped limit can be seen stopping the rest.
-      const photoCount = PHOTO_DOWNLOAD_CONCURRENCY + 4;
-      const failure = exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })], {
-          'item-1': Array.from({ length: photoCount }, (_, i) => `${i}.webp`),
-        }),
-        signUrls: fakeSignUrls(),
-      });
-      await expect(failure).rejects.toBeInstanceOf(zipModule.ZipLimitError);
-      expect(fetchCalls).toBeLessThan(photoCount);
-    } finally {
-      vi.unstubAllGlobals();
-      vi.restoreAllMocks();
-    }
+    // More photographs than the pool runs at once, so a tripped limit can be seen stopping the rest.
+    const photoCount = PHOTO_DOWNLOAD_CONCURRENCY + 4;
+    const failure = exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'item-1' })], {
+        'item-1': Array.from({ length: photoCount }, (_, i) => `${i}.webp`),
+      }),
+      signUrls: fakeSignUrls(),
+    });
+    await expect(failure).rejects.toBeInstanceOf(zipModule.ZipLimitError);
+    expect(fetchCalls).toBeLessThan(photoCount);
   });
 
   // The error reported must be the first to happen, not whichever runner reaches the catch last.
@@ -150,18 +137,13 @@ describe('exportCategory, a ZipLimitError from the writer', () => {
       'fetch',
       vi.fn(async () => okResponse([1])),
     );
-    try {
-      const failure = exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'item-1' })], {
-          'item-1': ['0.webp', '1.webp'],
-        }),
-        signUrls: fakeSignUrls(),
-      });
-      await expect(failure).rejects.toHaveProperty('message', 'limit-1');
-    } finally {
-      vi.unstubAllGlobals();
-      vi.restoreAllMocks();
-    }
+    const failure = exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'item-1' })], {
+        'item-1': ['0.webp', '1.webp'],
+      }),
+      signUrls: fakeSignUrls(),
+    });
+    await expect(failure).rejects.toHaveProperty('message', 'limit-1');
   });
 });

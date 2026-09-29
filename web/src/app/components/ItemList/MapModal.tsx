@@ -47,7 +47,7 @@ export function MapModal({
     search,
     enabled: open,
     canEdit,
-    locale: language,
+    language,
   });
 
   // Starts empty; the map frames pins as they stream in on its own.
@@ -109,7 +109,6 @@ export function MapModal({
       open={open}
       onOpenChange={onOpenChange}
       title={t('item_list.map_title')}
-      closeLabel={t('common.close')}
       size="full"
     >
       {placesError && (
@@ -148,6 +147,11 @@ export function MapModal({
                   }
                 : undefined
             }
+            labels={{
+              zoomIn: t('item_list.map_zoom_in'),
+              zoomOut: t('item_list.map_zoom_out'),
+              attribution: t('item_list.map_attribution'),
+            }}
           />
           {loadingPlaces && (
             // Fixed light colours and a solid plate: at 80% theme opacity this vanished on pale tiles.

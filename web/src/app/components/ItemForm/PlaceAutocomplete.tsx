@@ -2,9 +2,11 @@
 import { useEffect, useId, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import { isQueryLongEnough, usePhotonSearch } from './usePhoton';
-import type { PlaceCoords } from './types';
+import type { Coordinates } from '../../lib/coordinates';
 import { fieldClasses } from '../ui/fieldClasses';
 import { MAX_PLACE_LENGTH } from '../../lib/textLimits';
+
+const MENU_MESSAGE_CLASSES = 'px-3 py-2 text-sm text-muted-foreground';
 
 // `onChange` reports null coords for hand-typed edits, so stale coordinates never outlive their name.
 export function PlaceAutocomplete({
@@ -14,7 +16,7 @@ export function PlaceAutocomplete({
 }: {
   id?: string;
   value: string;
-  onChange: (value: string, coords: PlaceCoords | null) => void;
+  onChange: (value: string, coords: Coordinates | null) => void;
 }) {
   const { t, language } = useI18n();
   const {
@@ -32,7 +34,10 @@ export function PlaceAutocomplete({
     choose,
     onKeyDown,
     formatDisplay,
-  } = usePhotonSearch(language);
+  } = usePhotonSearch({
+    language,
+    onPick: (choice) => onChange(choice.label, choice.coords),
+  });
   const listId = useId();
 
   useEffect(() => {
@@ -87,13 +92,7 @@ export function PlaceAutocomplete({
         onFocus={() => {
           if (isQueryLongEnough(value)) setFocus(true);
         }}
-        onKeyDown={(event) => {
-          const picked = onKeyDown(event);
-          if (picked) {
-            onChange(picked.label, picked.coords);
-            setFocus(false);
-          }
-        }}
+        onKeyDown={onKeyDown}
         placeholder={t('item_create.place_placeholder')}
         className={fieldClasses()}
         autoComplete="off"
@@ -110,16 +109,13 @@ export function PlaceAutocomplete({
           }`}
         >
           {loading && (
-            <div className="px-3 py-2 text-sm text-muted-foreground">
+            <div className={MENU_MESSAGE_CLASSES}>
               {t('item_create.searching')}
             </div>
           )}
 
           {!loading && error && (
-            <div
-              data-testid="place-error"
-              className="px-3 py-2 text-sm text-muted-foreground"
-            >
+            <div data-testid="place-error" className={MENU_MESSAGE_CLASSES}>
               {t('item_create.search_error')}
             </div>
           )}
@@ -141,11 +137,7 @@ export function PlaceAutocomplete({
                     event.preventDefault();
                     event.stopPropagation();
                   }}
-                  onClick={() => {
-                    const picked = choose(hit);
-                    onChange(picked.label, picked.coords);
-                    setFocus(false);
-                  }}
+                  onClick={() => choose(hit)}
                   className={`block w-full text-left px-3 py-2 text-sm hover:bg-primary/10 ${
                     i === activeIndex ? 'bg-primary/10' : ''
                   }`}
@@ -157,7 +149,7 @@ export function PlaceAutocomplete({
             })}
 
           {!loading && !error && results.length === 0 && (
-            <div className="px-3 py-2 text-sm text-muted-foreground">
+            <div className={MENU_MESSAGE_CLASSES}>
               {t('item_create.no_results')}
             </div>
           )}

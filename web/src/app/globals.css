@@ -3,7 +3,7 @@
 /* Dark follows an explicit attribute, not the media query: a visitor on a dark OS may ask for light. */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
-/* Deliberately achromatic: the only colour on screen comes from the user's own photographs. */
+/* Near-achromatic, so colour comes from the user's photographs; --accent and --destructive are the exceptions. */
 :root {
   color-scheme: light;
 
@@ -26,7 +26,7 @@
   --destructive: #a32017;
   --destructive-foreground: #ffffff;
 
-  /* The only chromatic token, reserved for the wordmark; must clear 4.5:1 on background and card. */
+  /* Wordmark and link-hover accent; must clear 4.5:1 on background and card. */
   --accent: #ad5725;
 
   /* Both are the page's own ink laid on thinly, so both change hands with the page. */

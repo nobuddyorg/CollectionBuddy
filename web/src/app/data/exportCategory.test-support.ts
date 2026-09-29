@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 
 import type { exportCategory, ExportResult } from './exportCategory';
 import type { ExportItem } from './exportFormat';
@@ -52,11 +52,22 @@ export function paginatedListItems(
 }
 
 // Every path signs to a URL derived from itself, so a test can tell which photograph a fetch was for.
-export function fakeSignUrls(): SignUrls {
-  return (async (paths: string[]) => ({
+export function fakeSignUrls(): Mock<NonNullable<SignUrls>> {
+  return vi.fn(async (paths: string[]) => ({
     data: paths.map((path) => ({ path, signedUrl: `signed://${path}` })),
     error: null,
-  })) as unknown as SignUrls;
+  })) as unknown as Mock<NonNullable<SignUrls>>;
+}
+
+// One entry with one photograph, filed as '001-item/1.webp'.
+export function onePhotoExport() {
+  return {
+    category: { id: 'cat', name: 'Coins' },
+    listItems: paginatedListItems([item({ id: 'item-1' })], {
+      'item-1': ['1.webp'],
+    }),
+    signUrls: fakeSignUrls(),
+  };
 }
 
 export function okResponse(bytes: number[]): Response {

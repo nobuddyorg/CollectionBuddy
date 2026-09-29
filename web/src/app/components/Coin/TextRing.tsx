@@ -1,41 +1,24 @@
 'use client';
 
-import type React from 'react';
+import { RIM_RADIUS } from './CoinIcon';
 
 type Props = {
   rimId: string;
   text: string;
-  fontFamily: string;
-  fontSize: number;
-  letterSpacing: number;
-  opacity: number;
-  className?: string;
-  /** Radius of the rim path the text is set on, in user units. */
-  radius?: number;
 };
 
-// The rim path in Icon's CoinIcon is a circle of r=160.
-const DEFAULT_RADIUS = 160;
-
-export function TextRing({
-  rimId,
-  text,
-  fontFamily,
-  fontSize,
-  letterSpacing,
-  opacity,
-  className,
-  radius = DEFAULT_RADIUS,
-}: Props) {
+export function TextRing({ rimId, text }: Props) {
   // textLength + lengthAdjust fit the text to one full turn, or it wraps over its own start.
-  const circumference = 2 * Math.PI * radius;
+  const circumference = 2 * Math.PI * RIM_RADIUS;
 
   return (
     <text
-      fontSize={fontSize}
-      className={className}
-      style={{ letterSpacing, fontFamily }}
-      opacity={opacity}
+      fontSize={15}
+      className="fill-muted-foreground"
+      style={{
+        letterSpacing: 4,
+        fontFamily: 'var(--font-label-family), monospace',
+      }}
     >
       <textPath
         href={`#${rimId}`}

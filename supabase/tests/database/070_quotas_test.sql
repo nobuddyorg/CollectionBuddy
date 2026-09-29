@@ -1,8 +1,4 @@
--- Per-owner quotas (0009_user_quotas.sql, #637): photograph bytes as Storage
--- recorded them, never as the client claimed, and a ceiling on entries.
--- 0016_bound_row_volume.sql (#716): categories, shares, links per entry, text lengths.
--- 0025_photo_ceilings_fit_the_plan.sql (#753): thumbnails counted, the bucket's own ceiling, the upload backstops.
--- web/e2e/signed-in/rls/quotas.spec.ts proves the same refusals through PostgREST.
+-- Per-owner and bucket quotas (0009, 0016, 0025); rls/quotas.spec.ts proves the same refusals through PostgREST.
 begin;
 select no_plan();
 
@@ -348,7 +344,6 @@ select throws_ok(
   'an invited email past 320 characters is refused'
 );
 
--- Storage itself (0025): what the upload policy and the photograph trigger see of the bucket, orphans included.
 -- storage.protect_delete() refuses a delete from SQL without this; the policies are what is under test.
 select set_config('storage.allow_delete_query', 'true', true);
 

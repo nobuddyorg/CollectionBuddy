@@ -1,25 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  exportCursorFilter,
-  listItemsForExport,
-  rawListItemsForExport,
-} from './exportItemPages';
+import { listItemsForExport, rawListItemsForExport } from './exportItemPages';
+import { rowsAfterFilter } from './keyset';
+import { paramsOf } from './postgrestRequest.test-support';
 
-// A PostgREST builder holds its URL and only hits the network when awaited.
 describe('the query behind an export page', () => {
   const cursor = {
     linkedAt: '2026-01-02T03:04:05.123456+00:00',
     itemId: 'item-9',
   };
   const exportQuery = (after: typeof cursor | null = null) =>
-    (
-      rawListItemsForExport({
-        categoryId: 'cat-1',
-        after,
-        size: 500,
-      }) as unknown as { url: URL }
-    ).url.searchParams;
+    paramsOf(rawListItemsForExport({ categoryId: 'cat-1', after, size: 500 }));
 
   it('orders the export oldest-first with the item id as a tiebreaker', () => {
     expect(exportQuery().get('order')).toBe('created_at.asc,item_id.asc');
@@ -57,19 +48,11 @@ describe('the query behind an export page', () => {
     expect(params.get('created_at')).toBe(
       'gte.2026-01-02T03:04:05.123456+00:00',
     );
-    expect(params.get('or')).toBe(`(${exportCursorFilter(cursor)})`);
-  });
-});
-
-describe('exportCursorFilter', () => {
-  it('matches a later timestamp, or the same one with a later item id, both quoted', () => {
-    expect(
-      exportCursorFilter({
-        linkedAt: '2026-01-02T03:04:05+00:00',
-        itemId: 'b',
-      }),
-    ).toBe(
-      'created_at.gt."2026-01-02T03:04:05+00:00",and(created_at.eq."2026-01-02T03:04:05+00:00",item_id.gt."b")',
+    expect(params.get('or')).toBe(
+      `(${rowsAfterFilter(
+        { column: 'created_at', value: cursor.linkedAt },
+        { column: 'item_id', value: cursor.itemId },
+      )})`,
     );
   });
 });
@@ -145,17 +128,16 @@ describe('listItemsForExport', () => {
     expect(result.data?.next).toBeNull();
   });
 
-  it('ends the walk on an empty or missing page', async () => {
-    for (const data of [[], null]) {
-      const result = await listItemsForExport(
-        { categoryId: 'cat-1', after: null, size: 2 },
-        rawReturning({ data, error: null }),
-      );
-      expect(result).toEqual({
-        data: { items: [], photos: [], next: null },
-        error: null,
-      });
-    }
+  it('ends the walk on an empty page', async () => {
+    const result = await listItemsForExport(
+      { categoryId: 'cat-1', after: null, size: 2 },
+      rawReturning({ data: [], error: null }),
+    );
+
+    expect(result).toEqual({
+      data: { items: [], photos: [], next: null },
+      error: null,
+    });
   });
 
   it('hands back an error with no partial page', async () => {

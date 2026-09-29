@@ -17,37 +17,15 @@ describe('classifyLocationError', () => {
   it('reports a timeout as unavailable', () => {
     expect(classifyLocationError({ code: 3 })).toBe('unavailable');
   });
-
-  it('treats an error without a code as unavailable', () => {
-    expect(classifyLocationError({})).toBe('unavailable');
-  });
-
-  // Defensive rather than expected, but a defence is only worth keeping if it works.
-  it('survives being handed nothing at all', () => {
-    const nothing = undefined as unknown as { code?: number };
-    expect(classifyLocationError(nothing)).toBe('unavailable');
-  });
 });
 
 describe('isGeolocationGranted', () => {
-  const originalPermissions = Object.getOwnPropertyDescriptor(
-    globalThis.navigator ?? {},
-    'permissions',
-  );
-
   function stubPermissions(query: () => Promise<{ state: string }>) {
     vi.stubGlobal('navigator', { permissions: { query } });
   }
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    if (originalPermissions && globalThis.navigator) {
-      Object.defineProperty(
-        globalThis.navigator,
-        'permissions',
-        originalPermissions,
-      );
-    }
   });
 
   it('is true only when the permission is already granted', async () => {

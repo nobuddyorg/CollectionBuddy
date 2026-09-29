@@ -50,7 +50,7 @@ export function useShares(categoryId: string | null) {
   const { next, isCurrent } = useRequestSequence();
 
   const reload = useCallback(async () => {
-    if (!categoryId) return [];
+    if (!categoryId) return;
     const mySequence = next();
     setIsLoading(true);
     try {
@@ -58,7 +58,6 @@ export function useShares(categoryId: string | null) {
       if (error) throw error;
       const list = data ?? [];
       if (isCurrent(mySequence)) setLoaded({ categoryId, list });
-      return list;
     } catch (error) {
       // Cleared, not kept: what is left from before may belong to the category just switched away from.
       if (isCurrent(mySequence)) {
@@ -71,7 +70,6 @@ export function useShares(categoryId: string | null) {
       } else {
         console.error('reload shares', error);
       }
-      return [];
     } finally {
       if (isCurrent(mySequence)) setIsLoading(false);
     }
@@ -112,7 +110,7 @@ export function useShares(categoryId: string | null) {
   const updateShareRole = useCallback(
     async (shareId: string, role: ShareRole) => {
       if (isUpdatingRole || !shares.some((share) => share.id === shareId))
-        return false;
+        return;
       setIsUpdatingRole(true);
       try {
         const { data, error } = await updateShareRoleRow(shareId, role);
@@ -125,14 +123,12 @@ export function useShares(categoryId: string | null) {
             ),
           }));
         }
-        return true;
       } catch (error) {
         toast.reportError(
           'update share role',
           error,
           t('category_select.share_role_update_error'),
         );
-        return false;
       } finally {
         setIsUpdatingRole(false);
       }
@@ -199,7 +195,7 @@ export function useShares(categoryId: string | null) {
         );
       };
       toast.success(t('category_select.share_revoke_success'), {
-        action: { label: t('common.undo'), onClick: () => void reinstate() },
+        onUndo: () => void reinstate(),
       });
     },
     [categoryId, removeShare, shares, t, toast],

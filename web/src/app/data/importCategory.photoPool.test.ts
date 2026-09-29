@@ -1,10 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type Mock } from 'vitest';
 
 import { importCategory, PHOTO_UPLOAD_CONCURRENCY } from './importCategory';
 import {
   type CreateImage,
   type UploadImage,
-  item,
+  archiveWithOnePhotoPerEntry,
   buildArchive,
   baseFakes,
 } from './importCategory.test-support';
@@ -12,14 +12,7 @@ import {
 describe('importCategory, uploading through the pool', () => {
   it('uploads through a bounded pool, not one unbounded burst', async () => {
     const photoCount = PHOTO_UPLOAD_CONCURRENCY * 2;
-    const photosByItemId = Object.fromEntries(
-      Array.from({ length: photoCount }, (_, i) => [
-        `item-${i}`,
-        [new Uint8Array([i])],
-      ]),
-    );
-    const items = Object.keys(photosByItemId).map((id) => item({ id }));
-    const archive = await buildArchive({ items, photosByItemId });
+    const archive = await archiveWithOnePhotoPerEntry(photoCount);
 
     let inFlight = 0;
     let maxInFlight = 0;
@@ -34,7 +27,6 @@ describe('importCategory, uploading through the pool', () => {
 
     const promise = importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage,
     });
@@ -71,17 +63,16 @@ describe('importCategory, uploading through the pool', () => {
     const createImage = vi.fn(async (row: { size_bytes: number }) => {
       if (row.size_bytes === detail.length) releaseCover();
       return { data: null, error: null };
-    }) as unknown as CreateImage;
+    }) as unknown as Mock<NonNullable<CreateImage>>;
 
     await importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage,
       createImage,
     });
 
-    const rows = (createImage as ReturnType<typeof vi.fn>).mock.calls.map(
+    const rows = createImage.mock.calls.map(
       ([row]) => row as { size_bytes: number; created_at: string },
     );
     expect(rows.map((row) => row.size_bytes)).toEqual([

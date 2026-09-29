@@ -206,16 +206,7 @@ describe('useFocusTrap', () => {
     button('outside before').focus();
     await user.tab();
 
-    expect(screen.getByText('Nothing to focus')).toBeInTheDocument();
-  });
-
-  it('does nothing at all while it is closed', async () => {
-    const user = userEvent.setup();
-    render(<Harness open={false} />);
-
-    button('outside after').focus();
-    await user.tab();
-    expect(button('outside after')).not.toHaveFocus();
+    expect(button('outside after')).toHaveFocus();
   });
 
   it('does not steal focus into an already-mounted container while closed', () => {

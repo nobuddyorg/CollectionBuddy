@@ -176,20 +176,15 @@ export function formatExportBytes(bytes: number, locale: string): string {
   }).format(bytes / 1024 ** 3);
 }
 
-/** The download's name and its one root directory, so a non-wrapping extractor keeps it apart. */
-function archiveBaseName(categoryName: string, exportedAt: Date): string {
+/** The archive's one root directory, so an extractor that does not wrap keeps the export apart. */
+export function archiveRootFolder(
+  categoryName: string,
+  exportedAt: Date,
+): string {
   return `CollectionBuddy-${slugify(categoryName)}-${localDateStamp(exportedAt)}`;
 }
 
 /** What the download is called; slugged like a folder since it becomes a file name too. */
 export function archiveName(categoryName: string, exportedAt: Date): string {
-  return `${archiveBaseName(categoryName, exportedAt)}.zip`;
-}
-
-/** The one top-level directory every entry in the archive is written under. */
-export function archiveRootFolder(
-  categoryName: string,
-  exportedAt: Date,
-): string {
-  return archiveBaseName(categoryName, exportedAt);
+  return `${archiveRootFolder(categoryName, exportedAt)}.zip`;
 }

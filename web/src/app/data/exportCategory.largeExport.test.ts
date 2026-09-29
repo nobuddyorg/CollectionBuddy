@@ -1,10 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  ExportCancelledError,
-  exportCategory,
-  LARGE_EXPORT_WARN_BYTES,
-} from './exportCategory';
+import { ExportCancelledError } from './exportCancellation';
+import { exportCategory, LARGE_EXPORT_WARN_BYTES } from './exportCategory';
 import {
   item,
   paginatedListItems,
@@ -12,10 +9,18 @@ import {
   okResponse,
 } from './exportCategory.test-support';
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('confirmLargeExport', () => {
   it('does not ask when the total stays under the threshold', async () => {
     const confirmLargeExport = vi.fn().mockResolvedValue(true);
-    await exportCategory({
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => okResponse([1])),
+    );
+    const result = await exportCategory({
       category: { id: 'cat', name: 'Coins' },
       listItems: paginatedListItems([item({ id: 'a' })], {
         a: [{ name: '1.webp', size: 1024 }],
@@ -24,6 +29,7 @@ describe('confirmLargeExport', () => {
       confirmLargeExport,
     });
     expect(confirmLargeExport).not.toHaveBeenCalled();
+    expect(result.photoCount).toBe(1);
   });
 
   // The check is a `>`: a total sitting exactly on the threshold is not a large export.
@@ -33,20 +39,16 @@ describe('confirmLargeExport', () => {
       'fetch',
       vi.fn(async () => okResponse([1])),
     );
-    try {
-      const result = await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'a' })], {
-          a: [{ name: '1.webp', size: LARGE_EXPORT_WARN_BYTES }],
-        }),
-        signUrls: fakeSignUrls(),
-        confirmLargeExport,
-      });
-      expect(confirmLargeExport).not.toHaveBeenCalled();
-      expect(result.photoCount).toBe(1);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    const result = await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'a' })], {
+        a: [{ name: '1.webp', size: LARGE_EXPORT_WARN_BYTES }],
+      }),
+      signUrls: fakeSignUrls(),
+      confirmLargeExport,
+    });
+    expect(confirmLargeExport).not.toHaveBeenCalled();
+    expect(result.photoCount).toBe(1);
   });
 
   it('asks, with the total bytes, once the threshold is exceeded, and proceeds when accepted', async () => {
@@ -56,20 +58,16 @@ describe('confirmLargeExport', () => {
       'fetch',
       vi.fn(async () => okResponse([1])),
     );
-    try {
-      const result = await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'a' })], {
-          a: [{ name: '1.webp', size: bigSize }],
-        }),
-        signUrls: fakeSignUrls(),
-        confirmLargeExport,
-      });
-      expect(confirmLargeExport).toHaveBeenCalledWith(bigSize);
-      expect(result.photoCount).toBe(1);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    const result = await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'a' })], {
+        a: [{ name: '1.webp', size: bigSize }],
+      }),
+      signUrls: fakeSignUrls(),
+      confirmLargeExport,
+    });
+    expect(confirmLargeExport).toHaveBeenCalledWith(bigSize);
+    expect(result.photoCount).toBe(1);
   });
 
   it('cancels the export, before downloading anything, when the warning is declined', async () => {
@@ -77,20 +75,16 @@ describe('confirmLargeExport', () => {
     const confirmLargeExport = vi.fn().mockResolvedValue(false);
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
-    try {
-      const failure = exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'a' })], {
-          a: [{ name: '1.webp', size: bigSize }],
-        }),
-        signUrls: fakeSignUrls(),
-        confirmLargeExport,
-      });
-      await expect(failure).rejects.toBeInstanceOf(ExportCancelledError);
-      expect(fetchSpy).not.toHaveBeenCalled();
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    const failure = exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'a' })], {
+        a: [{ name: '1.webp', size: bigSize }],
+      }),
+      signUrls: fakeSignUrls(),
+      confirmLargeExport,
+    });
+    await expect(failure).rejects.toBeInstanceOf(ExportCancelledError);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('proceeds unprompted when no confirmLargeExport is supplied at all', async () => {
@@ -99,18 +93,14 @@ describe('confirmLargeExport', () => {
       'fetch',
       vi.fn(async () => okResponse([1])),
     );
-    try {
-      const result = await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'a' })], {
-          a: [{ name: '1.webp', size: bigSize }],
-        }),
-        signUrls: fakeSignUrls(),
-      });
-      expect(result.photoCount).toBe(1);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    const result = await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'a' })], {
+        a: [{ name: '1.webp', size: bigSize }],
+      }),
+      signUrls: fakeSignUrls(),
+    });
+    expect(result.photoCount).toBe(1);
   });
 
   it('sums sizes across every item', async () => {
@@ -120,19 +110,15 @@ describe('confirmLargeExport', () => {
       'fetch',
       vi.fn(async () => okResponse([1])),
     );
-    try {
-      await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'a' }), item({ id: 'b' })], {
-          a: [{ name: '1.webp', size: half }],
-          b: [{ name: '1.webp', size: half }],
-        }),
-        signUrls: fakeSignUrls(),
-        confirmLargeExport,
-      });
-      expect(confirmLargeExport).toHaveBeenCalledWith(2 * half);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'a' }), item({ id: 'b' })], {
+        a: [{ name: '1.webp', size: half }],
+        b: [{ name: '1.webp', size: half }],
+      }),
+      signUrls: fakeSignUrls(),
+      confirmLargeExport,
+    });
+    expect(confirmLargeExport).toHaveBeenCalledWith(2 * half);
   });
 });

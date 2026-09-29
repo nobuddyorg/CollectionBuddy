@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { refuseStorage } from './lib/browserStorage.test-support';
 import {
   THEME_MEDIA_QUERY,
   THEME_STORAGE_KEY,
@@ -174,6 +175,49 @@ describe('useTheme', () => {
   });
 });
 
+describe('useTheme with storage that refuses access', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('renders the system preference when reading storage throws', () => {
+    mockMatchMedia(true);
+    refuseStorage('getItem');
+    const { result } = renderHook(() => useTheme());
+
+    expect(result.current.preference).toBe('system');
+    expect(result.current.resolved).toBe('dark');
+  });
+
+  it('still announces a choice, without an error, when writing storage throws', () => {
+    mockMatchMedia(false);
+    refuseStorage('setItem');
+    refuseStorage('removeItem');
+    const { result } = renderHook(() => useTheme());
+    const heard = vi.fn();
+    window.addEventListener('collectionbuddy:theme', heard);
+
+    expect(() =>
+      act(() => {
+        result.current.setThemePreference('dark');
+      }),
+    ).not.toThrow();
+    expect(() =>
+      act(() => {
+        result.current.setThemePreference('system');
+      }),
+    ).not.toThrow();
+    window.removeEventListener('collectionbuddy:theme', heard);
+
+    expect(heard).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('detectTheme', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -211,9 +255,7 @@ describe('detectTheme', () => {
 
   it('still follows the OS when reading storage throws', () => {
     mockMatchMedia(true);
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new DOMException('blocked', 'SecurityError');
-    });
+    refuseStorage('getItem');
 
     expect(detectTheme()).toBe('dark');
   });

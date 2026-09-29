@@ -1,14 +1,13 @@
 // @vitest-environment jsdom
-import { act, renderHook } from '@testing-library/react';
+import { act, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { usePlaces } from './usePlaces';
 import {
   installUsePlacesMocks,
   renderUsePlaces,
   restoreGlobalsAndTimers,
 } from './usePlaces.hook.test-support';
-import { group, photonOk } from './usePlaces.test-support';
+import { group, photonFailure, photonOk } from './usePlaces.test-support';
 import { listCategoryPlaces, updateItemsPlace } from '../../data/items';
 
 vi.mock('../../data/items', () => ({
@@ -23,10 +22,13 @@ describe('usePlaces geocoding', () => {
 
   it('geocodes an unlocated place, adds it, caches it, and writes the coords back to its rows', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', null, null, ['Entry A'], ['row-1', 'row-2'])],
+      data: [
+        group('Cologne', { titles: ['Entry A'], ids: ['row-1', 'row-2'] }),
+      ],
       error: null,
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(photonOk([6.96, 50.94])));
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const { result } = renderUsePlaces();
     await act(async () => {
@@ -48,24 +50,46 @@ describe('usePlaces geocoding', () => {
       localStorage.getItem('cb_geocode_cache_v1') ?? '{}',
     ) as Record<string, unknown>;
     expect(cached.Cologne).toEqual({ name: 'Cologne', lat: 50.94, lng: 6.96 });
+    // A macrotask runs only once every microtask, the write-back's own included, has settled.
+    await act(() => new Promise((resolve) => setTimeout(resolve)));
+    expect(consoleSpy).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it('reports a refused write-back and still pins the place', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const denied = new Error('permission denied');
+    vi.mocked(updateItemsPlace).mockResolvedValue({ error: denied });
+    vi.mocked(listCategoryPlaces).mockResolvedValue({
+      data: [group('Cologne', { titles: ['Entry A'] })],
+      error: null,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(photonOk([6.96, 50.94])));
+
+    const { result } = renderUsePlaces();
+
+    await waitFor(() =>
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Could not store a geocoded place:',
+        denied,
+      ),
+    );
+    expect(result.current.places).toEqual([
+      { name: 'Cologne', lat: 50.94, lng: 6.96, titles: ['Entry A'] },
+    ]);
+    expect(result.current.error).toBe(false);
+    consoleSpy.mockRestore();
   });
 
   // RLS turns a viewer's write-back into a no-op; the device's own cache still spares the next lookup.
   it("sends a viewer's geocode no write-back, and caches it on the device all the same", async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', null, null, ['Entry A'], ['row-1'])],
+      data: [group('Cologne', { titles: ['Entry A'], ids: ['row-1'] })],
       error: null,
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(photonOk([6.96, 50.94])));
 
-    const { result } = renderHook(() =>
-      usePlaces({
-        categoryId: 'cat-1',
-        search: '',
-        enabled: true,
-        canEdit: false,
-      }),
-    );
+    const { result } = renderUsePlaces({ canEdit: false });
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -85,12 +109,10 @@ describe('usePlaces geocoding', () => {
 
   it('gives up on a place immediately for a non-retryable failure, without retrying', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Nowhereville', null, null)],
+      data: [group('Nowhereville')],
       error: null,
     });
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: false, status: 404, json: async () => ({}) });
+    const fetchMock = vi.fn().mockResolvedValue(photonFailure(404));
     vi.stubGlobal('fetch', fetchMock);
 
     const { result } = renderUsePlaces();
@@ -111,16 +133,12 @@ describe('usePlaces geocoding', () => {
   it('retries a retryable failure with backoff, then succeeds on a later attempt', async () => {
     vi.useFakeTimers();
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', null, null)],
+      data: [group('Cologne')],
       error: null,
     });
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 429,
-        json: async () => ({}),
-      })
+      .mockResolvedValueOnce(photonFailure(429))
       .mockResolvedValueOnce(photonOk([6.96, 50.94]));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -139,12 +157,10 @@ describe('usePlaces geocoding', () => {
   it('gives up after exhausting every retry attempt on a persistently retryable failure', async () => {
     vi.useFakeTimers();
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', null, null)],
+      data: [group('Cologne')],
       error: null,
     });
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
+    const fetchMock = vi.fn().mockResolvedValue(photonFailure(503));
     vi.stubGlobal('fetch', fetchMock);
 
     const { result } = renderUsePlaces();
@@ -160,7 +176,7 @@ describe('usePlaces geocoding', () => {
   it('treats a network error the same as a retryable failure', async () => {
     vi.useFakeTimers();
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', null, null)],
+      data: [group('Cologne')],
       error: null,
     });
     const fetchMock = vi
@@ -183,8 +199,12 @@ describe('usePlaces geocoding', () => {
   it('mixes already-known and freshly-geocoded places without one blocking the other', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
       data: [
-        group('Cologne', 50.94, 6.96, ['Known entry']),
-        group('Berlin', null, null, ['New entry']),
+        group('Cologne', {
+          place_lat: 50.94,
+          place_lng: 6.96,
+          titles: ['Known entry'],
+        }),
+        group('Berlin', { titles: ['New entry'] }),
       ],
       error: null,
     });
@@ -217,19 +237,16 @@ describe('usePlaces geocoding', () => {
   it('does not report an error when at least one place resolved, even if another never did', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
       data: [
-        group('Cologne', 50.94, 6.96, ['Known entry']),
-        group('Nowhereville', null, null),
+        group('Cologne', {
+          place_lat: 50.94,
+          place_lng: 6.96,
+          titles: ['Known entry'],
+        }),
+        group('Nowhereville'),
       ],
       error: null,
     });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 404,
-        json: async () => ({}),
-      }),
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(photonFailure(404)));
 
     const { result } = renderUsePlaces();
     await act(async () => {
@@ -247,21 +264,13 @@ describe('usePlaces geocoding', () => {
 
   it('asks Photon for exactly one result in the resolved language', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', null, null)],
+      data: [group('Cologne')],
       error: null,
     });
     const fetchMock = vi.fn().mockResolvedValue(photonOk([6.96, 50.94]));
     vi.stubGlobal('fetch', fetchMock);
 
-    renderHook(() =>
-      usePlaces({
-        categoryId: 'cat-1',
-        search: '',
-        enabled: true,
-        canEdit: true,
-        locale: 'de',
-      }),
-    );
+    renderUsePlaces({ language: 'de' });
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -277,16 +286,12 @@ describe('usePlaces geocoding', () => {
   it('waits out the backoff delay before retrying, rather than retrying immediately', async () => {
     vi.useFakeTimers();
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', null, null)],
+      data: [group('Cologne')],
       error: null,
     });
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 429,
-        json: async () => ({}),
-      })
+      .mockResolvedValueOnce(photonFailure(429))
       .mockResolvedValueOnce(photonOk([6.96, 50.94]));
     vi.stubGlobal('fetch', fetchMock);
 

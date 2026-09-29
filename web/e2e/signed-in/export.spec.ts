@@ -1,15 +1,14 @@
 import { execFileSync } from 'node:child_process';
-import { resolve } from 'node:path';
 
 import { expect, test } from './test';
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
+import { PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
 // exportCategory.test.ts covers the logic; only a browser proves a download a real extractor opens.
 test.use({ locale: 'en-GB' });
 
-const PHOTO = resolve(process.cwd(), 'public/logo.png');
-const ARRIVES = 30_000;
-const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
+// The default 30s sits below PHOTO_ARRIVES, so a slow upload would end in a bare test timeout.
+test.describe.configure({ timeout: 120_000 });
 
 test.describe('exporting a category', () => {
   test.beforeEach(async ({ on, page }) => {
@@ -21,21 +20,17 @@ test.describe('exporting a category', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueTitle('Exportstück');
+    const title = uniqueName('Exportstück');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
 
       await card.do.uploadPhoto(PHOTO);
-      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+      await expect(card.locators.images).toBeVisible({
+        timeout: PHOTO_ARRIVES,
+      });
 
-      const [download] = await Promise.all([
-        page.waitForEvent('download'),
-        app.categories.do.exportCollection(),
-      ]);
-
-      const zipPath = await download.path();
-      if (!zipPath) throw new Error('the export did not save a file to disk');
+      const zipPath = await app.categories.do.downloadExport();
 
       const listing = execFileSync('unzip', ['-l', zipPath], {
         encoding: 'utf8',

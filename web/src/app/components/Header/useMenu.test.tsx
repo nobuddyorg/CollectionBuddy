@@ -126,15 +126,6 @@ describe('useMenu', () => {
     expect(screen.getByText('trigger')).not.toHaveFocus();
   });
 
-  it('does not attach its outside-click listener before the menu has ever been opened', async () => {
-    const user = userEvent.setup();
-    render(<Harness />);
-
-    await user.click(screen.getByText('elsewhere'));
-
-    expect(menu()).toBeNull();
-  });
-
   // The listener bookkeeping is the only evidence that a closed menu is not still answering clicks.
   it('hangs no document listener until it is opened, and takes back every one it hangs', async () => {
     const addListener = vi.spyOn(document, 'addEventListener');

@@ -5,17 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { ItemCard, itemCardPropsAreEqual } from './ItemCard';
+import { item } from './item.test-support';
 import type { ImageEntry, ItemLite } from './types';
 
-const item: ItemLite = {
-  id: '1',
-  title: 'Item',
-  description: null,
-  place: null,
-  place_lat: null,
-  place_lng: null,
-  tags: [],
-};
+const ITEM = item('1', { title: 'Item' });
 
 function renderCard(
   overrides: Partial<ItemLite> = {},
@@ -31,7 +24,7 @@ function renderCard(
   render(
     <I18nProvider>
       <ItemCard
-        item={{ ...item, ...overrides }}
+        item={{ ...ITEM, ...overrides }}
         images={[]}
         {...handlers}
         {...props}
@@ -73,7 +66,7 @@ describe('ItemCard', () => {
     expect(screen.getByText('philately')).toBeVisible();
   });
 
-  // Regression: entry actions floated over the photo, colliding with the image's own delete control.
+  // The entry's actions share the card with each photograph's own delete control.
   it('names the entry-level delete so it cannot be read as the image one', () => {
     renderCard();
     expect(
@@ -99,19 +92,7 @@ describe('ItemCard', () => {
   });
 
   it('leads an unphotographed entry with an empty mount', () => {
-    render(
-      <I18nProvider>
-        <ItemCard
-          item={item}
-          images={[]}
-          onUpload={vi.fn()}
-          onEditItem={vi.fn()}
-          onDeleteItem={vi.fn()}
-          onDeleteImage={vi.fn()}
-          onOpenModal={vi.fn()}
-        />
-      </I18nProvider>,
-    );
+    renderCard();
     expect(screen.getByText('No images')).toBeVisible();
   });
 
@@ -132,20 +113,7 @@ describe('ItemCard', () => {
 
   // The mount is the resolved empty state; shown while signing is in flight it would flash "no images".
   it('waits for the image listing before declaring an entry empty', () => {
-    render(
-      <I18nProvider>
-        <ItemCard
-          item={item}
-          images={[]}
-          imagesLoading
-          onUpload={vi.fn()}
-          onEditItem={vi.fn()}
-          onDeleteItem={vi.fn()}
-          onDeleteImage={vi.fn()}
-          onOpenModal={vi.fn()}
-        />
-      </I18nProvider>,
-    );
+    renderCard({}, { imagesLoading: true });
     expect(screen.queryByText('No images')).not.toBeInTheDocument();
   });
 
@@ -186,7 +154,7 @@ describe('ItemCard', () => {
     ).toBeInTheDocument();
   });
 
-  // Regression: `display: none` pulled the file input out of the tab order entirely.
+  // A `display: none` file input leaves the tab order, so the inputs are only visually hidden.
   it('keeps the add-image controls reachable by keyboard', async () => {
     renderCard();
     const inputs = screen.getAllByTestId('upload-photo');
@@ -197,21 +165,9 @@ describe('ItemCard', () => {
   });
 
   it('disables the file input while an upload is in flight', () => {
-    const { container } = render(
-      <I18nProvider>
-        <ItemCard
-          item={item}
-          images={[]}
-          pendingUploads={1}
-          onUpload={vi.fn()}
-          onEditItem={vi.fn()}
-          onDeleteItem={vi.fn()}
-          onDeleteImage={vi.fn()}
-          onOpenModal={vi.fn()}
-        />
-      </I18nProvider>,
-    );
-    expect(container.querySelector('input[type="file"]')).toBeDisabled();
+    renderCard({}, { pendingUploads: 1 });
+    for (const input of screen.getAllByTestId('upload-photo'))
+      expect(input).toBeDisabled();
   });
 });
 
@@ -222,7 +178,7 @@ describe('itemCardPropsAreEqual', () => {
 
   function baseProps(overrides: Partial<Parameters<typeof ItemCard>[0]> = {}) {
     return {
-      item,
+      item: ITEM,
       images,
       onUpload: vi.fn(),
       onEditItem: vi.fn(),
@@ -235,7 +191,7 @@ describe('itemCardPropsAreEqual', () => {
 
   it('treats a different item reference as unequal', () => {
     const previous = baseProps();
-    const next = baseProps({ item: { ...item } });
+    const next = baseProps({ item: { ...ITEM } });
     expect(itemCardPropsAreEqual(previous, next)).toBe(false);
   });
 

@@ -1,6 +1,8 @@
 // zap-baseline's report_json.json as a markdown table (`--title '<heading>' <report>`), applying .zap/rules.tsv's ignores.
-import { readFile, appendFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+
+import { publishSummary } from './step-summary.mjs';
 
 const RULES_PATH = resolve(import.meta.dirname, '../../.zap/rules.tsv');
 
@@ -65,11 +67,7 @@ async function main() {
     readFile(RULES_PATH, 'utf8'),
   ]);
   const markdown = renderSummary({ title, report, rules: parseRules(tsv) });
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    await appendFile(process.env.GITHUB_STEP_SUMMARY, markdown);
-  } else {
-    process.stdout.write(markdown);
-  }
+  await publishSummary(markdown);
 }
 
 await main();

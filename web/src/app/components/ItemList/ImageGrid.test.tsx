@@ -57,8 +57,8 @@ describe('ImageGrid', () => {
   });
 
   it('shows the photographs, not the skeleton, once they arrive', () => {
-    const { container } = renderGrid([photo('a')], { loading: false });
-    expect(container.querySelector('[role="status"]')).toBeNull();
+    renderGrid([photo('a')], { loading: false });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.getByRole('img')).toBeInTheDocument();
   });
 
@@ -97,7 +97,7 @@ describe('ImageGrid', () => {
     expect(images[0]).toHaveClass('aspect-4/3');
   });
 
-  it('renders two images as an equal pair', () => {
+  it('renders both photographs of a pair', () => {
     renderGrid([photo('a'), photo('b')]);
     const images = screen.getAllByRole('img');
     expect(images).toHaveLength(2);
@@ -348,7 +348,7 @@ describe('ImageGrid', () => {
     });
   });
 
-  // Only after a failed signing: an unsigned photograph moved into a plate.
+  // A delete or a failed signing can move an unsigned photograph into a plate.
   it('holds a loading frame for a plate whose photograph is not signed yet', () => {
     renderGrid([photo('a'), photo('b'), { id: 'id-c', pathFull: 'c.webp' }]);
 

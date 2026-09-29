@@ -7,7 +7,7 @@ import {
   fanPositions,
 } from './collectibleFan';
 
-const distance = ({ ux, uy }: { ux: number; uy: number }) => Math.hypot(ux, uy);
+const distance = ({ x, y }: { x: number; y: number }) => Math.hypot(x, y);
 
 describe('fanPositions', () => {
   it('gives every chip a place', () => {
@@ -33,23 +33,23 @@ describe('fanPositions', () => {
   it('fans out sideways, alternating between the two lobes', () => {
     const positions = fanPositions(10);
     positions.forEach((position, i) => {
-      expect(Math.sign(position.ux)).toBe(i % 2 === 0 ? 1 : -1);
+      expect(Math.sign(position.x)).toBe(i % 2 === 0 ? 1 : -1);
       // No chip rises into the band above the coin, which belongs to the wordmark.
-      expect(Math.abs(position.uy)).toBeLessThan(MIN_ORBIT);
+      expect(Math.abs(position.y)).toBeLessThan(MIN_ORBIT);
     });
     const widest = Math.max(
-      ...positions.map((position) => Math.abs(position.ux)),
+      ...positions.map((position) => Math.abs(position.x)),
     );
     const tallest = Math.max(
-      ...positions.map((position) => Math.abs(position.uy)),
+      ...positions.map((position) => Math.abs(position.y)),
     );
     expect(widest).toBeGreaterThan(tallest);
   });
 
   // Each chip in a lobe takes its own slot down the arc rather than landing at a random angle.
   it('spreads a lobe down the arc instead of bunching up', () => {
-    const right = fanPositions(10).filter((position) => position.ux > 0);
-    const verticalOffsets = right.map((position) => position.uy);
+    const right = fanPositions(10).filter((position) => position.x > 0);
+    const verticalOffsets = right.map((position) => position.y);
     expect(verticalOffsets).toEqual([...verticalOffsets].sort((a, b) => a - b));
   });
 

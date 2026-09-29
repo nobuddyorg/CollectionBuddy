@@ -27,7 +27,6 @@ vi.mock('../../data/images', async () => {
     createImageRow: vi.fn(),
     createSignedUrls: vi.fn(),
     deleteImageRow: vi.fn(),
-    listImagePathsForItems: vi.fn(),
     listImagesForItems: vi.fn(),
     removeImageObjects: vi.fn(),
     uploadImageObject: vi.fn(),
@@ -40,7 +39,13 @@ const encodings: (string | undefined)[] = [];
 let encodedAs: Record<number, string> = {};
 vi.mock('../../lib/imageCompression', () => ({
   compressPhoto: vi.fn(
-    async (file: File, maxWidthOrHeight: number, encoding?: string) => {
+    async (
+      file: File,
+      {
+        maxWidthOrHeight,
+        encoding,
+      }: { maxWidthOrHeight: number; encoding?: string },
+    ) => {
       compressions.push(maxWidthOrHeight);
       encodings.push(encoding);
       return new File([`compressed-${maxWidthOrHeight}`], file.name, {

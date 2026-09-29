@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   exportCategory,
@@ -10,8 +10,14 @@ import {
   type SignUrls,
   item,
   paginatedListItems,
+  fakeSignUrls,
   okResponse,
 } from './exportCategory.test-support';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('exportCategory, signing the photograph URLs', () => {
   it('skips every photograph a signing call came back empty for', async () => {
@@ -36,21 +42,15 @@ describe('exportCategory, signing the photograph URLs', () => {
       ],
       error: null,
     })) as unknown as SignUrls;
-    const consoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-    try {
-      const result = await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'a' })], { a: ['1.webp'] }),
-        signUrls,
-      });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const result = await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'a' })], { a: ['1.webp'] }),
+      signUrls,
+    });
 
-      expect(result.skippedPhotoCount).toBe(1);
-      expect(result.photoCount).toBe(0);
-    } finally {
-      consoleError.mockRestore();
-    }
+    expect(result.skippedPhotoCount).toBe(1);
+    expect(result.photoCount).toBe(0);
   });
 
   it('leaves no entry at all for a path Storage could not sign', async () => {
@@ -96,30 +96,23 @@ describe('exportCategory, signing the photograph URLs', () => {
       { length: SIGN_BATCH_SIZE + 50 },
       (_, i) => `uid/a/${i}.webp`,
     );
-    const signUrls = vi.fn(async (batch: string[]) => ({
-      data: batch.map((path) => ({ path, signedUrl: `signed://${path}` })),
-      error: null,
-    }));
+    const signUrls = fakeSignUrls();
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => okResponse([1])),
     );
-    try {
-      await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'a' })], {
-          a: paths.map((path) => path.split('/').at(-1)!),
-        }),
-        signUrls: signUrls as unknown as SignUrls,
-      });
+    await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'a' })], {
+        a: paths.map((path) => path.split('/').at(-1)!),
+      }),
+      signUrls,
+    });
 
-      // Two calls (100, then 50): not three (an empty extra page), not one (all at once).
-      expect(signUrls).toHaveBeenCalledTimes(2);
-      expect(signUrls.mock.calls[0][0]).toHaveLength(SIGN_BATCH_SIZE);
-      expect(signUrls.mock.calls[1][0]).toHaveLength(50);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    // Two calls (100, then 50): not three (an empty extra page), not one (all at once).
+    expect(signUrls).toHaveBeenCalledTimes(2);
+    expect(signUrls.mock.calls[0][0]).toHaveLength(SIGN_BATCH_SIZE);
+    expect(signUrls.mock.calls[1][0]).toHaveLength(50);
   });
 
   it('does not ask for a trailing empty batch when the count is an exact multiple of SIGN_BATCH_SIZE', async () => {
@@ -127,25 +120,18 @@ describe('exportCategory, signing the photograph URLs', () => {
       { length: SIGN_BATCH_SIZE },
       (_, i) => `${i}.webp`,
     );
-    const signUrls = vi.fn(async (batch: string[]) => ({
-      data: batch.map((path) => ({ path, signedUrl: `signed://${path}` })),
-      error: null,
-    }));
+    const signUrls = fakeSignUrls();
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => okResponse([1])),
     );
-    try {
-      await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems([item({ id: 'a' })], { a: paths }),
-        signUrls: signUrls as unknown as SignUrls,
-      });
-      // An off-by-one the other way (<=) would ask for a second, empty batch.
-      expect(signUrls).toHaveBeenCalledOnce();
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems([item({ id: 'a' })], { a: paths }),
+      signUrls,
+    });
+    // An off-by-one the other way (<=) would ask for a second, empty batch.
+    expect(signUrls).toHaveBeenCalledOnce();
   });
 
   it('keeps at most SIGN_CONCURRENCY sign calls in flight', async () => {

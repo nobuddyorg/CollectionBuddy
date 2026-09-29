@@ -60,7 +60,6 @@ describe('importCategory, recreating the photographs', () => {
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const result = await importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage,
       compressThumb,
@@ -70,8 +69,7 @@ describe('importCategory, recreating the photographs', () => {
     expect(result.photoCount).toBe(1);
     expect(result.skippedPhotoCount).toBe(0);
     expect(uploadImage).toHaveBeenCalledTimes(2); // full + thumb
-    const [fullCall, thumbCall] = (uploadImage as ReturnType<typeof vi.fn>).mock
-      .calls as [string, Blob][];
+    const [fullCall, thumbCall] = uploadImage.mock.calls;
     const [fullPath, fullBlob] = fullCall;
     const [thumbPath, thumbBlob] = thumbCall;
     expect(fullPath).toMatch(/^uid\/new-item-1\/.+\.webp$/);
@@ -105,7 +103,6 @@ describe('importCategory, recreating the photographs', () => {
       file: archiveWithOnePhoto('photos/001-seated-dime/1.jpg', [
         new Uint8Array([4, 5]),
       ]),
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage,
       createImage,
@@ -113,9 +110,8 @@ describe('importCategory, recreating the photographs', () => {
     });
 
     expect(result.photoCount).toBe(1);
-    const [[fullPath, fullBlob], [thumbPath, thumbBlob]] = (
-      uploadImage as ReturnType<typeof vi.fn>
-    ).mock.calls as [string, Blob][];
+    const [[fullPath, fullBlob], [thumbPath, thumbBlob]] =
+      uploadImage.mock.calls;
     expect(fullPath).toMatch(/^uid\/new-item-1\/[0-9a-f-]+\.jpg$/);
     expect(fullBlob.type).toBe('image/jpeg');
     expect(thumbPath).toBe(fullPath.replace('.jpg', '.thumb.jpg'));
@@ -135,7 +131,6 @@ describe('importCategory, recreating the photographs', () => {
       file: archiveWithOnePhoto('photos/001-seated-dime/1.gif', [
         new Uint8Array([6]),
       ]),
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       uploadImage,
     });
@@ -161,7 +156,6 @@ describe('importCategory, recreating the photographs', () => {
 
     const result = await importCategory({
       file: archiveMissingOnePhoto(),
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       onProgress: (step) => progress.push(step),
     });
@@ -188,7 +182,6 @@ describe('importCategory, recreating the photographs', () => {
 
     const result = await importCategory({
       file: archiveMissingOnePhoto(),
-      nameCategory: () => 'Coins',
       ...baseFakes(),
     });
 
@@ -210,7 +203,6 @@ describe('importCategory, recreating the photographs', () => {
     try {
       const promise = importCategory({
         file: archive,
-        nameCategory: () => 'Coins',
         ...baseFakes(),
         createImage,
       });

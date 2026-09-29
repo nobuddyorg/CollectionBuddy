@@ -8,6 +8,9 @@ import type { MenuProps } from './types';
 import { labelClasses } from '../ui/labelClasses';
 import { BackgroundRemovalSetting } from '../BackgroundRemoval/BackgroundRemovalSetting';
 
+const MENU_ITEM =
+  'w-full text-left px-3 min-h-11 flex items-center rounded-sm text-sm transition-colors';
+
 function SegmentedControl<T extends string>({
   value,
   options,
@@ -51,7 +54,6 @@ export default function Menu({
   onDeleteAccount,
   onClose,
   onOpenHelp,
-  labelSignOut,
 }: MenuProps) {
   const { t, language, setLanguage } = useI18n();
   const { preference, setThemePreference } = useTheme();
@@ -61,6 +63,7 @@ export default function Menu({
   return (
     <div
       id={menuId}
+      data-testid="user-menu"
       aria-labelledby="user-menu-button"
       className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-sm border bg-card text-card-foreground backdrop-blur p-1 shadow-lg"
     >
@@ -72,7 +75,7 @@ export default function Menu({
         <SegmentedControl
           value={language}
           options={['de', 'en']}
-          labels={{ de: 'Deutsch', en: 'English' }}
+          labels={{ de: t('header.language_de'), en: t('header.language_en') }}
           onChange={setLanguage}
           testIdPrefix="lang"
         />
@@ -102,7 +105,7 @@ export default function Menu({
         data-testid="open-help"
         onClick={onOpenHelp}
         aria-keyshortcuts="Control+/ Meta+/"
-        className="w-full text-left px-3 min-h-11 flex items-center justify-between gap-3 rounded-sm hover:bg-muted text-sm transition-colors"
+        className={`${MENU_ITEM} justify-between gap-3 hover:bg-muted`}
       >
         {t('header.help')}
         {/* Hidden from the name: aria-keyshortcuts already announces it. */}
@@ -115,7 +118,7 @@ export default function Menu({
         href="/privacy"
         data-testid="menu-privacy-link"
         onClick={onClose}
-        className="w-full px-3 min-h-11 flex items-center rounded-sm hover:bg-muted text-sm transition-colors"
+        className={`${MENU_ITEM} hover:bg-muted`}
       >
         {t('privacy.link')}
       </Link>
@@ -129,9 +132,9 @@ export default function Menu({
             onClose();
           })();
         }}
-        className="w-full text-left px-3 min-h-11 flex items-center rounded-sm hover:bg-muted text-sm transition-colors"
+        className={`${MENU_ITEM} hover:bg-muted`}
       >
-        {labelSignOut}
+        {t('header.sign_out')}
       </button>
 
       <div className="my-1 border-t" />
@@ -140,7 +143,7 @@ export default function Menu({
         type="button"
         data-testid="delete-account"
         onClick={onDeleteAccount}
-        className="w-full text-left px-3 min-h-11 flex items-center rounded-sm hover:bg-destructive/10 text-sm text-destructive transition-colors"
+        className={`${MENU_ITEM} hover:bg-destructive/10 text-destructive`}
       >
         {t('header.delete_account')}
       </button>

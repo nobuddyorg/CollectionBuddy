@@ -3,6 +3,7 @@ import { Counter } from 'k6/metrics';
 
 import { SUMMARY_TREND_STATS } from '../../lib/options.js';
 import { PROFILE_NAME } from '../../lib/profile.js';
+import { reportFiles } from '../../lib/summary.js';
 import { SUPABASE_URL, TARGET } from '../../lib/target.js';
 
 // With `count`, the report can show what each percentile rests on, and spot a verdict metric that never got a sample.
@@ -13,6 +14,16 @@ export const measured = new Counter('proof_measured');
 
 const milliseconds = (value) =>
   value === undefined ? '-' : `${value.toFixed(1)} ms`;
+
+export function probeScenario(iterations, extra = {}) {
+  return {
+    executor: 'per-vu-iterations',
+    vus: 1,
+    iterations,
+    exec: 'probe',
+    ...extra,
+  };
+}
 
 /** Guards scoped to the measured scenarios (seed traffic cannot dilute a failing probe), plus a sub-metric per probe for the report. */
 export function probeThresholds(
@@ -73,7 +84,11 @@ const SHARED_GUARD =
   /^(checks|http_req_failed|proof_measured)(\{scenario:[^}]+\})?$/;
 
 /** Why the numbers cannot be read as a verdict: an iteration stopped early, a guard failed, or a verdict metric has no sample. */
-export function inconclusiveReasons(data, verdictMetrics, guards = []) {
+export function inconclusiveReasons({
+  data,
+  verdictMetrics = [],
+  guards = [],
+}) {
   const reasons = [];
   const finished = data.metrics.proof_measured?.values.count ?? 0;
   const iterations = data.metrics.iterations?.values.count ?? 0;
@@ -115,8 +130,11 @@ export function inconclusiveReasons(data, verdictMetrics, guards = []) {
   return reasons;
 }
 
-/** `claim` is the issue's sentence under test (`issue` is left out for a defect filed without one); `notes` are the seed and environment facts a reader needs to weigh the numbers. */
-/** `purpose: 'record'` marks a run with no verdict (an impact measurement or a control), so the report does not promise one. */
+export function inconclusiveBanner(reasons) {
+  return `**INCONCLUSIVE:** ${reasons.join('; ')}. Empty metrics pass their thresholds, so the verdicts below mean nothing.`;
+}
+
+/** `purpose: 'record'` marks a run with no verdict (an impact measurement or a control), so the report promises none. */
 export function proofSummary({
   proof,
   issue,
@@ -130,16 +148,15 @@ export function proofSummary({
   const { metrics } = data;
   // A second run of the same proof (a control, a candidate fix) keeps its own report.
   const name = __ENV.PROOF_VARIANT ? `${proof}-${__ENV.PROOF_VARIANT}` : proof;
-  const inconclusive = inconclusiveReasons(data, extra, guards);
+  const inconclusive = inconclusiveReasons({
+    data,
+    verdictMetrics: extra,
+    guards,
+  });
   const markdown = [
     `## k6 proof \`${name}\`${issue ? ` for #${issue}` : ''}`,
     '',
-    ...(inconclusive.length
-      ? [
-          `**INCONCLUSIVE:** ${inconclusive.join('; ')}. Empty metrics pass their thresholds, so the verdicts below mean nothing.`,
-          '',
-        ]
-      : []),
+    ...(inconclusive.length ? [inconclusiveBanner(inconclusive), ''] : []),
     `Claim under test: ${claim}`,
     '',
     `Target ${TARGET} \`${SUPABASE_URL}\`, profile \`${PROFILE_NAME}\`.`,
@@ -168,9 +185,5 @@ export function proofSummary({
     ...thresholdRows(metrics),
     '',
   ].join('\n');
-  return {
-    stdout: markdown,
-    [`load-results/proof-${name}.md`]: markdown,
-    [`load-results/proof-${name}.json`]: JSON.stringify(data, null, 2),
-  };
+  return reportFiles({ name: `proof-${name}`, markdown, data });
 }

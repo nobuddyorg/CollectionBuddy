@@ -16,6 +16,7 @@ import {
 import {
   PROOF_TREND_STATS,
   measured,
+  probeScenario,
   probeThresholds,
   proofSummary,
 } from './lib/report.js';
@@ -51,12 +52,7 @@ export const options = {
   ...LIFECYCLE_TIMEOUTS,
   summaryTrendStats: PROOF_TREND_STATS,
   scenarios: {
-    probe: {
-      executor: 'per-vu-iterations',
-      vus: 1,
-      iterations: SAMPLES,
-      exec: 'probe',
-    },
+    probe: probeScenario(SAMPLES),
   },
   thresholds: {
     ...probeThresholds(['upload_webp', `upload_${SAFARI_FORMAT}`]),

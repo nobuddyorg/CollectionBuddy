@@ -4,7 +4,6 @@ import { useI18n } from '../../i18n/useI18n';
 // Only the photo plate shimmers: sweeping the caption bars too read as six blinking cards.
 const bar = 'rounded-sm bg-muted';
 
-// Shown by `ItemCard` in place of the caption until the hero photograph has loaded.
 export function CaptionSkeleton() {
   return (
     <div className="flex flex-1 flex-col gap-2 p-4">
@@ -32,7 +31,7 @@ function CardSkeleton() {
 // Six, not nine: two desktop rows read as "a grid is coming"; more only shimmers below the fold.
 const CARD_COUNT = 6;
 
-export function GridSkeleton({ count = CARD_COUNT }: { count?: number }) {
+export function GridSkeleton() {
   const { t } = useI18n();
 
   return (
@@ -41,8 +40,8 @@ export function GridSkeleton({ count = CARD_COUNT }: { count?: number }) {
       aria-label={t('common.loading')}
       className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3"
     >
-      {Array.from({ length: count }, (_, i) => (
-        <CardSkeleton key={i} />
+      {Array.from({ length: CARD_COUNT }, (_, index) => (
+        <CardSkeleton key={index} />
       ))}
     </div>
   );

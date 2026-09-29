@@ -8,6 +8,7 @@ import { expect, test } from './test';
 import { expectNoSeriousA11yViolations } from '../axe';
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
+import { uniqueName } from './helpers';
 import type { PageTree } from '../pages';
 
 // Background removal runs for real, in its worker on the real runtime; only the 87 MB model is swapped for a stand-in.
@@ -22,8 +23,6 @@ const RED_CHANNEL_MODEL = readFileSync(
   resolve(process.cwd(), 'e2e/fixtures/red-channel.onnx'),
 );
 const PHOTO = resolve(process.cwd(), 'public/logo.png');
-
-const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
 
 /** A red disc on a dark table, drawn by the browser: the stand-in model sees exactly the disc. */
 async function itemPhoto(page: Page, path: string): Promise<string> {
@@ -94,7 +93,7 @@ test.describe('background removal', () => {
       if (/\/models\/|ort-wasm/.test(request.url()))
         fetched.push(request.url());
     });
-    const title = uniqueTitle('Mit Hintergrund');
+    const title = uniqueName('Mit Hintergrund');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
@@ -116,7 +115,7 @@ test.describe('background removal', () => {
     const app = on(page);
     await serveStandInModel(page);
     await turnOnBackgroundRemoval(app, page);
-    const title = uniqueTitle('Ohne Hintergrund');
+    const title = uniqueName('Ohne Hintergrund');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
@@ -159,7 +158,7 @@ test.describe('background removal', () => {
     const app = on(page);
     await serveStandInModel(page);
     await turnOnBackgroundRemoval(app, page);
-    const title = uniqueTitle('Original');
+    const title = uniqueName('Original');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
@@ -176,6 +175,42 @@ test.describe('background removal', () => {
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
     } finally {
       await removeEntriesTitled(title);
+    }
+  });
+
+  // Turbopack boots every worker from one script whose URL fragment Chrome reuses, so the first photo job must not decide the next.
+  test('still cuts out a photo after a plain upload in the same page', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const app = on(page);
+    await serveStandInModel(page);
+    const plainTitle = uniqueName('Erst mit Hintergrund');
+    const cutoutTitle = uniqueName('Dann ohne Hintergrund');
+    try {
+      await app.catalogue.do.addEntry(plainTitle);
+      const plainCard = app.catalogue.card(plainTitle);
+      await plainCard.do.uploadPhoto(PHOTO);
+      await expect(plainCard.locators.images).toBeVisible({ timeout: ARRIVES });
+
+      await turnOnBackgroundRemoval(app, page);
+      await app.catalogue.do.addEntry(cutoutTitle);
+      const cutoutCard = app.catalogue.card(cutoutTitle);
+      await cutoutCard.do.uploadPhoto(
+        await itemPhoto(page, testInfo.outputPath('item.png')),
+      );
+
+      const review = app.backgroundRemoval;
+      await expect(review.locators.cutout).toBeVisible({ timeout: ARRIVES });
+      await review.do.useCutout();
+
+      await expect(review()).toHaveCount(0);
+      await expect(cutoutCard.locators.images).toBeVisible({
+        timeout: ARRIVES,
+      });
+    } finally {
+      await removeEntriesTitled(plainTitle);
+      await removeEntriesTitled(cutoutTitle);
     }
   });
 

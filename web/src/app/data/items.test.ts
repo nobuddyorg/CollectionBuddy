@@ -8,12 +8,9 @@ import {
   updateItem,
 } from './items';
 import { likePatternFor } from './itemSearch';
+import { paramsOf, requestOf } from './postgrestRequest.test-support';
 
-// A PostgREST builder holds its URL and only hits the network when awaited.
 describe('the query behind the map', () => {
-  const paramsOf = (builder: unknown) =>
-    (builder as { url: URL }).url.searchParams;
-
   const mapQuery = (search: string) =>
     paramsOf(
       rawListCategoryPlaces({ categoryId: 'cat-1', search, from: 0, to: 999 }),
@@ -23,18 +20,17 @@ describe('the query behind the map', () => {
     const params = mapQuery('coin');
     expect(params.get('cat_id')).toBe('cat-1');
     expect(params.get('like_pattern')).toBe('%coin%');
-    const builder = rawListCategoryPlaces({
-      categoryId: 'cat-1',
-      search: 'coin',
-      from: 0,
-      to: 999,
-    }) as unknown as {
-      method: string;
-      url: URL;
-    };
-    expect(builder.method).toBe('GET');
+    const request = requestOf(
+      rawListCategoryPlaces({
+        categoryId: 'cat-1',
+        search: 'coin',
+        from: 0,
+        to: 999,
+      }),
+    );
+    expect(request.method).toBe('GET');
     // Naming the wrong function is a 404 at runtime and nothing at compile time.
-    expect(builder.url.pathname).toMatch(/\/rpc\/list_category_places$/);
+    expect(request.url.pathname).toMatch(/\/rpc\/list_category_places$/);
   });
 
   // PostgREST truncates an unranged function result at max_rows without an error.
@@ -54,14 +50,14 @@ describe('the query behind the map', () => {
   it('carries an abort signal through, and leaves it off when none is given', () => {
     const controller = new AbortController();
     const signalOf = (signal?: AbortSignal) =>
-      (
+      requestOf(
         rawListCategoryPlaces({
           categoryId: 'cat-1',
           search: 'coin',
           from: 0,
           to: 999,
           signal,
-        }) as unknown as { signal?: AbortSignal }
+        }),
       ).signal;
 
     expect(signalOf(controller.signal)).toBe(controller.signal);
@@ -79,16 +75,7 @@ describe('the query behind the map', () => {
   });
 });
 
-// A PostgREST builder composes its request eagerly, so each write can be read back without a server.
 describe('the queries behind creating, editing and deleting an entry', () => {
-  const requestOf = (builder: unknown) =>
-    builder as {
-      url: URL;
-      method: string;
-      headers: Headers;
-      body?: unknown;
-    };
-
   const fields = {
     title: 'Sixpence',
     description: null,

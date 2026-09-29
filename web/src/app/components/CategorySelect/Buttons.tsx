@@ -4,40 +4,72 @@ import type { Ref } from 'react';
 
 import Icon, { IconType } from '../Icon';
 import { IconButton } from '../ui/IconButton';
+import type { IconButtonVariant } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
+
+// xl, so it stands as tall as the text field beside it.
+export function FieldIconButton({
+  testId,
+  variant,
+  icon,
+  label,
+  onClick,
+  disabled,
+  busy,
+  className = '',
+}: {
+  testId: string;
+  variant: IconButtonVariant;
+  icon: IconType;
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+  busy?: boolean;
+  className?: string;
+}) {
+  return (
+    <IconButton
+      variant={variant}
+      size="xl"
+      data-testid={testId}
+      onClick={onClick}
+      disabled={disabled}
+      aria-busy={busy}
+      aria-label={label}
+      title={label}
+      className={className}
+    >
+      {busy ? (
+        <Spinner size="sm" />
+      ) : (
+        <Icon icon={icon} className="w-5 h-5" aria-hidden="true" />
+      )}
+    </IconButton>
+  );
+}
 
 export function AddButton({
   onClick,
   disabled,
   isCreating,
   label,
-  className = '',
 }: {
   onClick: () => void;
   disabled: boolean;
   isCreating: boolean;
   label: string;
-  className?: string;
 }) {
-  // Icon-only: a text label crowded the field to a sliver at phone width; aria-label says the name.
+  // Icon-only: a text label leaves the field no room at phone width.
   return (
-    <IconButton
+    <FieldIconButton
+      testId="add-category"
       variant="primary"
-      size="xl"
-      data-testid="add-category"
+      icon={IconType.Plus}
+      label={label}
       onClick={onClick}
       disabled={disabled}
-      aria-busy={isCreating}
-      aria-label={label}
-      title={label}
-      className={className}
-    >
-      {isCreating ? (
-        <Spinner size="sm" />
-      ) : (
-        <Icon icon={IconType.Plus} className="w-5 h-5" aria-hidden="true" />
-      )}
-    </IconButton>
+      busy={isCreating}
+    />
   );
 }
 
@@ -51,22 +83,19 @@ export function RenameButton({
   label: string;
 }) {
   return (
-    <IconButton
+    <FieldIconButton
+      testId="rename-category"
       variant="outline"
-      size="xl"
-      data-testid="rename-category"
+      icon={IconType.Check}
+      label={label}
       onClick={onClick}
       disabled={disabled}
       className="disabled:opacity-40"
-      aria-label={label}
-      title={label}
-    >
-      <Icon icon={IconType.Check} className="w-5 h-5" aria-hidden="true" />
-    </IconButton>
+    />
   );
 }
 
-export function DeleteButtonWithLabel({
+export function RemoveCategoryButton({
   onClick,
   disabled,
   label,
@@ -76,23 +105,24 @@ export function DeleteButtonWithLabel({
   label: string;
 }) {
   return (
-    <IconButton
+    <FieldIconButton
+      testId="delete-category"
       variant="destructive"
-      // Same height as the field and rename button beside it.
-      size="xl"
-      data-testid="delete-category"
+      icon={IconType.Trash}
+      label={label}
       onClick={onClick}
       disabled={disabled}
       className="disabled:opacity-50"
-      aria-label={label}
-      title={label}
-    >
-      <Icon icon={IconType.Trash} className="w-5 h-5" aria-hidden="true" />
-    </IconButton>
+    />
   );
 }
 
-function RoundIconButton({
+const GHOST_TONE_CLASSES = {
+  neutral: 'hover:text-foreground hover:bg-muted',
+  destructive: 'hover:bg-destructive/10 hover:text-destructive',
+} as const;
+
+export function GhostIconButton({
   testId,
   onClick,
   label,
@@ -100,6 +130,9 @@ function RoundIconButton({
   iconClassName,
   boxClassName,
   strokeLinecap,
+  disabled,
+  className = '',
+  tone = 'neutral',
   ref,
 }: {
   testId: string;
@@ -109,6 +142,9 @@ function RoundIconButton({
   iconClassName: string;
   boxClassName: string;
   strokeLinecap?: 'round';
+  disabled?: boolean;
+  className?: string;
+  tone?: keyof typeof GHOST_TONE_CLASSES;
   ref?: Ref<HTMLButtonElement>;
 }) {
   return (
@@ -117,7 +153,8 @@ function RoundIconButton({
       type="button"
       data-testid={testId}
       onClick={onClick}
-      className={`rounded-sm ${boxClassName} shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors`}
+      disabled={disabled}
+      className={`rounded-sm ${boxClassName} shrink-0 flex items-center justify-center text-muted-foreground transition-colors disabled:pointer-events-none disabled:opacity-40 ${GHOST_TONE_CLASSES[tone]} ${className}`}
       aria-label={label}
       title={label}
     >
@@ -132,8 +169,8 @@ function RoundIconButton({
   );
 }
 
-// Sizes down at sm, unlike CANCEL_BOX: the header's neighbours do too.
-const HEADER_TOGGLE_BOX = 'w-11 h-11 sm:w-9 sm:h-9';
+// A 44px touch target that shrinks to 36px at sm, as its neighbours do, unlike CANCEL_BOX.
+export const TOUCH_ICON_BOX = 'w-11 h-11 sm:w-9 sm:h-9';
 
 // Same box as ExpandButton, so the toggle does not move between open and closed.
 export function CollapseButton({
@@ -146,14 +183,14 @@ export function CollapseButton({
   ref?: Ref<HTMLButtonElement>;
 }) {
   return (
-    <RoundIconButton
+    <GhostIconButton
       ref={ref}
       testId="collapse-categories"
       onClick={onClick}
       label={label}
       icon={IconType.Close}
       iconClassName="w-5 h-5"
-      boxClassName={HEADER_TOGGLE_BOX}
+      boxClassName={TOUCH_ICON_BOX}
       // Close's own default draws a square cap.
       strokeLinecap="round"
     />
@@ -170,19 +207,19 @@ export function ExpandButton({
   ref?: Ref<HTMLButtonElement>;
 }) {
   return (
-    <RoundIconButton
+    <GhostIconButton
       ref={ref}
       testId="expand-categories"
       onClick={onClick}
       label={label}
       icon={IconType.Edit}
       iconClassName="w-5 h-5"
-      boxClassName={HEADER_TOGGLE_BOX}
+      boxClassName={TOUCH_ICON_BOX}
     />
   );
 }
 
-// Fixed, unlike HEADER_TOGGLE_BOX: sits inline with a status line that has no room to grow at sm.
+// Fixed, unlike TOUCH_ICON_BOX: sits inline with a status line that has no room to grow at sm.
 const CANCEL_BOX = 'w-9 h-9';
 
 export function CancelExportButton({
@@ -193,7 +230,7 @@ export function CancelExportButton({
   label: string;
 }) {
   return (
-    <RoundIconButton
+    <GhostIconButton
       testId="cancel-export"
       onClick={onClick}
       label={label}
@@ -213,7 +250,7 @@ export function CancelImportButton({
   label: string;
 }) {
   return (
-    <RoundIconButton
+    <GhostIconButton
       testId="cancel-import"
       onClick={onClick}
       label={label}

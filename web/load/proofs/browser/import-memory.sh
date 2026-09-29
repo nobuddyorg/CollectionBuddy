@@ -4,9 +4,9 @@ set -uo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 repo=${REPO:-$(git rev-parse --show-toplevel)}
 if [[ -z ${LOAD_SUPABASE_URL:-} || -z ${LOAD_SUPABASE_ANON_KEY:-} ]]; then
-  status=$(cd "$repo" && supabase status -o json) || { echo 'supabase start first' >&2; exit 1; }
-  export LOAD_SUPABASE_URL=$(node -e 'console.log(JSON.parse(process.argv[1]).API_URL ?? "")' "$status")
-  export LOAD_SUPABASE_ANON_KEY=$(node -e 'console.log(JSON.parse(process.argv[1]).ANON_KEY ?? "")' "$status")
+  source "$here/../lib/stack.sh"
+  read_stack || exit 1
+  export LOAD_SUPABASE_URL=$api_url LOAD_SUPABASE_ANON_KEY=$anon_key
 fi
 export LOAD_TARGET=${LOAD_TARGET:-local-stack} LOAD_PROFILE=${LOAD_PROFILE:-normal}
 [[ -z ${K6_BROWSER_WS_URL:-} ]] || { echo 'import-memory.sh samples a local Chromium under k6; unset K6_BROWSER_WS_URL' >&2; exit 1; }

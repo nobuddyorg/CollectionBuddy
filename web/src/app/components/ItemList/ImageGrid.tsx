@@ -157,7 +157,7 @@ export function ImageGrid({
   if (!total) return null;
 
   const altFor = (index: number) =>
-    t('item_list.image_alt', { title: itemTitle, idx: index + 1 });
+    t('item_list.image_alt', { title: itemTitle, position: index + 1 });
 
   // Not a trash icon, which means the whole entry: this reads as "take this one off".
   const deleteButton = ({
@@ -217,7 +217,7 @@ export function ImageGrid({
           label={t('item_list.uploading')}
         />
       );
-    // Only reachable after a failed signing moved an unsigned photograph up.
+    // Reachable when a delete or a failed signing moves an unsigned photograph into a plate.
     if (!image.urlFull)
       return (
         <PendingPlate

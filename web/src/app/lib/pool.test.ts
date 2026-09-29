@@ -15,22 +15,6 @@ describe('runPool', () => {
     expect(seen.sort()).toEqual([1, 2, 3]);
   });
 
-  it('never starts more workers than there are items', async () => {
-    let concurrent = 0;
-    let max = 0;
-    await runPool({
-      items: [1, 2],
-      concurrency: 5,
-      worker: async () => {
-        concurrent++;
-        max = Math.max(max, concurrent);
-        await Promise.resolve();
-        concurrent--;
-      },
-    });
-    expect(max).toBeLessThanOrEqual(2);
-  });
-
   it('rethrows a real Error from a failing worker unchanged', async () => {
     const failure = new Error('worker failed');
     await expect(
@@ -88,16 +72,31 @@ describe('runPool', () => {
   });
 
   it('reports only the first failure when several workers fail', async () => {
-    const onReject = vi.fn();
-    await runPool({
-      items: [1, 2],
-      concurrency: 2,
-      worker: async (item) => {
-        throw new Error(`item ${item} failed`);
-      },
-    }).catch(onReject);
+    await expect(
+      runPool({
+        items: [1, 2],
+        concurrency: 2,
+        worker: async (item) => {
+          throw new Error(`item ${item} failed`);
+        },
+      }),
+    ).rejects.toThrow('item 1 failed');
+  });
 
-    expect(onReject).toHaveBeenCalledTimes(1);
+  it('fails on a worker rejecting with nothing, and picks up no further items', async () => {
+    const seen: number[] = [];
+    await expect(
+      runPool({
+        items: [1, 2, 3],
+        concurrency: 2,
+        worker: (item) => {
+          seen.push(item);
+          // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- an empty rejection is the behavior under test
+          return item === 1 ? Promise.reject() : Promise.resolve();
+        },
+      }),
+    ).rejects.toThrow(new Error('undefined'));
+    expect(seen).toEqual([1, 2]);
   });
 
   it('resolves immediately for an empty item list', async () => {

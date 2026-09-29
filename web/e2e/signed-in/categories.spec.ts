@@ -2,6 +2,7 @@ import { expect, test } from './test';
 
 import { expectNoSeriousA11yViolations } from '../axe';
 import { removeCategoryNamed } from './cleanup';
+import { uniqueName } from './helpers';
 
 // A throwaway category, unique per run, so no other spec's collection is touched.
 test.use({ locale: 'en-GB' });
@@ -11,12 +12,11 @@ test.describe('managing categories', () => {
     on,
     page,
   }) => {
-    const name = `E2E Category ${Date.now()}`;
+    const name = uniqueName('E2E Category');
     const renamed = `${name} (renamed)`;
     const categories = on(page).categories;
 
-    await page.goto('', { waitUntil: 'networkidle' });
-    await expect(categories.locators.selected).not.toBeEmpty();
+    await categories.do.load();
 
     // Creating a category selects it and collapses the panel back down.
     await categories.do.create(name);
@@ -52,11 +52,10 @@ test.describe('managing categories', () => {
     on,
     page,
   }) => {
-    const name = `E2E US$$ $' $& ${Date.now()}`;
+    const name = uniqueName("E2E US$$ $' $&");
     const app = on(page);
 
-    await page.goto('', { waitUntil: 'networkidle' });
-    await expect(app.categories.locators.selected).not.toBeEmpty();
+    await app.categories.do.load();
     await app.categories.do.create(name);
     try {
       await app.categories.do.delete();
@@ -99,10 +98,7 @@ test.describe('managing categories', () => {
     await page.keyboard.press('Home');
     await expect(categories.tab(names[0])).toBeFocused();
     await expect(categories.locators.selected).toHaveText('Münzen');
-    // Cards fade in (.fade-up); axe samples contrast mid-fade as a false positive unless settled.
-    for (const card of await on(page).catalogue.locators.cards.all()) {
-      await expect(card).toHaveCSS('opacity', '1');
-    }
+    await on(page).catalogue.do.waitForCardsSettled();
     await expectNoSeriousA11yViolations(page, testInfo);
 
     await page.keyboard.press('End');

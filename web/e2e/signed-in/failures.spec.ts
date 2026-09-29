@@ -1,5 +1,3 @@
-import { resolve } from 'node:path';
-
 import { type Locator, type Page } from '@playwright/test';
 
 // Not './test': every case drives the app into toast.reportError, which logs to the console by design.
@@ -8,14 +6,21 @@ import { expect, test } from '../fixture';
 import { writeArchiveClaiming } from './archives';
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
-import { apiAs, context, ownedCategoryId, share, unshare } from './rls/helpers';
+import { GEOCODER, PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
+import {
+  apiAs,
+  context,
+  ownedCategoryId,
+  seededEntryId,
+  storedObjects,
+  unshare,
+  viewerShare,
+} from './rls/helpers';
+import { LOGIN_URL } from '../pages/login';
 // Failures are injected at the network boundary, so the app's own code runs for real.
 test.use({ locale: 'en-GB' });
 
 test.describe.configure({ timeout: 120_000 });
-
-const PHOTO = resolve(process.cwd(), 'public/logo.png');
-const uniqueTitle = (what: string) => `${what} ${Date.now()}`;
 
 test.describe('when something outside the app fails', () => {
   test.beforeEach(async ({ on, page }) => {
@@ -37,7 +42,7 @@ test.describe('when something outside the app fails', () => {
     await app.account.do.toggleBackgroundRemoval();
     await page.keyboard.press('Escape');
 
-    const title = uniqueTitle('Ohne Download');
+    const title = uniqueName('Ohne Download');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
@@ -65,11 +70,11 @@ test.describe('when something outside the app fails', () => {
     page,
   }) => {
     const app = on(page);
-    await page.route('https://photon.komoot.io/**', (route) =>
+    await page.route(GEOCODER, (route) =>
       route.fulfill({ status: 503, body: '' }),
     );
 
-    const title = uniqueTitle('Ohne Geocoder');
+    const title = uniqueName('Ohne Geocoder');
     try {
       await app.catalogue.do.openEntryForm();
       await app.form.do.fill({ title });
@@ -92,7 +97,7 @@ test.describe('when something outside the app fails', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueTitle('Upload kaputt');
+    const title = uniqueName('Upload kaputt');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
@@ -118,13 +123,15 @@ test.describe('when something outside the app fails', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueTitle('Nochmal');
+    const title = uniqueName('Nochmal');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
       // The first through the empty frame, so the next ones go through the card's own + control, which stays mounted.
       await card.do.uploadPhoto(PHOTO);
-      await expect(card.locators.images).toHaveCount(1, { timeout: 45_000 });
+      await expect(card.locators.images).toHaveCount(1, {
+        timeout: PHOTO_ARRIVES,
+      });
 
       await page.route('**/storage/v1/object/**', (route) =>
         route.request().method() === 'POST'
@@ -136,7 +143,9 @@ test.describe('when something outside the app fails', () => {
       await page.unroute('**/storage/v1/object/**');
 
       await card.do.uploadPhoto(PHOTO);
-      await expect(card.locators.images).toHaveCount(2, { timeout: 45_000 });
+      await expect(card.locators.images).toHaveCount(2, {
+        timeout: PHOTO_ARRIVES,
+      });
     } finally {
       await page.unroute('**/storage/v1/object/**');
       await removeEntriesTitled(title);
@@ -150,25 +159,18 @@ test.describe('when something outside the app fails', () => {
   }) => {
     const app = on(page);
     const { token, userId } = context();
-    const api = apiAs(token);
     const bulkDelete = '**/storage/v1/object/item-images';
-    const title = uniqueTitle('Bleibt ganz');
+    const title = uniqueName('Bleibt ganz');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
       await card.do.uploadPhoto(PHOTO);
-      await expect(card.locators.images).toBeVisible({ timeout: 45_000 });
-      const { data: item } = await api
-        .from('items')
-        .select('id')
-        .eq('title', title)
-        .single();
-      const itemId = (item as { id: string }).id;
+      await expect(card.locators.images).toBeVisible({
+        timeout: PHOTO_ARRIVES,
+      });
+      const itemId = await seededEntryId({ token, ownerId: userId, title });
       const storedFiles = async () =>
-        (
-          (await api.storage.from('item-images').list(`${userId}/${itemId}`))
-            .data ?? []
-        ).length;
+        (await storedObjects(token, `${userId}/${itemId}`)).length;
       const filesBefore = await storedFiles();
       expect(filesBefore).toBeGreaterThan(0);
 
@@ -183,10 +185,11 @@ test.describe('when something outside the app fails', () => {
 
       await expect(app.toast()).toContainText('Could not delete this image');
       await expect(card.locators.images).toHaveCount(1);
-      const { data: rows } = await api
+      const { data: rows, error } = await apiAs(token)
         .from('images')
         .select('id')
         .eq('item_id', itemId);
+      if (error) throw error;
       expect(rows).toHaveLength(1);
       expect(await storedFiles()).toBe(filesBefore);
     } finally {
@@ -207,11 +210,7 @@ test.describe('when something outside the app fails', () => {
       userId,
       name: SEED.failureCategory,
     });
-    const shareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-    });
+    const shareId = await viewerShare(token, categoryId);
     const shareList = (url: URL) =>
       url.pathname.endsWith('/rest/v1/category_shares');
     try {
@@ -375,7 +374,7 @@ test.describe('when an archive is not what the export wrote', () => {
   }, testInfo) => {
     const app = on(page);
     await app.categories.do.open(SEED.failureCategory);
-    const category = uniqueTitle('Riesenarchiv');
+    const category = uniqueName('Riesenarchiv');
     const crafted = testInfo.outputPath('crafted.zip');
     writeArchiveClaiming(
       { category, declaredSize: 200 * 1024 * 1024 },
@@ -419,7 +418,7 @@ test.describe('when sign-out cannot reach the auth server', () => {
     await app.account.do.signOut();
 
     // auth-js retries the refresh for up to its 30 s tick before it gives up.
-    await expect(page).toHaveURL(/\/login\/?$/, { timeout: 45_000 });
+    await expect(page).toHaveURL(LOGIN_URL, { timeout: 45_000 });
     await expect(app.toast()).toContainText("Sign-out didn't fully complete");
     const sessionKeys = await page.evaluate(() =>
       Object.keys(window.localStorage).filter(
@@ -431,6 +430,6 @@ test.describe('when sign-out cannot reach the auth server', () => {
     // A session left in storage would refresh here and sign straight back in.
     await page.unroute('**/auth/v1/**');
     await page.reload({ waitUntil: 'networkidle' });
-    await expect(page).toHaveURL(/\/login\/?$/);
+    await expect(page).toHaveURL(LOGIN_URL);
   });
 });

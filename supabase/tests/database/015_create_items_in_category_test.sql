@@ -1,7 +1,4 @@
--- create_items_in_category() (0029_entries_created_with_their_collection.sql, #775):
--- entries and their links in one transaction, as the caller, so a refused
--- link takes its entries with it and RLS decides what the two inserts did.
--- web/e2e/signed-in/rls/create-rpc.spec.ts proves the same through PostgREST.
+-- create_items_in_category (0029): entries and links in one transaction as the caller, so a refused link takes its entries with it; rls/create-rpc.spec.ts is the PostgREST half.
 begin;
 select no_plan();
 

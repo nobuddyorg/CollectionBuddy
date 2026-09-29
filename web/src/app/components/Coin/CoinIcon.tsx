@@ -1,17 +1,16 @@
 import React from 'react';
 
-type CoinIconProps = React.SVGProps<SVGSVGElement> & {
-  rimId?: string;
-  children?: React.ReactNode;
-};
+type CoinIconProps = React.SVGProps<SVGSVGElement> & { rimId: string };
+
+export const RIM_RADIUS = 160;
 
 export function CoinIcon({ rimId, children, ...props }: CoinIconProps) {
   return (
     <svg viewBox="0 0 380 380" {...props}>
       <defs>
         <path
-          id={rimId ?? 'rimTextPath'}
-          d="M190,190 m-160,0 a160,160 0 1,1 320,0 a160,160 0 1,1 -320,0"
+          id={rimId}
+          d={`M190,190 m-${RIM_RADIUS},0 a${RIM_RADIUS},${RIM_RADIUS} 0 1,1 ${2 * RIM_RADIUS},0 a${RIM_RADIUS},${RIM_RADIUS} 0 1,1 -${2 * RIM_RADIUS},0`}
         />
       </defs>
 

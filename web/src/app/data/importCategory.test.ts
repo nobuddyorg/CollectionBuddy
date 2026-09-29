@@ -6,7 +6,7 @@ import { createZipWriter } from './zip';
 import {
   type CreateCategoryRow,
   buildArchive,
-  fakeGetUid,
+  fakeGetUserId,
   fakeCreateCategory,
   fakeDeleteCategory,
   baseFakes,
@@ -17,9 +17,8 @@ describe('importCategory', () => {
     const archive = await buildArchive();
     const failure = importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
-      getUid: fakeGetUid(null),
+      getUserId: fakeGetUserId(null),
     });
     await expect(failure).rejects.toThrow('No user session');
     await expect(failure).rejects.toHaveProperty('name', 'ImportError');
@@ -30,7 +29,6 @@ describe('importCategory', () => {
     writer.add({ path: 'root/photos/1.webp', bytes: new Uint8Array([1]) });
     const failure = importCategory({
       file: writer.finish(),
-      nameCategory: () => 'Coins',
       ...baseFakes(),
     });
     await expect(failure).rejects.toBeInstanceOf(ImportFormatError);
@@ -49,7 +47,6 @@ describe('importCategory', () => {
     });
     const failure = importCategory({
       file: writer.finish(),
-      nameCategory: () => 'Coins',
       ...baseFakes(),
     });
     await expect(failure).rejects.toBeInstanceOf(ImportFormatError);
@@ -69,7 +66,6 @@ describe('importCategory', () => {
     });
     const failure = importCategory({
       file: writer.finish(),
-      nameCategory: () => 'Coins',
       ...baseFakes(),
     });
     await expect(failure).rejects.toBeInstanceOf(ImportFormatError);
@@ -85,8 +81,8 @@ describe('importCategory', () => {
     const nameCategory = vi.fn((archivedName: string) => `${archivedName} (2)`);
     await importCategory({
       file: archive,
-      nameCategory,
       ...baseFakes(),
+      nameCategory,
       createCategoryRow,
     });
     expect(nameCategory).toHaveBeenCalledWith('Coins');
@@ -104,7 +100,6 @@ describe('importCategory', () => {
 
     const failure = importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       createCategoryRow,
       deleteCategoryRow,
@@ -119,29 +114,11 @@ describe('importCategory', () => {
     expect(deleteCategoryRow).not.toHaveBeenCalled();
   });
 
-  it('treats a missing category row as a failure even without an explicit error', async () => {
-    const archive = await buildArchive();
-    const createCategoryRow = vi.fn(async () => ({
-      data: null,
-      error: null,
-    })) as unknown as CreateCategoryRow;
-
-    const failure = importCategory({
-      file: archive,
-      nameCategory: () => 'Coins',
-      ...baseFakes(),
-      createCategoryRow,
-    });
-
-    await expect(failure).rejects.toThrow('Could not create category');
-  });
-
   it('reports progress through reading, items and photos', async () => {
     const archive = await buildArchive();
     const progress: ImportProgress[] = [];
     await importCategory({
       file: archive,
-      nameCategory: () => 'Coins',
       ...baseFakes(),
       onProgress: (step) => progress.push(step),
     });

@@ -1,7 +1,9 @@
 // Stryker's JSON report as a markdown table, scored by mutation-testing-metrics as Stryker's own reporters are.
-import { readFile, appendFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 
 import { calculateMutationTestMetrics } from 'mutation-testing-metrics';
+
+import { publishSummary } from './step-summary.mjs';
 
 const REPORT_PATH = 'reports/mutation/mutation.json';
 // Must match stryker.config.mjs's thresholds.break.
@@ -60,7 +62,6 @@ async function buildSummary() {
 }
 
 async function main() {
-  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   let summary;
   try {
     summary = await buildSummary();
@@ -73,12 +74,7 @@ async function main() {
       '',
     ].join('\n');
   }
-
-  if (summaryPath) {
-    await appendFile(summaryPath, summary);
-  } else {
-    console.log(summary);
-  }
+  await publishSummary(summary);
 }
 
 await main();

@@ -18,22 +18,13 @@ describe('GridSkeleton', () => {
     expect(screen.getByRole('status')).toBeVisible();
   });
 
-  it('holds six card frames by default', () => {
+  it('holds six card frames', () => {
     const { container } = render(
       <I18nProvider>
         <GridSkeleton />
       </I18nProvider>,
     );
     expect(cardCount(container)).toBe(6);
-  });
-
-  it('holds as many frames as asked for', () => {
-    const { container } = render(
-      <I18nProvider>
-        <GridSkeleton count={2} />
-      </I18nProvider>,
-    );
-    expect(cardCount(container)).toBe(2);
   });
 });
 

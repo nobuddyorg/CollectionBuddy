@@ -2,6 +2,12 @@
 
 import { useEffect, useSyncExternalStore } from 'react';
 
+import {
+  readStoredValue,
+  removeStoredValue,
+  writeStoredValue,
+} from './lib/browserStorage';
+
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
 
@@ -18,7 +24,6 @@ export function normalizePreference(stored: string | null): ThemePreference {
   return stored === 'light' || stored === 'dark' ? stored : 'system';
 }
 
-/** The three the visitor chooses between, resolved to the two that exist. */
 export function resolveTheme(
   preference: ThemePreference,
   systemPrefersDark: boolean,
@@ -40,7 +45,7 @@ function subscribePreference(onChange: () => void) {
 }
 
 function readPreference(): ThemePreference {
-  return normalizePreference(localStorage.getItem(THEME_STORAGE_KEY));
+  return normalizePreference(readStoredValue(THEME_STORAGE_KEY));
 }
 
 function subscribeSystem(onChange: () => void) {
@@ -55,13 +60,7 @@ function readSystemPrefersDark(): boolean {
 
 /** What THEME_INIT_SCRIPT writes, for a screen that renders without it; storage that throws leaves the system deciding. */
 export function detectTheme(): ResolvedTheme {
-  let stored: string | null = null;
-  try {
-    stored = localStorage.getItem(THEME_STORAGE_KEY);
-  } catch {
-    // localStorage can throw (private browsing); the system's scheme still decides.
-  }
-  return resolveTheme(normalizePreference(stored), readSystemPrefersDark());
+  return resolveTheme(readPreference(), readSystemPrefersDark());
 }
 
 // Read as an external store, not copied into state, so two mounted controls can never disagree.
@@ -84,8 +83,8 @@ export function useTheme() {
   }, [resolved]);
 
   const setThemePreference = (next: ThemePreference) => {
-    if (next === 'system') localStorage.removeItem(THEME_STORAGE_KEY);
-    else localStorage.setItem(THEME_STORAGE_KEY, next);
+    if (next === 'system') removeStoredValue(THEME_STORAGE_KEY);
+    else writeStoredValue(THEME_STORAGE_KEY, next);
     window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
   };
 

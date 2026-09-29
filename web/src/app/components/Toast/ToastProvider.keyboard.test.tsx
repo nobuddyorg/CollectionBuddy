@@ -2,8 +2,8 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider, useToast } from './ToastProvider';
+import { ToastWrapper } from '../providers.test-support';
+import { useToast } from './ToastProvider';
 
 type Deletion = { message: string; onExpire: () => void; onUndo: () => void };
 
@@ -16,12 +16,7 @@ function Triggers({ deletions }: { deletions: Deletion[] }) {
         <button
           key={message}
           type="button"
-          onClick={() =>
-            toast.success(message, {
-              action: { label: 'Undo', onClick: onUndo },
-              onExpire,
-            })
-          }
+          onClick={() => toast.success(message, { onUndo, onExpire })}
         >
           {message}
         </button>
@@ -39,21 +34,15 @@ function deletion(message: string): Deletion {
 }
 
 function renderDeletions(...deletions: Deletion[]) {
-  render(
-    <I18nProvider>
-      <ToastProvider>
-        <Triggers deletions={deletions} />
-      </ToastProvider>
-    </I18nProvider>,
-  );
+  render(<Triggers deletions={deletions} />, { wrapper: ToastWrapper });
 }
 
 const post = (message: string) =>
   fireEvent.click(screen.getByRole('button', { name: message }));
 
-const wait = (ms: number) =>
+const wait = (milliseconds: number) =>
   act(() => {
-    vi.advanceTimersByTime(ms);
+    vi.advanceTimersByTime(milliseconds);
   });
 
 const toast = () => screen.queryByTestId('toast');

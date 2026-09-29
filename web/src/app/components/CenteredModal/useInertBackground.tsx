@@ -16,7 +16,7 @@ export function useInertBackground(active: boolean) {
     // Counted, not on/off: a confirm over an open modal keeps the root inert until both close.
     const count = (openCounts.get(root) ?? 0) + 1;
     openCounts.set(root, count);
-    if (count === 1) root.inert = true;
+    root.inert = true;
 
     return () => {
       const next = openCounts.get(root)! - 1;

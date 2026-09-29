@@ -3,7 +3,7 @@ import { write } from './lib/flows.js';
 import {
   LIFECYCLE_TIMEOUTS,
   SUMMARY_TREND_STATS,
-  rampTo,
+  rampingScenario,
   thresholdsFor,
 } from './lib/options.js';
 import { summarize } from './lib/summary.js';
@@ -14,11 +14,7 @@ export const options = {
   ...LIFECYCLE_TIMEOUTS,
   summaryTrendStats: SUMMARY_TREND_STATS,
   scenarios: {
-    write: {
-      executor: 'ramping-vus',
-      exec: 'writeEntry',
-      stages: rampTo(5),
-    },
+    write: rampingScenario('writeEntry', 5),
   },
   thresholds: thresholdsFor(['write']),
 };

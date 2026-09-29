@@ -1,12 +1,12 @@
 import { supabase } from '../supabase';
-import type { ImageListRow } from './images';
+import { IMAGE_LIST_SELECT, type ImageListRow } from './images';
 import { ITEM_FIELDS_SELECT, withSignal, type ItemFields } from './items';
 import { likePatternFor } from './itemSearch';
 
 /** One entry of a page read, with its photographs, before `listItems` splits them. */
 type ItemWithImages = ItemFields & { images: ImageListRow[] };
 
-const ITEM_WITH_IMAGES_SELECT = `${ITEM_FIELDS_SELECT},images(id,item_id,path_full,path_thumb)`;
+const ITEM_WITH_IMAGES_SELECT = `${ITEM_FIELDS_SELECT},images(${IMAGE_LIST_SELECT})`;
 
 /** The page's item ids, newest first, walking idx_item_categories_cat_created. */
 export function rawListItemIds({
@@ -120,20 +120,28 @@ function itemFieldsOf({
 }
 
 /** The rows in `ids` order; an id whose entry was deleted between the two reads drops out. */
-function inIdOrder<T extends { id: string }>(
-  ids: string[],
-  rows: T[] | null,
-): T[] {
-  const byId = new Map(rows?.map((row) => [row.id, row] as const));
+function inIdOrder<T extends { id: string }>(ids: string[], rows: T[]): T[] {
+  const byId = new Map(rows.map((row) => [row.id, row] as const));
   return ids.flatMap((id) => byId.get(id) ?? []);
 }
 
-type PageRead = {
-  data: ItemFields[] | null;
-  error: unknown;
-  count: number | null;
-  imageRows: ImageListRow[] | null;
-};
+type PageRead =
+  | {
+      data: ItemFields[];
+      count: number;
+      imageRows: ImageListRow[];
+      error: null;
+    }
+  | {
+      data: null;
+      count: null;
+      imageRows: null;
+      error: NonNullable<unknown>;
+    };
+
+function failedPage(error: NonNullable<unknown>): PageRead {
+  return { data: null, error, count: null, imageRows: null };
+}
 
 /** The searched page, its photographs, and its total, read off the first row whichever page that is. */
 async function searchedPage(
@@ -155,27 +163,24 @@ async function searchedPage(
       signal: params.signal,
     });
   const { data, error } = await search(params.from, params.to);
-  if (error) return { data: null, error, count: null, imageRows: null };
-  const rows = data ?? [];
-  if (rows.length > 0 || params.from === 0) {
-    const count = rows.length > 0 ? rows[0].total_count : 0;
+  if (error) return failedPage(error);
+  if (data.length > 0 || params.from === 0) {
+    const count = data.length > 0 ? data[0].total_count : 0;
     return {
-      data: rows.map(itemFieldsOf),
+      data: data.map(itemFieldsOf),
       error: null,
       count,
-      imageRows: rows.flatMap((row) => row.images),
+      imageRows: data.flatMap((row) => row.images),
     };
   }
 
   // Past the end no row carries total_count, and a 0 would clamp the grid to "No results".
   const { data: first, error: firstError } = await search(0, 0);
-  if (firstError) {
-    return { data: null, error: firstError, count: null, imageRows: null };
-  }
+  if (firstError) return failedPage(firstError);
   return {
     data: [],
     error: null,
-    count: first?.[0]?.total_count ?? 0,
+    count: first[0]?.total_count ?? 0,
     imageRows: [],
   };
 }
@@ -187,7 +192,7 @@ type ListItemsCalls = {
   rawSearch?: typeof rawSearchCategoryItems;
 };
 
-/** The catalogue page, newest first, with its photograph rows on both paths; `imageRows` is null only with an error. */
+/** The catalogue page, newest first, with its photograph rows on both paths. */
 export async function listItems(
   params: {
     categoryId: string;
@@ -206,22 +211,19 @@ export async function listItems(
   const likePattern = likePatternFor(params.search);
   if (likePattern) return searchedPage({ ...params, likePattern }, rawSearch);
 
-  const [{ data: links, error }, { count, error: countError }] =
+  const [{ data: links, error }, { count: headCount, error: countError }] =
     await Promise.all([rawIds(params), rawCount(params)]);
-  if (error) return { data: null, error, count: null, imageRows: null };
-  if (countError) {
-    return { data: null, error: countError, count: null, imageRows: null };
-  }
-  const ids = (links ?? []).map((link) => link.item_id);
+  if (error) return failedPage(error);
+  if (countError) return failedPage(countError);
+  const count = headCount ?? 0;
+  const ids = links.map((link) => link.item_id);
   if (ids.length === 0) return { data: [], error: null, count, imageRows: [] };
 
   const { data: rows, error: itemsError } = await rawItems({
     ids,
     signal: params.signal,
   });
-  if (itemsError) {
-    return { data: null, error: itemsError, count: null, imageRows: null };
-  }
+  if (itemsError) return failedPage(itemsError);
   const page = inIdOrder(ids, rows);
   return {
     data: page.map(itemFieldsOf),

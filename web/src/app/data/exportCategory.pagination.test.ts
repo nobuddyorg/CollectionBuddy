@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   exportCategory,
@@ -11,6 +11,10 @@ import {
   fakeSignUrls,
   okResponse,
 } from './exportCategory.test-support';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('exportCategory, paging through the items', () => {
   it('reads zero items in one call', async () => {
@@ -92,22 +96,18 @@ describe('exportCategory, paging through the items', () => {
       'fetch',
       vi.fn(async () => okResponse([1])),
     );
-    try {
-      const items = Array.from({ length: ITEM_PAGE_SIZE + 1 }, (_, i) =>
-        item({ id: `item-${i}` }),
-      );
-      const result = await exportCategory({
-        category: { id: 'cat', name: 'Coins' },
-        listItems: paginatedListItems(items, {
-          'item-0': ['1.webp'],
-          [`item-${ITEM_PAGE_SIZE}`]: ['1.webp', '2.webp'],
-        }),
-        signUrls: fakeSignUrls(),
-      });
-      expect(result.photoCount).toBe(3);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    const items = Array.from({ length: ITEM_PAGE_SIZE + 1 }, (_, i) =>
+      item({ id: `item-${i}` }),
+    );
+    const result = await exportCategory({
+      category: { id: 'cat', name: 'Coins' },
+      listItems: paginatedListItems(items, {
+        'item-0': ['1.webp'],
+        [`item-${ITEM_PAGE_SIZE}`]: ['1.webp', '2.webp'],
+      }),
+      signUrls: fakeSignUrls(),
+    });
+    expect(result.photoCount).toBe(3);
   });
 
   it('reports the running item count after every page', async () => {

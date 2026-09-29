@@ -23,7 +23,6 @@ vi.mock('../../data/images', async () => {
     createImageRow: vi.fn(),
     createSignedUrls: vi.fn(),
     deleteImageRow: vi.fn(),
-    listImagePathsForItems: vi.fn(),
     listImagesForItems: vi.fn(),
     removeImageObjects: vi.fn(),
     uploadImageObject: vi.fn(),
@@ -190,7 +189,7 @@ describe('useItemImages', () => {
       }
     });
 
-    // #757: re-showing a page from the cache must not postpone the re-sign its older signatures need.
+    // Re-showing a page from the cache must not postpone the re-sign its older signatures need.
     it('re-signs a page on its own signatures clock, however recently another page was shown', async () => {
       const { result } = await withOnePhotographAndFakeTimers();
       try {
@@ -299,14 +298,9 @@ describe('useItemImages', () => {
     });
 
     it('stops refreshing and stops listening for visibility changes once unmounted', async () => {
-      const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
       const { unmount } = await withOnePhotographAndFakeTimers();
       try {
         unmount();
-        expect(removeEventListenerSpy).toHaveBeenCalledWith(
-          'visibilitychange',
-          expect.any(Function),
-        );
 
         vi.mocked(listImagesForItems).mockClear();
         vi.setSystemTime(Date.now() + 56 * 60_000);
@@ -317,7 +311,6 @@ describe('useItemImages', () => {
 
         expect(listImagesForItems).not.toHaveBeenCalled();
       } finally {
-        removeEventListenerSpy.mockRestore();
         vi.useRealTimers();
       }
     });

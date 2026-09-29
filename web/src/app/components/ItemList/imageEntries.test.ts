@@ -7,6 +7,7 @@ import {
 } from './imageCache';
 import {
   entryDataOf,
+  entryPaths,
   groupImageRows,
   pageImageRowsFor,
   RENDERABLE_PLATES,
@@ -170,7 +171,7 @@ describe('what a card can render', () => {
 describe('toImageEntries past the plates', () => {
   it('keeps an unsigned photograph past the plates, so it still counts', () => {
     const result = toImageEntries(sevenPhotos(), new Map());
-    // The first five are dropped unsigned, as before; the last two are kept.
+    // The first five are dropped unsigned; the last two are kept.
     expect(result.map((entry) => entry.id)).toEqual(['img-5', 'img-6']);
     expect(result[0].urlFull).toBeUndefined();
   });
@@ -192,6 +193,18 @@ describe('entryDataOf', () => {
       ['a', { id: 'a', pathFull: 'p/a.webp', pathThumb: 'p/a.thumb.webp' }],
       ['b', { id: 'b', pathFull: 'p/b.webp', pathThumb: undefined }],
     ]);
+  });
+});
+
+describe('entryPaths', () => {
+  it("names a photograph's full size and its thumbnail", () => {
+    expect(
+      entryPaths({ pathFull: 'p/a.webp', pathThumb: 'p/a.thumb.webp' }),
+    ).toEqual(['p/a.webp', 'p/a.thumb.webp']);
+  });
+
+  it('names only the full size of a photograph without a thumbnail', () => {
+    expect(entryPaths({ pathFull: 'p/a.webp' })).toEqual(['p/a.webp']);
   });
 });
 

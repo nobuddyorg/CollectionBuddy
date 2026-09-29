@@ -1,10 +1,8 @@
 import { encodingFor, type PhotoEncoding } from '../data/photoType';
+import { type CompressionRequest, drawFitted } from './drawPhoto';
+import type { CompressionAnswer } from './photo.worker';
 
-// The bundler emits this as a hashed same-origin file; the library's default, a CDN, is refused by the CSP.
-const LIBRARY_URL = new URL(
-  'browser-image-compression/dist/browser-image-compression.js',
-  import.meta.url,
-).href;
+const QUALITY = 0.8;
 
 let probedEncoding: Promise<string> | undefined;
 
@@ -18,23 +16,87 @@ function probeWebpEncoding(): Promise<string> {
   });
 }
 
-/** Every derivative: ~80% quality, off the main thread, as WebP where the browser encodes it and JPEG (or PNG) elsewhere. */
+function compressInWorker(request: CompressionRequest): Promise<Blob> {
+  // Turbopack passes a worker's chunks in its URL fragment, which Chrome reuses across workers of one bootstrap, so every photo job shares one entry.
+  const worker = new Worker(new URL('./photo.worker.ts', import.meta.url), {
+    type: 'module',
+  });
+  const answered = new Promise<Blob>((resolve, reject) => {
+    worker.addEventListener(
+      'message',
+      ({ data }: MessageEvent<CompressionAnswer>) => {
+        if ('blob' in data) resolve(data.blob);
+        else reject(new Error(data.error));
+      },
+    );
+    worker.addEventListener('error', (event) => {
+      reject(
+        new Error('The photo compression worker failed', { cause: event }),
+      );
+    });
+  });
+  worker.postMessage(request);
+  return answered.finally(() => worker.terminate());
+}
+
+function dataUrlOf(file: Blob): Promise<string> {
+  const reader = new FileReader();
+  return new Promise((resolve, reject) => {
+    reader.addEventListener('load', () => resolve(reader.result as string));
+    reader.addEventListener('error', () => {
+      reject(
+        new Error('The photograph could not be read', { cause: reader.error }),
+      );
+    });
+    reader.readAsDataURL(file);
+  });
+}
+
+// Not createImageBitmap: Safari 14 lacks it and 15 ignores EXIF orientation there.
+async function decodeUpright(file: Blob): Promise<HTMLImageElement> {
+  const image = new Image();
+  image.src = await dataUrlOf(file);
+  await image.decode();
+  return image;
+}
+
+async function compressOnMainThread(
+  request: CompressionRequest,
+): Promise<Blob> {
+  const canvas = drawFitted(await decodeUpright(request.file), {
+    ...request,
+    contextOfSize: (size) =>
+      Object.assign(document.createElement('canvas'), size).getContext('2d'),
+  });
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) =>
+        blob ? resolve(blob) : reject(new Error('The canvas encoded nothing')),
+      request.type,
+      request.quality,
+    );
+  });
+}
+
+/** Every derivative: ~80% quality, as WebP where the browser encodes it and JPEG (PNG for a cut-out) elsewhere, in a worker wherever one can draw. */
 export async function compressPhoto(
   file: File,
-  maxWidthOrHeight: number,
-  encoding: PhotoEncoding = 'opaque',
+  {
+    maxWidthOrHeight,
+    encoding = 'opaque',
+  }: { maxWidthOrHeight: number; encoding?: PhotoEncoding },
 ): Promise<File> {
   probedEncoding ??= probeWebpEncoding();
-  const [{ default: imageCompression }, probed] = await Promise.all([
-    import('browser-image-compression'),
-    probedEncoding,
-  ]);
-  return imageCompression(file, {
+  const request: CompressionRequest = {
+    kind: 'compress',
+    file,
     maxWidthOrHeight,
-    initialQuality: 0.8,
-    fileType: encodingFor(probed, encoding),
-    useWebWorker: true,
-    // Absolute: the worker runs from a blob: URL, against which no path resolves.
-    libURL: new URL(LIBRARY_URL, document.baseURI).href,
-  });
+    type: encodingFor(await probedEncoding, encoding),
+    quality: QUALITY,
+  };
+  // Safari before 16.4 has no OffscreenCanvas, so a worker there could not draw.
+  const blob = await (typeof OffscreenCanvas === 'undefined'
+    ? compressOnMainThread(request)
+    : compressInWorker(request));
+  return new File([blob], file.name, { type: blob.type });
 }

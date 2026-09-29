@@ -2,9 +2,9 @@
 import { act, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { refuseStorage } from '../lib/browserStorage.test-support';
 import { I18nProvider, type TranslationKey } from './I18nProvider';
 import { useI18n } from './useI18n';
-import realEn from './en.json';
 
 function Probe() {
   const { language, locale, setLanguage, t, tCount } = useI18n();
@@ -16,12 +16,20 @@ function Probe() {
       <span data-testid="missing">
         {t('nope.not.a.real.key' as TranslationKey)}
       </span>
-      <span data-testid="tags-0">{tCount('item_create.tags_count', 0)}</span>
-      <span data-testid="tags-1">{tCount('item_create.tags_count', 1)}</span>
-      <span data-testid="tags-2">{tCount('item_create.tags_count', 2)}</span>
-      <span data-testid="no-plural-variant">{tCount('common.close', 1)}</span>
+      <span data-testid="tags-0">
+        {tCount('item_create.tags_count', { count: 0 })}
+      </span>
+      <span data-testid="tags-1">
+        {tCount('item_create.tags_count', { count: 1 })}
+      </span>
+      <span data-testid="tags-2">
+        {tCount('item_create.tags_count', { count: 2 })}
+      </span>
+      <span data-testid="no-plural-variant">
+        {tCount('common.close', { count: 1 })}
+      </span>
       <span data-testid="no-key-at-all">
-        {tCount('nope.not.real' as TranslationKey, 1)}
+        {tCount('nope.not.real' as TranslationKey, { count: 1 })}
       </span>
       <button type="button" onClick={() => setLanguage('en')}>
         English
@@ -91,16 +99,11 @@ describe('I18nProvider', () => {
 
   it('still follows the browser when reading the stored language throws', () => {
     localStorage.setItem('lang', 'de');
-    const getItem = vi
-      .spyOn(Storage.prototype, 'getItem')
-      .mockImplementation(() => {
-        throw new Error('storage disabled');
-      });
+    refuseStorage('getItem');
     vi.stubGlobal('navigator', { language: 'en-GB', languages: ['en-GB'] });
     renderProbe();
 
     expect(screen.getByTestId('lang')).toHaveTextContent('en');
-    getItem.mockRestore();
   });
 
   it("formats in the browser's regional form of the app language", () => {
@@ -140,6 +143,28 @@ describe('I18nProvider', () => {
     expect(localStorage.getItem('lang')).toBe('de');
   });
 
+  it('still switches the language, without an error, when storing the choice throws', async () => {
+    localStorage.setItem('lang', 'en');
+    renderProbe();
+    refuseStorage('setItem');
+    // React reports an event handler's throw as a window error event, not to the caller of click().
+    const reportedErrors: unknown[] = [];
+    const collectError = (event: ErrorEvent) => {
+      event.preventDefault();
+      reportedErrors.push(event.error);
+    };
+    window.addEventListener('error', collectError);
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Deutsch' }).click();
+    });
+    window.removeEventListener('error', collectError);
+
+    expect(reportedErrors).toEqual([]);
+    expect(screen.getByTestId('lang')).toHaveTextContent('de');
+    expect(screen.getByTestId('close')).toHaveTextContent('Schließen');
+  });
+
   it('falls back to the key itself for a translation that does not exist', () => {
     localStorage.setItem('lang', 'en');
     renderProbe();
@@ -161,32 +186,6 @@ describe('I18nProvider', () => {
 
     expect(document.documentElement.lang).toBe('de');
     expect(meta.getAttribute('content')).toBe('Sammeln • Ordnen • Behalten');
-  });
-
-  // The parity test guards only t()/tCount() literals, not this direct resolveTranslationKey call.
-  it('falls back to an empty meta description when the active language is missing page.footer', async () => {
-    vi.resetModules();
-    vi.doMock('./en.json', () => ({
-      default: { ...realEn, page: { ...realEn.page, footer: undefined } },
-    }));
-    const { I18nProvider: FreshProvider } = await import('./I18nProvider');
-    const { useI18n: freshUseI18n } = await import('./useI18n');
-    function FreshProbe() {
-      const { language } = freshUseI18n();
-      return <span data-testid="lang">{language}</span>;
-    }
-    localStorage.setItem('lang', 'en');
-
-    render(
-      <FreshProvider>
-        <FreshProbe />
-      </FreshProvider>,
-    );
-
-    expect(screen.getByTestId('lang')).toHaveTextContent('en');
-    expect(meta.getAttribute('content')).toBe('');
-    vi.doUnmock('./en.json');
-    vi.resetModules();
   });
 
   it('tolerates a document with no meta description tag at all', () => {
@@ -212,19 +211,33 @@ describe('I18nProvider', () => {
     });
     const { result } = renderHook(() => useI18n(), { wrapper: I18nProvider });
 
-    expect(result.current.tCount('item_list.results_count', 1000)).toBe(
-      '1,000 results',
-    );
     expect(
-      result.current.t('item_list.page_of', { n: 1000, total: 2000 }),
+      result.current.tCount('item_list.results_count', { count: 1000 }),
+    ).toBe('1,000 results');
+    expect(
+      result.current.t('item_list.page_of', { page: 1000, total: 2000 }),
     ).toBe('1,000 / 2,000');
 
     await act(async () => {
       result.current.setLanguage('de');
     });
 
-    expect(result.current.tCount('item_list.results_count', 1000)).toBe(
-      "1'000 Treffer",
+    expect(
+      result.current.tCount('item_list.results_count', { count: 1000 }),
+    ).toBe("1'000 Treffer");
+  });
+
+  it('fills every other placeholder of a counted template too', () => {
+    localStorage.setItem('lang', 'en');
+    const { result } = renderHook(() => useI18n(), { wrapper: I18nProvider });
+
+    expect(
+      result.current.tCount('category_select.confirm_delete_with_entries', {
+        name: 'Coins',
+        count: 2,
+      }),
+    ).toBe(
+      'Delete "Coins"? Its 2 entries and all their photographs will be permanently deleted.',
     );
   });
 

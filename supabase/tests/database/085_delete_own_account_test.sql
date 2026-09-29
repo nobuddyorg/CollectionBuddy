@@ -31,10 +31,6 @@ as $$
 $$;
 
 select gen_random_uuid() as leaver_id, gen_random_uuid() as keeper_id, gen_random_uuid() as revoked_id \gset
-insert into auth.users (id, email) values
-  (:'leaver_id'::uuid, 'leaver@collectionbuddy.test'),
-  (:'keeper_id'::uuid, 'keeper@collectionbuddy.test'),
-  (:'revoked_id'::uuid, 'revoked@collectionbuddy.test');
 
 -- The keeper's collection, shared with the leaver as editor and with the revoked editor.
 select pg_temp.auth_as(:'keeper_id'::uuid, 'keeper@collectionbuddy.test');

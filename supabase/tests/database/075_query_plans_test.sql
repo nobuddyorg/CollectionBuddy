@@ -32,64 +32,70 @@ begin
 end;
 $$;
 
+-- A TAP line with the text plan attached when it failed.
+create or replace function pg_temp.with_plan_on_failure(p_tap text, p_sql text)
+returns text
+language sql
+as $$
+  select p_tap || case when p_tap like 'not ok%' then e'\n' || diag(pg_temp.plan_text(p_sql)) else '' end
+$$;
+
 create or replace function pg_temp.plan_uses_index(p_sql text, p_index text, p_description text)
 returns text
-language plpgsql
+language sql
 as $$
-begin
-  if jsonb_path_exists(
-    pg_temp.plan_json(p_sql),
-    '$.** ? (@."Index Name" == $index)',
-    jsonb_build_object('index', p_index)
-  ) then
-    return ok(true, p_description);
-  end if;
-  return ok(false, p_description) || e'\n' || diag(pg_temp.plan_text(p_sql));
-end;
+  select pg_temp.with_plan_on_failure(
+    ok(
+      jsonb_path_exists(
+        pg_temp.plan_json(p_sql),
+        '$.** ? (@."Index Name" == $index)',
+        jsonb_build_object('index', p_index)
+      ),
+      p_description
+    ),
+    p_sql
+  )
 $$;
 
 create or replace function pg_temp.plan_has_no_seq_scan_on(p_sql text, p_relation text, p_description text)
 returns text
-language plpgsql
+language sql
 as $$
-begin
-  if not jsonb_path_exists(
-    pg_temp.plan_json(p_sql),
-    '$.** ? (@."Node Type" == "Seq Scan" && @."Relation Name" == $relation)',
-    jsonb_build_object('relation', p_relation)
-  ) then
-    return ok(true, p_description);
-  end if;
-  return ok(false, p_description) || e'\n' || diag(pg_temp.plan_text(p_sql));
-end;
+  select pg_temp.with_plan_on_failure(
+    ok(
+      not jsonb_path_exists(
+        pg_temp.plan_json(p_sql),
+        '$.** ? (@."Node Type" == "Seq Scan" && @."Relation Name" == $relation)',
+        jsonb_build_object('relation', p_relation)
+      ),
+      p_description
+    ),
+    p_sql
+  )
 $$;
 
 create or replace function pg_temp.plan_uses_index_only(p_sql text, p_index text, p_description text)
 returns text
-language plpgsql
+language sql
 as $$
-begin
-  if jsonb_path_exists(
-    pg_temp.plan_json(p_sql),
-    '$.** ? (@."Node Type" == "Index Only Scan" && @."Index Name" == $index)',
-    jsonb_build_object('index', p_index)
-  ) then
-    return ok(true, p_description);
-  end if;
-  return ok(false, p_description) || e'\n' || diag(pg_temp.plan_text(p_sql));
-end;
+  select pg_temp.with_plan_on_failure(
+    ok(
+      jsonb_path_exists(
+        pg_temp.plan_json(p_sql),
+        '$.** ? (@."Node Type" == "Index Only Scan" && @."Index Name" == $index)',
+        jsonb_build_object('index', p_index)
+      ),
+      p_description
+    ),
+    p_sql
+  )
 $$;
 
 create or replace function pg_temp.plan_never_mentions(p_sql text, p_fragment text, p_description text)
 returns text
-language plpgsql
+language sql
 as $$
-begin
-  if strpos(pg_temp.plan_text(p_sql), p_fragment) = 0 then
-    return ok(true, p_description);
-  end if;
-  return ok(false, p_description) || e'\n' || diag(pg_temp.plan_text(p_sql));
-end;
+  select pg_temp.with_plan_on_failure(ok(strpos(pg_temp.plan_text(p_sql), p_fragment) = 0, p_description), p_sql)
 $$;
 
 select gen_random_uuid() as owner_id \gset
@@ -101,6 +107,7 @@ insert into public.items (title, description, place, tags)
 values ('Plan Probe Silberdenar', 'A silver coin', 'Rome', array['coin']);
 insert into public.item_categories (item_id, category_id)
 select i.id, :'category_id'::uuid from public.items i where i.title = 'Plan Probe Silberdenar';
+select array['idx_items_title_trgm', 'idx_items_description_trgm', 'idx_items_place_trgm', 'idx_items_tags_text_trgm'] as trigram_indexes \gset
 
 -- The searched page's query, read from the live function rather than pasted, with its arguments inlined as the app sends them.
 select
@@ -141,12 +148,7 @@ set local enable_nestloop = off;
 select set_config('role', :'search_role', true);
 
 select pg_temp.plan_uses_index(:'search_sql', index_name, 'reachable: search_category_items can use ' || index_name)
-from unnest(array[
-  'idx_items_title_trgm',
-  'idx_items_description_trgm',
-  'idx_items_place_trgm',
-  'idx_items_tags_text_trgm'
-]) as index_name;
+from unnest(:'trigram_indexes'::text[]) as index_name;
 select pg_temp.plan_has_no_seq_scan_on(
   :'search_sql', 'items', 'reachable: search_category_items needs no sequential scan on items'
 );
@@ -186,23 +188,13 @@ where i.title like 'Plan filler %';
 
 -- Autovacuum flushes GIN's pending list in production; until it does, the planner prices every trigram probe as a pending-list scan.
 reset role;
-select gin_clean_pending_list(index_name::regclass)
-from unnest(array[
-  'public.idx_items_title_trgm',
-  'public.idx_items_description_trgm',
-  'public.idx_items_place_trgm',
-  'public.idx_items_tags_text_trgm'
-]) as index_name;
+select gin_clean_pending_list(('public.' || index_name)::regclass)
+from unnest(:'trigram_indexes'::text[]) as index_name;
 analyze public.items, public.item_categories;
 
 select set_config('role', :'search_role', true);
 select pg_temp.plan_uses_index(:'search_sql', index_name, 'preferred: search_category_items uses ' || index_name)
-from unnest(array[
-  'idx_items_title_trgm',
-  'idx_items_description_trgm',
-  'idx_items_place_trgm',
-  'idx_items_tags_text_trgm'
-]) as index_name;
+from unnest(:'trigram_indexes'::text[]) as index_name;
 select pg_temp.plan_has_no_seq_scan_on(
   :'search_sql', 'items', 'preferred: search_category_items does not scan items sequentially'
 );
@@ -295,8 +287,7 @@ select pg_temp.plan_uses_index(
   'preferred: deleting a category cascades to its links through idx_item_categories_cat_created'
 );
 
--- tg_images_quota()'s per-owner sum reads both sizes from the index alone, never the owner's heap rows (#718, 0025).
--- 50 rows with nothing stored count 250 MiB, inside the owner's 256 MiB.
+-- tg_images_quota()'s per-owner sum is index-only (#718, 0025); 50 unstored rows count 250 MiB, inside 256 MiB.
 select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
 insert into public.images (item_id, path_full)
 select i.id, :'owner_id'::text || '/' || i.id::text || '/plan.webp'

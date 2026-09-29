@@ -1,17 +1,10 @@
 'use client';
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type RefObject,
-} from 'react';
+import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { verifiedUserId } from '../../data/auth';
 import {
   createImageRow,
   deleteImageRow,
   imagePrefix,
-  listImagePathsForItems,
   listImagesForItems,
   uploadImageObject,
   type ImageListRow,
@@ -22,19 +15,22 @@ import type { ImageEntry } from './types';
 import { useConfirm } from '../Confirm/ConfirmProvider';
 import { useToast } from '../Toast/ToastProvider';
 import { useI18n } from '../../i18n/useI18n';
-import type { TranslationKey } from '../../i18n/I18nProvider';
+import type { Translate } from '../../i18n/I18nProvider';
 import {
   entryDataOf,
+  entryPaths,
   groupImageRows,
   itemsDueForResigning,
   keepingShown,
+  RENDERABLE_PLATES,
   signAllEntries,
   signEntries,
-  type ImageEntryData,
+  type EntryDataByItem,
 } from './imageEntries';
 import { extensionForType, type PhotoEncoding } from '../../data/photoType';
 import { compressPhoto } from '../../lib/imageCompression';
 import { restoreAt } from '../../lib/optimistic';
+import { useSyncedRef } from '../../lib/useSyncedRef';
 
 // Re-signs each shown photograph before its own 1h signature expires, so a long-lived tab keeps its thumbnails.
 function useSignedUrlRefresh(
@@ -62,11 +58,19 @@ function withoutItems(loading: Set<string>, itemIds: string[]): Set<string> {
   return next;
 }
 
+// An item forgotten because its entry's delete committed stays forgotten.
+function updatingItem(
+  itemId: string,
+  update: (entries: ImageEntry[]) => ImageEntry[],
+) {
+  return (previous: Record<string, ImageEntry[]>) =>
+    Object.hasOwn(previous, itemId)
+      ? { ...previous, [itemId]: update(previous[itemId]) }
+      : previous;
+}
+
 /** The app's storage before the owner's quota: deleting her own photographs may not free enough of it. */
-function uploadErrorMessage(
-  error: unknown,
-  t: (key: TranslationKey) => string,
-): string {
+function uploadErrorMessage(error: unknown, t: Translate): string {
   if (isPhotoStorageFull(error)) return t('item_list.photo_storage_full_error');
   if (isQuotaExceeded(error)) return t('item_list.photo_quota_error');
   return t('item_list.upload_error');
@@ -83,11 +87,7 @@ export function useItemImages() {
   const [images, setImages] = useState<Record<string, ImageEntry[]>>({});
   // Distinct from "has no images", so a card doesn't grow an image region once pictures arrive.
   const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
-  const imagesRef = useRef(images);
-
-  useEffect(() => {
-    imagesRef.current = images;
-  }, [images]);
+  const imagesRef = useSyncedRef(images);
 
   // Hands entries back rather than storing them, so the caller can settle its own state in one render.
   const fetchItemImages = useCallback(async (itemId: string) => {
@@ -103,10 +103,7 @@ export function useItemImages() {
   }, []);
 
   const applyGroupedImages = useCallback(
-    async (
-      itemIds: string[],
-      grouped: Map<string, Map<string, ImageEntryData>>,
-    ) => {
+    async (itemIds: string[], grouped: EntryDataByItem) => {
       const perItem = itemIds.map(
         (itemId) => [itemId, grouped.get(itemId) ?? new Map()] as const,
       );
@@ -146,11 +143,14 @@ export function useItemImages() {
   );
 
   // The carousel's top-up: signs the photographs past the card's plates only once someone opens them.
-  const signAllFor = useCallback(async (itemId: string) => {
-    const entries = imagesRef.current[itemId] ?? [];
-    const signed = await signAllEntries([[itemId, entryDataOf(entries)]]);
-    setImages((previous) => ({ ...previous, ...signed }));
-  }, []);
+  const signAllFor = useCallback(
+    async (itemId: string) => {
+      const entries = imagesRef.current[itemId] ?? [];
+      const signed = await signAllEntries([[itemId, entryDataOf(entries)]]);
+      setImages((previous) => ({ ...previous, ...signed }));
+    },
+    [imagesRef],
+  );
 
   useSignedUrlRefresh(imagesRef, refreshAllImages);
 
@@ -162,11 +162,17 @@ export function useItemImages() {
           [itemId]: (previous[itemId] ?? 0) + 1,
         }));
         const userId = await verifiedUserId();
-        if (!userId) throw new Error(t('item_list.no_user_session'));
+        if (!userId) throw new Error('No user session');
 
-        const fullFile = await compressPhoto(file, 1000, encoding);
+        const fullFile = await compressPhoto(file, {
+          maxWidthOrHeight: 1000,
+          encoding,
+        });
         // From the already-downscaled full size; 600px covers strip cells and pair halves at 3x density.
-        const thumbnailFile = await compressPhoto(fullFile, 600, encoding);
+        const thumbnailFile = await compressPhoto(fullFile, {
+          maxWidthOrHeight: 600,
+          encoding,
+        });
 
         const base = crypto.randomUUID();
         const pathBase = `${imagePrefix(userId, itemId)}/${base}`;
@@ -217,9 +223,9 @@ export function useItemImages() {
     async (itemId: string, image: ImageEntry) => {
       if (!(await confirm(t('item_list.confirm_delete_image')))) return;
 
-      const index = (images[itemId] ?? []).findIndex(
-        (entry) => entry.id === image.id,
-      );
+      const shown = imagesRef.current[itemId] ?? [];
+      const index = shown.findIndex((entry) => entry.id === image.id);
+      const remaining = shown.filter((entry) => entry.id !== image.id);
       setImages((previous) => ({
         ...previous,
         [itemId]: (previous[itemId] || []).filter(
@@ -228,24 +234,18 @@ export function useItemImages() {
       }));
 
       const restore = () => {
-        setImages((previous) => {
-          // Forgotten once its entry's delete committed, which took this photograph with it.
-          if (!Object.hasOwn(previous, itemId)) return previous;
-          return {
-            ...previous,
-            [itemId]: restoreAt({ list: previous[itemId], index, item: image }),
-          };
-        });
+        setImages(
+          updatingItem(itemId, (list) =>
+            restoreAt({ list, index, item: image }),
+          ),
+        );
       };
 
       toast.success(t('item_list.delete_image_success'), {
-        action: { label: t('common.undo'), onClick: restore },
+        onUndo: restore,
         onExpire: async () => {
           const { error } = await removeObjectsThenRows({
-            paths: [
-              image.pathFull,
-              ...(image.pathThumb ? [image.pathThumb] : []),
-            ],
+            paths: entryPaths(image),
             deleteRows: () => deleteImageRow({ id: image.id, itemId }),
           });
           if (!error) return;
@@ -258,13 +258,29 @@ export function useItemImages() {
           restore();
         },
       });
+
+      // A delete moves the next photograph up, and one past the plates was never signed.
+      if (
+        remaining.slice(0, RENDERABLE_PLATES).some((entry) => !entry.urlFull)
+      ) {
+        const signed = await signEntries([[itemId, entryDataOf(remaining)]]);
+        const signedById = new Map(
+          signed[itemId].map((entry) => [entry.id, entry]),
+        );
+        // Merged by id, not replaced, so an Undo pressed while signing keeps its photograph.
+        setImages(
+          updatingItem(itemId, (entries) =>
+            entries.map((entry) => signedById.get(entry.id) ?? entry),
+          ),
+        );
+      }
     },
-    [confirm, t, toast, images],
+    [confirm, t, toast, imagesRef],
   );
 
   // The item row's cascade takes the images rows with it, so their paths are read before the delete.
   const captureItemImagePaths = useCallback(async (itemId: string) => {
-    const listed = await listImagePathsForItems([itemId]);
+    const listed = await listImagesForItems([itemId]);
     if (listed.error !== null) {
       throw new Error('Could not read image paths before delete', {
         cause: listed.error,

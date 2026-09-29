@@ -1,17 +1,13 @@
 import { expect, test } from './test';
 
+import { themeAttribute } from '../helpers';
+
 // The only place either is changed; the signed-out specs seed that storage.
 test.use({ locale: 'en-GB' });
 
-type Page = import('@playwright/test').Page;
-
-const themeAttribute = (page: Page) =>
-  page.evaluate(() => document.documentElement.getAttribute('data-theme'));
-
 test.describe('the account menu', () => {
   test.beforeEach(async ({ on, page }) => {
-    await page.goto('', { waitUntil: 'networkidle' });
-    await expect(on(page).categories.locators.selected).not.toBeEmpty();
+    await on(page).categories.do.load();
     await on(page).account.do.open();
   });
 

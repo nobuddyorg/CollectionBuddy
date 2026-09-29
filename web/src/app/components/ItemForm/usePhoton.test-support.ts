@@ -1,13 +1,10 @@
-import type { PhotonFeature } from './types';
+import type { PhotonFeature } from '../../data/photon';
 
-export function props(
+export function placeProperties(
   partial: Partial<PhotonFeature['properties']> = {},
 ): PhotonFeature['properties'] {
   return {
     osm_id: 1,
-    osm_type: 'N',
-    osm_key: 'place',
-    osm_value: 'city',
     ...partial,
   };
 }
@@ -17,7 +14,11 @@ export function feature(
   partial: Partial<PhotonFeature['properties']> = {},
 ): PhotonFeature {
   return {
-    properties: props({ osm_id, ...partial }),
+    properties: placeProperties({ osm_id, ...partial }),
     geometry: { type: 'Point', coordinates: [0, 0] },
   };
+}
+
+export function photonAnswer(features: PhotonFeature[] = []) {
+  return { ok: true, json: async () => ({ features }) };
 }

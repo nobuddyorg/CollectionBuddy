@@ -38,7 +38,6 @@ export function useExportCategory() {
   const { t, locale } = useI18n();
   const toast = useToast();
   const confirm = useConfirm();
-  // Null means not exporting; a separate boolean would be a second source of truth.
   const [progress, setProgress] = useState<ExportProgress | null>(null);
   // One controller per run, so Cancel always aborts the export actually in flight.
   const controllerRef = useRef<AbortController | null>(null);
@@ -95,7 +94,6 @@ export function useExportCategory() {
     [progress, t, locale, toast, confirm],
   );
 
-  // Not memoized: it goes straight onto a button in a component nothing memoizes.
   const cancelExport = () => {
     controllerRef.current?.abort();
   };
@@ -104,7 +102,6 @@ export function useExportCategory() {
   useBeforeUnloadGuard(progress !== null);
 
   return {
-    progress,
     isExporting: progress !== null,
     message: exportProgressMessage(progress, t),
     runExport,

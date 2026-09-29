@@ -1,10 +1,6 @@
-import { act, renderHook, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, renderHook } from '@testing-library/react';
 import { vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import { ToastProvider } from '../Toast/ToastProvider';
-import { ConfirmProvider } from '../Confirm/ConfirmProvider';
 import { verifiedUserId } from '../../data/auth';
 import {
   createImageRow,
@@ -12,19 +8,10 @@ import {
   listImagesForItems,
   uploadImageObject,
 } from '../../data/images';
+import { ToastConfirmWrapper } from '../providers.test-support';
 import { clearImageCache } from './imageCache';
 import { useItemImages } from './useItemImages';
 import type { ImageEntry } from './types';
-
-function wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <I18nProvider>
-      <ToastProvider>
-        <ConfirmProvider>{children}</ConfirmProvider>
-      </ToastProvider>
-    </I18nProvider>
-  );
-}
 
 export function row(id: string, itemId: string) {
   return {
@@ -82,7 +69,7 @@ export function installDefaultImageMocks() {
 }
 
 export function renderItemImages() {
-  return renderHook(() => useItemImages(), { wrapper });
+  return renderHook(() => useItemImages(), { wrapper: ToastConfirmWrapper });
 }
 
 export async function withOnePhotograph() {
@@ -95,8 +82,4 @@ export async function withOnePhotograph() {
     await hook.result.current.refreshAllImages(['item-1']);
   });
   return hook;
-}
-
-export async function acceptConfirmation() {
-  await userEvent.click(await screen.findByTestId('confirm-accept'));
 }

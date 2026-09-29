@@ -56,11 +56,15 @@ function summaryMarkdown({ flow, data, seeded }) {
   ].join('\n');
 }
 
-export function summarize({ flow, data, seeded = seedSize() }) {
-  const markdown = summaryMarkdown({ flow, data, seeded });
+export function reportFiles({ name, markdown, data }) {
   return {
     stdout: markdown,
-    [`load-results/${flow}.md`]: markdown,
-    [`load-results/${flow}.json`]: JSON.stringify(data, null, 2),
+    [`load-results/${name}.md`]: markdown,
+    [`load-results/${name}.json`]: JSON.stringify(data, null, 2),
   };
+}
+
+export function summarize({ flow, data, seeded = seedSize() }) {
+  const markdown = summaryMarkdown({ flow, data, seeded });
+  return reportFiles({ name: flow, markdown, data });
 }

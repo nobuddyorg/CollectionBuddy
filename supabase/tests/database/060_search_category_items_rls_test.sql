@@ -29,16 +29,13 @@ select is(
   'the owner finds a matching title in their own category'
 );
 
--- A satisfiable filter that matches nothing real still comes back empty,
--- not an error.
 select is(
   pg_temp.search_titles(:'category_id'::uuid, 'zzzznothing'),
   array[]::text[],
   'a term matching nothing returns an empty array, not an error'
 );
 
--- Called directly, the way anyone holding a session could: a real category
--- id that is not theirs, and a term known to match a real row in it.
+-- A real category id and a term that matches a row in it, so empty means refused, not absent.
 select pg_temp.auth_as(:'other_id'::uuid, 'search-test-other@collectionbuddy.test');
 select is(
   pg_temp.search_titles(:'category_id'::uuid, 'Silberdenar'),
@@ -59,8 +56,7 @@ select is(
   'an active viewer grant opens search on the shared category'
 );
 
--- Revoking closes it again, with the entry still there (TEST_STRATEGY.md
--- #7: both directions of a grant, asserted with the resource still present).
+-- Revocation closes search with the entry still present (TEST_STRATEGY.md §7 rule 7).
 select pg_temp.auth_as(:'owner_id'::uuid, 'search-test-owner@collectionbuddy.test');
 delete from public.category_shares where id = :'viewer_share_id'::uuid;
 
@@ -77,12 +73,7 @@ select is(
   'the entry itself was never touched by the revocation'
 );
 
--- The deliberate asymmetry (0006_policies.sql, and the editor-role rls
--- tests): has_category_write_access() bundles category ownership in,
--- has_category_read_access() does not, so owning the collection does not
--- reveal, through search, an entry an editor merely filed into it.
--- search_category_items must reproduce this, not widen past it as a side
--- effect of bypassing RLS for the trigram indexes.
+-- Bypassing RLS must not widen 0006's asymmetry: owning the collection reveals no editor-filed entry through search either.
 insert into public.category_shares (category_id, invited_email, role)
 values (:'category_id'::uuid, 'search-test-other@collectionbuddy.test', 'editor')
 returning id as editor_share_id \gset
@@ -93,8 +84,7 @@ returning id as editor_item_id \gset
 insert into public.item_categories (item_id, category_id)
 values (:'editor_item_id'::uuid, :'category_id'::uuid);
 
--- The editor itself finds its own filed entry -- i.user_id = auth.uid()
--- covers it even without a read grant of its own on the owner's category.
+-- i.user_id = auth.uid() covers the editor's own entry, grant or not.
 select is(
   pg_temp.search_titles(:'category_id'::uuid, 'Editor Entry'),
   array['Search Probe Editor Entry'],

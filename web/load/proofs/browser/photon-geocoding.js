@@ -3,9 +3,9 @@ import { browser } from 'k6/browser';
 import { check } from 'k6';
 import http from 'k6/http';
 import { Counter, Trend } from 'k6/metrics';
-import { setTimeout } from 'k6/timers';
 
 import { insertRows } from '../../lib/api.js';
+import { expectOk } from '../../lib/http.js';
 import { clearAccount } from '../../lib/seed.js';
 import { ANON_KEY, SUPABASE_URL } from '../../lib/target.js';
 import {
@@ -18,37 +18,19 @@ import {
 } from '../lib/fixtures.js';
 import { PROOF_TREND_STATS, measured, proofSummary } from '../lib/report.js';
 import { browserScenario, openAsDemoUser, reloadCatalogue } from './lib/app.js';
+import {
+  SLOW_RESPONSE_MS,
+  WATCH_LOADING_BADGE,
+  closeMap,
+  fakePhoton,
+  openMap,
+  settle,
+} from './lib/photon.js';
 
-const PHOTON = /photon\.komoot\.io\/api/;
 // usePlaces.tsx GEOCODE_CONCURRENCY.
 const WORKERS = 3;
 const PLACES = 12;
 const VIEWER_PLACES = 5;
-const SLOW_RESPONSE_MS = 3000;
-// The app fetches Photon cross-origin, so a faked answer without this header is blocked like a network error.
-const CORS = { 'Access-Control-Allow-Origin': '*' };
-const FEATURE = JSON.stringify({
-  type: 'FeatureCollection',
-  features: [
-    {
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [6.64, 49.75] },
-      properties: { name: 'Trier' },
-    },
-  ],
-});
-
-/** In-page clock for the map's loading badge, so its end and Photon's resource timings share performance.now(). */
-const WATCH_LOADING_BADGE = `
-  performance.setResourceTimingBufferSize(5000);
-  window.__proofBadgeGone = [];
-  let loading = false;
-  new MutationObserver(() => {
-    const now = Boolean(document.querySelector('[role="dialog"] [role="status"]'));
-    if (loading && !now) window.__proofBadgeGone.push(performance.now());
-    loading = now;
-  }).observe(document, { childList: true, subtree: true });
-`;
 
 const waitAfterFinal = new Trend('photon_wait_after_final_attempt_ms', true);
 const completedAfterClose = new Counter('photon_completed_after_close');
@@ -77,68 +59,6 @@ export const options = {
   },
 };
 
-function placeOf(url) {
-  return decodeURIComponent(/[?&]q=([^&]*)/.exec(url)[1].replace(/\+/g, ' '));
-}
-
-async function openMap(page) {
-  await page.evaluate(() => {
-    window.__proofBadgeGone = [];
-    window.__proofOpenedAt = performance.now();
-  });
-  await page.getByTestId('open-map').click();
-}
-
-async function closeMap(page) {
-  await page.getByTestId('dialog-close').click();
-}
-
-/** Waits until no Photon request has started for `quietMs`. */
-async function settle(page, log, quietMs = 5000) {
-  for (let last = log.length; ; last = log.length) {
-    await page.waitForTimeout(quietMs);
-    if (log.length === last) return;
-  }
-}
-
-/** Routes Photon to a fake whose behaviour `mode()` picks per request, and logs every request and how it ended. */
-async function fakePhoton(page, mode) {
-  const requests = [];
-  const outcomes = new Map();
-  await page.route(PHOTON, (route) => {
-    const answer = (status, body) =>
-      route.fulfill({
-        status,
-        contentType: 'application/json',
-        headers: CORS,
-        body,
-      });
-    if (mode.current === 'ok') return answer(200, FEATURE);
-    if (mode.current === 'slow') {
-      // After an abort the interception is gone; the late fulfill then rejects, which is the fixed behaviour, not an error.
-      setTimeout(() => answer(503, '{}').catch(() => {}), SLOW_RESPONSE_MS);
-      return undefined;
-    }
-    return answer(503, '{}');
-  });
-  page.on('request', (request) => {
-    if (PHOTON.test(request.url()))
-      requests.push({
-        at: Date.now(),
-        place: placeOf(request.url()),
-        mode: mode.current,
-        url: request.url(),
-      });
-  });
-  page.on('response', (response) => {
-    if (PHOTON.test(response.url())) outcomes.set(response.url(), 'completed');
-  });
-  page.on('requestfailed', (request) => {
-    if (PHOTON.test(request.url())) outcomes.set(request.url(), 'failed');
-  });
-  return { requests, outcomes };
-}
-
 async function ownerMap() {
   const context = await browser.newContext();
   await context.addInitScript(WATCH_LOADING_BADGE);
@@ -148,20 +68,18 @@ async function ownerMap() {
   let session;
   try {
     session = await openAsDemoUser(page);
-    seedOrClear([session], () =>
-      insertEntries({
-        session,
-        categoryId: newCategory(session, 'Proof: Photon'),
-        count: PLACES,
-        // Unlocated, hand-typed find spots: every one needs a geocode.
-        fields: (n) => ({
-          title: `Fund ${n}`,
-          description: 'ohne Koordinaten',
-          place: `Fundstelle ${n}`,
-          tags: ['boden'],
-        }),
+    insertEntries({
+      session,
+      categoryId: newCategory(session, 'Proof: Photon'),
+      count: PLACES,
+      // Unlocated, hand-typed find spots: every one needs a geocode.
+      fields: (n) => ({
+        title: `Fund ${n}`,
+        description: 'ohne Koordinaten',
+        place: `Fundstelle ${n}`,
+        tags: ['boden'],
       }),
-    );
+    });
     await reloadCatalogue(page);
 
     // Throttled: every attempt answers 503, so every place fails after three attempts and the map ends in its error state.
@@ -260,13 +178,16 @@ async function ownerMap() {
 async function viewerMap() {
   const owner = newCollector('photon-owner');
   const email = `proof-photon-viewer-${Date.now()}@collectionbuddy.test`;
-  const signup = http.post(
-    `${SUPABASE_URL}/auth/v1/signup`,
-    JSON.stringify({ email, password: crypto.randomUUID() }),
-    {
-      headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' },
-      tags: { name: 'viewer signup' },
-    },
+  const signup = expectOk(
+    http.post(
+      `${SUPABASE_URL}/auth/v1/signup`,
+      JSON.stringify({ email, password: crypto.randomUUID() }),
+      {
+        headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' },
+        tags: { name: 'viewer signup' },
+      },
+    ),
+    `signing up ${email}`,
   );
   // A local stack confirms sign-ups at once and answers with the whole session supabase-js stores.
   const readerSession = signup.json();

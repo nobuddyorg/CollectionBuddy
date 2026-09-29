@@ -3,6 +3,4 @@ export type CollectibleProps = {
   emoji: string;
   x: string;
   y: string;
-  size?: number;
-  className?: string;
 };

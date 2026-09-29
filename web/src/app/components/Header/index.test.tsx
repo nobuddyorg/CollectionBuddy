@@ -1,22 +1,8 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
-import Header from './index';
-
-function renderHeader() {
-  return render(
-    <I18nProvider>
-      <Header
-        user={{ email: 'collector@example.com' }}
-        onSignOut={vi.fn()}
-        onDeleteAccount={vi.fn()}
-        onOpenHelp={vi.fn()}
-      />
-    </I18nProvider>,
-  );
-}
+import { renderHeader } from './index.test-support';
 
 describe('Header', () => {
   // Same mark as the login page: an ink rule under "Collection", the accent on "Buddy".
@@ -59,16 +45,7 @@ describe('Header', () => {
   });
 
   it('falls back to the app name for the title when there is no email to show', () => {
-    render(
-      <I18nProvider>
-        <Header
-          user={{ email: '' }}
-          onSignOut={vi.fn()}
-          onDeleteAccount={vi.fn()}
-          onOpenHelp={vi.fn()}
-        />
-      </I18nProvider>,
-    );
+    renderHeader({ user: { email: '' } });
     expect(
       screen.getByRole('button', { name: 'Account menu' }),
     ).toHaveAttribute('title', 'CollectionBuddy');

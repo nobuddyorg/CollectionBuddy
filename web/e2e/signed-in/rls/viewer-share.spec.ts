@@ -1,17 +1,22 @@
 import { expect, test } from '../test';
 import { SEED, itemsIn } from '../fixtures';
-import { apiAs, context, ownedCategoryId, share, unshare } from './helpers';
+import {
+  apiAs,
+  context,
+  expiredWindow,
+  ownedCategoryId,
+  seededEntryId,
+  share,
+  unshare,
+  viewerShare,
+} from './helpers';
 
 // Münzen is a read-only fixture for the rest of the suite, so each case issues and revokes its own grant.
 test.describe('a category shared with another collector', () => {
   test('an active grant opens the category, its items, and their links -- nothing more', async () => {
     const { token, userId, otherToken } = context();
     const categoryId = await ownedCategoryId({ token, userId, name: 'Münzen' });
-    const shareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-    });
+    const shareId = await viewerShare(token, categoryId);
 
     try {
       const { data: seen } = await apiAs(otherToken)
@@ -49,15 +54,11 @@ test.describe('a category shared with another collector', () => {
   test('an expired grant is refused, exactly like no grant at all', async () => {
     const { token, userId, otherToken } = context();
     const categoryId = await ownedCategoryId({ token, userId, name: 'Münzen' });
-
-    // The check constraint only demands expires_at > created_at, so an already-expired grant is a legal row.
-    const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    const expiresAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const shareId = await share({
       token,
       categoryId,
       invitedEmail: SEED.other.email,
-      window: { createdAt, expiresAt },
+      window: expiredWindow(),
     });
 
     try {
@@ -75,13 +76,11 @@ test.describe('a category shared with another collector', () => {
   test('an expired grant opens no entry, link or map place either', async () => {
     const { token, userId, otherToken } = context();
     const categoryId = await ownedCategoryId({ token, userId, name: 'Münzen' });
-    const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    const expiresAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const shareId = await share({
       token,
       categoryId,
       invitedEmail: SEED.other.email,
-      window: { createdAt, expiresAt },
+      window: expiredWindow(),
     });
 
     try {
@@ -118,11 +117,7 @@ test.describe('a category shared with another collector', () => {
       name: 'Briefmarken',
     });
     const [sibling] = itemsIn('Briefmarken');
-    const shareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-    });
+    const shareId = await viewerShare(token, categoryId);
 
     try {
       const other = apiAs(otherToken);
@@ -218,11 +213,7 @@ test.describe('a category shared with another collector', () => {
   test('a viewer grant does not extend to writing', async () => {
     const { token, userId, otherToken } = context();
     const categoryId = await ownedCategoryId({ token, userId, name: 'Münzen' });
-    const shareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-    });
+    const shareId = await viewerShare(token, categoryId);
 
     try {
       const { data: renamed } = await apiAs(otherToken)
@@ -233,20 +224,18 @@ test.describe('a category shared with another collector', () => {
       expect(renamed).toEqual([]);
 
       // By a seeded Münzen title: an unordered pick could land where another spec holds an editor grant.
-      const { data: mine } = await apiAs(otherToken)
-        .from('items')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('title', itemsIn('Münzen')[0].title)
-        .single();
+      const itemId = await seededEntryId({
+        token: otherToken,
+        ownerId: userId,
+        title: itemsIn('Münzen')[0].title,
+      });
       const { data: updated } = await apiAs(otherToken)
         .from('items')
         .update({ title: 'taken over' })
-        .eq('id', mine!.id)
+        .eq('id', itemId)
         .select('id');
       expect(updated).toEqual([]);
 
-      // Untouched, read back as the owner.
       const { data: after } = await apiAs(token)
         .from('categories')
         .select('name')
@@ -269,11 +258,7 @@ test.describe('a category shared with another collector', () => {
       .select('id')
       .single();
     expect(insertError).toBeNull();
-    const shareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-    });
+    const shareId = await viewerShare(token, categoryId);
 
     try {
       const { error } = await viewer

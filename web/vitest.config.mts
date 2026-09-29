@@ -51,7 +51,6 @@ export default defineConfig({
         'src/app/login/useGoogleSignIn.ts',
         'src/app/login/useAuthRedirect.ts',
         'src/app/login/useDemoSignIn.ts',
-        'src/app/data/auth.ts',
         'src/app/components/Map/index.tsx',
       ],
       thresholds: {

@@ -1,6 +1,5 @@
 // One iteration of each journey a collector takes, in the order the app sends its requests.
 import { sleep } from 'k6';
-import encoding from 'k6/encoding';
 
 import {
   createImageRow,
@@ -14,21 +13,21 @@ import {
   signedUrlsOf,
   uploadObject,
 } from './api.js';
+import {
+  EXPORT_SIGNED_URL_TTL_SECONDS,
+  PHOTO_DOWNLOAD_CONCURRENCY,
+  SIGN_BATCH_SIZE,
+  SIGN_CONCURRENCY,
+} from './clientLimits.js';
 import { sendAll } from './http.js';
-import { TINY_WEBP_BASE64 } from './photos.js';
+import { TINY_WEBP, photoPaths } from './photos.js';
 import { SEARCH_TERMS } from './seed.js';
 
 // A reader's pause between screens; without it every VU is a tight loop no person produces.
 const THINK_SECONDS = 1;
-// The bucket accepts image/webp, and the bytes are not what is under test.
-const PHOTO = encoding.b64decode(TINY_WEBP_BASE64, 'std');
 
 // components/ItemList/imageEntries.ts RENDERABLE_PLATES: a card signs full size and thumbnail of its first five photographs.
-const RENDERABLE_PLATES = 5;
-// data/exportCategory.ts SIGN_BATCH_SIZE, SIGN_CONCURRENCY (= PHOTO_DOWNLOAD_CONCURRENCY) and EXPORT_SIGNED_URL_TTL_SECONDS.
-const EXPORT_SIGN_BATCH = 100;
-const EXPORT_CONCURRENCY = 6;
-const EXPORT_URL_TTL_SECONDS = 6 * 3600;
+export const RENDERABLE_PLATES = 5;
 
 function pick(values) {
   return values[Math.floor(Math.random() * values.length)];
@@ -41,17 +40,13 @@ function slices(values, size) {
   return result;
 }
 
+export function platePaths(images) {
+  return images.slice(0, RENDERABLE_PLATES).flatMap(photoPaths);
+}
+
 /** imageEntries.ts signEntries: one call for the page's cards, none for a page without photographs. */
 function signCards(session, items) {
-  const paths = items.flatMap((item) =>
-    item.images
-      .slice(0, RENDERABLE_PLATES)
-      .flatMap((image) =>
-        image.path_thumb
-          ? [image.path_full, image.path_thumb]
-          : [image.path_full],
-      ),
-  );
+  const paths = items.flatMap((item) => platePaths(item.images));
   if (paths.length) signUrls({ session, paths });
 }
 
@@ -105,21 +100,21 @@ export function exportArchive(session, categoryId) {
     after = page.next;
   } while (after);
 
-  const urls = slices(slices(paths, EXPORT_SIGN_BATCH), EXPORT_CONCURRENCY)
+  const urls = slices(slices(paths, SIGN_BATCH_SIZE), SIGN_CONCURRENCY)
     .flatMap((batches) =>
       sendAll(
         batches.map((batch) =>
           signUrlsRequest({
             session,
             paths: batch,
-            expiresIn: EXPORT_URL_TTL_SECONDS,
+            expiresIn: EXPORT_SIGNED_URL_TTL_SECONDS,
             name: 'export sign',
           }),
         ),
       ),
     )
     .flatMap(signedUrlsOf);
-  for (const downloads of slices(urls, EXPORT_CONCURRENCY)) {
+  for (const downloads of slices(urls, PHOTO_DOWNLOAD_CONCURRENCY)) {
     sendAll(downloads.map((url) => ({ url, name: 'export photo' })));
   }
   sleep(THINK_SECONDS);
@@ -143,13 +138,13 @@ export function write(session, categoryId) {
   if (created.status >= 300) return;
 
   const base = `${session.userId}/${itemId}/${crypto.randomUUID()}`;
-  uploadObject({ session, path: `${base}.webp`, bytes: PHOTO });
-  uploadObject({ session, path: `${base}.thumb.webp`, bytes: PHOTO });
+  uploadObject({ session, path: `${base}.webp`, bytes: TINY_WEBP });
+  uploadObject({ session, path: `${base}.thumb.webp`, bytes: TINY_WEBP });
   createImageRow(session, {
     item_id: itemId,
     path_full: `${base}.webp`,
     path_thumb: `${base}.thumb.webp`,
-    size_bytes: PHOTO.byteLength,
+    size_bytes: TINY_WEBP.byteLength,
   });
   sleep(THINK_SECONDS);
 }

@@ -3,10 +3,15 @@ import { SEED, itemsIn } from '../fixtures';
 import {
   apiAs,
   context,
+  editorShare,
+  entryFiledBy,
+  expiredWindow,
   ownedCategoryId,
   ownerEntryIn,
+  removeFiledEntry,
   share,
   unshare,
+  viewerShare,
 } from './helpers';
 
 // SECURITY DEFINER bypasses RLS, so the RPC's own read-access check is what any cat_id meets.
@@ -95,11 +100,7 @@ test.describe('search_category_items (the search RPC)', () => {
       userId,
       name: SEED.searchCategory,
     });
-    const shareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-    });
+    const shareId = await viewerShare(token, categoryId);
 
     try {
       const { titles, error } = await searchIn({
@@ -121,13 +122,11 @@ test.describe('search_category_items (the search RPC)', () => {
       userId,
       name: SEED.searchCategory,
     });
-    const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    const expiresAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const shareId = await share({
       token,
       categoryId,
       invitedEmail: SEED.other.email,
-      window: { createdAt, expiresAt },
+      window: expiredWindow(),
     });
 
     try {
@@ -151,11 +150,7 @@ test.describe('search_category_items (the search RPC)', () => {
       userId,
       name: SEED.searchCategory,
     });
-    const shareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-    });
+    const shareId = await viewerShare(token, categoryId);
 
     const opened = await searchIn({
       token: otherToken,
@@ -202,11 +197,7 @@ test.describe('search_category_items (the search RPC)', () => {
         })),
       );
     expect(photoError).toBeNull();
-    const shareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-    });
+    const shareId = await viewerShare(token, categoryId);
 
     // The RPC's own rows next to what a plain, RLS-scoped read hands the same identity.
     const carriedAndDirect = async (caller: string) => {
@@ -217,17 +208,18 @@ test.describe('search_category_items (the search RPC)', () => {
         page_to: 9,
       });
       expect(error).toBeNull();
-      const { data: direct } = await apiAs(caller)
+      const { data: direct, error: directError } = await apiAs(caller)
         .from('images')
         .select('id, item_id, path_full, path_thumb')
         .eq('item_id', itemId)
         .order('created_at')
         .order('id');
+      expect(directError).toBeNull();
       return {
         carried: (data ?? []).flatMap(
           (row: { images: unknown[] }) => row.images,
         ),
-        direct: direct ?? [],
+        direct,
       };
     };
 
@@ -249,30 +241,19 @@ test.describe('search_category_items (the search RPC)', () => {
 
   // The asymmetry editor-share.spec.ts asserts; the RPC must reproduce it despite bypassing RLS.
   test('owning the collection does not surface, through search, an entry the editor filed into it', async () => {
-    const { token, userId, otherToken, otherUserId } = context();
+    const { token, userId, otherToken } = context();
     const categoryId = await ownedCategoryId({
       token,
       userId,
       name: SEED.searchCategory,
     });
-    const shareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-      role: 'editor',
-    });
-
-    const { data: mine } = await apiAs(otherToken)
-      .from('items')
-      .insert({ user_id: otherUserId, title: 'rls-search-invisible-entry' })
-      .select('id')
-      .single();
+    const shareId = await editorShare(token, categoryId);
+    const itemId = await entryFiledBy(
+      { token: otherToken, categoryId },
+      'rls-search-invisible-entry',
+    );
 
     try {
-      await apiAs(otherToken)
-        .from('item_categories')
-        .insert({ item_id: mine!.id, category_id: categoryId });
-
       const { titles, error } = await searchIn({
         token,
         categoryId,
@@ -282,36 +263,31 @@ test.describe('search_category_items (the search RPC)', () => {
       expect(titles).toEqual([]);
     } finally {
       await unshare(token, shareId);
-      await apiAs(otherToken).from('items').delete().eq('id', mine!.id);
+      await removeFiledEntry({
+        token,
+        otherToken,
+        categoryId,
+        itemId,
+        paths: [],
+      });
     }
   });
 
   // i.user_id = auth.uid() covers the editor's own entry, though they hold no read grant on the category.
   test('an editor finds, through search, an entry it filed into the shared collection itself', async () => {
-    const { token, userId, otherToken, otherUserId } = context();
+    const { token, userId, otherToken } = context();
     const categoryId = await ownedCategoryId({
       token,
       userId,
       name: SEED.searchCategory,
     });
-    const shareId = await share({
-      token,
-      categoryId,
-      invitedEmail: SEED.other.email,
-      role: 'editor',
-    });
-
-    const { data: mine } = await apiAs(otherToken)
-      .from('items')
-      .insert({ user_id: otherUserId, title: 'rls-search-editor-own-entry' })
-      .select('id')
-      .single();
+    const shareId = await editorShare(token, categoryId);
+    const itemId = await entryFiledBy(
+      { token: otherToken, categoryId },
+      'rls-search-editor-own-entry',
+    );
 
     try {
-      await apiAs(otherToken)
-        .from('item_categories')
-        .insert({ item_id: mine!.id, category_id: categoryId });
-
       const { titles, error } = await searchIn({
         token: otherToken,
         categoryId,
@@ -321,7 +297,13 @@ test.describe('search_category_items (the search RPC)', () => {
       expect(titles).toContain('rls-search-editor-own-entry');
     } finally {
       await unshare(token, shareId);
-      await apiAs(otherToken).from('items').delete().eq('id', mine!.id);
+      await removeFiledEntry({
+        token,
+        otherToken,
+        categoryId,
+        itemId,
+        paths: [],
+      });
     }
   });
 });

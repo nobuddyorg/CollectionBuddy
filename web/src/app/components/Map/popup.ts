@@ -1,14 +1,18 @@
 // Built as DOM, not markup: every string is user-entered, so each is set via `textContent`, never parsed.
-export const popupContent = (
-  text: string,
-  titles?: string[],
-  countLabel?: string,
-): HTMLDivElement => {
+export const popupContent = ({
+  popupText,
+  titles = [],
+  countLabel,
+}: {
+  popupText: string;
+  titles?: string[];
+  countLabel?: string;
+}): HTMLDivElement => {
   const element = document.createElement('div');
 
   const heading = document.createElement('p');
   heading.className = 'font-display text-sm font-bold';
-  heading.textContent = text;
+  heading.textContent = popupText;
   element.appendChild(heading);
 
   if (countLabel) {
@@ -18,7 +22,7 @@ export const popupContent = (
     element.appendChild(count);
   }
 
-  if (titles?.length) {
+  if (titles.length) {
     // Scrolls rather than truncates: the cap is on the popup's height, not on how many titles it names.
     const list = document.createElement('ul');
     list.className = 'mt-1.5 max-h-40 overflow-y-auto list-disc pl-4';
