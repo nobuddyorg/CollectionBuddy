@@ -80,4 +80,4 @@ CollectionBuddy is a personal hobby project and doesn't accept outside pull requ
 
 This project is licensed under the MIT License.
 
-The optional background removal uses third-party components under their own licenses, none of them copyleft: the [ISNet](https://github.com/xuebinqin/DIS) segmentation model (Apache-2.0), in the ONNX export published by [rembg](https://github.com/danielgatis/rembg) (MIT), run by [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (MIT). It deliberately does not use `@imgly/background-removal`, which is AGPL-3.0 (a commercial license is available from IMG.LY): see [design decisions](docs/explanation/design-decisions.md#why-background-removal-runs-isnet-in-a-worker-and-not-imglybackground-removal).
+The optional background removal downloads the [ISNet](https://github.com/xuebinqin/DIS) segmentation model (Apache-2.0), in the ONNX export published by [rembg](https://github.com/danielgatis/rembg) (MIT).
