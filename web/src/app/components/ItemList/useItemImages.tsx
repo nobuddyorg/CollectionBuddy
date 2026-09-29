@@ -1,5 +1,11 @@
 'use client';
-import { useCallback, useEffect, useState, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { verifiedUserId } from '../../data/auth';
 import {
   createImageRow,
@@ -25,7 +31,7 @@ import {
   RENDERABLE_PLATES,
   signAllEntries,
   signEntries,
-  type EntryDataByItem,
+  withoutRows,
 } from './imageEntries';
 import { extensionForType, type PhotoEncoding } from '../../data/photoType';
 import { compressPhoto } from '../../lib/imageCompression';
@@ -88,6 +94,8 @@ export function useItemImages() {
   // Distinct from "has no images", so a card doesn't grow an image region once pictures arrive.
   const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
   const imagesRef = useSyncedRef(images);
+  // Like useItemMutations' list, and kept after the commit: a listing in flight may still carry the row.
+  const pendingDeleteIds = useRef(new Set<string>());
 
   // Hands entries back rather than storing them, so the caller can settle its own state in one render.
   const fetchItemImages = useCallback(async (itemId: string) => {
@@ -96,14 +104,19 @@ export function useItemImages() {
       console.error('Failed to list images', listed.error);
       return undefined;
     }
-    const grouped = groupImageRows(listed.data);
+    const grouped = groupImageRows(
+      withoutRows(listed.data, pendingDeleteIds.current),
+    );
     const entryData = grouped.get(itemId) ?? new Map();
     const signed = await signEntries([[itemId, entryData]]);
     return signed[itemId];
   }, []);
 
-  const applyGroupedImages = useCallback(
-    async (itemIds: string[], grouped: EntryDataByItem) => {
+  const applyImageRows = useCallback(
+    async (itemIds: string[], rows: ImageListRow[]) => {
+      const grouped = groupImageRows(
+        withoutRows(rows, pendingDeleteIds.current),
+      );
       const perItem = itemIds.map(
         (itemId) => [itemId, grouped.get(itemId) ?? new Map()] as const,
       );
@@ -128,18 +141,18 @@ export function useItemImages() {
         setLoadingItems((previous) => withoutItems(previous, itemIds));
         return;
       }
-      await applyGroupedImages(itemIds, groupImageRows(listed.data));
+      await applyImageRows(itemIds, listed.data);
     },
-    [applyGroupedImages],
+    [applyImageRows],
   );
 
   // For rows the page read already carried: signing is all that's left.
   const showImages = useCallback(
     async (itemIds: string[], rows: ImageListRow[]) => {
       setLoadingItems((previous) => new Set([...previous, ...itemIds]));
-      await applyGroupedImages(itemIds, groupImageRows(rows));
+      await applyImageRows(itemIds, rows);
     },
-    [applyGroupedImages],
+    [applyImageRows],
   );
 
   // The carousel's top-up: signs the photographs past the card's plates only once someone opens them.
@@ -226,6 +239,7 @@ export function useItemImages() {
       const shown = imagesRef.current[itemId] ?? [];
       const index = shown.findIndex((entry) => entry.id === image.id);
       const remaining = shown.filter((entry) => entry.id !== image.id);
+      pendingDeleteIds.current.add(image.id);
       setImages((previous) => ({
         ...previous,
         [itemId]: (previous[itemId] || []).filter(
@@ -234,6 +248,7 @@ export function useItemImages() {
       }));
 
       const restore = () => {
+        pendingDeleteIds.current.delete(image.id);
         setImages(
           updatingItem(itemId, (list) =>
             restoreAt({ list, index, item: image }),
