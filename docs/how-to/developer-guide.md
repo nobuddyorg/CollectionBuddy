@@ -300,16 +300,16 @@ both reports, and why the hosted target stays off — is in
 
 ## Replay a property-test failure
 
-Five functions with adversarial input carry fast-check properties beside their
+Four functions with adversarial input carry fast-check properties beside their
 example tests (`*.property.test.ts`: the search filter, the CSV cell, the ZIP
-timestamp, the page range; `lib/photoDimensions.test.ts`: the photo fit).
-Every run uses one fixed seed from `vitest.setup.ts`, so a failure reproduces
-as it stands. A failure prints its seed and a shrunk counterexample; to replay
-a different seed, or explore new inputs:
+timestamp, the page range). Every run uses one fixed seed from
+`vitest.setup.ts`, so a failure reproduces as it stands. A failure prints its
+seed and a shrunk counterexample; to replay a different seed, or explore new
+inputs:
 
 ```bash
 cd web
-FC_SEED=12345 npx vitest run property photoDimensions
+FC_SEED=12345 npx vitest run property
 ```
 
 ## Run Opengrep

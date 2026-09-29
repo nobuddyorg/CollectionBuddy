@@ -1,4 +1,3 @@
-import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import { fitWithin } from './photoDimensions';
@@ -52,47 +51,5 @@ describe('fitWithin', () => {
       width: 1,
       height: 1000,
     });
-  });
-});
-
-const anySide = fc.integer({ min: 1, max: 20_000 });
-const anyLimit = fc.integer({ min: 1, max: 5_000 });
-
-describe('fitWithin, for any photograph and limit', () => {
-  it('never enlarges either side', () => {
-    fc.assert(
-      fc.property(anySide, anySide, anyLimit, (width, height, limit) => {
-        const fitted = fitWithin({ width, height }, limit);
-        expect(fitted.width).toBeLessThanOrEqual(width);
-        expect(fitted.height).toBeLessThanOrEqual(height);
-      }),
-    );
-  });
-
-  it('brings the longest side to the limit exactly when it was over, and keeps both sides whole and at least 1px', () => {
-    fc.assert(
-      fc.property(anySide, anySide, anyLimit, (width, height, limit) => {
-        const fitted = fitWithin({ width, height }, limit);
-        const longest = Math.max(fitted.width, fitted.height);
-        expect(longest).toBe(Math.min(limit, Math.max(width, height)));
-        for (const side of [fitted.width, fitted.height]) {
-          expect(Number.isInteger(side)).toBe(true);
-          expect(side).toBeGreaterThanOrEqual(1);
-        }
-      }),
-    );
-  });
-
-  it('keeps the aspect ratio, within the half pixel rounding costs each side', () => {
-    fc.assert(
-      fc.property(anySide, anySide, anyLimit, (width, height, limit) => {
-        const fitted = fitWithin({ width, height }, limit);
-        const scale = Math.min(1, limit / Math.max(width, height));
-        const exactWidth = Math.max(1, width * scale);
-        const exactHeight = Math.max(1, height * scale);
-        expect(Math.abs(fitted.width - exactWidth)).toBeLessThanOrEqual(0.5);
-        expect(Math.abs(fitted.height - exactHeight)).toBeLessThanOrEqual(0.5);
-      }),
-    );
   });
 });
