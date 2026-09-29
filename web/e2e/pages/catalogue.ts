@@ -1,7 +1,8 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
-import { initConfirm } from './dialogs';
-import { initEntryForm } from './entry-form';
+// Extensions spelled out: scripts/lighthouse-collector.ts loads this file under plain Node, which resolves no bare paths.
+import { initConfirm } from './dialogs.ts';
+import { initEntryForm } from './entry-form.ts';
 
 interface Catalogue {
   (): Locator;
