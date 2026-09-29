@@ -2,6 +2,7 @@
 import { act, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { refuseStorage } from '../lib/browserStorage.test-support';
 import { I18nProvider, type TranslationKey } from './I18nProvider';
 import { useI18n } from './useI18n';
 
@@ -98,16 +99,11 @@ describe('I18nProvider', () => {
 
   it('still follows the browser when reading the stored language throws', () => {
     localStorage.setItem('lang', 'de');
-    const getItem = vi
-      .spyOn(Storage.prototype, 'getItem')
-      .mockImplementation(() => {
-        throw new Error('storage disabled');
-      });
+    refuseStorage('getItem');
     vi.stubGlobal('navigator', { language: 'en-GB', languages: ['en-GB'] });
     renderProbe();
 
     expect(screen.getByTestId('lang')).toHaveTextContent('en');
-    getItem.mockRestore();
   });
 
   it("formats in the browser's regional form of the app language", () => {
@@ -150,9 +146,7 @@ describe('I18nProvider', () => {
   it('still switches the language, without an error, when storing the choice throws', async () => {
     localStorage.setItem('lang', 'en');
     renderProbe();
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('storage disabled');
-    });
+    refuseStorage('setItem');
     // React reports an event handler's throw as a window error event, not to the caller of click().
     const reportedErrors: unknown[] = [];
     const collectError = (event: ErrorEvent) => {

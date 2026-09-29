@@ -6,12 +6,7 @@ import {
   removeStoredValue,
   writeStoredValue,
 } from './browserStorage';
-
-function refuseStorageMethod(method: 'getItem' | 'setItem' | 'removeItem') {
-  vi.spyOn(Storage.prototype, method).mockImplementation(() => {
-    throw new DOMException('blocked', 'SecurityError');
-  });
-}
+import { refuseStorage } from './browserStorage.test-support';
 
 function refuseStorageAccess() {
   vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
@@ -54,19 +49,19 @@ describe('browser storage', () => {
   describe('when a storage call throws', () => {
     it('reads nothing', () => {
       window.localStorage.setItem('key', 'value');
-      refuseStorageMethod('getItem');
+      refuseStorage('getItem');
 
       expect(readStoredValue('key')).toBeNull();
     });
 
     it('writes nothing, without an error', () => {
-      refuseStorageMethod('setItem');
+      refuseStorage('setItem');
 
       expect(() => writeStoredValue('key', 'value')).not.toThrow();
     });
 
     it('removes nothing, without an error', () => {
-      refuseStorageMethod('removeItem');
+      refuseStorage('removeItem');
 
       expect(() => removeStoredValue('key')).not.toThrow();
     });

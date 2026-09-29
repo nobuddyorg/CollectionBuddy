@@ -268,7 +268,7 @@ describe('listImagesForItems', () => {
     expect(error).toBeNull();
     expect(data).toEqual([photo('item-1', 0)]);
     expect(calls).toEqual([firstPage(['item-1'])]);
-    expect(columns()).toBe('item_id, path_full, path_thumb, created_at, id');
+    expect(columns()).toBe('id, item_id, path_full, path_thumb, created_at');
   });
 
   // Oldest first, id breaking a same-instant tie: this puts an item's first photograph in its hero slot.

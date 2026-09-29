@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { refuseStorage } from './lib/browserStorage.test-support';
 import {
   THEME_MEDIA_QUERY,
   THEME_STORAGE_KEY,
@@ -175,12 +176,6 @@ describe('useTheme', () => {
 });
 
 describe('useTheme with storage that refuses access', () => {
-  function refuseStorage(method: 'getItem' | 'setItem' | 'removeItem') {
-    vi.spyOn(Storage.prototype, method).mockImplementation(() => {
-      throw new DOMException('blocked', 'SecurityError');
-    });
-  }
-
   beforeEach(() => {
     localStorage.clear();
   });
@@ -260,9 +255,7 @@ describe('detectTheme', () => {
 
   it('still follows the OS when reading storage throws', () => {
     mockMatchMedia(true);
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new DOMException('blocked', 'SecurityError');
-    });
+    refuseStorage('getItem');
 
     expect(detectTheme()).toBe('dark');
   });

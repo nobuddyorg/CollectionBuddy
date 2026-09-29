@@ -118,7 +118,7 @@ function rawSelectImagesPage({
 }) {
   let query = supabase
     .from('images')
-    .select('item_id, path_full, path_thumb, created_at, id')
+    .select(`${IMAGE_LIST_SELECT}, created_at`)
     .in('item_id', itemIds);
   if (after) {
     query = afterKeyset(query, {

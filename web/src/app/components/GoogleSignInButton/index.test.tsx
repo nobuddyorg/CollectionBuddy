@@ -6,10 +6,11 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
 import GoogleSignInButton from './index';
+import type { GoogleSignInButtonProps } from './types';
 
 function renderButton(
   props: Partial<React.ComponentProps<typeof GoogleSignInButton>> = {},
@@ -51,11 +52,8 @@ describe('GoogleSignInButton', () => {
     expect(screen.getByRole('button')).not.toBeDisabled();
   });
 
-  it('will not compile without onError, so no caller can swallow a rejected sign-in', () => {
-    // @ts-expect-error -- onError is required so a rejected sign-in cannot be swallowed
-    const withoutOnError = <GoogleSignInButton onClick={() => undefined} />;
-
-    expect(withoutOnError.props).not.toHaveProperty('onError');
+  it('requires onError at the type level, so no caller can swallow a rejected sign-in', () => {
+    expectTypeOf<GoogleSignInButtonProps['onError']>().not.toBeNullable();
   });
 
   // Nothing clears `loading` on success, so a bfcache restore would leave the overlay stuck.
