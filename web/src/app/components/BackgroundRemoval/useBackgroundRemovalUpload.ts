@@ -1,17 +1,13 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import type { PhotoEncoding } from '../../data/photoType';
+import type { PhotoUpload } from '../../data/photoType';
 import { useI18n } from '../../i18n/useI18n';
 import { useSyncedRef } from '../../lib/useSyncedRef';
 import { useToast } from '../Toast/ToastProvider';
 import { readBackgroundRemovalEnabled } from './useBackgroundRemovalPreference';
 
-type Upload = (
-  itemId: string,
-  file: File,
-  encoding?: PhotoEncoding,
-) => Promise<void>;
+type Upload = (itemId: string, photo: PhotoUpload) => Promise<void>;
 
 export type PendingCutout = { itemId: string; file: File };
 
@@ -28,7 +24,7 @@ export function useBackgroundRemovalUpload(upload: Upload) {
 
   const pickPhoto = (itemId: string, file: File) => {
     if (!readBackgroundRemovalEnabled()) {
-      void latest.current.upload(itemId, file);
+      void latest.current.upload(itemId, { file });
       return;
     }
     if (!file.type.startsWith('image/')) {
@@ -45,13 +41,13 @@ export function useBackgroundRemovalUpload(upload: Upload) {
       setPending(null);
       if (pending === null || choice.kind === 'cancel') return;
       if (choice.kind === 'original') {
-        void upload(pending.itemId, pending.file);
+        void upload(pending.itemId, { file: pending.file });
         return;
       }
       const cutout = new File([choice.blob], 'cutout.png', {
         type: 'image/png',
       });
-      void upload(pending.itemId, cutout, 'transparent');
+      void upload(pending.itemId, { file: cutout, encoding: 'transparent' });
     },
     [pending, upload],
   );

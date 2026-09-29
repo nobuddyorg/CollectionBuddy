@@ -36,6 +36,14 @@ export function pageImageRowsFor(
   return pageImages?.itemIdsKey === itemIdsKey ? pageImages.rows : null;
 }
 
+/** Drops rows whose delete is pending or done, so a re-list read before it commits can't bring them back. */
+export function withoutRows(
+  rows: ImageListRow[],
+  deletedIds: ReadonlySet<string>,
+): ImageListRow[] {
+  return rows.filter((row) => !deletedIds.has(row.id));
+}
+
 // Query order is preserved per item, which keeps the first photograph in the hero slot.
 export function groupImageRows(rows: ImageListRow[]): EntryDataByItem {
   const byItem: EntryDataByItem = new Map();

@@ -15,6 +15,7 @@ import {
   signEntries,
   STRIP_MAX,
   toImageEntries,
+  withoutRows,
   type ImageEntryData,
 } from './imageEntries';
 
@@ -31,6 +32,23 @@ function sevenPhotos(): Map<string, ImageEntryData> {
     ]),
   );
 }
+
+describe('withoutRows', () => {
+  const rowFor = (id: string) => ({
+    id,
+    item_id: 'item-1',
+    path_full: `p/1/${id}.webp`,
+    path_thumb: null,
+  });
+
+  it('drops only the rows whose id is listed, keeping the order of the rest', () => {
+    const result = withoutRows(
+      [rowFor('a'), rowFor('b'), rowFor('c')],
+      new Set(['b']),
+    );
+    expect(result.map((row) => row.id)).toEqual(['a', 'c']);
+  });
+});
 
 describe('groupImageRows', () => {
   it("groups a row by item, keyed by the row's own id", () => {

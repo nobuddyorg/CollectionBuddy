@@ -79,7 +79,7 @@ describe('the catalogue grid', () => {
     const file = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
     await userEvent.upload(screen.getByLabelText('Add image'), file);
 
-    expect(uploadImage).toHaveBeenCalledWith('item-1', file);
+    expect(uploadImage).toHaveBeenCalledWith('item-1', { file: file });
   });
 
   it('deletes the entry the delete button belongs to', async () => {

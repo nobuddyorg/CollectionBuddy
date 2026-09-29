@@ -57,7 +57,7 @@ describe('useBackgroundRemovalUpload', () => {
 
     act(() => result.current.pickPhoto('item-1', photo));
 
-    expect(upload).toHaveBeenCalledWith('item-1', photo);
+    expect(upload).toHaveBeenCalledWith('item-1', { file: photo });
     expect(result.current.pending).toBeNull();
     expect(load.loadBackgroundRemoval).not.toHaveBeenCalled();
     expect(load.loadCutoutReview).not.toHaveBeenCalled();
@@ -108,7 +108,7 @@ describe('useBackgroundRemovalUpload', () => {
 
     act(() => result.current.choose({ kind: 'original' }));
 
-    expect(upload).toHaveBeenCalledWith('item-1', photo);
+    expect(upload).toHaveBeenCalledWith('item-1', { file: photo });
     expect(result.current.pending).toBeNull();
   });
 
@@ -120,10 +120,9 @@ describe('useBackgroundRemovalUpload', () => {
 
     act(() => result.current.choose({ kind: 'cut-out', blob }));
 
-    const [itemId, file, encoding] = upload.mock.calls[0] as unknown as [
+    const [itemId, { file, encoding }] = upload.mock.calls[0] as unknown as [
       string,
-      File,
-      string,
+      { file: File; encoding: string },
     ];
     expect(itemId).toBe('item-1');
     expect(file).toBeInstanceOf(File);

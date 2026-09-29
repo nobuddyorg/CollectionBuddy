@@ -100,4 +100,5 @@ export const MUTATE_TARGETS = [
   'src/app/components/BackgroundRemoval/modelPreload.ts',
   'src/app/components/BackgroundRemoval/useBackgroundRemovalUpload.ts',
   'src/app/components/BackgroundRemoval/useCutoutJob.ts',
+  'src/app/components/BackgroundRemoval/downloadPercent.ts',
 ];
