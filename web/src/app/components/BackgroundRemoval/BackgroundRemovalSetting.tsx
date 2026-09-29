@@ -3,6 +3,7 @@
 import { useId, useState } from 'react';
 import Icon, { IconType } from '../Icon';
 import { useI18n } from '../../i18n/useI18n';
+import { downloadPercent } from './downloadPercent';
 import { preloadModel, usePreloadState } from './modelPreload';
 import { useBackgroundRemovalPreference } from './useBackgroundRemovalPreference';
 
@@ -17,13 +18,11 @@ function PreloadControl() {
     );
   }
   if (state.status === 'downloading') {
-    const percent =
-      state.total > 0
-        ? Math.min(100, Math.round((state.loaded / state.total) * 100))
-        : 0;
     return (
       <p role="status" data-testid="model-status" className="text-xs">
-        {t('background_removal.preload_progress', { percent })}
+        {t('background_removal.preload_progress', {
+          percent: downloadPercent(state),
+        })}
       </p>
     );
   }

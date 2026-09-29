@@ -68,10 +68,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage(
-        'item-1',
-        new File(['x'], 'photo.jpg', { type: 'image/jpeg' }),
-      );
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'photo.jpg', { type: 'image/jpeg' }),
+      });
     });
 
     // The thumbnail is derived from the already-downscaled full size.
@@ -98,7 +97,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'p.jpg'),
+      });
     });
 
     const [[pathFull, full], [pathThumb, thumbnail]] = vi.mocked(
@@ -114,10 +115,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage(
-        'item-1',
-        new File(['x'], 'photo.jpg', { type: 'image/jpeg' }),
-      );
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'photo.jpg', { type: 'image/jpeg' }),
+      });
     });
 
     expect(encodings).toEqual(['opaque', 'opaque']);
@@ -128,11 +128,10 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage(
-        'item-1',
-        new File(['x'], 'cutout.png', { type: 'image/png' }),
-        'transparent',
-      );
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'cutout.png', { type: 'image/png' }),
+        encoding: 'transparent',
+      });
     });
 
     expect(encodings).toEqual(['transparent', 'transparent']);
@@ -149,7 +148,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage('item-1', new File(['x'], 'p.gif'));
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'p.gif'),
+      });
     });
 
     expect(uploadImageObject).not.toHaveBeenCalled();
@@ -169,7 +170,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'p.jpg'),
+      });
     });
 
     expect(createImageRow).toHaveBeenCalledWith(
@@ -187,7 +190,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'p.jpg'),
+      });
     });
 
     expect(consoleWarn).not.toHaveBeenCalled();
@@ -201,7 +206,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'p.jpg'),
+      });
     });
 
     expect(createImageRow).not.toHaveBeenCalled();
@@ -221,7 +228,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'p.jpg'),
+      });
     });
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -240,7 +249,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'p.jpg'),
+      });
     });
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -255,7 +266,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'p.jpg'),
+      });
     });
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -271,7 +284,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'p.jpg'),
+      });
     });
 
     expect(uploadImageObject).not.toHaveBeenCalled();
@@ -292,7 +307,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'p.jpg'),
+      });
     });
 
     expect(result.current.images['item-1']).toEqual([]);
@@ -306,7 +323,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'p.jpg'),
+      });
     });
 
     expect(result.current.images['item-1']).toEqual([]);
@@ -323,7 +342,9 @@ describe('useItemImages uploadImage', () => {
     const { result } = renderItemImages();
 
     await act(async () => {
-      await result.current.uploadImage('item-1', new File(['x'], 'p.jpg'));
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'p.jpg'),
+      });
     });
 
     expect(consoleError).toHaveBeenCalledWith(

@@ -303,8 +303,7 @@ describe('analyzeMask', () => {
     expect(count(mask)).toBe(49);
   });
 
-  // Each notch touches exactly one edge, so only that edge's seeds can tell it from a hole.
-  // Plain it() in a loop, not it.each: Stryker's per-test filter never matches an it.each title.
+  // One notch per edge, so only that edge's seeds tell it from a hole; a loop, as Stryker cannot filter it.each.
   for (const [edge, x, y] of [
     ['top', 2, 0],
     ['bottom', 2, 4],

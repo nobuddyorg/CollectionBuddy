@@ -78,10 +78,9 @@ describe('useItemImages re-listing around a photograph delete', () => {
     const { result } = await deletedInsideUndoWindow();
 
     await act(async () => {
-      await result.current.uploadImage(
-        'item-1',
-        new File(['x'], 'photo.jpg', { type: 'image/jpeg' }),
-      );
+      await result.current.uploadImage('item-1', {
+        file: new File(['x'], 'photo.jpg', { type: 'image/jpeg' }),
+      });
     });
 
     expect(result.current.images['item-1']).toEqual([

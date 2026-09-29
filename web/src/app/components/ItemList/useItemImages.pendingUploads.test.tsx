@@ -60,8 +60,12 @@ describe('useItemImages pending upload count', () => {
     );
 
     act(() => {
-      void result.current.uploadImage('item-1', new File(['x'], 'a.jpg'));
-      void result.current.uploadImage('item-1', new File(['y'], 'b.jpg'));
+      void result.current.uploadImage('item-1', {
+        file: new File(['x'], 'a.jpg'),
+      });
+      void result.current.uploadImage('item-1', {
+        file: new File(['y'], 'b.jpg'),
+      });
     });
     await waitFor(() =>
       expect(result.current.pendingUploads['item-1']).toBe(2),
@@ -92,7 +96,9 @@ describe('useItemImages pending upload count', () => {
     );
 
     act(() => {
-      void result.current.uploadImage('item-1', new File(['x'], 'a.jpg'));
+      void result.current.uploadImage('item-1', {
+        file: new File(['x'], 'a.jpg'),
+      });
     });
     await waitFor(() =>
       expect(result.current.pendingUploads['item-1']).toBe(1),
@@ -100,7 +106,9 @@ describe('useItemImages pending upload count', () => {
 
     // A second upload for the same item runs to completion while the first is still held open.
     await act(async () => {
-      await result.current.uploadImage('item-1', new File(['y'], 'b.jpg'));
+      await result.current.uploadImage('item-1', {
+        file: new File(['y'], 'b.jpg'),
+      });
     });
 
     expect(result.current.pendingUploads['item-1']).toBe(1);
@@ -122,14 +130,18 @@ describe('useItemImages pending upload count', () => {
     );
 
     act(() => {
-      void result.current.uploadImage('item-1', new File(['x'], 'a.jpg'));
+      void result.current.uploadImage('item-1', {
+        file: new File(['x'], 'a.jpg'),
+      });
     });
     await waitFor(() =>
       expect(result.current.pendingUploads['item-1']).toBe(1),
     );
 
     await act(async () => {
-      await result.current.uploadImage('item-2', new File(['y'], 'b.jpg'));
+      await result.current.uploadImage('item-2', {
+        file: new File(['y'], 'b.jpg'),
+      });
     });
     expect(result.current.pendingUploads['item-2']).toBeUndefined();
 

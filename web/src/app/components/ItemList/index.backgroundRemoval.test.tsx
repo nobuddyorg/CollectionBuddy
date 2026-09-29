@@ -3,6 +3,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { PhotoUpload } from '../../data/photoType';
 import {
   defaultImagesState,
   item,
@@ -49,7 +50,9 @@ vi.mock('../../lib/backgroundRemoval', async (importActual) => ({
 const photo = new File(['jpeg'], 'coin.jpg', { type: 'image/jpeg' });
 
 function renderWithUpload() {
-  const uploadImage = vi.fn(async () => {});
+  const uploadImage = vi.fn<
+    (itemId: string, photo: PhotoUpload) => Promise<void>
+  >(async () => {});
   useItemImagesMock.mockReturnValue({ ...defaultImagesState(), uploadImage });
   renderList();
   return uploadImage;
@@ -84,7 +87,7 @@ describe('ItemList background removal', () => {
 
     await pickPhoto();
 
-    expect(uploadImage).toHaveBeenCalledWith('1', photo);
+    expect(uploadImage).toHaveBeenCalledWith('1', { file: photo });
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(load.loadCutoutReview).not.toHaveBeenCalled();
     expect(load.loadBackgroundRemoval).not.toHaveBeenCalled();
@@ -107,7 +110,7 @@ describe('ItemList background removal', () => {
     await userEvent.click(
       within(dialog).getByRole('button', { name: 'Keep original' }),
     );
-    expect(uploadImage).toHaveBeenCalledWith('1', photo);
+    expect(uploadImage).toHaveBeenCalledWith('1', { file: photo });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -130,10 +133,10 @@ describe('ItemList background removal', () => {
     await vi.waitFor(() => expect(use).toBeEnabled());
     await userEvent.click(use);
 
-    expect(uploadImage).toHaveBeenCalledWith(
-      '1',
-      expect.objectContaining({ type: 'image/png' }),
-      'transparent',
-    );
+    expect(uploadImage).toHaveBeenCalledOnce();
+    const [itemId, { file, encoding }] = uploadImage.mock.calls[0];
+    expect(itemId).toBe('1');
+    expect(file.type).toBe('image/png');
+    expect(encoding).toBe('transparent');
   });
 });

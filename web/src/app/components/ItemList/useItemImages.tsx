@@ -33,7 +33,7 @@ import {
   signEntries,
   withoutRows,
 } from './imageEntries';
-import { extensionForType, type PhotoEncoding } from '../../data/photoType';
+import { extensionForType, type PhotoUpload } from '../../data/photoType';
 import { compressPhoto } from '../../lib/imageCompression';
 import { restoreAt } from '../../lib/optimistic';
 import { useSyncedRef } from '../../lib/useSyncedRef';
@@ -168,7 +168,7 @@ export function useItemImages() {
   useSignedUrlRefresh(imagesRef, refreshAllImages);
 
   const uploadImage = useCallback(
-    async (itemId: string, file: File, encoding: PhotoEncoding = 'opaque') => {
+    async (itemId: string, { file, encoding = 'opaque' }: PhotoUpload) => {
       try {
         setPendingUploads((previous) => ({
           ...previous,

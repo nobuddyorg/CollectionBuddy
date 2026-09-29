@@ -19,6 +19,9 @@ const TYPE_BY_EXTENSION: Record<string, StoredPhotoType> = {
 /** `transparent` for a cut-out, whose see-through background JPEG would fill in white. */
 export type PhotoEncoding = 'opaque' | 'transparent';
 
+/** A photo on its way to an entry; `opaque` unless it is a cut-out. */
+export type PhotoUpload = { file: File; encoding?: PhotoEncoding };
+
 /** WebP where the canvas can encode it; elsewhere JPEG, or PNG where transparency must survive. Both the bucket accepts. */
 export function encodingFor(
   probedType: string,

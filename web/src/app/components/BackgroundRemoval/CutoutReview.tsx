@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useI18n } from '../../i18n/useI18n';
-import { buttonClasses } from '../ui/buttonClasses';
+import { buttonClasses, filledButtonClasses } from '../ui/buttonClasses';
 import { Spinner } from '../ui/Spinner';
 import type { CutoutChoice } from './useBackgroundRemovalUpload';
 import { useCutoutJob, type CutoutJob } from './useCutoutJob';
@@ -137,7 +137,10 @@ export default function CutoutReview({
               ? () => onChoose({ kind: 'cut-out', blob: job.cutout.blob })
               : undefined
           }
-          className="min-h-11 px-4 rounded-sm bg-primary text-primary-foreground font-label text-xs hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+          className={filledButtonClasses(
+            'primary',
+            'disabled:opacity-40 disabled:cursor-not-allowed transition-opacity',
+          )}
         >
           {t('background_removal.use_cutout')}
         </button>

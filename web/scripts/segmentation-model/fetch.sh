@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Puts the background removal model where the app serves it: public/models/ (docs/how-to/developer-guide.md#the-background-removal-model).
-# ISNet (DIS, Apache-2.0), as rembg exports it to ONNX, converted to float16: half the download, the same mask.
+# ISNet (Apache-2.0, rembg's ONNX export) as float16 into public/models/: docs/how-to/developer-guide.md#the-background-removal-model.
 set -euo pipefail
 
 cd "$(dirname "$0")"
