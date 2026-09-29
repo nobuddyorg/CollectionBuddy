@@ -1,6 +1,6 @@
 import { encodingFor, type PhotoEncoding } from '../data/photoType';
-import type { CompressionAnswer } from './compressPhoto.worker';
 import { type CompressionRequest, drawFitted } from './drawPhoto';
+import type { CompressionAnswer } from './photo.worker';
 
 const QUALITY = 0.8;
 
@@ -17,10 +17,10 @@ function probeWebpEncoding(): Promise<string> {
 }
 
 function compressInWorker(request: CompressionRequest): Promise<Blob> {
-  const worker = new Worker(
-    new URL('./compressPhoto.worker.ts', import.meta.url),
-    { type: 'module' },
-  );
+  // Turbopack passes a worker's chunks in its URL fragment, which Chrome reuses across workers of one bootstrap, so every photo job shares one entry.
+  const worker = new Worker(new URL('./photo.worker.ts', import.meta.url), {
+    type: 'module',
+  });
   const answered = new Promise<Blob>((resolve, reject) => {
     worker.addEventListener(
       'message',
@@ -88,6 +88,7 @@ export async function compressPhoto(
 ): Promise<File> {
   probedEncoding ??= probeWebpEncoding();
   const request: CompressionRequest = {
+    kind: 'compress',
     file,
     maxWidthOrHeight,
     type: encodingFor(await probedEncoding, encoding),

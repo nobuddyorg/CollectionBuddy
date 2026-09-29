@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CompressionAnswer } from './compressPhoto.worker';
+import type { CompressionAnswer } from './photo.worker';
 
 type WorkerReply = (worker: FakeWorker) => void;
 
-/** Stands in for the compression worker: records what it is sent and replies as the test says. */
+/** Stands in for the photo worker: records what it is sent and replies as the test says. */
 class FakeWorker {
   static started: FakeWorker[] = [];
   static reply: WorkerReply = () => {};
@@ -99,18 +99,24 @@ describe('compressPhoto, where a worker can draw', () => {
 
     expect(FakeWorker.started).toHaveLength(1);
     expect(FakeWorker.started[0].sent).toEqual([
-      { file: input, maxWidthOrHeight: 1000, type: 'image/webp', quality: 0.8 },
+      {
+        kind: 'compress',
+        file: input,
+        maxWidthOrHeight: 1000,
+        type: 'image/webp',
+        quality: 0.8,
+      },
     ]);
   });
 
-  it('starts the worker as a module from its own file, which the bundler emits beside the app', async () => {
+  it('starts the one photo worker as a module, which the bundler emits beside the app', async () => {
     canvasEncodes(encodesAsAsked);
     const compressPhoto = await freshCompressPhoto();
 
     await compressPhoto(photo(), { maxWidthOrHeight: 1000 });
 
     const [worker] = FakeWorker.started;
-    expect(worker.url.pathname).toMatch(/\/compressPhoto\.worker\.ts$/);
+    expect(worker.url.pathname).toMatch(/\/photo\.worker\.ts$/);
     expect(worker.options).toEqual({ type: 'module' });
   });
 

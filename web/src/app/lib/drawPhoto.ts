@@ -2,6 +2,8 @@ import { type Dimensions, fitWithin } from './photoDimensions';
 
 /** One compression: the photograph, the longest side it may keep, and the encoding asked for. */
 export type CompressionRequest = {
+  /** Tells it apart from a cut-out in the one photo worker. */
+  kind: 'compress';
   file: Blob;
   maxWidthOrHeight: number;
   type: string;

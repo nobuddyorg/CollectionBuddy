@@ -163,6 +163,42 @@ test.describe('background removal', () => {
     }
   });
 
+  // Turbopack boots every worker from one script whose URL fragment Chrome reuses, so the first photo job must not decide the next.
+  test('still cuts out a photo after a plain upload in the same page', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const app = on(page);
+    await serveStandInModel(page);
+    const plainTitle = uniqueName('Erst mit Hintergrund');
+    const cutoutTitle = uniqueName('Dann ohne Hintergrund');
+    try {
+      await app.catalogue.do.addEntry(plainTitle);
+      const plainCard = app.catalogue.card(plainTitle);
+      await plainCard.do.uploadPhoto(PHOTO);
+      await expect(plainCard.locators.images).toBeVisible({ timeout: ARRIVES });
+
+      await turnOnBackgroundRemoval(app, page);
+      await app.catalogue.do.addEntry(cutoutTitle);
+      const cutoutCard = app.catalogue.card(cutoutTitle);
+      await cutoutCard.do.uploadPhoto(
+        await itemPhoto(page, testInfo.outputPath('item.png')),
+      );
+
+      const review = app.backgroundRemoval;
+      await expect(review.locators.cutout).toBeVisible({ timeout: ARRIVES });
+      await review.do.useCutout();
+
+      await expect(review()).toHaveCount(0);
+      await expect(cutoutCard.locators.images).toBeVisible({
+        timeout: ARRIVES,
+      });
+    } finally {
+      await removeEntriesTitled(plainTitle);
+      await removeEntriesTitled(cutoutTitle);
+    }
+  });
+
   test('downloads the model ahead of time only when asked to', async ({
     on,
     page,

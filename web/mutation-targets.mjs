@@ -17,6 +17,7 @@ export const MUTATE_TARGETS = [
   'src/app/lib/localDate.ts',
   'src/app/lib/photoDimensions.ts',
   'src/app/lib/drawPhoto.ts',
+  'src/app/lib/compressOffscreen.ts',
   'src/app/lib/browserStorage.ts',
   'src/app/lib/env.ts',
   'src/app/components/CategorySelect/useExportCategory.tsx',

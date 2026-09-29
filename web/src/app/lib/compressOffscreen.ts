@@ -1,9 +1,9 @@
 import { type CompressionRequest, drawFitted } from './drawPhoto';
 
-/** The worker's one answer: the encoded photograph, or why there is none. */
-export type CompressionAnswer = { blob: Blob } | { error: string };
-
-async function compress(request: CompressionRequest): Promise<Blob> {
+/** The photograph decoded, fitted and encoded as asked, on an OffscreenCanvas: the photo worker's compression. */
+export async function compressOffscreen(
+  request: CompressionRequest,
+): Promise<Blob> {
   // Upright as EXIF says: every browser with OffscreenCanvas in workers (Safari from 16.4) applies it here.
   const bitmap = await createImageBitmap(request.file);
   try {
@@ -20,17 +20,3 @@ async function compress(request: CompressionRequest): Promise<Blob> {
     bitmap.close();
   }
 }
-
-function answer(message: CompressionAnswer): void {
-  self.postMessage(message);
-}
-
-self.addEventListener(
-  'message',
-  ({ data }: MessageEvent<CompressionRequest>) => {
-    compress(data).then(
-      (blob) => answer({ blob }),
-      (error: unknown) => answer({ error: String(error) }),
-    );
-  },
-);
