@@ -50,7 +50,6 @@ select pg_temp.auth_as(gen_random_uuid(), '  MiXed.Case@Collectionbuddy.TEST  ')
 select is(public.caller_email(), 'mixed.case@collectionbuddy.test',
   'caller_email lowercases and trims the JWT email claim');
 
--- tg_items_normalize, exercised through a real insert.
 select gen_random_uuid() as owner_id \gset
 select pg_temp.auth_as(:'owner_id'::uuid, 'functions-test@collectionbuddy.test');
 
