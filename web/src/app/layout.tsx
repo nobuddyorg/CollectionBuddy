@@ -53,8 +53,8 @@ const CONTENT_SECURITY_POLICY = [
   `img-src 'self' data: ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org`,
   `connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io`,
   `font-src 'self'`,
-  // browser-image-compression always starts its worker from a blob: URL; script-src 'self' governs what that worker imports.
-  `worker-src 'self' blob:`,
+  // Set apart from script-src: the one worker, photo compression, is a chunk of the export, never a blob: URL.
+  `worker-src 'self'`,
   `object-src 'none'`,
   `base-uri 'self'`,
   `form-action 'self'`,

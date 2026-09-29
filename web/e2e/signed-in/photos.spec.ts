@@ -33,7 +33,7 @@ async function storedNames(item: StoredItem) {
 // The logo's 414x341 PNG is ~210 KB; WebP or JPEG at 80% comes in far below, a PNG re-encode does not.
 const COMPRESSED_CEILING_BYTES = 100_000;
 
-// Safari's canvas cannot encode WebP and answers with PNG (MDN browser-compat-data); no Worker keeps the patch on the encoder's thread.
+// Safari's canvas cannot encode WebP and answers with PNG (MDN browser-compat-data); the patch cannot reach into a worker.
 function emulateSafariCanvas() {
   const asSafari = (type?: string) =>
     type === 'image/webp' ? 'image/png' : type;
@@ -45,28 +45,25 @@ function emulateSafariCanvas() {
   HTMLCanvasElement.prototype.toDataURL = function (type, quality) {
     return toDataURL.call(this, asSafari(type), quality);
   };
-  const convertToBlob = OffscreenCanvas.prototype.convertToBlob;
-  OffscreenCanvas.prototype.convertToBlob = function (options) {
-    return convertToBlob.call(this, {
-      ...options,
-      type: asSafari(options?.type),
-    });
-  };
-  Object.defineProperty(window, 'Worker', { value: undefined });
 }
 
-type WorkerAnswers = { files: number; errors: number };
+// Safari before 16.4 has no OffscreenCanvas, so the app encodes on the patched main-thread canvas instead.
+function removeOffscreenCanvas() {
+  Object.defineProperty(window, 'OffscreenCanvas', { value: undefined });
+}
 
-// browser-image-compression's worker posts back the compressed file, or {error} when it cannot import the library.
+type WorkerAnswers = { photographs: number; errors: number };
+
+// The compression worker posts back {blob}, or {error} when it cannot compress.
 function countCompressionWorkerAnswers() {
-  const answers: WorkerAnswers = { files: 0, errors: 0 };
+  const answers: WorkerAnswers = { photographs: 0, errors: 0 };
   Object.assign(window, { compressionWorkerAnswers: answers });
   const NativeWorker = window.Worker;
   window.Worker = class extends NativeWorker {
     constructor(...args: ConstructorParameters<typeof Worker>) {
       super(...args);
       this.addEventListener('message', ({ data }) => {
-        if (data?.file) answers.files++;
+        if (data?.blob) answers.photographs++;
         if (data?.error) answers.errors++;
       });
       this.addEventListener('error', () => answers.errors++);
@@ -160,12 +157,14 @@ test.describe('photographs', () => {
     }
   });
 
-  // A worker whose import the CSP refuses fails quietly and the library compresses on the main thread instead.
-  test('it is compressed off the main thread, in a worker that loads its library from the app', async ({
+  // A phone photograph takes seconds to compress; on the main thread that freezes the page.
+  test('it is compressed off the main thread, in a worker the app serves from its own origin', async ({
     on,
     page,
   }) => {
     const app = on(page);
+    const workerUrls: string[] = [];
+    page.on('worker', (worker) => workerUrls.push(worker.url()));
     await page.addInitScript(countCompressionWorkerAnswers);
     await app.categories.do.open(SEED.photoCategory);
 
@@ -184,44 +183,67 @@ test.describe('photographs', () => {
             .compressionWorkerAnswers,
       );
       // One worker for the full size, one for the thumbnail.
-      expect(answers).toEqual({ files: 2, errors: 0 });
-    } finally {
-      await removeEntriesTitled(title);
-    }
-  });
-
-  test('where the browser cannot encode WebP, it is stored as JPEG and named so', async ({
-    on,
-    page,
-  }) => {
-    const app = on(page);
-    const { token, userId } = context();
-    await page.addInitScript(emulateSafariCanvas);
-    await app.categories.do.open(SEED.photoCategory);
-
-    const title = uniqueName('Safari');
-    try {
-      await app.catalogue.do.addEntry(title);
-      const card = app.catalogue.card(title);
-      const itemId = await itemIdTitled(token, title);
-      await card.do.uploadPhoto(PHOTO);
-      await expect(card.locators.images).toBeVisible({
-        timeout: PHOTO_ARRIVES,
-      });
-
-      const stored = await storedFiles({ token, userId, itemId });
-      expect(stored.map(({ name }) => name).sort()).toEqual([
-        expect.stringMatching(/^[0-9a-f-]+\.jpg$/),
-        expect.stringMatching(/^[0-9a-f-]+\.thumb\.jpg$/),
-      ]);
-      for (const file of stored) {
-        expect(file.type).toBe('image/jpeg');
-        expect(file.bytes).toBeLessThan(COMPRESSED_CEILING_BYTES);
+      expect(answers).toEqual({ photographs: 2, errors: 0 });
+      await expect.poll(() => workerUrls).toHaveLength(2);
+      const appOrigin = new URL(page.url()).origin;
+      for (const workerUrl of workerUrls) {
+        const { origin, pathname } = new URL(workerUrl);
+        expect(origin).toBe(appOrigin);
+        expect(pathname).toMatch(/\/_next\/static\/chunks\/[^/]+\.js$/);
       }
     } finally {
       await removeEntriesTitled(title);
     }
   });
+
+  for (const { safari, emulations, workers } of [
+    {
+      safari: 'Safari 16.4 on, in a worker',
+      emulations: [emulateSafariCanvas],
+      workers: 2,
+    },
+    {
+      safari: 'Safari before 16.4, on the main thread',
+      emulations: [emulateSafariCanvas, removeOffscreenCanvas],
+      workers: 0,
+    },
+  ]) {
+    test(`where the browser cannot encode WebP, it is stored as JPEG and named so (${safari})`, async ({
+      on,
+      page,
+    }) => {
+      const app = on(page);
+      const { token, userId } = context();
+      const workerUrls: string[] = [];
+      page.on('worker', (worker) => workerUrls.push(worker.url()));
+      for (const emulation of emulations) await page.addInitScript(emulation);
+      await app.categories.do.open(SEED.photoCategory);
+
+      const title = uniqueName('Safari');
+      try {
+        await app.catalogue.do.addEntry(title);
+        const card = app.catalogue.card(title);
+        const itemId = await itemIdTitled(token, title);
+        await card.do.uploadPhoto(PHOTO);
+        await expect(card.locators.images).toBeVisible({
+          timeout: PHOTO_ARRIVES,
+        });
+
+        await expect.poll(() => workerUrls).toHaveLength(workers);
+        const stored = await storedFiles({ token, userId, itemId });
+        expect(stored.map(({ name }) => name).sort()).toEqual([
+          expect.stringMatching(/^[0-9a-f-]+\.jpg$/),
+          expect.stringMatching(/^[0-9a-f-]+\.thumb\.jpg$/),
+        ]);
+        for (const file of stored) {
+          expect(file.type).toBe('image/jpeg');
+          expect(file.bytes).toBeLessThan(COMPRESSED_CEILING_BYTES);
+        }
+      } finally {
+        await removeEntriesTitled(title);
+      }
+    });
+  }
 
   test('a second photograph joins the first rather than replacing it', async ({
     on,

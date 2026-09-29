@@ -41,12 +41,11 @@ describe('the Content-Security-Policy meta tag in layout.tsx', () => {
     );
   });
 
-  it('allows a worker to be created from a blob: URL', () => {
-    expect(policy).toContain(`worker-src 'self' blob:`);
+  it("starts workers from the app's own files only, never a blob: URL", () => {
+    expect(policy).toContain("`worker-src 'self'`,");
   });
 
-  // A blob: worker inherits this policy, so a CDN here would run third-party code over every photo uploaded.
-  it("loads scripts, a worker's imports included, from the app's own origin only", () => {
+  it("loads scripts from the app's own origin only", () => {
     expect(policy).toContain("`script-src 'self' 'unsafe-inline'`,");
   });
 

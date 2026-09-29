@@ -19,7 +19,7 @@ const sources = [
     : []),
 ];
 
-// browser-image-compression never upscales; adaptive filtering is what browsers' PNG encoders do by default.
+// compressPhoto() never upscales; adaptive filtering is what browsers' PNG encoders do by default.
 const ENCODE = {
   webp: (image) => image.webp({ quality: 80 }),
   png: (image) => image.png({ adaptiveFiltering: true }),
