@@ -153,9 +153,9 @@ Pinning segment 1 would have closed the hole and left a strict subset of `"updat
 
 ## Why Safari uploads JPEG instead of WebP
 
-WebKit's canvas has no WebP encoder: `toBlob`, `toDataURL` and `OffscreenCanvas.convertToBlob` answer an `image/webp` request with PNG, silently (MDN browser-compat-data, `type_parameter_webp`: Safari `false`, iOS mirrors it). `browser-image-compression` passes that PNG through, so Safari and every iOS browser stored roughly 10x the bytes under a `.webp` name, and every viewer downloaded them.
+WebKit's canvas has no WebP encoder: `toBlob`, `toDataURL` and `OffscreenCanvas.convertToBlob` answer an `image/webp` request with PNG, silently (MDN browser-compat-data, `type_parameter_webp`: Safari `false`, iOS mirrors it). `browser-image-compression`, the compressor the app used then, passed that PNG through, so Safari and every iOS browser stored roughly 10x the bytes under a `.webp` name, and every viewer downloaded them.
 
-`lib/imageCompression.ts` now encodes a 1x1 canvas as WebP once per session and asks for JPEG at the same quality when the answer is anything else; JPEG is about 1.3x WebP's bytes, not 12x. The path is named after the type the encoder actually returned (`data/photoType.ts`), so a name never lies about its bytes. The bucket already accepted all three types, and no policy, trigger, constraint or the orphan sweep reads the extension, so no migration was needed. Objects uploaded before the fix keep their PNG bytes under a `.webp` name. CI has no WebKit project; `e2e/signed-in/photos.spec.ts` emulates WebKit's canvas in Chromium instead, and `web/load/proofs/browser/safari-webp.js` proves the same with k6.
+`lib/imageCompression.ts` now encodes a 1x1 canvas as WebP once per session and asks for JPEG at the same quality when the answer is anything else; JPEG is about 1.3x WebP's bytes, not 12x. The path is named after the type the encoder actually returned (`data/photoType.ts`), so a name never lies about its bytes. The bucket already accepted all three types, and no policy, trigger, constraint or the orphan sweep reads the extension, so no migration was needed. Objects uploaded before the fix keep their PNG bytes under a `.webp` name. CI has no WebKit project; `e2e/signed-in/photos.spec.ts` emulates WebKit's canvas in Chromium instead, twice: compressing in the worker, as Safari 16.4 on does, and with `OffscreenCanvas` and `createImageBitmap` removed, on the main thread, as before 16.4. `web/load/proofs/browser/safari-webp.js` proves the main-thread case with k6.
 
 ## Why an entry is created with its link in one request
 
@@ -225,13 +225,13 @@ The 3-character minimum before a search fires, in every script, is about the ind
 
 ## Why mutation testing is scoped to a list of files
 
-Line coverage answers "did this run," not "would a real bug here have been caught." For presentational components and hooks that mostly orchestrate Supabase calls, the gap barely matters. It matters a lot for pure functions doing string and boundary construction — the search term's ILIKE escaping, pagination windows, ZIP date packing, CSV formula-injection guards, retry/backoff arithmetic — where a test can execute every line and assert nothing. The list is [`web/mutation-targets.mjs`](../../web/mutation-targets.mjs), shared with `vitest.config.mts`'s per-file coverage floors so the two cannot drift; each entry's own comment says what it guards.
+Line coverage answers "did this run," not "would a real bug here have been caught." For presentational components and hooks that mostly orchestrate Supabase calls, the gap barely matters. It matters a lot for pure functions doing string and boundary construction — the search term's ILIKE escaping, pagination windows, ZIP date packing, CSV formula-injection guards, retry/backoff arithmetic — where a test can execute every line and assert nothing. The list is [`web/mutation-targets.mjs`](../../web/mutation-targets.mjs), shared with `vitest.config.mts`'s per-file coverage floors so the two cannot drift.
 
 Mutating the whole `src/app` tree would mean JSX and Tailwind class strings too: thousands of near-equivalent mutants, a multi-minute run, and a score that means nothing. A scoped run finishes in seconds and produces a number worth acting on, which is why CI runs it on every PR rather than only on `main` — learning after the merge that a test asserts nothing is learning it too late.
 
 ### Incremental on pull requests, full on `main`
 
-Stryker's incremental mode (#714) reuses a mutant's previous result when neither the mutated code nor the tests that covered it changed, diffing both against `web/reports/stryker-incremental.json`. What it cannot see is everything else: a module a target imports without being on the list itself (`supabase.ts`, `data/auth.ts`, the i18n, toast and confirm providers), a test helper, a dependency bump. So CI keys the cached file on `package-lock.json` and the Stryker and Vitest config, and a change there starts from nothing; and `main` runs with `--force`, rerunning every mutant, so the dashboard score is always a full run and `main`'s file is the one every PR restores. A PR that only changes a non-target module a target depends on can pass on a reused result. `main`'s run is where that surfaces, and `npm run test:mutation -- --force` reproduces it locally.
+Stryker's incremental mode (#714) reuses a mutant's previous result when neither the mutated code nor the tests that covered it changed, diffing both against `web/reports/stryker-incremental.json`. What it cannot see is everything else: a module a target imports without being on the list itself (`supabase.ts`, `data/auth.ts`, `i18n/useI18n.ts`, the toast and confirm providers), a test helper, a dependency bump. So CI keys the cached file on `package-lock.json` and the Stryker and Vitest config, and a change there starts from nothing; and `main` runs with `--force`, rerunning every mutant, so the dashboard score is always a full run and `main`'s file is the one every PR restores. A PR that only changes a non-target module a target depends on can pass on a reused result. `main`'s run is where that surfaces, and `npm run test:mutation -- --force` reproduces it locally.
 
 ### No suppressions
 
@@ -243,19 +243,23 @@ React compares a dependency array against the **previous render's** array elemen
 
 Where the memoization those lists guard was not load-bearing, it is gone — callbacks handed straight to elements nothing memoizes earned nothing from `useCallback`. What remains is where identity really is a contract: a mount-only `useEffect`, or a callback another hook lists in its own dependencies. Those survive, deliberately unsuppressed, so the report keeps showing them.
 
-The other class is the **timeout**, which Stryker counts as a kill. Most were avoidable and the fixes were worth having: counters replaced by iteration over the thing being counted (`chunk()`, `attempts()`, the pool's shared iterator); page fakes backed by a finite table so a walk that asks for one page too many gets nothing instead of spinning; and `timeoutMS` raised to 20 s, since with the 5 s default a mutant covered by a few hundred tests was reported as a timeout after failing seven of them honestly. Four remain, each a mutant whose only effect is non-termination: two in `excludePendingDeletes`, whose job is returning the same reference when nothing changed (break that and the effect reading it re-renders for ever — the bug the line prevents), and the one unbounded walk each in `readAllPages` and `readAllKeysetPages`, which cannot know how many pages they need.
+The other class is the **timeout**, which Stryker counts as a kill. Most were avoidable and the fixes were worth having: counters replaced by iteration over the thing being counted (`chunk()`, the pool's shared iterator); page fakes backed by a finite table so a walk that asks for one page too many gets nothing instead of spinning; and `timeoutMS` raised to 20 s, since with the 5 s default a mutant covered by a few hundred tests was reported as a timeout after failing seven of them honestly. Four remain, each a mutant whose only effect is non-termination: two in `excludePendingDeletes`, whose job is returning the same reference when nothing changed (break that and the effect reading it re-renders for ever — the bug the line prevents), and the one unbounded walk each in `readAllPages` and `readAllKeysetPages`, which cannot know how many pages they need.
 
-## Why four functions have property tests
+## Why five functions have property tests
 
-`likePatternFor`, `csvCell`, `dosDateTime` and `clampPage`/`pageRange` take
-input that is adversarial or unbounded (any search term, any user text, any
-date, any page and total), and each has a property that is easy to state: the
-ILIKE pattern always matches the term literally, with no wildcard but its own;
-a CSV cell always parses back to the text, apostrophe-guarded exactly when it
-would start a formula; a DOS timestamp always decodes to a valid date and
-clamps rather than wraps; a page range always holds an entry when there is
-one. The generic playbook adopts property testing only after a near-miss;
-these were adopted at the maintainer's request (#616) without one. They run
+`likePatternFor`, `csvCell`, `dosDateTime`, `clampPage`/`pageRange` and
+`fitWithin` take input that is adversarial or unbounded (any search term, any
+user text, any date, any page and total, any photograph size), and each has a
+property that is easy to state: the ILIKE pattern always matches the term
+literally, with no wildcard but its own; a CSV cell always parses back to the
+text, apostrophe-guarded exactly when it would start a formula; a DOS
+timestamp always decodes to a valid date and clamps rather than wraps; a page
+range always holds an entry when there is one; a fitted photograph is never
+enlarged, keeps whole sides of at least 1 px and its aspect ratio within
+rounding. The generic playbook adopts property testing only after a
+near-miss; the first four were adopted at the maintainer's request (#616)
+without one, and `fitWithin`'s came with the in-repo compressor that replaced
+`browser-image-compression`, also without one. They run
 seeded and deterministic, with one dependency (`fast-check`), beside the
 example tests, in about two seconds. Everything else keeps example tests
 alone: small, enumerable inputs gain nothing from generated ones.
@@ -284,7 +288,7 @@ Postgres 17 plans a SQL function's body without its argument values, so `categor
 GitHub Pages sends no cache headers the app controls, so the worker (#333) makes the content-hashed `_next/static/**` files cache-first. It used to serve the HTML stale-while-revalidate too, and every deploy replaces the whole Pages site, so the first visit after a deploy ran the previous build's HTML and runtime. Its lazy chunks (the entry form, the map, the image compressor, and since #782 the export and import code) were cached only if that user had opened them before; otherwise they 404'd, and with no error boundary Next's English "This page couldn't load" replaced the app until a reload (#742). Every merge deploys, so this could happen to every user once per deploy.
 
 - **Network-first for pages.** The HTML now always matches the chunks the server has. It costs one round trip per navigation, the same as having no worker, while the hashed assets that dominate the bytes stay cache-first. The cache is used only when the network fails, which keeps the app opening offline.
-- **One reload for a missing chunk.** A tab left open across a deploy still runs the old build. `error.tsx` reloads once on a `ChunkLoadError` and refuses a second reload within 30 s, so a chunk that stays missing shows a reload button rather than a loop. A failed `import('browser-image-compression')` during an upload is not a render error: it stays a toast, because the same compressor runs inside a collection import, which a reload would abort. So does a failed load of the export or import code, which starts on the Export or Import click.
+- **One reload for a missing chunk.** A tab left open across a deploy still runs the old build. `error.tsx` reloads once on a `ChunkLoadError` and refuses a second reload within 30 s, so a chunk that stays missing shows a reload button rather than a loop. A compression worker whose chunk is gone is not a render error: its error event rejects the compression, which stays a toast, because the same compression runs inside a collection import, which a reload would abort. So does a failed load of the export or import code, which starts on the Export or Import click.
 - **One cache per build.** The cache name was fixed and `sw.js` never changed between deploys, so no new worker ever activated and old builds' assets stayed forever. The registration URL now names the build, so each deploy installs a worker with its own cache and deletes the previous ones. Pruning old builds' chunks is safe only because pages are network-first; the one-reload recovery covers a tab that outlives it. The prefix filter matters because every project page of an account shares one Pages origin, and with it Cache Storage ([why the origin matters](#why-the-origin-is-a-trust-boundary)).
 
 `web/load/proofs/browser/sw-deploy.sh` proves the deploy scenario with two real builds swapped mid-run.
