@@ -33,7 +33,9 @@ describe('importCategory with no thumbnailer injected', () => {
     });
 
     expect(result.photoCount).toBe(1);
-    expect(compress).toHaveBeenCalledWith(expect.any(File), 600);
+    expect(compress).toHaveBeenCalledWith(expect.any(File), {
+      maxWidthOrHeight: 600,
+    });
     // The archive only carries the full size, so the thumbnail comes from the bytes in it.
     const [file] = compress.mock.calls[0] as unknown as [File];
     expect(file.type).toBe('image/webp');

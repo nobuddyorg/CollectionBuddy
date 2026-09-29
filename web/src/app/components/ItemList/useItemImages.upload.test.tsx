@@ -35,20 +35,31 @@ vi.mock('../../data/images', async () => {
 
 // The real one probes a canvas and needs a Worker; this stand-in records the sizes asked for and encodes each as `encodedAs` says.
 const compressions: number[] = [];
+const encodings: (string | undefined)[] = [];
 let encodedAs: Record<number, string> = {};
 vi.mock('../../lib/imageCompression', () => ({
-  compressPhoto: vi.fn(async (file: File, maxWidthOrHeight: number) => {
-    compressions.push(maxWidthOrHeight);
-    return new File([`compressed-${maxWidthOrHeight}`], file.name, {
-      type: encodedAs[maxWidthOrHeight],
-    });
-  }),
+  compressPhoto: vi.fn(
+    async (
+      file: File,
+      {
+        maxWidthOrHeight,
+        encoding,
+      }: { maxWidthOrHeight: number; encoding?: string },
+    ) => {
+      compressions.push(maxWidthOrHeight);
+      encodings.push(encoding);
+      return new File([`compressed-${maxWidthOrHeight}`], file.name, {
+        type: encodedAs[maxWidthOrHeight],
+      });
+    },
+  ),
 }));
 
 describe('useItemImages uploadImage', () => {
   beforeEach(() => {
     installDefaultImageMocks();
     compressions.length = 0;
+    encodings.length = 0;
     encodedAs = { 1000: 'image/webp', 600: 'image/webp' };
     acceptsUploads();
   });
@@ -97,6 +108,37 @@ describe('useItemImages uploadImage', () => {
     expect(full.type).toBe('image/jpeg');
     expect(pathThumb).toBe(pathFull.replace('.jpg', '.thumb.png'));
     expect(thumbnail.type).toBe('image/png');
+  });
+
+  it('compresses an ordinary photo as opaque, both sizes', async () => {
+    const { result } = renderItemImages();
+
+    await act(async () => {
+      await result.current.uploadImage(
+        'item-1',
+        new File(['x'], 'photo.jpg', { type: 'image/jpeg' }),
+      );
+    });
+
+    expect(encodings).toEqual(['opaque', 'opaque']);
+  });
+
+  it('keeps a cut-out transparent in both sizes, stored as the PNG it was encoded as', async () => {
+    encodedAs = { 1000: 'image/png', 600: 'image/png' };
+    const { result } = renderItemImages();
+
+    await act(async () => {
+      await result.current.uploadImage(
+        'item-1',
+        new File(['x'], 'cutout.png', { type: 'image/png' }),
+        'transparent',
+      );
+    });
+
+    expect(encodings).toEqual(['transparent', 'transparent']);
+    const paths = vi.mocked(uploadImageObject).mock.calls.map(([path]) => path);
+    expect(paths[0]).toMatch(/\.png$/);
+    expect(paths[1]).toMatch(/\.thumb\.png$/);
   });
 
   it('uploads nothing encoded as a type the bucket refuses', async () => {

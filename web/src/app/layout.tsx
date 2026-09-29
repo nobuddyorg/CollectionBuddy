@@ -13,6 +13,10 @@ const SUPABASE_ORIGIN = new URL(
   requireEnv('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL),
 ).origin;
 
+// Only a model served from another origin (docs/reference/configuration.md) adds to connect-src; a path on this site adds nothing.
+const modelPath = process.env.NEXT_PUBLIC_SEGMENTATION_MODEL_PATH ?? '';
+const MODEL_ORIGIN = URL.canParse(modelPath) ? new URL(modelPath).origin : '';
+
 // No weights for the variable fonts: naming them makes next/font preload a file per weight.
 const displayFont = Archivo({
   subsets: ['latin'],
@@ -49,9 +53,9 @@ const CONTENT_SECURITY_POLICY = [
   `default-src 'self'`,
   `script-src 'self' 'unsafe-inline'`,
   `style-src 'self' 'unsafe-inline'`,
-  // data: is for Leaflet's default icon (a 1x1 GIF) and for decoding a photo to compress on Safari before 16.4.
-  `img-src 'self' data: ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org`,
-  `connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io`,
+  // data: is Leaflet's default icon and the photo decode Safari before 16.4 falls back to; blob: is the background removal's on-device preview.
+  `img-src 'self' data: blob: ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org`,
+  `connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io ${MODEL_ORIGIN}`.trimEnd(),
   `font-src 'self'`,
   // Workers (photo compression, the service worker) start from the export's own files, never a blob: URL.
   `worker-src 'self'`,

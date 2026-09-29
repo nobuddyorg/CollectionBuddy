@@ -20,7 +20,7 @@ const PHOTO_UPLOAD_RETRY_BASE_MS = 500;
 export function realCompressThumb(photo: Blob): Promise<Blob> {
   return compressPhoto(
     new File([photo], 'photo.webp', { type: 'image/webp' }),
-    600,
+    { maxWidthOrHeight: 600 },
   );
 }
 

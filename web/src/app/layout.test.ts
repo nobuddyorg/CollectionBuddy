@@ -34,11 +34,21 @@ describe('the Content-Security-Policy meta tag in layout.tsx', () => {
 
   it('restricts fetches and images to self plus the services the app actually talks to', () => {
     expect(layout).toContain(
-      "img-src 'self' data: ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org",
+      "img-src 'self' data: blob: ${SUPABASE_ORIGIN} https://*.tile.openstreetmap.org",
     );
     expect(layout).toContain(
-      "connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io",
+      "connect-src 'self' ${SUPABASE_ORIGIN} https://photon.komoot.io ${MODEL_ORIGIN}`.trimEnd()",
     );
+  });
+
+  // The background removal previews the photo and its result from object URLs; nothing is fetched for them.
+  it('allows a blob: image, and no other new image source', () => {
+    expect(policy).toMatch(/img-src[^;]*\bblob:/);
+  });
+
+  it('adds the model host only when it is a full URL on another origin', () => {
+    expect(layout).toContain('URL.canParse(modelPath)');
+    expect(layout).toContain('new URL(modelPath).origin');
   });
 
   it("starts workers from the app's own files only, never a blob: URL", () => {

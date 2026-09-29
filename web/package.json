@@ -19,6 +19,7 @@
     "demo": "node scripts/demo.mjs",
     "lighthouse": "node scripts/lighthouse.mjs",
     "lighthouse:summary": "node scripts/lighthouse-summary.mjs",
+    "fetch-segmentation-model": "bash scripts/segmentation-model/fetch.sh",
     "zap:summary": "node scripts/zap-summary.mjs"
   },
   "dependencies": {
@@ -26,6 +27,7 @@
     "@tailwindcss/postcss": "^4",
     "leaflet": "^1.9.4",
     "next": "16.3.5",
+    "onnxruntime-web": "^1.30.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "tailwindcss": "^4",

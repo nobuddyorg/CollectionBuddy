@@ -1,4 +1,4 @@
-import { encodingFor } from '../data/photoType';
+import { encodingFor, type PhotoEncoding } from '../data/photoType';
 import type { CompressionAnswer } from './compressPhoto.worker';
 import { type CompressionRequest, drawFitted } from './drawPhoto';
 
@@ -52,7 +52,7 @@ function dataUrlOf(file: Blob): Promise<string> {
   });
 }
 
-// Not createImageBitmap: Safari 14 lacks it and 15 ignores EXIF orientation there; img-src admits data:, not blob:.
+// Not createImageBitmap: Safari 14 lacks it and 15 ignores EXIF orientation there.
 async function decodeUpright(file: Blob): Promise<HTMLImageElement> {
   const image = new Image();
   image.src = await dataUrlOf(file);
@@ -78,16 +78,19 @@ async function compressOnMainThread(
   });
 }
 
-/** Every derivative: ~80% quality, as WebP where the browser encodes it and JPEG elsewhere, in a worker wherever one can draw. */
+/** Every derivative: ~80% quality, as WebP where the browser encodes it and JPEG (PNG for a cut-out) elsewhere, in a worker wherever one can draw. */
 export async function compressPhoto(
   file: File,
-  maxWidthOrHeight: number,
+  {
+    maxWidthOrHeight,
+    encoding = 'opaque',
+  }: { maxWidthOrHeight: number; encoding?: PhotoEncoding },
 ): Promise<File> {
   probedEncoding ??= probeWebpEncoding();
   const request: CompressionRequest = {
     file,
     maxWidthOrHeight,
-    type: encodingFor(await probedEncoding),
+    type: encodingFor(await probedEncoding, encoding),
     quality: QUALITY,
   };
   // Safari before 16.4 has no OffscreenCanvas, so a worker there could not draw.

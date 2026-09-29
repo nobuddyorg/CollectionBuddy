@@ -137,6 +137,22 @@ fields a line break becomes a space.
 
 An item can have any number of photos, in the order you added them.
 
+### Remove the background
+
+Tick **Remove backgrounds** in the user menu. From then on a photo you add opens
+a review first: the original, and next to it the item with its background
+removed, on a checkerboard where the background is now transparent. It works
+for any item, a coin, a stamp, a figurine; several items in one photo are kept
+together. **Use without background** uploads the result; **Keep original**
+uploads the photo as it was, and is always available, also when no item was
+found or the removal failed. Closing the review uploads nothing.
+
+Everything happens in your browser. The first photo downloads a model of about
+90 MB once, with its progress shown; **Download model now** in the menu does
+that ahead of time, for example on Wi-Fi. Removing a background takes about 20
+seconds on a desktop computer, longer on a phone. With the box unticked,
+uploads work exactly as before.
+
 ## Search and pages
 
 The search box above the grid matches title, description, place, and tags at

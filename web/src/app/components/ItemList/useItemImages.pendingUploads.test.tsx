@@ -31,7 +31,7 @@ vi.mock('../../data/images', async () => {
 // The real one probes a canvas and needs a Worker.
 vi.mock('../../lib/imageCompression', () => ({
   compressPhoto: vi.fn(
-    async (file: File, maxWidthOrHeight: number) =>
+    async (file: File, { maxWidthOrHeight }: { maxWidthOrHeight: number }) =>
       new File([`compressed-${maxWidthOrHeight}`], file.name, {
         type: 'image/webp',
       }),

@@ -23,6 +23,8 @@ import { listViewFor } from './listView';
 import type { ItemFormValues } from '../ItemForm';
 import type { ImageEntry, ItemLite } from './types';
 import { Toolbar } from './Toolbar';
+import { useBackgroundRemovalUpload } from '../BackgroundRemoval/useBackgroundRemovalUpload';
+import { BackgroundRemovalDialog } from '../BackgroundRemoval/BackgroundRemovalDialog';
 
 // Stable identity: a fresh [] per render would defeat ItemCard's reference-equality memo.
 const EMPTY_IMAGES: ImageEntry[] = [];
@@ -89,6 +91,7 @@ export default function ItemList({
     forgetItemImages,
     pendingUploads,
   } = useItemImages();
+  const backgroundRemoval = useBackgroundRemovalUpload(uploadImage);
 
   // Read through a ref so a reload that keeps the same items re-signs nothing.
   const pageImagesRef = useSyncedRef(pageImages);
@@ -221,7 +224,7 @@ export default function ItemList({
               images={images[item.id] ?? EMPTY_IMAGES}
               pendingUploads={pendingUploads[item.id] ?? 0}
               imagesLoading={loadingItems.has(item.id)}
-              onUpload={(file) => void uploadImage(item.id, file)}
+              onUpload={(file) => backgroundRemoval.pickPhoto(item.id, file)}
               onEditItem={() => setEditingItem(item)}
               onDeleteItem={() => void removeItem(item.id)}
               onDeleteImage={(image) => void deleteImage(item.id, image)}
@@ -249,6 +252,11 @@ export default function ItemList({
         onDelete={(image) => void deleteImage(modalState!.itemId, image)}
         busy={modalState ? (pendingUploads[modalState.itemId] ?? 0) > 0 : false}
         readOnly={!canEdit}
+      />
+
+      <BackgroundRemovalDialog
+        pending={backgroundRemoval.pending}
+        onChoose={backgroundRemoval.choose}
       />
 
       <EditItemModal

@@ -16,9 +16,16 @@ const TYPE_BY_EXTENSION: Record<string, StoredPhotoType> = {
   '.png': 'image/png',
 };
 
-/** WebP where the canvas can encode it; JPEG, which the bucket also accepts, where it answered with anything else. */
-export function encodingFor(probedType: string): 'image/webp' | 'image/jpeg' {
-  return probedType === 'image/webp' ? 'image/webp' : 'image/jpeg';
+/** `transparent` for a cut-out, whose see-through background JPEG would fill in white. */
+export type PhotoEncoding = 'opaque' | 'transparent';
+
+/** WebP where the canvas can encode it; elsewhere JPEG, or PNG where transparency must survive. Both the bucket accepts. */
+export function encodingFor(
+  probedType: string,
+  encoding: PhotoEncoding,
+): 'image/webp' | 'image/jpeg' | 'image/png' {
+  if (probedType === 'image/webp') return 'image/webp';
+  return encoding === 'transparent' ? 'image/png' : 'image/jpeg';
 }
 
 /** `.webp`, `.jpg` or `.png`: what a derivative is stored under, after the type its encoder actually produced. */

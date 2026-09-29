@@ -14,6 +14,7 @@ export default function CenteredModal({
   title,
   description,
   children,
+  closeOnBackdrop = true,
   initialFocusRef,
   size = 'default',
   role = 'dialog',
@@ -27,7 +28,7 @@ export default function CenteredModal({
 
   return (
     <Portal>
-      <Backdrop onClick={close} />
+      <Backdrop onClick={closeOnBackdrop ? close : undefined} />
       <Dialog
         title={title}
         description={description}

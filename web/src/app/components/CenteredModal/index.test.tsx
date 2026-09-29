@@ -58,6 +58,26 @@ describe('CenteredModal', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('ignores a backdrop click when closeOnBackdrop is false', async () => {
+    const onOpenChange = vi.fn();
+    render(
+      <CenteredModal
+        open
+        onOpenChange={onOpenChange}
+        title="Edit entry"
+        closeOnBackdrop={false}
+      >
+        content
+      </CenteredModal>,
+      { wrapper: I18nProvider },
+    );
+    const backdrop = document.querySelector('.z-backdrop') as HTMLElement;
+
+    await userEvent.click(backdrop);
+
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
   it('restores the app root once the dialog closes', () => {
     const { rerender } = render(
       <CenteredModal open onOpenChange={vi.fn()} title="Edit entry">

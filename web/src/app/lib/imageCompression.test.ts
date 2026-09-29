@@ -95,7 +95,7 @@ describe('compressPhoto, where a worker can draw', () => {
     const compressPhoto = await freshCompressPhoto();
     const input = photo();
 
-    await compressPhoto(input, 1000);
+    await compressPhoto(input, { maxWidthOrHeight: 1000 });
 
     expect(FakeWorker.started).toHaveLength(1);
     expect(FakeWorker.started[0].sent).toEqual([
@@ -107,7 +107,7 @@ describe('compressPhoto, where a worker can draw', () => {
     canvasEncodes(encodesAsAsked);
     const compressPhoto = await freshCompressPhoto();
 
-    await compressPhoto(photo(), 1000);
+    await compressPhoto(photo(), { maxWidthOrHeight: 1000 });
 
     const [worker] = FakeWorker.started;
     expect(worker.url.pathname).toMatch(/\/compressPhoto\.worker\.ts$/);
@@ -119,7 +119,7 @@ describe('compressPhoto, where a worker can draw', () => {
     answersWith({ blob: new Blob(['jpeg bytes'], { type: 'image/jpeg' }) });
     const compressPhoto = await freshCompressPhoto();
 
-    const output = await compressPhoto(photo(), 1000);
+    const output = await compressPhoto(photo(), { maxWidthOrHeight: 1000 });
 
     expect(output).toBeInstanceOf(File);
     expect(output.name).toBe('photo.jpg');
@@ -132,7 +132,7 @@ describe('compressPhoto, where a worker can draw', () => {
     canvasEncodes(encodesLikeSafari);
     const compressPhoto = await freshCompressPhoto();
 
-    await compressPhoto(photo(), 600);
+    await compressPhoto(photo(), { maxWidthOrHeight: 600 });
 
     expect(FakeWorker.started[0].sent).toEqual([
       expect.objectContaining({ maxWidthOrHeight: 600, type: 'image/jpeg' }),
@@ -143,19 +143,35 @@ describe('compressPhoto, where a worker can draw', () => {
     canvasEncodes(() => null);
     const compressPhoto = await freshCompressPhoto();
 
-    await compressPhoto(photo(), 600);
+    await compressPhoto(photo(), { maxWidthOrHeight: 600 });
 
     expect(FakeWorker.started[0].sent).toEqual([
       expect.objectContaining({ type: 'image/jpeg' }),
     ]);
   });
 
+  it('asks for PNG, not JPEG, for a transparent cut-out where the canvas has no WebP', async () => {
+    canvasEncodes(encodesLikeSafari);
+    answersWith({ blob: new Blob(['encoded'], { type: 'image/png' }) });
+    const compressPhoto = await freshCompressPhoto();
+
+    const output = await compressPhoto(photo(), {
+      maxWidthOrHeight: 600,
+      encoding: 'transparent',
+    });
+
+    expect(FakeWorker.started[0].sent).toEqual([
+      expect.objectContaining({ maxWidthOrHeight: 600, type: 'image/png' }),
+    ]);
+    expect(output.type).toBe('image/png');
+  });
+
   it('probes a 1x1 canvas for WebP once, however many photographs follow', async () => {
     const toBlob = canvasEncodes(encodesAsAsked);
     const compressPhoto = await freshCompressPhoto();
 
-    await compressPhoto(photo(), 1000);
-    await compressPhoto(photo(), 600);
+    await compressPhoto(photo(), { maxWidthOrHeight: 1000 });
+    await compressPhoto(photo(), { maxWidthOrHeight: 600 });
 
     expect(toBlob).toHaveBeenCalledOnce();
     expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/webp');
@@ -168,8 +184,8 @@ describe('compressPhoto, where a worker can draw', () => {
     canvasEncodes(encodesAsAsked);
     const compressPhoto = await freshCompressPhoto();
 
-    await compressPhoto(photo(), 1000);
-    await compressPhoto(photo(), 600);
+    await compressPhoto(photo(), { maxWidthOrHeight: 1000 });
+    await compressPhoto(photo(), { maxWidthOrHeight: 600 });
 
     expect(FakeWorker.started.map((worker) => worker.terminated)).toEqual([
       true,
@@ -184,9 +200,9 @@ describe('compressPhoto, where a worker can draw', () => {
     });
     const compressPhoto = await freshCompressPhoto();
 
-    await expect(compressPhoto(photo(), 1000)).rejects.toThrow(
-      'EncodingError: The source image cannot be decoded.',
-    );
+    await expect(
+      compressPhoto(photo(), { maxWidthOrHeight: 1000 }),
+    ).rejects.toThrow('EncodingError: The source image cannot be decoded.');
     expect(FakeWorker.started[0].terminated).toBe(true);
   });
 
@@ -196,7 +212,7 @@ describe('compressPhoto, where a worker can draw', () => {
     FakeWorker.reply = (worker) => worker.fail();
     const compressPhoto = await freshCompressPhoto();
 
-    const compressed = compressPhoto(photo(), 1000);
+    const compressed = compressPhoto(photo(), { maxWidthOrHeight: 1000 });
 
     await expect(compressed).rejects.toThrow(
       'The photo compression worker failed',
@@ -252,7 +268,7 @@ describe('compressPhoto, where no worker can draw (no OffscreenCanvas)', () => {
     canvasEncodes(encodesAsAsked);
     const compressPhoto = await freshCompressPhoto();
 
-    await compressPhoto(photo(), 1000);
+    await compressPhoto(photo(), { maxWidthOrHeight: 1000 });
 
     expect(decoded).toHaveLength(1);
     expect(decoded[0].src).toBe('data:image/jpeg;base64,eA==');
@@ -269,7 +285,7 @@ describe('compressPhoto, where no worker can draw (no OffscreenCanvas)', () => {
     const toBlob = canvasEncodes(encodesAsAsked);
     const compressPhoto = await freshCompressPhoto();
 
-    const output = await compressPhoto(photo(), 1000);
+    const output = await compressPhoto(photo(), { maxWidthOrHeight: 1000 });
 
     expect(FakeWorker.started).toEqual([]);
     expect(toBlob).toHaveBeenLastCalledWith(
@@ -287,7 +303,7 @@ describe('compressPhoto, where no worker can draw (no OffscreenCanvas)', () => {
     const toBlob = canvasEncodes(encodesLikeSafari);
     const compressPhoto = await freshCompressPhoto();
 
-    const output = await compressPhoto(photo(), 600);
+    const output = await compressPhoto(photo(), { maxWidthOrHeight: 600 });
 
     expect(toBlob).toHaveBeenLastCalledWith(
       expect.any(Function),
@@ -302,9 +318,9 @@ describe('compressPhoto, where no worker can draw (no OffscreenCanvas)', () => {
     canvasEncodes((type, canvas) => (canvas.width === 1 ? 'image/webp' : null));
     const compressPhoto = await freshCompressPhoto();
 
-    await expect(compressPhoto(photo(), 1000)).rejects.toThrow(
-      'The canvas encoded nothing',
-    );
+    await expect(
+      compressPhoto(photo(), { maxWidthOrHeight: 1000 }),
+    ).rejects.toThrow('The canvas encoded nothing');
   });
 
   it('rejects when the photograph cannot be decoded, drawing nothing', async () => {
@@ -317,9 +333,9 @@ describe('compressPhoto, where no worker can draw (no OffscreenCanvas)', () => {
     });
     const compressPhoto = await freshCompressPhoto();
 
-    await expect(compressPhoto(photo(), 1000)).rejects.toThrow(
-      'The source image cannot be decoded.',
-    );
+    await expect(
+      compressPhoto(photo(), { maxWidthOrHeight: 1000 }),
+    ).rejects.toThrow('The source image cannot be decoded.');
     expect(drawImage).not.toHaveBeenCalled();
   });
 
@@ -332,9 +348,9 @@ describe('compressPhoto, where no worker can draw (no OffscreenCanvas)', () => {
     );
     const compressPhoto = await freshCompressPhoto();
 
-    await expect(compressPhoto(photo(), 1000)).rejects.toThrow(
-      'The photograph could not be read',
-    );
+    await expect(
+      compressPhoto(photo(), { maxWidthOrHeight: 1000 }),
+    ).rejects.toThrow('The photograph could not be read');
     expect(decoded).toEqual([]);
   });
 });

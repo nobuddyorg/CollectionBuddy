@@ -6,6 +6,7 @@ import { useI18n } from '../../i18n/useI18n';
 import { THEME_PREFERENCES, useTheme } from '../../useTheme';
 import type { MenuProps } from './types';
 import { labelClasses } from '../ui/labelClasses';
+import { BackgroundRemovalSetting } from '../BackgroundRemoval/BackgroundRemovalSetting';
 
 const MENU_ITEM =
   'w-full text-left px-3 min-h-11 flex items-center rounded-sm text-sm transition-colors';
@@ -64,7 +65,7 @@ export default function Menu({
       id={menuId}
       data-testid="user-menu"
       aria-labelledby="user-menu-button"
-      className="absolute right-0 mt-2 w-56 rounded-sm border bg-card text-card-foreground backdrop-blur p-1 shadow-lg"
+      className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-sm border bg-card text-card-foreground backdrop-blur p-1 shadow-lg"
     >
       <div className={labelClasses('px-3 py-2 truncate')}>{user.email}</div>
 
@@ -94,6 +95,8 @@ export default function Menu({
           testIdPrefix="theme"
         />
       </div>
+
+      <BackgroundRemovalSetting />
 
       <div className="my-1 border-t" />
 

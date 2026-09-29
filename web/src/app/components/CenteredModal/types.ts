@@ -7,6 +7,8 @@ export type CenteredModalProps = {
   /** Rendered above the content and wired to `aria-describedby`, e.g. a confirm's question. */
   description?: string;
   children: React.ReactNode;
+  /** False where a stray click outside must not discard work in progress; Escape and the close button still close. */
+  closeOnBackdrop?: boolean;
   initialFocusRef?: React.RefObject<HTMLElement | null>;
   /** 'full' fills the viewport (the map); default is a centred, width-capped panel. */
   size?: 'default' | 'full';
