@@ -239,6 +239,7 @@
   "background_removal": {
     "setting_label": "Remove backgrounds",
     "setting_hint": "Before a photo uploads, the background around the item is removed, on this device only. The first time downloads a model of about 90 MB once.",
+    "info_label": "About removing backgrounds",
     "preload": "Download model now (about 90 MB)",
     "preload_progress": "Downloading model: {percent}%",
     "preload_ready": "Model downloaded",

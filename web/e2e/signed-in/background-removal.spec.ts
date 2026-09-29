@@ -68,6 +68,21 @@ test.describe('background removal', () => {
     await on(page).categories.do.open(SEED.photoCategory);
   });
 
+  test('keeps its explanation behind the info button in the account menu', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await app.account.do.open();
+    const { hint } = app.account.locators.backgroundRemoval;
+
+    await expect(hint).toBeHidden();
+    await app.account.do.toggleBackgroundRemovalHint();
+    await expect(hint).toBeVisible();
+    await app.account.do.toggleBackgroundRemovalHint();
+    await expect(hint).toBeHidden();
+  });
+
   test('is off by default: a photo uploads as before, and nothing of the model loads', async ({
     on,
     page,
