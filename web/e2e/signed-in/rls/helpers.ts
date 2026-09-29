@@ -107,7 +107,7 @@ export async function ownedCategoryId(owner: {
   return data.id;
 }
 
-/** A seeded entry's id, read as `token`; throws, so a missing row fails here, not as a null id. */
+/** A seeded or test-created entry's id, read as `token`; throws, so a missing row fails here, not as a null id. */
 export async function seededEntryId(entry: {
   token: string;
   ownerId: string;
@@ -118,20 +118,6 @@ export async function seededEntryId(entry: {
     .select('id')
     .eq('user_id', entry.ownerId)
     .eq('title', entry.title)
-    .single();
-  if (error) throw error;
-  return data.id;
-}
-
-/** The id of the uniquely titled entry a test just created; throws, so a missing row fails here, not as a null id. */
-export async function itemIdTitled(
-  token: string,
-  title: string,
-): Promise<string> {
-  const { data, error } = await apiAs(token)
-    .from('items')
-    .select('id')
-    .eq('title', title)
     .single();
   if (error) throw error;
   return data.id;

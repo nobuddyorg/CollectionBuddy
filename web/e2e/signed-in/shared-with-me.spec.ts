@@ -1,6 +1,7 @@
 import { expect, test } from './test';
 import { OTHER_AUTH_STATE_PATH, SEED } from './fixtures';
 import { removeCategoryNamed } from './cleanup';
+import { fileEntry } from './collectors';
 import { answerGeocoder, photonFeature, uniqueName } from './helpers';
 import {
   apiAs,
@@ -109,16 +110,10 @@ test.describe('the map of a collection shared with you', () => {
     if (error) throw error;
 
     try {
-      const { data: item, error: itemError } = await owner
-        .from('items')
-        .insert({ user_id: userId, title: 'Kartenstück', place: 'Aachen' })
-        .select('id')
-        .single();
-      if (itemError) throw itemError;
-      const { error: linkError } = await owner
-        .from('item_categories')
-        .insert({ item_id: item.id, category_id: category.id });
-      if (linkError) throw linkError;
+      await fileEntry(owner, {
+        categoryId: category.id,
+        fields: { user_id: userId, title: 'Kartenstück', place: 'Aachen' },
+      });
       await viewerShare(token, category.id);
       await answerGeocoder(page, [photonFeature('Aachen', [6.0839, 50.7753])]);
 

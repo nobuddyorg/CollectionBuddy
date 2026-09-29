@@ -4,8 +4,8 @@ import { PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
 import {
   apiAs,
   context,
-  itemIdTitled,
   ownedCategoryId,
+  seededEntryId,
   storedObjects,
 } from './rls/helpers';
 
@@ -32,7 +32,7 @@ test.describe('deleting a collection that still holds things', () => {
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
-      const itemId = await itemIdTitled(token, title);
+      const itemId = await seededEntryId({ token, ownerId: userId, title });
       const prefix = `${userId}/${itemId}`;
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toBeVisible({

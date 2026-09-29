@@ -3,7 +3,7 @@ import { expect, test } from './test';
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
 import { PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
-import { apiAs, context, itemIdTitled } from './rls/helpers';
+import { apiAs, context, seededEntryId } from './rls/helpers';
 // photos.spec.ts proves a photograph is stored; this opens it full size and walks the carousel.
 test.use({ locale: 'en-GB' });
 
@@ -138,14 +138,14 @@ test.describe('looking at a photograph full size', () => {
   }) => {
     test.setTimeout(240_000);
     const app = on(page);
-    const { token } = context();
+    const { token, userId } = context();
     await app.categories.do.open(SEED.viewerCategory);
 
     const title = uniqueName('Sechsfach');
     try {
       await app.catalogue.do.addEntry(title);
       // Past five the card shows no more plates, so each upload is awaited by its photograph row instead.
-      const itemId = await itemIdTitled(token, title);
+      const itemId = await seededEntryId({ token, ownerId: userId, title });
       for (let upload = 1; upload <= 6; upload++) {
         // The control stays disabled until the card has shown the last one.
         await expect(

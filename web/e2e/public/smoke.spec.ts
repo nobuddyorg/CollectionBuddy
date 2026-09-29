@@ -1,6 +1,7 @@
 import { expect, test } from '../fixture';
 
 import { collectPageProblems, expectNoPageProblems } from '../helpers';
+import { LOGIN_URL } from '../pages/login';
 
 test.use({ locale: 'en-GB' });
 
@@ -29,7 +30,7 @@ test.describe('the deployed bundle', () => {
   // No server redirect exists: the root page itself checks for a session and routes away.
   test('sends a signed-out visitor to the login page', async ({ page }) => {
     await page.goto('', { waitUntil: 'networkidle' });
-    await expect(page).toHaveURL(/\/login\/?$/);
+    await expect(page).toHaveURL(LOGIN_URL);
   });
 
   test('serves the login page directly, too', async ({ on, page }) => {

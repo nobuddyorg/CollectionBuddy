@@ -10,8 +10,8 @@ import { GEOCODER, PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
 import {
   apiAs,
   context,
-  itemIdTitled,
   ownedCategoryId,
+  seededEntryId,
   storedObjects,
   unshare,
   viewerShare,
@@ -131,7 +131,7 @@ test.describe('when something outside the app fails', () => {
       await expect(card.locators.images).toBeVisible({
         timeout: PHOTO_ARRIVES,
       });
-      const itemId = await itemIdTitled(token, title);
+      const itemId = await seededEntryId({ token, ownerId: userId, title });
       const storedFiles = async () =>
         (await storedObjects(token, `${userId}/${itemId}`)).length;
       const filesBefore = await storedFiles();

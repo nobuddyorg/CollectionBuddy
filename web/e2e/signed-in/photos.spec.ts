@@ -3,7 +3,7 @@ import { expect, test } from './test';
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
 import { PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
-import { context, itemIdTitled, storedObjects } from './rls/helpers';
+import { context, seededEntryId, storedObjects } from './rls/helpers';
 import type { PageTree } from '../pages';
 // Decode, resize, upload, list and sign all happen in the browser; rls/ covers what the policies allow.
 test.use({ locale: 'en-GB' });
@@ -139,7 +139,7 @@ test.describe('photographs', () => {
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
-      const itemId = await itemIdTitled(token, title);
+      const itemId = await seededEntryId({ token, ownerId: userId, title });
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toBeVisible({
         timeout: PHOTO_ARRIVES,
@@ -232,7 +232,7 @@ test.describe('photographs', () => {
       try {
         await app.catalogue.do.addEntry(title);
         const card = app.catalogue.card(title);
-        const itemId = await itemIdTitled(token, title);
+        const itemId = await seededEntryId({ token, ownerId: userId, title });
         await card.do.uploadPhoto(PHOTO);
         await expect(card.locators.images).toBeVisible({
           timeout: PHOTO_ARRIVES,
@@ -290,7 +290,7 @@ test.describe('photographs', () => {
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
-      const itemId = await itemIdTitled(token, title);
+      const itemId = await seededEntryId({ token, ownerId: userId, title });
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toBeVisible({
         timeout: PHOTO_ARRIVES,
@@ -326,7 +326,7 @@ test.describe('photographs', () => {
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
-      const itemId = await itemIdTitled(token, title);
+      const itemId = await seededEntryId({ token, ownerId: userId, title });
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toBeVisible({
         timeout: PHOTO_ARRIVES,
@@ -351,7 +351,8 @@ test.describe('photographs', () => {
     ): Promise<string> {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
-      const itemId = await itemIdTitled(context().token, title);
+      const { token, userId } = context();
+      const itemId = await seededEntryId({ token, ownerId: userId, title });
       await card.do.uploadPhoto(PHOTO);
       await expect(card.locators.images).toBeVisible({
         timeout: PHOTO_ARRIVES,

@@ -8,6 +8,7 @@ import {
   context,
   editorShare,
   ownerEntryIn,
+  seededEntryId,
   storedObjects,
 } from './rls/helpers';
 
@@ -24,18 +25,6 @@ async function granteeObjects(itemId: string) {
   return objects.map((object) => object.name);
 }
 
-async function granteeItemId(title: string) {
-  const { otherToken, otherUserId } = context();
-  const { data, error } = await apiAs(otherToken)
-    .from('items')
-    .select('id')
-    .eq('user_id', otherUserId)
-    .eq('title', title)
-    .single();
-  if (error) throw error;
-  return data.id;
-}
-
 test.describe('a collection shared with you to edit', () => {
   test('takes new, edited and deleted entries with photographs, shows the owner, and shuts once demoted', async ({
     on,
@@ -43,7 +32,7 @@ test.describe('a collection shared with you to edit', () => {
     browser,
   }) => {
     const app = on(page);
-    const { token, userId } = context();
+    const { token, userId, otherToken, otherUserId } = context();
     const ownerTitle = uniqueName('Tauschobjekt');
     const renamed = `${ownerTitle} (edited)`;
     const filedTitle = uniqueName('Mitgebracht');
@@ -65,7 +54,11 @@ test.describe('a collection shared with you to edit', () => {
       await expect(filed.locators.images).toBeVisible({
         timeout: PHOTO_ARRIVES,
       });
-      const filedId = await granteeItemId(filedTitle);
+      const filedId = await seededEntryId({
+        token: otherToken,
+        ownerId: otherUserId,
+        title: filedTitle,
+      });
       expect(await granteeObjects(filedId)).toHaveLength(2);
 
       // The owner's entry, photographed under the editor's prefix: one taken from the entry, Storage refuses.
