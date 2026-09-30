@@ -149,7 +149,8 @@ found or the removal failed. Closing the review uploads nothing.
 
 Everything happens in your browser. The first photo downloads a model of about
 90 MB once, with its progress shown; **Download model now** in the menu does
-that ahead of time, for example on Wi-Fi. Removing a background takes about 20
+that ahead of time, for example on Wi-Fi, and shows **Model downloaded** once
+your browser has it. Removing a background takes about 20
 seconds on a desktop computer, longer on a phone. With the box unticked,
 uploads work exactly as before.
 

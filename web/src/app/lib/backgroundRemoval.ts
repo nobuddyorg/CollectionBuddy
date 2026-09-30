@@ -4,6 +4,7 @@ import type {
   CutoutReply,
   CutoutRequest,
 } from './backgroundRemovalJob';
+import { isModelCached } from './modelCache';
 
 export type { Cutout, CutoutProgress };
 
@@ -101,4 +102,9 @@ export async function preloadSegmentationModel(
     options,
   );
   if (reply.kind !== 'preloaded') throw failure(reply);
+}
+
+/** Whether this browser already cached the model, from a preload or an earlier cut-out. */
+export function isSegmentationModelCached(): Promise<boolean> {
+  return isModelCached(segmentationModelUrl());
 }

@@ -239,4 +239,30 @@ test.describe('background removal', () => {
     );
     expect(requests).toHaveLength(1);
   });
+
+  // The ready state lives in page memory; the model itself lives in Cache Storage, which a reload keeps.
+  test('still knows the model is downloaded after a reload', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const requests = await serveStandInModel(page);
+    await turnOnBackgroundRemoval(app, page);
+    await app.account.do.open();
+    await app.account.do.downloadModel();
+    await expect(app.account.locators.backgroundRemoval.progress).toHaveText(
+      'Model downloaded',
+    );
+
+    await page.reload();
+    await app.account.do.open();
+
+    await expect(app.account.locators.backgroundRemoval.progress).toHaveText(
+      'Model downloaded',
+    );
+    await expect(app.account.locators.backgroundRemoval.download).toHaveCount(
+      0,
+    );
+    expect(requests).toHaveLength(1);
+  });
 });

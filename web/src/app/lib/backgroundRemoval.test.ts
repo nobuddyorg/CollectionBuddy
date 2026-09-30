@@ -7,6 +7,7 @@ import {
   removeBackground,
   NoObjectFoundError,
   preloadSegmentationModel,
+  isSegmentationModelCached,
 } from './backgroundRemoval';
 
 /** Stands in for the module worker: records what the page asks and answers with whatever the test replies. */
@@ -260,5 +261,16 @@ describe('preloadSegmentationModel', () => {
     lastWorker().reply({ kind: 'failed', message: 'Error: HTTP 404' });
 
     await expect(pending).rejects.toThrow('HTTP 404');
+  });
+});
+
+describe('isSegmentationModelCached', () => {
+  it('looks the model up under the URL cut-outs download it from', async () => {
+    const match = vi.fn(async () => new Response('model'));
+    vi.stubGlobal('caches', { open: vi.fn(async () => ({ match })) });
+
+    expect(await isSegmentationModelCached()).toBe(true);
+    expect(match).toHaveBeenCalledWith(segmentationModelUrl());
+    expect(FakeWorker.created).toEqual([]);
   });
 });

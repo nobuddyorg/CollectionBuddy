@@ -44,6 +44,17 @@ export async function preloadModel(): Promise<void> {
   }
 }
 
+/** Ready without a download when the model is already cached; page memory forgets it on every reload. */
+export async function detectCachedModel(): Promise<void> {
+  if (state.status === 'downloading' || state.status === 'ready') return;
+  try {
+    const { isSegmentationModelCached } = await loadBackgroundRemoval();
+    if (await isSegmentationModelCached()) publish({ status: 'ready' });
+  } catch (error: unknown) {
+    console.error('Could not check for a cached segmentation model', error);
+  }
+}
+
 export function usePreloadState(): PreloadState {
   return useSyncExternalStore(
     subscribe,

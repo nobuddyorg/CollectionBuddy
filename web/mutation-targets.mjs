@@ -94,6 +94,7 @@ export const MUTATE_TARGETS = [
   'src/app/lib/cutoutImage.ts',
   'src/app/lib/isnetTensor.ts',
   'src/app/lib/segmentationModel.ts',
+  'src/app/lib/modelCache.ts',
   'src/app/lib/backgroundRemovalJob.ts',
   'src/app/lib/backgroundRemoval.ts',
   'src/app/components/BackgroundRemoval/useBackgroundRemovalPreference.ts',
