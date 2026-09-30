@@ -1,15 +1,23 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import Icon, { IconType } from '../Icon';
 import { useI18n } from '../../i18n/useI18n';
 import { downloadPercent } from './downloadPercent';
-import { preloadModel, usePreloadState } from './modelPreload';
+import {
+  detectCachedModel,
+  preloadModel,
+  usePreloadState,
+} from './modelPreload';
 import { useBackgroundRemovalPreference } from './useBackgroundRemovalPreference';
 
 function PreloadControl() {
   const { t } = useI18n();
   const state = usePreloadState();
+  // The menu mounts this on every open, so a cut-out's download since the last one counts too.
+  useEffect(() => {
+    void detectCachedModel();
+  }, []);
   if (state.status === 'ready') {
     return (
       <p role="status" data-testid="model-status" className="text-xs">

@@ -1,7 +1,5 @@
 import { MODEL_SIZE } from './isnetTensor';
-
-// Outside sw.js's `collectionbuddy-` prefix, whose per-build sweep would re-download 90 MB after every deploy.
-const MODEL_CACHE = 'cb-segmentation-model';
+import { openModelCache } from './modelCache';
 
 export type DownloadProgress = (loaded: number, total: number) => void;
 
@@ -42,22 +40,12 @@ async function download(
   return readAll(response, onProgress);
 }
 
-async function openCache(): Promise<Cache | undefined> {
-  try {
-    return await caches.open(MODEL_CACHE);
-  } catch (error: unknown) {
-    // Private windows can refuse it; the cut-out still works, it just downloads again.
-    console.warn('No Cache Storage for the segmentation model', error);
-    return undefined;
-  }
-}
-
 /** The model's bytes: from this browser's cache, else downloaded once and kept there, replacing any older model. */
 export async function loadModel(
   url: string,
   onProgress: DownloadProgress,
 ): Promise<Uint8Array<ArrayBuffer>> {
-  const cache = await openCache();
+  const cache = await openModelCache();
   const cached = await cache?.match(url);
   if (cached) return new Uint8Array(await cached.arrayBuffer());
   const bytes = await download(url, onProgress);

@@ -6,12 +6,20 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import type { PreloadState } from './modelPreload';
 
-const preload = vi.hoisted((): { state: PreloadState; preloadModel: Mock } => ({
-  state: { status: 'idle' },
-  preloadModel: vi.fn(),
-}));
+const preload = vi.hoisted(
+  (): {
+    state: PreloadState;
+    preloadModel: Mock;
+    detectCachedModel: Mock;
+  } => ({
+    state: { status: 'idle' },
+    preloadModel: vi.fn(),
+    detectCachedModel: vi.fn(),
+  }),
+);
 vi.mock('./modelPreload', () => ({
   preloadModel: preload.preloadModel,
+  detectCachedModel: preload.detectCachedModel,
   usePreloadState: () => preload.state,
 }));
 
@@ -31,6 +39,7 @@ beforeEach(() => {
   localStorage.setItem('lang', 'en');
   preload.state = { status: 'idle' };
   preload.preloadModel.mockClear();
+  preload.detectCachedModel.mockClear();
 });
 
 describe('BackgroundRemovalSetting', () => {
@@ -85,6 +94,19 @@ describe('BackgroundRemovalSetting', () => {
       screen.getByRole('button', { name: 'Download model now (about 90 MB)' }),
     );
     expect(preload.preloadModel).toHaveBeenCalledOnce();
+  });
+
+  // The menu unmounts when it closes, so each opening checks again.
+  it('checks for a cached model each time it shows the download, and never before the opt-in', () => {
+    const { unmount } = renderSetting();
+    expect(preload.detectCachedModel).not.toHaveBeenCalled();
+    unmount();
+
+    localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
+    renderSetting().unmount();
+    renderSetting();
+
+    expect(preload.detectCachedModel).toHaveBeenCalledTimes(2);
   });
 
   it('shows the download in percent', () => {

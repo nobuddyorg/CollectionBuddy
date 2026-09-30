@@ -5,9 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CutoutProgress } from '../../lib/backgroundRemoval';
 
-const preloadSegmentationModel = vi.hoisted(() => vi.fn());
+const { preloadSegmentationModel, isSegmentationModelCached } = vi.hoisted(
+  () => ({
+    preloadSegmentationModel: vi.fn(),
+    isSegmentationModelCached: vi.fn(),
+  }),
+);
 vi.mock('./load', () => ({
-  loadBackgroundRemoval: async () => ({ preloadSegmentationModel }),
+  loadBackgroundRemoval: async () => ({
+    preloadSegmentationModel,
+    isSegmentationModelCached,
+  }),
 }));
 
 // Module state: each test loads a fresh copy, as a fresh page would.
@@ -18,6 +26,7 @@ async function freshPreload() {
 
 beforeEach(() => {
   preloadSegmentationModel.mockReset();
+  isSegmentationModelCached.mockReset();
 });
 
 afterEach(() => {
@@ -130,5 +139,79 @@ describe('model preload', () => {
     }
 
     expect(renderToString(<Probe />)).toContain('idle');
+  });
+
+  describe('a model cached before this page loaded', () => {
+    it('reads as ready without downloading it again', async () => {
+      isSegmentationModelCached.mockResolvedValue(true);
+      const { detectCachedModel, usePreloadState } = await freshPreload();
+      const { result } = renderHook(() => usePreloadState());
+
+      await act(() => detectCachedModel());
+
+      expect(result.current).toEqual({ status: 'ready' });
+      expect(preloadSegmentationModel).not.toHaveBeenCalled();
+    });
+
+    it('leaves the download to be offered when nothing is cached', async () => {
+      isSegmentationModelCached.mockResolvedValue(false);
+      const { detectCachedModel, usePreloadState } = await freshPreload();
+      const { result } = renderHook(() => usePreloadState());
+
+      await act(() => detectCachedModel());
+
+      expect(result.current).toEqual({ status: 'idle' });
+    });
+
+    it('turns a failed download ready once a cut-out has cached the model', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      preloadSegmentationModel.mockRejectedValue(new Error('offline'));
+      isSegmentationModelCached.mockResolvedValue(true);
+      const { detectCachedModel, preloadModel, usePreloadState } =
+        await freshPreload();
+      const { result } = renderHook(() => usePreloadState());
+      await act(() => preloadModel());
+
+      await act(() => detectCachedModel());
+
+      expect(result.current).toEqual({ status: 'ready' });
+    });
+
+    it('does not look while a download runs, nor once the model is ready', async () => {
+      let finish: () => void = () => {};
+      preloadSegmentationModel.mockReturnValue(
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+      );
+      const { detectCachedModel, preloadModel } = await freshPreload();
+      const done = preloadModel();
+
+      await detectCachedModel();
+      await vi.waitFor(() =>
+        expect(preloadSegmentationModel).toHaveBeenCalled(),
+      );
+      finish();
+      await done;
+      await detectCachedModel();
+
+      expect(isSegmentationModelCached).not.toHaveBeenCalled();
+    });
+
+    it('logs a check that fails and keeps offering the download', async () => {
+      const error = new Error('chunk failed to load');
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+      isSegmentationModelCached.mockRejectedValue(error);
+      const { detectCachedModel, usePreloadState } = await freshPreload();
+      const { result } = renderHook(() => usePreloadState());
+
+      await act(() => detectCachedModel());
+
+      expect(result.current).toEqual({ status: 'idle' });
+      expect(log).toHaveBeenCalledWith(
+        'Could not check for a cached segmentation model',
+        error,
+      );
+    });
   });
 });
