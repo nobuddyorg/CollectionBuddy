@@ -17,7 +17,7 @@ repos:
         args: ["--branch", "main"]
 
   - repo: https://github.com/crate-ci/typos
-    rev: 512fc24f32f44ab01972217aaaf3dc86ec234d53 # frozen: v1.50.2
+    rev: 00f422f3b19c57bc6338715ebfe3316d38768461 # frozen: v1.50.3
     hooks:
       - id: typos
         # German prose reads as misspelled English near word-for-word; the lockfile is a wall of hashes.
@@ -62,13 +62,13 @@ repos:
 
   # Lock and rewrite hazards sqlfluff cannot see; rules in .squawk.toml.
   - repo: https://github.com/sbdchd/squawk
-    rev: 0feae0d2ea3407c18f984623a23adff5103e996c # frozen: v2.65.0
+    rev: 1b906e138fd4f21975a2270885c56cffdc24f22b # frozen: v2.66.0
     hooks:
       - id: squawk
         files: ^supabase/migrations/.*\.sql$
         # 0001-0009 are applied history and predate the lock/statement timeout rules; never edited to satisfy them.
         exclude: ^supabase/migrations/000[1-9]_
-        additional_dependencies: ["squawk-cli@2.65.0"]
+        additional_dependencies: ["squawk-cli@2.66.0"]
 
   # The same commands CI runs, from web/ where their config lives.
   - repo: local
