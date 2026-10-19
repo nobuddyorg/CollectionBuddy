@@ -62,13 +62,13 @@ repos:
 
   # Lock and rewrite hazards sqlfluff cannot see; rules in .squawk.toml.
   - repo: https://github.com/sbdchd/squawk
-    rev: 1b906e138fd4f21975a2270885c56cffdc24f22b # frozen: v2.66.0
+    rev: 82eda4ef71455c6cf1b46e1fed2df34e2adebc9b # frozen: v2.68.0
     hooks:
       - id: squawk
         files: ^supabase/migrations/.*\.sql$
         # 0001-0009 are applied history and predate the lock/statement timeout rules; never edited to satisfy them.
         exclude: ^supabase/migrations/000[1-9]_
-        additional_dependencies: ["squawk-cli@2.66.0"]
+        additional_dependencies: ["squawk-cli@2.68.0"]
 
   # The same commands CI runs, from web/ where their config lives.
   - repo: local
