@@ -40,7 +40,7 @@ export default function Header({
         <div className="flex items-center gap-2.5 min-w-0">
           {/* eslint-disable-next-line @next/next/no-img-element -- next/image earns nothing on a static export with images.unoptimized */}
           <img
-            src={withBasePath('/logo-header.png')}
+            src={withBasePath('/logo-header.svg')}
             alt=""
             width={24}
             height={24}

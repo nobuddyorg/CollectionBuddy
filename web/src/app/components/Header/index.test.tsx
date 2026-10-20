@@ -39,7 +39,7 @@ describe('Header', () => {
       const { container } = renderHeader();
       expect(container.querySelector('img')).toHaveAttribute(
         'src',
-        '/collectionbuddy/logo-header.png',
+        '/collectionbuddy/logo-header.svg',
       );
     });
   });

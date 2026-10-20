@@ -30,29 +30,12 @@ const targets = [
   { file: 'icon-maskable-512.png', size: 512, fit: 'circle' },
   // iOS asks for exactly 180 and scales it itself.
   { file: 'apple-touch-icon.png', size: 180, fit: 'square' },
-  // The header draws it at 24px on a transparent background, so a raw crop at 4x stays sharp on any phone.
-  { file: 'logo-header.png', size: 96, fit: 'raw' },
 ];
 
 const dataUri = `data:image/png;base64,${source.toString('base64')}`;
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ deviceScaleFactor: 1 });
-
-async function renderRaw(width) {
-  const height = Math.round(width / aspect);
-  await page.setViewportSize({ width, height });
-  await page.setContent(
-    `<body style="margin:0;width:${width}px;height:${height}px;background:transparent">
-       <img src="${dataUri}" style="width:${width}px;height:${height}px;display:block">
-     </body>`,
-  );
-  await page.locator('img').waitFor({ state: 'visible' });
-  return page.screenshot({
-    clip: { x: 0, y: 0, width, height },
-    omitBackground: true,
-  });
-}
 
 // Returns the buffer: favicon.ico's 16px layer needs a square render that never becomes its own file.
 async function renderSquare({ size, fit, background }) {
@@ -71,16 +54,6 @@ async function renderSquare({ size, fit, background }) {
 }
 
 for (const { file, size, fit } of targets) {
-  if (fit === 'raw') {
-    const width = Math.min(size, sourceWidth);
-    const png = await renderRaw(width);
-    writeFileSync(new URL(file, publicDirectory), png);
-    console.log(
-      `${file}: ${width}px wide, raw (${(width / sourceWidth).toFixed(2)}x source)`,
-    );
-    continue;
-  }
-
   const width = artworkWidth(size, fit);
   if (width > sourceWidth) {
     console.error(
