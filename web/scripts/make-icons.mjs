@@ -30,8 +30,8 @@ const targets = [
   { file: 'icon-maskable-512.png', size: 512, fit: 'circle' },
   // iOS asks for exactly 180 and scales it itself.
   { file: 'apple-touch-icon.png', size: 180, fit: 'square' },
-  // The header draws the artwork on a transparent background, so it needs a small crop, not a paper tile.
-  { file: 'logo-header.png', size: 48, fit: 'raw' },
+  // The header draws it at 24px on a transparent background, so a raw crop at 4x stays sharp on any phone.
+  { file: 'logo-header.png', size: 96, fit: 'raw' },
 ];
 
 const dataUri = `data:image/png;base64,${source.toString('base64')}`;
