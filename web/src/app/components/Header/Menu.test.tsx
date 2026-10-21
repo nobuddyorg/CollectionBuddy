@@ -5,6 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderHeader } from './index.test-support';
 
+// The menu lists the account's passkeys on open; these tests are about the rest of it.
+vi.mock('../../data/passkeys', () => ({
+  listPasskeys: vi.fn().mockResolvedValue({ data: [], error: null }),
+  registerPasskey: vi.fn(),
+  deletePasskey: vi.fn(),
+}));
+
 // jsdom keeps localStorage across a file's tests; reset so each starts from the detected language.
 beforeEach(() => {
   localStorage.clear();
@@ -18,6 +25,21 @@ async function openMenu() {
 }
 
 describe('Menu', () => {
+  it('offers fingerprint sign-in to an account with an email', async () => {
+    await openMenu();
+
+    expect(await screen.findByTestId('passkey-setting')).toBeVisible();
+  });
+
+  it('leaves fingerprint sign-in out for the demo, whose anonymous user has no email', async () => {
+    const user = userEvent.setup();
+    renderHeader({ user: { email: '' } });
+    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+
+    expect(screen.getByTestId('user-menu')).toBeVisible();
+    expect(screen.queryByTestId('passkey-setting')).toBeNull();
+  });
+
   it('offers background removal, off by default', async () => {
     await openMenu();
 

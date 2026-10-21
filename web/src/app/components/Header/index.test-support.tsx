@@ -1,13 +1,13 @@
 import { render } from '@testing-library/react';
 import { vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
+import { ToastWrapper } from '../providers.test-support';
 import Header from './index';
 import type { HeaderProps } from './types';
 
 export function renderHeader(overrides: Partial<HeaderProps> = {}) {
   return render(
-    <I18nProvider>
+    <ToastWrapper>
       <Header
         user={{ email: 'collector@example.com' }}
         onSignOut={vi.fn()}
@@ -15,6 +15,6 @@ export function renderHeader(overrides: Partial<HeaderProps> = {}) {
         onOpenHelp={vi.fn()}
         {...overrides}
       />
-    </I18nProvider>,
+    </ToastWrapper>,
   );
 }

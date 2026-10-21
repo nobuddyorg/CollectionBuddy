@@ -132,6 +132,12 @@ export const SEED = {
   /** For failures.spec.ts, whose uploads are made to fail. */
   failureCategory: 'Pannenwerkstatt',
   /** For sign-out.spec.ts, as a collector of its own per parallel slot: a global sign-out revokes every session of its user. */
+  /** For passkeys.spec.ts, a collector per parallel slot: its sign-outs are global. */
+  passkeys: {
+    password: 'passkeys-password-not-a-secret',
+    category: 'Fingerabdruck',
+    item: 'Fingerabdruckstück',
+  },
   signOut: {
     password: 'sign-out-password-not-a-secret',
     category: 'Garderobe',

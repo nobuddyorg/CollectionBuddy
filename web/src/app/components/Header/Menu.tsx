@@ -7,6 +7,7 @@ import { THEME_PREFERENCES, useTheme } from '../../useTheme';
 import type { MenuProps } from './types';
 import { labelClasses } from '../ui/labelClasses';
 import { BackgroundRemovalSetting } from '../BackgroundRemoval/BackgroundRemovalSetting';
+import { PasskeySetting } from './PasskeySetting';
 
 const MENU_ITEM =
   'w-full text-left px-3 min-h-11 flex items-center rounded-sm text-sm transition-colors';
@@ -97,6 +98,9 @@ export default function Menu({
       </div>
 
       <BackgroundRemovalSetting />
+
+      {/* Auth saves a passkey only for a confirmed email; the demo's anonymous user has none. */}
+      {user.email && <PasskeySetting />}
 
       <div className="my-1 border-t" />
 

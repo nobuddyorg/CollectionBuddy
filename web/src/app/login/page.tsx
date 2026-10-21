@@ -8,14 +8,17 @@ import { coinSizeCss } from '../components/Coin/size';
 import Collectible from '../components/Collectible';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import LoadingOverlay from '../components/LoadingOverlay';
+import PasskeySignInButton from '../components/PasskeySignInButton';
 import { labelClasses } from '../components/ui/labelClasses';
 import { linkClasses } from '../components/ui/linkClasses';
 import { useToast } from '../components/Toast/ToastProvider';
 import { useI18n } from '../i18n/useI18n';
+import { usePasskeySupport } from '../lib/usePasskeySupport';
 import { fanOffsetX, fanOffsetY, fanPositions } from './collectibleFan';
 import { useAuthRedirect } from './useAuthRedirect';
 import { isDemoMode, useDemoSignIn } from './useDemoSignIn';
 import { useGoogleSignIn } from './useGoogleSignIn';
+import { usePasskeySignIn } from './usePasskeySignIn';
 
 const EMOJIS = ['🪙', '📮', '🎟️', '🐚', '🎖️', '🧩', '📀'] as const;
 
@@ -33,11 +36,17 @@ export default function LoginPage() {
   const toast = useToast();
   const checking = useAuthRedirect('/');
   const signIn = useGoogleSignIn();
+  const signInWithPasskey = usePasskeySignIn();
+  const passkeysSupported = usePasskeySupport();
   const demoMode = isDemoMode();
   const { error: demoError } = useDemoSignIn(demoMode && !checking);
 
   const handleSignInError = (error: unknown) => {
     toast.reportError('google sign-in', error, t('login_page.sign_in_error'));
+  };
+
+  const handlePasskeyError = (error: unknown) => {
+    toast.reportError('passkey sign-in', error, t('passkeys.sign_in_error'));
   };
 
   useEffect(() => {
@@ -101,6 +110,15 @@ export default function LoginPage() {
           ))}
         </div>
       </div>
+
+      {passkeysSupported && (
+        <div className="mt-8 sm:mt-10">
+          <PasskeySignInButton
+            onClick={signInWithPasskey}
+            onError={handlePasskeyError}
+          />
+        </div>
+      )}
 
       <p className="mt-8 sm:mt-10 text-sm sm:text-base text-muted-foreground text-center max-w-sm text-balance">
         {t('login_page.subtitle')}
