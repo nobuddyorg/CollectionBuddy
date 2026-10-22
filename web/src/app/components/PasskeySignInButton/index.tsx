@@ -4,7 +4,6 @@ import { useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import Icon, { IconType } from '../Icon';
-import { buttonClasses } from '../ui/buttonClasses';
 import { Spinner } from '../ui/Spinner';
 import type { PasskeySignInButtonProps } from './types';
 
@@ -27,27 +26,28 @@ export default function PasskeySignInButton({
     }
   };
 
+  const label = t('passkeys.sign_in');
+
   return (
     <button
       type="button"
       data-testid="passkey-sign-in"
       onClick={() => void handleClick()}
       disabled={loading}
+      aria-label={label}
+      title={label}
       aria-busy={loading ? 'true' : 'false'}
-      className={buttonClasses(
-        'inline-flex items-center gap-2 bg-background disabled:opacity-60 disabled:cursor-not-allowed',
-      )}
+      className="flex items-center justify-center w-14 h-14 rounded-full text-foreground hover:bg-muted transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current disabled:opacity-60 disabled:cursor-not-allowed"
     >
       {loading ? (
-        <Spinner size="sm" />
+        <Spinner size="lg" />
       ) : (
         <Icon
           icon={IconType.Fingerprint}
-          className="w-4 h-4"
+          className="w-10 h-10"
           aria-hidden="true"
         />
       )}
-      {t('passkeys.sign_in')}
     </button>
   );
 }

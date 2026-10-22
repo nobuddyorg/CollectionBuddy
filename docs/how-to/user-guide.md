@@ -8,7 +8,7 @@ Recipes for specific tasks. New to the app? Start with
 An account starts with Google (`/login`). After that you can sign in with your
 fingerprint instead: open the user menu and choose **Save fingerprint**; your
 device asks for your fingerprint (or face, or PIN) and saves a passkey. Next
-time, **Sign in with fingerprint** on the login page is all it takes. Your
+time, tapping the fingerprint symbol on the login page is all it takes. Your
 fingerprint never leaves the device. The user menu lists every saved passkey;
 remove the one for a phone you lost, and it can no longer sign in. Deleting
 your account removes them all.

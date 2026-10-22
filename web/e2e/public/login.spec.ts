@@ -23,10 +23,14 @@ test.describe('the login page', () => {
   });
 
   // Every engine the suite runs has WebAuthn; the button is hidden only where a browser lacks it.
-  test('offers fingerprint sign-in beside Google', async ({ on, page }) => {
+  test('offers fingerprint sign-in beside Google, as the symbol alone', async ({
+    on,
+    page,
+  }) => {
     const fingerprint = on(page).login.locators.buttons.signInWithFingerprint;
     await expect(fingerprint).toBeVisible();
-    await expect(fingerprint).toHaveText('Sign in with fingerprint');
+    await expect(fingerprint).toHaveAccessibleName('Sign in with fingerprint');
+    await expect(fingerprint).toHaveText('');
     await expect(fingerprint).toBeEnabled();
   });
 
