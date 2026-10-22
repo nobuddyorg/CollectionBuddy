@@ -260,8 +260,9 @@
     "not_an_image": "Nur Fotos können hinzugefügt werden."
   },
   "passkeys": {
-    "heading": "Anmelden mit Fingerabdruck",
+    "heading": "Fingerabdruck",
     "hint": "Speichere einmal deinen Fingerabdruck auf diesem Gerät; danach meldest du dich ohne Google an. Je nach Gerät bestätigst du mit Fingerabdruck, Gesicht oder PIN. Dein Gerät nennt das einen „Passkey“.",
+    "info_label": "Mehr zur Anmeldung mit Fingerabdruck",
     "add": "Fingerabdruck speichern",
     "added": "Fingerabdruck gespeichert. Du kannst dich jetzt damit anmelden.",
     "already_added": "Auf diesem Gerät ist schon ein Fingerabdruck für dein Konto gespeichert.",

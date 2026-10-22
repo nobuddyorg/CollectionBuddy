@@ -80,6 +80,36 @@ describe('PasskeySetting', () => {
     ]);
   });
 
+  it('keeps its explanation behind the info button', async () => {
+    listAnswers([]);
+    const user = renderSetting();
+    const info = screen.getByRole('button', {
+      name: 'About fingerprint sign-in',
+    });
+    const hint = screen.getByTestId('passkey-hint');
+
+    expect(hint).not.toBeVisible();
+    expect(info).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(info);
+    expect(hint).toBeVisible();
+    expect(hint).toHaveTextContent('Your device calls this a "passkey".');
+    expect(info).toHaveAttribute('aria-expanded', 'true');
+    expect(info).toHaveAttribute('aria-controls', hint.id);
+
+    await user.click(info);
+    expect(hint).not.toBeVisible();
+  });
+
+  it('saves with the fingerprint symbol alone, named for screen readers', async () => {
+    listAnswers([]);
+    renderSetting();
+
+    const add = screen.getByRole('button', { name: 'Save fingerprint' });
+    expect(add).toHaveTextContent(/^$/);
+    expect(add).toHaveAttribute('title', 'Save fingerprint');
+  });
+
   it('shows a spinner until the list arrives, and no list when there is none', async () => {
     listAnswers([]);
     renderSetting();

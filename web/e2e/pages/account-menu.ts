@@ -13,6 +13,7 @@ interface AccountMenu {
     openHelp(): Promise<void>;
     removeFingerprint(index: number): Promise<void>;
     saveFingerprint(): Promise<void>;
+    toggleFingerprintHint(): Promise<void>;
     signOut(): Promise<void>;
   };
   locators: {
@@ -32,6 +33,8 @@ interface AccountMenu {
     fingerprints: {
       add: Locator;
       error: Locator;
+      hint: Locator;
+      info: Locator;
       saved: Locator;
       setting: Locator;
     };
@@ -60,6 +63,8 @@ export function initAccountMenu(page: Page): AccountMenu {
     fingerprints: {
       add: page.getByTestId('passkey-add'),
       error: page.getByTestId('passkey-setting').getByRole('alert'),
+      hint: page.getByTestId('passkey-hint'),
+      info: page.getByTestId('passkey-info'),
       saved: page.getByTestId('passkey'),
       setting: page.getByTestId('passkey-setting'),
     },
@@ -108,6 +113,9 @@ export function initAccountMenu(page: Page): AccountMenu {
     },
     saveFingerprint: async () => {
       await locators.fingerprints.add.click();
+    },
+    toggleFingerprintHint: async () => {
+      await locators.fingerprints.info.click();
     },
     signOut: async () => {
       await locators.buttons.signOut.click();
