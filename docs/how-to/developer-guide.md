@@ -796,7 +796,7 @@ and `hosted-auth.json` back.
 ## Check the hosted Auth settings
 
 Nothing checks these automatically. Compare the dashboard (Authentication →
-Sign In / Providers, and URL Configuration) with
+Sign In / Providers, URL Configuration, and Passkeys) with
 [`supabase/hosted-auth.json`](../../supabase/hosted-auth.json) whenever
 Supabase announces an Auth change, after a project restore, and before
 relying on sharing with someone new. Every provider the file does not name
