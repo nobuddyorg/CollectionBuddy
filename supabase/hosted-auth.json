@@ -8,10 +8,14 @@
   "hook_custom_access_token_enabled": false,
   "mailer_allow_unverified_email_sign_ins": false,
   "mailer_autoconfirm": false,
+  "passkey_enabled": true,
   "refresh_token_rotation_enabled": true,
   "saml_enabled": false,
   "security_manual_linking_enabled": false,
   "security_refresh_token_reuse_interval": 10,
   "site_url": "https://nobuddy.org/CollectionBuddy/",
-  "uri_allow_list": ""
+  "uri_allow_list": "",
+  "webauthn_rp_display_name": "CollectionBuddy",
+  "webauthn_rp_id": "nobuddy.org",
+  "webauthn_rp_origins": "https://nobuddy.org"
 }

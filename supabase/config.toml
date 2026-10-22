@@ -56,6 +56,15 @@ enable_confirmations = false
 [auth.rate_limit]
 sign_in_sign_ups = 500
 
+# Fingerprint sign-in. WebAuthn refuses an IP address as RP ID, so only `localhost` origins work: the dev server and the e2e export.
+[auth.passkey]
+enabled = true
+
+[auth.webauthn]
+rp_display_name = "CollectionBuddy"
+rp_id = "localhost"
+rp_origins = ["http://localhost:3000", "http://localhost:4173"]
+
 [auth.external.google]
 enabled   = true
 client_id = "env(GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID)"

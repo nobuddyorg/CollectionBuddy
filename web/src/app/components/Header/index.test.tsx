@@ -4,6 +4,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { renderHeader } from './index.test-support';
 
+// The menu lists the account's passkeys on open; these tests are about the rest of it.
+vi.mock('../../data/passkeys', () => ({
+  listPasskeys: vi.fn().mockResolvedValue({ data: [], error: null }),
+  registerPasskey: vi.fn(),
+  deletePasskey: vi.fn(),
+}));
+
 describe('Header', () => {
   // Same mark as the login page: an ink rule under "Collection", the accent on "Buddy".
   it('renders the wordmark in two parts', () => {

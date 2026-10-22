@@ -90,6 +90,10 @@ export default function PrivacyPage() {
             text={t('privacy.data_sign_ins')}
           />
           <Item
+            label={t('privacy.data_passkeys_label')}
+            text={t('privacy.data_passkeys')}
+          />
+          <Item
             label={t('privacy.data_collections_label')}
             text={t('privacy.data_collections')}
           />
@@ -157,6 +161,7 @@ export default function PrivacyPage() {
           <li>{t('privacy.retention_until_deleted')}</li>
           <li>{t('privacy.retention_orphans')}</li>
           <li>{t('privacy.retention_account')}</li>
+          <li>{t('privacy.retention_passkeys')}</li>
           <li>{t('privacy.retention_sharing')}</li>
           <li>{t('privacy.retention_logs')}</li>
         </List>
