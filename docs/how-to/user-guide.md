@@ -6,12 +6,13 @@ Recipes for specific tasks. New to the app? Start with
 ## Sign in and out
 
 An account starts with Google (`/login`). After that you can sign in with your
-fingerprint instead: open the user menu and choose **Save fingerprint**; your
-device asks for your fingerprint (or face, or PIN) and saves a passkey. Next
-time, **Sign in with fingerprint** on the login page is all it takes. Your
-fingerprint never leaves the device. The user menu lists every saved passkey;
-remove the one for a phone you lost, and it can no longer sign in. Deleting
-your account removes them all.
+fingerprint instead: open the user menu and tap the fingerprint symbol beside
+**Sign in with fingerprint** (the ⓘ next to it explains it); your device asks
+for your fingerprint (or face, or PIN) and saves a passkey. Next time, tapping
+the fingerprint symbol on the login page is all it takes. Your fingerprint
+never leaves the device. The user menu lists every saved passkey; remove the
+one for a phone you lost, and it can no longer sign in. Deleting your account
+removes them all.
 
 **Sign out** is in the user menu (click
 your email in the header). If the sign-out request fails — you are offline,

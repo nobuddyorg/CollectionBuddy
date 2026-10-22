@@ -78,6 +78,9 @@ test.describe('signing in with a fingerprint', () => {
 
     await app.account.do.open();
     await expect(app.account.locators.fingerprints.saved).toHaveCount(0);
+    await expect(app.account.locators.fingerprints.hint).toBeHidden();
+    await app.account.do.toggleFingerprintHint();
+    await expect(app.account.locators.fingerprints.hint).toBeVisible();
     await app.account.do.saveFingerprint();
     await expect(
       app.toast().filter({ hasText: 'Fingerprint saved.' }),

@@ -262,6 +262,7 @@
   "passkeys": {
     "heading": "Sign in with fingerprint",
     "hint": "Save your fingerprint on this device once, then sign in without Google. Depending on the device you confirm with your fingerprint, face or PIN. Your device calls this a \"passkey\".",
+    "info_label": "About fingerprint sign-in",
     "add": "Save fingerprint",
     "added": "Fingerprint saved. You can sign in with it now.",
     "already_added": "This device already has a fingerprint saved for your account.",
