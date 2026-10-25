@@ -36,7 +36,7 @@ repos:
       - id: gitleaks
 
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: fa412071e4f5d44d44f9e365f4676f9df92456a2 # frozen: v1.30.1
+    rev: c92afdf2c6ca336aaa8f39e2bd8d48f62dbd8e1f # frozen: v1.31.1
     hooks:
       - id: zizmor
 
@@ -62,13 +62,13 @@ repos:
 
   # Lock and rewrite hazards sqlfluff cannot see; rules in .squawk.toml.
   - repo: https://github.com/sbdchd/squawk
-    rev: 1b906e138fd4f21975a2270885c56cffdc24f22b # frozen: v2.66.0
+    rev: aef68d413ddcf38876cf47a8e693c20f9ebf6aa0 # frozen: v2.70.0
     hooks:
       - id: squawk
         files: ^supabase/migrations/.*\.sql$
         # 0001-0009 are applied history and predate the lock/statement timeout rules; never edited to satisfy them.
         exclude: ^supabase/migrations/000[1-9]_
-        additional_dependencies: ["squawk-cli@2.66.0"]
+        additional_dependencies: ["squawk-cli@2.70.0"]
 
   # The same commands CI runs, from web/ where their config lives.
   - repo: local
