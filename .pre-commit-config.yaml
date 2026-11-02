@@ -66,8 +66,8 @@ repos:
     hooks:
       - id: squawk
         files: ^supabase/migrations/.*\.sql$
-        # 0001-0009 are applied history and predate the lock/statement timeout rules; never edited to satisfy them.
-        exclude: ^supabase/migrations/000[1-9]_
+        # 0001-0009 predate the lock/statement timeout rules; 0030 and 0036 predate ban-drop-function/-constraint; applied history, never edited to satisfy them.
+        exclude: ^supabase/migrations/(000[1-9]|0030|0036)_
         additional_dependencies: ["squawk-cli@2.70.0"]
 
   # The same commands CI runs, from web/ where their config lives.
