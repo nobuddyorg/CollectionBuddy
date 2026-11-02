@@ -90,7 +90,7 @@ export default function RootLayout({
         />
         <link
           rel="apple-touch-icon"
-          href={withBasePath('/apple-touch-icon.png')}
+          href={withBasePath('/apple-touch-icon-v2.png')}
         />
         <link rel="shortcut icon" href={withBasePath('/favicon.ico')} />
         {/* One per OS scheme: a meta tag can only follow the OS, not the in-app toggle. */}
