@@ -22,7 +22,7 @@ const UNSTORED_ROW_BYTES = 5_242_880;
 // More than importCategory.ts runs at once (6), so a pool that stopped uploads fewer than all of them.
 const PHOTOS = 8;
 const IN_FLIGHT = 6;
-const PHOTO = readFileSync(resolve(process.cwd(), 'public/icon-192.png'));
+const PHOTO = readFileSync(resolve(process.cwd(), 'public/icon-192-v2.png'));
 
 type Collector = { email: string; userId: string; client: SupabaseClient };
 

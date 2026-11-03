@@ -15,7 +15,7 @@ test.use({ locale: 'en-GB' });
 // Two real round trips, past the 30s default under parallel load.
 test.describe.configure({ timeout: 120_000 });
 
-const DETAIL = resolve(process.cwd(), 'public/icon-192.png');
+const DETAIL = resolve(process.cwd(), 'public/icon-192-v2.png');
 
 /** Every entry titled `title` the caller can read: the original and, after an import, its copy. */
 async function itemIdsFor(token: string, title: string) {

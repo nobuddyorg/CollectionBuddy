@@ -23,13 +23,14 @@ const artworkWidth = (size, fit) =>
     ? (size * SAFE_CIRCLE * aspect) / Math.hypot(aspect, 1)
     : size * SQUARE_SPAN;
 
+// The -v2 suffix busts phone caches that kept serving the pre-redraw icons under the old names.
 const targets = [
   // The two sizes Android looks for: home screen, then splash screen and install prompt.
-  { file: 'icon-192.png', size: 192, fit: 'square' },
-  { file: 'icon-512.png', size: 512, fit: 'square' },
-  { file: 'icon-maskable-512.png', size: 512, fit: 'circle' },
+  { file: 'icon-192-v2.png', size: 192, fit: 'square' },
+  { file: 'icon-512-v2.png', size: 512, fit: 'square' },
+  { file: 'icon-maskable-512-v2.png', size: 512, fit: 'circle' },
   // iOS asks for exactly 180 and scales it itself.
-  { file: 'apple-touch-icon.png', size: 180, fit: 'square' },
+  { file: 'apple-touch-icon-v2.png', size: 180, fit: 'square' },
 ];
 
 const dataUri = `data:image/png;base64,${source.toString('base64')}`;
