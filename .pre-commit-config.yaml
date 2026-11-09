@@ -56,13 +56,13 @@ repos:
 
   # Lint only, never `sqlfluff-fix`: migrations are applied history, not reformattable source.
   - repo: https://github.com/sqlfluff/sqlfluff
-    rev: 0348222a3bcdb0226563f7349c5a39beb0641955 # frozen: 4.4.0
+    rev: 0a7c698408dc56e5efcbe37edc1ec23c782c003b # frozen: 4.5.0
     hooks:
       - id: sqlfluff-lint
 
   # Lock and rewrite hazards sqlfluff cannot see; rules in .squawk.toml.
   - repo: https://github.com/sbdchd/squawk
-    rev: aef68d413ddcf38876cf47a8e693c20f9ebf6aa0 # frozen: v2.70.0
+    rev: a8cf181356a658b8b2b46b5afd18d1d8f2b18a10 # frozen: v2.71.0
     hooks:
       - id: squawk
         files: ^supabase/migrations/.*\.sql$
