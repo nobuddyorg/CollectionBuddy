@@ -13,7 +13,7 @@ type ItemCardProps = {
   /** Photographs handed over for this entry that have not landed yet. */
   pendingUploads?: number;
   imagesLoading?: boolean;
-  onUpload: (file: File) => void;
+  onUpload: (files: File[]) => void;
   onEditItem: () => void;
   onDeleteItem: () => void;
   onDeleteImage: (image: ImageEntry) => void;
@@ -76,8 +76,8 @@ function ItemCardComponent({
     dragDepth.current = 0;
     setIsDragOver(false);
     if (dropDisabled) return;
-    const file = event.dataTransfer.files?.[0];
-    if (file) onUpload(file);
+    const files = Array.from(event.dataTransfer.files);
+    if (files.length > 0) onUpload(files);
   };
 
   // Deliberately one-way: a later photo swap fades in on its own rather than hiding the label again.

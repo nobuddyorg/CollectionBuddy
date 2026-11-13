@@ -23,6 +23,7 @@ export const MUTATE_TARGETS = [
   'src/app/lib/passkeyCeremony.ts',
   'src/app/components/CategorySelect/useExportCategory.tsx',
   'src/app/components/ItemList/imageEntries.ts',
+  'src/app/components/BackgroundRemoval/photoBatch.ts',
   'src/app/lib/optimistic.ts',
   'src/app/components/Toast/pendingToasts.ts',
   'src/app/components/Toast/countdown.ts',

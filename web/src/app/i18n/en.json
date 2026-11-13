@@ -154,6 +154,8 @@
     "delete_entry": "Delete entry",
     "delete_image": "Delete image",
     "add_image": "Add image",
+    "take_photo": "Take photo",
+    "choose_files": "Choose from files",
     "search_placeholder": "Search…",
     "search_clear": "Clear search",
     "edit_item": "Edit entry",
@@ -257,7 +259,8 @@
     "failed": "The background could not be removed. The original can still be uploaded.",
     "use_cutout": "Use without background",
     "keep_original": "Keep original",
-    "not_an_image": "Only photos can be added."
+    "not_an_image": "Only photos can be added.",
+    "progress": "Photo {current} of {total}"
   },
   "passkeys": {
     "heading": "Sign in with fingerprint",

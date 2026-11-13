@@ -37,7 +37,25 @@ export function BackgroundRemovalDialog({
       title={t('background_removal.title')}
       closeOnBackdrop={false}
     >
-      {pending && <CutoutReview file={pending.file} onChoose={onChoose} />}
+      {pending && pending.position.total > 1 && (
+        <p
+          data-testid="cutout-progress"
+          className="text-sm text-muted-foreground"
+        >
+          {t('background_removal.progress', {
+            current: pending.position.current,
+            total: pending.position.total,
+          })}
+        </p>
+      )}
+      {/* Keyed by position: each photo of a pick gets a fresh review, focus included. */}
+      {pending && (
+        <CutoutReview
+          key={pending.position.current}
+          file={pending.file}
+          onChoose={onChoose}
+        />
+      )}
     </CenteredModal>
   );
 }

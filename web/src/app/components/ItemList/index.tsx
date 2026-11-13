@@ -224,7 +224,7 @@ export default function ItemList({
               images={images[item.id] ?? EMPTY_IMAGES}
               pendingUploads={pendingUploads[item.id] ?? 0}
               imagesLoading={loadingItems.has(item.id)}
-              onUpload={(file) => backgroundRemoval.pickPhoto(item.id, file)}
+              onUpload={(files) => backgroundRemoval.pickPhotos(item.id, files)}
               onEditItem={() => setEditingItem(item)}
               onDeleteItem={() => void removeItem(item.id)}
               onDeleteImage={(image) => void deleteImage(item.id, image)}

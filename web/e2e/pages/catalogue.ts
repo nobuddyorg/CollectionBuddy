@@ -48,7 +48,10 @@ interface CatalogueCard {
     delete(): Promise<void>;
     edit(): Promise<void>;
     openImage(): Promise<void>;
-    uploadPhoto(file: string): Promise<void>;
+    /** Several paths are one pick, as the file chooser would hand them over. */
+    uploadPhoto(files: string | string[]): Promise<void>;
+    /** The camera control, offered on touch devices only. */
+    takePhoto(file: string): Promise<void>;
   };
   locators: {
     buttons: {
@@ -57,6 +60,7 @@ interface CatalogueCard {
       deleteImage: Locator;
       openImage: Locator;
     };
+    cameraInput: Locator;
     description: Locator;
     images: Locator;
     place: Locator;
@@ -74,6 +78,7 @@ function initCard(root: Locator): CatalogueCard {
       deleteImage: root.getByTestId('delete-image'),
       openImage: root.getByTestId('open-image'),
     },
+    cameraInput: root.getByTestId('take-photo').first(),
     description: root.getByTestId('item-card-description'),
     images: root.getByTestId('item-image'),
     place: root.getByTestId('item-card-place'),
@@ -91,8 +96,11 @@ function initCard(root: Locator): CatalogueCard {
     openImage: async () => {
       await locators.buttons.openImage.first().click();
     },
-    uploadPhoto: async (file: string) => {
-      await locators.uploadInput.setInputFiles(file);
+    uploadPhoto: async (files: string | string[]) => {
+      await locators.uploadInput.setInputFiles(files);
+    },
+    takePhoto: async (file: string) => {
+      await locators.cameraInput.setInputFiles(file);
     },
   };
   return Object.assign(() => root, { locators, do: interactions });

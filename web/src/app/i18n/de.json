@@ -154,6 +154,8 @@
     "delete_entry": "Eintrag löschen",
     "delete_image": "Bild löschen",
     "add_image": "Bild hinzufügen",
+    "take_photo": "Foto aufnehmen",
+    "choose_files": "Aus Dateien wählen",
     "search_placeholder": "Suchen…",
     "search_clear": "Suche leeren",
     "edit_item": "Eintrag bearbeiten",
@@ -257,7 +259,8 @@
     "failed": "Der Hintergrund konnte nicht entfernt werden. Das Original kann trotzdem hochgeladen werden.",
     "use_cutout": "Ohne Hintergrund verwenden",
     "keep_original": "Original behalten",
-    "not_an_image": "Nur Fotos können hinzugefügt werden."
+    "not_an_image": "Nur Fotos können hinzugefügt werden.",
+    "progress": "Foto {current} von {total}"
   },
   "passkeys": {
     "heading": "Fingerabdruck",

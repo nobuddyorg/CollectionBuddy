@@ -39,9 +39,14 @@ Save. Items sort newest first, and the list jumps to page 1 so you see it.
 
 ## 4. Add a photo
 
-Click **+** at the bottom of the card and pick any image. The browser
-compresses it to WebP (JPEG in Safari and on iOS) and makes a thumbnail before
-uploading, so a full-size phone photo is fine.
+Click **+** at the bottom of the card and pick any image, or several at once:
+they upload one after the other, in the order picked, so the first becomes the
+cover of an empty entry. You can also drop files onto the card. On a phone or
+tablet there is a second button, **Take photo**, that opens the camera; it takes
+one shot at a time. The browser compresses each photo to WebP (JPEG in Safari
+and on iOS) and makes a thumbnail before uploading, so a full-size phone photo
+is fine. A photo that fails to upload says so; the others in the same pick still
+go through.
 
 Click the thumbnail to open it full size. A second photo makes a pair; from the
 third on, the first photo gets the large slot and the rest form a strip under

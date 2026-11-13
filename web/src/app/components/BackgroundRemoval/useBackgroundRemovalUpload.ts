@@ -1,56 +1,87 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { PhotoUpload } from '../../data/photoType';
 import { useI18n } from '../../i18n/useI18n';
 import { useSyncedRef } from '../../lib/useSyncedRef';
 import { useToast } from '../Toast/ToastProvider';
+import {
+  afterCurrent,
+  positionIn,
+  splitImages,
+  uploadInOrder,
+  type BatchPosition,
+  type PhotoBatch,
+} from './photoBatch';
 import { readBackgroundRemovalEnabled } from './useBackgroundRemovalPreference';
 
 type Upload = (itemId: string, photo: PhotoUpload) => Promise<void>;
 
-export type PendingCutout = { itemId: string; file: File };
+export type PendingCutout = {
+  itemId: string;
+  file: File;
+  position: BatchPosition;
+};
 
 export type CutoutChoice =
   { kind: 'cut-out'; blob: Blob } | { kind: 'original' } | { kind: 'cancel' };
 
-/** Routes a picked photo past the cut-out review when this browser opted in; otherwise straight to `upload`, as before. */
+/** Routes picked photos past the cut-out review when this browser opted in; otherwise straight to `upload`, one after the other. */
 export function useBackgroundRemovalUpload(upload: Upload) {
   const { t } = useI18n();
   const toast = useToast();
-  const [pending, setPending] = useState<PendingCutout | null>(null);
+  const [batch, setBatch] = useState<PhotoBatch | null>(null);
   // Read at call time: ItemCard's memo keeps an old handler, which must still see a toggle flipped since.
   const latest = useSyncedRef({ upload, t, toast });
+  // Decided photos upload in decision order, so the first picked stays the cover; `upload` reports its own failures.
+  const uploadsSoFar = useRef<Promise<void>>(Promise.resolve());
 
-  const pickPhoto = (itemId: string, file: File) => {
+  const pickPhotos = (itemId: string, files: File[]) => {
     if (!readBackgroundRemovalEnabled()) {
-      void latest.current.upload(itemId, { file });
-      return;
-    }
-    if (!file.type.startsWith('image/')) {
-      latest.current.toast.error(
-        latest.current.t('background_removal.not_an_image'),
+      void uploadInOrder(files, (file) =>
+        latest.current.upload(itemId, { file }),
       );
       return;
     }
-    setPending({ itemId, file });
+    const { images, skipped } = splitImages(files);
+    if (skipped > 0) {
+      latest.current.toast.error(
+        latest.current.t('background_removal.not_an_image'),
+      );
+    }
+    if (images.length === 0) return;
+    uploadsSoFar.current = Promise.resolve();
+    setBatch({ itemId, files: images, total: images.length });
   };
 
+  // Cancelling drops the photos still waiting too: closing the review is the way out of a pick.
   const choose = useCallback(
     (choice: CutoutChoice) => {
-      setPending(null);
-      if (pending === null || choice.kind === 'cancel') return;
-      if (choice.kind === 'original') {
-        void upload(pending.itemId, { file: pending.file });
-        return;
-      }
-      const cutout = new File([choice.blob], 'cutout.png', {
-        type: 'image/png',
-      });
-      void upload(pending.itemId, { file: cutout, encoding: 'transparent' });
+      if (batch === null) return;
+      setBatch(choice.kind === 'cancel' ? null : afterCurrent(batch));
+      if (choice.kind === 'cancel') return;
+      const [file] = batch.files;
+      const photo: PhotoUpload =
+        choice.kind === 'original'
+          ? { file }
+          : {
+              file: new File([choice.blob], 'cutout.png', {
+                type: 'image/png',
+              }),
+              encoding: 'transparent',
+            };
+      uploadsSoFar.current = uploadsSoFar.current.then(() =>
+        upload(batch.itemId, photo),
+      );
     },
-    [pending, upload],
+    [batch, upload],
   );
 
-  return { pending, pickPhoto, choose };
+  const pending: PendingCutout | null = batch && {
+    itemId: batch.itemId,
+    file: batch.files[0],
+    position: positionIn(batch),
+  };
+
+  return { pending, pickPhotos, choose };
 }
