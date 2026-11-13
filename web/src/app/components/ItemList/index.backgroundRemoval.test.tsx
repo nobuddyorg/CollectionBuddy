@@ -47,6 +47,12 @@ vi.mock('../../lib/backgroundRemoval', async (importActual) => ({
   removeBackground,
 }));
 
+// jsdom decodes no image, so the blur check answers as each test says.
+const assessSharpness = vi.hoisted(() =>
+  vi.fn<(file: Blob) => Promise<'sharp' | 'blurry'>>(),
+);
+vi.mock('../../lib/photoSharpness', () => ({ assessSharpness }));
+
 const photo = new File(['jpeg'], 'coin.jpg', { type: 'image/jpeg' });
 
 function renderWithUpload() {
@@ -72,6 +78,7 @@ beforeEach(() => {
     .mockReset()
     .mockImplementation(() => import('../BackgroundRemoval/CutoutReview'));
   removeBackground.mockReset();
+  assessSharpness.mockReset().mockResolvedValue('sharp');
   vi.stubGlobal(
     'URL',
     Object.assign(URL, {
@@ -87,11 +94,46 @@ describe('ItemList background removal', () => {
 
     await pickPhoto();
 
-    expect(uploadImage).toHaveBeenCalledWith('1', { file: photo });
+    await vi.waitFor(() =>
+      expect(uploadImage).toHaveBeenCalledWith('1', { file: photo }),
+    );
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(load.loadCutoutReview).not.toHaveBeenCalled();
     expect(load.loadBackgroundRemoval).not.toHaveBeenCalled();
     expect(removeBackground).not.toHaveBeenCalled();
+  });
+
+  it('asks about a blurry photo first, and uploads it once kept anyway', async () => {
+    assessSharpness.mockResolvedValue('blurry');
+    const uploadImage = renderWithUpload();
+
+    await pickPhoto();
+    const dialog = await screen.findByRole('dialog', { name: 'Blurry photo' });
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(load.loadCutoutReview).not.toHaveBeenCalled();
+
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Keep anyway' }),
+    );
+
+    await vi.waitFor(() =>
+      expect(uploadImage).toHaveBeenCalledWith('1', { file: photo }),
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('uploads nothing of a blurry photo skipped', async () => {
+    assessSharpness.mockResolvedValue('blurry');
+    const uploadImage = renderWithUpload();
+    await pickPhoto();
+    const dialog = await screen.findByRole('dialog', { name: 'Blurry photo' });
+
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Skip this photo' }),
+    );
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(uploadImage).not.toHaveBeenCalled();
   });
 
   it('falls back to the original when the cut-out fails', async () => {

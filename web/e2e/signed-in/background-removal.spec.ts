@@ -8,7 +8,7 @@ import { expect, test } from './test';
 import { expectNoSeriousA11yViolations } from '../axe';
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
-import { uniqueName } from './helpers';
+import { blurryPhoto, uniqueName } from './helpers';
 import type { PageTree } from '../pages';
 
 // Background removal runs for real, in its worker on the real runtime; only the 87 MB model is swapped for a stand-in.
@@ -233,6 +233,35 @@ test.describe('background removal', () => {
       await app.backgroundRemoval.do.cancel();
 
       await expect(app.backgroundRemoval()).toHaveCount(0);
+      await expect(card.locators.images).toHaveCount(0);
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
+  test('warns about a blurry photo in the review too, and stores nothing once it is skipped', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const app = on(page);
+    await serveStandInModel(page);
+    await turnOnBackgroundRemoval(app, page);
+    const title = uniqueName('Unscharf mit Freisteller');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+
+      await card.do.uploadPhoto(
+        await blurryPhoto(page, testInfo.outputPath('blurry.png')),
+      );
+
+      const review = app.backgroundRemoval;
+      await expect(review.locators.blurWarning).toBeVisible({
+        timeout: ARRIVES,
+      });
+      await review.do.skip();
+
+      await expect(review()).toHaveCount(0);
       await expect(card.locators.images).toHaveCount(0);
     } finally {
       await removeEntriesTitled(title);

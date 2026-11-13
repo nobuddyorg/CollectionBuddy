@@ -1,6 +1,7 @@
 import { encodingFor, type PhotoEncoding } from '../data/photoType';
 import { type CompressionRequest, drawFitted } from './drawPhoto';
 import type { CompressionAnswer } from './photo.worker';
+import { askPhotoWorker, decodeUpright } from './photoWorkerClient';
 
 const QUALITY = 0.8;
 
@@ -16,48 +17,13 @@ function probeWebpEncoding(): Promise<string> {
   });
 }
 
-function compressInWorker(request: CompressionRequest): Promise<Blob> {
-  // Turbopack passes a worker's chunks in its URL fragment, which Chrome reuses across workers of one bootstrap, so every photo job shares one entry.
-  const worker = new Worker(new URL('./photo.worker.ts', import.meta.url), {
-    type: 'module',
-  });
-  const answered = new Promise<Blob>((resolve, reject) => {
-    worker.addEventListener(
-      'message',
-      ({ data }: MessageEvent<CompressionAnswer>) => {
-        if ('blob' in data) resolve(data.blob);
-        else reject(new Error(data.error));
-      },
-    );
-    worker.addEventListener('error', (event) => {
-      reject(
-        new Error('The photo compression worker failed', { cause: event }),
-      );
-    });
-  });
-  worker.postMessage(request);
-  return answered.finally(() => worker.terminate());
-}
-
-function dataUrlOf(file: Blob): Promise<string> {
-  const reader = new FileReader();
-  return new Promise((resolve, reject) => {
-    reader.addEventListener('load', () => resolve(reader.result as string));
-    reader.addEventListener('error', () => {
-      reject(
-        new Error('The photograph could not be read', { cause: reader.error }),
-      );
-    });
-    reader.readAsDataURL(file);
-  });
-}
-
-// Not createImageBitmap: Safari 14 lacks it and 15 ignores EXIF orientation there.
-async function decodeUpright(file: Blob): Promise<HTMLImageElement> {
-  const image = new Image();
-  image.src = await dataUrlOf(file);
-  await image.decode();
-  return image;
+async function compressInWorker(request: CompressionRequest): Promise<Blob> {
+  const answer = await askPhotoWorker<CompressionAnswer>(
+    request,
+    'The photo compression worker failed',
+  );
+  if ('error' in answer) throw new Error(answer.error);
+  return answer.blob;
 }
 
 async function compressOnMainThread(

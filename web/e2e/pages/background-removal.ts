@@ -5,14 +5,18 @@ interface CutoutReview {
   do: {
     cancel(): Promise<void>;
     keepOriginal(): Promise<void>;
+    skip(): Promise<void>;
     useCutout(): Promise<void>;
   };
   locators: {
     buttons: {
       close: Locator;
       keepOriginal: Locator;
+      skip: Locator;
       useCutout: Locator;
     };
+    /** Shown only once the photo reads as blurry. */
+    blurWarning: Locator;
     cutout: Locator;
     original: Locator;
     /** "Photo 2 of 3"; absent for a single photo. */
@@ -28,8 +32,10 @@ export function initBackgroundRemovalReview(page: Page): CutoutReview {
     buttons: {
       close: page.getByTestId('dialog-close'),
       keepOriginal: root.getByTestId('cutout-keep-original'),
+      skip: root.getByTestId('cutout-skip'),
       useCutout: root.getByTestId('cutout-use'),
     },
+    blurWarning: root.getByTestId('blur-warning'),
     cutout: root.getByTestId('cutout-result'),
     original: root.getByTestId('cutout-original'),
     progress: page.getByTestId('cutout-progress'),
@@ -41,6 +47,9 @@ export function initBackgroundRemovalReview(page: Page): CutoutReview {
     },
     keepOriginal: async () => {
       await locators.buttons.keepOriginal.click();
+    },
+    skip: async () => {
+      await locators.buttons.skip.click();
     },
     useCutout: async () => {
       await locators.buttons.useCutout.click();

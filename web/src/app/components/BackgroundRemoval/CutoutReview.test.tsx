@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '../../i18n/I18nProvider';
+import type { Sharpness } from '../../lib/photoSharpness';
 import type { CutOutOptions } from '../../lib/backgroundRemoval';
 
 const removeBackground = vi.hoisted(() => vi.fn());
@@ -31,10 +32,13 @@ let settle: {
   reject: (error: unknown) => void;
 };
 
-function renderReview(onChoose = vi.fn()) {
+function renderReview(
+  onChoose = vi.fn(),
+  sharpness: Sharpness | 'checking' = 'sharp',
+) {
   render(
     <I18nProvider>
-      <CutoutReview file={photo} onChoose={onChoose} />
+      <CutoutReview file={photo} sharpness={sharpness} onChoose={onChoose} />
     </I18nProvider>,
   );
   return onChoose;
@@ -196,7 +200,7 @@ describe('CutoutReview', () => {
   it('stops the work and frees every image URL when it closes', async () => {
     const { unmount } = render(
       <I18nProvider>
-        <CutoutReview file={photo} onChoose={vi.fn()} />
+        <CutoutReview file={photo} sharpness="sharp" onChoose={vi.fn()} />
       </I18nProvider>,
     );
     await act(async () => settle.resolve(cutout));
@@ -211,7 +215,7 @@ describe('CutoutReview', () => {
   it('starts over, stopping the old job, when handed another photo', () => {
     const { rerender } = render(
       <I18nProvider>
-        <CutoutReview file={photo} onChoose={vi.fn()} />
+        <CutoutReview file={photo} sharpness="sharp" onChoose={vi.fn()} />
       </I18nProvider>,
     );
     const first = options.signal!;
@@ -219,7 +223,7 @@ describe('CutoutReview', () => {
 
     rerender(
       <I18nProvider>
-        <CutoutReview file={other} onChoose={vi.fn()} />
+        <CutoutReview file={other} sharpness="sharp" onChoose={vi.fn()} />
       </I18nProvider>,
     );
 
@@ -234,7 +238,7 @@ describe('CutoutReview', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     const { unmount } = render(
       <I18nProvider>
-        <CutoutReview file={photo} onChoose={vi.fn()} />
+        <CutoutReview file={photo} sharpness="sharp" onChoose={vi.fn()} />
       </I18nProvider>,
     );
     unmount();
@@ -244,5 +248,42 @@ describe('CutoutReview', () => {
     );
 
     expect(log).not.toHaveBeenCalled();
+  });
+});
+
+describe('CutoutReview of a photo that reads as blurry', () => {
+  beforeEach(() => {
+    localStorage.setItem('lang', 'en');
+  });
+
+  it('says so, and offers to skip it', async () => {
+    const onChoose = renderReview(vi.fn(), 'blurry');
+
+    expect(screen.getByTestId('blur-warning')).toHaveTextContent(
+      'This photo looks blurry.',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Skip this photo' }),
+    );
+
+    expect(onChoose).toHaveBeenCalledExactlyOnceWith({ kind: 'skip' });
+  });
+
+  it.each(['sharp', 'checking'] as const)(
+    'says nothing of blur, and offers no skip, while %s',
+    (sharpness) => {
+      renderReview(vi.fn(), sharpness);
+
+      expect(screen.queryByTestId('blur-warning')).toBeNull();
+      expect(
+        screen.queryByRole('button', { name: 'Skip this photo' }),
+      ).toBeNull();
+    },
+  );
+
+  it('keeps Keep original focused, so Enter never skips', () => {
+    renderReview(vi.fn(), 'blurry');
+
+    expect(screen.getByRole('button', { name: 'Keep original' })).toHaveFocus();
   });
 });
