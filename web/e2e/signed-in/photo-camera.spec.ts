@@ -45,7 +45,7 @@ test.describe('on a touch device', () => {
     page,
   }) => {
     const app = on(page);
-    const title = uniqueName('Zwei Wege');
+    const title = uniqueName('Zweierlei');
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
