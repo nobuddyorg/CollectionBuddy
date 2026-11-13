@@ -102,14 +102,16 @@ describe('analyzeMask', () => {
 
   it('fills holes the model left inside the coin, such as a shiny highlight', () => {
     const coin = insideEllipse(COIN);
-    const withHoles = alphaWhere(
-      (x, y) =>
-        coin(x, y) &&
-        Math.hypot(x - 50, y - 45) > 6 &&
-        Math.hypot(x - 72, y - 55) > 4,
-    );
+    const highlight = (x: number, y: number) =>
+      Math.hypot(x - 50, y - 45) <= 6 || Math.hypot(x - 72, y - 55) <= 4;
+    const withHoles = alphaWhere((x, y) => coin(x, y) && !highlight(x, y));
+    // Bright where the light catches the coin, on a black table.
+    const pixels = new Uint8Array(WIDTH * HEIGHT * 4);
+    alphaWhere(highlight).forEach((lit, index) => {
+      if (lit) pixels.set([250, 250, 250, 255], index * 4);
+    });
 
-    const analysis = analyzeMask(withHoles, WIDTH, HEIGHT)!;
+    const analysis = analyzeMask(withHoles, WIDTH, HEIGHT, pixels)!;
 
     expect(count(analysis.mask)).toBe(count(alphaWhere(coin)) / 255);
     expect(analysis.fillRatio).toBeGreaterThan(0.97);
@@ -227,7 +229,9 @@ describe('analyzeMask', () => {
     // A 5x5 block less its four corners and a 1-pixel hole: 20 pixels of object, the hole exactly 5%.
     const exact = new Uint8Array(7 * 7);
     for (let y = 1; y < 6; y += 1) exact.fill(255, y * 7 + 1, y * 7 + 6);
-    for (const index of [8, 12, 36, 40, 24]) exact[index] = 0;
+    for (const index of [8, 12, 36, 40]) exact[index] = 0;
+    // Below the object's threshold, yet not a sure background: the size alone decides.
+    exact[24] = 100;
     expect(analyzeMask(exact, 7, 7)!.mask[24]).toBe(1);
 
     // One pixel less on its top edge, open to the background: 19 pixels, so the hole is over 5%.
@@ -313,7 +317,8 @@ describe('analyzeMask', () => {
     it(`leaves a notch reaching only the ${edge} edge open, but fills a hole`, () => {
       const alpha = new Uint8Array(5 * 5).fill(255);
       alpha[y * 5 + x] = 0;
-      alpha[2 * 5 + 2] = 0;
+      // A hole the model was unsure of: the size alone decides it.
+      alpha[2 * 5 + 2] = 100;
 
       const { mask } = analyzeMask(alpha, 5, 5)!;
 
@@ -487,5 +492,65 @@ describe('ellipseCoverage', () => {
 
     expect(coverage[14 * 20 + 14]).toBe(255);
     expect(coverage[5 * 20 + 14]).toBe(0);
+  });
+});
+
+describe('analyzeMask with holes the model was sure of', () => {
+  /** A ring on a plain table, its 1-pixel centre the table's colour, at the model alpha given. */
+  function ringWithPinhole(centreAlpha: number) {
+    const ring = new Uint8Array(7 * 7);
+    for (let y = 1; y < 6; y += 1) ring.fill(255, y * 7 + 1, y * 7 + 6);
+    ring[24] = centreAlpha;
+    return analyzeMask(ring, 7, 7)!.mask[24];
+  }
+
+  // Openwork, a lattice: small, the backdrop's colour, and plainly background to the model.
+  it.each([
+    [0, 0],
+    [63, 0],
+    [64, 1],
+    [127, 1],
+  ])(
+    'at a mean alpha of %d, leaves a small backdrop-coloured hole %s-filled',
+    (alpha, filled) => {
+      expect(ringWithPinhole(alpha)).toBe(filled);
+    },
+  );
+
+  // Red around the ring, blue over most of the frame: a vignette, a gradient, the lights of a scene.
+  it('judges a hole by the backdrop around the object, not the far edges of the frame', () => {
+    const ringShape = (x: number, y: number) => {
+      const distance = Math.hypot(x - 60, y - 50);
+      return distance <= 30 && distance > 15;
+    };
+    const nearRing = (x: number, y: number) => Math.hypot(x - 60, y - 50) <= 40;
+    const pixels = new Uint8Array(WIDTH * HEIGHT * 4);
+    for (let y = 0; y < HEIGHT; y += 1) {
+      for (let x = 0; x < WIDTH; x += 1) {
+        const colour = nearRing(x + 0.5, y + 0.5)
+          ? [200, 40, 40]
+          : [20, 20, 220];
+        pixels.set([...colour, 255], (y * WIDTH + x) * 4);
+      }
+    }
+
+    const { mask } = analyzeMask(alphaWhere(ringShape), WIDTH, HEIGHT, pixels)!;
+
+    expect(mask[50 * WIDTH + 60]).toBe(0);
+    // However unlike the backdrop around the ring, the frame's own background is never a hole.
+    expect(mask[0]).toBe(0);
+  });
+
+  // Two pixels at alpha 40 in a 118-pixel object, so the hole is small: a mean of 40 is a sure background, though 2 x 80 is not.
+  it('judges the model by its mean alpha over the hole, not its sum', () => {
+    const ring = new Uint8Array(14 * 12);
+    for (let y = 1; y < 11; y += 1) ring.fill(255, y * 14 + 1, y * 14 + 13);
+    ring[5 * 14 + 6] = 40;
+    ring[5 * 14 + 7] = 40;
+
+    const { mask } = analyzeMask(ring, 14, 12)!;
+
+    expect(mask[5 * 14 + 6]).toBe(0);
+    expect(mask[5 * 14 + 7]).toBe(0);
   });
 });
