@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useRef } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import CenteredModal from '../CenteredModal';
 import { Spinner } from '../ui/Spinner';
@@ -32,14 +33,16 @@ export function BackgroundRemovalDialog({
   onChoose: (choice: CutoutChoice) => void;
 }) {
   const { t } = useI18n();
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const asksAboutBlur = pending?.removeBackground === false;
   return (
     <CenteredModal
       open={pending !== null}
+      // The cut-out review focuses its own button once it has loaded; the blur question is there at once.
+      initialFocusRef={asksAboutBlur ? keepRef : undefined}
       onOpenChange={() => onChoose({ kind: 'cancel' })}
       title={
-        pending?.removeBackground === false
-          ? t('sharpness.title')
-          : t('background_removal.title')
+        asksAboutBlur ? t('sharpness.title') : t('background_removal.title')
       }
       closeOnBackdrop={false}
     >
@@ -63,8 +66,13 @@ export function BackgroundRemovalDialog({
           onChoose={onChoose}
         />
       )}
-      {pending?.removeBackground === false && (
-        <BlurReview key={pending.key} file={pending.file} onChoose={onChoose} />
+      {asksAboutBlur && (
+        <BlurReview
+          key={pending.key}
+          file={pending.file}
+          onChoose={onChoose}
+          keepRef={keepRef}
+        />
       )}
     </CenteredModal>
   );

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
+import { createRef } from 'react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,12 +14,13 @@ const revokeObjectURL = vi.fn();
 function renderReview(language = 'en') {
   localStorage.setItem('lang', language);
   const onChoose = vi.fn();
+  const keepRef = createRef<HTMLButtonElement>();
   const view = render(
     <I18nProvider>
-      <BlurReview file={photo} onChoose={onChoose} />
+      <BlurReview file={photo} onChoose={onChoose} keepRef={keepRef} />
     </I18nProvider>,
   );
-  return { onChoose, ...view };
+  return { onChoose, keepRef, ...view };
 }
 
 beforeEach(() => {
@@ -61,11 +63,13 @@ describe('BlurReview', () => {
     expect(onChoose).toHaveBeenCalledExactlyOnceWith({ kind: 'skip' });
   });
 
-  // What the person picked stays the default, as it would have with no warning at all.
-  it('focuses Keep anyway, so Enter keeps the photo', () => {
-    renderReview();
+  // The dialog focuses it, so Enter keeps what the person picked.
+  it('hands the dialog its Keep anyway button to focus', () => {
+    const { keepRef } = renderReview();
 
-    expect(screen.getByRole('button', { name: 'Keep anyway' })).toHaveFocus();
+    expect(keepRef.current).toBe(
+      screen.getByRole('button', { name: 'Keep anyway' }),
+    );
   });
 
   it('speaks German by default', () => {

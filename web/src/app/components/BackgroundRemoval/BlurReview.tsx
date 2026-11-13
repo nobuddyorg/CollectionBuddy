@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import type { RefObject } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import { buttonClasses, filledButtonClasses } from '../ui/buttonClasses';
 import { BlurWarning, FRAME, Preview } from './PhotoPreview';
@@ -10,17 +10,14 @@ import type { CutoutChoice } from './useBackgroundRemovalUpload';
 export function BlurReview({
   file,
   onChoose,
+  keepRef,
 }: {
   file: File;
   onChoose: (choice: CutoutChoice) => void;
+  /** The dialog focuses it on opening: Enter keeps the photo, as with no warning at all. */
+  keepRef: RefObject<HTMLButtonElement | null>;
 }) {
   const { t } = useI18n();
-  const keepRef = useRef<HTMLButtonElement>(null);
-
-  // What the person picked stays the default: Enter keeps it, as with no warning at all.
-  useEffect(() => {
-    keepRef.current!.focus();
-  }, []);
 
   return (
     <div data-testid="blur-review" className="space-y-4">

@@ -120,6 +120,8 @@ describe('BackgroundRemovalDialog', () => {
       screen.getByRole('dialog', { name: 'Blurry photo' }),
     ).toBeInTheDocument();
     expect(screen.getByTestId('blur-review')).toBeInTheDocument();
+    // What the person picked stays the default: Enter keeps it, as with no warning at all.
+    expect(screen.getByRole('button', { name: 'Keep anyway' })).toHaveFocus();
     expect(screen.queryByText(/Reviewing/)).toBeNull();
     vi.unstubAllGlobals();
   });
