@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { PhotoUpload } from '../../data/photoType';
 import { useI18n } from '../../i18n/useI18n';
 import { useSyncedRef } from '../../lib/useSyncedRef';
@@ -33,6 +33,8 @@ export function useBackgroundRemovalUpload(upload: Upload) {
   const [batch, setBatch] = useState<PhotoBatch | null>(null);
   // Read at call time: ItemCard's memo keeps an old handler, which must still see a toggle flipped since.
   const latest = useSyncedRef({ upload, t, toast });
+  // Decided photos upload in decision order, so the first picked stays the cover; `upload` reports its own failures.
+  const uploadsSoFar = useRef<Promise<void>>(Promise.resolve());
 
   const pickPhotos = (itemId: string, files: File[]) => {
     if (!readBackgroundRemovalEnabled()) {
@@ -48,6 +50,7 @@ export function useBackgroundRemovalUpload(upload: Upload) {
       );
     }
     if (images.length === 0) return;
+    uploadsSoFar.current = Promise.resolve();
     setBatch({ itemId, files: images, total: images.length });
   };
 
@@ -58,14 +61,18 @@ export function useBackgroundRemovalUpload(upload: Upload) {
       setBatch(choice.kind === 'cancel' ? null : afterCurrent(batch));
       if (choice.kind === 'cancel') return;
       const [file] = batch.files;
-      if (choice.kind === 'original') {
-        void upload(batch.itemId, { file });
-        return;
-      }
-      const cutout = new File([choice.blob], 'cutout.png', {
-        type: 'image/png',
-      });
-      void upload(batch.itemId, { file: cutout, encoding: 'transparent' });
+      const photo: PhotoUpload =
+        choice.kind === 'original'
+          ? { file }
+          : {
+              file: new File([choice.blob], 'cutout.png', {
+                type: 'image/png',
+              }),
+              encoding: 'transparent',
+            };
+      uploadsSoFar.current = uploadsSoFar.current.then(() =>
+        upload(batch.itemId, photo),
+      );
     },
     [batch, upload],
   );

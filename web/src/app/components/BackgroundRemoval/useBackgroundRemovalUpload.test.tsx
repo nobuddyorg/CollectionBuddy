@@ -104,12 +104,12 @@ describe('useBackgroundRemovalUpload', () => {
     expect(upload).not.toHaveBeenCalled();
   });
 
-  it('uploads the original, unchanged, when that is chosen', () => {
+  it('uploads the original, unchanged, when that is chosen', async () => {
     localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
     const { upload, result } = setup();
     act(() => result.current.pickPhotos('item-1', [photo]));
 
-    act(() => result.current.choose({ kind: 'original' }));
+    await act(async () => result.current.choose({ kind: 'original' }));
 
     expect(upload).toHaveBeenCalledWith('item-1', { file: photo });
     expect(result.current.pending).toBeNull();
@@ -121,7 +121,7 @@ describe('useBackgroundRemovalUpload', () => {
     act(() => result.current.pickPhotos('item-1', [photo]));
     const blob = new Blob(['png'], { type: 'image/png' });
 
-    act(() => result.current.choose({ kind: 'cut-out', blob }));
+    await act(async () => result.current.choose({ kind: 'cut-out', blob }));
 
     const [itemId, { file, encoding }] = upload.mock.calls[0] as unknown as [
       string,
@@ -176,7 +176,7 @@ describe('useBackgroundRemovalUpload', () => {
       expect(upload.mock.calls.at(-1)).toEqual(['item-1', { file: third }]);
     });
 
-    it('reviews them one at a time, counting from the first', () => {
+    it('reviews them one at a time, counting from the first', async () => {
       localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
       const { upload, result } = setup();
 
@@ -187,7 +187,7 @@ describe('useBackgroundRemovalUpload', () => {
         position: { current: 1, total: 3 },
       });
 
-      act(() => result.current.choose({ kind: 'original' }));
+      await act(async () => result.current.choose({ kind: 'original' }));
       expect(result.current.pending).toEqual({
         itemId: 'item-1',
         file: second,
@@ -196,11 +196,11 @@ describe('useBackgroundRemovalUpload', () => {
       expect(upload).toHaveBeenCalledTimes(1);
 
       const blob = new Blob(['png'], { type: 'image/png' });
-      act(() => result.current.choose({ kind: 'cut-out', blob }));
+      await act(async () => result.current.choose({ kind: 'cut-out', blob }));
       expect(result.current.pending?.file).toBe(third);
       expect(upload).toHaveBeenCalledTimes(2);
 
-      act(() => result.current.choose({ kind: 'original' }));
+      await act(async () => result.current.choose({ kind: 'original' }));
       expect(result.current.pending).toBeNull();
       expect(upload).toHaveBeenCalledTimes(3);
       expect(
@@ -210,11 +210,39 @@ describe('useBackgroundRemovalUpload', () => {
       ).toEqual(['coin.jpg', 'cutout.png', 'ring.jpg']);
     });
 
-    it('drops the photos still waiting when the review is cancelled', () => {
+    it('uploads the decided photos in decision order, each after the one before', async () => {
+      localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
+      const finish: Array<() => void> = [];
+      const upload = vi.fn(
+        () => new Promise<void>((resolve) => finish.push(resolve)),
+      );
+      const { result } = renderHook(() => useBackgroundRemovalUpload(upload), {
+        wrapper,
+      });
+      act(() => result.current.pickPhotos('item-1', [photo, second, third]));
+
+      act(() => result.current.choose({ kind: 'original' }));
+      act(() => result.current.choose({ kind: 'original' }));
+      act(() => result.current.choose({ kind: 'original' }));
+      await act(async () => {});
+
+      expect(upload).toHaveBeenCalledTimes(1);
+      await act(async () => finish[0]());
+      expect(upload).toHaveBeenCalledTimes(2);
+      await act(async () => finish[1]());
+      expect(upload).toHaveBeenCalledTimes(3);
+      expect(
+        (upload.mock.calls as unknown as Array<[string, { file: File }]>).map(
+          ([, { file }]) => file.name,
+        ),
+      ).toEqual(['coin.jpg', 'medal.jpg', 'ring.jpg']);
+    });
+
+    it('drops the photos still waiting when the review is cancelled', async () => {
       localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
       const { upload, result } = setup();
       act(() => result.current.pickPhotos('item-1', [photo, second]));
-      act(() => result.current.choose({ kind: 'original' }));
+      await act(async () => result.current.choose({ kind: 'original' }));
 
       act(() => result.current.choose({ kind: 'cancel' }));
 
