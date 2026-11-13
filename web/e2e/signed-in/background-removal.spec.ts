@@ -178,6 +178,67 @@ test.describe('background removal', () => {
     }
   });
 
+  test('reviews several photos one after the other, then uploads each as decided', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const app = on(page);
+    await serveStandInModel(page);
+    await turnOnBackgroundRemoval(app, page);
+    const title = uniqueName('Mehrere Fotos');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+
+      await card.do.uploadPhoto([
+        await itemPhoto(page, testInfo.outputPath('first.png')),
+        await itemPhoto(page, testInfo.outputPath('second.png')),
+      ]);
+
+      const review = app.backgroundRemoval;
+      await expect(review.locators.progress).toHaveText('Photo 1 of 2');
+      await expect(review.locators.cutout).toBeVisible({ timeout: ARRIVES });
+      await review.do.useCutout();
+
+      await expect(review.locators.progress).toHaveText('Photo 2 of 2');
+      await expect(review.locators.cutout).toBeVisible({ timeout: ARRIVES });
+      await review.do.keepOriginal();
+
+      await expect(review()).toHaveCount(0);
+      await expect(card.locators.images).toHaveCount(2, { timeout: ARRIVES });
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
+  test('closing the review drops the photos still waiting', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const app = on(page);
+    await serveStandInModel(page);
+    await turnOnBackgroundRemoval(app, page);
+    const title = uniqueName('Abgebrochen');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      await card.do.uploadPhoto([
+        await itemPhoto(page, testInfo.outputPath('first.png')),
+        await itemPhoto(page, testInfo.outputPath('second.png')),
+      ]);
+      await expect(app.backgroundRemoval.locators.progress).toHaveText(
+        'Photo 1 of 2',
+      );
+
+      await app.backgroundRemoval.do.cancel();
+
+      await expect(app.backgroundRemoval()).toHaveCount(0);
+      await expect(card.locators.images).toHaveCount(0);
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
   // Turbopack boots every worker from one script whose URL fragment Chrome reuses, so the first photo job must not decide the next.
   test('still cuts out a photo after a plain upload in the same page', async ({
     on,

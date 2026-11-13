@@ -2,7 +2,7 @@ import { expect, test } from './test';
 
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
-import { PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
+import { OTHER_PHOTO, PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
 import { context, seededEntryId, storedObjects } from './rls/helpers';
 import type { PageTree } from '../pages';
 // Decode, resize, upload, list and sign all happen in the browser; rls/ covers what the policies allow.
@@ -157,6 +157,33 @@ test.describe('photographs', () => {
         expect(file.type).toBe('image/webp');
         expect(file.bytes).toBeLessThan(COMPRESSED_CEILING_BYTES);
       }
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
+  test('several photographs picked at once are all stored, a pair each', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const { token, userId } = context();
+    const title = uniqueName('Mehrere');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      const itemId = await seededEntryId({ token, ownerId: userId, title });
+
+      await card.do.uploadPhoto([PHOTO, OTHER_PHOTO]);
+
+      await expect
+        .poll(() => storedNames({ token, userId, itemId }), {
+          timeout: PHOTO_ARRIVES * 2,
+        })
+        .toHaveLength(4);
+      await expect(card.locators.images).toHaveCount(2, {
+        timeout: PHOTO_ARRIVES,
+      });
     } finally {
       await removeEntriesTitled(title);
     }

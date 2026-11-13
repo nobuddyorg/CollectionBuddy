@@ -14,6 +14,7 @@ import { BackgroundRemovalDialog } from './BackgroundRemovalDialog';
 const pending = {
   itemId: 'item-1',
   file: new File(['jpeg'], 'coin.jpg', { type: 'image/jpeg' }),
+  position: { current: 1, total: 1 },
 };
 
 function renderDialog(props: Parameters<typeof BackgroundRemovalDialog>[0]) {
@@ -62,5 +63,23 @@ describe('BackgroundRemovalDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(onChoose).toHaveBeenCalledWith({ kind: 'cancel' });
+  });
+
+  it('says nothing about progress for a single photo', async () => {
+    renderDialog({ pending, onChoose: vi.fn() });
+    await screen.findByText('Reviewing coin.jpg');
+
+    expect(screen.queryByTestId('cutout-progress')).toBeNull();
+  });
+
+  it('says which photo of several is under review', async () => {
+    renderDialog({
+      pending: { ...pending, position: { current: 2, total: 3 } },
+      onChoose: vi.fn(),
+    });
+
+    expect(await screen.findByTestId('cutout-progress')).toHaveTextContent(
+      'Photo 2 of 3',
+    );
   });
 });

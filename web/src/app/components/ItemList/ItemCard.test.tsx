@@ -213,7 +213,25 @@ describe('ItemCard drag-and-drop upload', () => {
     const file = new File(['x'], 'photo.png', { type: 'image/png' });
     const card = screen.getByTestId('item-card');
     fireEvent.drop(card, { dataTransfer: { files: [file] } });
-    expect(handlers.onUpload).toHaveBeenCalledWith(file);
+    expect(handlers.onUpload).toHaveBeenCalledWith([file]);
+  });
+
+  it('hands every dropped file to onUpload, in drop order', () => {
+    const handlers = renderCard();
+    const first = new File(['1'], 'a.png', { type: 'image/png' });
+    const second = new File(['2'], 'b.png', { type: 'image/png' });
+    fireEvent.drop(screen.getByTestId('item-card'), {
+      dataTransfer: { files: [first, second] },
+    });
+    expect(handlers.onUpload).toHaveBeenCalledExactlyOnceWith([first, second]);
+  });
+
+  it('ignores a drop that carries no files', () => {
+    const handlers = renderCard();
+    fireEvent.drop(screen.getByTestId('item-card'), {
+      dataTransfer: { files: [] },
+    });
+    expect(handlers.onUpload).not.toHaveBeenCalled();
   });
 
   it('highlights the card while a file is dragged over it', () => {

@@ -55,7 +55,7 @@ describe('useBackgroundRemovalUpload', () => {
   it('uploads straight away, exactly as before, while the opt-in is off', () => {
     const { upload, result } = setup();
 
-    act(() => result.current.pickPhoto('item-1', photo));
+    act(() => result.current.pickPhotos('item-1', [photo]));
 
     expect(upload).toHaveBeenCalledWith('item-1', { file: photo });
     expect(result.current.pending).toBeNull();
@@ -67,19 +67,23 @@ describe('useBackgroundRemovalUpload', () => {
     localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
     const { upload, result } = setup();
 
-    act(() => result.current.pickPhoto('item-1', photo));
+    act(() => result.current.pickPhotos('item-1', [photo]));
 
     expect(upload).not.toHaveBeenCalled();
-    expect(result.current.pending).toEqual({ itemId: 'item-1', file: photo });
+    expect(result.current.pending).toEqual({
+      itemId: 'item-1',
+      file: photo,
+      position: { current: 1, total: 1 },
+    });
   });
 
   // ItemCard's memo keeps an old handler; it must still see a toggle flipped after it was made.
   it('reads the opt-in when a photo is picked, not when the handler was made', () => {
     const { upload, result } = setup();
-    const pickPhoto = result.current.pickPhoto;
+    const pickPhotos = result.current.pickPhotos;
 
     localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
-    act(() => pickPhoto('item-1', photo));
+    act(() => pickPhotos('item-1', [photo]));
 
     expect(upload).not.toHaveBeenCalled();
     expect(result.current.pending).not.toBeNull();
@@ -90,10 +94,9 @@ describe('useBackgroundRemovalUpload', () => {
     const { upload, result } = setup();
 
     act(() =>
-      result.current.pickPhoto(
-        'item-1',
+      result.current.pickPhotos('item-1', [
         new File(['%PDF'], 'a.pdf', { type: 'application/pdf' }),
-      ),
+      ]),
     );
 
     expect(toastError).toHaveBeenCalledWith('Only photos can be added.');
@@ -104,7 +107,7 @@ describe('useBackgroundRemovalUpload', () => {
   it('uploads the original, unchanged, when that is chosen', () => {
     localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
     const { upload, result } = setup();
-    act(() => result.current.pickPhoto('item-1', photo));
+    act(() => result.current.pickPhotos('item-1', [photo]));
 
     act(() => result.current.choose({ kind: 'original' }));
 
@@ -115,7 +118,7 @@ describe('useBackgroundRemovalUpload', () => {
   it('uploads the cut-out as a PNG that keeps its transparency', async () => {
     localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
     const { upload, result } = setup();
-    act(() => result.current.pickPhoto('item-1', photo));
+    act(() => result.current.pickPhotos('item-1', [photo]));
     const blob = new Blob(['png'], { type: 'image/png' });
 
     act(() => result.current.choose({ kind: 'cut-out', blob }));
@@ -136,7 +139,7 @@ describe('useBackgroundRemovalUpload', () => {
   it('uploads nothing when the review is cancelled', () => {
     localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
     const { upload, result } = setup();
-    act(() => result.current.pickPhoto('item-1', photo));
+    act(() => result.current.pickPhotos('item-1', [photo]));
 
     act(() => result.current.choose({ kind: 'cancel' }));
 
@@ -150,5 +153,89 @@ describe('useBackgroundRemovalUpload', () => {
     act(() => result.current.choose({ kind: 'original' }));
 
     expect(upload).not.toHaveBeenCalled();
+  });
+  describe('with several photos picked at once', () => {
+    const second = new File(['jpeg2'], 'medal.jpg', { type: 'image/jpeg' });
+    const third = new File(['jpeg3'], 'ring.jpg', { type: 'image/jpeg' });
+
+    it('uploads them one after the other, in pick order, while the opt-in is off', async () => {
+      const finish: Array<() => void> = [];
+      const upload = vi.fn(
+        () => new Promise<void>((resolve) => finish.push(resolve)),
+      );
+      const { result } = renderHook(() => useBackgroundRemovalUpload(upload), {
+        wrapper,
+      });
+
+      act(() => result.current.pickPhotos('item-1', [photo, second, third]));
+
+      expect(upload.mock.calls).toEqual([['item-1', { file: photo }]]);
+      await act(async () => finish[0]());
+      expect(upload.mock.calls.at(-1)).toEqual(['item-1', { file: second }]);
+      await act(async () => finish[1]());
+      expect(upload.mock.calls.at(-1)).toEqual(['item-1', { file: third }]);
+    });
+
+    it('reviews them one at a time, counting from the first', () => {
+      localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
+      const { upload, result } = setup();
+
+      act(() => result.current.pickPhotos('item-1', [photo, second, third]));
+      expect(result.current.pending).toEqual({
+        itemId: 'item-1',
+        file: photo,
+        position: { current: 1, total: 3 },
+      });
+
+      act(() => result.current.choose({ kind: 'original' }));
+      expect(result.current.pending).toEqual({
+        itemId: 'item-1',
+        file: second,
+        position: { current: 2, total: 3 },
+      });
+      expect(upload).toHaveBeenCalledTimes(1);
+
+      const blob = new Blob(['png'], { type: 'image/png' });
+      act(() => result.current.choose({ kind: 'cut-out', blob }));
+      expect(result.current.pending?.file).toBe(third);
+      expect(upload).toHaveBeenCalledTimes(2);
+
+      act(() => result.current.choose({ kind: 'original' }));
+      expect(result.current.pending).toBeNull();
+      expect(upload).toHaveBeenCalledTimes(3);
+      expect(
+        (upload.mock.calls as unknown as Array<[string, { file: File }]>).map(
+          ([, { file }]) => file.name,
+        ),
+      ).toEqual(['coin.jpg', 'cutout.png', 'ring.jpg']);
+    });
+
+    it('drops the photos still waiting when the review is cancelled', () => {
+      localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
+      const { upload, result } = setup();
+      act(() => result.current.pickPhotos('item-1', [photo, second]));
+      act(() => result.current.choose({ kind: 'original' }));
+
+      act(() => result.current.choose({ kind: 'cancel' }));
+
+      expect(result.current.pending).toBeNull();
+      expect(upload).toHaveBeenCalledTimes(1);
+    });
+
+    it('reviews the photos among them and says once that the others were refused', () => {
+      localStorage.setItem(BACKGROUND_REMOVAL_STORAGE_KEY, 'on');
+      const { result } = setup();
+      const pdf = new File(['%PDF'], 'a.pdf', { type: 'application/pdf' });
+      const text = new File(['hi'], 'b.txt', { type: 'text/plain' });
+
+      act(() => result.current.pickPhotos('item-1', [pdf, photo, text]));
+
+      expect(toastError).toHaveBeenCalledTimes(1);
+      expect(result.current.pending).toEqual({
+        itemId: 'item-1',
+        file: photo,
+        position: { current: 1, total: 1 },
+      });
+    });
   });
 });

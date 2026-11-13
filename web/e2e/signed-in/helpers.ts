@@ -9,6 +9,9 @@ export const uniqueName = (what: string) => `${what} ${Date.now()}`;
 // A real photograph: the compressor decodes what it is given, and a canvas cannot draw a fake PNG.
 export const PHOTO = resolve(process.cwd(), 'public/logo.png');
 
+// A second real image, for a pick of more than one.
+export const OTHER_PHOTO = resolve(process.cwd(), 'public/icon-192-v2.png');
+
 // Below the test timeout, so a slow upload fails with its own message instead of a bare timeout.
 export const PHOTO_ARRIVES = 45_000;
 

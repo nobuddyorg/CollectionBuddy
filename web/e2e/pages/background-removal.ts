@@ -15,6 +15,8 @@ interface CutoutReview {
     };
     cutout: Locator;
     original: Locator;
+    /** "Photo 2 of 3"; absent for a single photo. */
+    progress: Locator;
     status: Locator;
   };
 }
@@ -30,6 +32,7 @@ export function initBackgroundRemovalReview(page: Page): CutoutReview {
     },
     cutout: root.getByTestId('cutout-result'),
     original: root.getByTestId('cutout-original'),
+    progress: page.getByTestId('cutout-progress'),
     status: root.getByTestId('cutout-status'),
   };
   const interactions = {
