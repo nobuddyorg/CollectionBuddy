@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import type { PhotoUpload } from '../../data/photoType';
 import type { Sharpness } from '../../lib/photoSharpness';
+import type { ImageEntry } from '../ItemList/types';
 import { ToastProvider } from '../Toast/ToastProvider';
 
 // Spies on the feature's only import() sites: with the opt-in off, neither may ever run.
@@ -20,12 +21,26 @@ const assessSharpness = vi.hoisted(() =>
 );
 vi.mock('../../lib/photoSharpness', () => ({ assessSharpness }));
 
+const downloadImageObject = vi.hoisted(() =>
+  vi.fn<
+    (
+      path: string,
+    ) => Promise<{ data: Blob; error: null } | { data: null; error: Error }>
+  >(),
+);
+vi.mock('../../data/images', () => ({ downloadImageObject }));
+
 const toastError = vi.hoisted(() => vi.fn());
+const toastReportError = vi.hoisted(() => vi.fn());
 vi.mock('../Toast/ToastProvider', async (importActual) => {
   const actual = await importActual<typeof import('../Toast/ToastProvider')>();
   return {
     ...actual,
-    useToast: () => ({ ...actual.useToast(), error: toastError }),
+    useToast: () => ({
+      ...actual.useToast(),
+      error: toastError,
+      reportError: toastReportError,
+    }),
   };
 });
 
@@ -45,6 +60,11 @@ const second = new File(['jpeg2'], 'medal.jpg', { type: 'image/jpeg' });
 const third = new File(['jpeg3'], 'ring.jpg', { type: 'image/jpeg' });
 
 type Upload = (itemId: string, photo: PhotoUpload) => Promise<void>;
+type Replace = (
+  itemId: string,
+  image: ImageEntry,
+  photo: PhotoUpload,
+) => Promise<void>;
 
 /** Each check waits until the test answers it, by file name. */
 const checks = new Map<string, (sharpness: Sharpness) => void>();
@@ -60,11 +80,14 @@ async function answer(name: string, sharpness: Sharpness) {
 /** Lets every check answered so far, and every upload chained after one, run. */
 const settle = () => act(async () => {});
 
-function setup(upload: Mock<Upload> = vi.fn<Upload>(async () => {})) {
-  const hook = renderHook(() => useBackgroundRemovalUpload(upload), {
+function setup(
+  upload: Mock<Upload> = vi.fn<Upload>(async () => {}),
+  replace: Mock<Replace> = vi.fn<Replace>(async () => {}),
+) {
+  const hook = renderHook(() => useBackgroundRemovalUpload(upload, replace), {
     wrapper,
   });
-  return { upload, ...hook };
+  return { upload, replace, ...hook };
 }
 
 const uploadedNames = (upload: Mock<Upload>) =>
@@ -78,6 +101,8 @@ beforeEach(() => {
   load.loadBackgroundRemoval.mockClear();
   load.loadCutoutReview.mockClear();
   toastError.mockClear();
+  toastReportError.mockClear();
+  downloadImageObject.mockReset();
   checks.clear();
   assessSharpness.mockReset();
   assessSharpness.mockResolvedValue('sharp');
@@ -375,5 +400,73 @@ describe('useBackgroundRemovalUpload, with the opt-in on', () => {
     await act(async () => result.current.choose({ kind: 'original' }));
 
     expect(upload).not.toHaveBeenCalled();
+  });
+});
+
+describe('useBackgroundRemovalUpload, for a photo already stored', () => {
+  const stored: ImageEntry = { id: 'image-1', pathFull: 'uid/item-1/a.webp' };
+  const bytes = new Blob(['webp'], { type: 'image/webp' });
+
+  it('loads the stored photo and opens its cut-out review, with no blur check', async () => {
+    downloadImageObject.mockResolvedValue({ data: bytes, error: null });
+    const { result } = setup();
+
+    await act(async () => result.current.reviewStored('item-1', stored));
+
+    expect(downloadImageObject).toHaveBeenCalledWith('uid/item-1/a.webp');
+    expect(assessSharpness).not.toHaveBeenCalled();
+    expect(result.current.pending).toMatchObject({
+      itemId: 'item-1',
+      removeBackground: true,
+      target: { kind: 'replace', image: stored },
+    });
+    expect(result.current.pending?.file.type).toBe('image/webp');
+    expect(await result.current.pending?.file.text()).toBe('webp');
+  });
+
+  it("puts the cut-out in the stored photo's place, never adding one", async () => {
+    downloadImageObject.mockResolvedValue({ data: bytes, error: null });
+    const { upload, replace, result } = setup();
+    await act(async () => result.current.reviewStored('item-1', stored));
+    const blob = new Blob(['png'], { type: 'image/png' });
+
+    await act(async () => result.current.choose({ kind: 'cut-out', blob }));
+
+    expect(upload).not.toHaveBeenCalled();
+    const [itemId, image, { file, encoding }] = replace.mock.calls[0];
+    expect([itemId, image]).toEqual(['item-1', stored]);
+    expect(file.name).toBe('cutout.png');
+    expect(encoding).toBe('transparent');
+    expect(result.current.pending).toBeNull();
+  });
+
+  it.each(['original', 'skip', 'cancel'] as const)(
+    'leaves the stored photo as it is on %s',
+    async (kind) => {
+      downloadImageObject.mockResolvedValue({ data: bytes, error: null });
+      const { upload, replace, result } = setup();
+      await act(async () => result.current.reviewStored('item-1', stored));
+
+      await act(async () => result.current.choose({ kind }));
+
+      expect(upload).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
+      expect(result.current.pending).toBeNull();
+    },
+  );
+
+  it('says so, and opens nothing, when the stored photo cannot be loaded', async () => {
+    const error = new Error('Object not found');
+    downloadImageObject.mockResolvedValue({ data: null, error });
+    const { result } = setup();
+
+    await act(async () => result.current.reviewStored('item-1', stored));
+
+    expect(toastReportError).toHaveBeenCalledWith(
+      'load photo for background removal',
+      error,
+      'This photo could not be loaded to remove its background. Please try again.',
+    );
+    expect(result.current.pending).toBeNull();
   });
 });

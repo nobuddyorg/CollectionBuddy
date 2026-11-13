@@ -29,6 +29,11 @@ export function uploadImageObject(path: string, file: Blob) {
   return supabase.storage.from(ITEM_IMAGES_BUCKET).upload(path, file);
 }
 
+/** A stored photograph's bytes, read through the same policies that let this user see it. */
+export function downloadImageObject(path: string) {
+  return supabase.storage.from(ITEM_IMAGES_BUCKET).download(path);
+}
+
 /** Only no response, a 429 or a 5xx can pass on a retry; Storage sends its own code as `statusCode`, often under an HTTP 400. */
 export function isTransientStorageError({
   status,
@@ -71,13 +76,27 @@ type NewImageRow = {
 /** An import stamps `created_at` in archive order; an upload leaves it to the column default. */
 type ImportedImageRow = NewImageRow & { created_at: string };
 
+/** A photograph taking another's place: its `created_at`, and an `id` just after its own, keep the order the photos are shown in. */
+type ReplacingImageRow = ImportedImageRow & { id: string };
+
 // user_id is never sent: tg_images_enforce derives it from the item's owner and rejects the rest.
-export function createImageRow(row: NewImageRow | ImportedImageRow) {
+export function createImageRow(
+  row: NewImageRow | ImportedImageRow | ReplacingImageRow,
+) {
   return supabase
     .from('images')
     .insert(row as Database['public']['Tables']['images']['Insert'])
     .select(IMAGE_LIST_SELECT)
     .single<ImageListRow>();
+}
+
+/** When a photograph was added: the first key the photos of an entry are ordered by. */
+export function readImageCreatedAt(id: string) {
+  return supabase
+    .from('images')
+    .select('created_at')
+    .eq('id', id)
+    .single<{ created_at: string }>();
 }
 
 /** A delete that matched no row, hidden by RLS or already gone, fails, unless its entry is gone and its cascade took the row. */

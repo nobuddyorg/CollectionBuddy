@@ -19,6 +19,8 @@ export function ModalImage({
   onIndexChange,
   onClose,
   onDelete,
+  onRemoveBackground = () => {},
+  offerRemoveBackground = false,
   busy = false,
   readOnly = false,
 }: {
@@ -30,6 +32,9 @@ export function ModalImage({
   onIndexChange: (index: number) => void;
   onClose: () => void;
   onDelete: (image: ImageEntry) => void;
+  onRemoveBackground?: (image: ImageEntry) => void;
+  /** Only where this browser opted in to background removal, and only to an editor. */
+  offerRemoveBackground?: boolean;
   busy?: boolean;
   /** Shared category: no delete control in the carousel either. */
   readOnly?: boolean;
@@ -141,6 +146,18 @@ export function ModalImage({
             aria-label={t('item_list.delete_image')}
           >
             <Icon icon={IconType.Trash} className="w-5 h-5" />
+          </button>
+        )}
+        {!readOnly && offerRemoveBackground && (
+          <button
+            data-testid="remove-background-image"
+            onClick={() => onRemoveBackground(current)}
+            disabled={busy}
+            className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-15 z-10 w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-60 transition-colors"
+            title={t('item_list.remove_background')}
+            aria-label={t('item_list.remove_background')}
+          >
+            <Icon icon={IconType.Scissors} className="w-5 h-5" />
           </button>
         )}
 

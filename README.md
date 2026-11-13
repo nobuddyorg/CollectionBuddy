@@ -46,7 +46,7 @@ It is designed for keeping a structured personal record of collected items rathe
 ## Features
 
 - **Photo-first entries**: one photo, a pair, or a whole strip. Add several photos at once, or take one with the camera on a phone; a blurry one is flagged before it uploads. Photos are compressed to WebP (JPEG in Safari and on iOS) in the browser before upload, so there's no manual resizing.
-- **Background removal, if you want it**: turn on **Remove backgrounds** in the account menu and each photo is offered without its background, next to the original, before it uploads: a coin, a stamp, whatever you collect. It runs entirely in your browser; the model is downloaded once (about 90 MB), and nothing changes for anyone who leaves it off.
+- **Background removal, if you want it**: turn on **Remove backgrounds** in the account menu and each photo is offered without its background, next to the original, before it uploads: a coin, a stamp, whatever you collect. A photo already added can lose its background too, and keeps its place. It runs entirely in your browser; the model is downloaded once (about 90 MB), and nothing changes for anyone who leaves it off.
 - **Categories** to keep collections apart, with **sharing** so someone else can browse yours — read-only by default, or with edit access if you grant it.
 - **Place and map**: give an item a location, then see your whole collection pinned on a map.
 - **Tags and search** across title, description, place, and tags at once.
