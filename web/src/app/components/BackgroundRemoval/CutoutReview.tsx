@@ -1,44 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import { buttonClasses, filledButtonClasses } from '../ui/buttonClasses';
 import { Spinner } from '../ui/Spinner';
+import type { Sharpness } from '../../lib/photoSharpness';
+import { BlurWarning, FRAME, Preview } from './PhotoPreview';
 import type { CutoutChoice } from './useBackgroundRemovalUpload';
 import { useCutoutJob, type CutoutJob } from './useCutoutJob';
-
-// A checkerboard, so a transparent background reads as transparent in both themes.
-const FRAME =
-  'grid aspect-square place-items-center overflow-hidden rounded-sm ring-1 ring-border bg-[conic-gradient(var(--color-muted)_25%,var(--color-card)_0_50%,var(--color-muted)_0_75%,var(--color-card)_0)] bg-size-[16px_16px]';
-
-function Preview({
-  blob,
-  alt,
-  testId,
-}: {
-  blob: Blob;
-  alt: string;
-  testId: string;
-}) {
-  // A ref with cleanup, which React 19 never calls with null, so each object URL is revoked with its image.
-  const show = useCallback(
-    (image: HTMLImageElement | null) => {
-      const url = URL.createObjectURL(blob);
-      image!.src = url;
-      return () => URL.revokeObjectURL(url);
-    },
-    [blob],
-  );
-  return (
-    // eslint-disable-next-line @next/next/no-img-element -- a blob: URL of a photo that has not left the device; next/image cannot take one
-    <img
-      ref={show}
-      alt={alt}
-      data-testid={testId}
-      className="h-full w-full object-contain"
-    />
-  );
-}
 
 function DownloadProgress({ job }: { job: CutoutJob }) {
   const { t } = useI18n();
@@ -57,9 +26,11 @@ function DownloadProgress({ job }: { job: CutoutJob }) {
 
 export default function CutoutReview({
   file,
+  sharpness,
   onChoose,
 }: {
   file: File;
+  sharpness: Sharpness | 'checking';
   onChoose: (choice: CutoutChoice) => void;
 }) {
   const { t } = useI18n();
@@ -117,8 +88,19 @@ export default function CutoutReview({
         {status[job.status]}
       </p>
       <DownloadProgress job={job} />
+      {sharpness === 'blurry' && <BlurWarning />}
 
       <div className="flex flex-wrap justify-end gap-2">
+        {sharpness === 'blurry' && (
+          <button
+            type="button"
+            data-testid="cutout-skip"
+            onClick={() => onChoose({ kind: 'skip' })}
+            className={buttonClasses()}
+          >
+            {t('sharpness.skip')}
+          </button>
+        )}
         <button
           ref={keepOriginalRef}
           type="button"

@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CutoutReply, CutoutRequest } from './backgroundRemovalJob';
 import type { CompressionRequest } from './drawPhoto';
 import type { CompressionAnswer } from './photo.worker';
+import type { SharpnessAnswer, SharpnessRequest } from './sharpnessJob';
 
-type Job = CompressionRequest | CutoutRequest;
-type Answer = CompressionAnswer | CutoutReply;
+type Job = CompressionRequest | SharpnessRequest | CutoutRequest;
+type Answer = CompressionAnswer | SharpnessAnswer | CutoutReply;
 
 const handleRequest = vi.hoisted(() =>
   vi.fn<
@@ -20,6 +21,10 @@ const compressOffscreen = vi.hoisted(() =>
 );
 vi.mock('./backgroundRemovalJob', () => ({ handleRequest }));
 vi.mock('./compressOffscreen', () => ({ compressOffscreen }));
+const measureOffscreen = vi.hoisted(() =>
+  vi.fn<(request: SharpnessRequest) => Promise<number>>(),
+);
+vi.mock('./sharpnessJob', () => ({ measureOffscreen }));
 
 /** The worker's global scope: the page's messages arrive at `onmessage`, and its answers are recorded. */
 const scope = {
@@ -56,6 +61,7 @@ beforeEach(async () => {
   scope.answers = [];
   handleRequest.mockReset();
   compressOffscreen.mockReset();
+  measureOffscreen.mockReset();
   vi.stubGlobal('self', scope);
   vi.resetModules();
   await import('./photo.worker');
@@ -80,6 +86,30 @@ describe('the photo worker', () => {
 
     await send(compression, [
       { error: 'EncodingError: The canvas is too large.' },
+    ]);
+  });
+
+  it('answers a sharpness check with its score', async () => {
+    const check: SharpnessRequest = {
+      kind: 'sharpness',
+      file: new Blob(['photo']),
+    };
+    measureOffscreen.mockResolvedValue(1234.5);
+
+    await send(check, [{ score: 1234.5 }]);
+
+    expect(measureOffscreen).toHaveBeenCalledExactlyOnceWith(check);
+    expect(compressOffscreen).not.toHaveBeenCalled();
+    expect(handleRequest).not.toHaveBeenCalled();
+  });
+
+  it('answers a sharpness check that failed with its reason', async () => {
+    measureOffscreen.mockRejectedValue(
+      new DOMException('The source image cannot be decoded.', 'EncodingError'),
+    );
+
+    await send({ kind: 'sharpness', file: new Blob(['photo']) }, [
+      { error: 'EncodingError: The source image cannot be decoded.' },
     ]);
   });
 

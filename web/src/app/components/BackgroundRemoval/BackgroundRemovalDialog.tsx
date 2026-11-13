@@ -1,11 +1,14 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useRef } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import CenteredModal from '../CenteredModal';
 import { Spinner } from '../ui/Spinner';
 import { loadCutoutReview } from './load';
-import type { CutoutChoice, PendingCutout } from './useBackgroundRemovalUpload';
+import { BlurReview } from './BlurReview';
+import type { QueuedPhoto } from './photoBatch';
+import type { CutoutChoice } from './useBackgroundRemovalUpload';
 
 function Loading() {
   const { t } = useI18n();
@@ -21,20 +24,26 @@ const CutoutReview = dynamic(loadCutoutReview, {
   loading: Loading,
 });
 
-/** Only this shell is in the main bundle; the review and everything it runs load when a photo is picked. */
+/** The review a picked photo may need: a cut-out to compare, loaded on demand, or a blur warning, which is small enough to ship. */
 export function BackgroundRemovalDialog({
   pending,
   onChoose,
 }: {
-  pending: PendingCutout | null;
+  pending: QueuedPhoto | null;
   onChoose: (choice: CutoutChoice) => void;
 }) {
   const { t } = useI18n();
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const asksAboutBlur = pending?.removeBackground === false;
   return (
     <CenteredModal
       open={pending !== null}
+      // The cut-out review focuses its own button once it has loaded; the blur question is there at once.
+      initialFocusRef={asksAboutBlur ? keepRef : undefined}
       onOpenChange={() => onChoose({ kind: 'cancel' })}
-      title={t('background_removal.title')}
+      title={
+        asksAboutBlur ? t('sharpness.title') : t('background_removal.title')
+      }
       closeOnBackdrop={false}
     >
       {pending && pending.position.total > 1 && (
@@ -48,12 +57,21 @@ export function BackgroundRemovalDialog({
           })}
         </p>
       )}
-      {/* Keyed by position: each photo of a pick gets a fresh review, focus included. */}
-      {pending && (
+      {/* Keyed per photo: each gets a fresh review, focus included. */}
+      {pending?.removeBackground && (
         <CutoutReview
-          key={pending.position.current}
+          key={pending.key}
+          file={pending.file}
+          sharpness={pending.sharpness}
+          onChoose={onChoose}
+        />
+      )}
+      {asksAboutBlur && (
+        <BlurReview
+          key={pending.key}
           file={pending.file}
           onChoose={onChoose}
+          keepRef={keepRef}
         />
       )}
     </CenteredModal>

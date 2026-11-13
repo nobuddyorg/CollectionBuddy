@@ -5,6 +5,7 @@ import { initAppError } from './app-error';
 import { initCatalogue } from './catalogue';
 import { initCategoryPanel } from './category-panel';
 import { initBackgroundRemovalReview } from './background-removal';
+import { initBlurReview } from './blur-review';
 import { initConfirm, initImageViewer, initToast } from './dialogs';
 import { initEntryForm } from './entry-form';
 import { initHelp } from './help';
@@ -33,6 +34,9 @@ export function createPageTree(page: Page) {
     },
     get backgroundRemoval() {
       return initBackgroundRemovalReview(page);
+    },
+    get blurReview() {
+      return initBlurReview(page);
     },
     get confirm() {
       return initConfirm(page);

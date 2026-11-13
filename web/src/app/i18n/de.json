@@ -262,6 +262,13 @@
     "not_an_image": "Nur Fotos können hinzugefügt werden.",
     "progress": "Foto {current} von {total}"
   },
+  "sharpness": {
+    "title": "Unscharfes Foto",
+    "warning": "Dieses Foto wirkt unscharf. Behalte es trotzdem oder überspringe es und nimm oder wähle ein anderes.",
+    "keep": "Trotzdem behalten",
+    "skip": "Foto überspringen",
+    "preview_alt": "Das Foto, das unscharf wirkt"
+  },
   "passkeys": {
     "heading": "Fingerabdruck",
     "hint": "Speichere einmal deinen Fingerabdruck auf diesem Gerät; danach meldest du dich ohne Google an. Je nach Gerät bestätigst du mit Fingerabdruck, Gesicht oder PIN. Dein Gerät nennt das einen „Passkey“.",

@@ -214,9 +214,9 @@ test.describe('photographs', () => {
           (window as unknown as { compressionWorkerAnswers: WorkerAnswers })
             .compressionWorkerAnswers,
       );
-      // One worker for the full size, one for the thumbnail.
+      // One worker for the full size, one for the thumbnail; a third judged its sharpness first.
       expect(answers).toEqual({ photographs: 2, errors: 0 });
-      await expect.poll(() => workerUrls).toHaveLength(2);
+      await expect.poll(() => workerUrls).toHaveLength(3);
       const appOrigin = new URL(page.url()).origin;
       for (const workerUrl of workerUrls) {
         const { origin, pathname } = new URL(workerUrl);
@@ -232,7 +232,8 @@ test.describe('photographs', () => {
     {
       safari: 'Safari 16.4 on, in a worker',
       emulations: [emulateSafariCanvas],
-      workers: 2,
+      // The sharpness check, the full size and the thumbnail.
+      workers: 3,
     },
     {
       safari: 'Safari before 16.4, on the main thread',
