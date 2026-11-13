@@ -76,7 +76,7 @@ function ItemCardComponent({
     dragDepth.current = 0;
     setIsDragOver(false);
     if (dropDisabled) return;
-    const files = Array.from(event.dataTransfer.files ?? []);
+    const files = Array.from(event.dataTransfer.files);
     if (files.length > 0) onUpload(files);
   };
 

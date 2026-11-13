@@ -78,6 +78,12 @@ describe('Actions', () => {
     expect(onUpload).not.toHaveBeenCalled();
   });
 
+  it('does not call onUpload when the input reports no file list at all', () => {
+    const { onUpload, input } = renderActions();
+    fireEvent.change(input, { target: { files: null } });
+    expect(onUpload).not.toHaveBeenCalled();
+  });
+
   it('blocks the file picker while an upload is in flight', () => {
     const { input } = renderActions({ busy: true });
     expect(input).toBeDisabled();
