@@ -149,6 +149,7 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   numberFormatRef.current = numberFormat;
 
   useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- React's two-pass hydration fix, in a layout effect so no German frame paints first
     setLanguage(detectLanguage());
   }, []);
 

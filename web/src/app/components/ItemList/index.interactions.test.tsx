@@ -35,6 +35,11 @@ vi.mock('./useItemMutations', () => ({
     useItemMutationsMock(...args) as ReturnType<typeof useItemMutations>,
 }));
 
+// jsdom decodes no image: the blur check would fall back only after the test has looked.
+vi.mock('../../lib/photoSharpness', () => ({
+  assessSharpness: async () => 'sharp',
+}));
+
 vi.mock('../Map/usePlaces', () => ({
   usePlaces: () => ({ places: [], loading: false, error: false }),
 }));
@@ -79,7 +84,10 @@ describe('the catalogue grid', () => {
     const file = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
     await userEvent.upload(screen.getByLabelText('Add image'), file);
 
-    expect(uploadImage).toHaveBeenCalledWith('item-1', { file: file });
+    // The upload waits for the photo's blur check, which answers a tick later.
+    await vi.waitFor(() =>
+      expect(uploadImage).toHaveBeenCalledWith('item-1', { file: file }),
+    );
   });
 
   it('deletes the entry the delete button belongs to', async () => {

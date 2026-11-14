@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   deletePasskey,
@@ -27,19 +27,19 @@ export function usePasskeys() {
   const [list, setList] = useState<PasskeyList>({ status: 'loading' });
   const [busy, setBusy] = useState(false);
 
-  const reload = useCallback(async () => {
-    const { data, error } = await listPasskeys();
+  const show = ({ data, error }: Awaited<ReturnType<typeof listPasskeys>>) => {
     if (data === null) {
       console.error('listing passkeys failed', error);
       setList({ status: 'failed' });
       return;
     }
     setList({ status: 'ready', passkeys: data });
-  }, []);
+  };
+  const reload = async () => show(await listPasskeys());
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    void listPasskeys().then(show);
+  }, []);
 
   const add = async () => {
     setBusy(true);

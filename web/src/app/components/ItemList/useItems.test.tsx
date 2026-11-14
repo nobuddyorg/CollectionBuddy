@@ -370,6 +370,50 @@ describe('useItems with requests in flight', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
   });
 
+  it.each([
+    ['a new search', { query: 'lamp' }],
+    ['another collection', { categoryId: 'cat2' }],
+  ])(
+    'raises loading again for %s, before its answer arrives',
+    async (_change, filters) => {
+      listItemsMock.mockResolvedValueOnce(page([{ id: 'a' }]));
+      listItemsMock.mockReturnValueOnce(new Promise(() => {}));
+      const { result, rerender } = renderHook(
+        ({ categoryId, query }) => useItems(categoryId, query),
+        { wrapper, initialProps: { categoryId: 'cat1', query: '' } },
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      rerender({ categoryId: 'cat1', query: '', ...filters });
+
+      expect(result.current.loading).toBe(true);
+    },
+  );
+
+  it('raises loading again for another page, before its answer arrives', async () => {
+    listItemsMock.mockResolvedValueOnce(page([{ id: 'a' }], 20));
+    listItemsMock.mockReturnValueOnce(new Promise(() => {}));
+    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => result.current.setPage(2));
+
+    expect(result.current.loading).toBe(true);
+  });
+
+  it('raises loading for a reload once the list has settled, and leaves it down for a silent one', async () => {
+    listItemsMock.mockResolvedValueOnce(page([{ id: 'a' }]));
+    listItemsMock.mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => void result.current.reload({ silent: true }));
+    expect(result.current.loading).toBe(false);
+
+    act(() => void result.current.reload());
+    expect(result.current.loading).toBe(true);
+  });
+
   it('keeps loading true until every non-silent request in flight has settled', async () => {
     const first = deferred<ReturnType<typeof page>>();
     const second = deferred<ReturnType<typeof page>>();
