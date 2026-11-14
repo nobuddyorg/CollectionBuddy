@@ -186,8 +186,12 @@ The search box above the grid matches title, description, place, and tags at
 once, from the third character; one or two characters show the unfiltered
 list. **×** clears it.
 
-Nine items per page. Up to seven pages, every page number is shown; beyond
-that the control shows first, last, and a window around the current page.
+Nine items per page, unless you choose 6, 12 or 24 under **Per page** below
+the page numbers. The choice is shown once a collection has more than six
+items, is remembered on this device, and keeps your place: the item that was
+first on screen stays on the page you land on. Up to seven pages, every page
+number is shown; beyond that the control shows first, last, and a window
+around the current page.
 
 ## Map
 

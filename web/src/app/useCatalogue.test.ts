@@ -56,7 +56,17 @@ describe('useCatalogue', () => {
 
     // The list has not answered (and never will here), yet the page is on its way.
     expect(reload).toHaveBeenCalled();
-    expect(prefetchFirstPage).toHaveBeenCalledWith('b');
+    expect(prefetchFirstPage).toHaveBeenCalledWith('b', 9);
+  });
+
+  it("prefetches the first page at this device's page size", () => {
+    window.localStorage.setItem(SELECTED_CATEGORY_KEY, 'b');
+    window.localStorage.setItem('pageSize', '24');
+
+    renderHook(() => useCatalogue(false, 'user-1'));
+
+    expect(prefetchFirstPage).toHaveBeenCalledWith('b', 24);
+    window.localStorage.removeItem('pageSize');
   });
 
   it('prefetches nothing when no category was stored', () => {

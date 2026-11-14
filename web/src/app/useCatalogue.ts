@@ -8,6 +8,7 @@ import {
 } from './components/CategorySelect/selection';
 import { useCategories } from './components/CategorySelect/useCategories';
 import { prefetchFirstPage } from './components/ItemList/firstPagePrefetch';
+import { readPageSize } from './components/ItemList/usePageSize';
 
 /** Waits on the session: category rows are only readable under the signed-in user's RLS policies. */
 export function useCatalogue(loading: boolean, userId: string | undefined) {
@@ -40,7 +41,7 @@ export function useCatalogue(loading: boolean, userId: string | undefined) {
   useEffect(() => {
     if (loading || !userId) return;
     const storedId = readStoredCategory();
-    if (storedId) prefetchFirstPage(storedId);
+    if (storedId) prefetchFirstPage(storedId, readPageSize());
     void loadAndSelect(storedId);
   }, [loading, userId, loadAndSelect]);
 

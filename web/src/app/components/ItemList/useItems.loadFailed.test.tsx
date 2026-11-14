@@ -69,7 +69,7 @@ describe('useItems load failure', () => {
   it('has not failed before any answer arrives', () => {
     listItemsMock.mockReturnValue(new Promise(() => {}));
 
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
 
     expect(result.current.loadFailed).toBe(false);
   });
@@ -77,7 +77,7 @@ describe('useItems load failure', () => {
   it('marks a failed load apart from an empty category', async () => {
     listItemsMock.mockResolvedValue(FAILED);
 
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
 
     await waitFor(() => expect(result.current.loadFailed).toBe(true));
     expect(result.current.items).toEqual([]);
@@ -87,7 +87,7 @@ describe('useItems load failure', () => {
   it('keeps the search wording for a failed search', async () => {
     listItemsMock.mockResolvedValue(FAILED);
 
-    renderHook(() => useItems('cat1', 'denar'), { wrapper });
+    renderHook(() => useItems('cat1', 'denar', 9), { wrapper });
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Search failed. Please try again.',
@@ -96,7 +96,7 @@ describe('useItems load failure', () => {
 
   it('clears the failure once a retry answers', async () => {
     listItemsMock.mockResolvedValueOnce(FAILED).mockResolvedValue(ONE_ENTRY);
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
     await waitFor(() => expect(result.current.loadFailed).toBe(true));
 
     await act(() => result.current.reload());
@@ -107,7 +107,7 @@ describe('useItems load failure', () => {
 
   it('keeps the failure while a retry fails again', async () => {
     listItemsMock.mockResolvedValue(FAILED);
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
     await waitFor(() => expect(result.current.loadFailed).toBe(true));
 
     await act(() => result.current.reload());
@@ -120,7 +120,7 @@ describe('useItems load failure', () => {
     listItemsMock
       .mockImplementationOnce(resolvesWithAbortErrorOnAbort)
       .mockResolvedValue(ONE_ENTRY);
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
 
     await act(() => result.current.reload());
 

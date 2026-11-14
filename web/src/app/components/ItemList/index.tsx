@@ -2,7 +2,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import ItemCreate from '../ItemCreate';
+import { PageSizeChoice } from './PageSizeChoice';
 import { Pagination } from './Pagination';
+import { usePageSize } from './usePageSize';
 import { ItemCard } from './ItemCard';
 import { ModalImage } from './ModalImage';
 import { GridSkeleton } from './Skeleton';
@@ -55,6 +57,7 @@ export default function ItemList({
   const debouncedQuery = useDebouncedValue(query, 200).trim();
 
   const [mapOpen, setMapOpen] = useState(false);
+  const { pageSize, setPageSize } = usePageSize();
 
   const {
     items,
@@ -67,7 +70,7 @@ export default function ItemList({
     totalPages,
     reload,
     setItems,
-  } = useItems(categoryId, debouncedQuery);
+  } = useItems(categoryId, debouncedQuery, pageSize);
   const searchStatus = searchStatusFor(debouncedQuery, total);
 
   const handleCreated = useCallback(() => {
@@ -246,6 +249,11 @@ export default function ItemList({
       )}
 
       <Pagination page={page} setPage={setPage} totalPages={totalPages} />
+      <PageSizeChoice
+        pageSize={pageSize}
+        total={total}
+        onChange={setPageSize}
+      />
 
       <ModalImage
         images={modalImages}

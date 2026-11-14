@@ -201,6 +201,7 @@
     "pagination": "Pagination",
     "page": "Page {page}",
     "page_of": "{page} / {total}",
+    "per_page": "Per page",
     "results_count": "{count} results",
     "results_count_one": "{count} result",
     "search_too_short": "Keep typing to search"
@@ -347,7 +348,7 @@
     "retention_sharing": "An invitation is kept until the owner or the invited person removes it, or the collection is deleted, even after its expiry date has passed.",
     "retention_logs": "Supabase keeps its technical logs, with IP addresses, for one day and its sign-in logs for one hour. Records of your sign-ins can also be kept with your account while it exists. GitHub, Google, Komoot and the OpenStreetMap Foundation keep their own logs under their own policies.",
     "browser_heading": "What is stored in your browser",
-    "browser_storage": "CollectionBuddy keeps your sign-in session, your language, your colour theme, whether backgrounds are removed, what photos are shown on, the collection you last opened and the coordinates the map has looked up for place names in your browser's local storage, so they survive a reload. It also notes which account the last collection and the coordinates belong to, and removes both when you sign out, delete your account, or a different account signs in on the same browser. For the open tab, it records when it last reloaded itself after an update.",
+    "browser_storage": "CollectionBuddy keeps your sign-in session, your language, your colour theme, whether backgrounds are removed, what photos are shown on, how many entries a page shows, the collection you last opened and the coordinates the map has looked up for place names in your browser's local storage, so they survive a reload. It also notes which account the last collection and the coordinates belong to, and removes both when you sign out, delete your account, or a different account signs in on the same browser. For the open tab, it records when it last reloaded itself after an update.",
     "browser_cache": "A service worker keeps a copy of the app's own files so that it starts faster and opens offline; it keeps none of your collections or photos. Once you use \"Remove backgrounds\", your browser also keeps the model for it, about 90 MB, which it downloaded from CollectionBuddy's own website, so that it is not downloaded again.",
     "browser_no_cookies": "CollectionBuddy sets no cookies and uses no tracking. What it stores is needed for the service you asked for (Section 25(2) no. 2 TDDDG).",
     "rights_heading": "Your rights",

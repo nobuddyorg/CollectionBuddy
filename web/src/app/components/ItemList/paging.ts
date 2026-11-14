@@ -1,9 +1,19 @@
-/** Entries per page. Nine fills three desktop rows of three. */
-export const PAGE_SIZE = 9;
+/** The entries a page may show: each fills whole rows at one, two and three columns but 9, today's size, kept as the default. */
+export const PAGE_SIZES = [6, 9, 12, 24] as const;
+export type PageSize = (typeof PAGE_SIZES)[number];
+/** Nine fills three desktop rows of three. */
+export const DEFAULT_PAGE_SIZE: PageSize = 9;
+
+/** A stored choice, or the default where there is none or it is not one of the sizes offered. */
+export function normalizePageSize(stored: string | null): PageSize {
+  return (
+    PAGE_SIZES.find((size) => String(size) === stored) ?? DEFAULT_PAGE_SIZE
+  );
+}
 
 /** How many pages a collection of this size needs. Nothing needs no pages. */
-export function pageCount(total: number): number {
-  return Math.ceil(total / PAGE_SIZE);
+export function pageCount(total: number, size: PageSize): number {
+  return Math.ceil(total / size);
 }
 
 /** Derived, so a page number left past the end corrects itself the same render, not one later. */
@@ -13,9 +23,20 @@ export function clampPage(page: number, totalPages: number): number {
 }
 
 /** Inclusive at both ends, as PostgREST's `.range()` takes; an exclusive end fetches one row too few. */
-export function pageRange(page: number): { from: number; to: number } {
-  const from = (page - 1) * PAGE_SIZE;
-  return { from, to: from + PAGE_SIZE - 1 };
+export function pageRange(
+  page: number,
+  size: PageSize,
+): { from: number; to: number } {
+  const from = (page - 1) * size;
+  return { from, to: from + size - 1 };
+}
+
+/** The page, at the new size, holding the entry that was first on `page` at the old one: a new size keeps your place. */
+export function pageHolding(
+  page: number,
+  { from, to }: { from: PageSize; to: PageSize },
+): number {
+  return Math.floor(((page - 1) * from) / to) + 1;
 }
 
 /** Every page up to seven; past that, first, last and the pages around the current one, gaps as an ellipsis. */

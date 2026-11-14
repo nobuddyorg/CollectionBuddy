@@ -39,6 +39,39 @@ test.describe('a collection larger than one page', () => {
     await expectTitles(page, ['Schaustück 02', 'Schaustück 01']);
   });
 
+  test('shows as many entries a page as chosen, remembers it, and keeps the entry that was first in view', async ({
+    on,
+    page,
+  }) => {
+    const catalogue = on(page).catalogue;
+    await expect(catalogue.locators.cards).toHaveCount(9);
+
+    // All eleven on one page: no pager left to show.
+    await catalogue.do.choosePageSize(12);
+    await expect(catalogue.locators.cards).toHaveCount(11);
+    await expect(catalogue.locators.pagination).toHaveCount(0);
+
+    // The device remembers it.
+    await page.reload();
+    await expect(catalogue.locators.cards).toHaveCount(11);
+
+    // Page 2 at nine starts with the tenth entry, which is on page 2 at six too.
+    await catalogue.do.choosePageSize(9);
+    await catalogue.locators.buttons.nextPage.click();
+    await expectTitles(page, ['Schaustück 02', 'Schaustück 01']);
+    await catalogue.do.choosePageSize(6);
+    await expect(
+      catalogue.locators.buttons.pageNumbers.filter({ hasText: /^2$/ }),
+    ).toHaveAttribute('aria-current', 'page');
+    await expectTitles(page, [
+      'Schaustück 05',
+      'Schaustück 04',
+      'Schaustück 03',
+      'Schaustück 02',
+      'Schaustück 01',
+    ]);
+  });
+
   // Paging follows what the search left, not what the collection holds.
   test('stops paging when a search narrows it to one page', async ({
     on,
