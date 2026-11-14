@@ -41,6 +41,25 @@ export async function blurryPhoto(page: Page, path: string): Promise<string> {
   return path;
 }
 
+/** An opaque, sharp photo drawn by the browser: a red disc on a dark table, exactly what the stand-in model sees. */
+export async function itemPhoto(page: Page, path: string): Promise<string> {
+  const dataUrl = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 480;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#202020';
+    context.fillRect(0, 0, 640, 480);
+    context.fillStyle = '#ff2000';
+    context.beginPath();
+    context.arc(320, 240, 150, 0, Math.PI * 2);
+    context.fill();
+    return canvas.toDataURL('image/png');
+  });
+  writeFileSync(path, Buffer.from(dataUrl.split(',')[1], 'base64'));
+  return path;
+}
+
 // Below the test timeout, so a slow upload fails with its own message instead of a bare timeout.
 export const PHOTO_ARRIVES = 45_000;
 

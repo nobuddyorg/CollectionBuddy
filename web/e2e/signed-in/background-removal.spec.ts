@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { type Locator, type Page } from '@playwright/test';
@@ -9,7 +9,7 @@ import { expectNoSeriousA11yViolations } from '../axe';
 import { themeAttribute } from '../helpers';
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
-import { blurryPhoto, uniqueName } from './helpers';
+import { blurryPhoto, itemPhoto, uniqueName } from './helpers';
 import { context, seededEntryId, storedObjects } from './rls/helpers';
 import type { PageTree } from '../pages';
 
@@ -28,25 +28,6 @@ const PHOTO = resolve(process.cwd(), 'public/logo.png');
 const BLACK = 'rgb(0, 0, 0)';
 const WHITE = 'rgb(255, 255, 255)';
 const NO_BACKDROP = 'rgba(0, 0, 0, 0)';
-
-/** A red disc on a dark table, drawn by the browser: the stand-in model sees exactly the disc. */
-async function itemPhoto(page: Page, path: string): Promise<string> {
-  const dataUrl = await page.evaluate(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 640;
-    canvas.height = 480;
-    const context = canvas.getContext('2d')!;
-    context.fillStyle = '#202020';
-    context.fillRect(0, 0, 640, 480);
-    context.fillStyle = '#ff2000';
-    context.beginPath();
-    context.arc(320, 240, 150, 0, Math.PI * 2);
-    context.fill();
-    return canvas.toDataURL('image/png');
-  });
-  writeFileSync(path, Buffer.from(dataUrl.split(',')[1], 'base64'));
-  return path;
-}
 
 /** A stored photo as drawn: its size, and how opaque the middle of its top, right, bottom and left edges is. */
 async function edgesOf(image: Locator) {
