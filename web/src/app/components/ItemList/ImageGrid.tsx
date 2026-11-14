@@ -4,6 +4,10 @@ import Icon, { IconType } from '../Icon';
 import type { ImageEntry } from './types';
 import { STRIP_MAX } from './imageEntries';
 import { useI18n } from '../../i18n/useI18n';
+import {
+  photoBackdropClass,
+  usePhotoBackdrop,
+} from '../../lib/usePhotoBackdrop';
 import { Spinner } from '../ui/Spinner';
 
 // ItemList's grid: one column, two from sm, three from lg inside max-w-6xl's 1120px of content.
@@ -45,15 +49,18 @@ function Plate({
   /** Fires once the photograph settles (loaded or failed); ItemCard holds its caption until then. */
   onReady?: () => void;
 }) {
-  const [loaded, setLoaded] = useState(false);
+  const [photo, setPhoto] = useState<'loading' | 'shown' | 'failed'>('loading');
+  const { backdrop } = usePhotoBackdrop();
 
-  const settle = () => {
-    setLoaded(true);
+  const settle = (outcome: 'shown' | 'failed') => () => {
+    setPhoto(outcome);
     onReady?.();
   };
 
   return (
-    <div className={`relative bg-muted ${!loaded ? 'img-skeleton' : ''}`}>
+    <div
+      className={`relative bg-muted ${photo === 'loading' ? 'img-skeleton' : ''}`}
+    >
       <button
         type="button"
         data-testid="open-image"
@@ -72,11 +79,12 @@ function Plate({
           crossOrigin="anonymous"
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : undefined}
-          onLoad={settle}
-          onError={settle}
+          onLoad={settle('shown')}
+          onError={settle('failed')}
+          // The chosen backdrop behind a cut-out's see-through background; not behind a failed photo's alt text.
           className={`${ratio} w-full object-cover cursor-zoom-in transition-opacity duration-300 ${
-            loaded ? 'opacity-100' : 'opacity-0'
-          }`}
+            photo === 'loading' ? 'opacity-0' : 'opacity-100'
+          } ${photo === 'shown' ? photoBackdropClass(backdrop) : ''}`}
         />
         {overlay}
       </button>

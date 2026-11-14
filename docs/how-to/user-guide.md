@@ -18,8 +18,8 @@ removes them all.
 your email in the header). If the sign-out request fails — you are offline,
 say — the session is cleared locally anyway, so you are never stuck signed in
 on a device without network. Signing out also makes the browser forget the
-collection you last had open and the places the map looked up; your theme and
-language stay.
+collection you last had open and the places the map looked up; your theme,
+language and photo background stay.
 
 ## Delete your account
 
@@ -150,8 +150,9 @@ An item can have any number of photos, in the order you added them.
 
 Tick **Remove backgrounds** in the user menu. From then on a photo you add opens
 a review first: the original, and next to it the item with its background
-removed, on a checkerboard where the background is now transparent. It works
-for any item, a coin, a stamp, a figurine; several items in one photo are kept
+removed, on the photo background you chose (below) where the background is
+now transparent: a checkerboard while it follows the theme. It works for any
+item, a coin, a stamp, a figurine; several items in one photo are kept
 together. **Use without background** uploads the result; **Keep original**
 uploads the photo as it was, and is always available, also when no item was
 found or the removal failed. Closing the review uploads nothing.
@@ -194,15 +195,20 @@ places up again.
 If you allow location access, your position shows as a red marker; the map has
 buttons to zoom to it and to frame all pins.
 
-## Language and theme
+## Language, theme and photo background
 
-Two independent settings in the user menu:
+Three independent settings in the user menu, which fills the screen on a phone
+and closes with its **×** button there:
 
 - **Language** (_Sprache_): Deutsch / English. Detected from your browser on
   first visit, German if it is set to neither, then remembered. Dates and
   sizes are written the way the chosen language writes them.
 - **Appearance** (_Darstellung_): System / Light / Dark. System follows your
   OS setting live. Light or Dark overrides it until you switch back.
+- **Photo background** (_Fotohintergrund_): Theme / Black / White, what shows
+  through a photo's transparent parts, a cut-out's background say. Theme keeps
+  the theme's own surface; Black or White is the same in both themes. Photos
+  already saved follow the choice, and the saved files stay transparent.
 
 ## Accessibility
 

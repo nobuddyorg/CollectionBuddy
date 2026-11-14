@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -41,6 +41,7 @@ describe('ImageGrid', () => {
   beforeEach(() => {
     // Pins the locale so the alt text doesn't depend on jsdom's navigator.language default.
     window.localStorage.setItem('lang', 'en');
+    window.localStorage.removeItem('photoBackdrop');
   });
 
   it('renders nothing when the item has no images', () => {
@@ -297,6 +298,47 @@ describe('ImageGrid', () => {
   it('fades the plate in rather than swapping it', () => {
     renderGrid([photo('a')]);
     expect(screen.getByRole('img')).toHaveClass('transition-opacity');
+  });
+
+  it('leaves a loaded photo on the plate’s own colour while the backdrop follows the theme', () => {
+    renderGrid([photo('a')]);
+    const image = screen.getByRole('img');
+
+    fireEvent.load(image);
+
+    expect(image).toHaveClass('opacity-100');
+    expect(image).not.toHaveClass('bg-black');
+    expect(image).not.toHaveClass('bg-white');
+  });
+
+  it.each([
+    ['black', 'bg-black'],
+    ['white', 'bg-white'],
+  ])(
+    'sets a loaded photo on %s once chosen, for a cut-out’s see-through background to show',
+    (backdrop, backdropClass) => {
+      localStorage.setItem('photoBackdrop', backdrop);
+      const { container } = renderGrid([photo('a')]);
+      const image = screen.getByRole('img');
+      expect(image).not.toHaveClass(backdropClass);
+
+      fireEvent.load(image);
+
+      expect(image).toHaveClass(backdropClass, 'opacity-100');
+      expect(container.querySelector('.img-skeleton')).toBeNull();
+    },
+  );
+
+  it('uncovers a photo that failed without setting it on the backdrop, where its alt text would not read', () => {
+    localStorage.setItem('photoBackdrop', 'black');
+    const { container } = renderGrid([photo('a')]);
+    const image = screen.getByRole('img');
+
+    fireEvent.error(image);
+
+    expect(image).toHaveClass('opacity-100');
+    expect(image).not.toHaveClass('bg-black');
+    expect(container.querySelector('.img-skeleton')).toBeNull();
   });
 
   it('passes the image being removed to onDelete', async () => {

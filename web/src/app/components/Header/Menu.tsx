@@ -4,6 +4,8 @@ import Link from 'next/link';
 
 import { useI18n } from '../../i18n/useI18n';
 import { THEME_PREFERENCES, useTheme } from '../../useTheme';
+import { PHOTO_BACKDROPS, usePhotoBackdrop } from '../../lib/usePhotoBackdrop';
+import Icon, { IconType } from '../Icon';
 import type { MenuProps } from './types';
 import { labelClasses } from '../ui/labelClasses';
 import { BackgroundRemovalSetting } from '../BackgroundRemoval/BackgroundRemovalSetting';
@@ -54,21 +56,37 @@ export default function Menu({
   onSignOut,
   onDeleteAccount,
   onClose,
+  onDismiss,
   onOpenHelp,
 }: MenuProps) {
   const { t, language, setLanguage } = useI18n();
   const { preference, setThemePreference } = useTheme();
+  const { backdrop, setPhotoBackdrop } = usePhotoBackdrop();
   if (!open) return null;
   const menuId = 'user-menu';
 
   return (
+    // The whole screen on a phone, where a dropdown leaves its controls too small; a dropdown from `sm` up.
     <div
       id={menuId}
       data-testid="user-menu"
       aria-labelledby="user-menu-button"
-      className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-sm border bg-card text-card-foreground backdrop-blur p-1 shadow-lg"
+      className="fixed inset-0 z-modal overflow-y-auto overscroll-contain bg-card text-card-foreground p-1 pt-[max(0.25rem,env(safe-area-inset-top))] pb-[max(0.25rem,env(safe-area-inset-bottom))] sm:absolute sm:inset-auto sm:right-0 sm:mt-2 sm:w-72 sm:max-w-[calc(100vw-2rem)] sm:overflow-visible sm:rounded-sm sm:border sm:p-1 sm:shadow-lg sm:backdrop-blur"
     >
-      <div className={labelClasses('px-3 py-2 truncate')}>{user.email}</div>
+      <div className="flex items-center gap-2">
+        <div className={labelClasses('flex-1 min-w-0 px-3 py-2 truncate')}>
+          {user.email}
+        </div>
+        <button
+          type="button"
+          data-testid="close-user-menu"
+          onClick={onDismiss}
+          aria-label={t('header.close_menu')}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm hover:bg-muted transition-colors sm:hidden"
+        >
+          <Icon icon={IconType.Close} className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </div>
 
       {/* Caption above, not beside: the layout must not depend on a translation's length. */}
       <div className="px-3 py-2 space-y-1.5">
@@ -94,6 +112,21 @@ export default function Menu({
           }}
           onChange={setThemePreference}
           testIdPrefix="theme"
+        />
+      </div>
+
+      <div className="px-3 py-2 space-y-1.5">
+        <span className="block text-sm">{t('header.photo_backdrop')}</span>
+        <SegmentedControl
+          value={backdrop}
+          options={PHOTO_BACKDROPS}
+          labels={{
+            theme: t('header.photo_backdrop_theme'),
+            black: t('header.photo_backdrop_black'),
+            white: t('header.photo_backdrop_white'),
+          }}
+          onChange={setPhotoBackdrop}
+          testIdPrefix="photo-backdrop"
         />
       </div>
 
