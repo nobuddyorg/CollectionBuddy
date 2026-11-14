@@ -79,6 +79,17 @@ describe('ModalImage', () => {
   });
 
   // Matches the grid: no credentials, so the browser never processes Cloudflare's public-suffix cookie.
+  it('sets the photo on black once it has loaded, and the next one only once it has too', () => {
+    const { rerender } = renderModal({ images: [photo('a'), photo('b')] });
+    expect(screen.getByRole('img')).not.toHaveClass('bg-black');
+
+    fireEvent.load(screen.getByRole('img'));
+    expect(screen.getByRole('img')).toHaveClass('bg-black');
+
+    rerender({ index: 1 });
+    expect(screen.getByRole('img')).not.toHaveClass('bg-black');
+  });
+
   it('fetches the full-size image without credentials', () => {
     renderModal();
     expect(screen.getByRole('img')).toHaveAttribute('crossorigin', 'anonymous');

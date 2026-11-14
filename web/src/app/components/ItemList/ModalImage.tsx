@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
 import { Portal } from '../CenteredModal/Portal';
@@ -63,6 +63,8 @@ export function ModalImage({
   const SWIPE_THRESHOLD_PX = 50;
   // Set when a touch just navigated, so the synthetic click after touchend doesn't close the modal.
   const suppressImageClickRef = useRef(false);
+  // Black behind a cut-out's see-through background, in both themes; not behind a failed photo's alt text.
+  const [shownPath, setShownPath] = useState('');
 
   const onTouchStart = useCallback((event: React.TouchEvent) => {
     const touch = event.touches[0];
@@ -212,7 +214,10 @@ export function ModalImage({
                 decoding="async"
                 // Same reasoning as the grid: see the note in ImageGrid.tsx.
                 crossOrigin="anonymous"
-                className="w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg"
+                onLoad={() => setShownPath(current.pathFull)}
+                className={`w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg ${
+                  shownPath === current.pathFull ? 'bg-black' : ''
+                }`}
                 onClick={() => {
                   if (suppressImageClickRef.current) {
                     suppressImageClickRef.current = false;

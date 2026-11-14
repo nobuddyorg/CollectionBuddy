@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -297,6 +297,28 @@ describe('ImageGrid', () => {
   it('fades the plate in rather than swapping it', () => {
     renderGrid([photo('a')]);
     expect(screen.getByRole('img')).toHaveClass('transition-opacity');
+  });
+
+  it('sets a loaded photo on black, so a cut-out’s see-through background reads black in both themes', () => {
+    const { container } = renderGrid([photo('a')]);
+    const image = screen.getByRole('img');
+    expect(image).not.toHaveClass('bg-black');
+
+    fireEvent.load(image);
+
+    expect(image).toHaveClass('bg-black', 'opacity-100');
+    expect(container.querySelector('.img-skeleton')).toBeNull();
+  });
+
+  it('uncovers a photo that failed without setting it on black, where its alt text would not read', () => {
+    const { container } = renderGrid([photo('a')]);
+    const image = screen.getByRole('img');
+
+    fireEvent.error(image);
+
+    expect(image).toHaveClass('opacity-100');
+    expect(image).not.toHaveClass('bg-black');
+    expect(container.querySelector('.img-skeleton')).toBeNull();
   });
 
   it('passes the image being removed to onDelete', async () => {

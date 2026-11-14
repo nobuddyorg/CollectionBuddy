@@ -6,6 +6,7 @@ import { type Page } from '@playwright/test';
 import { expect, test } from './test';
 
 import { expectNoSeriousA11yViolations } from '../axe';
+import { themeAttribute } from '../helpers';
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
 import { blurryPhoto, uniqueName } from './helpers';
@@ -24,6 +25,7 @@ const RED_CHANNEL_MODEL = readFileSync(
   resolve(process.cwd(), 'e2e/fixtures/red-channel.onnx'),
 );
 const PHOTO = resolve(process.cwd(), 'public/logo.png');
+const BLACK = 'rgb(0, 0, 0)';
 
 /** A red disc on a dark table, drawn by the browser: the stand-in model sees exactly the disc. */
 async function itemPhoto(page: Page, path: string): Promise<string> {
@@ -147,6 +149,18 @@ test.describe('background removal', () => {
         },
       );
       expect(cornerAlpha).toBe(0);
+
+      // Shown on black wherever it is see-through, whichever theme the page is in.
+      await card.do.openImage();
+      for (const colorScheme of ['light', 'dark'] as const) {
+        await page.emulateMedia({ colorScheme });
+        await expect.poll(() => themeAttribute(page)).toBe(colorScheme);
+        await expect(card.locators.images).toHaveCSS('background-color', BLACK);
+        await expect(app.viewer.locators.photo).toHaveCSS(
+          'background-color',
+          BLACK,
+        );
+      }
     } finally {
       await removeEntriesTitled(title);
     }

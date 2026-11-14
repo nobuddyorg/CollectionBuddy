@@ -3,9 +3,9 @@
 import { useCallback } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 
-// A checkerboard, so a transparent background reads as transparent in both themes.
+// Black, as the catalogue shows a cut-out's see-through background, in both themes.
 export const FRAME =
-  'grid aspect-square place-items-center overflow-hidden rounded-sm ring-1 ring-border bg-[conic-gradient(var(--color-muted)_25%,var(--color-card)_0_50%,var(--color-muted)_0_75%,var(--color-card)_0)] bg-size-[16px_16px]';
+  'grid aspect-square place-items-center overflow-hidden rounded-sm ring-1 ring-border bg-black';
 
 export function Preview({
   blob,

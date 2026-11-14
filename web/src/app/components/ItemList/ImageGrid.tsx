@@ -45,15 +45,17 @@ function Plate({
   /** Fires once the photograph settles (loaded or failed); ItemCard holds its caption until then. */
   onReady?: () => void;
 }) {
-  const [loaded, setLoaded] = useState(false);
+  const [photo, setPhoto] = useState<'loading' | 'shown' | 'failed'>('loading');
 
-  const settle = () => {
-    setLoaded(true);
+  const settle = (outcome: 'shown' | 'failed') => () => {
+    setPhoto(outcome);
     onReady?.();
   };
 
   return (
-    <div className={`relative bg-muted ${!loaded ? 'img-skeleton' : ''}`}>
+    <div
+      className={`relative bg-muted ${photo === 'loading' ? 'img-skeleton' : ''}`}
+    >
       <button
         type="button"
         data-testid="open-image"
@@ -72,11 +74,12 @@ function Plate({
           crossOrigin="anonymous"
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : undefined}
-          onLoad={settle}
-          onError={settle}
+          onLoad={settle('shown')}
+          onError={settle('failed')}
+          // Black behind a cut-out's see-through background, in both themes; not behind a failed photo's alt text.
           className={`${ratio} w-full object-cover cursor-zoom-in transition-opacity duration-300 ${
-            loaded ? 'opacity-100' : 'opacity-0'
-          }`}
+            photo === 'loading' ? 'opacity-0' : 'opacity-100'
+          } ${photo === 'shown' ? 'bg-black' : ''}`}
         />
         {overlay}
       </button>
