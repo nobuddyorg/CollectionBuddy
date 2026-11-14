@@ -26,6 +26,8 @@ const RED_CHANNEL_MODEL = readFileSync(
 );
 const PHOTO = resolve(process.cwd(), 'public/logo.png');
 const BLACK = 'rgb(0, 0, 0)';
+const WHITE = 'rgb(255, 255, 255)';
+const NO_BACKDROP = 'rgba(0, 0, 0, 0)';
 
 /** A red disc on a dark table, drawn by the browser: the stand-in model sees exactly the disc. */
 async function itemPhoto(page: Page, path: string): Promise<string> {
@@ -150,17 +152,32 @@ test.describe('background removal', () => {
       );
       expect(cornerAlpha).toBe(0);
 
-      // Shown on black wherever it is see-through, whichever theme the page is in.
-      await card.do.openImage();
-      for (const colorScheme of ['light', 'dark'] as const) {
-        await page.emulateMedia({ colorScheme });
-        await expect.poll(() => themeAttribute(page)).toBe(colorScheme);
-        await expect(card.locators.images).toHaveCSS('background-color', BLACK);
-        await expect(app.viewer.locators.photo).toHaveCSS(
-          'background-color',
-          BLACK,
-        );
+      // On the theme's own surface by default; on the chosen colour, in either theme, once one is chosen.
+      await expect(card.locators.images).toHaveCSS(
+        'background-color',
+        NO_BACKDROP,
+      );
+      for (const [backdrop, colour] of [
+        ['black', BLACK],
+        ['white', WHITE],
+      ] as const) {
+        await app.account.do.open();
+        await app.account.do.choosePhotoBackdrop(backdrop);
+        await page.keyboard.press('Escape');
+        for (const colorScheme of ['light', 'dark'] as const) {
+          await page.emulateMedia({ colorScheme });
+          await expect.poll(() => themeAttribute(page)).toBe(colorScheme);
+          await expect(card.locators.images).toHaveCSS(
+            'background-color',
+            colour,
+          );
+        }
       }
+      await card.do.openImage();
+      await expect(app.viewer.locators.photo).toHaveCSS(
+        'background-color',
+        WHITE,
+      );
     } finally {
       await removeEntriesTitled(title);
     }

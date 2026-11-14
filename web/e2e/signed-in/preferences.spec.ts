@@ -39,6 +39,27 @@ test.describe('the account menu', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'de');
   });
 
+  test('fills a phone’s screen and closes from its own button; on a wider screen it drops down, with no such button', async ({
+    on,
+    page,
+  }) => {
+    const account = on(page).account;
+    await expect(account.locators.buttons.close).toBeHidden();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(account()).toBeVisible();
+    expect(await account().boundingBox()).toEqual({
+      x: 0,
+      y: 0,
+      width: 390,
+      height: 844,
+    });
+
+    await account.do.close();
+    await expect(account()).toBeHidden();
+    await expect(account.locators.buttons.open).toBeFocused();
+  });
+
   test('links the privacy notice, which leads back to the catalogue', async ({
     on,
     page,

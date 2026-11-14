@@ -41,6 +41,7 @@ describe('ImageGrid', () => {
   beforeEach(() => {
     // Pins the locale so the alt text doesn't depend on jsdom's navigator.language default.
     window.localStorage.setItem('lang', 'en');
+    window.localStorage.removeItem('photoBackdrop');
   });
 
   it('renders nothing when the item has no images', () => {
@@ -299,18 +300,37 @@ describe('ImageGrid', () => {
     expect(screen.getByRole('img')).toHaveClass('transition-opacity');
   });
 
-  it('sets a loaded photo on black, so a cut-out’s see-through background reads black in both themes', () => {
-    const { container } = renderGrid([photo('a')]);
+  it('leaves a loaded photo on the plate’s own colour while the backdrop follows the theme', () => {
+    renderGrid([photo('a')]);
     const image = screen.getByRole('img');
-    expect(image).not.toHaveClass('bg-black');
 
     fireEvent.load(image);
 
-    expect(image).toHaveClass('bg-black', 'opacity-100');
-    expect(container.querySelector('.img-skeleton')).toBeNull();
+    expect(image).toHaveClass('opacity-100');
+    expect(image).not.toHaveClass('bg-black');
+    expect(image).not.toHaveClass('bg-white');
   });
 
-  it('uncovers a photo that failed without setting it on black, where its alt text would not read', () => {
+  it.each([
+    ['black', 'bg-black'],
+    ['white', 'bg-white'],
+  ])(
+    'sets a loaded photo on %s once chosen, for a cut-out’s see-through background to show',
+    (backdrop, backdropClass) => {
+      localStorage.setItem('photoBackdrop', backdrop);
+      const { container } = renderGrid([photo('a')]);
+      const image = screen.getByRole('img');
+      expect(image).not.toHaveClass(backdropClass);
+
+      fireEvent.load(image);
+
+      expect(image).toHaveClass(backdropClass, 'opacity-100');
+      expect(container.querySelector('.img-skeleton')).toBeNull();
+    },
+  );
+
+  it('uncovers a photo that failed without setting it on the backdrop, where its alt text would not read', () => {
+    localStorage.setItem('photoBackdrop', 'black');
     const { container } = renderGrid([photo('a')]);
     const image = screen.getByRole('img');
 

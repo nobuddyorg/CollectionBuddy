@@ -22,6 +22,12 @@ export default function Header({
     void onDeleteAccount();
   };
 
+  const dismiss = () => {
+    // The close button unmounts with the menu, so focus goes back to the trigger that opened it.
+    anchorRef.current!.focus();
+    close();
+  };
+
   const openHelp = () => {
     // The Help item unmounts with the menu, so the trigger is what the closing dialog returns focus to.
     anchorRef.current!.focus();
@@ -30,11 +36,12 @@ export default function Header({
   };
 
   return (
+    // A backdrop-filter makes the header the box a `fixed` child is laid out in: off while the phone's full-screen menu is open.
     <header
-      className="sticky top-0 z-header backdrop-blur
+      className={`sticky top-0 z-header backdrop-blur
         supports-[backdrop-filter]:bg-background/90
         border-b border-border
-        pt-[env(safe-area-inset-top)]"
+        pt-[env(safe-area-inset-top)] ${menuOpen ? 'max-sm:backdrop-blur-none' : ''}`}
     >
       <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -85,6 +92,7 @@ export default function Header({
               onSignOut={onSignOut}
               onDeleteAccount={deleteAccount}
               onClose={close}
+              onDismiss={dismiss}
               onOpenHelp={openHelp}
             />
           </div>

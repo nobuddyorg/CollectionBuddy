@@ -4,6 +4,10 @@ import Icon, { IconType } from '../Icon';
 import type { ImageEntry } from './types';
 import { STRIP_MAX } from './imageEntries';
 import { useI18n } from '../../i18n/useI18n';
+import {
+  photoBackdropClass,
+  usePhotoBackdrop,
+} from '../../lib/usePhotoBackdrop';
 import { Spinner } from '../ui/Spinner';
 
 // ItemList's grid: one column, two from sm, three from lg inside max-w-6xl's 1120px of content.
@@ -46,6 +50,7 @@ function Plate({
   onReady?: () => void;
 }) {
   const [photo, setPhoto] = useState<'loading' | 'shown' | 'failed'>('loading');
+  const { backdrop } = usePhotoBackdrop();
 
   const settle = (outcome: 'shown' | 'failed') => () => {
     setPhoto(outcome);
@@ -76,10 +81,10 @@ function Plate({
           fetchPriority={priority ? 'high' : undefined}
           onLoad={settle('shown')}
           onError={settle('failed')}
-          // Black behind a cut-out's see-through background, in both themes; not behind a failed photo's alt text.
+          // The chosen backdrop behind a cut-out's see-through background; not behind a failed photo's alt text.
           className={`${ratio} w-full object-cover cursor-zoom-in transition-opacity duration-300 ${
             photo === 'loading' ? 'opacity-0' : 'opacity-100'
-          } ${photo === 'shown' ? 'bg-black' : ''}`}
+          } ${photo === 'shown' ? photoBackdropClass(backdrop) : ''}`}
         />
         {overlay}
       </button>

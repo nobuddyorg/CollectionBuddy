@@ -5,7 +5,7 @@ import { useI18n } from '../../i18n/useI18n';
 import { buttonClasses, filledButtonClasses } from '../ui/buttonClasses';
 import { Spinner } from '../ui/Spinner';
 import type { Sharpness } from '../../lib/photoSharpness';
-import { BlurWarning, FRAME, Preview } from './PhotoPreview';
+import { BlurWarning, Preview, usePreviewFrame } from './PhotoPreview';
 import type { CutoutChoice } from './useBackgroundRemovalUpload';
 import { useCutoutJob, type CutoutJob } from './useCutoutJob';
 
@@ -35,6 +35,7 @@ export default function CutoutReview({
 }) {
   const { t } = useI18n();
   const job = useCutoutJob(file);
+  const frame = usePreviewFrame();
   const keepOriginalRef = useRef<HTMLButtonElement>(null);
 
   // The one choice always open, so Enter never uploads something the person has not seen.
@@ -56,7 +57,7 @@ export default function CutoutReview({
     <div data-testid="background-removal-review" className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <figure className="space-y-1.5">
-          <div className={FRAME}>
+          <div className={frame}>
             <Preview
               blob={file}
               alt={t('background_removal.original_alt')}
@@ -68,7 +69,7 @@ export default function CutoutReview({
           </figcaption>
         </figure>
         <figure className="space-y-1.5" aria-busy={working}>
-          <div className={FRAME}>
+          <div className={frame}>
             {job.status === 'done' && (
               <Preview
                 blob={job.cutout.blob}

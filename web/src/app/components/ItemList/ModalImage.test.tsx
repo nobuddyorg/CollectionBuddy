@@ -50,6 +50,7 @@ function renderModal(
 describe('ModalImage', () => {
   beforeEach(() => {
     window.localStorage.setItem('lang', 'en');
+    window.localStorage.removeItem('photoBackdrop');
     mountAppRoot();
   });
 
@@ -79,15 +80,25 @@ describe('ModalImage', () => {
   });
 
   // Matches the grid: no credentials, so the browser never processes Cloudflare's public-suffix cookie.
-  it('sets the photo on black once it has loaded, and the next one only once it has too', () => {
+  it('sets the photo on the chosen backdrop once it has loaded, and the next one only once it has too', () => {
+    localStorage.setItem('photoBackdrop', 'white');
     const { rerender } = renderModal({ images: [photo('a'), photo('b')] });
-    expect(screen.getByRole('img')).not.toHaveClass('bg-black');
+    expect(screen.getByRole('img')).not.toHaveClass('bg-white');
 
     fireEvent.load(screen.getByRole('img'));
-    expect(screen.getByRole('img')).toHaveClass('bg-black');
+    expect(screen.getByRole('img')).toHaveClass('bg-white');
 
     rerender({ index: 1 });
+    expect(screen.getByRole('img')).not.toHaveClass('bg-white');
+  });
+
+  it('lays nothing behind a loaded photo while the backdrop follows the theme', () => {
+    renderModal();
+
+    fireEvent.load(screen.getByRole('img'));
+
     expect(screen.getByRole('img')).not.toHaveClass('bg-black');
+    expect(screen.getByRole('img')).not.toHaveClass('bg-white');
   });
 
   it('fetches the full-size image without credentials', () => {

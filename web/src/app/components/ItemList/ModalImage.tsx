@@ -3,6 +3,10 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { useI18n } from '../../i18n/useI18n';
+import {
+  photoBackdropClass,
+  usePhotoBackdrop,
+} from '../../lib/usePhotoBackdrop';
 import { Portal } from '../CenteredModal/Portal';
 import { useFocusTrap } from '../CenteredModal/useFocusTrap';
 import { useInertBackground } from '../CenteredModal/useInertBackground';
@@ -63,8 +67,9 @@ export function ModalImage({
   const SWIPE_THRESHOLD_PX = 50;
   // Set when a touch just navigated, so the synthetic click after touchend doesn't close the modal.
   const suppressImageClickRef = useRef(false);
-  // Black behind a cut-out's see-through background, in both themes; not behind a failed photo's alt text.
+  // The chosen backdrop behind a cut-out's see-through background; not behind a failed photo's alt text.
   const [shownPath, setShownPath] = useState('');
+  const { backdrop } = usePhotoBackdrop();
 
   const onTouchStart = useCallback((event: React.TouchEvent) => {
     const touch = event.touches[0];
@@ -216,7 +221,9 @@ export function ModalImage({
                 crossOrigin="anonymous"
                 onLoad={() => setShownPath(current.pathFull)}
                 className={`w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg ${
-                  shownPath === current.pathFull ? 'bg-black' : ''
+                  shownPath === current.pathFull
+                    ? photoBackdropClass(backdrop)
+                    : ''
                 }`}
                 onClick={() => {
                   if (suppressImageClickRef.current) {

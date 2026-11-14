@@ -71,8 +71,8 @@ Add one or two more items with different titles and places, then:
 - **Delete a category**: open the picker, select the category, click
   **Delete**, confirm. Its items are deleted with it: every item belongs to
   exactly one category.
-- **Language and theme**: click your email in the header. German/English and
-  System/Light/Dark are independent.
+- **Language, theme and photo background**: click your email in the header.
+  German/English, System/Light/Dark and Theme/Black/White are independent.
 - **Help**: click your email in the header, then **Help**, or press Ctrl+/
   (Cmd+/ on a Mac).
 

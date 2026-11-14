@@ -5,6 +5,8 @@ interface AccountMenu {
   do: {
     chooseLanguage(language: 'de' | 'en'): Promise<void>;
     chooseTheme(theme: 'system' | 'light' | 'dark'): Promise<void>;
+    choosePhotoBackdrop(backdrop: 'theme' | 'black' | 'white'): Promise<void>;
+    close(): Promise<void>;
     downloadModel(): Promise<void>;
     toggleBackgroundRemoval(): Promise<void>;
     toggleBackgroundRemovalHint(): Promise<void>;
@@ -25,6 +27,7 @@ interface AccountMenu {
       progress: Locator;
     };
     buttons: {
+      close: Locator;
       deleteAccount: Locator;
       open: Locator;
       help: Locator;
@@ -39,6 +42,7 @@ interface AccountMenu {
       setting: Locator;
     };
     languages: { de: Locator; en: Locator };
+    photoBackdrops: { theme: Locator; black: Locator; white: Locator };
     privacyLink: Locator;
     themes: { system: Locator; light: Locator; dark: Locator };
   };
@@ -55,6 +59,7 @@ export function initAccountMenu(page: Page): AccountMenu {
       progress: page.getByTestId('model-status'),
     },
     buttons: {
+      close: page.getByTestId('close-user-menu'),
       deleteAccount: page.getByTestId('delete-account'),
       open: page.getByTestId('account-menu'),
       help: page.getByTestId('open-help'),
@@ -72,6 +77,11 @@ export function initAccountMenu(page: Page): AccountMenu {
       de: page.getByTestId('lang-de'),
       en: page.getByTestId('lang-en'),
     },
+    photoBackdrops: {
+      theme: page.getByTestId('photo-backdrop-theme'),
+      black: page.getByTestId('photo-backdrop-black'),
+      white: page.getByTestId('photo-backdrop-white'),
+    },
     privacyLink: page.getByTestId('menu-privacy-link'),
     themes: {
       system: page.getByTestId('theme-system'),
@@ -85,6 +95,12 @@ export function initAccountMenu(page: Page): AccountMenu {
     },
     chooseTheme: async (theme: 'system' | 'light' | 'dark') => {
       await locators.themes[theme].click();
+    },
+    choosePhotoBackdrop: async (backdrop: 'theme' | 'black' | 'white') => {
+      await locators.photoBackdrops[backdrop].click();
+    },
+    close: async () => {
+      await locators.buttons.close.click();
     },
     downloadModel: async () => {
       await locators.backgroundRemoval.download.click();

@@ -2,10 +2,22 @@
 
 import { useCallback } from 'react';
 import { useI18n } from '../../i18n/useI18n';
+import {
+  photoBackdropClass,
+  usePhotoBackdrop,
+} from '../../lib/usePhotoBackdrop';
 
-// Black, as the catalogue shows a cut-out's see-through background, in both themes.
-export const FRAME =
-  'grid aspect-square place-items-center overflow-hidden rounded-sm ring-1 ring-border bg-black';
+const FRAME =
+  'grid aspect-square place-items-center overflow-hidden rounded-sm ring-1 ring-border';
+// A checkerboard, so a transparent background reads as transparent in both themes.
+const CHECKERBOARD =
+  'bg-[conic-gradient(var(--color-muted)_25%,var(--color-card)_0_50%,var(--color-muted)_0_75%,var(--color-card)_0)] bg-size-[16px_16px]';
+
+/** A preview's frame, on the backdrop the catalogue will show the photo on; on the theme's, a checkerboard. */
+export function usePreviewFrame(): string {
+  const { backdrop } = usePhotoBackdrop();
+  return `${FRAME} ${backdrop === 'theme' ? CHECKERBOARD : photoBackdropClass(backdrop)}`;
+}
 
 export function Preview({
   blob,

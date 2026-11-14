@@ -92,6 +92,31 @@ describe('Menu', () => {
     expect(dark).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('follows the theme for photo backgrounds until black or white is chosen', async () => {
+    const { user } = await openMenu();
+    const menu = document.getElementById('user-menu') as HTMLElement;
+    const theme = within(menu).getByRole('button', { name: 'Theme' });
+    const black = within(menu).getByRole('button', { name: 'Black' });
+    expect(theme).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(black);
+
+    expect(black).toHaveAttribute('aria-pressed', 'true');
+    expect(theme).toHaveAttribute('aria-pressed', 'false');
+    expect(localStorage.getItem('photoBackdrop')).toBe('black');
+  });
+
+  it('closes from its own close button, leaving focus on the trigger', async () => {
+    const { user } = await openMenu();
+    const trigger = screen.getByRole('button', { name: 'Account menu' });
+    const menu = document.getElementById('user-menu') as HTMLElement;
+
+    await user.click(within(menu).getByRole('button', { name: 'Close menu' }));
+
+    expect(document.getElementById('user-menu')).toBeNull();
+    expect(trigger).toHaveFocus();
+  });
+
   it('links the privacy notice, closing the menu on the way', async () => {
     const { user } = await openMenu();
     const menu = document.getElementById('user-menu') as HTMLElement;

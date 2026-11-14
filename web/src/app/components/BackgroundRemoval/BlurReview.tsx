@@ -3,7 +3,7 @@
 import type { RefObject } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import { buttonClasses, filledButtonClasses } from '../ui/buttonClasses';
-import { BlurWarning, FRAME, Preview } from './PhotoPreview';
+import { BlurWarning, Preview, usePreviewFrame } from './PhotoPreview';
 import type { CutoutChoice } from './useBackgroundRemovalUpload';
 
 /** A blurry photo, shown before it uploads, with the choice to keep it or skip it and take or pick another. */
@@ -18,10 +18,11 @@ export function BlurReview({
   keepRef: RefObject<HTMLButtonElement | null>;
 }) {
   const { t } = useI18n();
+  const frame = usePreviewFrame();
 
   return (
     <div data-testid="blur-review" className="space-y-4">
-      <div className={`${FRAME} mx-auto max-w-xs`}>
+      <div className={`${frame} mx-auto max-w-xs`}>
         <Preview
           blob={file}
           alt={t('sharpness.preview_alt')}
