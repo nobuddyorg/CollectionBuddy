@@ -23,7 +23,7 @@ vi.mock('../../data/itemPage', () => ({
 }));
 
 function ItemList({ categoryId }: { categoryId: string }) {
-  useItems(categoryId, '');
+  useItems(categoryId, '', 9);
   return null;
 }
 

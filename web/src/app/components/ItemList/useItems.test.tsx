@@ -75,7 +75,7 @@ describe('useItems', () => {
       imageRows: null,
     });
 
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.items).toEqual([]);
@@ -104,7 +104,7 @@ describe('useItems', () => {
       imageRows: [],
     });
 
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.items[0]).toMatchObject({
@@ -117,7 +117,7 @@ describe('useItems', () => {
   it('trims the search term before sending it', async () => {
     listItemsMock.mockResolvedValue(page([]));
 
-    renderHook(() => useItems('cat1', '  coin  '), { wrapper });
+    renderHook(() => useItems('cat1', '  coin  ', 9), { wrapper });
 
     await waitFor(() =>
       expect(listItemsMock).toHaveBeenCalledWith(
@@ -129,7 +129,7 @@ describe('useItems', () => {
   it('starts loading immediately, before the first request settles', () => {
     listItemsMock.mockReturnValue(new Promise(() => {}));
 
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
 
     expect(result.current.loading).toBe(true);
   });
@@ -139,7 +139,7 @@ describe('useItems', () => {
     listItemsMock.mockReturnValue(new Promise(() => {}));
     const passes: boolean[] = [];
     function Probe() {
-      passes.push(useItems('cat1', '').loading);
+      passes.push(useItems('cat1', '', 9).loading);
       return null;
     }
 
@@ -152,7 +152,7 @@ describe('useItems', () => {
     listItemsMock.mockResolvedValue(page([{ id: 'a' }], 30));
 
     const { result, rerender } = renderHook(
-      ({ query }: { query: string }) => useItems('cat1', query),
+      ({ query }: { query: string }) => useItems('cat1', query, 9),
       { wrapper, initialProps: { query: '' } },
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -169,7 +169,7 @@ describe('useItems', () => {
     listItemsMock.mockResolvedValue(page([{ id: 'a' }], 30));
 
     const { result, rerender } = renderHook(
-      ({ categoryId }: { categoryId: string }) => useItems(categoryId, ''),
+      ({ categoryId }: { categoryId: string }) => useItems(categoryId, '', 9),
       { wrapper, initialProps: { categoryId: 'cat1' } },
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -186,7 +186,7 @@ describe('useItems', () => {
     listItemsMock.mockResolvedValue(page([{ id: 'a' }], 30));
 
     const { result, rerender } = renderHook(
-      ({ query }: { query: string }) => useItems('cat1', query),
+      ({ query }: { query: string }) => useItems('cat1', query, 9),
       { wrapper, initialProps: { query: 'coin' } },
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -207,7 +207,7 @@ describe('useItems', () => {
           ids.length,
         ),
     );
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
     await waitFor(() => expect(result.current.totalPages).toBe(2));
     act(() => result.current.setPage(2));
     await waitFor(() =>
@@ -240,7 +240,7 @@ describe('useItems', () => {
   it('totals zero pages for an empty category rather than reporting one empty page', async () => {
     listItemsMock.mockResolvedValue(page([], 0));
 
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.totalPages).toBe(0);
@@ -264,9 +264,9 @@ describe('useItems with a prefetched first page', () => {
       ...page([{ id: 'a' }]),
       imageRows: [photo],
     }));
-    prefetchFirstPage('cat1', prefetched);
+    prefetchFirstPage('cat1', 9, prefetched);
 
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.items.map((entry) => entry.id)).toEqual(['a']);
@@ -275,9 +275,9 @@ describe('useItems with a prefetched first page', () => {
 
   it('leaves a prefetched page alone for a later page', async () => {
     listItemsMock.mockResolvedValue(page([{ id: 'a' }], 20));
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
     await waitFor(() => expect(result.current.total).toBe(20));
-    prefetchFirstPage('cat1', staleRead());
+    prefetchFirstPage('cat1', 9, staleRead());
 
     act(() => result.current.setPage(2));
 
@@ -290,9 +290,9 @@ describe('useItems with a prefetched first page', () => {
 
   it('leaves a prefetched page alone for a silent reload', async () => {
     listItemsMock.mockResolvedValue(page([{ id: 'a' }]));
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
-    prefetchFirstPage('cat1', staleRead());
+    prefetchFirstPage('cat1', 9, staleRead());
 
     await act(async () => {
       await result.current.reload({ silent: true });
@@ -303,10 +303,12 @@ describe('useItems with a prefetched first page', () => {
   });
 
   it('ignores a prefetched page when the first read is a search', async () => {
-    prefetchFirstPage('cat1', staleRead());
+    prefetchFirstPage('cat1', 9, staleRead());
     listItemsMock.mockResolvedValue(page([{ id: 'match' }]));
 
-    const { result } = renderHook(() => useItems('cat1', 'coin'), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', 'coin', 9), {
+      wrapper,
+    });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.items.map((entry) => entry.id)).toEqual(['match']);
@@ -319,7 +321,7 @@ describe('useItems with a prefetched first page', () => {
       imageRows: [photo],
     });
 
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
 
     await waitFor(() =>
       expect(result.current.pageImages).toEqual({
@@ -342,7 +344,7 @@ describe('useItems with requests in flight', () => {
     listItemsMock.mockReturnValueOnce(mount.promise);
     listItemsMock.mockReturnValueOnce(resync.promise);
 
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
     expect(result.current.loading).toBe(true);
 
     // A silent resync, like a delete's trailing reload, starts while the mount fetch is in flight.
@@ -379,7 +381,7 @@ describe('useItems with requests in flight', () => {
       listItemsMock.mockResolvedValueOnce(page([{ id: 'a' }]));
       listItemsMock.mockReturnValueOnce(new Promise(() => {}));
       const { result, rerender } = renderHook(
-        ({ categoryId, query }) => useItems(categoryId, query),
+        ({ categoryId, query }) => useItems(categoryId, query, 9),
         { wrapper, initialProps: { categoryId: 'cat1', query: '' } },
       );
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -393,7 +395,7 @@ describe('useItems with requests in flight', () => {
   it('raises loading again for another page, before its answer arrives', async () => {
     listItemsMock.mockResolvedValueOnce(page([{ id: 'a' }], 20));
     listItemsMock.mockReturnValueOnce(new Promise(() => {}));
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     act(() => result.current.setPage(2));
@@ -404,7 +406,7 @@ describe('useItems with requests in flight', () => {
   it('raises loading for a reload once the list has settled, and leaves it down for a silent one', async () => {
     listItemsMock.mockResolvedValueOnce(page([{ id: 'a' }]));
     listItemsMock.mockReturnValue(new Promise(() => {}));
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     act(() => void result.current.reload({ silent: true }));
@@ -420,7 +422,7 @@ describe('useItems with requests in flight', () => {
     listItemsMock.mockReturnValueOnce(first.promise);
     listItemsMock.mockReturnValueOnce(second.promise);
 
-    const { result } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { result } = renderHook(() => useItems('cat1', '', 9), { wrapper });
 
     await act(async () => {
       void result.current.reload();
@@ -446,7 +448,7 @@ describe('useItems with requests in flight', () => {
     listItemsMock.mockResolvedValue(page([{ id: 'coin-1' }]));
 
     const { result, rerender } = renderHook(
-      ({ query }: { query: string }) => useItems('cat1', query),
+      ({ query }: { query: string }) => useItems('cat1', query, 9),
       { wrapper, initialProps: { query: 'coin' } },
     );
 
@@ -487,7 +489,7 @@ describe('useItems with requests in flight', () => {
     listItemsMock.mockReturnValueOnce(stale.promise);
 
     const { result, rerender } = renderHook(
-      ({ query }: { query: string }) => useItems('cat1', query),
+      ({ query }: { query: string }) => useItems('cat1', query, 9),
       { wrapper, initialProps: { query: 'coin' } },
     );
     expect(listItemsMock).toHaveBeenCalledTimes(1);
@@ -517,7 +519,7 @@ describe('useItems with requests in flight', () => {
   it('aborts whatever request is still in flight on unmount', () => {
     listItemsMock.mockReturnValue(new Promise(() => {}));
 
-    const { unmount } = renderHook(() => useItems('cat1', ''), { wrapper });
+    const { unmount } = renderHook(() => useItems('cat1', '', 9), { wrapper });
     const [options] = listItemsMock.mock.calls[0] as Parameters<
       typeof listItems
     >;

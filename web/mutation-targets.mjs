@@ -34,6 +34,7 @@ export const MUTATE_TARGETS = [
   'src/app/components/ItemList/paging.ts',
   'src/app/components/ItemList/imageCache.ts',
   'src/app/components/ItemList/firstPagePrefetch.ts',
+  'src/app/components/ItemList/usePageSize.ts',
   'src/app/components/Map/usePlaces.tsx',
   'src/app/components/Map/useCurrentLocation.ts',
   'src/app/components/Coin/size.ts',

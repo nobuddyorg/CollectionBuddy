@@ -5,12 +5,12 @@ interface LoginPage {
   do: {
     open(): Promise<void>;
     signIn(): Promise<void>;
-    signInWithFingerprint(): Promise<void>;
+    signInWithPasskey(): Promise<void>;
   };
   locators: {
     buttons: {
       signIn: Locator;
-      signInWithFingerprint: Locator;
+      signInWithPasskey: Locator;
     };
     coin: Locator;
     collectibles: Locator;
@@ -28,7 +28,7 @@ export function initLoginPage(page: Page): LoginPage {
   const locators = {
     buttons: {
       signIn: root.getByTestId('google-sign-in'),
-      signInWithFingerprint: root.getByTestId('passkey-sign-in'),
+      signInWithPasskey: root.getByTestId('passkey-sign-in'),
     },
     coin: root.getByTestId('coin'),
     collectibles: root.getByTestId('collectible'),
@@ -44,8 +44,8 @@ export function initLoginPage(page: Page): LoginPage {
     signIn: async () => {
       await locators.buttons.signIn.click();
     },
-    signInWithFingerprint: async () => {
-      await locators.buttons.signInWithFingerprint.click();
+    signInWithPasskey: async () => {
+      await locators.buttons.signInWithPasskey.click();
     },
   };
   return Object.assign(() => root, { locators, do: interactions });

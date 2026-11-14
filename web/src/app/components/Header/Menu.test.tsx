@@ -25,13 +25,13 @@ async function openMenu() {
 }
 
 describe('Menu', () => {
-  it('offers fingerprint sign-in to an account with an email', async () => {
+  it('offers passkey sign-in to an account with an email', async () => {
     await openMenu();
 
     expect(await screen.findByTestId('passkey-setting')).toBeVisible();
   });
 
-  it('leaves fingerprint sign-in out for the demo, whose anonymous user has no email', async () => {
+  it('leaves passkey sign-in out for the demo, whose anonymous user has no email', async () => {
     const user = userEvent.setup();
     renderHeader({ user: { email: '' } });
     await user.click(screen.getByRole('button', { name: 'Account menu' }));

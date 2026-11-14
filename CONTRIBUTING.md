@@ -45,7 +45,7 @@ Data lives in the Docker volume until `supabase db reset` or `supabase stop`.
 
 Google OAuth is the only way to start a real session, and it needs
 credentials even locally — without them the dev server looks normal and
-sign-in fails silently. Fingerprint sign-in (passkeys) works once you are
+sign-in fails silently. Passkey sign-in works once you are
 signed in, but only on `http://localhost:3000`: WebAuthn refuses
 `127.0.0.1`.
 

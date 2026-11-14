@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type CSSProperties } from 'react';
+import { useEffect, useId, type CSSProperties } from 'react';
 import Link from 'next/link';
 
 import Coin from '../components/Coin';
@@ -38,6 +38,7 @@ export default function LoginPage() {
   const signIn = useGoogleSignIn();
   const signInWithPasskey = usePasskeySignIn();
   const passkeysSupported = usePasskeySupport();
+  const passkeyConfirmId = useId();
   const demoMode = isDemoMode();
   const { error: demoError } = useDemoSignIn(demoMode && !checking);
 
@@ -112,11 +113,15 @@ export default function LoginPage() {
       </div>
 
       {passkeysSupported && (
-        <div className="mt-8 sm:mt-10">
+        <div className="mt-8 sm:mt-10 flex flex-col items-center gap-1">
           <PasskeySignInButton
             onClick={signInWithPasskey}
             onError={handlePasskeyError}
+            describedBy={passkeyConfirmId}
           />
+          <p id={passkeyConfirmId} className="text-xs text-muted-foreground">
+            {t('passkeys.confirm_with')}
+          </p>
         </div>
       )}
 

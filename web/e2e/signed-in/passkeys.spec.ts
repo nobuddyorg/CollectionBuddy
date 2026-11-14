@@ -66,7 +66,7 @@ async function addFingerprintReader(page: Page) {
   });
 }
 
-test.describe('signing in with a fingerprint', () => {
+test.describe('signing in with a passkey, confirmed by fingerprint', () => {
   test('saves one, signs back in with it alone, and is refused once it is removed', async ({
     on,
     page,
@@ -77,40 +77,40 @@ test.describe('signing in with a fingerprint', () => {
     await app.categories.do.open(SEED.passkeys.category);
 
     await app.account.do.open();
-    await expect(app.account.locators.fingerprints.saved).toHaveCount(0);
-    await expect(app.account.locators.fingerprints.hint).toBeHidden();
-    await app.account.do.toggleFingerprintHint();
-    await expect(app.account.locators.fingerprints.hint).toBeVisible();
-    await app.account.do.saveFingerprint();
+    await expect(app.account.locators.passkeys.saved).toHaveCount(0);
+    await expect(app.account.locators.passkeys.hint).toBeHidden();
+    await app.account.do.togglePasskeyHint();
+    await expect(app.account.locators.passkeys.hint).toBeVisible();
+    await app.account.do.savePasskey();
     await expect(
-      app.toast().filter({ hasText: 'Fingerprint saved.' }),
+      app.toast().filter({ hasText: 'Passkey saved.' }),
     ).toBeVisible();
-    await expect(app.account.locators.fingerprints.saved).toHaveCount(1);
+    await expect(app.account.locators.passkeys.saved).toHaveCount(1);
 
     await app.account.do.signOut();
     await expect(page).toHaveURL(LOGIN_URL);
 
     // No Google, no password: the authenticator picks the account.
-    await app.login.do.signInWithFingerprint();
+    await app.login.do.signInWithPasskey();
     await expect(page).not.toHaveURL(LOGIN_URL);
     await app.categories.do.open(SEED.passkeys.category);
 
     await app.account.do.open();
-    await app.account.do.removeFingerprint(0);
+    await app.account.do.removePasskey(0);
     await expect(
-      app.toast().filter({ hasText: 'Fingerprint sign-in removed.' }),
+      app.toast().filter({ hasText: 'Passkey removed.' }),
     ).toBeVisible();
-    await expect(app.account.locators.fingerprints.saved).toHaveCount(0);
+    await expect(app.account.locators.passkeys.saved).toHaveCount(0);
     expectNoPageProblems(problems);
 
     await app.account.do.signOut();
     await expect(page).toHaveURL(LOGIN_URL);
 
     // The device still holds its key; Auth no longer knows it, so a lost phone is locked out.
-    await app.login.do.signInWithFingerprint();
+    await app.login.do.signInWithPasskey();
     await expect(
       app.toast.locators.alert.filter({
-        hasText: 'Fingerprint sign-in failed.',
+        hasText: 'Passkey sign-in failed.',
       }),
     ).toBeVisible();
     await expect(page).toHaveURL(LOGIN_URL);

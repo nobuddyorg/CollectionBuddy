@@ -31,7 +31,7 @@ function leaveBehind() {
 
 function prefetchTheirFirstPage() {
   const read = vi.fn(() => new Promise(() => {}));
-  prefetchFirstPage('category-a', read as unknown as typeof listItems);
+  prefetchFirstPage('category-a', 9, read as unknown as typeof listItems);
 }
 
 function storedKeys(): string[] {
@@ -53,7 +53,7 @@ describe('forgetUserData', () => {
 
     expect(storedKeys()).toEqual(['lang', 'theme']);
     expect(lastSignedUrl('user-a/item/full.jpg')).toBeUndefined();
-    expect(takePrefetchedFirstPage('category-a')).toBeNull();
+    expect(takePrefetchedFirstPage('category-a', 9)).toBeNull();
     expect(storageOwner()).toBeNull();
   });
 

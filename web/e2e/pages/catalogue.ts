@@ -8,6 +8,7 @@ interface Catalogue {
   (): Locator;
   do: {
     addEntry(title: string, description?: string): Promise<void>;
+    choosePageSize(size: 6 | 9 | 12 | 24): Promise<void>;
     clearSearch(): Promise<void>;
     removeEntry(title: string): Promise<void>;
     removeEntryByKeyboard(title: string): Promise<void>;
@@ -33,6 +34,8 @@ interface Catalogue {
       search: Locator;
     };
     pagination: Locator;
+    /** The entries-per-page choice beside the pager. */
+    pageSize: Locator;
     texts: {
       emptyTitle: Locator;
       searchStatus: Locator;
@@ -125,6 +128,7 @@ export function initCatalogue(page: Page): Catalogue {
       search: root.getByTestId('search-input'),
     },
     pagination,
+    pageSize: root.getByTestId('page-size'),
     texts: {
       emptyTitle: root.getByTestId('empty-title'),
       searchStatus: root.getByTestId('search-status'),
@@ -140,6 +144,9 @@ export function initCatalogue(page: Page): Catalogue {
       await form.do.fill({ title, description });
       await form.do.submit();
       await expect(card(title)()).toBeVisible();
+    },
+    choosePageSize: async (size: 6 | 9 | 12 | 24) => {
+      await locators.pageSize.getByTestId(`page-size-${size}`).click();
     },
     clearSearch: async () => {
       await locators.buttons.clearSearch.click();

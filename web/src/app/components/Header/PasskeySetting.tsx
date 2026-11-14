@@ -12,7 +12,7 @@ import { usePasskeys } from './usePasskeys';
 const ROW_BUTTON =
   'flex h-9 w-9 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted transition-colors disabled:opacity-60';
 
-/** Fingerprint sign-in: saves a passkey for this account and lists the saved ones, so a lost device can be removed. */
+/** Passkey sign-in, confirmed by fingerprint, face or screen lock: saves one for this account and lists the saved ones, so a lost device can be removed. */
 export function PasskeySetting() {
   const { t } = useI18n();
   const supported = usePasskeySupport();
@@ -53,6 +53,12 @@ export function PasskeySetting() {
           <Icon icon={IconType.Info} className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
+      <p
+        data-testid="passkey-confirm-with"
+        className="text-xs text-muted-foreground"
+      >
+        {t('passkeys.confirm_with')}
+      </p>
       <p
         id={hintId}
         hidden={!hintOpen}
