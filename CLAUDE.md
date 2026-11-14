@@ -15,8 +15,9 @@ tags, and is searchable. Features: [README.md](README.md). Full docs:
 - **Frontend**: Next.js App Router as a **static export** — no server runtime,
   no route handlers, no server-side authorization code. `web/`.
 - **Backend**: Supabase (Postgres, Auth, Storage). Google OAuth is the only
-  way to create an account; a passkey saved to one (fingerprint sign-in) signs
-  back in to it. Anonymous sign-in exists only for the local demo mode.
+  way to create an account; a passkey saved to one (confirmed by fingerprint,
+  face or screen lock) signs back in to it. Anonymous sign-in exists only for
+  the local demo mode.
 - **Authorization**: Postgres Row Level Security, and nothing else. Sharing is
   account-based, per category, at role `viewer` or `editor` — an editor
   creates, edits and deletes entries and photos inside a shared category, so

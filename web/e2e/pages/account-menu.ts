@@ -13,9 +13,9 @@ interface AccountMenu {
     deleteAccount(): Promise<void>;
     open(): Promise<void>;
     openHelp(): Promise<void>;
-    removeFingerprint(index: number): Promise<void>;
-    saveFingerprint(): Promise<void>;
-    toggleFingerprintHint(): Promise<void>;
+    removePasskey(index: number): Promise<void>;
+    savePasskey(): Promise<void>;
+    togglePasskeyHint(): Promise<void>;
     signOut(): Promise<void>;
   };
   locators: {
@@ -33,7 +33,7 @@ interface AccountMenu {
       help: Locator;
       signOut: Locator;
     };
-    fingerprints: {
+    passkeys: {
       add: Locator;
       error: Locator;
       hint: Locator;
@@ -65,7 +65,7 @@ export function initAccountMenu(page: Page): AccountMenu {
       help: page.getByTestId('open-help'),
       signOut: page.getByTestId('sign-out'),
     },
-    fingerprints: {
+    passkeys: {
       add: page.getByTestId('passkey-add'),
       error: page.getByTestId('passkey-setting').getByRole('alert'),
       hint: page.getByTestId('passkey-hint'),
@@ -121,17 +121,17 @@ export function initAccountMenu(page: Page): AccountMenu {
     openHelp: async () => {
       await locators.buttons.help.click();
     },
-    removeFingerprint: async (index: number) => {
-      await locators.fingerprints.saved
+    removePasskey: async (index: number) => {
+      await locators.passkeys.saved
         .nth(index)
         .getByTestId('passkey-remove')
         .click();
     },
-    saveFingerprint: async () => {
-      await locators.fingerprints.add.click();
+    savePasskey: async () => {
+      await locators.passkeys.add.click();
     },
-    toggleFingerprintHint: async () => {
-      await locators.fingerprints.info.click();
+    togglePasskeyHint: async () => {
+      await locators.passkeys.info.click();
     },
     signOut: async () => {
       await locators.buttons.signOut.click();

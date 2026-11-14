@@ -15,11 +15,28 @@ function renderButton(onClick: () => Promise<unknown>, onError = vi.fn()) {
 }
 
 describe('PasskeySignInButton', () => {
-  it('shows the fingerprint alone, and names it for screen readers', () => {
+  it('shows the fingerprint alone, and names it a passkey for screen readers', () => {
     const { button } = renderButton(() => Promise.resolve());
-    expect(button).toHaveAccessibleName('Sign in with fingerprint');
+    expect(button).toHaveAccessibleName('Sign in with passkey');
     expect(button).toHaveTextContent(/^$/);
     expect(button.querySelector('svg')).toBeInTheDocument();
+  });
+
+  it('reads the line it is described by after its name', () => {
+    render(
+      <I18nProvider>
+        <p id="confirm">With your fingerprint, face or screen lock</p>
+        <PasskeySignInButton
+          onClick={() => Promise.resolve()}
+          onError={vi.fn()}
+          describedBy="confirm"
+        />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByRole('button')).toHaveAccessibleDescription(
+      'With your fingerprint, face or screen lock',
+    );
   });
 
   it('is busy while the prompt is open', () => {

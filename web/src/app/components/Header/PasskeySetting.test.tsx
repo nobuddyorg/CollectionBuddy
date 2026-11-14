@@ -84,7 +84,7 @@ describe('PasskeySetting', () => {
     listAnswers([]);
     const user = renderSetting();
     const info = screen.getByRole('button', {
-      name: 'About fingerprint sign-in',
+      name: 'About passkeys',
     });
     const hint = screen.getByTestId('passkey-hint');
 
@@ -93,7 +93,7 @@ describe('PasskeySetting', () => {
 
     await user.click(info);
     expect(hint).toBeVisible();
-    expect(hint).toHaveTextContent('Your device calls this a "passkey".');
+    expect(hint).toHaveTextContent('sign in without Google');
     expect(info).toHaveAttribute('aria-expanded', 'true');
     expect(info).toHaveAttribute('aria-controls', hint.id);
 
@@ -101,13 +101,23 @@ describe('PasskeySetting', () => {
     expect(hint).not.toBeVisible();
   });
 
-  it('saves with the fingerprint symbol alone, named for screen readers', async () => {
+  it('saves with the fingerprint symbol alone, named a passkey for screen readers', async () => {
     listAnswers([]);
     renderSetting();
 
-    const add = screen.getByRole('button', { name: 'Save fingerprint' });
+    const add = screen.getByRole('button', { name: 'Save passkey' });
     expect(add).toHaveTextContent(/^$/);
-    expect(add).toHaveAttribute('title', 'Save fingerprint');
+    expect(add).toHaveAttribute('title', 'Save passkey');
+  });
+
+  it('says how a passkey is confirmed, without opening the explanation', () => {
+    listAnswers([]);
+    renderSetting();
+
+    expect(screen.getByText('Passkey')).toBeVisible();
+    expect(
+      screen.getByText('With your fingerprint, face or screen lock'),
+    ).toBeVisible();
   });
 
   it('shows a spinner until the list arrives, and no list when there is none', async () => {
@@ -127,7 +137,7 @@ describe('PasskeySetting', () => {
     renderSetting();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Could not load your saved fingerprints.',
+      'Could not load your saved passkeys.',
     );
     expect(console.error).toHaveBeenCalledWith(
       'listing passkeys failed',
@@ -135,15 +145,15 @@ describe('PasskeySetting', () => {
     );
   });
 
-  it('saves a fingerprint, confirms it and lists it', async () => {
+  it('saves a passkey, confirms it and lists it', async () => {
     listAnswers([], [PHONE]);
     vi.mocked(registerPasskey).mockResolvedValueOnce({ error: null });
     const user = renderSetting();
 
-    await user.click(screen.getByRole('button', { name: 'Save fingerprint' }));
+    await user.click(screen.getByRole('button', { name: 'Save passkey' }));
 
     expect(await screen.findByTestId('toast')).toHaveTextContent(
-      'Fingerprint saved.',
+      'Passkey saved.',
     );
     expect(await screen.findByTestId('passkey')).toHaveTextContent(
       'Google Password Manager',
@@ -160,7 +170,7 @@ describe('PasskeySetting', () => {
       ),
     });
     const user = renderSetting();
-    const add = screen.getByRole('button', { name: 'Save fingerprint' });
+    const add = screen.getByRole('button', { name: 'Save passkey' });
 
     await user.click(add);
 
@@ -176,10 +186,10 @@ describe('PasskeySetting', () => {
     });
     const user = renderSetting();
 
-    await user.click(screen.getByRole('button', { name: 'Save fingerprint' }));
+    await user.click(screen.getByRole('button', { name: 'Save passkey' }));
 
     expect(await screen.findByTestId('toast')).toHaveTextContent(
-      'This device already has a fingerprint saved for your account.',
+      'This device already has a passkey saved for your account.',
     );
   });
 
@@ -189,10 +199,10 @@ describe('PasskeySetting', () => {
     vi.mocked(registerPasskey).mockResolvedValueOnce({ error });
     const user = renderSetting();
 
-    await user.click(screen.getByRole('button', { name: 'Save fingerprint' }));
+    await user.click(screen.getByRole('button', { name: 'Save passkey' }));
 
     expect(await screen.findByTestId('toast')).toHaveTextContent(
-      'Could not save the fingerprint. Please try again.',
+      'Could not save the passkey. Please try again.',
     );
     expect(console.error).toHaveBeenCalledWith('passkey registration', error);
   });
@@ -203,11 +213,9 @@ describe('PasskeySetting', () => {
     const user = renderSetting();
     const remove = await screen.findByTestId('passkey-remove');
 
-    await user.click(screen.getByRole('button', { name: 'Save fingerprint' }));
+    await user.click(screen.getByRole('button', { name: 'Save passkey' }));
 
-    expect(
-      screen.getByRole('button', { name: 'Save fingerprint' }),
-    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save passkey' })).toBeDisabled();
     expect(remove).toBeDisabled();
   });
 
@@ -225,7 +233,7 @@ describe('PasskeySetting', () => {
 
     expect(deletePasskey).toHaveBeenCalledWith('passkey-phone');
     expect(await screen.findByTestId('toast')).toHaveTextContent(
-      'Fingerprint sign-in removed.',
+      'Passkey removed.',
     );
     await waitFor(() =>
       expect(screen.getAllByTestId('passkey')).toHaveLength(1),
@@ -254,8 +262,6 @@ describe('PasskeySetting', () => {
     renderSetting();
 
     expect(await screen.findByTestId('passkey-remove')).toBeVisible();
-    expect(
-      screen.queryByRole('button', { name: 'Save fingerprint' }),
-    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save passkey' })).toBeNull();
   });
 });

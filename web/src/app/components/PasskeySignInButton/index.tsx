@@ -10,6 +10,7 @@ import type { PasskeySignInButtonProps } from './types';
 export default function PasskeySignInButton({
   onClick,
   onError,
+  describedBy,
 }: PasskeySignInButtonProps) {
   const [loading, setLoading] = useState(false);
   const { t } = useI18n();
@@ -35,6 +36,7 @@ export default function PasskeySignInButton({
       onClick={() => void handleClick()}
       disabled={loading}
       aria-label={label}
+      aria-describedby={describedBy}
       title={label}
       aria-busy={loading ? 'true' : 'false'}
       className="flex items-center justify-center w-14 h-14 rounded-full text-foreground hover:bg-muted transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current disabled:opacity-60 disabled:cursor-not-allowed"
