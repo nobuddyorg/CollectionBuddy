@@ -95,6 +95,8 @@ export const MUTATE_TARGETS = [
   'src/app/components/CenteredModal/useLockBodyScroll.tsx',
   'src/app/components/Map/worldCopies.ts',
   'src/app/lib/objectMask.ts',
+  'src/app/lib/maskRim.ts',
+  'src/app/lib/fillEach.ts',
   'src/app/lib/cutoutImage.ts',
   'src/app/lib/isnetTensor.ts',
   'src/app/lib/segmentationModel.ts',

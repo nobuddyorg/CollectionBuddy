@@ -168,6 +168,7 @@ describe('opaqueBounds', () => {
 });
 
 describe('cropWithAlpha', () => {
+  // The pixel at alpha 100 lies outside the object, so it shows its opaque neighbour's colour, not its own.
   it("copies the original photo's colours inside the box and takes the cut-out's alpha", () => {
     const pixels = [
       1, 2, 3, 255, 4, 5, 6, 255, 7, 8, 9, 255, 10, 11, 12, 255, 13, 14, 15,
@@ -182,7 +183,7 @@ describe('cropWithAlpha', () => {
       box: { x: 1, y: 1, width: 2, height: 1 },
     });
 
-    expect(Array.from(cropped)).toEqual([13, 14, 15, 100, 16, 17, 18, 200]);
+    expect(Array.from(cropped)).toEqual([16, 17, 18, 100, 16, 17, 18, 200]);
   });
 
   it('walks every row and column of a box set into the photo', () => {
@@ -206,7 +207,7 @@ describe('cropWithAlpha', () => {
     ]);
   });
 
-  it('keeps bright colours as they are where the cut-out is half transparent', () => {
+  it('keeps its own colour where a half-transparent pixel has no opaque neighbour', () => {
     const cropped = cropWithAlpha({
       pixels: [250, 240, 230, 255],
       alpha: [100],
@@ -226,5 +227,101 @@ describe('cropWithAlpha', () => {
     });
 
     expect(Array.from(cropped)).toEqual([1, 2, 3, 50]);
+  });
+});
+
+describe('cropWithAlpha at the rim outside the object', () => {
+  const whole = (width: number, height: number) => ({
+    x: 0,
+    y: 0,
+    width,
+    height,
+  });
+  const photo = (colours: Array<[number, number, number]>) =>
+    colours.flatMap((colour) => [...colour, 255]);
+
+  // The centre is outside the object (alpha under 128); two opaque corners touch it.
+  it('shows the mean colour of the opaque pixels around it, not the background it lies on', () => {
+    const pixels = photo([
+      [10, 20, 30],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [99, 99, 99],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [30, 40, 50],
+    ]);
+    const alpha = [255, 0, 0, 0, 100, 0, 0, 0, 255];
+
+    const cropped = cropWithAlpha({
+      pixels,
+      alpha,
+      width: 3,
+      box: whole(3, 3),
+    });
+
+    expect(Array.from(cropped.slice(16, 20))).toEqual([20, 30, 40, 100]);
+  });
+
+  it.each([
+    [127, [7, 8, 9]],
+    [128, [99, 99, 99]],
+  ])('at alpha %d, takes %j', (centre, colour) => {
+    const pixels = photo([
+      [0, 0, 0],
+      [99, 99, 99],
+      [7, 8, 9],
+    ]);
+
+    const cropped = cropWithAlpha({
+      pixels,
+      alpha: [0, centre, 255],
+      width: 3,
+      box: whole(3, 1),
+    });
+
+    expect(Array.from(cropped.slice(4, 7))).toEqual(colour);
+  });
+
+  it('keeps the photo colour of a pixel no one sees', () => {
+    const cropped = cropWithAlpha({
+      pixels: photo([
+        [1, 2, 3],
+        [4, 5, 6],
+      ]),
+      alpha: [0, 255],
+      width: 2,
+      box: whole(2, 1),
+    });
+
+    expect(Array.from(cropped.slice(0, 4))).toEqual([1, 2, 3, 0]);
+  });
+
+  // The row end's next index is the row below's start, and the row start's previous one is the row above's end.
+  it.each([
+    ['the start of the next row', 2, 3],
+    ['the end of the row above', 3, 2],
+  ])('does not take %s for a neighbour', (_where, rim, wrapped) => {
+    const colours: Array<[number, number, number]> = Array.from(
+      { length: 6 },
+      () => [50, 50, 50],
+    );
+    colours[wrapped] = [200, 0, 0];
+    const alpha = [0, 0, 0, 0, 0, 0];
+    alpha[rim] = 100;
+    alpha[wrapped] = 255;
+
+    const cropped = cropWithAlpha({
+      pixels: photo(colours),
+      alpha,
+      width: 3,
+      box: whole(3, 2),
+    });
+
+    expect(Array.from(cropped.slice(rim * 4, rim * 4 + 3))).toEqual([
+      50, 50, 50,
+    ]);
   });
 });

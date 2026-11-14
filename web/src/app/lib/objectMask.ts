@@ -1,3 +1,6 @@
+import { fillEach } from './fillEach';
+import { colourAround, trimBackgroundRim } from './maskRim';
+
 /** Centre and semi-axes in pixels; `angle` turns the x semi-axis, in radians. */
 export type Ellipse = {
   centerX: number;
@@ -25,8 +28,10 @@ export function isOpaque(alpha: number): boolean {
 
 // A blob under this share of the largest is the model's residue, not another object.
 const MIN_OBJECT_SHARE = 0.05;
-// An enclosed hole up to this share of the object is always a miss, a highlight say, whatever its colour.
+// An enclosed hole up to this share of the object is a miss, a highlight say, unless it is plainly background.
 const MAX_FILLED_HOLE_SHARE = 0.05;
+// A small hole is plainly background where the model's mean alpha in it stays under this, and it looks like the backdrop: openwork, a lattice.
+const CONFIDENT_BACKGROUND_ALPHA = 64;
 // A larger hole stays open only if its mean colour is this close (RGB distance) to the background's: a ring's centre, not a stamp's picture.
 const BACKGROUND_COLOUR_DISTANCE = 48;
 
@@ -44,11 +49,16 @@ export function analyzeMask({
 }): MaskAnalysis | null {
   const objects = significantBlobs(alpha, width);
   if (objects === null) return null;
-  const mask = fillHoles({ objects, pixels, width, height });
+  const mask = trimBackgroundRim({
+    mask: fillHoles({ objects, alpha, pixels, width, height }),
+    pixels,
+    width,
+    height,
+  });
   const ellipse = fitEllipse(mask, width);
-  const ellipseInside = Uint8Array.from(
-    ellipseCoverage(ellipse, width, height),
-    (value) => (isOpaque(value) ? 1 : 0),
+  const coverage = ellipseCoverage(ellipse, width, height);
+  const ellipseInside = fillEach(new Uint8Array(coverage.length), (index) =>
+    isOpaque(coverage[index]) ? 1 : 0,
   );
   return { mask, ellipse, fillRatio: overlap(mask, ellipseInside) };
 }
@@ -125,7 +135,9 @@ function significantBlobs(alpha: ArrayLike<number>, width: number) {
   const largest = sizes.reduce((most, size) => Math.max(most, size), 0);
   if (largest === 0) return null;
   const smallest = largest * MIN_OBJECT_SHARE;
-  return Uint8Array.from(labels, (label) => (sizes[label] >= smallest ? 1 : 0));
+  return fillEach(new Uint8Array(labels.length), (index) =>
+    sizes[labels[index]] >= smallest ? 1 : 0,
+  );
 }
 
 function borderIndices(width: number, height: number): number[] {
@@ -141,38 +153,46 @@ function borderIndices(width: number, height: number): number[] {
 }
 
 type Colour = [red: number, green: number, blue: number];
-type RegionStats = { colour: Colour; size: number };
+type RegionStats = { colour: Colour; size: number; alpha: number };
 
 /** Each region's size and mean colour, keyed by its label; -1 is the background the border reaches, 0 the objects. */
-function regionStats(regions: Int32Array, pixels: ArrayLike<number>) {
+function regionStats(
+  regions: Int32Array,
+  pixels: ArrayLike<number>,
+  alpha: ArrayLike<number>,
+) {
   // Unsigned, so a sum that ever went negative would wrap and show, not cancel out.
   const sums = new Map<number, Uint32Array>();
   regions.forEach((region, index) => {
-    const sum = sums.get(region) ?? new Uint32Array(4);
+    const sum = sums.get(region) ?? new Uint32Array(5);
     sum[0] += pixels[index * 4];
     sum[1] += pixels[index * 4 + 1];
     sum[2] += pixels[index * 4 + 2];
     sum[3] += 1;
+    sum[4] += alpha[index];
     sums.set(region, sum);
   });
   const stats = new Map<number, RegionStats>();
-  sums.forEach(([red, green, blue, size], region) =>
+  sums.forEach(([red, green, blue, size, opacity], region) =>
     stats.set(region, {
       colour: [red / size, green / size, blue / size],
       size,
+      alpha: opacity / size,
     }),
   );
   return stats;
 }
 
-/** Background is whatever the image border reaches; an enclosed hole is filled if it is small or does not look like that background. */
+/** Background is whatever the image border reaches; an enclosed hole stays open only where it looks like the backdrop, and a small one only where the model is sure of it too. */
 function fillHoles({
   objects,
+  alpha,
   pixels,
   width,
   height,
 }: {
   objects: Uint8Array;
+  alpha: ArrayLike<number>;
   pixels: ArrayLike<number>;
   width: number;
   height: number;
@@ -187,21 +207,30 @@ function fillHoles({
     width,
   });
   labelRegions({ include: isBackground, marks: regions, width });
-  const stats = regionStats(regions, pixels);
-  // No background at all when the object fills the frame's whole border: then no hole can look like it.
-  const background = stats.get(-1)?.colour ?? [Infinity, Infinity, Infinity];
+  const stats = regionStats(regions, pixels, alpha);
+  // Infinite when the object fills the frame's whole border: then no hole can look like the background.
+  const background = colourAround({
+    objects,
+    isBackground: (index) => regions[index] === -1,
+    pixels,
+    width,
+    height,
+  });
   const largestFilled = stats.get(0)!.size * MAX_FILLED_HOLE_SHARE;
   const filled = new Map<number, boolean>();
-  stats.forEach(({ colour, size }, region) => {
+  stats.forEach(({ colour, size, alpha: opacity }, region) => {
     const distance = Math.hypot(
       ...colour.map((value, channel) => value - background[channel]),
     );
-    const miss = size <= largestFilled || distance > BACKGROUND_COLOUR_DISTANCE;
+    const looksLikeBackdrop = distance <= BACKGROUND_COLOUR_DISTANCE;
+    const surelyBackground = opacity < CONFIDENT_BACKGROUND_ALPHA;
+    const miss =
+      !looksLikeBackdrop || (size <= largestFilled && !surelyBackground);
     // The background itself is never a hole, however small it is.
     filled.set(region, region !== -1 && miss);
   });
-  return Uint8Array.from(regions, (region, index) =>
-    objects[index] === 1 || filled.get(region) === true ? 1 : 0,
+  return fillEach(new Uint8Array(regions.length), (index) =>
+    objects[index] === 1 || filled.get(regions[index]) === true ? 1 : 0,
   );
 }
 
@@ -245,7 +274,7 @@ export function ellipseCoverage(
   const cos = Math.cos(ellipse.angle);
   const sin = Math.sin(ellipse.angle);
   const edgeScale = Math.sqrt(ellipse.radiusX * ellipse.radiusY);
-  return Uint8ClampedArray.from({ length: width * height }, (_, index) => {
+  return fillEach(new Uint8ClampedArray(width * height), (index) => {
     const dx = (index % width) + 0.5 - ellipse.centerX;
     const dy = Math.floor(index / width) + 0.5 - ellipse.centerY;
     const along = (dx * cos + dy * sin) / ellipse.radiusX;

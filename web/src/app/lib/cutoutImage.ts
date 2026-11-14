@@ -1,4 +1,5 @@
-import { ellipseCoverage, type MaskAnalysis } from './objectMask';
+import { fillEach } from './fillEach';
+import { ellipseCoverage, isOpaque, type MaskAnalysis } from './objectMask';
 
 export type Size = { width: number; height: number };
 export type Box = Size & { x: number; y: number };
@@ -20,9 +21,10 @@ function softEdge(mask: Uint8Array, size: Size): Uint8ClampedArray {
   // Only x can wrap into the next row; a row off the image reads undefined, which is not 1.
   const covered = (x: number, y: number) =>
     x >= 0 && x < size.width && mask[y * size.width + x] === 1;
+  const cell = (x: number, y: number) => (covered(x, y) ? 1 : 0);
   const row = (x: number, y: number) =>
-    [x - 1, x, x + 1].filter((column) => covered(column, y)).length;
-  return Uint8ClampedArray.from(mask, (_, index) => {
+    cell(x - 1, y) + cell(x, y) + cell(x + 1, y);
+  return fillEach(new Uint8ClampedArray(mask.length), (index) => {
     const x = index % size.width;
     const y = Math.floor(index / size.width);
     const hits = row(x, y - 1) + row(x, y) + row(x, y + 1);
@@ -69,7 +71,41 @@ export function opaqueBounds(alpha: ArrayLike<number>, size: Size): Box {
   return { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
 }
 
-/** The original photo's own colours inside `box`, with `alpha` as their opacity. */
+/** The mean colour of the opaque pixels around `source`, or its own where none is: what a rim pixel outside the object shows. */
+function rimColour({
+  pixels,
+  alpha,
+  width,
+  source,
+}: {
+  pixels: ArrayLike<number>;
+  alpha: ArrayLike<number>;
+  width: number;
+  source: number;
+}): number[] {
+  const x = source % width;
+  const y = Math.floor(source / width);
+  const sum = [0, 0, 0];
+  let count = 0;
+  // Columns clamped, so x never wraps into the next row; a row off the image reads undefined, which is not opaque.
+  const right = Math.min(width - 1, x + 1);
+  for (let row = y - 1; row <= y + 1; row += 1) {
+    for (let column = Math.max(0, x - 1); column <= right; column += 1) {
+      const neighbour = row * width + column;
+      if (!isOpaque(alpha[neighbour])) continue;
+      sum[0] += pixels[neighbour * 4];
+      sum[1] += pixels[neighbour * 4 + 1];
+      sum[2] += pixels[neighbour * 4 + 2];
+      count += 1;
+    }
+  }
+  if (count === 0) {
+    return [0, 1, 2].map((channel) => pixels[source * 4 + channel]);
+  }
+  return sum.map((total) => total / count);
+}
+
+/** The original photo's colours inside `box`, with `alpha` as their opacity; the soft rim outside the object takes the object's colour, not the background's. */
 export function cropWithAlpha({
   pixels,
   alpha,
@@ -89,6 +125,8 @@ export function cropWithAlpha({
     const source = row * width + box.x + (pixel % box.width);
     const value = pixels[source * 4 + channel];
     // Never more opaque than the photo already was.
-    return channel === 3 ? Math.min(value, alpha[source]) : value;
+    if (channel === 3) return Math.min(value, alpha[source]);
+    if (alpha[source] === 0 || isOpaque(alpha[source])) return value;
+    return rimColour({ pixels, alpha, width, source })[channel];
   });
 }
