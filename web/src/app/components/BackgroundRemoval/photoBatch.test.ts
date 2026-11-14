@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   enqueuePick,
+  enqueueStored,
   judged,
   nextStep,
   splitImages,
@@ -27,6 +28,7 @@ const photo = (overrides: Partial<QueuedPhoto> = {}): QueuedPhoto => ({
   removeBackground: false,
   position: { current: 1, total: 1 },
   sharpness: 'checking',
+  target: { kind: 'new' },
   ...overrides,
 });
 
@@ -76,6 +78,7 @@ describe('enqueuePick', () => {
         removeBackground: true,
         position: { current: 1, total: 2 },
         sharpness: 'checking',
+        target: { kind: 'new' },
       },
       {
         key: '3:1',
@@ -85,6 +88,7 @@ describe('enqueuePick', () => {
         removeBackground: true,
         position: { current: 2, total: 2 },
         sharpness: 'checking',
+        target: { kind: 'new' },
       },
     ]);
   });
@@ -101,6 +105,58 @@ describe('enqueuePick', () => {
     const queue = enqueuePick([], pickOf(1, [same, same]));
 
     expect(new Set(queue.map((waiting) => waiting.key)).size).toBe(2);
+  });
+});
+
+describe('enqueueStored', () => {
+  const stored = { id: 'image-1', pathFull: 'uid/item-1/a.webp' };
+
+  it('queues a stored photo for its cut-out review alone, as sharp as it was judged when added', () => {
+    const photoFile = file('photo');
+
+    expect(
+      enqueueStored([], {
+        pick: 4,
+        itemId: 'item-1',
+        image: stored,
+        file: photoFile,
+      }),
+    ).toEqual([
+      {
+        key: '4:0',
+        pick: 4,
+        itemId: 'item-1',
+        file: photoFile,
+        removeBackground: true,
+        position: { current: 1, total: 1 },
+        sharpness: 'sharp',
+        target: { kind: 'replace', image: stored },
+      },
+    ]);
+  });
+
+  it('puts it after the photos already waiting', () => {
+    const waiting = enqueuePick([], pickOf(1, [file('a.jpg')]));
+
+    const queue = enqueueStored(waiting, {
+      pick: 2,
+      itemId: 'item-1',
+      image: stored,
+      file: file('photo'),
+    });
+
+    expect(queue.map((photo) => photo.key)).toEqual(['1:0', '2:0']);
+  });
+
+  it('is always reviewed, never uploaded on its own', () => {
+    const [queued] = enqueueStored([], {
+      pick: 1,
+      itemId: 'item-1',
+      image: stored,
+      file: file('photo'),
+    });
+
+    expect(nextStep(queued)).toBe('ask');
   });
 });
 

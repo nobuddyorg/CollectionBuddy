@@ -6,13 +6,11 @@ import {
   useState,
   type RefObject,
 } from 'react';
-import { verifiedUserId } from '../../data/auth';
 import {
   createImageRow,
   deleteImageRow,
-  imagePrefix,
   listImagesForItems,
-  uploadImageObject,
+  readImageCreatedAt,
   type ImageListRow,
 } from '../../data/images';
 import { removeObjectsThenRows } from '../../data/imageRemoval';
@@ -33,10 +31,11 @@ import {
   signEntries,
   withoutRows,
 } from './imageEntries';
-import { extensionForType, type PhotoUpload } from '../../data/photoType';
-import { compressPhoto } from '../../lib/imageCompression';
+import type { PhotoUpload } from '../../data/photoType';
+import { idAfter } from '../../lib/idAfter';
 import { restoreAt } from '../../lib/optimistic';
 import { useSyncedRef } from '../../lib/useSyncedRef';
+import { storePhotoPair } from './storePhoto';
 
 // Re-signs each shown photograph before its own 1h signature expires, so a long-lived tab keeps its thumbnails.
 function useSignedUrlRefresh(
@@ -86,7 +85,6 @@ export function useItemImages() {
   const { t } = useI18n();
   const toast = useToast();
   const confirm = useConfirm();
-  // A count, not a flag: a second photograph can be handed over while the first still compresses.
   const [pendingUploads, setPendingUploads] = useState<Record<string, number>>(
     {},
   );
@@ -167,57 +165,15 @@ export function useItemImages() {
 
   useSignedUrlRefresh(imagesRef, refreshAllImages);
 
-  const uploadImage = useCallback(
-    async (itemId: string, { file, encoding = 'opaque' }: PhotoUpload) => {
+  // A count, not a flag: a second photograph can be handed over while the first still compresses.
+  const whilePending = useCallback(
+    async (itemId: string, work: () => Promise<void>) => {
+      setPendingUploads((previous) => ({
+        ...previous,
+        [itemId]: (previous[itemId] ?? 0) + 1,
+      }));
       try {
-        setPendingUploads((previous) => ({
-          ...previous,
-          [itemId]: (previous[itemId] ?? 0) + 1,
-        }));
-        const userId = await verifiedUserId();
-        if (!userId) throw new Error('No user session');
-
-        const fullFile = await compressPhoto(file, {
-          maxWidthOrHeight: 1000,
-          encoding,
-        });
-        // From the already-downscaled full size; 600px covers strip cells and pair halves at 3x density.
-        const thumbnailFile = await compressPhoto(fullFile, {
-          maxWidthOrHeight: 600,
-          encoding,
-        });
-
-        const base = crypto.randomUUID();
-        const pathBase = `${imagePrefix(userId, itemId)}/${base}`;
-        const pathFull = `${pathBase}${extensionForType(fullFile.type)}`;
-        const pathThumb = `${pathBase}.thumb${extensionForType(thumbnailFile.type)}`;
-
-        const fullUpload = await uploadImageObject(pathFull, fullFile);
-        if (fullUpload.error) throw fullUpload.error;
-
-        const thumbnailUpload = await uploadImageObject(
-          pathThumb,
-          thumbnailFile,
-        );
-        const thumbnailUploaded = !thumbnailUpload.error;
-        if (!thumbnailUploaded) {
-          console.warn('Thumbnail upload failed:', thumbnailUpload.error);
-        }
-
-        const { error: rowError } = await createImageRow({
-          item_id: itemId,
-          path_full: pathFull,
-          path_thumb: thumbnailUploaded ? pathThumb : null,
-          size_bytes: fullFile.size,
-        });
-        if (rowError) throw rowError;
-
-        // Released in the same synchronous run as the `finally` below, so React batches both into one render.
-        const entries = await fetchItemImages(itemId);
-        if (entries)
-          setImages((previous) => ({ ...previous, [itemId]: entries }));
-      } catch (error: unknown) {
-        toast.reportError('upload image', error, uploadErrorMessage(error, t));
+        await work();
       } finally {
         setPendingUploads((previous) => {
           const remaining = previous[itemId] - 1;
@@ -228,7 +184,73 @@ export function useItemImages() {
         });
       }
     },
-    [fetchItemImages, t, toast],
+    [],
+  );
+
+  // Released in the same synchronous run as whilePending's `finally`, so React batches both into one render.
+  const showListed = useCallback(
+    async (itemId: string) => {
+      const entries = await fetchItemImages(itemId);
+      if (entries)
+        setImages((previous) => ({ ...previous, [itemId]: entries }));
+    },
+    [fetchItemImages],
+  );
+
+  const uploadImage = useCallback(
+    (itemId: string, photo: PhotoUpload) =>
+      whilePending(itemId, async () => {
+        try {
+          const { error } = await createImageRow(
+            await storePhotoPair(itemId, photo),
+          );
+          if (error) throw error;
+          await showListed(itemId);
+        } catch (error: unknown) {
+          toast.reportError(
+            'upload image',
+            error,
+            uploadErrorMessage(error, t),
+          );
+        }
+      }),
+    [showListed, t, toast, whilePending],
+  );
+
+  // The new photograph takes the old one's place before the old bytes, then its row, go: a failure leaves two, never none.
+  const replaceImage = useCallback(
+    (itemId: string, image: ImageEntry, photo: PhotoUpload) =>
+      whilePending(itemId, async () => {
+        try {
+          const added = await readImageCreatedAt(image.id);
+          if (added.error) throw added.error;
+          const { error } = await createImageRow({
+            ...(await storePhotoPair(itemId, photo)),
+            id: idAfter(image.id),
+            created_at: added.data.created_at,
+          });
+          if (error) throw error;
+          const removed = await removeObjectsThenRows({
+            paths: entryPaths(image),
+            deleteRows: () => deleteImageRow({ id: image.id, itemId }),
+          });
+          if (removed.error) {
+            toast.reportError(
+              'replace image',
+              removed.error,
+              t('item_list.replace_original_kept'),
+            );
+          }
+          await showListed(itemId);
+        } catch (error: unknown) {
+          toast.reportError(
+            'replace image',
+            error,
+            uploadErrorMessage(error, t),
+          );
+        }
+      }),
+    [showListed, t, toast, whilePending],
   );
 
   // The thumbnail goes on confirm; its bytes, then its row, go once the toast's undo window closes.
@@ -319,6 +341,7 @@ export function useItemImages() {
     showImages,
     signAllFor,
     uploadImage,
+    replaceImage,
     deleteImage,
     captureItemImagePaths,
     forgetItemImages,

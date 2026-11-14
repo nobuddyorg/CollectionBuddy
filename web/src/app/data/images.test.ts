@@ -6,10 +6,12 @@ import {
   createImageRow,
   createSignedUrls,
   deleteImageRow,
+  downloadImageObject,
   imagePrefix,
   isTransientStorageError,
   listImagePathsForCategory,
   listImagesForItems,
+  readImageCreatedAt,
   removeImageObjects,
   uploadImageObject,
 } from './images';
@@ -25,6 +27,7 @@ function mockStorageFrom() {
     createSignedUrls: vi.fn(),
     upload: vi.fn(),
     remove: vi.fn(),
+    download: vi.fn(),
   };
   const from = vi
     .spyOn(supabase.storage, 'from')
@@ -60,6 +63,15 @@ describe('uploadImageObject', () => {
     void uploadImageObject('uid/item/1.webp', file);
     expect(from).toHaveBeenCalledWith(ITEM_IMAGES_BUCKET);
     expect(upload).toHaveBeenCalledWith('uid/item/1.webp', file);
+  });
+});
+
+describe('downloadImageObject', () => {
+  it('reads the given path from the item-images bucket', () => {
+    const { from, download } = mockStorageFrom();
+    void downloadImageObject('uid/item/1.webp');
+    expect(from).toHaveBeenCalledWith(ITEM_IMAGES_BUCKET);
+    expect(download).toHaveBeenCalledWith('uid/item/1.webp');
   });
 });
 
@@ -106,6 +118,39 @@ describe('createImageRow', () => {
       args: ['id, item_id, path_full, path_thumb'],
     });
     expect(calls[2].method).toBe('single');
+  });
+});
+
+describe('readImageCreatedAt', () => {
+  it('reads one row by its id, and only when it was added', () => {
+    const { from, calls } = mockTableFrom();
+
+    void readImageCreatedAt('image-1');
+
+    expect(from).toHaveBeenCalledWith('images');
+    expect(calls).toEqual([
+      { method: 'select', args: ['created_at'] },
+      { method: 'eq', args: ['id', 'image-1'] },
+      { method: 'single', args: [] },
+    ]);
+  });
+});
+
+describe("createImageRow taking another photograph's place", () => {
+  it('sends the id and the time it was given, for the order to stay', () => {
+    const { calls } = mockTableFrom();
+    const row = {
+      id: '7c9e6679-7425-40de-944b-e07fc1f90ae8',
+      created_at: '2026-01-02T03:04:05.678Z',
+      item_id: 'item-1',
+      path_full: 'uid/item-1/2.png',
+      path_thumb: 'uid/item-1/2.thumb.png',
+      size_bytes: 99,
+    };
+
+    void createImageRow(row);
+
+    expect(calls[0]).toEqual({ method: 'insert', args: [row] });
   });
 });
 

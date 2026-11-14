@@ -53,6 +53,13 @@ const assessSharpness = vi.hoisted(() =>
 );
 vi.mock('../../lib/photoSharpness', () => ({ assessSharpness }));
 
+// The stored photograph a viewer's Remove background loads.
+const downloadImageObject = vi.hoisted(() => vi.fn());
+vi.mock('../../data/images', async (importActual) => ({
+  ...(await importActual<typeof import('../../data/images')>()),
+  downloadImageObject,
+}));
+
 const photo = new File(['jpeg'], 'coin.jpg', { type: 'image/jpeg' });
 
 function renderWithUpload() {
@@ -180,5 +187,89 @@ describe('ItemList background removal', () => {
     expect(itemId).toBe('1');
     expect(file.type).toBe('image/png');
     expect(encoding).toBe('transparent');
+  });
+
+  it('removes the background of a stored photo from the viewer, and puts the cut-out in its place', async () => {
+    localStorage.setItem('removeBackground', 'on');
+    const blob = new Blob(['png'], { type: 'image/png' });
+    removeBackground.mockResolvedValue({
+      blob,
+      width: 4,
+      height: 4,
+      mode: 'ellipse',
+      fillRatio: 1,
+    });
+    downloadImageObject.mockResolvedValue({
+      data: new Blob(['webp'], { type: 'image/webp' }),
+      error: null,
+    });
+    const stored = {
+      id: 'img-1',
+      pathFull: '1/1.webp',
+      urlFull: 'https://example.com/1.webp',
+    };
+    const replaceImage = vi.fn<
+      (
+        itemId: string,
+        image: typeof stored,
+        photo: PhotoUpload,
+      ) => Promise<void>
+    >(async () => {});
+    const uploadImage = vi.fn(async () => {});
+    useItemImagesMock.mockReturnValue({
+      ...defaultImagesState(),
+      images: { '1': [stored] },
+      uploadImage,
+      replaceImage,
+    });
+    renderList();
+
+    await userEvent.click(screen.getByAltText('Item 1, image 1'));
+    await userEvent.click(
+      within(screen.getByRole('dialog', { name: 'Full size image' })).getByRole(
+        'button',
+        { name: 'Remove background' },
+      ),
+    );
+
+    expect(
+      screen.queryByRole('dialog', { name: 'Full size image' }),
+    ).toBeNull();
+    expect(downloadImageObject).toHaveBeenCalledWith('1/1.webp');
+    const use = await screen.findByRole('button', {
+      name: 'Use without background',
+    });
+    await vi.waitFor(() => expect(use).toBeEnabled());
+    await userEvent.click(use);
+
+    await vi.waitFor(() => expect(replaceImage).toHaveBeenCalledOnce());
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(assessSharpness).not.toHaveBeenCalled();
+    const [itemId, image, { file, encoding }] = replaceImage.mock.calls[0];
+    expect([itemId, image]).toEqual(['1', stored]);
+    expect(file.type).toBe('image/png');
+    expect(encoding).toBe('transparent');
+  });
+
+  it('offers no Remove background in the viewer while the opt-in is off', async () => {
+    useItemImagesMock.mockReturnValue({
+      ...defaultImagesState(),
+      images: {
+        '1': [
+          {
+            id: 'img-1',
+            pathFull: '1/1.webp',
+            urlFull: 'https://example.com/1.webp',
+          },
+        ],
+      },
+    });
+    renderList();
+
+    await userEvent.click(screen.getByAltText('Item 1, image 1'));
+
+    expect(
+      screen.queryByRole('button', { name: 'Remove background' }),
+    ).toBeNull();
   });
 });

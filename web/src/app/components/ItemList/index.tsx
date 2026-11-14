@@ -23,6 +23,7 @@ import { listViewFor } from './listView';
 import type { ItemFormValues } from '../ItemForm';
 import type { ImageEntry, ItemLite } from './types';
 import { Toolbar } from './Toolbar';
+import { useBackgroundRemovalPreference } from '../BackgroundRemoval/useBackgroundRemovalPreference';
 import { useBackgroundRemovalUpload } from '../BackgroundRemoval/useBackgroundRemovalUpload';
 import { BackgroundRemovalDialog } from '../BackgroundRemoval/BackgroundRemovalDialog';
 
@@ -86,12 +87,17 @@ export default function ItemList({
     showImages,
     signAllFor,
     uploadImage,
+    replaceImage,
     deleteImage,
     captureItemImagePaths,
     forgetItemImages,
     pendingUploads,
   } = useItemImages();
-  const backgroundRemoval = useBackgroundRemovalUpload(uploadImage);
+  const backgroundRemoval = useBackgroundRemovalUpload(
+    uploadImage,
+    replaceImage,
+  );
+  const { enabled: removesBackgrounds } = useBackgroundRemovalPreference();
 
   // Read through a ref so a reload that keeps the same items re-signs nothing.
   const pageImagesRef = useSyncedRef(pageImages);
@@ -250,6 +256,12 @@ export default function ItemList({
         }
         onClose={() => setModalState(null)}
         onDelete={(image) => void deleteImage(modalState!.itemId, image)}
+        // The viewer closes first: the cut-out review is a dialog of its own.
+        onRemoveBackground={(image) => {
+          setModalState(null);
+          void backgroundRemoval.reviewStored(modalState!.itemId, image);
+        }}
+        offerRemoveBackground={removesBackgrounds}
         busy={modalState ? (pendingUploads[modalState.itemId] ?? 0) > 0 : false}
         readOnly={!canEdit}
       />

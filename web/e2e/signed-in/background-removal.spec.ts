@@ -9,6 +9,7 @@ import { expectNoSeriousA11yViolations } from '../axe';
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
 import { blurryPhoto, uniqueName } from './helpers';
+import { context, seededEntryId, storedObjects } from './rls/helpers';
 import type { PageTree } from '../pages';
 
 // Background removal runs for real, in its worker on the real runtime; only the 87 MB model is swapped for a stand-in.
@@ -263,6 +264,68 @@ test.describe('background removal', () => {
 
       await expect(review()).toHaveCount(0);
       await expect(card.locators.images).toHaveCount(0);
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
+  test('removes the background of a photo already stored, and keeps it where it was', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const app = on(page);
+    await serveStandInModel(page);
+    const { token, userId } = context();
+    const title = uniqueName('Nachträglich');
+    // A stored object's name, from a signed URL: its uuid base is the same for both sizes.
+    const baseOf = (url: string | null) =>
+      new URL(url!).pathname.split('/').pop()!.split('.')[0];
+    const storedBases = async (itemId: string) =>
+      (await storedObjects(token, `${userId}/${itemId}`)).map(
+        (object) => object.name.split('.')[0],
+      );
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      const itemId = await seededEntryId({ token, ownerId: userId, title });
+      await card.do.uploadPhoto([
+        await itemPhoto(page, testInfo.outputPath('item.png')),
+        PHOTO,
+      ]);
+      await expect(card.locators.images).toHaveCount(2, { timeout: ARRIVES });
+      const cover = baseOf(
+        await card.locators.images.first().getAttribute('src'),
+      );
+      const second = baseOf(
+        await card.locators.images.nth(1).getAttribute('src'),
+      );
+
+      await turnOnBackgroundRemoval(app, page);
+      await card.do.openImage();
+      await app.viewer.do.removeBackground();
+      await expect(app.viewer()).toHaveCount(0);
+      const review = app.backgroundRemoval;
+      await expect(review.locators.cutout).toBeVisible({ timeout: ARRIVES });
+      await review.do.useCutout();
+      await expect(review()).toHaveCount(0);
+
+      // The old pair gone, a new pair in its stead, the second photo untouched.
+      await expect
+        .poll(() => storedBases(itemId), { timeout: ARRIVES })
+        .not.toContain(cover);
+      const bases = await storedBases(itemId);
+      expect(bases).toHaveLength(4);
+      expect(bases).toContain(second);
+      // Still the cover, now the cut-out; still second, the photo that was.
+      await expect(card.locators.images).toHaveCount(2);
+      await expect
+        .poll(async () =>
+          baseOf(await card.locators.images.first().getAttribute('src')),
+        )
+        .not.toBe(cover);
+      expect(
+        baseOf(await card.locators.images.nth(1).getAttribute('src')),
+      ).toBe(second);
     } finally {
       await removeEntriesTitled(title);
     }

@@ -163,6 +163,17 @@ your browser has it. Removing a background takes about 20
 seconds on a desktop computer, longer on a phone. With the box unticked,
 uploads work exactly as before.
 
+A photo already added can lose its background too: open it full size and choose
+the scissors, **Remove background**. The same review opens; **Use without
+background** puts the result in the original's place, so the cover and the order
+of the photos stay as they were, and **Keep original** changes nothing. Anyone
+who can edit the collection can do this; someone it is only shared with to view
+cannot.
+
+A photo that looks blurry is shown before it uploads, with **Keep anyway** and
+**Skip this photo**. With **Remove backgrounds** ticked, the warning and **Skip
+this photo** appear in the review instead.
+
 ## Search and pages
 
 The search box above the grid matches title, description, place, and tags at

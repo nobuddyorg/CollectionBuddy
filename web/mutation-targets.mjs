@@ -97,6 +97,7 @@ export const MUTATE_TARGETS = [
   'src/app/lib/objectMask.ts',
   'src/app/lib/maskRim.ts',
   'src/app/lib/fillEach.ts',
+  'src/app/lib/idAfter.ts',
   'src/app/lib/cutoutImage.ts',
   'src/app/lib/isnetTensor.ts',
   'src/app/lib/segmentationModel.ts',

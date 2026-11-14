@@ -37,6 +37,7 @@ export function defaultImagesState() {
     showImages: vi.fn(),
     signAllFor: vi.fn(),
     uploadImage: vi.fn(),
+    replaceImage: vi.fn(),
     deleteImage: vi.fn(),
     captureItemImagePaths: vi.fn(),
     forgetItemImages: vi.fn(),

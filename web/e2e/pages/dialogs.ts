@@ -42,12 +42,15 @@ interface ImageViewer {
     close(): Promise<void>;
     deleteImage(): Promise<void>;
     previous(): Promise<void>;
+    /** Closes the viewer and opens the cut-out review for the photo shown. */
+    removeBackground(): Promise<void>;
   };
   locators: {
     buttons: {
       close: Locator;
       deleteImage: Locator;
       previous: Locator;
+      removeBackground: Locator;
     };
     photo: Locator;
     position: Locator;
@@ -122,6 +125,7 @@ export function initImageViewer(page: Page): ImageViewer {
       close: root.getByTestId('close-image'),
       deleteImage: root.getByTestId('delete-image'),
       previous: root.getByTestId('previous-image'),
+      removeBackground: root.getByTestId('remove-background-image'),
     },
     photo: root.getByTestId('viewer-photo'),
     position: root.getByTestId('image-position'),
@@ -136,6 +140,9 @@ export function initImageViewer(page: Page): ImageViewer {
     },
     previous: async () => {
       await locators.buttons.previous.click();
+    },
+    removeBackground: async () => {
+      await locators.buttons.removeBackground.click();
     },
   };
   return Object.assign(() => root, { locators, do: interactions });

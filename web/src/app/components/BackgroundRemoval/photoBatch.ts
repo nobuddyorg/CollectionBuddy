@@ -1,6 +1,10 @@
 import type { Sharpness } from '../../lib/photoSharpness';
+import type { ImageEntry } from '../ItemList/types';
 
 type BatchPosition = { current: number; total: number };
+
+/** A photo picked to add, or a stored one to put back without its background. */
+type PhotoTarget = { kind: 'new' } | { kind: 'replace'; image: ImageEntry };
 
 /** One picked photo waiting its turn; `sharpness` stays `checking` until its check answers. */
 export type QueuedPhoto = {
@@ -12,6 +16,7 @@ export type QueuedPhoto = {
   removeBackground: boolean;
   position: BatchPosition;
   sharpness: Sharpness | 'checking';
+  target: PhotoTarget;
 };
 
 export type PhotoPick = {
@@ -48,7 +53,33 @@ export function enqueuePick(
       removeBackground,
       position: { current: index + 1, total: files.length },
       sharpness: 'checking' as const,
+      target: { kind: 'new' } as const,
     })),
+  ];
+}
+
+/** The queue with a stored photo after the ones waiting, for its cut-out review alone: it was judged when it was added. */
+export function enqueueStored(
+  queue: readonly QueuedPhoto[],
+  {
+    pick,
+    itemId,
+    image,
+    file,
+  }: { pick: number; itemId: string; image: ImageEntry; file: File },
+): QueuedPhoto[] {
+  return [
+    ...queue,
+    {
+      key: `${pick}:0`,
+      pick,
+      itemId,
+      file,
+      removeBackground: true,
+      position: { current: 1, total: 1 },
+      sharpness: 'sharp',
+      target: { kind: 'replace', image },
+    },
   ];
 }
 
