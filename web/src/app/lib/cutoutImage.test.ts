@@ -6,6 +6,7 @@ import {
   cutoutAlpha,
   fitWithin,
   opaqueBounds,
+  withMargin,
 } from './cutoutImage';
 
 describe('fitWithin', () => {
@@ -179,7 +180,7 @@ describe('cropWithAlpha', () => {
     const cropped = cropWithAlpha({
       pixels,
       alpha,
-      width: 3,
+      size: { width: 3, height: 2 },
       box: { x: 1, y: 1, width: 2, height: 1 },
     });
 
@@ -198,7 +199,7 @@ describe('cropWithAlpha', () => {
     const cropped = cropWithAlpha({
       pixels,
       alpha: Array.from({ length: 9 }, () => 255),
-      width: 3,
+      size: { width: 3, height: 3 },
       box: { x: 1, y: 1, width: 2, height: 2 },
     });
 
@@ -211,7 +212,7 @@ describe('cropWithAlpha', () => {
     const cropped = cropWithAlpha({
       pixels: [250, 240, 230, 255],
       alpha: [100],
-      width: 1,
+      size: { width: 1, height: 1 },
       box: { x: 0, y: 0, width: 1, height: 1 },
     });
 
@@ -222,11 +223,84 @@ describe('cropWithAlpha', () => {
     const cropped = cropWithAlpha({
       pixels: [1, 2, 3, 50],
       alpha: [255],
-      width: 1,
+      size: { width: 1, height: 1 },
       box: { x: 0, y: 0, width: 1, height: 1 },
     });
 
     expect(Array.from(cropped)).toEqual([1, 2, 3, 50]);
+  });
+});
+
+describe('cropWithAlpha past the photo’s edge', () => {
+  // A 2x2 photo, red numbering its pixels 1-4, cropped with a one-pixel margin all round.
+  const pixels = [1, 2, 3, 4].flatMap((red) => [red, 0, 0, 255]);
+
+  it('leaves the margin beyond every edge transparent, and the photo where it was', () => {
+    const cropped = cropWithAlpha({
+      pixels,
+      alpha: [255, 255, 255, 255],
+      size: { width: 2, height: 2 },
+      box: { x: -1, y: -1, width: 4, height: 4 },
+    });
+
+    const reds = Array.from(cropped).filter((_, index) => index % 4 === 0);
+    const alphas = Array.from(cropped).filter((_, index) => index % 4 === 3);
+    expect(reds).toEqual([0, 0, 0, 0, 0, 1, 2, 0, 0, 3, 4, 0, 0, 0, 0, 0]);
+    expect(alphas).toEqual([
+      0, 0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 0, 0, 0,
+    ]);
+  });
+
+  // One past each edge alone: a column past the right reads no pixel of the next row, a row past the bottom none at all.
+  it.each([
+    ['left', { x: -1, y: 0, width: 1, height: 1 }],
+    ['right', { x: 2, y: 0, width: 1, height: 1 }],
+    ['top', { x: 0, y: -1, width: 1, height: 1 }],
+    ['bottom', { x: 0, y: 2, width: 1, height: 1 }],
+  ])('is fully transparent just past the %s edge', (_edge, box) => {
+    const cropped = cropWithAlpha({
+      pixels,
+      alpha: [255, 255, 255, 255],
+      size: { width: 2, height: 2 },
+      box,
+    });
+
+    expect(Array.from(cropped)).toEqual([0, 0, 0, 0]);
+  });
+});
+
+describe('withMargin', () => {
+  it('grows the box by the share of its longer side on every side', () => {
+    expect(withMargin({ x: 30, y: 40, width: 100, height: 50 }, 0.08)).toEqual({
+      x: 22,
+      y: 32,
+      width: 116,
+      height: 66,
+    });
+  });
+
+  it('reaches past the photo’s edge rather than stopping at it', () => {
+    expect(withMargin({ x: 0, y: 2, width: 50, height: 100 }, 0.08)).toEqual({
+      x: -8,
+      y: -6,
+      width: 66,
+      height: 116,
+    });
+  });
+
+  it('rounds the margin to whole pixels, and leaves the box as it is without one', () => {
+    expect(withMargin({ x: 5, y: 5, width: 10, height: 6 }, 0.15)).toEqual({
+      x: 3,
+      y: 3,
+      width: 14,
+      height: 10,
+    });
+    expect(withMargin({ x: 5, y: 5, width: 10, height: 6 }, 0)).toEqual({
+      x: 5,
+      y: 5,
+      width: 10,
+      height: 6,
+    });
   });
 });
 
@@ -258,7 +332,7 @@ describe('cropWithAlpha at the rim outside the object', () => {
     const cropped = cropWithAlpha({
       pixels,
       alpha,
-      width: 3,
+      size: { width: 3, height: 3 },
       box: whole(3, 3),
     });
 
@@ -278,7 +352,7 @@ describe('cropWithAlpha at the rim outside the object', () => {
     const cropped = cropWithAlpha({
       pixels,
       alpha: [0, centre, 255],
-      width: 3,
+      size: { width: 3, height: 1 },
       box: whole(3, 1),
     });
 
@@ -292,7 +366,7 @@ describe('cropWithAlpha at the rim outside the object', () => {
         [4, 5, 6],
       ]),
       alpha: [0, 255],
-      width: 2,
+      size: { width: 2, height: 1 },
       box: whole(2, 1),
     });
 
@@ -316,7 +390,7 @@ describe('cropWithAlpha at the rim outside the object', () => {
     const cropped = cropWithAlpha({
       pixels: photo(colours),
       alpha,
-      width: 3,
+      size: { width: 3, height: 2 },
       box: whole(3, 2),
     });
 

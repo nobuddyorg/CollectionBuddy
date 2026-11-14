@@ -6,7 +6,13 @@ import { expect, test } from '../fixture';
 import { writeArchiveClaiming } from './archives';
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
-import { GEOCODER, PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
+import {
+  GEOCODER,
+  itemPhoto,
+  PHOTO,
+  PHOTO_ARRIVES,
+  uniqueName,
+} from './helpers';
 import {
   apiAs,
   context,
@@ -31,7 +37,7 @@ test.describe('when something outside the app fails', () => {
   test('a photo still uploads as it was when the background model cannot be loaded', async ({
     on,
     page,
-  }) => {
+  }, testInfo) => {
     const app = on(page);
     await page
       .context()
@@ -46,7 +52,10 @@ test.describe('when something outside the app fails', () => {
     try {
       await app.catalogue.do.addEntry(title);
       const card = app.catalogue.card(title);
-      await card.do.uploadPhoto(PHOTO);
+      // Opaque: a transparent PNG is a cut-out already, and never needs the model.
+      await card.do.uploadPhoto(
+        await itemPhoto(page, testInfo.outputPath('item.png')),
+      );
 
       await expect(app.backgroundRemoval.locators.status).toHaveText(
         'The background could not be removed. The original can still be uploaded.',

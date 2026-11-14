@@ -48,6 +48,7 @@ const cutout: CutoutRequest = {
   modelUrl: 'https://example.test/m.onnx',
   maxSide: 2048,
   minFillRatio: 0.95,
+  margin: 0.08,
 };
 
 /** Delivers a job the way the page's postMessage would, and waits for the answers expected of it. */

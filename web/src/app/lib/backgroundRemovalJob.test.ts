@@ -35,6 +35,9 @@ const drawn: { width: number; height: number; smoothing: string }[] = [];
 const encoded: { data: Uint8ClampedArray; width: number; height: number }[] =
   [];
 const bitmap = { ...PHOTO, close: vi.fn() };
+/** What the decoded photo reads back as: opaque grey unless a test draws something else. */
+let photoPixels = (width: number, height: number) =>
+  new Uint8ClampedArray(width * height * 4).fill(200);
 
 class FakeOffscreenCanvas {
   constructor(
@@ -59,9 +62,7 @@ class FakeOffscreenCanvas {
         _y: number,
         width: number,
         height: number,
-      ) => ({
-        data: new Uint8ClampedArray(width * height * 4).fill(200),
-      }),
+      ) => ({ data: photoPixels(width, height) }),
       putImageData: (image: {
         data: Uint8ClampedArray;
         width: number;
@@ -96,12 +97,15 @@ const cutOutRequest = {
   modelUrl: 'https://example.test/models/isnet.onnx',
   maxSide: 2048,
   minFillRatio: 0.9,
+  margin: 0,
 };
 
 describe('handleRequest', () => {
   beforeEach(() => {
     drawn.length = 0;
     encoded.length = 0;
+    photoPixels = (width, height) =>
+      new Uint8ClampedArray(width * height * 4).fill(200);
     bitmap.close.mockClear();
     vi.stubGlobal('OffscreenCanvas', FakeOffscreenCanvas);
     vi.stubGlobal('ImageData', FakeImageData);
@@ -172,6 +176,87 @@ describe('handleRequest', () => {
     expect(encoded[0].data.length).toBe(
       last.cutout.width * last.cutout.height * 4,
     );
+  });
+
+  it('leaves a clear margin of the given share of the object’s longer side all round it', async () => {
+    const tight = await repliesTo(cutOutRequest);
+    const roomy = await repliesTo({ ...cutOutRequest, margin: 0.25 });
+
+    const [before, after] = [tight[2], roomy[2]];
+    if (before.kind !== 'cut-out' || after.kind !== 'cut-out') {
+      throw new Error('expected two cut-outs');
+    }
+    const pad = Math.round(
+      Math.max(before.cutout.width, before.cutout.height) * 0.25,
+    );
+    expect(after.cutout.width).toBe(before.cutout.width + 2 * pad);
+    expect(after.cutout.height).toBe(before.cutout.height + 2 * pad);
+    // The first row of the roomy PNG is all margin: nothing in it shows.
+    const firstRow = encoded[1].data.slice(0, after.cutout.width * 4);
+    expect(
+      firstRow.filter((_, index) => index % 4 === 3).every((a) => a === 0),
+    ).toBe(true);
+  });
+
+  describe('a photo that is a cut-out already', () => {
+    // Transparent all over but a 10 x 4 block at (12, 6): the cut-out's own outline.
+    const keptBlock = (width: number, height: number) => {
+      const pixels = new Uint8ClampedArray(width * height * 4);
+      for (let y = 6; y < 10; y += 1) {
+        for (let x = 12; x < 22; x += 1) {
+          pixels.set([90, 80, 70, 255], (y * width + x) * 4);
+        }
+      }
+      return pixels;
+    };
+
+    it('keeps its own outline, gives it the margin, and never runs the model', async () => {
+      photoPixels = keptBlock;
+
+      const replies = await repliesTo({ ...cutOutRequest, margin: 0.2 });
+
+      expect(model.loadModel).not.toHaveBeenCalled();
+      expect(model.runModel).not.toHaveBeenCalled();
+      expect(replies).toHaveLength(1);
+      const [last] = replies;
+      if (last.kind !== 'cut-out') throw new Error('expected a cut-out');
+      // Its longer side 10, so 2 pixels of margin all round the 10 x 4 block.
+      expect(last.cutout).toMatchObject({
+        width: 14,
+        height: 8,
+        mode: 'kept',
+        fillRatio: 0,
+      });
+      const alphas = Array.from(encoded[0].data).filter(
+        (_, index) => index % 4 === 3,
+      );
+      expect(alphas.filter((a) => a === 255)).toHaveLength(40);
+      expect(alphas.slice(0, 14).every((a) => a === 0)).toBe(true);
+      expect(
+        Array.from(encoded[0].data.slice((2 * 14 + 2) * 4, (2 * 14 + 3) * 4)),
+      ).toEqual([90, 80, 70, 255]);
+    });
+
+    it('counts a single see-through pixel as a cut-out already', async () => {
+      photoPixels = (width, height) => {
+        const pixels = new Uint8ClampedArray(width * height * 4).fill(200);
+        pixels[3] = 0;
+        return pixels;
+      };
+
+      const [last] = await repliesTo(cutOutRequest);
+
+      expect(model.runModel).not.toHaveBeenCalled();
+      expect(last).toMatchObject({ kind: 'cut-out', cutout: { mode: 'kept' } });
+    });
+
+    it('answers no-object when nothing of it shows at all', async () => {
+      photoPixels = (width, height) =>
+        new Uint8ClampedArray(width * height * 4);
+
+      expect(await repliesTo(cutOutRequest)).toEqual([{ kind: 'no-object' }]);
+      expect(model.runModel).not.toHaveBeenCalled();
+    });
   });
 
   it('decodes upright, at the photo size capped by maxSide, and once more at the model size', async () => {

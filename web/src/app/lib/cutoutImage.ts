@@ -71,6 +71,17 @@ export function opaqueBounds(alpha: ArrayLike<number>, size: Size): Box {
   return { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
 }
 
+/** `box` grown by `margin` of its longer side on every side, past the photo's edge where it must: the object never touches the frame. */
+export function withMargin(box: Box, margin: number): Box {
+  const pad = Math.round(Math.max(box.width, box.height) * margin);
+  return {
+    x: box.x - pad,
+    y: box.y - pad,
+    width: box.width + 2 * pad,
+    height: box.height + 2 * pad,
+  };
+}
+
 /** The mean colour of the opaque pixels around `source`, or its own where none is: what a rim pixel outside the object shows. */
 function rimColour({
   pixels,
@@ -105,24 +116,27 @@ function rimColour({
   return sum.map((total) => total / count);
 }
 
-/** The original photo's colours inside `box`, with `alpha` as their opacity; the soft rim outside the object takes the object's colour, not the background's. */
+/** The original photo's colours inside `box`, with `alpha` as their opacity; the soft rim outside the object takes the object's colour, not the background's, and the box past the photo's edge is transparent. */
 export function cropWithAlpha({
   pixels,
   alpha,
-  width,
+  size,
   box,
 }: {
   pixels: ArrayLike<number>;
   alpha: ArrayLike<number>;
-  width: number;
+  size: Size;
   box: Box;
 }): Uint8ClampedArray<ArrayBuffer> {
+  const { width, height } = size;
   const length = box.width * box.height * 4;
   return Uint8ClampedArray.from({ length }, (_, index) => {
     const pixel = Math.floor(index / 4);
     const channel = index % 4;
     const row = box.y + Math.floor(pixel / box.width);
-    const source = row * width + box.x + (pixel % box.width);
+    const column = box.x + (pixel % box.width);
+    if (row < 0 || row >= height || column < 0 || column >= width) return 0;
+    const source = row * width + column;
     const value = pixels[source * 4 + channel];
     // Never more opaque than the photo already was.
     if (channel === 3) return Math.min(value, alpha[source]);

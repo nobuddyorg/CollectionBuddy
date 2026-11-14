@@ -153,7 +153,8 @@ a review first: the original, and next to it the item with its background
 removed, on the photo background you chose (below) where the background is
 now transparent: a checkerboard while it follows the theme. It works for any
 item, a coin, a stamp, a figurine; several items in one photo are kept
-together. **Use without background** uploads the result; **Keep original**
+together, with a little clear space around them so nothing touches the
+edge of the frame. **Use without background** uploads the result; **Keep original**
 uploads the photo as it was, and is always available, also when no item was
 found or the removal failed. Closing the review uploads nothing.
 
@@ -167,7 +168,10 @@ uploads work exactly as before.
 A photo already added can lose its background too: open it full size and choose
 the scissors, **Remove background**. The same review opens; **Use without
 background** puts the result in the original's place, so the cover and the order
-of the photos stay as they were, and **Keep original** changes nothing. Anyone
+of the photos stay as they were, and **Keep original** changes nothing. A photo
+that already has its background removed keeps its outline exactly and only
+gains that clear space, in a moment and without the model, so an older cut-out
+cropped close to the item can be given room this way. Anyone
 who can edit the collection can do this; someone it is only shared with to view
 cannot.
 
