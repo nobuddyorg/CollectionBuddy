@@ -105,14 +105,16 @@ describe('removeBackground', () => {
         modelUrl: 'https://assets.example.test/isnet-general-use-fp16.onnx',
         maxSide: 2048,
         minFillRatio: 0.95,
+        margin: 0.08,
       },
     ]);
   });
 
-  it('passes a caller-chosen size cap and fill ratio through', async () => {
+  it('passes a caller-chosen size cap, fill ratio and margin through', async () => {
     const pending = removeBackground(photo, {
       maxSide: 1000,
       minFillRatio: 0.8,
+      margin: 0,
     });
     lastWorker().reply({ kind: 'cut-out', cutout });
     await pending;
@@ -120,6 +122,7 @@ describe('removeBackground', () => {
     expect(lastWorker().requests[0]).toMatchObject({
       maxSide: 1000,
       minFillRatio: 0.8,
+      margin: 0,
     });
   });
 

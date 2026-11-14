@@ -1,9 +1,11 @@
 import { analyzeMask } from './objectMask';
+import { fillEach } from './fillEach';
 import {
   cropWithAlpha,
   cutoutAlpha,
   fitWithin,
   opaqueBounds,
+  withMargin,
   type CutoutMode,
   type Size,
 } from './cutoutImage';
@@ -14,11 +16,13 @@ export type CutoutProgress =
   { stage: 'download'; loaded: number; total: number } | { stage: 'analyze' };
 
 export type Cutout = {
-  /** A transparent PNG, cropped to the object. */
+  /** A transparent PNG, cropped to the object with a clear margin around it. */
   blob: Blob;
   width: number;
   height: number;
-  mode: CutoutMode;
+  /** `kept` for a photo that was a cut-out already: its own transparency is the outline, and the model never ran. */
+  mode: CutoutMode | 'kept';
+  /** How well one ellipse explains the objects; 0 when kept, where nothing was fitted. */
   fillRatio: number;
 };
 
@@ -29,6 +33,8 @@ export type CutoutRequest =
       modelUrl: string;
       maxSide: number;
       minFillRatio: number;
+      /** Clear space around the object, as a share of its longer side. */
+      margin: number;
     }
   | { kind: 'preload'; modelUrl: string };
 
@@ -83,14 +89,62 @@ async function encodePng(pixels: Uint8ClampedArray<ArrayBuffer>, size: Size) {
   return canvas.convertToBlob({ type: 'image/png' });
 }
 
-async function cutOut(
-  request: Extract<CutoutRequest, { kind: 'cut-out' }>,
-  reply: Reply,
-) {
+type CutOutRequest = Extract<CutoutRequest, { kind: 'cut-out' }>;
+
+/** The objects inside a clear margin, as a PNG: the one reply a cut-out ends with. */
+async function framed(
+  {
+    pixels,
+    alpha,
+    size,
+  }: { pixels: Uint8ClampedArray; alpha: ArrayLike<number>; size: Size },
+  {
+    margin,
+    mode,
+    fillRatio,
+  }: { margin: number; mode: Cutout['mode']; fillRatio: number },
+): Promise<CutoutReply> {
+  const box = withMargin(opaqueBounds(alpha, size), margin);
+  const cropped = cropWithAlpha({ pixels, alpha, size, box });
+  return {
+    kind: 'cut-out',
+    cutout: {
+      blob: await encodePng(cropped, box),
+      width: box.width,
+      height: box.height,
+      mode,
+      fillRatio,
+    },
+  };
+}
+
+/** The photo's own opacity, where it has a see-through pixel at all: then it is a cut-out already. */
+function ownTransparency(pixels: Uint8ClampedArray): Uint8ClampedArray | null {
+  const alpha = fillEach(
+    new Uint8ClampedArray(pixels.length / 4),
+    (index) => pixels[index * 4 + 3],
+  );
+  return alpha.includes(0) ? alpha : null;
+}
+
+async function cutOut(request: CutOutRequest, reply: Reply) {
   const { size, pixels, modelPixels } = await decode(
     request.file,
     request.maxSide,
   );
+  // Cut out again, a cut-out only gains its margin: a second pass of the model would eat into its edge.
+  const kept = ownTransparency(pixels);
+  if (kept !== null) {
+    reply(
+      kept.some((value) => value > 0)
+        ? await framed(
+            { pixels, alpha: kept, size },
+            { margin: request.margin, mode: 'kept', fillRatio: 0 },
+          )
+        : { kind: 'no-object' },
+    );
+    return;
+  }
   const model = await fetchModel(request.modelUrl, reply);
   reply({ kind: 'progress', progress: { stage: 'analyze' } });
   const prediction = await runModel(model, toModelInput(modelPixels));
@@ -109,18 +163,12 @@ async function cutOut(
     size,
     minFillRatio: request.minFillRatio,
   });
-  const box = opaqueBounds(alpha, size);
-  const cropped = cropWithAlpha({ pixels, alpha, width: size.width, box });
-  reply({
-    kind: 'cut-out',
-    cutout: {
-      blob: await encodePng(cropped, box),
-      width: box.width,
-      height: box.height,
-      mode,
-      fillRatio: analysis.fillRatio,
-    },
-  });
+  reply(
+    await framed(
+      { pixels, alpha, size },
+      { margin: request.margin, mode, fillRatio: analysis.fillRatio },
+    ),
+  );
 }
 
 /** One request from the page, answered with progress and then exactly one final reply. */

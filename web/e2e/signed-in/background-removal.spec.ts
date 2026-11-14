@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { type Page } from '@playwright/test';
+import { type Locator, type Page } from '@playwright/test';
 
 import { expect, test } from './test';
 
@@ -46,6 +46,32 @@ async function itemPhoto(page: Page, path: string): Promise<string> {
   });
   writeFileSync(path, Buffer.from(dataUrl.split(',')[1], 'base64'));
   return path;
+}
+
+/** A stored photo as drawn: its size, and how opaque the middle of its top, right, bottom and left edges is. */
+async function edgesOf(image: Locator) {
+  return image.evaluate(async (element: HTMLImageElement) => {
+    await element.decode();
+    const { naturalWidth: width, naturalHeight: height } = element;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d')!;
+    context.drawImage(element, 0, 0);
+    const alphaAt = (x: number, y: number) =>
+      context.getImageData(x, y, 1, 1).data[3];
+    const [midX, midY] = [Math.floor(width / 2), Math.floor(height / 2)];
+    return {
+      width,
+      height,
+      edges: [
+        alphaAt(midX, 0),
+        alphaAt(width - 1, midY),
+        alphaAt(midX, height - 1),
+        alphaAt(0, midY),
+      ],
+    };
+  });
 }
 
 /** Every request for the model, served from the stand-in. */
@@ -138,19 +164,8 @@ test.describe('background removal', () => {
 
       await expect(review()).toHaveCount(0);
       await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
-      // Cropped to the item, so the stored photo's corner lies outside it: see-through, not white.
-      const cornerAlpha = await card.locators.images.evaluate(
-        async (image: HTMLImageElement) => {
-          await image.decode();
-          const canvas = document.createElement('canvas');
-          canvas.width = image.naturalWidth;
-          canvas.height = image.naturalHeight;
-          const context = canvas.getContext('2d')!;
-          context.drawImage(image, 0, 0);
-          return context.getImageData(0, 0, 1, 1).data[3];
-        },
-      );
-      expect(cornerAlpha).toBe(0);
+      // A clear margin round the disc: the middle of every edge, where a tight crop would touch it, is see-through, not white.
+      expect((await edgesOf(card.locators.images)).edges).toEqual([0, 0, 0, 0]);
 
       // On the theme's own surface by default; on the chosen colour, in either theme, once one is chosen.
       await expect(card.locators.images).toHaveCSS(
@@ -363,6 +378,52 @@ test.describe('background removal', () => {
   });
 
   // Turbopack boots every worker from one script whose URL fragment Chrome reuses, so the first photo job must not decide the next.
+  test('cut out again, a stored cut-out keeps its outline and its size: the margin is not doubled, nothing is eaten', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const app = on(page);
+    await serveStandInModel(page);
+    await turnOnBackgroundRemoval(app, page);
+    const title = uniqueName('Zweimal freigestellt');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      await card.do.uploadPhoto(
+        await itemPhoto(page, testInfo.outputPath('item.png')),
+      );
+      await expect(app.backgroundRemoval.locators.cutout).toBeVisible({
+        timeout: ARRIVES,
+      });
+      await app.backgroundRemoval.do.useCutout();
+      await expect(card.locators.images).toBeVisible({ timeout: ARRIVES });
+      await card.do.openImage();
+      const once = await edgesOf(app.viewer.locators.photo);
+      const firstSrc = await app.viewer.locators.photo.getAttribute('src');
+
+      await app.viewer.do.removeBackground();
+      await expect(app.backgroundRemoval.locators.cutout).toBeVisible({
+        timeout: ARRIVES,
+      });
+      await app.backgroundRemoval.do.useCutout();
+      await expect(app.backgroundRemoval()).toHaveCount(0);
+      await expect
+        .poll(() => card.locators.images.getAttribute('src'), {
+          timeout: ARRIVES,
+        })
+        .not.toBe(firstSrc);
+      await card.do.openImage();
+      const twice = await edgesOf(app.viewer.locators.photo);
+
+      expect(twice.edges).toEqual([0, 0, 0, 0]);
+      // Re-encoding may move the faint rim by a pixel; a doubled margin or an eaten edge moves it by dozens.
+      expect(Math.abs(twice.width - once.width)).toBeLessThanOrEqual(2);
+      expect(Math.abs(twice.height - once.height)).toBeLessThanOrEqual(2);
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
   test('still cuts out a photo after a plain upload in the same page', async ({
     on,
     page,

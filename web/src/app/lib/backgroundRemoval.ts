@@ -25,6 +25,8 @@ export type CutOutOptions = {
   maxSide?: number;
   /** Below this fill ratio the ellipse is not trusted and the cleaned model mask is used instead. */
   minFillRatio?: number;
+  /** Clear space left around the object on every side, as a share of its longer side. */
+  margin?: number;
 };
 
 /** Where the model is served from: NEXT_PUBLIC_SEGMENTATION_MODEL_PATH, else this site's own `models/` folder. */
@@ -86,6 +88,7 @@ export async function removeBackground(
       modelUrl: segmentationModelUrl(),
       maxSide: options.maxSide ?? 2048,
       minFillRatio: options.minFillRatio ?? 0.95,
+      margin: options.margin ?? 0.08,
     },
     options,
   );
