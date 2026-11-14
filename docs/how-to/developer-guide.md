@@ -284,7 +284,10 @@ npm run test:mutation -- --force
 
 CI runs this on every PR, restoring `main`'s incremental file; `main` itself
 always runs with `--force` ([Design decisions](../explanation/design-decisions.md#incremental-on-pull-requests-full-on-main)).
-Only `main` publishes to the
+CI splits the targets across four `mutation_shard` jobs
+(`npm run mutation:shard -- <shard> 4` prints one shard's `--mutate` list),
+and `mutation_test` merges their reports (`npm run mutation:merge`), so the
+required check and the score cover every target. Only `main` publishes to the
 [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/nobuddyorg/CollectionBuddy/main);
 locally, the report is `web/reports/mutation/index.html`.
 

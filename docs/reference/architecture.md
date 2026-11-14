@@ -194,7 +194,7 @@ Shared steps live in [`.github/actions/`](../../.github/actions): `setup-web` (N
 | `ci.yml` (`changes`) | push/PR to `main`, manual | Path filter: `web` (`web/**`, `.zap/rules.tsv`) and `sql` (`supabase/migrations/**`, `supabase/tests/database/**`, `splinter.sh`, `.sqlfluff`, `.semgrepignore`, `cleanup-orphaned-photos.yml`), `ci.yml`, `.github/actions/**` and `supabase/config.toml` in both; always true on a push to `main` or a dispatch. |
 | `ci.yml` (`build_and_test`) | `web` changed | Build, type-check, format, lint, `depcruise`, `knip`, Vitest with coverage (uploaded to Codecov), the signed-out Playwright suite on desktop Chrome, Firefox and a phone viewport. |
 | `ci.yml` (`e2e_local_stack`) | `web` or `sql` changed | Supabase in Docker: pgTAP (query plans included), Splinter, the `database.types.ts` drift check, the full Chromium Playwright suite (signed-out and signed-in) with the one e2e coverage floor. |
-| `ci.yml` (`mutation_test`) | `web` changed | Stryker over `mutation-targets.mjs`: incremental on a PR from `main`'s cached results, every mutant on `main`. |
+| `ci.yml` (`mutation_shard`, `mutation_test`) | `web` changed | Stryker over `mutation-targets.mjs`, split across four shards and merged by `mutation_test`: incremental on a PR from `main`'s cached results, every mutant on `main`. |
 | `ci.yml` (`opengrep`) | `web` or `sql` changed | Opengrep SAST; SARIF to code scanning; fails on ERROR severity. |
 | `ci.yml` (`lighthouse`) | `web` changed | Lighthouse CI against the export, signed out and signed in to a seeded, photographed collection. |
 | `ci.yml` (`zap_baseline`) | `web` changed | OWASP ZAP passive scan against the export, signed out and in demo mode, served on the runner. |

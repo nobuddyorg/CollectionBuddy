@@ -265,11 +265,17 @@ jobs:
         working-directory: .
 
   # Scoped to mutation-targets.mjs (stryker.config.mjs); nothing there is affected by a SQL-only change.
-  mutation_test:
+  # Four machines share the mutants (scripts/mutation-shard.mjs), so main's full run takes about a quarter of the time the deploy waits for.
+  mutation_shard:
     needs: [prek, changes]
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    strategy:
+      # Every shard runs to the end, so one failure does not hide another's.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     defaults:
       run:
         working-directory: ./web
@@ -282,32 +288,106 @@ jobs:
 
       # Stryker's incremental file (#714); a PR restores main's latest. Keyed on what incremental mode cannot see: dependencies and test config.
       - name: Restore the incremental mutation report
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: web/reports/stryker-incremental.json
           key: stryker-incremental-${{ hashFiles('web/package-lock.json', 'web/stryker.config.mjs', 'web/vitest.config.mts', 'web/vitest.mutation.config.mts', 'web/vitest.setup.ts') }}-${{ github.run_id }}
           restore-keys: stryker-incremental-${{ hashFiles('web/package-lock.json', 'web/stryker.config.mjs', 'web/vitest.config.mts', 'web/vitest.mutation.config.mts', 'web/vitest.setup.ts') }}-
 
-      # No Supabase env: the unit suite never reads it. Dashboard key only on main, so the published report and badge track one branch.
+      # No Supabase env: the unit suite never reads it. No dashboard key: mutation_test uploads the merged report, not a quarter of it.
       # main reruns every mutant (--force): incremental is blind to modules a target imports, and main's run seeds every PR's cache.
-      - name: Run mutation testing
-        run: npx stryker run ${FULL_RUN:+--force}
+      - name: Run mutation testing on this shard's targets
+        run: |
+          mkdir -p shard
+          npm run --silent mutation:shard -- "$SHARD" "$SHARDS" > shard/targets.txt
+          npx stryker run ${FULL_RUN:+--force} --mutate "$(cat shard/targets.txt)"
         env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: ${{ strategy.job-total }}
           FULL_RUN: ${{ github.ref == 'refs/heads/main' && 'true' || '' }}
-          STRYKER_DASHBOARD_API_KEY: ${{ github.ref == 'refs/heads/main' && secrets.STRYKER_DASHBOARD_API_KEY || '' }}
+
+      # A report also carries the restored file's older results for the other shards' targets; targets.txt tells the merge which are this shard's.
+      - name: Collect this shard's reports
+        if: always()
+        run: cp reports/mutation/mutation.json reports/mutation/index.html reports/stryker-incremental.json shard/
+
+      - name: Upload this shard's reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-shard-${{ matrix.shard }}
+          path: web/shard
+          retention-days: 30
+
+  # The required check. It runs whenever the shards should have, and passes only if all four did: a skipped required job would count as passed.
+  mutation_test:
+    needs: [changes, mutation_shard]
+    if: ${{ !cancelled() && needs.changes.outputs.web == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-web
+
+      - name: Download the shards' reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: mutation-shard-*
+          path: web/shards
+
+      # Each file from the shard that mutated it, tests renumbered (scripts/mutation-merge.mjs).
+      - name: Merge the shards' reports
+        run: npm run mutation:merge -- shards/*
 
       # Built from reports/mutation/mutation.json (scripts/mutation-summary.mjs); the console log is mostly expected per-mutant failures.
       - name: Add mutation report to job summary
-        if: always()
         run: npm run mutation:summary
+
+      # Only a run every shard passed seeds the next PR's incremental mode.
+      - name: Save the incremental mutation report
+        if: needs.mutation_shard.result == 'success'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: web/reports/stryker-incremental.json
+          key: stryker-incremental-${{ hashFiles('web/package-lock.json', 'web/stryker.config.mjs', 'web/vitest.config.mts', 'web/vitest.mutation.config.mts', 'web/vitest.setup.ts') }}-${{ github.run_id }}
+
+      # The dashboard's own API, as Stryker's reporter would call it: only main, so the published report and badge track one branch.
+      - name: Publish the merged report to the Stryker dashboard
+        if: github.ref == 'refs/heads/main' && needs.mutation_shard.result == 'success'
+        run: |
+          # Optional, as for Stryker's own reporter: a fork or a repository without the key publishes nothing.
+          if [ -z "${STRYKER_DASHBOARD_API_KEY}" ]; then exit 0; fi
+          curl --fail-with-body --silent --show-error -X PUT \
+            "https://dashboard.stryker-mutator.io/api/reports/github.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}" \
+            -H 'Content-Type: application/json' \
+            -H "X-Api-Key: ${STRYKER_DASHBOARD_API_KEY}" \
+            --data-binary @reports/mutation/mutation.json
+        env:
+          STRYKER_DASHBOARD_API_KEY: ${{ secrets.STRYKER_DASHBOARD_API_KEY }}
 
       - name: Upload mutation report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mutation-report
-          path: web/reports/mutation
+          path: |
+            web/reports/mutation
+            web/shards
           retention-days: 30
+
+      - name: Fail unless every shard passed
+        if: needs.mutation_shard.result != 'success'
+        run: |
+          echo "::error::A mutation shard did not pass (${SHARD_RESULT}): see its job."
+          exit 1
+        env:
+          SHARD_RESULT: ${{ needs.mutation_shard.result }}
 
   # Opengrep needs no node_modules, so it is its own job. The scanned tree is web/{src,scripts,e2e} and supabase/, hence the `web` or `sql` gate.
   opengrep:
