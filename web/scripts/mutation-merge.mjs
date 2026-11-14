@@ -2,6 +2,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
+import { calculateMutationTestMetrics } from 'mutation-testing-metrics';
+
 // Where a single run writes them: the summary, the dashboard and the next run's incremental mode read them there.
 const OUTPUTS = {
   'mutation.json': 'reports/mutation/mutation.json',
@@ -48,6 +50,7 @@ const folders = process.argv.slice(2);
 if (folders.length === 0) {
   throw new Error('Usage: node scripts/mutation-merge.mjs <shard folder>...');
 }
+const merged = {};
 for (const [name, output] of Object.entries(OUTPUTS)) {
   const shards = await Promise.all(
     folders.map(async (folder) => ({
@@ -57,6 +60,19 @@ for (const [name, output] of Object.entries(OUTPUTS)) {
         .split(','),
     })),
   );
+  merged[name] = merge(shards);
   await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, JSON.stringify(merge(shards)));
+  await writeFile(output, JSON.stringify(merged[name]));
+}
+
+// The gate itself: a shard's own score also counts the other shards' cached results, so only the merged one has every target tested now.
+const report = merged['mutation.json'];
+const { mutationScore } =
+  calculateMutationTestMetrics(report).systemUnderTestMetrics.metrics;
+const threshold = report.thresholds?.break;
+if (Number.isFinite(threshold) && !(mutationScore >= threshold)) {
+  console.error(
+    `Mutation score ${mutationScore.toFixed(2)} is below the break threshold ${threshold}.`,
+  );
+  process.exitCode = 1;
 }

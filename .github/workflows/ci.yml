@@ -341,12 +341,13 @@ jobs:
           pattern: mutation-shard-*
           path: web/shards
 
-      # Each file from the shard that mutated it, tests renumbered (scripts/mutation-merge.mjs).
+      # Each file from the shard that mutated it, tests renumbered, and the break threshold checked on the result (scripts/mutation-merge.mjs).
       - name: Merge the shards' reports
         run: npm run mutation:merge -- shards/*
 
-      # Built from reports/mutation/mutation.json (scripts/mutation-summary.mjs); the console log is mostly expected per-mutant failures.
+      # Built from reports/mutation/mutation.json (scripts/mutation-summary.mjs), also when the merged score failed the threshold.
       - name: Add mutation report to job summary
+        if: always()
         run: npm run mutation:summary
 
       # Only a run every shard passed seeds the next PR's incremental mode.
