@@ -4,8 +4,7 @@ import type { ImageEntry } from '../ItemList/types';
 type BatchPosition = { current: number; total: number };
 
 /** A photo picked to add, or a stored one to put back without its background. */
-type PhotoTarget =
-  { kind: 'new' } | { kind: 'replace'; image: ImageEntry };
+type PhotoTarget = { kind: 'new' } | { kind: 'replace'; image: ImageEntry };
 
 /** One picked photo waiting its turn; `sharpness` stays `checking` until its check answers. */
 export type QueuedPhoto = {
