@@ -75,10 +75,11 @@ for (const { jsonPath } of JSON.parse(
   readFileSync(SIGNED_IN_MANIFEST, 'utf8'),
 )) {
   const { audits } = JSON.parse(readFileSync(jsonPath, 'utf8'));
-  // A list of tables; the first holds the element's node.
-  const [elementTable] =
-    audits['largest-contentful-paint-element']?.details?.items ?? [];
-  const snippet = elementTable?.items?.[0]?.node?.snippet ?? '';
+  // Lighthouse 13 names the largest paint's element in its LCP breakdown insight, as the list's node item.
+  const element = audits['lcp-breakdown-insight']?.details?.items?.find(
+    (item) => item.type === 'node',
+  );
+  const snippet = element?.snippet ?? '';
   if (!snippet.includes('data-testid="item-image"')) {
     console.error(
       `The signed-in pass's largest paint was not a photograph, so it measured no photo grid (${jsonPath}).`,
