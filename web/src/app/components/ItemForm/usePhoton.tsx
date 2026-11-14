@@ -107,18 +107,26 @@ export function usePhotonSearch({
     [regionNames],
   );
 
-  useEffect(() => {
-    if (!focus || !isQueryLongEnough(query)) {
-      // An in-flight geocode could otherwise resolve after a re-focus and show results for a cleared query.
-      abortRef.current?.abort();
+  // Reset as the render that changes the query or ends the search, so no frame shows the last answer as this one's.
+  const searchKey = focus && isQueryLongEnough(query) ? query : null;
+  const [previousSearchKey, setPreviousSearchKey] = useState(searchKey);
+  if (searchKey !== previousSearchKey) {
+    setPreviousSearchKey(searchKey);
+    setSearched(false);
+    if (searchKey === null) {
       setResults([]);
       setActiveIndex(-1);
       setError(false);
       setLoading(false);
-      setSearched(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!focus || !isQueryLongEnough(query)) {
+      // An in-flight geocode could otherwise resolve after a re-focus and show results for a cleared query.
+      abortRef.current?.abort();
       return;
     }
-    setSearched(false);
     const trimmedQuery = query.trim();
     const timer = setTimeout(() => {
       void (async () => {

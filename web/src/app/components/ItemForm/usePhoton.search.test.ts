@@ -178,6 +178,32 @@ describe('usePhotonSearch search effect', () => {
     expect(result.current.searched).toBe(false);
   });
 
+  it('keeps the last suggestions and the highlighted one on screen while the next keystroke waits its turn', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          photonAnswer([
+            feature(1, { city: 'Cologne' }),
+            feature(2, { city: 'Colmar' }),
+          ]),
+        ),
+    );
+    const { result } = renderPhotonSearch();
+    await searchFor(result, 'Col');
+    act(() => {
+      result.current.onKeyDown(keyEvent('ArrowDown').event);
+    });
+
+    act(() => {
+      result.current.setQuery('Colo');
+    });
+
+    expect(result.current.results).toHaveLength(2);
+    expect(result.current.activeIndex).toBe(0);
+  });
+
   it('searches for nothing when focused before any query has been set', async () => {
     const fetchMock = vi.fn().mockResolvedValue(photonAnswer());
     vi.stubGlobal('fetch', fetchMock);

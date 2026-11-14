@@ -43,16 +43,21 @@ export function useItems(categoryId: string, query: string) {
     setPage(currentPage);
   }
 
+  // Raised as the render that changes what to load, so no frame shows the old list as settled.
+  const loadKey = `${filterKey} ${currentPage}`;
+  const [previousLoadKey, setPreviousLoadKey] = useState(loadKey);
+  if (loadKey !== previousLoadKey) {
+    setPreviousLoadKey(loadKey);
+    setLoading(true);
+  }
+
   // `silent` refetches without raising `loading`: a delete already removed its card up front.
   const load = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
-      if (!silent) {
-        pendingNonSilent.current += 1;
-        setLoading(true);
-      }
+      if (!silent) pendingNonSilent.current += 1;
 
       try {
         const { from, to } = pageRange(currentPage);
@@ -111,7 +116,10 @@ export function useItems(categoryId: string, query: string) {
   const loadRef = useSyncedRef(load);
 
   const reload = useCallback(
-    (options?: { silent?: boolean }) => loadRef.current(options),
+    (options?: { silent?: boolean }) => {
+      if (!options?.silent) setLoading(true);
+      return loadRef.current(options);
+    },
     [loadRef],
   );
 

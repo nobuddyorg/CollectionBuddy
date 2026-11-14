@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import { isQueryLongEnough, usePhotonSearch } from './usePhoton';
 import type { Coordinates } from '../../lib/coordinates';
@@ -47,9 +47,9 @@ export function PlaceAutocomplete({
   const showMenu =
     focus && (loading || results.length > 0 || error || searched);
 
-  // Positioned absolute inside the anchor, so it scrolls with the input; only below/above is recomputed.
+  // Positioned absolute inside the anchor, so it scrolls with the input; only below/above is recomputed, before paint.
   const [placement, setPlacement] = useState<'below' | 'above'>('below');
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!showMenu) return;
     const compute = () => {
       const inputRect = inputRef.current!.getBoundingClientRect();
