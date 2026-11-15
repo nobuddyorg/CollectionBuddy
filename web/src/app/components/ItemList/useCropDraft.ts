@@ -20,14 +20,8 @@ export type CropStage =
 export type CropDraft =
   | { kind: 'closed' }
   | { kind: 'working'; image: ImageEntry; stage: CropStage }
-  | {
-      kind: 'ready';
-      image: ImageEntry;
-      crop: Crop;
-      /** An object URL of the crop, shown in the original's place until Save or Cancel. */
-      previewUrl: string;
-      saving: boolean;
-    }
+  /** The crop shows in the original's place until Save or Cancel. */
+  | { kind: 'ready'; image: ImageEntry; crop: Crop; saving: boolean }
   /** Nothing to save: no object was found, or the photo is framed round it already. */
   | {
       kind: 'unchanged';
@@ -62,13 +56,6 @@ export function useCropDraft(
   // Cancelling stops the worker, and so its ~200 MB of model, at once.
   const running = useRef(new AbortController());
 
-  const previewUrl = draft.kind === 'ready' ? draft.previewUrl : '';
-  useEffect(
-    () => () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    },
-    [previewUrl],
-  );
   // Leaving the page while a crop works stops it too.
   useEffect(() => () => running.current.abort(), []);
 
@@ -108,13 +95,7 @@ export function useCropDraft(
         });
         return;
       }
-      setDraft({
-        kind: 'ready',
-        image,
-        crop: result.crop,
-        previewUrl: URL.createObjectURL(result.crop.blob),
-        saving: false,
-      });
+      setDraft({ kind: 'ready', image, crop: result.crop, saving: false });
     } catch (error: unknown) {
       if (!controller.signal.aborted) fail(t('item_list.crop_error'), error);
     }

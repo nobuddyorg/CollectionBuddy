@@ -285,7 +285,7 @@ export function ModalImage({
         >
           {crop.kind === 'ready' && (
             <CropPreview
-              previewUrl={crop.previewUrl}
+              crop={crop.crop}
               backdropClass={
                 crop.crop.transparent ? photoBackdropClass(backdrop) : ''
               }

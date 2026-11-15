@@ -1,6 +1,8 @@
 'use client';
 
 import { useI18n } from '../../i18n/useI18n';
+import type { Crop } from '../../lib/backgroundRemoval';
+import { Preview } from '../BackgroundRemoval/PhotoPreview';
 import { buttonClasses, filledButtonClasses } from '../ui/buttonClasses';
 import { Spinner } from '../ui/Spinner';
 import type { CropDraft, CropDraftApi } from './useCropDraft';
@@ -86,19 +88,18 @@ export function CropControls({
 
 /** The crop in the original's place, on the chosen backdrop where a cut-out is see-through. */
 export function CropPreview({
-  previewUrl,
+  crop,
   backdropClass,
 }: {
-  previewUrl: string;
+  crop: Crop;
   backdropClass: string;
 }) {
   const { t } = useI18n();
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- the static export is unoptimized, and this is a local object URL
-    <img
-      data-testid="crop-preview"
-      src={previewUrl}
+    <Preview
+      blob={crop.blob}
       alt={t('item_list.crop_preview_alt')}
+      testId="crop-preview"
       className={`w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg ${backdropClass}`}
     />
   );

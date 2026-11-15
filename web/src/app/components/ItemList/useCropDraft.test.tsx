@@ -40,8 +40,6 @@ const crop: Crop = {
   height: 300,
   transparent: false,
 };
-const createObjectURL = vi.fn(() => 'blob:crop');
-const revokeObjectURL = vi.fn();
 
 function renderDraft(
   onSave: (image: ImageEntry, photo: PhotoUpload) => Promise<void> = vi.fn(
@@ -69,12 +67,6 @@ beforeEach(() => {
   downloadImageObject.mockResolvedValue({ data: source, error: null });
   cropToObject.mockReset();
   cropToObject.mockResolvedValue({ kind: 'cropped', crop });
-  createObjectURL.mockClear();
-  revokeObjectURL.mockClear();
-  vi.stubGlobal(
-    'URL',
-    Object.assign(URL, { createObjectURL, revokeObjectURL }),
-  );
 });
 
 afterEach(() => {
@@ -154,10 +146,8 @@ describe('useCropDraft', () => {
       kind: 'ready',
       image,
       crop,
-      previewUrl: 'blob:crop',
       saving: false,
     });
-    expect(createObjectURL).toHaveBeenCalledWith(crop.blob);
   });
 
   it('says so when the photo is framed round its item already', async () => {
@@ -296,14 +286,13 @@ describe('useCropDraft', () => {
     expect(signal.aborted).toBe(true);
   });
 
-  it('saves the crop as an upload, then closes and lets go of its preview', async () => {
+  it('saves the crop as an upload, then closes', async () => {
     const { result, onSave } = await started();
 
     await act(() => result.current.save());
 
     expect(onSave).toHaveBeenCalledExactlyOnceWith(image, uploadOf(crop));
     expect(kindOf(result.current.draft)).toBe('closed');
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:crop');
   });
 
   it('says it is saving meanwhile, and does not save twice', async () => {
