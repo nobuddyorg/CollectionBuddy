@@ -22,6 +22,8 @@ export enum IconType {
   Fingerprint,
   Camera,
   Scissors,
+  RotateLeft,
+  RotateRight,
 }
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
@@ -152,6 +154,20 @@ const Icon: React.FC<IconProps> = ({ icon, ...props }) => {
           <circle cx="6" cy="6" r="3" />
           <circle cx="6" cy="18" r="3" />
           <path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12" />
+        </svg>
+      );
+    case IconType.RotateLeft:
+      return (
+        <svg {...ROUNDED_SVG} {...props}>
+          <path d="M3 12a9 9 0 1 0 2.6-6.4L3 8" />
+          <path d="M3 3v5h5" />
+        </svg>
+      );
+    case IconType.RotateRight:
+      return (
+        <svg {...ROUNDED_SVG} {...props}>
+          <path d="M21 12a9 9 0 1 1-2.6-6.4L21 8" />
+          <path d="M21 3v5h-5" />
         </svg>
       );
     case IconType.Camera:

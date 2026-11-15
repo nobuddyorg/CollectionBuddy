@@ -44,6 +44,17 @@ interface ImageViewer {
     previous(): Promise<void>;
     /** Closes the viewer and opens the cut-out review for the photo shown. */
     removeBackground(): Promise<void>;
+    /** Opens the rotation's tools for the photo shown. */
+    rotate(): Promise<void>;
+    rotateLeft(): Promise<void>;
+    rotateRight(): Promise<void>;
+    /** Moves the slider from where it is by `steps` of 0.1°, by keyboard, as a collector without a pointer would. */
+    nudgeAngle(steps: number): Promise<void>;
+    straighten(): Promise<void>;
+    resetRotation(): Promise<void>;
+    cancelRotation(): Promise<void>;
+    /** Saves the rotation and waits until the turned photo has taken the original's place. */
+    saveRotation(): Promise<void>;
   };
   locators: {
     buttons: {
@@ -51,9 +62,22 @@ interface ImageViewer {
       deleteImage: Locator;
       previous: Locator;
       removeBackground: Locator;
+      rotate: Locator;
     };
     photo: Locator;
     position: Locator;
+    rotation: {
+      controls: Locator;
+      left: Locator;
+      right: Locator;
+      angle: Locator;
+      angleValue: Locator;
+      straighten: Locator;
+      reset: Locator;
+      cancel: Locator;
+      save: Locator;
+      preview: Locator;
+    };
   };
 }
 
@@ -126,9 +150,22 @@ export function initImageViewer(page: Page): ImageViewer {
       deleteImage: root.getByTestId('delete-image'),
       previous: root.getByTestId('previous-image'),
       removeBackground: root.getByTestId('remove-background-image'),
+      rotate: root.getByTestId('rotate-image'),
     },
     photo: root.getByTestId('viewer-photo'),
     position: root.getByTestId('image-position'),
+    rotation: {
+      controls: root.getByTestId('rotation-controls'),
+      left: root.getByTestId('rotate-left'),
+      right: root.getByTestId('rotate-right'),
+      angle: root.getByTestId('rotation-angle'),
+      angleValue: root.getByTestId('rotation-angle-value'),
+      straighten: root.getByTestId('straighten-image'),
+      reset: root.getByTestId('rotation-reset'),
+      cancel: root.getByTestId('rotation-cancel'),
+      save: root.getByTestId('rotation-save'),
+      preview: root.getByTestId('rotation-preview'),
+    },
   };
   const interactions = {
     close: async () => {
@@ -143,6 +180,42 @@ export function initImageViewer(page: Page): ImageViewer {
     },
     removeBackground: async () => {
       await locators.buttons.removeBackground.click();
+    },
+    rotate: async () => {
+      await locators.buttons.rotate.click();
+      await expect(locators.rotation.controls).toBeVisible();
+    },
+    rotateLeft: async () => {
+      await locators.rotation.left.click();
+    },
+    rotateRight: async () => {
+      await locators.rotation.right.click();
+    },
+    nudgeAngle: async (steps: number) => {
+      await locators.rotation.angle.focus();
+      const key = steps < 0 ? 'ArrowLeft' : 'ArrowRight';
+      for (let step = 0; step < Math.abs(steps); step += 1) {
+        await page.keyboard.press(key);
+      }
+    },
+    straighten: async () => {
+      await locators.rotation.straighten.click();
+    },
+    resetRotation: async () => {
+      await locators.rotation.reset.click();
+    },
+    cancelRotation: async () => {
+      await locators.rotation.cancel.click();
+    },
+    // The new row's photo has a new path, so its signed URL differs from the original's.
+    saveRotation: async () => {
+      const original = await locators.photo.getAttribute('src');
+      await expect(locators.rotation.save).toBeEnabled();
+      await locators.rotation.save.click();
+      await expect(locators.rotation.controls).toHaveCount(0);
+      await expect(locators.photo).not.toHaveAttribute('src', original ?? '', {
+        timeout: 45_000,
+      });
     },
   };
   return Object.assign(() => root, { locators, do: interactions });

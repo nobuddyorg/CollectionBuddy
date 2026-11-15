@@ -194,7 +194,7 @@ describe('useItemImages replaceImage', () => {
 
     expect(deleteImageRow).not.toHaveBeenCalled();
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The photo without its background was saved, but the original could not be removed.',
+      'The changed photo was saved, but the original could not be removed.',
     );
   });
 

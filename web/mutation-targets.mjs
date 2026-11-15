@@ -111,4 +111,8 @@ export const MUTATE_TARGETS = [
   'src/app/components/BackgroundRemoval/useBackgroundRemovalUpload.ts',
   'src/app/components/BackgroundRemoval/useCutoutJob.ts',
   'src/app/components/BackgroundRemoval/downloadPercent.ts',
+  'src/app/lib/rotation.ts',
+  'src/app/lib/straighten.ts',
+  'src/app/lib/rotationJob.ts',
+  'src/app/components/ItemList/useRotationDraft.ts',
 ];

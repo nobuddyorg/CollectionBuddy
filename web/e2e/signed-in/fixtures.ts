@@ -125,7 +125,7 @@ export const SEED = {
   sortingCategory: 'Sortierkasten',
   /** For entry-details.spec.ts, which files entries with places and tags. */
   detailCategory: 'Etikett',
-  /** For photo-viewer.spec.ts, which photographs an entry and opens it. */
+  /** For photo-viewer.spec.ts and photo-rotation.spec.ts, which photograph an entry and open it. */
   viewerCategory: 'Bildergalerie',
   /** For undo.spec.ts, which deletes an entry and takes it back. */
   undoCategory: 'Rückgängig',

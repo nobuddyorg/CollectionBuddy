@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
+import { ToastWrapper } from '../providers.test-support';
 import {
   appRoot,
   mountAppRoot,
@@ -32,17 +32,17 @@ function renderModal(
     ...overrides,
   };
   const { rerender } = render(
-    <I18nProvider>
+    <ToastWrapper>
       <ModalImage {...props} />
-    </I18nProvider>,
+    </ToastWrapper>,
   );
   return {
     ...props,
     rerender: (next: Partial<Parameters<typeof ModalImage>[0]>) =>
       rerender(
-        <I18nProvider>
+        <ToastWrapper>
           <ModalImage {...{ ...props, ...next }} />
-        </I18nProvider>,
+        </ToastWrapper>,
       ),
   };
 }

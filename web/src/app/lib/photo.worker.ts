@@ -6,6 +6,14 @@ import {
 import { compressOffscreen } from './compressOffscreen';
 import type { CompressionRequest } from './drawPhoto';
 import {
+  inspectOffscreen,
+  rotateOffscreen,
+  type InspectionAnswer,
+  type InspectionRequest,
+  type RotationAnswer,
+  type RotationRequest,
+} from './rotationJob';
+import {
   measureOffscreen,
   type SharpnessAnswer,
   type SharpnessRequest,
@@ -19,29 +27,45 @@ const scope = self as unknown as {
   onmessage:
     | ((
         event: MessageEvent<
-          CompressionRequest | SharpnessRequest | CutoutRequest
+          | CompressionRequest
+          | SharpnessRequest
+          | CutoutRequest
+          | RotationRequest
+          | InspectionRequest
         >,
       ) => void)
     | null;
   postMessage: (
-    answer: CompressionAnswer | SharpnessAnswer | CutoutReply,
+    answer:
+      | CompressionAnswer
+      | SharpnessAnswer
+      | CutoutReply
+      | RotationAnswer
+      | InspectionAnswer,
   ) => void;
 };
 
+const failed = (error: unknown) => scope.postMessage({ error: String(error) });
+
 scope.onmessage = ({ data: job }) => {
-  if (job.kind === 'sharpness') {
-    measureOffscreen(job).then(
-      (score) => scope.postMessage({ score }),
-      (error: unknown) => scope.postMessage({ error: String(error) }),
+  if (job.kind === 'rotate') {
+    rotateOffscreen(job).then((rotated) => scope.postMessage(rotated), failed);
+    return;
+  }
+  if (job.kind === 'inspect-rotation') {
+    inspectOffscreen(job).then(
+      (inspection) => scope.postMessage({ inspection }),
+      failed,
     );
+    return;
+  }
+  if (job.kind === 'sharpness') {
+    measureOffscreen(job).then((score) => scope.postMessage({ score }), failed);
     return;
   }
   if (job.kind !== 'compress') {
     void handleRequest(job, (reply) => scope.postMessage(reply));
     return;
   }
-  compressOffscreen(job).then(
-    (blob) => scope.postMessage({ blob }),
-    (error: unknown) => scope.postMessage({ error: String(error) }),
-  );
+  compressOffscreen(job).then((blob) => scope.postMessage({ blob }), failed);
 };

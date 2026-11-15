@@ -1,10 +1,10 @@
 import { analyzeMask } from './objectMask';
-import { fillEach } from './fillEach';
 import {
   cropWithAlpha,
   cutoutAlpha,
   fitWithin,
   opaqueBounds,
+  ownTransparency,
   withMargin,
   type CutoutMode,
   type Size,
@@ -116,15 +116,6 @@ async function framed(
       fillRatio,
     },
   };
-}
-
-/** The photo's own opacity, where it has a see-through pixel at all: then it is a cut-out already. */
-function ownTransparency(pixels: Uint8ClampedArray): Uint8ClampedArray | null {
-  const alpha = fillEach(
-    new Uint8ClampedArray(pixels.length / 4),
-    (index) => pixels[index * 4 + 3],
-  );
-  return alpha.includes(0) ? alpha : null;
 }
 
 async function cutOut(request: CutOutRequest, reply: Reply) {

@@ -143,6 +143,7 @@ fields a line break becomes a space.
   WebP (JPEG in Safari and on iOS) with a thumbnail before upload, so there is
   no size to worry about.
 - **View full size**: click a thumbnail. Escape or the backdrop closes it.
+- **Rotate**: from the full-size view ([below](#rotate-and-straighten-a-photo)).
 - **Delete**: from the full-size view or the per-photo control, confirm.
 
 An item can have any number of photos, in the order you added them.
@@ -175,6 +176,28 @@ gains that clear space, in a moment and without the model, so an older cut-out
 cropped close to the item can be given room this way. Anyone
 who can edit the collection can do this; someone it is only shared with to view
 cannot.
+
+### Rotate and straighten a photo
+
+A photo taken from above, lying on a table, is often stored sideways: held
+flat, the phone cannot tell which way is up. Open it full size and choose
+**Rotate**:
+
+- **Rotate left** and **Rotate right** turn it a quarter at a time.
+- The **Angle** slider turns it by up to 45° either way, in tenths of a degree,
+  with the arrow keys too; it catches at 0°, and **Reset** undoes every turn.
+- **Straighten** appears for a photo without its background whose item is
+  rectangular, a stamp, a card, a banknote, a book: it sets the slider to the
+  smallest turn that squares the item. A round coin or an irregular figure
+  gets no suggestion, and neither does an item already square.
+
+What you see is a preview. **Save** stores the turned photo in the original's
+place, so the cover and the order of the photos stay as they were; **Cancel**
+or Escape changes nothing. A photo turned by an angle is cropped to the
+largest upright rectangle inside it, as phone galleries do; one without its
+background is kept whole instead, the new corners see-through like the rest
+of its background. Anyone who can edit the collection can rotate its photos;
+someone it is only shared with to view cannot.
 
 A photo that looks blurry is shown before it uploads, with **Keep anyway** and
 **Skip this photo**. With **Remove backgrounds** ticked, the warning and **Skip

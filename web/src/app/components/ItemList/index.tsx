@@ -12,6 +12,7 @@ import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
 import { pageImageRowsFor } from './imageEntries';
 import { useItemMutations } from './useItemMutations';
+import { useRotateStoredPhoto } from './useRotateStoredPhoto';
 import { searchStatusFor } from './searchStatus';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { useSyncedRef } from '../../lib/useSyncedRef';
@@ -101,6 +102,7 @@ export default function ItemList({
     replaceImage,
   );
   const { enabled: removesBackgrounds } = useBackgroundRemovalPreference();
+  const rotateStored = useRotateStoredPhoto(replaceImage);
 
   // Read through a ref so a reload that keeps the same items re-signs nothing.
   const pageImagesRef = useSyncedRef(pageImages);
@@ -270,6 +272,9 @@ export default function ItemList({
           void backgroundRemoval.reviewStored(modalState!.itemId, image);
         }}
         offerRemoveBackground={removesBackgrounds}
+        onRotate={(image, edit) =>
+          rotateStored(modalState!.itemId, image, edit)
+        }
         busy={modalState ? (pendingUploads[modalState.itemId] ?? 0) > 0 : false}
         readOnly={!canEdit}
       />
