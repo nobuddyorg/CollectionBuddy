@@ -1,4 +1,4 @@
-// Generated from the migrations in supabase/migrations/ (0001-0037).
+// Generated from the migrations in supabase/migrations/ (0001-0038).
 //
 // Regenerate after a schema change, against a local stack:
 //   supabase start
@@ -246,6 +246,26 @@ export type Database = {
         }[];
       };
       photo_upload_has_room: { Args: never; Returns: boolean };
+      search_category_entries: {
+        Args: {
+          at_place: string;
+          cat_id: string;
+          like_pattern: string;
+          page_from: number;
+          page_to: number;
+        };
+        Returns: {
+          description: string;
+          id: string;
+          images: Json;
+          place: string;
+          place_lat: number;
+          place_lng: number;
+          tags: string[];
+          title: string;
+          total_count: number;
+        }[];
+      };
       search_category_items: {
         Args: {
           cat_id: string;
