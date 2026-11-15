@@ -100,10 +100,7 @@ export default function ItemList({
     pendingUploads,
   } = useItemImages();
   const makeCover = useMakeCover({ updateItemImages, refreshAllImages });
-  const backgroundRemoval = useBackgroundRemovalUpload(
-    uploadImage,
-    replaceImage,
-  );
+  const backgroundRemoval = useBackgroundRemovalUpload(uploadImage);
   const { enabled: removesBackgrounds } = useBackgroundRemovalPreference();
   const rotateStored = useRotateStoredPhoto(replaceImage);
 
@@ -269,16 +266,11 @@ export default function ItemList({
         }
         onClose={() => setModalState(null)}
         onDelete={(image) => void deleteImage(modalState!.itemId, image)}
-        // The viewer closes first: the cut-out review is a dialog of its own.
-        onRemoveBackground={(image) => {
-          setModalState(null);
-          void backgroundRemoval.reviewStored(modalState!.itemId, image);
-        }}
         offerRemoveBackground={removesBackgrounds}
         onRotate={(image, edit) =>
           rotateStored(modalState!.itemId, image, edit)
         }
-        onCrop={(image, photo) =>
+        onEdit={(image, photo) =>
           replaceImage(modalState!.itemId, image, photo)
         }
         // The viewer follows the photo to the front, where it now is.

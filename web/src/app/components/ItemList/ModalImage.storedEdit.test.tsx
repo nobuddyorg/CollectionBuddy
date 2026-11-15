@@ -3,7 +3,11 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CropResult, CutOutOptions } from '../../lib/backgroundRemoval';
+import type {
+  CropResult,
+  Cutout,
+  CutOutOptions,
+} from '../../lib/backgroundRemoval';
 import {
   mountAppRoot,
   removeAppRoot,
@@ -19,8 +23,15 @@ class NoObjectFoundError extends Error {}
 const cropToObject = vi.hoisted(() =>
   vi.fn<(file: Blob, options: CutOutOptions) => Promise<CropResult>>(),
 );
+const removeBackground = vi.hoisted(() =>
+  vi.fn<(file: Blob, options: CutOutOptions) => Promise<Cutout>>(),
+);
 vi.mock('../BackgroundRemoval/load', () => ({
-  loadBackgroundRemoval: async () => ({ cropToObject, NoObjectFoundError }),
+  loadBackgroundRemoval: async () => ({
+    cropToObject,
+    removeBackground,
+    NoObjectFoundError,
+  }),
 }));
 
 const photo = (name: string): ImageEntry => ({
@@ -46,7 +57,7 @@ function renderModal(
     onIndexChange: vi.fn(),
     onClose: vi.fn(),
     onDelete: vi.fn(),
-    onCrop: vi.fn(async () => {}),
+    onEdit: vi.fn(async () => {}),
     offerRemoveBackground: true,
     ...overrides,
   };
@@ -72,7 +83,7 @@ async function startCropping() {
   await act(async () => {});
 }
 
-const status = () => screen.getByTestId('crop-status');
+const status = () => screen.getByTestId('edit-status');
 
 beforeEach(() => {
   window.localStorage.setItem('lang', 'en');
@@ -82,6 +93,14 @@ beforeEach(() => {
   downloadImageObject.mockResolvedValue({ data: source, error: null });
   cropToObject.mockReset();
   cropToObject.mockResolvedValue({ kind: 'cropped', crop });
+  removeBackground.mockReset();
+  removeBackground.mockResolvedValue({
+    blob: new Blob(['cut-out'], { type: 'image/png' }),
+    width: 300,
+    height: 300,
+    mode: 'ellipse',
+    fillRatio: 0.97,
+  });
   vi.stubGlobal(
     'URL',
     Object.assign(URL, {
@@ -127,7 +146,7 @@ describe('cropping the shown photo to its item', () => {
     await userEvent.click(screen.getByTestId('crop-image'));
     expect(
       within(screen.getByRole('group', { name: 'Crop photo' })).getByTestId(
-        'crop-status',
+        'edit-status',
       ),
     ).toHaveTextContent('Reading the photo…');
     await vi.waitFor(() => expect(cropToObject).toHaveBeenCalled());
@@ -136,7 +155,7 @@ describe('cropping the shown photo to its item', () => {
     act(() => report!({ stage: 'analyze' }));
     expect(status()).toHaveTextContent('Finding the item…');
 
-    expect(screen.getByTestId('crop-save')).toBeDisabled();
+    expect(screen.getByTestId('edit-save')).toBeDisabled();
     expect(screen.queryByTestId('previous-image')).not.toBeInTheDocument();
     for (const tool of [
       'delete-image',
@@ -149,11 +168,11 @@ describe('cropping the shown photo to its item', () => {
   });
 
   it('shows the crop in the original’s place, and saves it as the upload', async () => {
-    const { onCrop } = renderModal();
+    const { onEdit } = renderModal();
     await startCropping();
 
     expect(status()).toHaveTextContent('Cropped to the item');
-    expect(screen.getByTestId('crop-preview')).toHaveAttribute(
+    expect(screen.getByTestId('edit-preview')).toHaveAttribute(
       'src',
       'blob:crop',
     );
@@ -162,23 +181,23 @@ describe('cropping the shown photo to its item', () => {
     );
     expect(screen.queryByTestId('viewer-photo')).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByTestId('crop-save'));
+    await userEvent.click(screen.getByTestId('edit-save'));
 
-    expect(onCrop).toHaveBeenCalledExactlyOnceWith(
+    expect(onEdit).toHaveBeenCalledExactlyOnceWith(
       photo('a'),
       expect.objectContaining({ encoding: 'opaque' }),
     );
-    expect(screen.queryByTestId('crop-controls')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('edit-controls')).not.toBeInTheDocument();
     expect(screen.getByTestId('viewer-photo')).toBeInTheDocument();
   });
 
   it('saves to nothing without a handler, by default', async () => {
-    renderModal({ onCrop: undefined });
+    renderModal({ onEdit: undefined });
     await startCropping();
 
-    await userEvent.click(screen.getByTestId('crop-save'));
+    await userEvent.click(screen.getByTestId('edit-save'));
 
-    expect(screen.queryByTestId('crop-controls')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('edit-controls')).not.toBeInTheDocument();
   });
 
   it('lays a see-through crop on the chosen backdrop, and an opaque one on none', async () => {
@@ -189,34 +208,34 @@ describe('cropping the shown photo to its item', () => {
     });
     renderModal();
     await startCropping();
-    expect(screen.getByTestId('crop-preview')).toHaveClass('bg-black');
+    expect(screen.getByTestId('edit-preview')).toHaveClass('bg-black');
 
-    await userEvent.click(screen.getByTestId('crop-cancel'));
+    await userEvent.click(screen.getByTestId('edit-cancel'));
     cropToObject.mockResolvedValue({ kind: 'cropped', crop });
     await startCropping();
-    expect(screen.getByTestId('crop-preview')).not.toHaveClass('bg-black');
+    expect(screen.getByTestId('edit-preview')).not.toHaveClass('bg-black');
   });
 
   it('shows it is saving and holds Cancel until the save is in', async () => {
     let finish!: () => void;
     renderModal({
-      onCrop: () =>
+      onEdit: () =>
         new Promise<void>((resolve) => {
           finish = resolve;
         }),
     });
     await startCropping();
 
-    await userEvent.click(screen.getByTestId('crop-save'));
+    await userEvent.click(screen.getByTestId('edit-save'));
 
-    expect(screen.getByTestId('crop-save')).toHaveAttribute(
+    expect(screen.getByTestId('edit-save')).toHaveAttribute(
       'aria-busy',
       'true',
     );
-    expect(screen.getByTestId('crop-save')).toBeDisabled();
-    expect(screen.getByTestId('crop-cancel')).toBeDisabled();
+    expect(screen.getByTestId('edit-save')).toBeDisabled();
+    expect(screen.getByTestId('edit-cancel')).toBeDisabled();
     await act(async () => finish());
-    expect(screen.queryByTestId('crop-controls')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('edit-controls')).not.toBeInTheDocument();
   });
 
   it('cannot save while another change to the entry’s photos is on its way', async () => {
@@ -225,7 +244,7 @@ describe('cropping the shown photo to its item', () => {
 
     view.rerender({ busy: true });
 
-    expect(screen.getByTestId('crop-save')).toBeDisabled();
+    expect(screen.getByTestId('edit-save')).toBeDisabled();
   });
 
   it('says the photo is cropped to its item already, with nothing to save', async () => {
@@ -236,7 +255,7 @@ describe('cropping the shown photo to its item', () => {
     expect(status()).toHaveTextContent(
       'This photo is cropped to its item already.',
     );
-    expect(screen.getByTestId('crop-save')).toBeDisabled();
+    expect(screen.getByTestId('edit-save')).toBeDisabled();
     expect(screen.getByTestId('viewer-photo')).toBeInTheDocument();
   });
 
@@ -249,13 +268,13 @@ describe('cropping the shown photo to its item', () => {
   });
 
   it('changes nothing on Cancel', async () => {
-    const { onCrop } = renderModal();
+    const { onEdit } = renderModal();
     await startCropping();
 
-    await userEvent.click(screen.getByTestId('crop-cancel'));
+    await userEvent.click(screen.getByTestId('edit-cancel'));
 
-    expect(onCrop).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('crop-controls')).not.toBeInTheDocument();
+    expect(onEdit).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('edit-controls')).not.toBeInTheDocument();
     expect(screen.getByTestId('viewer-photo')).toBeInTheDocument();
   });
 
@@ -267,7 +286,7 @@ describe('cropping the shown photo to its item', () => {
     expect(onIndexChange).not.toHaveBeenCalled();
 
     await userEvent.keyboard('{Escape}');
-    expect(screen.queryByTestId('crop-controls')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('edit-controls')).not.toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -280,7 +299,7 @@ describe('cropping the shown photo to its item', () => {
     view.rerender({ index: 0 });
 
     expect(view.onClose).toHaveBeenCalledOnce();
-    expect(screen.queryByTestId('crop-controls')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('edit-controls')).not.toBeInTheDocument();
   });
 
   it('shows no crop for a photo it was not started on', async () => {
@@ -289,7 +308,111 @@ describe('cropping the shown photo to its item', () => {
 
     view.rerender({ images: [photo('b')] });
 
-    expect(screen.queryByTestId('crop-controls')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('edit-controls')).not.toBeInTheDocument();
     expect(screen.getByTestId('crop-image')).toBeEnabled();
+  });
+});
+
+describe('removing the shown photo’s background, in the viewer as a crop is', () => {
+  async function startRemoving() {
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Remove background' }),
+    );
+    await act(async () => {});
+  }
+
+  it('stays in the viewer, cutting out the photo shown, and says where it has got to', async () => {
+    let report!: CutOutOptions['onProgress'];
+    removeBackground.mockImplementation((_file, options) => {
+      report = options.onProgress;
+      return new Promise(() => {});
+    });
+    const { onClose } = renderModal({ index: 1 });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Remove background' }),
+    );
+    await vi.waitFor(() => expect(removeBackground).toHaveBeenCalled());
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(downloadImageObject).toHaveBeenCalledWith('b.webp');
+    expect(removeBackground.mock.calls[0][0]).toBe(source);
+    expect(
+      screen.getByRole('group', { name: 'Remove background' }),
+    ).toBeInTheDocument();
+    act(() => report!({ stage: 'download', loaded: 3, total: 4 }));
+    expect(status()).toHaveTextContent('Downloading model: 75%');
+    act(() => report!({ stage: 'analyze' }));
+    expect(status()).toHaveTextContent('Removing the background…');
+    expect(screen.getByTestId('edit-save')).toBeDisabled();
+  });
+
+  it('shows the cut-out in the photo’s place on the chosen backdrop, and saves it see-through', async () => {
+    window.localStorage.setItem('photoBackdrop', 'white');
+    const { onEdit } = renderModal();
+    await startRemoving();
+
+    expect(status()).toHaveTextContent('The background is removed.');
+    const preview = screen.getByTestId('edit-preview');
+    expect(preview).toHaveAccessibleName(
+      'The item with its background removed',
+    );
+    expect(preview).toHaveClass('bg-white');
+
+    await userEvent.click(screen.getByTestId('edit-save'));
+
+    expect(onEdit).toHaveBeenCalledExactlyOnceWith(
+      photo('a'),
+      expect.objectContaining({ encoding: 'transparent' }),
+    );
+    expect(screen.queryByTestId('edit-controls')).not.toBeInTheDocument();
+  });
+
+  it('says when no item was found, with nothing to save', async () => {
+    removeBackground.mockRejectedValue(new NoObjectFoundError());
+    renderModal();
+    await startRemoving();
+
+    expect(status()).toHaveTextContent(
+      'No item was found in this photo, so there is no background to remove.',
+    );
+    expect(screen.getByTestId('edit-save')).toBeDisabled();
+  });
+
+  it('closes and says so when the background cannot be removed', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    removeBackground.mockRejectedValue(new Error('Model failed'));
+    renderModal();
+    await startRemoving();
+
+    expect(screen.queryByTestId('edit-controls')).not.toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The background could not be removed. The original is unchanged',
+    );
+  });
+
+  it('closes and says so when the stored photo cannot be loaded', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    downloadImageObject.mockResolvedValue({
+      data: null,
+      error: new Error('Object not found'),
+    });
+    renderModal();
+    await startRemoving();
+
+    expect(removeBackground).not.toHaveBeenCalled();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This photo could not be loaded to remove its background.',
+    );
+  });
+
+  it('holds the other tools while it works, the crop among them', async () => {
+    removeBackground.mockReturnValue(new Promise(() => {}));
+    renderModal();
+    await startRemoving();
+
+    for (const tool of ['crop-image', 'rotate-image', 'delete-image']) {
+      expect(screen.getByTestId(tool)).toBeDisabled();
+    }
   });
 });

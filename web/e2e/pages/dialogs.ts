@@ -42,7 +42,7 @@ interface ImageViewer {
     close(): Promise<void>;
     deleteImage(): Promise<void>;
     previous(): Promise<void>;
-    /** Closes the viewer and opens the cut-out review for the photo shown. */
+    /** Opens the edit panel and cuts out the photo shown; the cut-out shows in its place once ready. */
     removeBackground(): Promise<void>;
     /** Opens the rotation's tools for the photo shown. */
     rotate(): Promise<void>;
@@ -57,11 +57,11 @@ interface ImageViewer {
     saveRotation(): Promise<void>;
     makeCover(): Promise<void>;
     next(): Promise<void>;
-    /** Opens the crop's panel; the crop shows once the item is found. */
+    /** Opens the edit panel and crops the photo shown to its item; the crop shows once the item is found. */
     cropToItem(): Promise<void>;
-    cancelCrop(): Promise<void>;
-    /** Saves the crop and waits until it has taken the original's place. */
-    saveCrop(): Promise<void>;
+    cancelEdit(): Promise<void>;
+    /** Saves a crop or cut-out and waits until it has taken the original's place. */
+    saveEdit(): Promise<void>;
   };
   locators: {
     buttons: {
@@ -87,7 +87,7 @@ interface ImageViewer {
       save: Locator;
       preview: Locator;
     };
-    crop: {
+    edit: {
       controls: Locator;
       status: Locator;
       preview: Locator;
@@ -160,8 +160,8 @@ export function initToast(page: Page): Toast {
 
 export function initImageViewer(page: Page): ImageViewer {
   const root = page.getByTestId('image-viewer');
-  // The src of the photo a crop started on, which a saved crop replaces.
-  let cropped = '';
+  // The src of the photo an edit started on, which a saved edit replaces.
+  let edited = '';
   const locators = {
     buttons: {
       close: root.getByTestId('close-image'),
@@ -186,12 +186,12 @@ export function initImageViewer(page: Page): ImageViewer {
       save: root.getByTestId('rotation-save'),
       preview: root.getByTestId('rotation-preview'),
     },
-    crop: {
-      controls: root.getByTestId('crop-controls'),
-      status: root.getByTestId('crop-status'),
-      preview: root.getByTestId('crop-preview'),
-      cancel: root.getByTestId('crop-cancel'),
-      save: root.getByTestId('crop-save'),
+    edit: {
+      controls: root.getByTestId('edit-controls'),
+      status: root.getByTestId('edit-status'),
+      preview: root.getByTestId('edit-preview'),
+      cancel: root.getByTestId('edit-cancel'),
+      save: root.getByTestId('edit-save'),
     },
   };
   const interactions = {
@@ -205,8 +205,11 @@ export function initImageViewer(page: Page): ImageViewer {
     previous: async () => {
       await locators.buttons.previous.click();
     },
+    // The preview takes the photo's place, so its src is read before the edit starts.
     removeBackground: async () => {
+      edited = (await locators.photo.getAttribute('src')) ?? '';
       await locators.buttons.removeBackground.click();
+      await expect(locators.edit.controls).toBeVisible();
     },
     makeCover: async () => {
       await locators.buttons.makeCover.click();
@@ -250,19 +253,18 @@ export function initImageViewer(page: Page): ImageViewer {
         timeout: 45_000,
       });
     },
-    // The preview takes the photo's place, so its src is read before the crop starts.
     cropToItem: async () => {
-      cropped = (await locators.photo.getAttribute('src')) ?? '';
+      edited = (await locators.photo.getAttribute('src')) ?? '';
       await locators.buttons.crop.click();
-      await expect(locators.crop.controls).toBeVisible();
+      await expect(locators.edit.controls).toBeVisible();
     },
-    cancelCrop: async () => {
-      await locators.crop.cancel.click();
+    cancelEdit: async () => {
+      await locators.edit.cancel.click();
     },
-    saveCrop: async () => {
-      await locators.crop.save.click();
-      await expect(locators.crop.controls).toHaveCount(0);
-      await expect(locators.photo).not.toHaveAttribute('src', cropped, {
+    saveEdit: async () => {
+      await locators.edit.save.click();
+      await expect(locators.edit.controls).toHaveCount(0);
+      await expect(locators.photo).not.toHaveAttribute('src', edited, {
         timeout: 45_000,
       });
     },

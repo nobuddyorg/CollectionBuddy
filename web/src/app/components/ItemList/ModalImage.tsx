@@ -16,9 +16,9 @@ import Icon, { IconType } from '../Icon';
 import type { ImageEntry } from './types';
 import { StatusSpinner } from '../ui/Spinner';
 import type { PhotoUpload } from '../../data/photoType';
-import { CropControls, CropPreview } from './CropControls';
+import { StoredEditControls, StoredEditPreview } from './StoredEditControls';
 import { RotationControls } from './RotationControls';
-import { useCropDraft, type CropDraft } from './useCropDraft';
+import { useStoredEdit, type StoredEdit } from './useStoredEdit';
 import {
   useRotationDraft,
   type RotationDraft,
@@ -33,10 +33,9 @@ export function ModalImage({
   onIndexChange,
   onClose,
   onDelete,
-  onRemoveBackground = () => {},
   offerRemoveBackground = false,
   onRotate = async () => {},
-  onCrop = async () => {},
+  onEdit = async () => {},
   onMakeCover = () => {},
   busy = false,
   readOnly = false,
@@ -49,13 +48,12 @@ export function ModalImage({
   onIndexChange: (index: number) => void;
   onClose: () => void;
   onDelete: (image: ImageEntry) => void;
-  onRemoveBackground?: (image: ImageEntry) => void;
   /** Only where this browser opted in to background removal, and only to an editor. */
   offerRemoveBackground?: boolean;
   /** Saves a confirmed rotation; the viewer previews it until then. */
   onRotate?: (image: ImageEntry, edit: RotationEdit) => Promise<void>;
-  /** Saves a confirmed crop to the object; offered with background removal, which finds the object. */
-  onCrop?: (image: ImageEntry, photo: PhotoUpload) => Promise<void>;
+  /** Saves a confirmed crop or cut-out in the photo's place; both find the item with background removal's model. */
+  onEdit?: (image: ImageEntry, photo: PhotoUpload) => Promise<void>;
   /** Makes the shown photo its entry's cover; not offered on the cover itself, the first. */
   onMakeCover?: (image: ImageEntry) => void;
   busy?: boolean;
@@ -95,16 +93,17 @@ export function ModalImage({
     rotation.draft.kind === 'editing' && rotation.draft.image.id === current?.id
       ? rotation.draft
       : { kind: 'closed' };
-  const cropping = useCropDraft(onCrop);
-  const crop: CropDraft =
-    cropping.draft.kind !== 'closed' && cropping.draft.image.id === current?.id
-      ? cropping.draft
+  const storedEdit = useStoredEdit(onEdit);
+  const edit: StoredEdit =
+    storedEdit.edit.kind !== 'closed' &&
+    storedEdit.edit.image.id === current?.id
+      ? storedEdit.edit
       : { kind: 'closed' };
   // Either tool holds the viewer: no paging, and Escape or a tap ends the tool, not the viewer.
-  const editing = draft.kind === 'editing' || crop.kind !== 'closed';
+  const editing = draft.kind === 'editing' || edit.kind !== 'closed';
   const cancelTools = () => {
     rotation.cancel();
-    cropping.cancel();
+    storedEdit.cancel();
   };
   const close = () => {
     cancelTools();
@@ -146,7 +145,7 @@ export function ModalImage({
   useInertBackground(open);
 
   // One layer for Escape and the arrows alike, so a confirm raised on top takes all three.
-  // While rotating or cropping, Escape ends that and the arrows belong to the slider.
+  // While editing, Escape ends the edit and the arrows belong to the rotation's slider.
   useTopmostKeydown(open, (event) => {
     if (editing) {
       if (event.key === 'Escape') cancelTools();
@@ -201,7 +200,7 @@ export function ModalImage({
             {offerRemoveBackground && (
               <button
                 data-testid="remove-background-image"
-                onClick={() => onRemoveBackground(current)}
+                onClick={() => void storedEdit.start(current, 'cut-out')}
                 disabled={busy || editing}
                 className={TOOL_CLASSES}
                 title={t('item_list.remove_background')}
@@ -235,7 +234,7 @@ export function ModalImage({
             {offerRemoveBackground && (
               <button
                 data-testid="crop-image"
-                onClick={() => void cropping.start(current)}
+                onClick={() => void storedEdit.start(current, 'crop')}
                 disabled={busy || editing}
                 className={TOOL_CLASSES}
                 title={t('item_list.crop')}
@@ -250,8 +249,8 @@ export function ModalImage({
         {draft.kind === 'editing' && (
           <RotationControls draft={draft} actions={rotation} busy={busy} />
         )}
-        {crop.kind !== 'closed' && (
-          <CropControls draft={crop} actions={cropping} busy={busy} />
+        {edit.kind !== 'closed' && (
+          <StoredEditControls edit={edit} actions={storedEdit} busy={busy} />
         )}
 
         {count > 1 && !editing && (
@@ -294,19 +293,17 @@ export function ModalImage({
 
         {/* pb reserves the bottom bar, or the open tool's panel, plus safe area, so a tall photo's edge sits above it. */}
         <div
-          className={`absolute inset-0 flex items-center justify-center p-4 pt-16 ${bottomReserve(draft, crop)}`}
+          className={`absolute inset-0 flex items-center justify-center p-4 pt-16 ${bottomReserve(draft, edit)}`}
           // The preview sizes itself in container units: no measuring, and it follows a resize.
           style={{ containerType: 'size' }}
         >
-          {crop.kind === 'ready' && (
-            <CropPreview
-              crop={crop.crop}
-              backdropClass={
-                crop.crop.transparent ? photoBackdropClass(backdrop) : ''
-              }
+          {edit.kind === 'ready' && (
+            <StoredEditPreview
+              edit={edit}
+              backdropClass={photoBackdropClass(backdrop)}
             />
           )}
-          {crop.kind !== 'ready' && current.urlFull && (
+          {edit.kind !== 'ready' && current.urlFull && (
             <ViewerPhoto
               key={current.pathFull}
               image={current}
@@ -340,11 +337,11 @@ export function ModalImage({
   );
 }
 
-function bottomReserve(draft: RotationDraft, crop: CropDraft): string {
+function bottomReserve(draft: RotationDraft, edit: StoredEdit): string {
   if (draft.kind === 'editing') {
     return 'pb-[calc(12rem+env(safe-area-inset-bottom))]';
   }
-  if (crop.kind !== 'closed') {
+  if (edit.kind !== 'closed') {
     return 'pb-[calc(9rem+env(safe-area-inset-bottom))]';
   }
   return 'pb-[calc(3.5rem+env(safe-area-inset-bottom))]';

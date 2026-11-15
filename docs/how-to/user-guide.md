@@ -175,9 +175,10 @@ seconds on a desktop computer, longer on a phone. With the box unticked,
 uploads work exactly as before.
 
 A photo already added can lose its background too: open it full size and choose
-the scissors, **Remove background**. The same review opens; **Use without
-background** puts the result in the original's place, so the cover and the order
-of the photos stay as they were, and **Keep original** changes nothing. A photo
+the scissors, **Remove background**. As with a crop or a rotation, it happens
+right there in the full-size view: the item without its background shows in the
+photo's place, and **Save** keeps it there, so the cover and the order of the
+photos stay as they were; **Cancel** or Escape changes nothing. A photo
 that already has its background removed keeps its outline exactly and only
 gains that clear space, in a moment and without the model, so an older cut-out
 cropped close to the item can be given room this way. Anyone

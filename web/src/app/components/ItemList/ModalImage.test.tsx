@@ -163,22 +163,6 @@ describe('ModalImage', () => {
       ).toBeNull();
     });
 
-    it('passes the photograph currently shown on, once offered', async () => {
-      const onRemoveBackground = vi.fn();
-      renderModal({
-        images: [photo('a'), photo('b')],
-        index: 1,
-        offerRemoveBackground: true,
-        onRemoveBackground,
-      });
-
-      await userEvent.click(
-        screen.getByRole('button', { name: 'Remove background' }),
-      );
-
-      expect(onRemoveBackground).toHaveBeenCalledExactlyOnceWith(photo('b'));
-    });
-
     it('is not offered to a viewer of a shared collection', () => {
       renderModal({ offerRemoveBackground: true, readOnly: true });
       expect(
@@ -191,14 +175,6 @@ describe('ModalImage', () => {
       expect(
         screen.getByRole('button', { name: 'Remove background' }),
       ).toBeDisabled();
-    });
-
-    it('does nothing without a handler, by default', async () => {
-      renderModal({ offerRemoveBackground: true });
-      await userEvent.click(
-        screen.getByRole('button', { name: 'Remove background' }),
-      );
-      expect(screen.getByRole('img')).toBeInTheDocument();
     });
   });
 

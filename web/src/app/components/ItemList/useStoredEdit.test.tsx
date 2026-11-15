@@ -6,6 +6,7 @@ import type { PhotoUpload } from '../../data/photoType';
 import type {
   Crop,
   CropResult,
+  Cutout,
   CutOutOptions,
 } from '../../lib/backgroundRemoval';
 import { ToastWrapper } from '../providers.test-support';
@@ -13,9 +14,9 @@ import type { ImageEntry } from './types';
 import {
   stageOf,
   uploadOf,
-  useCropDraft,
-  type CropDraft,
-} from './useCropDraft';
+  useStoredEdit,
+  type StoredEdit,
+} from './useStoredEdit';
 
 const downloadImageObject = vi.hoisted(() => vi.fn());
 vi.mock('../../data/images', () => ({ downloadImageObject }));
@@ -24,8 +25,15 @@ class NoObjectFoundError extends Error {}
 const cropToObject = vi.hoisted(() =>
   vi.fn<(file: Blob, options: CutOutOptions) => Promise<CropResult>>(),
 );
+const removeBackground = vi.hoisted(() =>
+  vi.fn<(file: Blob, options: CutOutOptions) => Promise<Cutout>>(),
+);
 vi.mock('../BackgroundRemoval/load', () => ({
-  loadBackgroundRemoval: async () => ({ cropToObject, NoObjectFoundError }),
+  loadBackgroundRemoval: async () => ({
+    cropToObject,
+    removeBackground,
+    NoObjectFoundError,
+  }),
 }));
 
 const image: ImageEntry = {
@@ -46,7 +54,7 @@ function renderDraft(
     async () => {},
   ),
 ) {
-  const hook = renderHook(() => useCropDraft(onSave), {
+  const hook = renderHook(() => useStoredEdit(onSave), {
     wrapper: ToastWrapper,
   });
   return { ...hook, onSave };
@@ -54,11 +62,11 @@ function renderDraft(
 
 async function started(onSave?: () => Promise<void>) {
   const rendered = renderDraft(onSave);
-  await act(() => rendered.result.current.start(image));
+  await act(() => rendered.result.current.start(image, 'crop'));
   return rendered;
 }
 
-const kindOf = (draft: CropDraft) => draft.kind;
+const kindOf = (edit: StoredEdit) => edit.kind;
 
 beforeEach(() => {
   window.localStorage.setItem('lang', 'en');
@@ -81,8 +89,8 @@ describe('stageOf', () => {
     });
   });
 
-  it('reads the model at work as finding the item', () => {
-    expect(stageOf({ stage: 'analyze' })).toEqual({ kind: 'finding' });
+  it('reads the model at work as working on the item', () => {
+    expect(stageOf({ stage: 'analyze' })).toEqual({ kind: 'working' });
   });
 });
 
@@ -90,7 +98,7 @@ describe('uploadOf', () => {
   it('uploads an opaque crop as an opaque PNG', async () => {
     const upload = uploadOf(crop);
     expect(upload.encoding).toBe('opaque');
-    expect(upload.file.name).toBe('cropped.png');
+    expect(upload.file.name).toBe('edited.png');
     expect(upload.file.type).toBe('image/png');
     expect(await upload.file.text()).toBe('png');
   });
@@ -104,7 +112,7 @@ describe('uploadOf', () => {
 
 describe('useCropDraft', () => {
   it('starts closed', () => {
-    expect(renderDraft().result.current.draft).toEqual({ kind: 'closed' });
+    expect(renderDraft().result.current.edit).toEqual({ kind: 'closed' });
   });
 
   it('reads the stored photo, follows the worker’s progress, then shows the crop', async () => {
@@ -120,10 +128,11 @@ describe('useCropDraft', () => {
 
     let starting!: Promise<void>;
     act(() => {
-      starting = result.current.start(image);
+      starting = result.current.start(image, 'crop');
     });
-    expect(result.current.draft).toEqual({
+    expect(result.current.edit).toEqual({
       kind: 'working',
+      tool: 'crop',
       image,
       stage: { kind: 'reading' },
     });
@@ -132,20 +141,21 @@ describe('useCropDraft', () => {
     expect(cropToObject.mock.calls[0][0]).toBe(source);
     expect(downloadImageObject).toHaveBeenCalledWith(image.pathFull);
     act(() => report!({ stage: 'download', loaded: 1, total: 2 }));
-    expect(result.current.draft).toMatchObject({
+    expect(result.current.edit).toMatchObject({
       stage: { kind: 'downloading', percent: 50 },
     });
     act(() => report!({ stage: 'analyze' }));
-    expect(result.current.draft).toMatchObject({ stage: { kind: 'finding' } });
+    expect(result.current.edit).toMatchObject({ stage: { kind: 'working' } });
 
     await act(async () => {
       finish({ kind: 'cropped', crop });
       await starting;
     });
-    expect(result.current.draft).toEqual({
+    expect(result.current.edit).toEqual({
       kind: 'ready',
+      tool: 'crop',
       image,
-      crop,
+      edited: crop,
       saving: false,
     });
   });
@@ -154,8 +164,9 @@ describe('useCropDraft', () => {
     cropToObject.mockResolvedValue({ kind: 'already-framed' });
     const { result } = await started();
 
-    expect(result.current.draft).toEqual({
+    expect(result.current.edit).toEqual({
       kind: 'unchanged',
+      tool: 'crop',
       image,
       reason: 'already-framed',
     });
@@ -165,8 +176,9 @@ describe('useCropDraft', () => {
     cropToObject.mockRejectedValue(new NoObjectFoundError());
     const { result } = await started();
 
-    expect(result.current.draft).toEqual({
+    expect(result.current.edit).toEqual({
       kind: 'unchanged',
+      tool: 'crop',
       image,
       reason: 'no-object',
     });
@@ -179,13 +191,13 @@ describe('useCropDraft', () => {
     });
     const { result } = await started();
 
-    expect(result.current.draft).toEqual({ kind: 'closed' });
+    expect(result.current.edit).toEqual({ kind: 'closed' });
     expect(cropToObject).not.toHaveBeenCalled();
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This photo could not be loaded to crop it.',
     );
     expect(console.error).toHaveBeenCalledWith(
-      'crop photo',
+      'edit photo',
       new Error('Object not found'),
     );
   });
@@ -194,7 +206,7 @@ describe('useCropDraft', () => {
     cropToObject.mockRejectedValue(new Error('Model failed'));
     const { result } = await started();
 
-    expect(result.current.draft).toEqual({ kind: 'closed' });
+    expect(result.current.edit).toEqual({ kind: 'closed' });
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This photo could not be cropped. The original is unchanged',
     );
@@ -213,7 +225,7 @@ describe('useCropDraft', () => {
     const { result } = renderDraft();
     let starting!: Promise<void>;
     act(() => {
-      starting = result.current.start(image);
+      starting = result.current.start(image, 'crop');
     });
     await vi.waitFor(() => expect(cropToObject).toHaveBeenCalled());
 
@@ -223,7 +235,7 @@ describe('useCropDraft', () => {
     });
 
     expect(options.signal!.aborted).toBe(true);
-    expect(result.current.draft).toEqual({ kind: 'closed' });
+    expect(result.current.edit).toEqual({ kind: 'closed' });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -237,7 +249,7 @@ describe('useCropDraft', () => {
     const { result } = renderDraft();
     let starting!: Promise<void>;
     act(() => {
-      starting = result.current.start(image);
+      starting = result.current.start(image, 'crop');
     });
     act(() => result.current.cancel());
 
@@ -247,7 +259,7 @@ describe('useCropDraft', () => {
     });
 
     expect(cropToObject).not.toHaveBeenCalled();
-    expect(result.current.draft).toEqual({ kind: 'closed' });
+    expect(result.current.edit).toEqual({ kind: 'closed' });
   });
 
   it('stops an earlier crop when another starts', async () => {
@@ -258,12 +270,12 @@ describe('useCropDraft', () => {
     });
     const { result } = renderDraft();
     act(() => {
-      void result.current.start(image);
+      void result.current.start(image, 'crop');
     });
     await vi.waitFor(() => expect(signals).toHaveLength(1));
 
     act(() => {
-      void result.current.start({ ...image, id: 'image-2' });
+      void result.current.start({ ...image, id: 'image-2' }, 'crop');
     });
 
     expect(signals[0].aborted).toBe(true);
@@ -277,7 +289,7 @@ describe('useCropDraft', () => {
     });
     const { result, unmount } = renderDraft();
     act(() => {
-      void result.current.start(image);
+      void result.current.start(image, 'crop');
     });
     await vi.waitFor(() => expect(cropToObject).toHaveBeenCalled());
 
@@ -292,7 +304,7 @@ describe('useCropDraft', () => {
     await act(() => result.current.save());
 
     expect(onSave).toHaveBeenCalledExactlyOnceWith(image, uploadOf(crop));
-    expect(kindOf(result.current.draft)).toBe('closed');
+    expect(kindOf(result.current.edit)).toBe('closed');
   });
 
   it('says it is saving meanwhile, and does not save twice', async () => {
@@ -309,7 +321,7 @@ describe('useCropDraft', () => {
     act(() => {
       saving = result.current.save();
     });
-    expect(result.current.draft).toMatchObject({ saving: true });
+    expect(result.current.edit).toMatchObject({ saving: true });
     await act(() => result.current.save());
     expect(onSave).toHaveBeenCalledOnce();
 
@@ -317,7 +329,7 @@ describe('useCropDraft', () => {
       finish();
       await saving;
     });
-    expect(kindOf(result.current.draft)).toBe('closed');
+    expect(kindOf(result.current.edit)).toBe('closed');
   });
 
   it('closes even when the save throws', async () => {
@@ -327,7 +339,7 @@ describe('useCropDraft', () => {
 
     await act(() => result.current.save().catch(() => {}));
 
-    expect(kindOf(result.current.draft)).toBe('closed');
+    expect(kindOf(result.current.edit)).toBe('closed');
   });
 
   it('saves nothing before the crop is ready', async () => {
@@ -337,6 +349,89 @@ describe('useCropDraft', () => {
     await act(() => result.current.save());
 
     expect(onSave).not.toHaveBeenCalled();
-    expect(kindOf(result.current.draft)).toBe('unchanged');
+    expect(kindOf(result.current.edit)).toBe('unchanged');
+  });
+});
+
+describe('useStoredEdit, removing the background', () => {
+  const cutout: Cutout = {
+    blob: new Blob(['cut-out'], { type: 'image/png' }),
+    width: 300,
+    height: 300,
+    mode: 'mask',
+    fillRatio: 0.5,
+  };
+
+  beforeEach(() => {
+    removeBackground.mockReset().mockResolvedValue(cutout);
+  });
+
+  it('cuts the stored photo out, through the same worker progress, and shows it see-through', async () => {
+    const { result } = renderDraft();
+
+    await act(() => result.current.start(image, 'cut-out'));
+
+    expect(cropToObject).not.toHaveBeenCalled();
+    expect(removeBackground.mock.calls[0][0]).toBe(source);
+    expect(result.current.edit).toEqual({
+      kind: 'ready',
+      tool: 'cut-out',
+      image,
+      edited: { blob: cutout.blob, transparent: true },
+      saving: false,
+    });
+  });
+
+  it('says so when no item is found', async () => {
+    removeBackground.mockRejectedValue(new NoObjectFoundError());
+    const { result } = renderDraft();
+
+    await act(() => result.current.start(image, 'cut-out'));
+
+    expect(result.current.edit).toEqual({
+      kind: 'unchanged',
+      tool: 'cut-out',
+      image,
+      reason: 'no-object',
+    });
+  });
+
+  it('closes and names the background in what it says when the photo cannot be loaded', async () => {
+    downloadImageObject.mockResolvedValue({
+      data: null,
+      error: new Error('Object not found'),
+    });
+    const { result } = renderDraft();
+
+    await act(() => result.current.start(image, 'cut-out'));
+
+    expect(result.current.edit).toEqual({ kind: 'closed' });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This photo could not be loaded to remove its background.',
+    );
+  });
+
+  it('closes and names the background in what it says when the cut-out fails', async () => {
+    removeBackground.mockRejectedValue(new Error('Model failed'));
+    const { result } = renderDraft();
+
+    await act(() => result.current.start(image, 'cut-out'));
+
+    expect(result.current.edit).toEqual({ kind: 'closed' });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The background could not be removed. The original is unchanged',
+    );
+  });
+
+  it('saves the cut-out as a see-through upload', async () => {
+    const { result, onSave } = renderDraft();
+    await act(() => result.current.start(image, 'cut-out'));
+
+    await act(() => result.current.save());
+
+    expect(onSave).toHaveBeenCalledExactlyOnceWith(
+      image,
+      expect.objectContaining({ encoding: 'transparent' }),
+    );
   });
 });

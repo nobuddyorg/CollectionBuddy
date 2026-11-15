@@ -101,7 +101,7 @@ export function RotationControls({
       <div className="grid grid-cols-2 gap-2">
         {draft.inspection.kind === 'reading' && (
           <span className="flex min-h-11 items-center justify-center">
-            <StatusSpinner size="sm" label={t('item_list.rotate_reading')} />
+            <StatusSpinner size="sm" label={t('item_list.photo_reading')} />
           </span>
         )}
         {straightening.kind === 'straighten' && (
