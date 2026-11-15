@@ -300,6 +300,8 @@ Where the memoization those lists guard was not load-bearing, it is gone — cal
 
 The other class is the **timeout**, which Stryker counts as a kill. Most were avoidable and the fixes were worth having: counters replaced by iteration over the thing being counted (`chunk()`, the pool's shared iterator); page fakes backed by a finite table so a walk that asks for one page too many gets nothing instead of spinning; and `timeoutMS` raised to 20 s, since with the 5 s default a mutant covered by a few hundred tests was reported as a timeout after failing seven of them honestly. Four remain, each a mutant whose only effect is non-termination: two in `excludePendingDeletes`, whose job is returning the same reference when nothing changed (break that and the effect reading it re-renders for ever — the bug the line prevents), and the one unbounded walk each in `readAllPages` and `readAllKeysetPages`, which cannot know how many pages they need.
 
+One more is equivalent by symmetry: `croppedSize()` in `lib/rotation.ts` asks whether the photo is wider than tall (`width >= height`), and `width > height` differs only for a square, whose crop is the same either way round.
+
 ## Why four functions have property tests
 
 `likePatternFor`, `csvCell`, `dosDateTime` and `clampPage`/`pageRange` take
