@@ -248,9 +248,9 @@ export type Database = {
       photo_upload_has_room: { Args: never; Returns: boolean };
       search_category_entries: {
         Args: {
-          at_place: string;
+          at_place?: string;
           cat_id: string;
-          like_pattern: string;
+          like_pattern?: string;
           page_from: number;
           page_to: number;
         };

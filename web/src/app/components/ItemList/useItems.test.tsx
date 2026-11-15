@@ -315,6 +315,48 @@ describe('useItems with a prefetched first page', () => {
     expect(listItemsMock).toHaveBeenCalledOnce();
   });
 
+  it('sends the place the list is narrowed to, and every place by default', async () => {
+    listItemsMock.mockResolvedValue(page([]));
+
+    renderHook(() => useItems('cat1', '', 9, 'Garmisch'), { wrapper });
+    renderHook(() => useItems('cat2', '', 9), { wrapper });
+
+    await waitFor(() => expect(listItemsMock).toHaveBeenCalledTimes(2));
+    expect(listItemsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ categoryId: 'cat1', place: 'Garmisch' }),
+    );
+    expect(listItemsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ categoryId: 'cat2', place: '' }),
+    );
+  });
+
+  it('resets to page 1 when the place changes while on a later page', async () => {
+    listItemsMock.mockResolvedValue(page([{ id: 'a' }], 30));
+    const { result, rerender } = renderHook(
+      ({ place }: { place: string }) => useItems('cat1', '', 9, place),
+      { wrapper, initialProps: { place: '' } },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.setPage(2));
+
+    rerender({ place: 'Garmisch' });
+
+    expect(result.current.page).toBe(1);
+  });
+
+  it('ignores a prefetched page when the first read is narrowed to a place', async () => {
+    prefetchFirstPage('cat1', 9, staleRead());
+    listItemsMock.mockResolvedValue(page([{ id: 'there' }]));
+
+    const { result } = renderHook(() => useItems('cat1', '', 9, 'Garmisch'), {
+      wrapper,
+    });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.items.map((entry) => entry.id)).toEqual(['there']);
+    expect(listItemsMock).toHaveBeenCalledOnce();
+  });
+
   it("tags the page's carried photograph rows with the items they cover", async () => {
     listItemsMock.mockResolvedValue({
       ...page([{ id: 'a' }, { id: 'b' }]),

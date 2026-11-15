@@ -28,12 +28,19 @@ describe('markerKey', () => {
     ['place name', { popupText: 'Potsdam' }],
     ['entry titles', { titles: ['Dime', 'Nickel'] }],
     ['count label', { countLabel: '2 entries' }],
+    ['action label', { action: { label: 'Show in list', onSelect: () => {} } }],
   ])('changes with the %s', (_, change) => {
     expect(markerKey({ ...berlin, ...change })).not.toBe(markerKey(berlin));
   });
 
   it('reads a missing count label as empty', () => {
     expect(markerKey(paris)).toBe(markerKey({ ...paris, countLabel: '' }));
+  });
+
+  it('reads a missing action as one with an empty label, its handler aside', () => {
+    expect(markerKey(paris)).toBe(
+      markerKey({ ...paris, action: { label: '', onSelect: () => {} } }),
+    );
   });
 });
 

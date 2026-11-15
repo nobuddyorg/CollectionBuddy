@@ -1,12 +1,18 @@
+/** A popup's button: its label already translated, and what it does. */
+export type PopupAction = { label: string; onSelect: () => void };
+
 // Built as DOM, not markup: every string is user-entered, so each is set via `textContent`, never parsed.
 export const popupContent = ({
   popupText,
   titles = [],
   countLabel,
+  action,
 }: {
   popupText: string;
   titles?: string[];
   countLabel?: string;
+  /** A button under the titles: the catalogue narrowed to this place, say. */
+  action?: PopupAction;
 }): HTMLDivElement => {
   const element = document.createElement('div');
 
@@ -32,6 +38,17 @@ export const popupContent = ({
       list.appendChild(item);
     }
     element.appendChild(list);
+  }
+
+  if (action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.testid = 'map-show-in-list';
+    button.className =
+      'mt-2 min-h-11 w-full rounded-sm bg-neutral-900 px-3 font-label text-xs text-white';
+    button.textContent = action.label;
+    button.addEventListener('click', action.onSelect);
+    element.appendChild(button);
   }
 
   return element;

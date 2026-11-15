@@ -10,6 +10,8 @@ interface Catalogue {
     addEntry(title: string, description?: string): Promise<void>;
     choosePageSize(size: 6 | 9 | 12 | 24): Promise<void>;
     clearSearch(): Promise<void>;
+    /** × on the place chip: every place again. */
+    clearPlaceFilter(): Promise<void>;
     removeEntry(title: string): Promise<void>;
     removeEntryByKeyboard(title: string): Promise<void>;
     openEntryForm(): Promise<void>;
@@ -36,6 +38,8 @@ interface Catalogue {
     pagination: Locator;
     /** The entries-per-page choice beside the pager. */
     pageSize: Locator;
+    /** The chip saying the list is narrowed to one place, and that place. */
+    placeFilter: { chip: Locator; name: Locator };
     texts: {
       emptyTitle: Locator;
       searchStatus: Locator;
@@ -129,6 +133,10 @@ export function initCatalogue(page: Page): Catalogue {
     },
     pagination,
     pageSize: root.getByTestId('page-size'),
+    placeFilter: {
+      chip: root.getByTestId('place-filter'),
+      name: root.getByTestId('place-filter-name'),
+    },
     texts: {
       emptyTitle: root.getByTestId('empty-title'),
       searchStatus: root.getByTestId('search-status'),
@@ -150,6 +158,10 @@ export function initCatalogue(page: Page): Catalogue {
     },
     clearSearch: async () => {
       await locators.buttons.clearSearch.click();
+    },
+    clearPlaceFilter: async () => {
+      await root.getByTestId('place-filter-clear').click();
+      await expect(locators.placeFilter.chip).toHaveCount(0);
     },
     // Answers the confirmation too: an action spanning two screens belongs to the one that starts it.
     removeEntry: async (title: string) => {

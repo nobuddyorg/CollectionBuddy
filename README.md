@@ -51,7 +51,7 @@ It is designed for keeping a structured personal record of collected items rathe
 - **Crop to the item**: with background removal on, a stored photo is cropped to its item in the card's 4:3 frame, its background kept, in one tap.
 - **Rotate and straighten**: turn a stored photo a quarter at a time or by any angle, and a rectangular item without its background, a stamp or a card, is squared in one tap. The photo keeps its place.
 - **Categories** to keep collections apart, with **sharing** so someone else can browse yours — read-only by default, or with edit access if you grant it.
-- **Place and map**: give an item a location, then see your whole collection pinned on a map.
+- **Place and map**: give an item a location, then see your whole collection pinned on a map, and any pin's items in the list.
 - **Tags and search** across title, description, place, and tags at once.
 - **Import/export** a category you own as a portable archive.
 - **Bilingual, themeable**: German/English and light/dark/system, both remembered per visitor.

@@ -248,6 +248,13 @@ but the map is not paged — it draws every match. Geocoding results are cached
 in your browser, so reopening the map for the same category does not look
 places up again.
 
+Press a pin to see the place and the items there. **Show in list** closes the
+map and shows just those items, with a chip above the list naming the place;
+its **×** shows every place again, and so does switching to another category.
+The place narrows the list exactly, so items whose description merely
+mentions it are not included, and a search typed meanwhile narrows the list
+further.
+
 If you allow location access, your position shows as a red marker; the map has
 buttons to zoom to it and to frame all pins.
 

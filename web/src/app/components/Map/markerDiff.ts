@@ -8,6 +8,7 @@ export function markerKey(marker: MarkerInput): string {
     marker.popupText,
     marker.titles,
     marker.countLabel ?? '',
+    marker.action?.label ?? '',
   ]);
 }
 

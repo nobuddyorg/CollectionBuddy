@@ -107,13 +107,28 @@ describe('the queries behind the catalogue page', () => {
         to: 8,
       }),
     );
-    expect(request.url.pathname).toMatch(/\/rpc\/search_category_items$/);
+    // The new search (0038); search_category_items stays only for the previous bundle.
+    expect(request.url.pathname).toMatch(/\/rpc\/search_category_entries$/);
     expect(request.method).toBe('GET');
     const params = searchParamsOf('coin');
     expect(params.get('cat_id')).toBe('cat-1');
     expect(params.get('like_pattern')).toBe(likePatternFor('coin'));
     expect(params.get('page_from')).toBe('0');
     expect(params.get('page_to')).toBe('8');
+    expect(params.has('at_place')).toBe(false);
+  });
+
+  it('narrows the RPC to one exact place, leaving out a pattern there is none of', () => {
+    const params = requestOf(
+      rawSearchCategoryItems({
+        categoryId: 'cat-1',
+        place: 'Garmisch',
+        from: 0,
+        to: 8,
+      }),
+    ).url.searchParams;
+    expect(params.get('at_place')).toBe('Garmisch');
+    expect(params.has('like_pattern')).toBe(false);
   });
 
   it('counts item_categories alone, with no join to items', () => {

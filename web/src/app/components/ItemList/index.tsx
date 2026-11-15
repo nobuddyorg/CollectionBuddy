@@ -2,7 +2,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import ItemCreate from '../ItemCreate';
+import { EntriesEmptyState } from './EntriesEmptyState';
 import { PageSizeChoice } from './PageSizeChoice';
+import { PlaceFilterChip } from './PlaceFilterChip';
 import { Pagination } from './Pagination';
 import { usePageSize } from './usePageSize';
 import { ItemCard } from './ItemCard';
@@ -21,7 +23,6 @@ import { useGuardedModalClose } from '../../lib/useGuardedModalClose';
 import { EditItemModal } from './EditItemModal';
 import { MapModal } from './MapModal';
 import CenteredModal from '../CenteredModal';
-import EmptyState from '../EmptyState';
 import LoadError from '../LoadError';
 import { listViewFor } from './listView';
 import type { ItemFormValues } from '../ItemForm';
@@ -59,6 +60,8 @@ export default function ItemList({
   const debouncedQuery = useDebouncedValue(query, 200).trim();
 
   const [mapOpen, setMapOpen] = useState(false);
+  // A map pin's exact place text, '' for every place; the list is keyed by collection, so a switch clears it.
+  const [place, setPlace] = useState('');
   const { pageSize, setPageSize } = usePageSize();
 
   const {
@@ -72,7 +75,7 @@ export default function ItemList({
     totalPages,
     reload,
     setItems,
-  } = useItems(categoryId, debouncedQuery, pageSize);
+  } = useItems(categoryId, debouncedQuery, pageSize, place);
   const searchStatus = searchStatusFor(debouncedQuery, total);
 
   const handleCreated = useCallback(() => {
@@ -152,17 +155,10 @@ export default function ItemList({
     loading,
     loadFailed,
   });
-  // A viewer's New entry button is disabled, so their hint must not point at it.
-  const noItemsHint = canEdit
-    ? t('item_list.no_items_hint')
-    : t('item_list.no_items_hint_read_only');
-
   let searchAnnouncement = '';
   if (!loading) {
-    if (searchStatus.kind === 'active') {
-      searchAnnouncement = tCount('item_list.results_count', {
-        count: searchStatus.total,
-      });
+    if (searchStatus.kind === 'active' || place) {
+      searchAnnouncement = tCount('item_list.results_count', { count: total });
     } else if (searchStatus.kind === 'tooShort') {
       searchAnnouncement = t('item_list.search_too_short');
     }
@@ -177,6 +173,8 @@ export default function ItemList({
         onNewEntry={() => setCreateOpen(true)}
         onOpenMap={() => setMapOpen(true)}
       />
+
+      {place && <PlaceFilterChip place={place} onClear={() => setPlace('')} />}
 
       {/* A too-short term earns no filter, so its count would pass off the whole category as results. */}
       <span data-testid="search-status" className="sr-only" aria-live="polite">
@@ -195,31 +193,13 @@ export default function ItemList({
       )}
 
       {view === 'empty' && (
-        <EmptyState
-          symbol={debouncedQuery ? '🔍' : '🧺'}
-          title={
-            searchStatus.kind === 'active'
-              ? t('item_list.no_results_title', { query: debouncedQuery })
-              : t('item_list.no_items_title')
-          }
-          hint={
-            searchStatus.kind === 'active'
-              ? t('item_list.no_results_hint')
-              : noItemsHint
-          }
-          titleTestId="empty-title"
-        >
-          {debouncedQuery && (
-            <button
-              type="button"
-              data-testid="empty-clear-search"
-              onClick={() => setQuery('')}
-              className="min-h-11 px-3 font-label text-xs text-foreground underline underline-offset-4"
-            >
-              {t('item_list.search_clear')}
-            </button>
-          )}
-        </EmptyState>
+        <EntriesEmptyState
+          query={debouncedQuery}
+          searchActive={searchStatus.kind === 'active'}
+          place={place}
+          canEdit={canEdit}
+          onClearSearch={() => setQuery('')}
+        />
       )}
 
       {view === 'grid' && (
@@ -301,6 +281,7 @@ export default function ItemList({
         canEdit={canEdit}
         open={mapOpen}
         onOpenChange={setMapOpen}
+        onShowPlace={setPlace}
       />
 
       <CenteredModal

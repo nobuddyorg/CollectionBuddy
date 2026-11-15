@@ -21,6 +21,8 @@ export function useItems(
   categoryId: string,
   query: string,
   pageSize: PageSize,
+  /** One map pin's exact place text, or '' for every place. */
+  place = '',
 ) {
   const { t } = useI18n();
   const toast = useToast();
@@ -46,7 +48,7 @@ export function useItems(
   const currentPage = clampPage(page, totalPages);
 
   // At render time, not in an effect, so the page resets the same render the filters change.
-  const filterKey = `${categoryId} ${query}`;
+  const filterKey = `${categoryId} ${query} ${place}`;
   const [previousFilterKey, setPreviousFilterKey] = useState(filterKey);
   // A new size moves to the page holding the entry that was first on screen, the same render.
   const [previousPageSize, setPreviousPageSize] = useState(pageSize);
@@ -80,8 +82,9 @@ export function useItems(
       try {
         const { from, to } = pageRange(currentPage, pageSize);
         const search = query.trim();
+        // The prefetch is of the unfiltered first page only.
         const prefetched =
-          !silent && currentPage === 1 && !search
+          !silent && currentPage === 1 && !search && !place
             ? takePrefetchedFirstPage(categoryId, pageSize)
             : null;
 
@@ -89,6 +92,7 @@ export function useItems(
           listItems({
             categoryId,
             search,
+            place,
             from,
             to,
             signal: controller.signal,
@@ -121,7 +125,7 @@ export function useItems(
         }
       }
     },
-    [categoryId, currentPage, pageSize, query, t, toast],
+    [categoryId, currentPage, pageSize, place, query, t, toast],
   );
 
   // A filter change aborts the previous load itself; unmount never gets that chance otherwise.
