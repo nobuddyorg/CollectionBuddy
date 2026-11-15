@@ -92,6 +92,7 @@ describe('useItemImages replaceImage', () => {
     addedAt(ADDED);
     removesFine();
     moveItemCover.mockReset().mockResolvedValue({ error: null });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   it("puts the new photo in the old one's place: its time, and the id just after its own", async () => {
@@ -141,6 +142,7 @@ describe('useItemImages replaceImage', () => {
   it('removes the old bytes, then the old row, only once the new row is in', async () => {
     await replace();
 
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(removeImageObjects).toHaveBeenCalledWith([
       old.pathFull,
       old.pathThumb,
@@ -201,6 +203,10 @@ describe('useItemImages replaceImage', () => {
     expect(removeImageObjects).not.toHaveBeenCalled();
     expect(deleteImageRow).not.toHaveBeenCalled();
     expect(await screen.findByRole('alert')).toBeVisible();
+    expect(console.error).toHaveBeenCalledWith(
+      'replace image',
+      new Error('row refused'),
+    );
   });
 
   it('changes nothing when it cannot tell when the old photo was added', async () => {
@@ -226,6 +232,10 @@ describe('useItemImages replaceImage', () => {
     expect(deleteImageRow).not.toHaveBeenCalled();
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'The changed photo was saved, but the original could not be removed.',
+    );
+    expect(console.error).toHaveBeenCalledWith(
+      'replace image',
+      new Error('Storage refused'),
     );
   });
 

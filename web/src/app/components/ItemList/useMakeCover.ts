@@ -1,7 +1,5 @@
 'use client';
 
-import { useCallback } from 'react';
-
 import { coverFirst, setItemCover } from '../../data/cover';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
@@ -20,14 +18,12 @@ export function useMakeCover({
 }) {
   const { t } = useI18n();
   const toast = useToast();
-  return useCallback(
-    async (itemId: string, image: ImageEntry) => {
-      updateItemImages(itemId, (entries) => coverFirst(entries, image.id));
-      const { error } = await setItemCover({ itemId, imageId: image.id });
-      if (!error) return;
-      toast.reportError('make cover', error, t('item_list.make_cover_error'));
-      await refreshAllImages([itemId]);
-    },
-    [refreshAllImages, t, toast, updateItemImages],
-  );
+  // Not memoized: the viewer's handler calls it, and nothing memoizes that.
+  return async (itemId: string, image: ImageEntry) => {
+    updateItemImages(itemId, (entries) => coverFirst(entries, image.id));
+    const { error } = await setItemCover({ itemId, imageId: image.id });
+    if (!error) return;
+    toast.reportError('make cover', error, t('item_list.make_cover_error'));
+    await refreshAllImages([itemId]);
+  };
 }
