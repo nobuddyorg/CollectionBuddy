@@ -25,6 +25,7 @@ export enum IconType {
   RotateLeft,
   RotateRight,
   Crop,
+  Star,
 }
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
@@ -176,6 +177,12 @@ const Icon: React.FC<IconProps> = ({ icon, ...props }) => {
         <svg {...ROUNDED_SVG} {...props}>
           <path d="M6 2v14a2 2 0 0 0 2 2h14" />
           <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+        </svg>
+      );
+    case IconType.Star:
+      return (
+        <svg {...ROUNDED_SVG} {...props}>
+          <path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3z" />
         </svg>
       );
     case IconType.Camera:

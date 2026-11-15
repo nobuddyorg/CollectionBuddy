@@ -1,4 +1,4 @@
-// Generated from the migrations in supabase/migrations/ (0001-0007).
+// Generated from the migrations in supabase/migrations/ (0001-0037).
 //
 // Regenerate after a schema change, against a local stack:
 //   supabase start
@@ -159,6 +159,7 @@ export type Database = {
       };
       items: {
         Row: {
+          cover_image_id: string | null;
           created_at: string;
           description: string | null;
           id: string;
@@ -172,6 +173,7 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          cover_image_id?: string | null;
           created_at?: string;
           description?: string | null;
           id?: string;
@@ -185,6 +187,7 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          cover_image_id?: string | null;
           created_at?: string;
           description?: string | null;
           id?: string;

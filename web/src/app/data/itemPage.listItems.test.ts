@@ -37,6 +37,34 @@ describe('listItems', () => {
   }
   const params = { categoryId: 'cat-1', search: '', from: 0, to: 8 };
 
+  it("puts each entry's chosen cover first among the page's photographs, and leaves it off the entry", async () => {
+    const photo = (itemId: string, id: string) => ({
+      id,
+      item_id: itemId,
+      path_full: `${itemId}/${id}.webp`,
+      path_thumb: null,
+    });
+    const rawItems = vi.fn().mockResolvedValue({
+      data: [
+        {
+          ...itemRow('a', [photo('a', '1'), photo('a', '2')]),
+          cover_image_id: '2',
+        },
+        { ...itemRow('b', [photo('b', '3')]), cover_image_id: null },
+      ],
+      error: null,
+    });
+
+    const { data, imageRows } = await listItems(params, {
+      rawIds: idsPage('a', 'b'),
+      rawItems,
+      rawCount: vi.fn().mockResolvedValue({ count: 2, error: null }),
+    });
+
+    expect(data).toEqual([item('a'), item('b')]);
+    expect(imageRows!.map((row) => row.id)).toEqual(['2', '1', '3']);
+  });
+
   it("pages the ids, then reads just that page's entries by id, combining them with the separate count", async () => {
     const rawIds = idsPage('a', 'b');
     const rawItems = vi.fn().mockResolvedValue({

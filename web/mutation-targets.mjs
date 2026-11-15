@@ -117,4 +117,6 @@ export const MUTATE_TARGETS = [
   'src/app/components/ItemList/useRotationDraft.ts',
   'src/app/lib/cropFrame.ts',
   'src/app/components/ItemList/useCropDraft.ts',
+  'src/app/data/cover.ts',
+  'src/app/components/ItemList/useMakeCover.ts',
 ];

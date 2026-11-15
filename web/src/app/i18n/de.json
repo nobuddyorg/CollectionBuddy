@@ -199,6 +199,8 @@
     "crop_preview_alt": "Das Foto, auf das Objekt zugeschnitten",
     "crop_load_error": "Dieses Foto konnte zum Zuschneiden nicht geladen werden. Bitte versuche es erneut.",
     "crop_error": "Dieses Foto konnte nicht zugeschnitten werden. Das Original ist unverändert; bitte versuche es erneut.",
+    "make_cover": "Als Titelbild verwenden",
+    "make_cover_error": "Das Titelbild konnte nicht geändert werden. Bitte versuche es erneut.",
     "replace_original_kept": "Das geänderte Foto wurde gespeichert, aber das Original konnte nicht entfernt werden. Lösche es selbst, wenn du es nicht mehr brauchst.",
     "upload_error": "Bild konnte nicht hochgeladen werden. Bitte erneut versuchen.",
     "photo_quota_error": "Das Limit von 256 MiB an Fotos ist erreicht. Lösche welche, um weitere hinzuzufügen.",

@@ -1,6 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { supabase } from '../supabase';
+import type { ItemCover } from './cover';
+
+// The covers' read has tests of its own in cover.test.ts; here it answers as each test says.
+const readItemCovers = vi.hoisted(() => vi.fn());
+vi.mock('./cover', async (importActual) => ({
+  ...(await importActual<typeof import('./cover')>()),
+  readItemCovers,
+}));
 import {
   ITEM_IMAGES_BUCKET,
   createImageRow,
@@ -303,6 +311,44 @@ const photo = (itemId: string, n: number): Row => ({
 });
 
 describe('listImagesForItems', () => {
+  beforeEach(() => {
+    readItemCovers.mockReset().mockResolvedValue({ data: [], error: null });
+  });
+
+  it('puts each entry’s chosen cover first, the rest oldest first', async () => {
+    mockImagesQuery((call) => ({
+      data: call.or.length
+        ? []
+        : [photo('item-1', 0), photo('item-2', 1), photo('item-1', 2)],
+      error: null,
+    }));
+    const covers: ItemCover[] = [
+      { id: 'item-1', cover_image_id: 'photo-0002' },
+      { id: 'item-2', cover_image_id: null },
+    ];
+    readItemCovers.mockResolvedValue({ data: covers, error: null });
+
+    const { data } = await listImagesForItems(['item-1', 'item-2']);
+
+    expect(readItemCovers).toHaveBeenCalledWith(['item-1', 'item-2']);
+    expect(data).toEqual([
+      photo('item-1', 2),
+      photo('item-1', 0),
+      photo('item-2', 1),
+    ]);
+  });
+
+  it('returns the covers’ read error when that read fails', async () => {
+    const boom = new Error('covers');
+    mockImagesQuery(() => ({ data: [], error: null }));
+    readItemCovers.mockResolvedValue({ data: null, error: boom });
+
+    const { data, error } = await listImagesForItems(['item-1']);
+
+    expect(data).toBeNull();
+    expect(error).toBe(boom);
+  });
+
   it('selects the listing columns, with the sort key, for a single page, single chunk', async () => {
     const { from, calls, columns } = mockImagesQuery((call) => ({
       data: call.or.length ? [] : [photo(call.chunk[0], 0)],

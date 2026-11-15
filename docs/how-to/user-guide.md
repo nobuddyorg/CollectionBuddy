@@ -148,7 +148,12 @@ fields a line break becomes a space.
   ([below](#crop-a-photo-to-its-item)).
 - **Delete**: from the full-size view or the per-photo control, confirm.
 
-An item can have any number of photos, in the order you added them.
+An item can have any number of photos, in the order you added them. The
+first is its cover, the one the card shows large. To choose another, open it
+full size and choose the star, **Make cover**: it moves to the front, in the
+card, the full-size view and an export. Deleting the cover makes the oldest
+photo the cover again. Anyone who can edit the collection can choose the
+cover; someone it is only shared with to view cannot.
 
 ### Remove the background
 

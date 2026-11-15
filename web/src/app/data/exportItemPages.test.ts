@@ -22,7 +22,7 @@ describe('the query behind an export page', () => {
 
   it('drives the export from the category link, embedding every listed field, the timestamp and the full-size photographs', () => {
     expect(exportQuery().get('select')).toBe(
-      'created_at,item_id,items!inner(id,title,description,place,place_lat,place_lng,tags,created_at,images(item_id,path_full,size_bytes))',
+      'created_at,item_id,items!inner(id,title,description,place,place_lat,place_lng,tags,created_at,cover_image_id,images(id,item_id,path_full,size_bytes))',
     );
     expect(exportQuery().get('category_id')).toBe('eq.cat-1');
   });
@@ -115,6 +115,36 @@ describe('listItemsForExport', () => {
       },
       error: null,
     });
+  });
+
+  it('puts each item’s chosen cover first, and keeps the cover id out of the manifest’s item', async () => {
+    const withIds = (names: string[]) =>
+      names.map((name) => ({ ...photo('1', name), id: `id-${name}` }));
+    const raw = rawReturning({
+      data: [
+        {
+          ...link('1'),
+          items: {
+            ...item('1'),
+            cover_image_id: 'id-c',
+            images: withIds(['a', 'b', 'c']),
+          },
+        },
+      ],
+      error: null,
+    });
+
+    const result = await listItemsForExport(
+      { categoryId: 'cat-1', after: null, size: 3 },
+      raw,
+    );
+
+    expect(result.data!.items).toEqual([item('1')]);
+    expect(result.data!.photos.map((row) => row.path_full)).toEqual([
+      'u/1/c',
+      'u/1/a',
+      'u/1/b',
+    ]);
   });
 
   it('ends the walk on a short page', async () => {

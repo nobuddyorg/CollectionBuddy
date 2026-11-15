@@ -37,6 +37,7 @@ export function ModalImage({
   offerRemoveBackground = false,
   onRotate = async () => {},
   onCrop = async () => {},
+  onMakeCover = () => {},
   busy = false,
   readOnly = false,
 }: {
@@ -55,6 +56,8 @@ export function ModalImage({
   onRotate?: (image: ImageEntry, edit: RotationEdit) => Promise<void>;
   /** Saves a confirmed crop to the object; offered with background removal, which finds the object. */
   onCrop?: (image: ImageEntry, photo: PhotoUpload) => Promise<void>;
+  /** Makes the shown photo its entry's cover; not offered on the cover itself, the first. */
+  onMakeCover?: (image: ImageEntry) => void;
   busy?: boolean;
   /** Shared category: no delete control in the carousel either. */
   readOnly?: boolean;
@@ -217,6 +220,18 @@ export function ModalImage({
             >
               <Icon icon={IconType.RotateRight} className="w-5 h-5" />
             </button>
+            {clampedIndex > 0 && (
+              <button
+                data-testid="make-cover"
+                onClick={() => onMakeCover(current)}
+                disabled={busy || editing}
+                className={TOOL_CLASSES}
+                title={t('item_list.make_cover')}
+                aria-label={t('item_list.make_cover')}
+              >
+                <Icon icon={IconType.Star} className="w-5 h-5" />
+              </button>
+            )}
             {offerRemoveBackground && (
               <button
                 data-testid="crop-image"

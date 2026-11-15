@@ -1,12 +1,16 @@
 import { supabase } from '../supabase';
+import { coverFirst } from './cover';
 import { IMAGE_LIST_SELECT, type ImageListRow } from './images';
 import { ITEM_FIELDS_SELECT, withSignal, type ItemFields } from './items';
 import { likePatternFor } from './itemSearch';
 
-/** One entry of a page read, with its photographs, before `listItems` splits them. */
-type ItemWithImages = ItemFields & { images: ImageListRow[] };
+/** One entry of a page read, with its photographs and its cover, before `listItems` splits them. */
+type ItemWithImages = ItemFields & {
+  cover_image_id: string | null;
+  images: ImageListRow[];
+};
 
-const ITEM_WITH_IMAGES_SELECT = `${ITEM_FIELDS_SELECT},images(${IMAGE_LIST_SELECT})`;
+const ITEM_WITH_IMAGES_SELECT = `${ITEM_FIELDS_SELECT},cover_image_id,images(${IMAGE_LIST_SELECT})`;
 
 /** The page's item ids, newest first, walking idx_item_categories_cat_created. */
 export function rawListItemIds({
@@ -49,7 +53,7 @@ export function rawListItemsByIds({
     .in('id', ids);
   return (
     withSignal(query, signal)
-      // Photographs oldest-first per item, as listImagesForItems orders them.
+      // Photographs oldest-first per item; listItems then puts each entry's cover first, as listImagesForItems does.
       .order('created_at', { referencedTable: 'images', ascending: true })
       .order('id', { referencedTable: 'images', ascending: true })
       .overrideTypes<ItemWithImages[], { merge: false }>()
@@ -229,6 +233,8 @@ export async function listItems(
     data: page.map(itemFieldsOf),
     error: null,
     count,
-    imageRows: page.flatMap((row) => row.images),
+    imageRows: page.flatMap((row) =>
+      coverFirst(row.images, row.cover_image_id),
+    ),
   };
 }

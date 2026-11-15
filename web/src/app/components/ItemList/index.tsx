@@ -12,6 +12,7 @@ import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
 import { pageImageRowsFor } from './imageEntries';
 import { useItemMutations } from './useItemMutations';
+import { useMakeCover } from './useMakeCover';
 import { useRotateStoredPhoto } from './useRotateStoredPhoto';
 import { searchStatusFor } from './searchStatus';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
@@ -94,9 +95,11 @@ export default function ItemList({
     replaceImage,
     deleteImage,
     captureItemImagePaths,
+    updateItemImages,
     forgetItemImages,
     pendingUploads,
   } = useItemImages();
+  const makeCover = useMakeCover({ updateItemImages, refreshAllImages });
   const backgroundRemoval = useBackgroundRemovalUpload(
     uploadImage,
     replaceImage,
@@ -278,6 +281,11 @@ export default function ItemList({
         onCrop={(image, photo) =>
           replaceImage(modalState!.itemId, image, photo)
         }
+        // The viewer follows the photo to the front, where it now is.
+        onMakeCover={(image) => {
+          void makeCover(modalState!.itemId, image);
+          setModalState({ itemId: modalState!.itemId, index: 0 });
+        }}
         busy={modalState ? (pendingUploads[modalState.itemId] ?? 0) > 0 : false}
         readOnly={!canEdit}
       />

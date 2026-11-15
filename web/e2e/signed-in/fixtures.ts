@@ -104,6 +104,7 @@ export const SEED = {
     'Dunkelkammer',
     'Tauschkiste',
     'Neuzugänge',
+    'Titelbilder',
   ],
   /** For entries.spec.ts. */
   scratchCategory: 'Werkstatt',
@@ -176,6 +177,8 @@ export const SEED = {
   editorJourneyCategory: 'Tauschkiste',
   /** For rls/create-rpc.spec.ts, into which each kind of grantee tries to create an entry. */
   createCategory: 'Neuzugänge',
+  /** For rls/cover.spec.ts, whose grantees try to choose the covers of the owner's entries. */
+  coverCategory: 'Titelbilder',
 
   // Oldest first; the list sorts newest first, so the last one here is the first card on the page.
   items: [

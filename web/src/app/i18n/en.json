@@ -199,6 +199,8 @@
     "crop_preview_alt": "The photo cropped to the item",
     "crop_load_error": "This photo could not be loaded to crop it. Please try again.",
     "crop_error": "This photo could not be cropped. The original is unchanged; please try again.",
+    "make_cover": "Make cover",
+    "make_cover_error": "The cover could not be changed. Please try again.",
     "replace_original_kept": "The changed photo was saved, but the original could not be removed. Delete it yourself if you no longer want it.",
     "upload_error": "Could not upload this image. Please try again.",
     "photo_quota_error": "The limit of 256 MiB of photographs is reached. Delete some to add more.",

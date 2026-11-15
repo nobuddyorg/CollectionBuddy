@@ -38,13 +38,13 @@ describe('the queries behind the catalogue page', () => {
     expect(params.get('limit')).toBe('9');
   });
 
-  it("reads the page's entries from items by id, with their photographs", () => {
+  it("reads the page's entries from items by id, with their covers and photographs", () => {
     const request = byIdsRequest();
     expect(request.url.pathname).toMatch(/\/items$/);
     expect(request.method).toBe('GET');
     expect(request.url.searchParams.get('id')).toBe('in.(a,b)');
     expect(request.url.searchParams.get('select')).toBe(
-      'id,title,description,place,place_lat,place_lng,tags,images(id,item_id,path_full,path_thumb)',
+      'id,title,description,place,place_lat,place_lng,tags,cover_image_id,images(id,item_id,path_full,path_thumb)',
     );
   });
 

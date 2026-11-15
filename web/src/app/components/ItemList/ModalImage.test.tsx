@@ -492,4 +492,41 @@ describe('ModalImage', () => {
       });
     });
   });
+
+  describe('making the shown photo the cover', () => {
+    const three = [photo('a'), photo('b'), photo('c')];
+
+    it('is offered on every photo but the cover, the first', () => {
+      const { rerender } = renderModal({ images: three, index: 0 });
+      expect(screen.queryByTestId('make-cover')).not.toBeInTheDocument();
+
+      rerender({ images: three, index: 2 });
+      expect(screen.getByRole('button', { name: 'Make cover' })).toBeEnabled();
+    });
+
+    it('passes the photograph shown on', async () => {
+      const onMakeCover = vi.fn();
+      renderModal({ images: three, index: 1, onMakeCover });
+
+      await userEvent.click(screen.getByTestId('make-cover'));
+
+      expect(onMakeCover).toHaveBeenCalledExactlyOnceWith(photo('b'));
+    });
+
+    it('is not offered to a viewer of a shared collection', () => {
+      renderModal({ images: three, index: 1, readOnly: true });
+      expect(screen.queryByTestId('make-cover')).not.toBeInTheDocument();
+    });
+
+    it('waits while the entry is busy', () => {
+      renderModal({ images: three, index: 1, busy: true });
+      expect(screen.getByTestId('make-cover')).toBeDisabled();
+    });
+
+    it('does nothing without a handler, by default', async () => {
+      renderModal({ images: three, index: 1 });
+      await userEvent.click(screen.getByTestId('make-cover'));
+      expect(screen.getByTestId('image-viewer')).toBeInTheDocument();
+    });
+  });
 });

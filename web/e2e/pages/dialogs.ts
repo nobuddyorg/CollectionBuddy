@@ -55,6 +55,8 @@ interface ImageViewer {
     cancelRotation(): Promise<void>;
     /** Saves the rotation and waits until the turned photo has taken the original's place. */
     saveRotation(): Promise<void>;
+    makeCover(): Promise<void>;
+    next(): Promise<void>;
     /** Opens the crop's panel; the crop shows once the item is found. */
     cropToItem(): Promise<void>;
     cancelCrop(): Promise<void>;
@@ -69,6 +71,7 @@ interface ImageViewer {
       removeBackground: Locator;
       rotate: Locator;
       crop: Locator;
+      makeCover: Locator;
     };
     photo: Locator;
     position: Locator;
@@ -167,6 +170,7 @@ export function initImageViewer(page: Page): ImageViewer {
       removeBackground: root.getByTestId('remove-background-image'),
       rotate: root.getByTestId('rotate-image'),
       crop: root.getByTestId('crop-image'),
+      makeCover: root.getByTestId('make-cover'),
     },
     photo: root.getByTestId('viewer-photo'),
     position: root.getByTestId('image-position'),
@@ -203,6 +207,12 @@ export function initImageViewer(page: Page): ImageViewer {
     },
     removeBackground: async () => {
       await locators.buttons.removeBackground.click();
+    },
+    makeCover: async () => {
+      await locators.buttons.makeCover.click();
+    },
+    next: async () => {
+      await root.getByTestId('next-image').click();
     },
     rotate: async () => {
       await locators.buttons.rotate.click();

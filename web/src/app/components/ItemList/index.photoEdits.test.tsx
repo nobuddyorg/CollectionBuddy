@@ -51,6 +51,12 @@ vi.mock('../BackgroundRemoval/load', () => ({
   loadCutoutReview: () => import('../BackgroundRemoval/CutoutReview'),
 }));
 
+const setItemCover = vi.hoisted(() => vi.fn());
+vi.mock('../../data/cover', async (importActual) => ({
+  ...(await importActual<typeof import('../../data/cover')>()),
+  setItemCover,
+}));
+
 const downloadImageObject = vi.hoisted(() => vi.fn());
 vi.mock('../../data/images', async (importActual) => ({
   ...(await importActual<typeof import('../../data/images')>()),
@@ -188,5 +194,40 @@ describe('ItemList crop', () => {
     expect(
       screen.queryByRole('button', { name: 'Crop to the item' }),
     ).toBeNull();
+  });
+});
+
+describe('ItemList cover', () => {
+  it('makes a later photo the cover from the viewer, and follows it to the front', async () => {
+    setItemCover.mockResolvedValue({ data: { id: '1' }, error: null });
+    const second = { ...stored, id: 'img-2', pathFull: '1/2.webp' };
+    const updateItemImages = vi.fn();
+    useItemImagesMock.mockReturnValue({
+      ...defaultImagesState(),
+      images: { '1': [stored, second] },
+      updateItemImages,
+    });
+    renderList();
+
+    await userEvent.click(screen.getByAltText('Item 1, image 1'));
+    const viewer = screen.getByRole('dialog', { name: 'Full size image' });
+    await userEvent.click(within(viewer).getByTestId('next-image'));
+    expect(within(viewer).getByTestId('image-position')).toHaveTextContent(
+      '2 / 2',
+    );
+    await userEvent.click(
+      within(viewer).getByRole('button', { name: 'Make cover' }),
+    );
+
+    expect(within(viewer).getByTestId('image-position')).toHaveTextContent(
+      '1 / 2',
+    );
+    expect(updateItemImages).toHaveBeenCalledWith('1', expect.any(Function));
+    await vi.waitFor(() =>
+      expect(setItemCover).toHaveBeenCalledWith({
+        itemId: '1',
+        imageId: 'img-2',
+      }),
+    );
   });
 });
