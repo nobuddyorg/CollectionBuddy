@@ -36,7 +36,7 @@ repos:
       - id: gitleaks
 
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: c92afdf2c6ca336aaa8f39e2bd8d48f62dbd8e1f # frozen: v1.31.1
+    rev: 06a39750ec31860bb44f2acf67182c40016cd1e7 # frozen: v1.32.0
     hooks:
       - id: zizmor
 
@@ -62,7 +62,7 @@ repos:
 
   # Lock and rewrite hazards sqlfluff cannot see; rules in .squawk.toml.
   - repo: https://github.com/sbdchd/squawk
-    rev: a8cf181356a658b8b2b46b5afd18d1d8f2b18a10 # frozen: v2.71.0
+    rev: 950ba0f40c6259bcbae6c92a1252f2674a877b68 # frozen: v2.72.0
     hooks:
       - id: squawk
         files: ^supabase/migrations/.*\.sql$
