@@ -115,4 +115,6 @@ export const MUTATE_TARGETS = [
   'src/app/lib/straighten.ts',
   'src/app/lib/rotationJob.ts',
   'src/app/components/ItemList/useRotationDraft.ts',
+  'src/app/lib/cropFrame.ts',
+  'src/app/components/ItemList/useCropDraft.ts',
 ];

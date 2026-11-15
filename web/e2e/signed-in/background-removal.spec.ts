@@ -358,6 +358,54 @@ test.describe('background removal', () => {
     }
   });
 
+  test('crops a stored photo to its item in the grid’s 4:3, keeping it opaque and where it was', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const app = on(page);
+    await serveStandInModel(page);
+    const title = uniqueName('Zugeschnitten');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      await card.do.uploadPhoto([
+        await itemPhoto(page, testInfo.outputPath('item.png')),
+        PHOTO,
+      ]);
+      await expect(card.locators.images).toHaveCount(2, { timeout: ARRIVES });
+
+      await turnOnBackgroundRemoval(app, page);
+      await card.do.openImage();
+      await app.viewer.do.cropToItem();
+      await expect(app.viewer.locators.crop.preview).toBeVisible({
+        timeout: ARRIVES,
+      });
+      await expect(app.viewer.locators.crop.status).toContainText(
+        'Cropped to the item',
+      );
+      await app.viewer.do.saveCrop();
+
+      // The 300 px disc with 24 px of margin, 348 × 348, widened to 464 × 348.
+      const { width, height, edges } = await edgesOf(app.viewer.locators.photo);
+      expect(Math.abs(width - 464)).toBeLessThanOrEqual(3);
+      expect(Math.abs(height - 348)).toBeLessThanOrEqual(3);
+      expect(edges).toEqual([255, 255, 255, 255]);
+      await expect(app.viewer.locators.position).toHaveText('1 / 2');
+
+      // A second crop finds it framed already, and Cancel leaves it be.
+      await app.viewer.do.cropToItem();
+      await expect(app.viewer.locators.crop.status).toContainText(
+        'cropped to its item already',
+        { timeout: ARRIVES },
+      );
+      await expect(app.viewer.locators.crop.save).toBeDisabled();
+      await app.viewer.do.cancelCrop();
+      await expect(app.viewer.locators.crop.controls).toHaveCount(0);
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
   // Turbopack boots every worker from one script whose URL fragment Chrome reuses, so the first photo job must not decide the next.
   test('cut out again, a stored cut-out keeps its outline and its size: the margin is not doubled, nothing is eaten', async ({
     on,

@@ -15,7 +15,10 @@ import { useTopmostKeydown } from '../CenteredModal/useTopmostKeydown';
 import Icon, { IconType } from '../Icon';
 import type { ImageEntry } from './types';
 import { StatusSpinner } from '../ui/Spinner';
+import type { PhotoUpload } from '../../data/photoType';
+import { CropControls, CropPreview } from './CropControls';
 import { RotationControls } from './RotationControls';
+import { useCropDraft, type CropDraft } from './useCropDraft';
 import {
   useRotationDraft,
   type RotationDraft,
@@ -33,6 +36,7 @@ export function ModalImage({
   onRemoveBackground = () => {},
   offerRemoveBackground = false,
   onRotate = async () => {},
+  onCrop = async () => {},
   busy = false,
   readOnly = false,
 }: {
@@ -49,6 +53,8 @@ export function ModalImage({
   offerRemoveBackground?: boolean;
   /** Saves a confirmed rotation; the viewer previews it until then. */
   onRotate?: (image: ImageEntry, edit: RotationEdit) => Promise<void>;
+  /** Saves a confirmed crop to the object; offered with background removal, which finds the object. */
+  onCrop?: (image: ImageEntry, photo: PhotoUpload) => Promise<void>;
   busy?: boolean;
   /** Shared category: no delete control in the carousel either. */
   readOnly?: boolean;
@@ -86,9 +92,19 @@ export function ModalImage({
     rotation.draft.kind === 'editing' && rotation.draft.image.id === current?.id
       ? rotation.draft
       : { kind: 'closed' };
-  const editing = draft.kind === 'editing';
-  const close = () => {
+  const cropping = useCropDraft(onCrop);
+  const crop: CropDraft =
+    cropping.draft.kind !== 'closed' && cropping.draft.image.id === current?.id
+      ? cropping.draft
+      : { kind: 'closed' };
+  // Either tool holds the viewer: no paging, and Escape or a tap ends the tool, not the viewer.
+  const editing = draft.kind === 'editing' || crop.kind !== 'closed';
+  const cancelTools = () => {
     rotation.cancel();
+    cropping.cancel();
+  };
+  const close = () => {
+    cancelTools();
     onClose();
   };
 
@@ -127,10 +143,10 @@ export function ModalImage({
   useInertBackground(open);
 
   // One layer for Escape and the arrows alike, so a confirm raised on top takes all three.
-  // While rotating, Escape cancels the rotation and the arrows belong to its slider.
+  // While rotating or cropping, Escape ends that and the arrows belong to the slider.
   useTopmostKeydown(open, (event) => {
     if (editing) {
-      if (event.key === 'Escape') rotation.cancel();
+      if (event.key === 'Escape') cancelTools();
     } else if (event.key === 'Escape') onClose();
     else if (count > 1 && event.key === 'ArrowLeft') goTo(clampedIndex! - 1);
     else if (count > 1 && event.key === 'ArrowRight') goTo(clampedIndex! + 1);
@@ -201,11 +217,26 @@ export function ModalImage({
             >
               <Icon icon={IconType.RotateRight} className="w-5 h-5" />
             </button>
+            {offerRemoveBackground && (
+              <button
+                data-testid="crop-image"
+                onClick={() => void cropping.start(current)}
+                disabled={busy || editing}
+                className={TOOL_CLASSES}
+                title={t('item_list.crop')}
+                aria-label={t('item_list.crop')}
+              >
+                <Icon icon={IconType.Crop} className="w-5 h-5" />
+              </button>
+            )}
           </div>
         )}
 
         {draft.kind === 'editing' && (
           <RotationControls draft={draft} actions={rotation} busy={busy} />
+        )}
+        {crop.kind !== 'closed' && (
+          <CropControls draft={crop} actions={cropping} busy={busy} />
         )}
 
         {count > 1 && !editing && (
@@ -246,17 +277,21 @@ export function ModalImage({
           </div>
         )}
 
-        {/* pb reserves the bottom bar's row (the rotation's tools while rotating) plus safe area, so a tall photo's edge sits above it. */}
+        {/* pb reserves the bottom bar, or the open tool's panel, plus safe area, so a tall photo's edge sits above it. */}
         <div
-          className={`absolute inset-0 flex items-center justify-center p-4 pt-16 ${
-            editing
-              ? 'pb-[calc(12rem+env(safe-area-inset-bottom))]'
-              : 'pb-[calc(3.5rem+env(safe-area-inset-bottom))]'
-          }`}
+          className={`absolute inset-0 flex items-center justify-center p-4 pt-16 ${bottomReserve(draft, crop)}`}
           // The preview sizes itself in container units: no measuring, and it follows a resize.
           style={{ containerType: 'size' }}
         >
-          {current.urlFull ? (
+          {crop.kind === 'ready' && (
+            <CropPreview
+              previewUrl={crop.previewUrl}
+              backdropClass={
+                crop.crop.transparent ? photoBackdropClass(backdrop) : ''
+              }
+            />
+          )}
+          {crop.kind !== 'ready' && current.urlFull && (
             <ViewerPhoto
               key={current.pathFull}
               image={current}
@@ -279,14 +314,25 @@ export function ModalImage({
                 if (!editing) onClose();
               }}
             />
-          ) : (
-            // Past the card's plates, this photograph is signed only now.
+          )}
+          {/* Past the card's plates, this photograph is signed only now. */}
+          {!current.urlFull && (
             <StatusSpinner size="lg" label={t('common.loading')} />
           )}
         </div>
       </div>
     </Portal>
   );
+}
+
+function bottomReserve(draft: RotationDraft, crop: CropDraft): string {
+  if (draft.kind === 'editing') {
+    return 'pb-[calc(12rem+env(safe-area-inset-bottom))]';
+  }
+  if (crop.kind !== 'closed') {
+    return 'pb-[calc(9rem+env(safe-area-inset-bottom))]';
+  }
+  return 'pb-[calc(3.5rem+env(safe-area-inset-bottom))]';
 }
 
 const TOOL_CLASSES =

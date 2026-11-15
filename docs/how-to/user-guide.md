@@ -144,6 +144,8 @@ fields a line break becomes a space.
   no size to worry about.
 - **View full size**: click a thumbnail. Escape or the backdrop closes it.
 - **Rotate**: from the full-size view ([below](#rotate-and-straighten-a-photo)).
+- **Crop to the item**: from the full-size view, with background removal on
+  ([below](#crop-a-photo-to-its-item)).
 - **Delete**: from the full-size view or the per-photo control, confirm.
 
 An item can have any number of photos, in the order you added them.
@@ -176,6 +178,22 @@ gains that clear space, in a moment and without the model, so an older cut-out
 cropped close to the item can be given room this way. Anyone
 who can edit the collection can do this; someone it is only shared with to view
 cannot.
+
+### Crop a photo to its item
+
+With **Remove backgrounds** ticked, a photo opened full size also offers
+**Crop to the item**. It finds the item the way background removal does, then
+crops the photo to it with a little room all round, in the 4:3 frame the
+card shows the first photo in, so the whole crop shows on the card. The
+background stays: only the table, floor or clutter beyond the frame goes.
+
+The crop shows in the photo's place first. **Save** keeps it in the
+original's place, so the cover and the order of the photos stay as they were;
+**Cancel** or Escape changes nothing. A photo already cropped to its item, or
+one in which no item was found, says so and has nothing to save. A photo
+without its background is cropped to its own outline, without the model.
+Anyone who can edit the collection can crop its photos; someone it is only
+shared with to view cannot.
 
 ### Rotate and straighten a photo
 

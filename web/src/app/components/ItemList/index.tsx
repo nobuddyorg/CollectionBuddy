@@ -275,6 +275,9 @@ export default function ItemList({
         onRotate={(image, edit) =>
           rotateStored(modalState!.itemId, image, edit)
         }
+        onCrop={(image, photo) =>
+          replaceImage(modalState!.itemId, image, photo)
+        }
         busy={modalState ? (pendingUploads[modalState.itemId] ?? 0) > 0 : false}
         readOnly={!canEdit}
       />

@@ -55,6 +55,11 @@ interface ImageViewer {
     cancelRotation(): Promise<void>;
     /** Saves the rotation and waits until the turned photo has taken the original's place. */
     saveRotation(): Promise<void>;
+    /** Opens the crop's panel; the crop shows once the item is found. */
+    cropToItem(): Promise<void>;
+    cancelCrop(): Promise<void>;
+    /** Saves the crop and waits until it has taken the original's place. */
+    saveCrop(): Promise<void>;
   };
   locators: {
     buttons: {
@@ -63,6 +68,7 @@ interface ImageViewer {
       previous: Locator;
       removeBackground: Locator;
       rotate: Locator;
+      crop: Locator;
     };
     photo: Locator;
     position: Locator;
@@ -77,6 +83,13 @@ interface ImageViewer {
       cancel: Locator;
       save: Locator;
       preview: Locator;
+    };
+    crop: {
+      controls: Locator;
+      status: Locator;
+      preview: Locator;
+      cancel: Locator;
+      save: Locator;
     };
   };
 }
@@ -144,6 +157,8 @@ export function initToast(page: Page): Toast {
 
 export function initImageViewer(page: Page): ImageViewer {
   const root = page.getByTestId('image-viewer');
+  // The src of the photo a crop started on, which a saved crop replaces.
+  let cropped = '';
   const locators = {
     buttons: {
       close: root.getByTestId('close-image'),
@@ -151,6 +166,7 @@ export function initImageViewer(page: Page): ImageViewer {
       previous: root.getByTestId('previous-image'),
       removeBackground: root.getByTestId('remove-background-image'),
       rotate: root.getByTestId('rotate-image'),
+      crop: root.getByTestId('crop-image'),
     },
     photo: root.getByTestId('viewer-photo'),
     position: root.getByTestId('image-position'),
@@ -165,6 +181,13 @@ export function initImageViewer(page: Page): ImageViewer {
       cancel: root.getByTestId('rotation-cancel'),
       save: root.getByTestId('rotation-save'),
       preview: root.getByTestId('rotation-preview'),
+    },
+    crop: {
+      controls: root.getByTestId('crop-controls'),
+      status: root.getByTestId('crop-status'),
+      preview: root.getByTestId('crop-preview'),
+      cancel: root.getByTestId('crop-cancel'),
+      save: root.getByTestId('crop-save'),
     },
   };
   const interactions = {
@@ -214,6 +237,22 @@ export function initImageViewer(page: Page): ImageViewer {
       await locators.rotation.save.click();
       await expect(locators.rotation.controls).toHaveCount(0);
       await expect(locators.photo).not.toHaveAttribute('src', original ?? '', {
+        timeout: 45_000,
+      });
+    },
+    // The preview takes the photo's place, so its src is read before the crop starts.
+    cropToItem: async () => {
+      cropped = (await locators.photo.getAttribute('src')) ?? '';
+      await locators.buttons.crop.click();
+      await expect(locators.crop.controls).toBeVisible();
+    },
+    cancelCrop: async () => {
+      await locators.crop.cancel.click();
+    },
+    saveCrop: async () => {
+      await locators.crop.save.click();
+      await expect(locators.crop.controls).toHaveCount(0);
+      await expect(locators.photo).not.toHaveAttribute('src', cropped, {
         timeout: 45_000,
       });
     },

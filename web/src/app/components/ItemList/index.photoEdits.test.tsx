@@ -41,6 +41,16 @@ const rotation = vi.hoisted(() => ({
 }));
 vi.mock('../../lib/photoRotation', () => rotation);
 
+// No model in tests: the crop itself is a stand-in.
+const cropToObject = vi.hoisted(() => vi.fn());
+vi.mock('../BackgroundRemoval/load', () => ({
+  loadBackgroundRemoval: async () => ({
+    cropToObject,
+    NoObjectFoundError: class extends Error {},
+  }),
+  loadCutoutReview: () => import('../BackgroundRemoval/CutoutReview'),
+}));
+
 const downloadImageObject = vi.hoisted(() => vi.fn());
 vi.mock('../../data/images', async (importActual) => ({
   ...(await importActual<typeof import('../../data/images')>()),
@@ -69,6 +79,15 @@ beforeEach(() => {
     straightening: { kind: 'none' },
   });
   rotation.rotatePhoto.mockReset().mockResolvedValue(rotated);
+  cropToObject.mockReset();
+  localStorage.removeItem('removeBackground');
+  vi.stubGlobal(
+    'URL',
+    Object.assign(URL, {
+      createObjectURL: () => 'blob:crop',
+      revokeObjectURL: () => {},
+    }),
+  );
 });
 
 describe('ItemList rotation', () => {
@@ -118,5 +137,56 @@ describe('ItemList rotation', () => {
     await userEvent.click(screen.getByAltText('Item 1, image 1'));
 
     expect(screen.queryByRole('button', { name: 'Rotate' })).toBeNull();
+  });
+});
+
+describe('ItemList crop', () => {
+  it('crops a stored photo to its item from the viewer and replaces it in place', async () => {
+    localStorage.setItem('removeBackground', 'on');
+    const crop = {
+      blob: new Blob(['png'], { type: 'image/png' }),
+      width: 400,
+      height: 300,
+      transparent: true,
+    };
+    cropToObject.mockResolvedValue({ kind: 'cropped', crop });
+    const replaceImage = vi.fn(async () => {});
+    useItemImagesMock.mockReturnValue({
+      ...defaultImagesState(),
+      images: { '1': [stored] },
+      replaceImage,
+    });
+    renderList();
+
+    await userEvent.click(screen.getByAltText('Item 1, image 1'));
+    const viewer = screen.getByRole('dialog', { name: 'Full size image' });
+    await userEvent.click(
+      within(viewer).getByRole('button', { name: 'Crop to the item' }),
+    );
+    const save = within(viewer).getByRole('button', { name: 'Save' });
+    await vi.waitFor(() => expect(save).toBeEnabled());
+    await userEvent.click(save);
+
+    await vi.waitFor(() => expect(replaceImage).toHaveBeenCalledOnce());
+    expect(replaceImage).toHaveBeenCalledWith(
+      '1',
+      stored,
+      expect.objectContaining({ encoding: 'transparent' }),
+    );
+    expect(cropToObject.mock.calls[0][0]).toBe(source);
+  });
+
+  it('offers no crop while background removal is off', async () => {
+    useItemImagesMock.mockReturnValue({
+      ...defaultImagesState(),
+      images: { '1': [stored] },
+    });
+    renderList();
+
+    await userEvent.click(screen.getByAltText('Item 1, image 1'));
+
+    expect(
+      screen.queryByRole('button', { name: 'Crop to the item' }),
+    ).toBeNull();
   });
 });
