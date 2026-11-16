@@ -381,7 +381,9 @@ What would regress under load is gated deterministically instead: `075_query_pla
 
 `web/package.json`'s `overrides` pin transitive dependencies that `npm audit` flagged and that have a same-major patched version:
 
-- `qs` → `6.16.0`, via `typed-rest-client` and `@lhci/cli`'s `express` (GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx). Dev-only.
+- `qs` → `6.16.2`, via `typed-rest-client` and `@lhci/cli`'s `express` (GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx, GHSA-6pq8-jhm2-2vcw). Dev-only.
+- `compression` → `1.8.2`, under `serve` and `@lhci/cli`; `serve@14.2.7` still pins `1.8.1` (GHSA-vc2v-76pw-4v95). Dev-only.
+- `basic-ftp` → `6.2.6`, under `@lhci/cli`'s `proxy-agent` → `get-uri`, which declares `^5` (GHSA-c475-qrg2-pj4r, GHSA-5pm8-86m8-9m6r, GHSA-r4jh-29pc-gfqr). Dev-only, and only an `ftp:` proxy URI reaches it, which this project never configures; 6.0.0's one breaking change refuses a separate transfer host, which `get-uri` never asks for.
 - `@babel/core` → `7.29.7` (GHSA-4x5r-pxfx-6jf8). Stryker's toolchain, never shipped.
 - `minimatch` → `10.2.6`, which brings a patched `brace-expansion`. Three `minimatch` majors used to be installed across `eslint`, `typescript-eslint` and Stryker, two with vulnerable `brace-expansion` ranges. Overriding `brace-expansion` directly broke `npm audit`'s own advisory correlation into a bogus 20-vulnerability cascade; overriding `minimatch` sidesteps that and dedupes the install.
 - `sharp` → `0.35.4` (GHSA-rgj7-g3m4-5g8c), in range of `next`'s own `optionalDependencies`. It was accepted risk while the only fix was a 7-major `next` downgrade; a same-range patch shipped later. Check for that before assuming a downgrade is the only option.
