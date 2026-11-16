@@ -28,12 +28,15 @@ export function MapModal({
   canEdit,
   open,
   onOpenChange,
+  onShowPlace,
 }: {
   categoryId: string;
   search: string;
   canEdit: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Narrows the catalogue to the entries at one pin's exact place text. */
+  onShowPlace: (place: string) => void;
 }) {
   const { t, language } = useI18n();
   const toast = useToast();
@@ -71,8 +74,16 @@ export function MapModal({
                 count: place.titles.length,
               })
             : undefined,
+        // The map closes on the way, so the list it narrows is what shows.
+        action: {
+          label: t('item_list.map_show_in_list'),
+          onSelect: () => {
+            onOpenChange(false);
+            onShowPlace(place.name);
+          },
+        },
       })),
-    [places, t],
+    [onOpenChange, onShowPlace, places, t],
   );
 
   // Waits for a pin, not just for loading: `loadingPlaces` is still false on the render that opens the map.

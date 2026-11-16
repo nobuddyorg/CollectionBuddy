@@ -330,11 +330,14 @@ test.describe('background removal', () => {
       await turnOnBackgroundRemoval(app, page);
       await card.do.openImage();
       await app.viewer.do.removeBackground();
-      await expect(app.viewer()).toHaveCount(0);
-      const review = app.backgroundRemoval;
-      await expect(review.locators.cutout).toBeVisible({ timeout: ARRIVES });
-      await review.do.useCutout();
-      await expect(review()).toHaveCount(0);
+      // In the viewer, as a crop or a rotation is: no review dialog for a stored photo.
+      await expect(app.viewer.locators.edit.preview).toBeVisible({
+        timeout: ARRIVES,
+      });
+      await expect(app.backgroundRemoval()).toHaveCount(0);
+      await app.viewer.do.saveEdit();
+      await expect(app.viewer.locators.position).toHaveText('1 / 2');
+      await app.viewer.do.close();
 
       // The old pair gone, a new pair in its stead, the second photo untouched.
       await expect
@@ -353,6 +356,54 @@ test.describe('background removal', () => {
       expect(
         baseOf(await card.locators.images.nth(1).getAttribute('src')),
       ).toBe(second);
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
+  test('crops a stored photo to its item in the grid’s 4:3, keeping it opaque and where it was', async ({
+    on,
+    page,
+  }, testInfo) => {
+    const app = on(page);
+    await serveStandInModel(page);
+    const title = uniqueName('Zugeschnitten');
+    try {
+      await app.catalogue.do.addEntry(title);
+      const card = app.catalogue.card(title);
+      await card.do.uploadPhoto([
+        await itemPhoto(page, testInfo.outputPath('item.png')),
+        PHOTO,
+      ]);
+      await expect(card.locators.images).toHaveCount(2, { timeout: ARRIVES });
+
+      await turnOnBackgroundRemoval(app, page);
+      await card.do.openImage();
+      await app.viewer.do.cropToItem();
+      await expect(app.viewer.locators.edit.preview).toBeVisible({
+        timeout: ARRIVES,
+      });
+      await expect(app.viewer.locators.edit.status).toContainText(
+        'Cropped to the item',
+      );
+      await app.viewer.do.saveEdit();
+
+      // The 300 px disc with 24 px of margin, 348 × 348, widened to 464 × 348.
+      const { width, height, edges } = await edgesOf(app.viewer.locators.photo);
+      expect(Math.abs(width - 464)).toBeLessThanOrEqual(3);
+      expect(Math.abs(height - 348)).toBeLessThanOrEqual(3);
+      expect(edges).toEqual([255, 255, 255, 255]);
+      await expect(app.viewer.locators.position).toHaveText('1 / 2');
+
+      // A second crop finds it framed already, and Cancel leaves it be.
+      await app.viewer.do.cropToItem();
+      await expect(app.viewer.locators.edit.status).toContainText(
+        'cropped to its item already',
+        { timeout: ARRIVES },
+      );
+      await expect(app.viewer.locators.edit.save).toBeDisabled();
+      await app.viewer.do.cancelEdit();
+      await expect(app.viewer.locators.edit.controls).toHaveCount(0);
     } finally {
       await removeEntriesTitled(title);
     }
@@ -383,11 +434,11 @@ test.describe('background removal', () => {
       const firstSrc = await app.viewer.locators.photo.getAttribute('src');
 
       await app.viewer.do.removeBackground();
-      await expect(app.backgroundRemoval.locators.cutout).toBeVisible({
+      await expect(app.viewer.locators.edit.preview).toBeVisible({
         timeout: ARRIVES,
       });
-      await app.backgroundRemoval.do.useCutout();
-      await expect(app.backgroundRemoval()).toHaveCount(0);
+      await app.viewer.do.saveEdit();
+      await app.viewer.do.close();
       await expect
         .poll(() => card.locators.images.getAttribute('src'), {
           timeout: ARRIVES,

@@ -113,6 +113,9 @@ test.describe('a collection shared with you to edit', () => {
       await expect(edited.locators.buttons.delete).toHaveCount(0);
       await expect(edited.locators.buttons.deleteImage).toHaveCount(0);
       await expect(edited.locators.uploadInput).toHaveCount(0);
+      await edited.do.openImage();
+      await expect(app.viewer.locators.buttons.rotate).toHaveCount(0);
+      await app.viewer.do.close();
     } finally {
       // The grantee's bytes first: it can remove them only while the owner's entry still exists.
       await removeGranteeWrites({

@@ -1,11 +1,5 @@
 'use client';
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type RefObject,
-} from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   createImageRow,
   deleteImageRow,
@@ -13,6 +7,7 @@ import {
   readImageCreatedAt,
   type ImageListRow,
 } from '../../data/images';
+import { moveItemCover } from '../../data/cover';
 import { removeObjectsThenRows } from '../../data/imageRemoval';
 import { isPhotoStorageFull, isQuotaExceeded } from '../../data/quota';
 import type { ImageEntry } from './types';
@@ -24,7 +19,6 @@ import {
   entryDataOf,
   entryPaths,
   groupImageRows,
-  itemsDueForResigning,
   keepingShown,
   RENDERABLE_PLATES,
   signAllEntries,
@@ -36,26 +30,7 @@ import { idAfter } from '../../lib/idAfter';
 import { restoreAt } from '../../lib/optimistic';
 import { useSyncedRef } from '../../lib/useSyncedRef';
 import { storePhotoPair } from './storePhoto';
-
-// Re-signs each shown photograph before its own 1h signature expires, so a long-lived tab keeps its thumbnails.
-function useSignedUrlRefresh(
-  imagesRef: RefObject<Record<string, ImageEntry[]>>,
-  refreshAllImages: (itemIds: string[]) => Promise<void>,
-) {
-  useEffect(() => {
-    const maybeRefresh = () => {
-      void refreshAllImages(
-        itemsDueForResigning(imagesRef.current, Date.now()),
-      );
-    };
-    const interval = setInterval(maybeRefresh, 60_000);
-    document.addEventListener('visibilitychange', maybeRefresh);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', maybeRefresh);
-    };
-  }, [imagesRef, refreshAllImages]);
-}
+import { useSignedUrlRefresh } from './useSignedUrlRefresh';
 
 function withoutItems(loading: Set<string>, itemIds: string[]): Set<string> {
   const next = new Set(loading);
@@ -224,12 +199,16 @@ export function useItemImages() {
         try {
           const added = await readImageCreatedAt(image.id);
           if (added.error) throw added.error;
+          const id = idAfter(image.id);
           const { error } = await createImageRow({
             ...(await storePhotoPair(itemId, photo)),
-            id: idAfter(image.id),
+            id,
             created_at: added.data.created_at,
           });
           if (error) throw error;
+          // A chosen cover stays the cover in its new form; a failure here keeps the original too.
+          const moved = await moveItemCover({ itemId, from: image.id, to: id });
+          if (moved.error) throw moved.error;
           const removed = await removeObjectsThenRows({
             paths: entryPaths(image),
             deleteRows: () => deleteImageRow({ id: image.id, itemId }),
@@ -326,6 +305,13 @@ export function useItemImages() {
     return listed.data;
   }, []);
 
+  // For an edit of one entry's photos made elsewhere: reordering them, say.
+  const updateItemImages = useCallback(
+    (itemId: string, update: (entries: ImageEntry[]) => ImageEntry[]) =>
+      setImages(updatingItem(itemId, update)),
+    [],
+  );
+
   const forgetItemImages = useCallback((itemId: string) => {
     setImages((previous) => {
       const next = { ...previous };
@@ -344,6 +330,7 @@ export function useItemImages() {
     replaceImage,
     deleteImage,
     captureItemImagePaths,
+    updateItemImages,
     forgetItemImages,
     pendingUploads,
   };

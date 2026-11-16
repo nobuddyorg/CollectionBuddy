@@ -1,9 +1,11 @@
 import type { CompressionRequest } from './drawPhoto';
+import type { InspectionRequest, RotationRequest } from './rotationJob';
 import type { SharpnessRequest } from './sharpnessJob';
 
 /** One request to a fresh photo worker, and the one answer it posts back; the worker ends with it. */
 export function askPhotoWorker<Answer>(
-  request: CompressionRequest | SharpnessRequest,
+  request:
+    CompressionRequest | SharpnessRequest | RotationRequest | InspectionRequest,
   failure: string,
 ): Promise<Answer> {
   // Turbopack passes a worker's chunks in its URL fragment, which Chrome reuses across workers of one bootstrap, so every photo job shares one entry.

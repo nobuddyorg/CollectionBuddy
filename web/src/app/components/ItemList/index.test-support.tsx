@@ -40,6 +40,7 @@ export function defaultImagesState() {
     replaceImage: vi.fn(),
     deleteImage: vi.fn(),
     captureItemImagePaths: vi.fn(),
+    updateItemImages: vi.fn(),
     forgetItemImages: vi.fn(),
     pendingUploads: {} as Record<string, number>,
   };

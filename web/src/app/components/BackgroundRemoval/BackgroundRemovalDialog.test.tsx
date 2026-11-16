@@ -24,7 +24,6 @@ const pending: QueuedPhoto = {
   removeBackground: true,
   position: { current: 1, total: 1 },
   sharpness: 'checking',
-  target: { kind: 'new' },
 };
 
 function renderDialog(props: Parameters<typeof BackgroundRemovalDialog>[0]) {

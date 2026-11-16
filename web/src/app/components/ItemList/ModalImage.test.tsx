@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '../../i18n/I18nProvider';
+import { ToastWrapper } from '../providers.test-support';
 import {
   appRoot,
   mountAppRoot,
@@ -32,17 +32,17 @@ function renderModal(
     ...overrides,
   };
   const { rerender } = render(
-    <I18nProvider>
+    <ToastWrapper>
       <ModalImage {...props} />
-    </I18nProvider>,
+    </ToastWrapper>,
   );
   return {
     ...props,
     rerender: (next: Partial<Parameters<typeof ModalImage>[0]>) =>
       rerender(
-        <I18nProvider>
+        <ToastWrapper>
           <ModalImage {...{ ...props, ...next }} />
-        </I18nProvider>,
+        </ToastWrapper>,
       ),
   };
 }
@@ -163,22 +163,6 @@ describe('ModalImage', () => {
       ).toBeNull();
     });
 
-    it('passes the photograph currently shown on, once offered', async () => {
-      const onRemoveBackground = vi.fn();
-      renderModal({
-        images: [photo('a'), photo('b')],
-        index: 1,
-        offerRemoveBackground: true,
-        onRemoveBackground,
-      });
-
-      await userEvent.click(
-        screen.getByRole('button', { name: 'Remove background' }),
-      );
-
-      expect(onRemoveBackground).toHaveBeenCalledExactlyOnceWith(photo('b'));
-    });
-
     it('is not offered to a viewer of a shared collection', () => {
       renderModal({ offerRemoveBackground: true, readOnly: true });
       expect(
@@ -191,14 +175,6 @@ describe('ModalImage', () => {
       expect(
         screen.getByRole('button', { name: 'Remove background' }),
       ).toBeDisabled();
-    });
-
-    it('does nothing without a handler, by default', async () => {
-      renderModal({ offerRemoveBackground: true });
-      await userEvent.click(
-        screen.getByRole('button', { name: 'Remove background' }),
-      );
-      expect(screen.getByRole('img')).toBeInTheDocument();
     });
   });
 
@@ -490,6 +466,43 @@ describe('ModalImage', () => {
         ).not.toThrow();
         expect(onIndexChange).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('making the shown photo the cover', () => {
+    const three = [photo('a'), photo('b'), photo('c')];
+
+    it('is offered on every photo but the cover, the first', () => {
+      const { rerender } = renderModal({ images: three, index: 0 });
+      expect(screen.queryByTestId('make-cover')).not.toBeInTheDocument();
+
+      rerender({ images: three, index: 2 });
+      expect(screen.getByRole('button', { name: 'Make cover' })).toBeEnabled();
+    });
+
+    it('passes the photograph shown on', async () => {
+      const onMakeCover = vi.fn();
+      renderModal({ images: three, index: 1, onMakeCover });
+
+      await userEvent.click(screen.getByTestId('make-cover'));
+
+      expect(onMakeCover).toHaveBeenCalledExactlyOnceWith(photo('b'));
+    });
+
+    it('is not offered to a viewer of a shared collection', () => {
+      renderModal({ images: three, index: 1, readOnly: true });
+      expect(screen.queryByTestId('make-cover')).not.toBeInTheDocument();
+    });
+
+    it('waits while the entry is busy', () => {
+      renderModal({ images: three, index: 1, busy: true });
+      expect(screen.getByTestId('make-cover')).toBeDisabled();
+    });
+
+    it('does nothing without a handler, by default', async () => {
+      renderModal({ images: three, index: 1 });
+      await userEvent.click(screen.getByTestId('make-cover'));
+      expect(screen.getByTestId('image-viewer')).toBeInTheDocument();
     });
   });
 });

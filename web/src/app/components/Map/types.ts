@@ -1,5 +1,6 @@
 import type { Icon } from 'leaflet';
 import type { Coordinates } from '../../lib/coordinates';
+import type { PopupAction } from './popup';
 
 export type Leaflet = typeof import('leaflet');
 
@@ -13,6 +14,7 @@ export interface MarkerInput extends Coordinates {
   titles: string[];
   /** Already translated: the map draws Leaflet layers, not React, and has no i18n of its own. */
   countLabel?: string;
+  action?: PopupAction;
 }
 
 export type MapCommandKind = 'fitAll' | 'fitCurrent';

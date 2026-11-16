@@ -2,6 +2,7 @@ import type { ReadResult } from '../lib/pages';
 import { supabase } from '../supabase';
 import type { ExportImageRow } from './images';
 import { ITEM_FIELDS_SELECT, type ItemFields } from './items';
+import { coverFirst } from './cover';
 import { afterKeyset } from './keyset';
 
 export type ExportItemRow = ItemFields & { created_at: string };
@@ -18,11 +19,15 @@ export type ExportPageRequest = {
 type ExportLinkRow = {
   created_at: string;
   item_id: string;
-  items: ExportItemRow & { images: ExportImageRow[] };
+  items: ExportItemRow & {
+    cover_image_id: string | null;
+    // `id` only to find the cover by.
+    images: (ExportImageRow & { id: string })[];
+  };
 };
 
 // Full size only: an export never wants thumbnails, and `size_bytes` sums to its size estimate.
-const EXPORT_ITEM_SELECT = `created_at,item_id,items!inner(${ITEM_FIELDS_SELECT},created_at,images(item_id,path_full,size_bytes))`;
+const EXPORT_ITEM_SELECT = `created_at,item_id,items!inner(${ITEM_FIELDS_SELECT},created_at,cover_image_id,images(id,item_id,path_full,size_bytes))`;
 
 // Keyset-paged from item_categories, oldest-first, walking idx_item_categories_cat_created; photos ride along per item.
 export function rawListItemsForExport({
@@ -44,7 +49,7 @@ export function rawListItemsForExport({
     query
       .order('created_at')
       .order('item_id')
-      // Photographs oldest-first per item, the order the app shows them in, the cover first.
+      // Photographs oldest-first per item; the flattening below puts the cover first, the order the app shows them in.
       .order('created_at', { referencedTable: 'items.images', ascending: true })
       .order('id', { referencedTable: 'items.images', ascending: true })
       .limit(size)
@@ -72,12 +77,12 @@ export async function listItemsForExport(
       : null;
   const items: ExportItemRow[] = [];
   const photos: ExportImageRow[] = [];
-  // Split off, since the manifest spreads an item whole and must not carry its storage paths.
+  // Split off, since the manifest spreads an item whole and must not carry its storage paths; the cover is carried by order.
   for (const {
-    items: { images, ...item },
+    items: { images, cover_image_id, ...item },
   } of data) {
     items.push(item);
-    photos.push(...images);
+    photos.push(...coverFirst(images, cover_image_id));
   }
   return { data: { items, photos, next }, error: null };
 }

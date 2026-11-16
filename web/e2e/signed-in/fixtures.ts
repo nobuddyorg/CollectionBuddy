@@ -104,6 +104,7 @@ export const SEED = {
     'Dunkelkammer',
     'Tauschkiste',
     'Neuzugänge',
+    'Titelbilder',
   ],
   /** For entries.spec.ts. */
   scratchCategory: 'Werkstatt',
@@ -125,7 +126,7 @@ export const SEED = {
   sortingCategory: 'Sortierkasten',
   /** For entry-details.spec.ts, which files entries with places and tags. */
   detailCategory: 'Etikett',
-  /** For photo-viewer.spec.ts, which photographs an entry and opens it. */
+  /** For photo-viewer.spec.ts and photo-rotation.spec.ts, which photograph an entry and open it. */
   viewerCategory: 'Bildergalerie',
   /** For undo.spec.ts, which deletes an entry and takes it back. */
   undoCategory: 'Rückgängig',
@@ -176,6 +177,8 @@ export const SEED = {
   editorJourneyCategory: 'Tauschkiste',
   /** For rls/create-rpc.spec.ts, into which each kind of grantee tries to create an entry. */
   createCategory: 'Neuzugänge',
+  /** For rls/cover.spec.ts, whose grantees try to choose the covers of the owner's entries. */
+  coverCategory: 'Titelbilder',
 
   // Oldest first; the list sorts newest first, so the last one here is the first card on the page.
   items: [

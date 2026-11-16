@@ -361,4 +361,116 @@ describe('handleRequest', () => {
     ]);
     expect(model.loadModel).not.toHaveBeenCalled();
   });
+
+  describe('cropping to the object', () => {
+    const cropRequest = {
+      kind: 'crop-to-object' as const,
+      file: new Blob(['webp'], { type: 'image/webp' }),
+      modelUrl: cutOutRequest.modelUrl,
+      maxSide: 2048,
+      margin: 0,
+    };
+    // Transparent all over but a 10 x 4 block at (12, 6): a stored cut-out.
+    const keptBlock = (width: number, height: number) => {
+      const pixels = new Uint8ClampedArray(width * height * 4);
+      for (let y = 6; y < 10; y += 1) {
+        for (let x = 12; x < 22; x += 1) {
+          pixels.set([90, 80, 70, 255], (y * width + x) * 4);
+        }
+      }
+      return pixels;
+    };
+
+    it('crops a cut-out to its own outline in the grid’s frame, never running the model', async () => {
+      photoPixels = keptBlock;
+
+      const replies = await repliesTo(cropRequest);
+
+      expect(model.loadModel).not.toHaveBeenCalled();
+      // The 10 x 4 block heightened to 10 x 8 (4:3 rounded), about its centre: from (12, 4).
+      expect(replies).toHaveLength(1);
+      expect(replies[0]).toMatchObject({
+        kind: 'cropped',
+        crop: { width: 10, height: 8, transparent: true },
+      });
+      const [image] = encoded;
+      expect(image).toMatchObject({ width: 10, height: 8 });
+      // Rows 4 and 5 are above the block, see-through; row 6 is its top edge.
+      expect(image.data[3]).toBe(0);
+      expect(Array.from(image.data.slice(2 * 10 * 4, 2 * 10 * 4 + 4))).toEqual([
+        90, 80, 70, 255,
+      ]);
+    });
+
+    it('grows the crop by the margin asked for', async () => {
+      photoPixels = keptBlock;
+
+      const [reply] = await repliesTo({ ...cropRequest, margin: 0.2 });
+
+      // 2 pixels all round make 14 x 8, heightened to 14 x 11.
+      expect(reply).toMatchObject({
+        kind: 'cropped',
+        crop: { width: 14, height: 11 },
+      });
+    });
+
+    it('asks the model where the object of an opaque photo is, and keeps its colours opaque', async () => {
+      const replies = await repliesTo(cropRequest);
+
+      expect(model.runModel).toHaveBeenCalledOnce();
+      expect(replies.slice(0, 2)).toEqual([
+        {
+          kind: 'progress',
+          progress: { stage: 'download', loaded: 50, total: 100 },
+        },
+        { kind: 'progress', progress: { stage: 'analyze' } },
+      ]);
+      const last = replies[2];
+      if (last.kind !== 'cropped') throw new Error('expected a crop');
+      expect(last.crop.transparent).toBe(false);
+      // The disc's mask, grown to the grid's 4:3, a crop of the 40 x 20 photo.
+      expect(last.crop.width).toBeLessThan(40);
+      expect(last.crop.height).toBeLessThan(20);
+      expect(last.crop.width / last.crop.height).toBeCloseTo(4 / 3, 1);
+      expect(encoded[0].data.every((value) => value === 200)).toBe(true);
+    });
+
+    it('answers already-framed when the object fills the photo already', async () => {
+      // Opaque all over but one see-through corner pixel: a cut-out as wide as its photo.
+      photoPixels = (width, height) => {
+        const pixels = new Uint8ClampedArray(width * height * 4).fill(200);
+        pixels[3] = 0;
+        return pixels;
+      };
+
+      expect(await repliesTo(cropRequest)).toEqual([
+        { kind: 'already-framed' },
+      ]);
+      expect(encoded).toEqual([]);
+    });
+
+    it('answers no-object for a cut-out with nothing showing, without the model', async () => {
+      photoPixels = (width, height) =>
+        new Uint8ClampedArray(width * height * 4);
+
+      expect(await repliesTo(cropRequest)).toEqual([{ kind: 'no-object' }]);
+      expect(model.runModel).not.toHaveBeenCalled();
+    });
+
+    it('answers no-object when the model finds nothing in an opaque photo', async () => {
+      model.runModel.mockResolvedValue(discPrediction(0));
+
+      const replies = await repliesTo(cropRequest);
+
+      expect(replies.at(-1)).toEqual({ kind: 'no-object' });
+    });
+
+    it('answers failed with the reason when the model cannot load', async () => {
+      model.loadModel.mockRejectedValue(new Error('offline'));
+
+      expect(await repliesTo(cropRequest)).toEqual([
+        { kind: 'failed', message: 'Error: offline' },
+      ]);
+    });
+  });
 });

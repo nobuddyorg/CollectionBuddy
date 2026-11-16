@@ -23,10 +23,12 @@ export function Preview({
   blob,
   alt,
   testId,
+  className = 'h-full w-full object-contain',
 }: {
   blob: Blob;
   alt: string;
   testId: string;
+  className?: string;
 }) {
   // A ref with cleanup, which React 19 never calls with null, so each object URL is revoked with its image.
   const show = useCallback(
@@ -39,12 +41,7 @@ export function Preview({
   );
   return (
     // eslint-disable-next-line @next/next/no-img-element -- a blob: URL of a photo that has not left the device; next/image cannot take one
-    <img
-      ref={show}
-      alt={alt}
-      data-testid={testId}
-      className="h-full w-full object-contain"
-    />
+    <img ref={show} alt={alt} data-testid={testId} className={className} />
   );
 }
 

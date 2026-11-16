@@ -27,6 +27,43 @@ test.describe('the map, up close', () => {
     );
   });
 
+  test('Show in list narrows the catalogue to the pin’s entries, with a chip, until × or another collection', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await openMap(app);
+    await expect(app.map.locators.pins).toHaveCount(2);
+    await app.map.do.openPin();
+    const place = (await app.map.locators.popup
+      .locator('p')
+      .first()
+      .textContent())!;
+    const there = await app.map.locators.popupTitles.allTextContents();
+    const everywhere = await app.catalogue.locators.cardTitles.count();
+
+    await app.map.do.showInList();
+
+    await expect(app.catalogue.locators.placeFilter.name).toHaveText(place);
+    await expect(app.catalogue.locators.cardTitles).toHaveText(there);
+    expect(there.length).toBeLessThan(everywhere);
+
+    // Search and place narrow together: a term matching nothing there empties the list.
+    await app.catalogue.do.search('zzzznothing');
+    await expect(app.catalogue.locators.texts.emptyTitle).toBeVisible();
+    await app.catalogue.do.clearSearch();
+    await expect(app.catalogue.locators.cardTitles).toHaveText(there);
+
+    await app.catalogue.do.clearPlaceFilter();
+    await expect(app.catalogue.locators.cardTitles).toHaveCount(everywhere);
+
+    await app.map.do.open();
+    await app.map.do.openPin();
+    await app.map.do.showInList();
+    await app.categories.do.open('Briefmarken');
+    await expect(app.catalogue.locators.placeFilter.chip).toHaveCount(0);
+  });
+
   // Leaflet's own zoom, not "zoom to me": that one awaits a position fix, which this would race.
   test('frames every pin again after zooming away from them', async ({
     on,

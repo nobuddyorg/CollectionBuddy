@@ -6,6 +6,7 @@ import {
   cutoutAlpha,
   fitWithin,
   opaqueBounds,
+  ownTransparency,
   withMargin,
 } from './cutoutImage';
 
@@ -397,5 +398,19 @@ describe('cropWithAlpha at the rim outside the object', () => {
     expect(Array.from(cropped.slice(rim * 4, rim * 4 + 3))).toEqual([
       50, 50, 50,
     ]);
+  });
+});
+
+describe('ownTransparency', () => {
+  it('reads each pixel’s alpha out of RGBA where one pixel is fully see-through', () => {
+    const pixels = new Uint8ClampedArray([
+      9, 9, 9, 255, 9, 9, 9, 0, 9, 9, 9, 40,
+    ]);
+    expect(Array.from(ownTransparency(pixels)!)).toEqual([255, 0, 40]);
+  });
+
+  it('calls a photo without a fully see-through pixel opaque, however faint its alpha', () => {
+    const pixels = new Uint8ClampedArray([9, 9, 9, 255, 9, 9, 9, 1]);
+    expect(ownTransparency(pixels)).toBeNull();
   });
 });

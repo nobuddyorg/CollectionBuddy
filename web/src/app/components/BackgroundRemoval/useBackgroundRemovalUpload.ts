@@ -1,16 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { downloadImageObject } from '../../data/images';
 import type { PhotoUpload } from '../../data/photoType';
 import { useI18n } from '../../i18n/useI18n';
 import { assessSharpness } from '../../lib/photoSharpness';
 import { useSyncedRef } from '../../lib/useSyncedRef';
-import type { ImageEntry } from '../ItemList/types';
 import { useToast } from '../Toast/ToastProvider';
 import {
   enqueuePick,
-  enqueueStored,
   judged,
   nextStep,
   splitImages,
@@ -21,11 +18,6 @@ import {
 import { readBackgroundRemovalEnabled } from './useBackgroundRemovalPreference';
 
 type Upload = (itemId: string, photo: PhotoUpload) => Promise<void>;
-type Replace = (
-  itemId: string,
-  image: ImageEntry,
-  photo: PhotoUpload,
-) => Promise<void>;
 
 export type CutoutChoice =
   | { kind: 'cut-out'; blob: Blob }
@@ -41,14 +33,14 @@ function photoFor(choice: CutoutChoice, file: File): PhotoUpload {
   };
 }
 
-/** Checks each picked photo for blur, then routes it past the review it needs, if any, and on to `upload` in pick order; a stored photo's cut-out goes to `replace`. */
-export function useBackgroundRemovalUpload(upload: Upload, replace: Replace) {
+/** Checks each picked photo for blur, then routes it past the review it needs, if any, and on to `upload` in pick order. */
+export function useBackgroundRemovalUpload(upload: Upload) {
   const { t } = useI18n();
   const toast = useToast();
   const [queue, setQueue] = useState<readonly QueuedPhoto[]>([]);
   const picks = useRef(0);
   // Read at call time: ItemCard's memo keeps an old handler, which must still see a toggle flipped since.
-  const latest = useSyncedRef({ upload, replace, t, toast });
+  const latest = useSyncedRef({ upload, t, toast });
   // Decided photos upload in decision order, so the first picked stays the cover; `upload` reports its own failures.
   const uploadsSoFar = useRef<Promise<void>>(Promise.resolve());
   const head = queue.at(0);
@@ -56,11 +48,8 @@ export function useBackgroundRemovalUpload(upload: Upload, replace: Replace) {
 
   const queueUpload = useCallback(
     (photo: QueuedPhoto, upload: PhotoUpload) => {
-      const { target } = photo;
       uploadsSoFar.current = uploadsSoFar.current.then(() =>
-        target.kind === 'replace'
-          ? latest.current.replace(photo.itemId, target.image, upload)
-          : latest.current.upload(photo.itemId, upload),
+        latest.current.upload(photo.itemId, upload),
       );
     },
     [latest],
@@ -82,24 +71,6 @@ export function useBackgroundRemovalUpload(upload: Upload, replace: Replace) {
       removeBackground: readBackgroundRemovalEnabled(),
     };
     setQueue((waiting) => enqueuePick(waiting, pick));
-  };
-
-  const reviewStored = async (itemId: string, image: ImageEntry) => {
-    const { data, error } = await downloadImageObject(image.pathFull);
-    if (error) {
-      latest.current.toast.reportError(
-        'load photo for background removal',
-        error,
-        latest.current.t('item_list.remove_background_load_error'),
-      );
-      return;
-    }
-    picks.current += 1;
-    const pick = picks.current;
-    const file = new File([data], 'photo', { type: data.type });
-    setQueue((waiting) =>
-      enqueueStored(waiting, { pick, itemId, image, file }),
-    );
   };
 
   const headKey = head?.key;
@@ -131,8 +102,6 @@ export function useBackgroundRemovalUpload(upload: Upload, replace: Replace) {
       }
       setQueue((waiting) => withoutHead(waiting, head));
       if (choice.kind === 'skip') return;
-      // A stored photo kept as it is needs nothing done.
-      if (head.target.kind === 'replace' && choice.kind === 'original') return;
       queueUpload(head, photoFor(choice, head.file));
     },
     [head, queueUpload],
@@ -140,5 +109,5 @@ export function useBackgroundRemovalUpload(upload: Upload, replace: Replace) {
 
   const pending = head && nextStep(head) === 'ask' ? head : null;
 
-  return { pending, pickPhotos, reviewStored, choose };
+  return { pending, pickPhotos, choose };
 }

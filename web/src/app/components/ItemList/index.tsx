@@ -2,7 +2,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import ItemCreate from '../ItemCreate';
+import { EntriesEmptyState } from './EntriesEmptyState';
 import { PageSizeChoice } from './PageSizeChoice';
+import { PlaceFilterChip } from './PlaceFilterChip';
 import { Pagination } from './Pagination';
 import { usePageSize } from './usePageSize';
 import { ItemCard } from './ItemCard';
@@ -12,6 +14,8 @@ import { useItems } from './useItems';
 import { useItemImages } from './useItemImages';
 import { pageImageRowsFor } from './imageEntries';
 import { useItemMutations } from './useItemMutations';
+import { useMakeCover } from './useMakeCover';
+import { useRotateStoredPhoto } from './useRotateStoredPhoto';
 import { searchStatusFor } from './searchStatus';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { useSyncedRef } from '../../lib/useSyncedRef';
@@ -19,7 +23,6 @@ import { useGuardedModalClose } from '../../lib/useGuardedModalClose';
 import { EditItemModal } from './EditItemModal';
 import { MapModal } from './MapModal';
 import CenteredModal from '../CenteredModal';
-import EmptyState from '../EmptyState';
 import LoadError from '../LoadError';
 import { listViewFor } from './listView';
 import type { ItemFormValues } from '../ItemForm';
@@ -57,6 +60,8 @@ export default function ItemList({
   const debouncedQuery = useDebouncedValue(query, 200).trim();
 
   const [mapOpen, setMapOpen] = useState(false);
+  // A map pin's exact place text, '' for every place; the list is keyed by collection, so a switch clears it.
+  const [place, setPlace] = useState('');
   const { pageSize, setPageSize } = usePageSize();
 
   const {
@@ -70,7 +75,7 @@ export default function ItemList({
     totalPages,
     reload,
     setItems,
-  } = useItems(categoryId, debouncedQuery, pageSize);
+  } = useItems(categoryId, debouncedQuery, pageSize, place);
   const searchStatus = searchStatusFor(debouncedQuery, total);
 
   const handleCreated = useCallback(() => {
@@ -93,14 +98,14 @@ export default function ItemList({
     replaceImage,
     deleteImage,
     captureItemImagePaths,
+    updateItemImages,
     forgetItemImages,
     pendingUploads,
   } = useItemImages();
-  const backgroundRemoval = useBackgroundRemovalUpload(
-    uploadImage,
-    replaceImage,
-  );
+  const makeCover = useMakeCover({ updateItemImages, refreshAllImages });
+  const backgroundRemoval = useBackgroundRemovalUpload(uploadImage);
   const { enabled: removesBackgrounds } = useBackgroundRemovalPreference();
+  const rotateStored = useRotateStoredPhoto(replaceImage);
 
   // Read through a ref so a reload that keeps the same items re-signs nothing.
   const pageImagesRef = useSyncedRef(pageImages);
@@ -150,17 +155,10 @@ export default function ItemList({
     loading,
     loadFailed,
   });
-  // A viewer's New entry button is disabled, so their hint must not point at it.
-  const noItemsHint = canEdit
-    ? t('item_list.no_items_hint')
-    : t('item_list.no_items_hint_read_only');
-
   let searchAnnouncement = '';
   if (!loading) {
-    if (searchStatus.kind === 'active') {
-      searchAnnouncement = tCount('item_list.results_count', {
-        count: searchStatus.total,
-      });
+    if (searchStatus.kind === 'active' || place) {
+      searchAnnouncement = tCount('item_list.results_count', { count: total });
     } else if (searchStatus.kind === 'tooShort') {
       searchAnnouncement = t('item_list.search_too_short');
     }
@@ -175,6 +173,8 @@ export default function ItemList({
         onNewEntry={() => setCreateOpen(true)}
         onOpenMap={() => setMapOpen(true)}
       />
+
+      {place && <PlaceFilterChip place={place} onClear={() => setPlace('')} />}
 
       {/* A too-short term earns no filter, so its count would pass off the whole category as results. */}
       <span data-testid="search-status" className="sr-only" aria-live="polite">
@@ -193,31 +193,13 @@ export default function ItemList({
       )}
 
       {view === 'empty' && (
-        <EmptyState
-          symbol={debouncedQuery ? '🔍' : '🧺'}
-          title={
-            searchStatus.kind === 'active'
-              ? t('item_list.no_results_title', { query: debouncedQuery })
-              : t('item_list.no_items_title')
-          }
-          hint={
-            searchStatus.kind === 'active'
-              ? t('item_list.no_results_hint')
-              : noItemsHint
-          }
-          titleTestId="empty-title"
-        >
-          {debouncedQuery && (
-            <button
-              type="button"
-              data-testid="empty-clear-search"
-              onClick={() => setQuery('')}
-              className="min-h-11 px-3 font-label text-xs text-foreground underline underline-offset-4"
-            >
-              {t('item_list.search_clear')}
-            </button>
-          )}
-        </EmptyState>
+        <EntriesEmptyState
+          query={debouncedQuery}
+          searchActive={searchStatus.kind === 'active'}
+          place={place}
+          canEdit={canEdit}
+          onClearSearch={() => setQuery('')}
+        />
       )}
 
       {view === 'grid' && (
@@ -264,12 +246,18 @@ export default function ItemList({
         }
         onClose={() => setModalState(null)}
         onDelete={(image) => void deleteImage(modalState!.itemId, image)}
-        // The viewer closes first: the cut-out review is a dialog of its own.
-        onRemoveBackground={(image) => {
-          setModalState(null);
-          void backgroundRemoval.reviewStored(modalState!.itemId, image);
-        }}
         offerRemoveBackground={removesBackgrounds}
+        onRotate={(image, edit) =>
+          rotateStored(modalState!.itemId, image, edit)
+        }
+        onEdit={(image, photo) =>
+          replaceImage(modalState!.itemId, image, photo)
+        }
+        // The viewer follows the photo to the front, where it now is.
+        onMakeCover={(image) => {
+          void makeCover(modalState!.itemId, image);
+          setModalState({ itemId: modalState!.itemId, index: 0 });
+        }}
         busy={modalState ? (pendingUploads[modalState.itemId] ?? 0) > 0 : false}
         readOnly={!canEdit}
       />
@@ -293,6 +281,7 @@ export default function ItemList({
         canEdit={canEdit}
         open={mapOpen}
         onOpenChange={setMapOpen}
+        onShowPlace={setPlace}
       />
 
       <CenteredModal

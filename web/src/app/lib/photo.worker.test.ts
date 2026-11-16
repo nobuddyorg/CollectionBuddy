@@ -3,10 +3,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CutoutReply, CutoutRequest } from './backgroundRemovalJob';
 import type { CompressionRequest } from './drawPhoto';
 import type { CompressionAnswer } from './photo.worker';
+import type {
+  InspectionAnswer,
+  InspectionRequest,
+  PhotoInspection,
+  Rotated,
+  RotationAnswer,
+  RotationRequest,
+} from './rotationJob';
 import type { SharpnessAnswer, SharpnessRequest } from './sharpnessJob';
 
-type Job = CompressionRequest | SharpnessRequest | CutoutRequest;
-type Answer = CompressionAnswer | SharpnessAnswer | CutoutReply;
+type Job =
+  | CompressionRequest
+  | SharpnessRequest
+  | CutoutRequest
+  | RotationRequest
+  | InspectionRequest;
+type Answer =
+  | CompressionAnswer
+  | SharpnessAnswer
+  | CutoutReply
+  | RotationAnswer
+  | InspectionAnswer;
 
 const handleRequest = vi.hoisted(() =>
   vi.fn<
@@ -25,6 +43,12 @@ const measureOffscreen = vi.hoisted(() =>
   vi.fn<(request: SharpnessRequest) => Promise<number>>(),
 );
 vi.mock('./sharpnessJob', () => ({ measureOffscreen }));
+const rotation = vi.hoisted(() => ({
+  rotateOffscreen: vi.fn<(request: RotationRequest) => Promise<Rotated>>(),
+  inspectOffscreen:
+    vi.fn<(request: InspectionRequest) => Promise<PhotoInspection>>(),
+}));
+vi.mock('./rotationJob', () => rotation);
 
 /** The worker's global scope: the page's messages arrive at `onmessage`, and its answers are recorded. */
 const scope = {
@@ -63,6 +87,8 @@ beforeEach(async () => {
   handleRequest.mockReset();
   compressOffscreen.mockReset();
   measureOffscreen.mockReset();
+  rotation.rotateOffscreen.mockReset();
+  rotation.inspectOffscreen.mockReset();
   vi.stubGlobal('self', scope);
   vi.resetModules();
   await import('./photo.worker');
@@ -141,5 +167,54 @@ describe('the photo worker', () => {
     await send(preload, [{ kind: 'preloaded' }]);
 
     expect(handleRequest).toHaveBeenCalledWith(preload, expect.any(Function));
+  });
+
+  it('answers a rotation with the turned photo and whether it is a cut-out', async () => {
+    const turn: RotationRequest = {
+      kind: 'rotate',
+      file: new Blob(['photo']),
+      degrees: 90,
+    };
+    const rotated = { blob: new Blob(['png']), transparent: true };
+    rotation.rotateOffscreen.mockResolvedValue(rotated);
+
+    await send(turn, [rotated]);
+
+    expect(rotation.rotateOffscreen).toHaveBeenCalledExactlyOnceWith(turn);
+    expect(compressOffscreen).not.toHaveBeenCalled();
+    expect(handleRequest).not.toHaveBeenCalled();
+  });
+
+  it('answers a rotation that failed with its reason', async () => {
+    rotation.rotateOffscreen.mockRejectedValue(new Error('No canvas'));
+
+    await send({ kind: 'rotate', file: new Blob(['photo']), degrees: 3 }, [
+      { error: 'Error: No canvas' },
+    ]);
+  });
+
+  it('answers an inspection with what it found', async () => {
+    const look: InspectionRequest = {
+      kind: 'inspect-rotation',
+      file: new Blob(['photo']),
+    };
+    const inspection: PhotoInspection = {
+      transparent: true,
+      straightening: { kind: 'straighten', degrees: -3.5 },
+    };
+    rotation.inspectOffscreen.mockResolvedValue(inspection);
+
+    await send(look, [{ inspection }]);
+
+    expect(rotation.inspectOffscreen).toHaveBeenCalledExactlyOnceWith(look);
+    expect(handleRequest).not.toHaveBeenCalled();
+  });
+
+  it('answers an inspection that failed with its reason', async () => {
+    rotation.inspectOffscreen.mockRejectedValue(new Error('Undecodable'));
+
+    await send({ kind: 'inspect-rotation', file: new Blob(['photo']) }, [
+      { error: 'Error: Undecodable' },
+    ]);
   });
 });
