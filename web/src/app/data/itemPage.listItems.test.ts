@@ -37,6 +37,34 @@ describe('listItems', () => {
   }
   const params = { categoryId: 'cat-1', search: '', from: 0, to: 8 };
 
+  it("puts each entry's chosen cover first among the page's photographs, and leaves it off the entry", async () => {
+    const photo = (itemId: string, id: string) => ({
+      id,
+      item_id: itemId,
+      path_full: `${itemId}/${id}.webp`,
+      path_thumb: null,
+    });
+    const rawItems = vi.fn().mockResolvedValue({
+      data: [
+        {
+          ...itemRow('a', [photo('a', '1'), photo('a', '2')]),
+          cover_image_id: '2',
+        },
+        { ...itemRow('b', [photo('b', '3')]), cover_image_id: null },
+      ],
+      error: null,
+    });
+
+    const { data, imageRows } = await listItems(params, {
+      rawIds: idsPage('a', 'b'),
+      rawItems,
+      rawCount: vi.fn().mockResolvedValue({ count: 2, error: null }),
+    });
+
+    expect(data).toEqual([item('a'), item('b')]);
+    expect(imageRows!.map((row) => row.id)).toEqual(['2', '1', '3']);
+  });
+
   it("pages the ids, then reads just that page's entries by id, combining them with the separate count", async () => {
     const rawIds = idsPage('a', 'b');
     const rawItems = vi.fn().mockResolvedValue({
@@ -240,6 +268,60 @@ describe('listItems, once a search term earns a filter', () => {
       to: 8,
       signal: undefined,
     });
+  });
+
+  it('narrows the page to one place through the same RPC, with no pattern when there is no search', async () => {
+    const rawIds = vi.fn();
+    const rawSearch = vi
+      .fn()
+      .mockResolvedValue({ data: [searchRow('a', 1)], error: null });
+
+    const { count } = await listItems(
+      { categoryId: 'cat-1', search: '', place: 'Garmisch', from: 0, to: 8 },
+      { rawIds, rawSearch },
+    );
+
+    expect(rawIds).not.toHaveBeenCalled();
+    expect(count).toBe(1);
+    expect(rawSearch).toHaveBeenCalledWith({
+      categoryId: 'cat-1',
+      likePattern: undefined,
+      place: 'Garmisch',
+      from: 0,
+      to: 8,
+      signal: undefined,
+    });
+    expect(rawSearch.mock.calls[0][0]).not.toHaveProperty('likePattern', '');
+  });
+
+  it('combines a place with a search: both narrow the one call', async () => {
+    const rawSearch = vi.fn().mockResolvedValue({ data: [], error: null });
+
+    await listItems(
+      { categoryId: 'cat-1', search: 'coin', place: 'Rom', from: 0, to: 8 },
+      { rawSearch },
+    );
+
+    expect(rawSearch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        likePattern: likePatternFor('coin'),
+        place: 'Rom',
+      }),
+    );
+  });
+
+  it('reads an empty place as every place, the plain page', async () => {
+    const rawSearch = vi.fn();
+    const rawIds = vi.fn().mockResolvedValue({ data: [], error: null });
+    const rawCount = vi.fn().mockResolvedValue({ count: 0, error: null });
+
+    await listItems(
+      { categoryId: 'cat-1', search: '', place: '', from: 0, to: 8 },
+      { rawIds, rawCount, rawSearch },
+    );
+
+    expect(rawSearch).not.toHaveBeenCalled();
+    expect(rawIds).toHaveBeenCalled();
   });
 
   it('strips total_count and the photographs off each row and reads the exact total from it', async () => {

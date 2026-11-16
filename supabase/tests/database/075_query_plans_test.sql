@@ -109,16 +109,19 @@ insert into public.item_categories (item_id, category_id)
 select i.id, :'category_id'::uuid from public.items i where i.title = 'Plan Probe Silberdenar';
 select array['idx_items_title_trgm', 'idx_items_description_trgm', 'idx_items_place_trgm', 'idx_items_tags_text_trgm'] as trigram_indexes \gset
 
--- The searched page's query, read from the live function rather than pasted, with its arguments inlined as the app sends them.
+-- The searched page's query, read from the live function rather than pasted, with its arguments inlined as the app sends them (no place, 0038).
 select
   regexp_replace(
     regexp_replace(
       regexp_replace(
         regexp_replace(
-          substring(p.prosrc from 'return query(.*);\s*end'),
-          '\mcat_id\M', quote_literal(:'category_id') || '::uuid', 'g'
+          regexp_replace(
+            substring(p.prosrc from 'return query(.*);\s*end'),
+            '\mcat_id\M', quote_literal(:'category_id') || '::uuid', 'g'
+          ),
+          '\mlike_pattern\M', quote_literal('%silberdenar%'), 'g'
         ),
-        '\mlike_pattern\M', quote_literal('%silberdenar%'), 'g'
+        '\mat_place\M', 'null::text', 'g'
       ),
       '\mpage_from\M', '0', 'g'
     ),
@@ -127,7 +130,7 @@ select
   -- EXPLAIN of the call hides the body, so it is planned as the role it runs as: the owner if SECURITY DEFINER, else the caller.
   case when p.prosecdef then pg_catalog.pg_get_userbyid(p.proowner) else 'authenticated' end as search_role
 from pg_catalog.pg_proc p
-where p.oid = 'public.search_category_items(uuid, text, int, int)'::regprocedure \gset
+where p.oid = 'public.search_category_entries(uuid, int, int, text, text)'::regprocedure \gset
 
 -- The catalogue page's ids as data/itemPage.ts rawListItemIds reads them: item_categories alone, newest first, no embed (#758).
 select format(
@@ -147,10 +150,10 @@ set local enable_indexscan = off;
 set local enable_nestloop = off;
 select set_config('role', :'search_role', true);
 
-select pg_temp.plan_uses_index(:'search_sql', index_name, 'reachable: search_category_items can use ' || index_name)
+select pg_temp.plan_uses_index(:'search_sql', index_name, 'reachable: search_category_entries can use ' || index_name)
 from unnest(:'trigram_indexes'::text[]) as index_name;
 select pg_temp.plan_has_no_seq_scan_on(
-  :'search_sql', 'items', 'reachable: search_category_items needs no sequential scan on items'
+  :'search_sql', 'items', 'reachable: search_category_entries needs no sequential scan on items'
 );
 
 -- Sorting off too: the index's whole point is a page already in order, which a bitmap scan plus a sort would also answer.
@@ -193,10 +196,18 @@ from unnest(:'trigram_indexes'::text[]) as index_name;
 analyze public.items, public.item_categories;
 
 select set_config('role', :'search_role', true);
-select pg_temp.plan_uses_index(:'search_sql', index_name, 'preferred: search_category_items uses ' || index_name)
+select pg_temp.plan_uses_index(:'search_sql', index_name, 'preferred: search_category_entries uses ' || index_name)
 from unnest(:'trigram_indexes'::text[]) as index_name;
 select pg_temp.plan_has_no_seq_scan_on(
-  :'search_sql', 'items', 'preferred: search_category_items does not scan items sequentially'
+  :'search_sql', 'items', 'preferred: search_category_entries does not scan items sequentially'
+);
+-- The map's "Show in list": one place, no text, an equality on the rows the category's links reach (0038).
+select pg_temp.plan_has_no_seq_scan_on(
+  regexp_replace(
+    regexp_replace(:'search_sql', '\mnull::text\M', quote_literal('Place 7') || '::text', 'g'),
+    quote_literal('%silberdenar%'), 'null::text', 'g'
+  ),
+  'items', 'preferred: a page at one place does not scan items sequentially'
 );
 
 select pg_temp.auth_as(:'owner_id'::uuid, 'plans-owner@collectionbuddy.test');
@@ -368,7 +379,7 @@ select pg_temp.plan_uses_index(
 select set_config('role', :'search_role', true);
 select pg_temp.plan_never_mentions(
   :'search_sql', 'has_category_read_access',
-  'search_category_items checks the grant once per call, not per row'
+  'search_category_entries checks the grant once per call, not per row'
 );
 
 -- The entry and link quotas' checks, read from the live functions with a statement's keys inlined, as each call is planned (0032).
@@ -416,7 +427,7 @@ select is(
      and coalesce(p.proconfig, '{}') @> array['plan_cache_mode=force_custom_plan']),
   array[
     'create_items_in_category', 'delete_item_if_orphan', 'list_category_places',
-    'search_category_items', 'tg_item_categories_quota', 'tg_items_quota'
+    'search_category_entries', 'search_category_items', 'tg_item_categories_quota', 'tg_items_quota'
   ],
   'the map and search RPCs plan each call for the category it names, entry creation and its quotas for the rows it adds, the orphan cleanup for the links it lost'
 );

@@ -1,4 +1,5 @@
 import type {
+  Crop,
   Cutout,
   CutoutProgress,
   CutoutReply,
@@ -6,10 +7,12 @@ import type {
 } from './backgroundRemovalJob';
 import { isModelCached } from './modelCache';
 
-export type { Cutout, CutoutProgress };
+export type { Crop, Cutout, CutoutProgress };
 
 // Renamed with the model: a new file name is what retires the copy browsers cached (segmentationModel.ts).
 const MODEL_FILE = 'isnet-general-use-fp16.onnx';
+const MAX_SIDE = 2048;
+const MARGIN = 0.08;
 
 export class NoObjectFoundError extends Error {
   constructor() {
@@ -86,13 +89,38 @@ export async function removeBackground(
       kind: 'cut-out',
       file,
       modelUrl: segmentationModelUrl(),
-      maxSide: options.maxSide ?? 2048,
+      maxSide: options.maxSide ?? MAX_SIDE,
       minFillRatio: options.minFillRatio ?? 0.95,
-      margin: options.margin ?? 0.08,
+      margin: options.margin ?? MARGIN,
     },
     options,
   );
   if (reply.kind === 'cut-out') return reply.cutout;
+  throw failure(reply);
+}
+
+/** A crop to the object, or word that the photo already is one, inside its margin and the grid's frame. */
+export type CropResult =
+  { kind: 'cropped'; crop: Crop } | { kind: 'already-framed' };
+
+/** `file` cropped to its object with a clear margin, on this device; a cut-out's own outline spares the model. */
+export async function cropToObject(
+  file: Blob,
+  options: Pick<CutOutOptions, 'onProgress' | 'signal' | 'margin'> = {},
+): Promise<CropResult> {
+  const reply = await runInWorker(
+    {
+      kind: 'crop-to-object',
+      file,
+      modelUrl: segmentationModelUrl(),
+      maxSide: MAX_SIDE,
+      margin: options.margin ?? MARGIN,
+    },
+    options,
+  );
+  if (reply.kind === 'cropped' || reply.kind === 'already-framed') {
+    return reply;
+  }
   throw failure(reply);
 }
 

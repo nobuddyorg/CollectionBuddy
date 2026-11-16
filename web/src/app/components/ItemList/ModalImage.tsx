@@ -15,6 +15,16 @@ import { useTopmostKeydown } from '../CenteredModal/useTopmostKeydown';
 import Icon, { IconType } from '../Icon';
 import type { ImageEntry } from './types';
 import { StatusSpinner } from '../ui/Spinner';
+import type { PhotoUpload } from '../../data/photoType';
+import { StoredEditControls, StoredEditPreview } from './StoredEditControls';
+import { RotationControls } from './RotationControls';
+import { useStoredEdit, type StoredEdit } from './useStoredEdit';
+import {
+  useRotationDraft,
+  type RotationDraft,
+  type RotationEdit,
+} from './useRotationDraft';
+import { ViewerPhoto, type Shown } from './ViewerPhoto';
 
 export function ModalImage({
   images,
@@ -23,8 +33,10 @@ export function ModalImage({
   onIndexChange,
   onClose,
   onDelete,
-  onRemoveBackground = () => {},
   offerRemoveBackground = false,
+  onRotate = async () => {},
+  onEdit = async () => {},
+  onMakeCover = () => {},
   busy = false,
   readOnly = false,
 }: {
@@ -36,9 +48,14 @@ export function ModalImage({
   onIndexChange: (index: number) => void;
   onClose: () => void;
   onDelete: (image: ImageEntry) => void;
-  onRemoveBackground?: (image: ImageEntry) => void;
   /** Only where this browser opted in to background removal, and only to an editor. */
   offerRemoveBackground?: boolean;
+  /** Saves a confirmed rotation; the viewer previews it until then. */
+  onRotate?: (image: ImageEntry, edit: RotationEdit) => Promise<void>;
+  /** Saves a confirmed crop or cut-out in the photo's place; both find the item with background removal's model. */
+  onEdit?: (image: ImageEntry, photo: PhotoUpload) => Promise<void>;
+  /** Makes the shown photo its entry's cover; not offered on the cover itself, the first. */
+  onMakeCover?: (image: ImageEntry) => void;
   busy?: boolean;
   /** Shared category: no delete control in the carousel either. */
   readOnly?: boolean;
@@ -68,8 +85,30 @@ export function ModalImage({
   // Set when a touch just navigated, so the synthetic click after touchend doesn't close the modal.
   const suppressImageClickRef = useRef(false);
   // The chosen backdrop behind a cut-out's see-through background; not behind a failed photo's alt text.
-  const [shownPath, setShownPath] = useState('');
+  const [shown, setShown] = useState<Shown>({ path: '', width: 0, height: 0 });
   const { backdrop } = usePhotoBackdrop();
+  const rotation = useRotationDraft(onRotate);
+  // Only for the photo it was opened on: a delete or a closed viewer leaves it behind.
+  const draft: RotationDraft =
+    rotation.draft.kind === 'editing' && rotation.draft.image.id === current?.id
+      ? rotation.draft
+      : { kind: 'closed' };
+  const storedEdit = useStoredEdit(onEdit);
+  const edit: StoredEdit =
+    storedEdit.edit.kind !== 'closed' &&
+    storedEdit.edit.image.id === current?.id
+      ? storedEdit.edit
+      : { kind: 'closed' };
+  // Either tool holds the viewer: no paging, and Escape or a tap ends the tool, not the viewer.
+  const editing = draft.kind === 'editing' || edit.kind !== 'closed';
+  const cancelTools = () => {
+    rotation.cancel();
+    storedEdit.cancel();
+  };
+  const close = () => {
+    cancelTools();
+    onClose();
+  };
 
   const onTouchStart = useCallback((event: React.TouchEvent) => {
     const touch = event.touches[0];
@@ -83,7 +122,7 @@ export function ModalImage({
       const start = touchStartRef.current;
       touchStartRef.current = null;
       suppressImageClickRef.current = false;
-      if (!start || count < 2 || clampedIndex === null) return;
+      if (!start || count < 2 || clampedIndex === null || editing) return;
       const touch = event.changedTouches[0];
       if (!touch) return;
       const deltaX = touch.clientX - start.x;
@@ -98,7 +137,7 @@ export function ModalImage({
       suppressImageClickRef.current = true;
       goTo(deltaX < 0 ? clampedIndex + 1 : clampedIndex - 1);
     },
-    [count, clampedIndex, goTo],
+    [count, clampedIndex, editing, goTo],
   );
 
   useLockBodyScroll(open);
@@ -106,8 +145,11 @@ export function ModalImage({
   useInertBackground(open);
 
   // One layer for Escape and the arrows alike, so a confirm raised on top takes all three.
+  // While editing, Escape ends the edit and the arrows belong to the rotation's slider.
   useTopmostKeydown(open, (event) => {
-    if (event.key === 'Escape') onClose();
+    if (editing) {
+      if (event.key === 'Escape') cancelTools();
+    } else if (event.key === 'Escape') onClose();
     else if (count > 1 && event.key === 'ArrowLeft') goTo(clampedIndex! - 1);
     else if (count > 1 && event.key === 'ArrowRight') goTo(clampedIndex! + 1);
   });
@@ -134,7 +176,7 @@ export function ModalImage({
         {/* Pinned to the corner: stacked under a max-h-full image it landed past the bottom of the overlay. */}
         <button
           data-testid="close-image"
-          onClick={onClose}
+          onClick={close}
           className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted transition-colors"
           title={t('common.close')}
           aria-label={t('common.close')}
@@ -142,33 +184,76 @@ export function ModalImage({
           <Icon icon={IconType.Close} className="w-5 h-5" />
         </button>
 
-        {/* The only delete control for photographs past the strip; trash, not a second X beside Close. */}
         {!readOnly && (
-          <button
-            data-testid="delete-image"
-            onClick={() => onDelete(current)}
-            disabled={busy}
-            className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-10 w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-60 transition-colors"
-            title={t('item_list.delete_image')}
-            aria-label={t('item_list.delete_image')}
-          >
-            <Icon icon={IconType.Trash} className="w-5 h-5" />
-          </button>
-        )}
-        {!readOnly && offerRemoveBackground && (
-          <button
-            data-testid="remove-background-image"
-            onClick={() => onRemoveBackground(current)}
-            disabled={busy}
-            className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-15 z-10 w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-60 transition-colors"
-            title={t('item_list.remove_background')}
-            aria-label={t('item_list.remove_background')}
-          >
-            <Icon icon={IconType.Scissors} className="w-5 h-5" />
-          </button>
+          <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-10 flex gap-1">
+            {/* The only delete control for photographs past the strip; trash, not a second X beside Close. */}
+            <button
+              data-testid="delete-image"
+              onClick={() => onDelete(current)}
+              disabled={busy || editing}
+              className={TOOL_CLASSES}
+              title={t('item_list.delete_image')}
+              aria-label={t('item_list.delete_image')}
+            >
+              <Icon icon={IconType.Trash} className="w-5 h-5" />
+            </button>
+            {offerRemoveBackground && (
+              <button
+                data-testid="remove-background-image"
+                onClick={() => void storedEdit.start(current, 'cut-out')}
+                disabled={busy || editing}
+                className={TOOL_CLASSES}
+                title={t('item_list.remove_background')}
+                aria-label={t('item_list.remove_background')}
+              >
+                <Icon icon={IconType.Scissors} className="w-5 h-5" />
+              </button>
+            )}
+            <button
+              data-testid="rotate-image"
+              onClick={() => void rotation.start(current)}
+              disabled={busy || editing}
+              className={TOOL_CLASSES}
+              title={t('item_list.rotate')}
+              aria-label={t('item_list.rotate')}
+            >
+              <Icon icon={IconType.RotateRight} className="w-5 h-5" />
+            </button>
+            {clampedIndex > 0 && (
+              <button
+                data-testid="make-cover"
+                onClick={() => onMakeCover(current)}
+                disabled={busy || editing}
+                className={TOOL_CLASSES}
+                title={t('item_list.make_cover')}
+                aria-label={t('item_list.make_cover')}
+              >
+                <Icon icon={IconType.Star} className="w-5 h-5" />
+              </button>
+            )}
+            {offerRemoveBackground && (
+              <button
+                data-testid="crop-image"
+                onClick={() => void storedEdit.start(current, 'crop')}
+                disabled={busy || editing}
+                className={TOOL_CLASSES}
+                title={t('item_list.crop')}
+                aria-label={t('item_list.crop')}
+              >
+                <Icon icon={IconType.Crop} className="w-5 h-5" />
+              </button>
+            )}
+          </div>
         )}
 
-        {count > 1 && (
+        {draft.kind === 'editing' && (
+          <RotationControls draft={draft} actions={rotation} busy={busy} />
+        )}
+        {edit.kind !== 'closed' && (
+          <StoredEditControls edit={edit} actions={storedEdit} busy={busy} />
+        )}
+
+        {count > 1 && !editing && (
           // One bar on every pointer type: hover-only edge buttons sat over the photograph on touch screens.
           <div
             aria-live="polite"
@@ -206,36 +291,44 @@ export function ModalImage({
           </div>
         )}
 
-        {/* pb reserves the bottom bar's row plus safe area, so a tall photo's edge sits above the bar. */}
-        <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
-          {current.urlFull ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- the static export is unoptimized, and tap-to-close is pointer-only: the Close button and Escape cover the keyboard */}
-              <img
-                key={current.pathFull}
-                data-testid="viewer-photo"
-                src={current.urlFull}
-                alt={alt}
-                decoding="async"
-                // Same reasoning as the grid: see the note in ImageGrid.tsx.
-                crossOrigin="anonymous"
-                onLoad={() => setShownPath(current.pathFull)}
-                className={`w-auto h-auto max-w-full max-h-full object-contain rounded-sm shadow-lg ${
-                  shownPath === current.pathFull
-                    ? photoBackdropClass(backdrop)
-                    : ''
-                }`}
-                onClick={() => {
-                  if (suppressImageClickRef.current) {
-                    suppressImageClickRef.current = false;
-                    return;
-                  }
-                  onClose();
-                }}
-              />
-            </>
-          ) : (
-            // Past the card's plates, this photograph is signed only now.
+        {/* pb reserves the bottom bar, or the open tool's panel, plus safe area, so a tall photo's edge sits above it. */}
+        <div
+          className={`absolute inset-0 flex items-center justify-center p-4 pt-16 ${bottomReserve(draft, edit)}`}
+          // The preview sizes itself in container units: no measuring, and it follows a resize.
+          style={{ containerType: 'size' }}
+        >
+          {edit.kind === 'ready' && (
+            <StoredEditPreview
+              edit={edit}
+              backdropClass={photoBackdropClass(backdrop)}
+            />
+          )}
+          {edit.kind !== 'ready' && current.urlFull && (
+            <ViewerPhoto
+              key={current.pathFull}
+              image={current}
+              alt={alt}
+              draft={draft}
+              shown={shown}
+              backdropClass={photoBackdropClass(backdrop)}
+              onLoad={(photo) =>
+                setShown({
+                  path: current.pathFull,
+                  width: photo.naturalWidth,
+                  height: photo.naturalHeight,
+                })
+              }
+              onClick={() => {
+                if (suppressImageClickRef.current) {
+                  suppressImageClickRef.current = false;
+                  return;
+                }
+                if (!editing) onClose();
+              }}
+            />
+          )}
+          {/* Past the card's plates, this photograph is signed only now. */}
+          {!current.urlFull && (
             <StatusSpinner size="lg" label={t('common.loading')} />
           )}
         </div>
@@ -243,3 +336,16 @@ export function ModalImage({
     </Portal>
   );
 }
+
+function bottomReserve(draft: RotationDraft, edit: StoredEdit): string {
+  if (draft.kind === 'editing') {
+    return 'pb-[calc(12rem+env(safe-area-inset-bottom))]';
+  }
+  if (edit.kind !== 'closed') {
+    return 'pb-[calc(9rem+env(safe-area-inset-bottom))]';
+  }
+  return 'pb-[calc(3.5rem+env(safe-area-inset-bottom))]';
+}
+
+const TOOL_CLASSES =
+  'w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-60 transition-colors';

@@ -5,6 +5,7 @@ import type { CutoutReply, CutoutRequest } from './backgroundRemovalJob';
 import {
   segmentationModelUrl,
   removeBackground,
+  cropToObject,
   NoObjectFoundError,
   preloadSegmentationModel,
   isSegmentationModelCached,
@@ -220,6 +221,59 @@ describe('removeBackground', () => {
     controller.abort();
 
     expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+});
+
+describe('cropToObject', () => {
+  const crop = {
+    blob: new Blob(['png'], { type: 'image/png' }),
+    width: 40,
+    height: 30,
+    transparent: false,
+  };
+
+  it('asks the photo worker to crop the photo to its object, with the cut-out’s defaults', async () => {
+    const pending = cropToObject(photo);
+    lastWorker().reply({ kind: 'cropped', crop });
+
+    await expect(pending).resolves.toEqual({ kind: 'cropped', crop });
+    expect(lastWorker().requests).toEqual([
+      {
+        kind: 'crop-to-object',
+        file: photo,
+        modelUrl: segmentationModelUrl(),
+        maxSide: 2048,
+        margin: 0.08,
+      },
+    ]);
+  });
+
+  it('passes a caller-chosen margin through, and forwards progress', async () => {
+    const onProgress = vi.fn();
+    const pending = cropToObject(photo, { margin: 0.2, onProgress });
+    lastWorker().reply({ kind: 'progress', progress: { stage: 'analyze' } });
+    lastWorker().reply({ kind: 'already-framed' });
+
+    await expect(pending).resolves.toEqual({ kind: 'already-framed' });
+    expect(onProgress).toHaveBeenCalledWith({ stage: 'analyze' });
+    expect(lastWorker().requests[0]).toMatchObject({ margin: 0.2 });
+  });
+
+  it('rejects with NoObjectFoundError when there is no object to crop to', async () => {
+    const pending = cropToObject(photo);
+    lastWorker().reply({ kind: 'no-object' });
+
+    await expect(pending).rejects.toBeInstanceOf(NoObjectFoundError);
+  });
+
+  it("rejects with the worker's reason when it fails, or on a reply meant for a cut-out", async () => {
+    const failed = cropToObject(photo);
+    lastWorker().reply({ kind: 'failed', message: 'Error: HTTP 404' });
+    await expect(failed).rejects.toThrow('Error: HTTP 404');
+
+    const confused = cropToObject(photo);
+    lastWorker().reply({ kind: 'cut-out', cutout });
+    await expect(confused).rejects.toThrow('Unexpected reply');
   });
 });
 

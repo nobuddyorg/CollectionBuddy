@@ -60,6 +60,30 @@ export async function itemPhoto(page: Page, path: string): Promise<string> {
   return path;
 }
 
+/** A cut-out of a card tilted `tilt` degrees clockwise, on a see-through background: checked, so it reads as sharp. */
+export async function tiltedCardPhoto(
+  page: Page,
+  { path, tilt }: { path: string; tilt: number },
+): Promise<string> {
+  const dataUrl = await page.evaluate((degrees) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 480;
+    const context = canvas.getContext('2d')!;
+    context.translate(320, 240);
+    context.rotate((degrees * Math.PI) / 180);
+    for (let x = -150; x < 150; x += 10) {
+      for (let y = -90; y < 90; y += 10) {
+        context.fillStyle = (x + y) % 20 === 0 ? '#1a3a8a' : '#e8d070';
+        context.fillRect(x, y, 10, 10);
+      }
+    }
+    return canvas.toDataURL('image/png');
+  }, tilt);
+  writeFileSync(path, Buffer.from(dataUrl.split(',')[1], 'base64'));
+  return path;
+}
+
 // Below the test timeout, so a slow upload fails with its own message instead of a bare timeout.
 export const PHOTO_ARRIVES = 45_000;
 

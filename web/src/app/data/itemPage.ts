@@ -1,12 +1,16 @@
 import { supabase } from '../supabase';
+import { coverFirst } from './cover';
 import { IMAGE_LIST_SELECT, type ImageListRow } from './images';
 import { ITEM_FIELDS_SELECT, withSignal, type ItemFields } from './items';
 import { likePatternFor } from './itemSearch';
 
-/** One entry of a page read, with its photographs, before `listItems` splits them. */
-type ItemWithImages = ItemFields & { images: ImageListRow[] };
+/** One entry of a page read, with its photographs and its cover, before `listItems` splits them. */
+type ItemWithImages = ItemFields & {
+  cover_image_id: string | null;
+  images: ImageListRow[];
+};
 
-const ITEM_WITH_IMAGES_SELECT = `${ITEM_FIELDS_SELECT},images(${IMAGE_LIST_SELECT})`;
+const ITEM_WITH_IMAGES_SELECT = `${ITEM_FIELDS_SELECT},cover_image_id,images(${IMAGE_LIST_SELECT})`;
 
 /** The page's item ids, newest first, walking idx_item_categories_cat_created. */
 export function rawListItemIds({
@@ -49,7 +53,7 @@ export function rawListItemsByIds({
     .in('id', ids);
   return (
     withSignal(query, signal)
-      // Photographs oldest-first per item, as listImagesForItems orders them.
+      // Photographs oldest-first per item; listItems then puts each entry's cover first, as listImagesForItems does.
       .order('created_at', { referencedTable: 'images', ascending: true })
       .order('id', { referencedTable: 'images', ascending: true })
       .overrideTypes<ItemWithImages[], { merge: false }>()
@@ -71,25 +75,30 @@ export function rawCountItems({
   return withSignal(query, signal);
 }
 
-/** The searched page, its total and its photographs in one `search_category_items` call, an RLS-bypassing ILIKE. */
+/** The searched page, its total and its photographs in one `search_category_entries` call, an RLS-bypassing ILIKE and place filter. */
 export function rawSearchCategoryItems({
   categoryId,
   likePattern,
+  place,
   from,
   to,
   signal,
 }: {
   categoryId: string;
-  likePattern: string;
+  /** Left out where only a place narrows the page. */
+  likePattern?: string;
+  /** The exact place text a map pin stands for; left out where none narrows it. */
+  place?: string;
   from: number;
   to: number;
   signal?: AbortSignal;
 }) {
   const query = supabase.rpc(
-    'search_category_items',
+    'search_category_entries',
     {
       cat_id: categoryId,
       like_pattern: likePattern,
+      at_place: place,
       page_from: from,
       page_to: to,
     },
@@ -147,7 +156,8 @@ function failedPage(error: NonNullable<unknown>): PageRead {
 async function searchedPage(
   params: {
     categoryId: string;
-    likePattern: string;
+    likePattern?: string;
+    place?: string;
     from: number;
     to: number;
     signal?: AbortSignal;
@@ -158,6 +168,7 @@ async function searchedPage(
     rawSearch({
       categoryId: params.categoryId,
       likePattern: params.likePattern,
+      place: params.place,
       from,
       to,
       signal: params.signal,
@@ -192,11 +203,13 @@ type ListItemsCalls = {
   rawSearch?: typeof rawSearchCategoryItems;
 };
 
-/** The catalogue page, newest first, with its photograph rows on both paths. */
+/** The catalogue page, newest first, with its photograph rows on both paths; a search or a place narrows it through the RPC. */
 export async function listItems(
   params: {
     categoryId: string;
     search: string;
+    /** One map pin's exact place text, or '' for every place. */
+    place?: string;
     from: number;
     to: number;
     signal?: AbortSignal;
@@ -208,8 +221,11 @@ export async function listItems(
     rawSearch = rawSearchCategoryItems,
   }: ListItemsCalls = {},
 ): Promise<PageRead> {
-  const likePattern = likePatternFor(params.search);
-  if (likePattern) return searchedPage({ ...params, likePattern }, rawSearch);
+  const likePattern = likePatternFor(params.search) ?? undefined;
+  const place = params.place || undefined;
+  if (likePattern || place) {
+    return searchedPage({ ...params, likePattern, place }, rawSearch);
+  }
 
   const [{ data: links, error }, { count: headCount, error: countError }] =
     await Promise.all([rawIds(params), rawCount(params)]);
@@ -229,6 +245,8 @@ export async function listItems(
     data: page.map(itemFieldsOf),
     error: null,
     count,
-    imageRows: page.flatMap((row) => row.images),
+    imageRows: page.flatMap((row) =>
+      coverFirst(row.images, row.cover_image_id),
+    ),
   };
 }

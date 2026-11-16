@@ -7,6 +7,8 @@ interface MapView {
     frameAllPins(): Promise<void>;
     open(): Promise<void>;
     openPin(index?: number): Promise<void>;
+    /** Show in list in the open popup: the map closes on a list narrowed to that pin's place. */
+    showInList(): Promise<void>;
     zoomIn(): Promise<void>;
     zoomToLocation(): Promise<void>;
   };
@@ -20,6 +22,8 @@ interface MapView {
     };
     pins: Locator;
     popup: Locator;
+    /** The entries the open popup names. */
+    popupTitles: Locator;
     texts: {
       empty: Locator;
     };
@@ -39,6 +43,7 @@ export function initMap(page: Page): MapView {
     },
     pins: page.locator('.leaflet-marker-icon'),
     popup: page.locator('.leaflet-popup-content'),
+    popupTitles: page.locator('.leaflet-popup-content li'),
     texts: {
       empty: page.getByTestId('map-empty'),
     },
@@ -58,6 +63,10 @@ export function initMap(page: Page): MapView {
     },
     openPin: async (index = 0) => {
       await locators.pins.nth(index).click();
+    },
+    showInList: async () => {
+      await locators.popup.getByTestId('map-show-in-list').click();
+      await expect(root).toBeHidden();
     },
     // One step only: Leaflet swallows a second click sent mid-animation, and one carries a fitted pin off screen.
     zoomIn: async () => {

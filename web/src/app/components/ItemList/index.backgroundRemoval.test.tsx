@@ -191,6 +191,9 @@ describe('ItemList background removal', () => {
 
   it('removes the background of a stored photo from the viewer, and puts the cut-out in its place', async () => {
     localStorage.setItem('removeBackground', 'on');
+    load.loadBackgroundRemoval.mockImplementation(
+      () => import('../../lib/backgroundRemoval'),
+    );
     const blob = new Blob(['png'], { type: 'image/png' });
     removeBackground.mockResolvedValue({
       blob,
@@ -232,15 +235,13 @@ describe('ItemList background removal', () => {
       ),
     );
 
-    expect(
-      screen.queryByRole('dialog', { name: 'Full size image' }),
-    ).toBeNull();
+    // The viewer stays open: the cut-out shows in the photo's place, under the panel's Save.
+    const viewer = screen.getByRole('dialog', { name: 'Full size image' });
     expect(downloadImageObject).toHaveBeenCalledWith('1/1.webp');
-    const use = await screen.findByRole('button', {
-      name: 'Use without background',
-    });
-    await vi.waitFor(() => expect(use).toBeEnabled());
-    await userEvent.click(use);
+    const save = within(viewer).getByRole('button', { name: 'Save' });
+    await vi.waitFor(() => expect(save).toBeEnabled());
+    expect(load.loadCutoutReview).not.toHaveBeenCalled();
+    await userEvent.click(save);
 
     await vi.waitFor(() => expect(replaceImage).toHaveBeenCalledOnce());
     expect(uploadImage).not.toHaveBeenCalled();

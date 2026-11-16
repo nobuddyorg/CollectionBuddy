@@ -143,9 +143,17 @@ fields a line break becomes a space.
   WebP (JPEG in Safari and on iOS) with a thumbnail before upload, so there is
   no size to worry about.
 - **View full size**: click a thumbnail. Escape or the backdrop closes it.
+- **Rotate**: from the full-size view ([below](#rotate-and-straighten-a-photo)).
+- **Crop to the item**: from the full-size view, with background removal on
+  ([below](#crop-a-photo-to-its-item)).
 - **Delete**: from the full-size view or the per-photo control, confirm.
 
-An item can have any number of photos, in the order you added them.
+An item can have any number of photos, in the order you added them. The
+first is its cover, the one the card shows large. To choose another, open it
+full size and choose the star, **Make cover**: it moves to the front, in the
+card, the full-size view and an export. Deleting the cover makes the oldest
+photo the cover again. Anyone who can edit the collection can choose the
+cover; someone it is only shared with to view cannot.
 
 ### Remove the background
 
@@ -167,14 +175,53 @@ seconds on a desktop computer, longer on a phone. With the box unticked,
 uploads work exactly as before.
 
 A photo already added can lose its background too: open it full size and choose
-the scissors, **Remove background**. The same review opens; **Use without
-background** puts the result in the original's place, so the cover and the order
-of the photos stay as they were, and **Keep original** changes nothing. A photo
+the scissors, **Remove background**. As with a crop or a rotation, it happens
+right there in the full-size view: the item without its background shows in the
+photo's place, and **Save** keeps it there, so the cover and the order of the
+photos stay as they were; **Cancel** or Escape changes nothing. A photo
 that already has its background removed keeps its outline exactly and only
 gains that clear space, in a moment and without the model, so an older cut-out
 cropped close to the item can be given room this way. Anyone
 who can edit the collection can do this; someone it is only shared with to view
 cannot.
+
+### Crop a photo to its item
+
+With **Remove backgrounds** ticked, a photo opened full size also offers
+**Crop to the item**. It finds the item the way background removal does, then
+crops the photo to it with a little room all round, in the 4:3 frame the
+card shows the first photo in, so the whole crop shows on the card. The
+background stays: only the table, floor or clutter beyond the frame goes.
+
+The crop shows in the photo's place first. **Save** keeps it in the
+original's place, so the cover and the order of the photos stay as they were;
+**Cancel** or Escape changes nothing. A photo already cropped to its item, or
+one in which no item was found, says so and has nothing to save. A photo
+without its background is cropped to its own outline, without the model.
+Anyone who can edit the collection can crop its photos; someone it is only
+shared with to view cannot.
+
+### Rotate and straighten a photo
+
+A photo taken from above, lying on a table, is often stored sideways: held
+flat, the phone cannot tell which way is up. Open it full size and choose
+**Rotate**:
+
+- **Rotate left** and **Rotate right** turn it a quarter at a time.
+- The **Angle** slider turns it by up to 45° either way, in tenths of a degree,
+  with the arrow keys too; it catches at 0°, and **Reset** undoes every turn.
+- **Straighten** appears for a photo without its background whose item is
+  rectangular, a stamp, a card, a banknote, a book: it sets the slider to the
+  smallest turn that squares the item. A round coin or an irregular figure
+  gets no suggestion, and neither does an item already square.
+
+What you see is a preview. **Save** stores the turned photo in the original's
+place, so the cover and the order of the photos stay as they were; **Cancel**
+or Escape changes nothing. A photo turned by an angle is cropped to the
+largest upright rectangle inside it, as phone galleries do; one without its
+background is kept whole instead, the new corners see-through like the rest
+of its background. Anyone who can edit the collection can rotate its photos;
+someone it is only shared with to view cannot.
 
 A photo that looks blurry is shown before it uploads, with **Keep anyway** and
 **Skip this photo**. With **Remove backgrounds** ticked, the warning and **Skip
@@ -200,6 +247,13 @@ a place. An active search narrows the pins the same way it narrows the grid,
 but the map is not paged — it draws every match. Geocoding results are cached
 in your browser, so reopening the map for the same category does not look
 places up again.
+
+Press a pin to see the place and the items there. **Show in list** closes the
+map and shows just those items, with a chip above the list naming the place;
+its **×** shows every place again, and so does switching to another category.
+The place narrows the list exactly, so items whose description merely
+mentions it are not included, and a search typed meanwhile narrows the list
+further.
 
 If you allow location access, your position shows as a red marker; the map has
 buttons to zoom to it and to frame all pins.

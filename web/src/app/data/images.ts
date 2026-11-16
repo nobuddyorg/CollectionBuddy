@@ -6,6 +6,7 @@ import {
   type ReadResult,
 } from '../lib/pages';
 import { supabase } from '../supabase';
+import { coversFirst, readItemCovers } from './cover';
 import type { Database } from './database.types';
 import { afterKeyset } from './keyset';
 import { ID_FILTER_CHUNK_SIZE, POSTGREST_MAX_ROWS } from './postgrestLimits';
@@ -152,15 +153,21 @@ function rawSelectImagesPage({
     .overrideTypes<ImagePageRow[], { merge: false }>();
 }
 
-// Oldest-first, `id` breaking a same-instant tie, matching idx_images_item_created_at.
-export function listImagesForItems(
+/** Each entry's cover first, then oldest-first with `id` breaking a same-instant tie, as idx_images_item_created_at walks them. */
+export async function listImagesForItems(
   itemIds: string[],
 ): Promise<ReadResult<ImageListRow[]>> {
-  return readAllChunks(chunk(itemIds, ID_FILTER_CHUNK_SIZE), (ids) =>
-    readAllKeysetPages<ImagePageRow>(POSTGREST_MAX_ROWS, (after) =>
-      rawSelectImagesPage({ itemIds: ids, after }),
+  const [photos, covers] = await Promise.all([
+    readAllChunks(chunk(itemIds, ID_FILTER_CHUNK_SIZE), (ids) =>
+      readAllKeysetPages<ImagePageRow>(POSTGREST_MAX_ROWS, (after) =>
+        rawSelectImagesPage({ itemIds: ids, after }),
+      ),
     ),
-  );
+    readItemCovers(itemIds),
+  ]);
+  if (photos.error !== null) return photos;
+  if (covers.error !== null) return covers;
+  return { data: coversFirst(photos.data, covers.data), error: null };
 }
 
 // Keyset-paged down images_pkey, each row kept via items_pkey and item_categories_pkey; the empty embeds only filter.

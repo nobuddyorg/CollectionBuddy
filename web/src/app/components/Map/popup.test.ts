@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { popupContent } from './popup';
 
@@ -73,5 +73,28 @@ describe('popupContent', () => {
     expect(item?.textContent).toBe(hostile);
     expect(item?.querySelector('img')).toBeNull();
     expect(element.querySelector('img')).toBeNull();
+  });
+
+  it('adds a button for the action asked for, its label as text, that does what it says', () => {
+    const onSelect = vi.fn();
+    const element = popupContent({
+      popupText: 'Garmisch',
+      action: { label: '<b>Show in list</b>', onSelect },
+    });
+
+    const button = element.querySelector('button')!;
+    expect(button.type).toBe('button');
+    expect(button.dataset.testid).toBe('map-show-in-list');
+    expect(button.textContent).toBe('<b>Show in list</b>');
+    expect(button.querySelector('b')).toBeNull();
+    expect(button.className).toContain('min-h-11');
+    button.click();
+    expect(onSelect).toHaveBeenCalledOnce();
+  });
+
+  it('adds no button without an action', () => {
+    expect(
+      popupContent({ popupText: 'Garmisch' }).querySelector('button'),
+    ).toBeNull();
   });
 });

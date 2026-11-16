@@ -73,6 +73,7 @@ function renderModal(props: Partial<Parameters<typeof MapModal>[0]> = {}) {
           canEdit
           open
           onOpenChange={vi.fn()}
+          onShowPlace={vi.fn()}
           {...props}
         />
       </ToastProvider>
@@ -134,6 +135,27 @@ describe('MapModal', () => {
     expect(markers.map((marker) => marker.popupText)).toEqual(['Bonn', 'Köln']);
     expect(markers[0]?.countLabel).toMatch(/^2 /);
     expect(markers[1]?.countLabel).toBeUndefined();
+  });
+
+  it("gives each pin's popup Show in list: it closes the map and narrows the list to that exact place", async () => {
+    placesState({ places: [place('Bonn', ['a']), place('Köln', ['c'])] });
+    const onOpenChange = vi.fn();
+    const onShowPlace = vi.fn();
+    renderModal({ onOpenChange, onShowPlace });
+
+    await waitFor(() => expect(drawn.length).toBeGreaterThan(0));
+    const markers = drawn.at(-1)?.markers as {
+      action: { label: string; onSelect: () => void };
+    }[];
+    // Either language: which one the memo was built in depends on render order.
+    expect(markers[1].action.label).toMatch(
+      /^(Show in list|In der Liste zeigen)$/,
+    );
+
+    markers[1].action.onSelect();
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(onShowPlace).toHaveBeenCalledExactlyOnceWith('Köln');
   });
 
   // Leaflet draws its zoom buttons and attribution itself, in English unless handed the words.

@@ -40,13 +40,18 @@ export function PageSizeChoice({
           data-testid={`page-size-${size}`}
           aria-pressed={size === pageSize}
           onClick={() => onChange(size)}
-          className={`min-w-11 min-h-11 sm:min-w-9 sm:min-h-9 px-2 rounded-sm font-label text-xs transition-colors ${
-            size === pageSize
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-          }`}
+          // The whole 44px stays tappable; only the pill inside it shows the choice.
+          className="group min-w-11 min-h-11 sm:min-w-9 sm:min-h-9 flex items-center justify-center font-label text-xs"
         >
-          {size}
+          <span
+            className={`min-w-7 h-7 px-1.5 flex items-center justify-center rounded-sm transition-colors ${
+              size === pageSize
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground group-hover:text-foreground group-hover:bg-muted'
+            }`}
+          >
+            {size}
+          </span>
         </button>
       ))}
     </div>

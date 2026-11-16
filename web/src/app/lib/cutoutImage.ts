@@ -144,3 +144,14 @@ export function cropWithAlpha({
     return rimColour({ pixels, alpha, width, source })[channel];
   });
 }
+
+/** The photo's own opacity, where it has a see-through pixel at all: then it is a cut-out already. */
+export function ownTransparency(
+  pixels: Uint8ClampedArray,
+): Uint8ClampedArray | null {
+  const alpha = fillEach(
+    new Uint8ClampedArray(pixels.length / 4),
+    (index) => pixels[index * 4 + 3],
+  );
+  return alpha.includes(0) ? alpha : null;
+}

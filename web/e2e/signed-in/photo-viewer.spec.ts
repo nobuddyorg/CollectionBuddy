@@ -2,7 +2,7 @@ import { expect, test } from './test';
 
 import { removeEntriesTitled } from './cleanup';
 import { SEED } from './fixtures';
-import { PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
+import { OTHER_PHOTO, PHOTO, PHOTO_ARRIVES, uniqueName } from './helpers';
 import { apiAs, context, seededEntryId } from './rls/helpers';
 // photos.spec.ts proves a photograph is stored; this opens it full size and walks the carousel.
 test.use({ locale: 'en-GB' });
@@ -95,6 +95,65 @@ test.describe('looking at a photograph full size', () => {
       await page.keyboard.press('Escape');
       await expect(app.viewer()).toHaveCount(0);
       await expect(card.locators.images).toHaveCount(2);
+    } finally {
+      await removeEntriesTitled(title);
+    }
+  });
+
+  test('makes a later photo the cover, which stays first after a reload and falls back to the oldest once deleted', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await app.categories.do.open(SEED.viewerCategory);
+    // A stored photo's name from its signed URL: the uuid both its sizes share.
+    const nameOf = async (index: number) =>
+      new URL(
+        (await card.locators.images.nth(index).getAttribute('src'))!,
+      ).pathname
+        .split('/')
+        .pop()!
+        .split('.')[0];
+
+    const title = uniqueName('Titelbild');
+    const card = app.catalogue.card(title);
+    try {
+      await app.catalogue.do.addEntry(title);
+      await card.do.uploadPhoto(PHOTO);
+      await expect(card.locators.images).toHaveCount(1, {
+        timeout: PHOTO_ARRIVES,
+      });
+      await card.do.uploadPhoto(OTHER_PHOTO);
+      await expect(card.locators.images).toHaveCount(2, {
+        timeout: PHOTO_ARRIVES,
+      });
+      const [oldest, later] = [await nameOf(0), await nameOf(1)];
+
+      await card.do.openImage();
+      // The cover itself is not offered.
+      await expect(app.viewer.locators.buttons.makeCover).toHaveCount(0);
+      await app.viewer.do.next();
+      await app.viewer.do.makeCover();
+      await expect(app.viewer.locators.position).toHaveText('1 / 2');
+      await expect(app.viewer.locators.buttons.makeCover).toHaveCount(0);
+      await app.viewer.do.close();
+      await expect.poll(() => nameOf(0)).toBe(later);
+
+      await page.reload({ waitUntil: 'networkidle' });
+      await expect(card.locators.images).toHaveCount(2, {
+        timeout: PHOTO_ARRIVES,
+      });
+      expect(await nameOf(0)).toBe(later);
+
+      await card.do.openImage();
+      await app.viewer.do.deleteImage();
+      await app.confirm.do.accept();
+      await app.toast.do.commitDeletion('images');
+      await page.reload({ waitUntil: 'networkidle' });
+      await expect(card.locators.images).toHaveCount(1, {
+        timeout: PHOTO_ARRIVES,
+      });
+      expect(await nameOf(0)).toBe(oldest);
     } finally {
       await removeEntriesTitled(title);
     }

@@ -47,8 +47,11 @@ It is designed for keeping a structured personal record of collected items rathe
 
 - **Photo-first entries**: one photo, a pair, or a whole strip. Add several photos at once, or take one with the camera on a phone; a blurry one is flagged before it uploads. Photos are compressed to WebP (JPEG in Safari and on iOS) in the browser before upload, so there's no manual resizing.
 - **Background removal, if you want it**: turn on **Remove backgrounds** in the account menu and each photo is offered without its background, next to the original, before it uploads: a coin, a stamp, whatever you collect. A photo already added can lose its background too, and keeps its place. It runs entirely in your browser; the model is downloaded once (about 90 MB), and nothing changes for anyone who leaves it off.
+- **Choose the cover**: any photo of an entry can be its cover, the one its card shows large.
+- **Crop to the item**: with background removal on, a stored photo is cropped to its item in the card's 4:3 frame, its background kept, in one tap.
+- **Rotate and straighten**: turn a stored photo a quarter at a time or by any angle, and a rectangular item without its background, a stamp or a card, is squared in one tap. The photo keeps its place.
 - **Categories** to keep collections apart, with **sharing** so someone else can browse yours — read-only by default, or with edit access if you grant it.
-- **Place and map**: give an item a location, then see your whole collection pinned on a map.
+- **Place and map**: give an item a location, then see your whole collection pinned on a map, and any pin's items in the list.
 - **Tags and search** across title, description, place, and tags at once.
 - **Import/export** a category you own as a portable archive.
 - **Bilingual, themeable**: German/English and light/dark/system, both remembered per visitor.

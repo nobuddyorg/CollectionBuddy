@@ -42,8 +42,26 @@ interface ImageViewer {
     close(): Promise<void>;
     deleteImage(): Promise<void>;
     previous(): Promise<void>;
-    /** Closes the viewer and opens the cut-out review for the photo shown. */
+    /** Opens the edit panel and cuts out the photo shown; the cut-out shows in its place once ready. */
     removeBackground(): Promise<void>;
+    /** Opens the rotation's tools for the photo shown. */
+    rotate(): Promise<void>;
+    rotateLeft(): Promise<void>;
+    rotateRight(): Promise<void>;
+    /** Moves the slider from where it is by `steps` of 0.1°, by keyboard, as a collector without a pointer would. */
+    nudgeAngle(steps: number): Promise<void>;
+    straighten(): Promise<void>;
+    resetRotation(): Promise<void>;
+    cancelRotation(): Promise<void>;
+    /** Saves the rotation and waits until the turned photo has taken the original's place. */
+    saveRotation(): Promise<void>;
+    makeCover(): Promise<void>;
+    next(): Promise<void>;
+    /** Opens the edit panel and crops the photo shown to its item; the crop shows once the item is found. */
+    cropToItem(): Promise<void>;
+    cancelEdit(): Promise<void>;
+    /** Saves a crop or cut-out and waits until it has taken the original's place. */
+    saveEdit(): Promise<void>;
   };
   locators: {
     buttons: {
@@ -51,9 +69,31 @@ interface ImageViewer {
       deleteImage: Locator;
       previous: Locator;
       removeBackground: Locator;
+      rotate: Locator;
+      crop: Locator;
+      makeCover: Locator;
     };
     photo: Locator;
     position: Locator;
+    rotation: {
+      controls: Locator;
+      left: Locator;
+      right: Locator;
+      angle: Locator;
+      angleValue: Locator;
+      straighten: Locator;
+      reset: Locator;
+      cancel: Locator;
+      save: Locator;
+      preview: Locator;
+    };
+    edit: {
+      controls: Locator;
+      status: Locator;
+      preview: Locator;
+      cancel: Locator;
+      save: Locator;
+    };
   };
 }
 
@@ -120,15 +160,39 @@ export function initToast(page: Page): Toast {
 
 export function initImageViewer(page: Page): ImageViewer {
   const root = page.getByTestId('image-viewer');
+  // The src of the photo an edit started on, which a saved edit replaces.
+  let edited = '';
   const locators = {
     buttons: {
       close: root.getByTestId('close-image'),
       deleteImage: root.getByTestId('delete-image'),
       previous: root.getByTestId('previous-image'),
       removeBackground: root.getByTestId('remove-background-image'),
+      rotate: root.getByTestId('rotate-image'),
+      crop: root.getByTestId('crop-image'),
+      makeCover: root.getByTestId('make-cover'),
     },
     photo: root.getByTestId('viewer-photo'),
     position: root.getByTestId('image-position'),
+    rotation: {
+      controls: root.getByTestId('rotation-controls'),
+      left: root.getByTestId('rotate-left'),
+      right: root.getByTestId('rotate-right'),
+      angle: root.getByTestId('rotation-angle'),
+      angleValue: root.getByTestId('rotation-angle-value'),
+      straighten: root.getByTestId('straighten-image'),
+      reset: root.getByTestId('rotation-reset'),
+      cancel: root.getByTestId('rotation-cancel'),
+      save: root.getByTestId('rotation-save'),
+      preview: root.getByTestId('rotation-preview'),
+    },
+    edit: {
+      controls: root.getByTestId('edit-controls'),
+      status: root.getByTestId('edit-status'),
+      preview: root.getByTestId('edit-preview'),
+      cancel: root.getByTestId('edit-cancel'),
+      save: root.getByTestId('edit-save'),
+    },
   };
   const interactions = {
     close: async () => {
@@ -141,8 +205,68 @@ export function initImageViewer(page: Page): ImageViewer {
     previous: async () => {
       await locators.buttons.previous.click();
     },
+    // The preview takes the photo's place, so its src is read before the edit starts.
     removeBackground: async () => {
+      edited = (await locators.photo.getAttribute('src')) ?? '';
       await locators.buttons.removeBackground.click();
+      await expect(locators.edit.controls).toBeVisible();
+    },
+    makeCover: async () => {
+      await locators.buttons.makeCover.click();
+    },
+    next: async () => {
+      await root.getByTestId('next-image').click();
+    },
+    rotate: async () => {
+      await locators.buttons.rotate.click();
+      await expect(locators.rotation.controls).toBeVisible();
+    },
+    rotateLeft: async () => {
+      await locators.rotation.left.click();
+    },
+    rotateRight: async () => {
+      await locators.rotation.right.click();
+    },
+    nudgeAngle: async (steps: number) => {
+      await locators.rotation.angle.focus();
+      const key = steps < 0 ? 'ArrowLeft' : 'ArrowRight';
+      for (let step = 0; step < Math.abs(steps); step += 1) {
+        await page.keyboard.press(key);
+      }
+    },
+    straighten: async () => {
+      await locators.rotation.straighten.click();
+    },
+    resetRotation: async () => {
+      await locators.rotation.reset.click();
+    },
+    cancelRotation: async () => {
+      await locators.rotation.cancel.click();
+    },
+    // The new row's photo has a new path, so its signed URL differs from the original's.
+    saveRotation: async () => {
+      const original = await locators.photo.getAttribute('src');
+      await expect(locators.rotation.save).toBeEnabled();
+      await locators.rotation.save.click();
+      await expect(locators.rotation.controls).toHaveCount(0);
+      await expect(locators.photo).not.toHaveAttribute('src', original ?? '', {
+        timeout: 45_000,
+      });
+    },
+    cropToItem: async () => {
+      edited = (await locators.photo.getAttribute('src')) ?? '';
+      await locators.buttons.crop.click();
+      await expect(locators.edit.controls).toBeVisible();
+    },
+    cancelEdit: async () => {
+      await locators.edit.cancel.click();
+    },
+    saveEdit: async () => {
+      await locators.edit.save.click();
+      await expect(locators.edit.controls).toHaveCount(0);
+      await expect(locators.photo).not.toHaveAttribute('src', edited, {
+        timeout: 45_000,
+      });
     },
   };
   return Object.assign(() => root, { locators, do: interactions });
