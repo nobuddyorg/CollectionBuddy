@@ -12,7 +12,7 @@ returns text[]
 language sql
 as $$
   select coalesce(array_agg(x.title order by x.ord), array[]::text[])
-  from public.search_category_items(p_category_id, '%' || p_term || '%', p_from, p_to)
+  from public.search_category_entries(p_category_id, p_from, p_to, '%' || p_term || '%')
     with ordinality as x(id, title, description, place, place_lat, place_lng, tags, total_count, images, ord)
 $$;
 
@@ -23,7 +23,7 @@ returns bigint
 language sql
 as $$
   select max(total_count)
-  from public.search_category_items(p_category_id, '%' || p_term || '%', p_from, p_to)
+  from public.search_category_entries(p_category_id, p_from, p_to, '%' || p_term || '%')
 $$;
 
 -- The first match's photograph paths, in the order the function carries them.
@@ -32,7 +32,7 @@ returns text[]
 language sql
 as $$
   select coalesce(array_agg(p.photo ->> 'path_full' order by p.ord), array[]::text[])
-  from public.search_category_items(p_category_id, '%' || p_term || '%', 0, 0) s,
+  from public.search_category_entries(p_category_id, 0, 0, '%' || p_term || '%') s,
     jsonb_array_elements(s.images) with ordinality as p(photo, ord)
 $$;
 
@@ -110,14 +110,14 @@ select is(
 
 select is(
   (select s.images
-   from public.search_category_items(:'category_id'::uuid, '%Probe three%', 0, 0) s),
+   from public.search_category_entries(:'category_id'::uuid, 0, 0, '%Probe three%') s),
   '[]'::jsonb,
   'an entry without photographs carries an empty list, not null'
 );
 
 select is(
   (select array_agg(key order by key)
-   from public.search_category_items(:'category_id'::uuid, '%Probe four%', 0, 0) s,
+   from public.search_category_entries(:'category_id'::uuid, 0, 0, '%Probe four%') s,
      jsonb_array_elements(s.images) photo,
      jsonb_object_keys(photo) key),
   array['id', 'item_id', 'path_full', 'path_thumb'],
@@ -164,6 +164,47 @@ select is(
   pg_temp.search_page(:'category_id'::uuid, 'sILBERGLANZ', 0, 9),
   array['Branch entry'],
   'matching ignores case'
+);
+
+-- at_place is the map's exact pin text (0038), so neither a fragment nor another casing may widen it into a second search.
+create or replace function pg_temp.place_page(p_category_id uuid, p_pattern text, p_place text)
+returns text[]
+language sql
+as $$
+  select coalesce(array_agg(title order by title), array[]::text[])
+  from public.search_category_entries(p_category_id, 0, 9, p_pattern, p_place)
+$$;
+
+select is(
+  pg_temp.place_page(:'category_id'::uuid, null, 'Kölnisch Wasser'),
+  array['Branch entry'],
+  'a place alone narrows to the entries at exactly that place'
+);
+select is(
+  pg_temp.place_page(:'category_id'::uuid, null, 'Kölnisch'),
+  array[]::text[],
+  'a fragment of the place is not a match'
+);
+select is(
+  pg_temp.place_page(:'category_id'::uuid, null, 'kölnisch wasser'),
+  array[]::text[],
+  'nor is the place in another casing'
+);
+select is(
+  pg_temp.place_page(:'category_id'::uuid, '%Probe%', 'Kölnisch Wasser'),
+  array[]::text[],
+  'a term and a place both apply'
+);
+select is(
+  pg_temp.place_page(:'category_id'::uuid, '%Reichsmark%', 'Kölnisch Wasser'),
+  array['Branch entry'],
+  'so an entry matching both is found'
+);
+select is(
+  (select max(total_count)
+   from public.search_category_entries(:'category_id'::uuid, 0, 0, null, 'Kölnisch Wasser')),
+  1::bigint,
+  'total_count counts the entries at the place, not the whole collection'
 );
 
 -- has_category_read_access ignores the role, so an editor grant reads as a viewer grant (060) does.

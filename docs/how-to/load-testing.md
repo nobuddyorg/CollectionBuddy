@@ -15,7 +15,7 @@ supabase-js. Change one, change the other.
 | Script | Scenarios | Normal load | Exercises |
 | --- | --- | --- | --- |
 | `smoke.js` | every journey below | 1 VU, 1 iteration each, whatever the profile | That the scripts and the target work, before a heavier run |
-| `catalogue.js` | `browse`, `search`, `export` | 10 + 5 + 1 VUs | The owner paging the catalogue as the app does (a page's ids and exact count side by side, then its entries with their photographs, then one sign call for the cards; pages 1 to 3, then the last page, then every page of the map), searching it through `search_category_items` (each page's photographs signed), and exporting all of it (keyset pages, sign calls of 100 paths six at a time, every photograph downloaded) |
+| `catalogue.js` | `browse`, `search`, `export` | 10 + 5 + 1 VUs | The owner paging the catalogue as the app does (a page's ids and exact count side by side, then its entries with their photographs, then one sign call for the cards; pages 1 to 3, then the last page, then every page of the map), searching it through `search_category_entries` (each page's photographs signed), and exporting all of it (keyset pages, sign calls of 100 paths six at a time, every photograph downloaded) |
 | `shared-viewer.js` | `shared_browse`, `shared_search` | 10 + 5 VUs | A second identity reading a category it holds a `viewer` grant on: the `has_category_read_access()` path (#619) |
 | `write.js` | `write` | 5 VUs | Creating an entry, filing it, uploading a photograph and its thumbnail, writing its `images` row |
 | `population.js` | `own_browse`, `own_search`, `lent_browse`, `write` | 10 + 5 + 5 + 3 VUs | Many collectors at once, each VU one of them: tables and trigram indexes shared by everyone, a grant per collector, quota triggers per owner. Searches are mostly another collector's word, common across the table and absent from the searcher's own collection |
@@ -192,7 +192,7 @@ Three things to keep in mind:
   `INSERT`s and their per-row trigger lookups show up. They are recognisable
   by their shape: a few calls, many rows each.
 - `pg_stat_statements` tracks top-level statements only, so the statements
-  inside `search_category_items` count toward the call that ran it.
+  inside `search_category_entries` count toward the call that ran it.
 - The wrapper waits 11 s after k6 before the second snapshot, because an idle
   backend can hold its table counters for up to 10 s before flushing them.
 

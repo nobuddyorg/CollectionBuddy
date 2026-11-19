@@ -266,25 +266,6 @@ export type Database = {
           total_count: number;
         }[];
       };
-      search_category_items: {
-        Args: {
-          cat_id: string;
-          like_pattern: string;
-          page_from: number;
-          page_to: number;
-        };
-        Returns: {
-          description: string;
-          id: string;
-          images: Json;
-          place: string;
-          place_lat: number;
-          place_lng: number;
-          tags: string[];
-          title: string;
-          total_count: number;
-        }[];
-      };
       storage_item_id: { Args: { path: string }; Returns: string };
     };
     Enums: {

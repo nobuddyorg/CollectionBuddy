@@ -107,7 +107,6 @@ describe('the queries behind the catalogue page', () => {
         to: 8,
       }),
     );
-    // The new search (0038); search_category_items stays only for the previous bundle.
     expect(request.url.pathname).toMatch(/\/rpc\/search_category_entries$/);
     expect(request.method).toBe('GET');
     const params = searchParamsOf('coin');
