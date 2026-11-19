@@ -175,6 +175,15 @@ export function MapModal({
               {t('common.loading')}
             </div>
           )}
+          {search.length >= SEARCH_MIN_LENGTH && (
+            // The map has no search of its own: name the catalogue's, which narrows the pins (#912).
+            <p
+              data-testid="map-search-note"
+              className="absolute bottom-2 left-2 z-[1000] max-w-[60%] truncate rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-900 shadow-md"
+            >
+              {t('item_list.map_search_note', { term: search })}
+            </p>
+          )}
           {/* Fixed light colours, not theme tokens: the map tiles beneath never go dark. */}
           <div className="absolute top-2 right-2 z-[1000] bg-white/80 backdrop-blur rounded-lg flex gap-1 p-1">
             <button

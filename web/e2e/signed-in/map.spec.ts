@@ -28,6 +28,9 @@ test.describe('the map', () => {
 
     await on(page).map.do.open();
     await expect(on(page).map.locators.pins).toHaveCount(1);
+    await expect(on(page).map.locators.texts.searchNote).toHaveText(
+      'Pins for entries matching your search “Silberdenar”',
+    );
   });
 
   test('ignores a search too short for the list to use', async ({
@@ -39,6 +42,7 @@ test.describe('the map', () => {
 
     await on(page).map.do.open();
     await expect(on(page).map.locators.pins).toHaveCount(2);
+    await expect(on(page).map.locators.texts.searchNote).toBeHidden();
   });
 
   test('says there is nothing to show when the search matches no place', async ({

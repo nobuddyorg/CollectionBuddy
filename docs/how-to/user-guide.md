@@ -244,7 +244,9 @@ around the current page.
 
 The map icon next to **+** opens a map of every item in the category that has
 a place. An active search narrows the pins the same way it narrows the grid,
-but the map is not paged — it draws every match. Geocoding results are cached
+and a note at the bottom of the map names it; the map has no search field of
+its own. It is not paged — it draws every match. A place typed without picking
+a suggestion is looked up on Photon to place its pin. Geocoding results are cached
 in your browser, so reopening the map for the same category does not look
 places up again.
 
