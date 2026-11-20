@@ -54,18 +54,6 @@ const CORNERS: {
 
 const share = (value: number, of: number) => `${(100 * value) / of}%`;
 
-const TARGETS: readonly Target[] = [
-  'frame',
-  ...CORNERS.map(({ corner }) => corner),
-];
-
-/** What a grip drags, as its `data-grip` says: read when the event fires, never during render. */
-function targetOf(element: HTMLElement): Target {
-  const grip = TARGETS.find((target) => target === element.dataset.grip);
-  if (!grip) throw new Error(`Not a crop grip: ${element.dataset.grip}`);
-  return grip;
-}
-
 /** The stored photo with a frame over it to drag, and its corners to resize: the crop shows as the undimmed part. */
 export function ManualCropView({
   image,
@@ -90,8 +78,7 @@ export function ManualCropView({
     else actions.resize(from, target, by);
   };
 
-  const begin = (event: React.PointerEvent<HTMLElement>) => {
-    const target = targetOf(event.currentTarget);
+  const begin = (event: React.PointerEvent<HTMLElement>, target: Target) => {
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     const area = areaRef.current!.getBoundingClientRect();
@@ -116,12 +103,12 @@ export function ManualCropView({
     drag.current = null;
   };
 
-  const press = (event: React.KeyboardEvent<HTMLElement>) => {
+  const press = (event: React.KeyboardEvent<HTMLElement>, target: Target) => {
     const unit = ARROW_SHIFTS[event.key];
     if (!unit) return;
     event.preventDefault();
     const step = keyStep(size, event.shiftKey);
-    apply(targetOf(event.currentTarget), frame, {
+    apply(target, frame, {
       x: unit.x * step,
       y: unit.y * step,
     });
@@ -166,12 +153,11 @@ export function ManualCropView({
           data-testid="crop-frame"
           aria-label={t('item_list.crop_frame_move')}
           className="absolute inset-0 cursor-move border-2 border-white outline-offset-2 focus-visible:outline-2 focus-visible:outline-white"
-          data-grip="frame"
-          onPointerDown={begin}
+          onPointerDown={(event) => begin(event, 'frame')}
           onPointerMove={follow}
           onPointerUp={end}
           onPointerCancel={end}
-          onKeyDown={press}
+          onKeyDown={(event) => press(event, 'frame')}
         />
         {CORNERS.map(({ corner, label, place, cursor }) => (
           <button
@@ -181,12 +167,11 @@ export function ManualCropView({
             aria-label={label(t)}
             // A 44px reach around a small visible square: a finger finds it on a phone.
             className={`absolute ${place} ${cursor} flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-white`}
-            data-grip={corner}
-            onPointerDown={begin}
+            onPointerDown={(event) => begin(event, corner)}
             onPointerMove={follow}
             onPointerUp={end}
             onPointerCancel={end}
-            onKeyDown={press}
+            onKeyDown={(event) => press(event, corner)}
           >
             <span className="h-4 w-4 rounded-sm border-2 border-white bg-neutral-900/70" />
           </button>

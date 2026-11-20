@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CutoutReply, CutoutRequest } from './backgroundRemovalJob';
 import type { CompressionRequest } from './drawPhoto';
+import type {
+  FrameCrop,
+  FrameCropAnswer,
+  FrameCropRequest,
+} from './frameCropJob';
 import type { CompressionAnswer } from './photo.worker';
 import type {
   InspectionAnswer,
@@ -18,13 +23,15 @@ type Job =
   | SharpnessRequest
   | CutoutRequest
   | RotationRequest
-  | InspectionRequest;
+  | InspectionRequest
+  | FrameCropRequest;
 type Answer =
   | CompressionAnswer
   | SharpnessAnswer
   | CutoutReply
   | RotationAnswer
-  | InspectionAnswer;
+  | InspectionAnswer
+  | FrameCropAnswer;
 
 const handleRequest = vi.hoisted(() =>
   vi.fn<
@@ -49,6 +56,10 @@ const rotation = vi.hoisted(() => ({
     vi.fn<(request: InspectionRequest) => Promise<PhotoInspection>>(),
 }));
 vi.mock('./rotationJob', () => rotation);
+const cropFrameOffscreen = vi.hoisted(() =>
+  vi.fn<(request: FrameCropRequest) => Promise<FrameCrop>>(),
+);
+vi.mock('./frameCropJob', () => ({ cropFrameOffscreen }));
 
 /** The worker's global scope: the page's messages arrive at `onmessage`, and its answers are recorded. */
 const scope = {
@@ -191,6 +202,35 @@ describe('the photo worker', () => {
     await send({ kind: 'rotate', file: new Blob(['photo']), degrees: 3 }, [
       { error: 'Error: No canvas' },
     ]);
+  });
+
+  it('answers a hand-drawn crop with the cropped photo and whether it is a cut-out', async () => {
+    const cut: FrameCropRequest = {
+      kind: 'crop-frame',
+      file: new Blob(['photo']),
+      box: { x: 1, y: 2, width: 30, height: 40 },
+    };
+    const cropped = { blob: new Blob(['png']), transparent: false };
+    cropFrameOffscreen.mockResolvedValue(cropped);
+
+    await send(cut, [cropped]);
+
+    expect(cropFrameOffscreen).toHaveBeenCalledExactlyOnceWith(cut);
+    expect(rotation.rotateOffscreen).not.toHaveBeenCalled();
+    expect(handleRequest).not.toHaveBeenCalled();
+  });
+
+  it('answers a hand-drawn crop that failed with its reason', async () => {
+    cropFrameOffscreen.mockRejectedValue(new Error('No canvas'));
+
+    await send(
+      {
+        kind: 'crop-frame',
+        file: new Blob(['photo']),
+        box: { x: 0, y: 0, width: 1, height: 1 },
+      },
+      [{ error: 'Error: No canvas' }],
+    );
   });
 
   it('answers an inspection with what it found', async () => {
