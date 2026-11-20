@@ -51,7 +51,8 @@ test.describe('cropping a stored photo by hand', () => {
     await on(page).categories.do.open(SEED.viewerCategory);
   });
 
-  test('a corner dragged and the frame nudged by keyboard crop it at the card’s 4:3, in its place', async ({
+  // An ASCII title: its output path holds the photo, and no file uploaded from a path with a curly quote in it.
+  test('a corner dragged and the frame nudged by keyboard crop it to the card frame, in its place', async ({
     on,
     page,
   }, testInfo) => {
