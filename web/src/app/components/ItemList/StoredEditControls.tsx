@@ -36,14 +36,21 @@ export function StoredEditControls({
   edit,
   actions,
   busy,
+  cropByHand,
 }: {
   edit: Open;
   actions: Pick<StoredEditApi, 'cancel' | 'save'>;
   /** Another change to this entry's photos is still on its way. */
   busy: boolean;
+  /** Where the model found no item, a frame drawn by hand instead; `ready` once the photo it is drawn over has loaded. */
+  cropByHand: { start: () => void; ready: boolean };
 }) {
   const { t } = useI18n();
   const saving = edit.kind === 'ready' && edit.saving;
+  const foundNothing =
+    edit.kind === 'unchanged' &&
+    edit.tool === 'crop' &&
+    edit.reason === 'no-object';
 
   return (
     <div
@@ -64,6 +71,17 @@ export function StoredEditControls({
         {edit.kind === 'working' && <Spinner size="sm" />}
         {statusText(edit, t)}
       </p>
+      {foundNothing && (
+        <button
+          type="button"
+          data-testid="edit-crop-by-hand"
+          onClick={cropByHand.start}
+          disabled={busy || !cropByHand.ready}
+          className={buttonClasses('w-full disabled:opacity-60')}
+        >
+          {t('item_list.crop_by_hand_instead')}
+        </button>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"

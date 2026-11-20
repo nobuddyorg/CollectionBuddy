@@ -62,6 +62,22 @@ interface ImageViewer {
     cancelEdit(): Promise<void>;
     /** Saves a crop or cut-out and waits until it has taken the original's place. */
     saveEdit(): Promise<void>;
+    /** Opens a frame over the photo shown, to crop it by hand. */
+    cropByHand(): Promise<void>;
+    /** Drags a corner of that frame by `by` screen pixels, as a finger or mouse would. */
+    dragCropCorner(
+      corner: CropCorner,
+      by: { x: number; y: number },
+    ): Promise<void>;
+    /** Moves the frame by keyboard from where it is, `presses` times in the arrow's direction. */
+    nudgeCropFrame(
+      key: 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown',
+      presses: number,
+    ): Promise<void>;
+    toggleCropLock(): Promise<void>;
+    cancelCropByHand(): Promise<void>;
+    /** Saves the hand-drawn crop and waits until it has taken the original's place. */
+    saveCropByHand(): Promise<void>;
   };
   locators: {
     buttons: {
@@ -71,6 +87,7 @@ interface ImageViewer {
       removeBackground: Locator;
       rotate: Locator;
       crop: Locator;
+      cropByHand: Locator;
       makeCover: Locator;
     };
     photo: Locator;
@@ -94,8 +111,21 @@ interface ImageViewer {
       cancel: Locator;
       save: Locator;
     };
+    manualCrop: {
+      view: Locator;
+      frame: Locator;
+      controls: Locator;
+      lock: Locator;
+      cancel: Locator;
+      save: Locator;
+      /** A crop-by-hand offered where Crop to the item found nothing. */
+      instead: Locator;
+    };
   };
 }
+
+type CropCorner =
+  'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 export function initConfirm(page: Page): Confirm {
   const root = page.getByTestId('dialog-message');
@@ -170,6 +200,7 @@ export function initImageViewer(page: Page): ImageViewer {
       removeBackground: root.getByTestId('remove-background-image'),
       rotate: root.getByTestId('rotate-image'),
       crop: root.getByTestId('crop-image'),
+      cropByHand: root.getByTestId('crop-by-hand'),
       makeCover: root.getByTestId('make-cover'),
     },
     photo: root.getByTestId('viewer-photo'),
@@ -192,6 +223,15 @@ export function initImageViewer(page: Page): ImageViewer {
       preview: root.getByTestId('edit-preview'),
       cancel: root.getByTestId('edit-cancel'),
       save: root.getByTestId('edit-save'),
+    },
+    manualCrop: {
+      view: root.getByTestId('manual-crop'),
+      frame: root.getByTestId('crop-frame'),
+      controls: root.getByTestId('manual-crop-controls'),
+      lock: root.getByTestId('manual-crop-lock'),
+      cancel: root.getByTestId('manual-crop-cancel'),
+      save: root.getByTestId('manual-crop-save'),
+      instead: root.getByTestId('edit-crop-by-hand'),
     },
   };
   const interactions = {
@@ -264,6 +304,49 @@ export function initImageViewer(page: Page): ImageViewer {
     saveEdit: async () => {
       await locators.edit.save.click();
       await expect(locators.edit.controls).toHaveCount(0);
+      await expect(locators.photo).not.toHaveAttribute('src', edited, {
+        timeout: 45_000,
+      });
+    },
+    // The frame is drawn over the photo once it has loaded, so the button waits for that.
+    cropByHand: async () => {
+      edited = (await locators.photo.getAttribute('src')) ?? '';
+      await expect(locators.buttons.cropByHand).toBeEnabled();
+      await locators.buttons.cropByHand.click();
+      await expect(locators.manualCrop.view).toBeVisible();
+    },
+    dragCropCorner: async (
+      corner: CropCorner,
+      by: { x: number; y: number },
+    ) => {
+      const handle = root.getByTestId(`crop-handle-${corner}`);
+      const box = (await handle.boundingBox())!;
+      const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.mouse.move(start.x + by.x, start.y + by.y, { steps: 5 });
+      await page.mouse.up();
+    },
+    nudgeCropFrame: async (
+      key: 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown',
+      presses: number,
+    ) => {
+      await locators.manualCrop.frame.focus();
+      for (let press = 0; press < presses; press += 1) {
+        await page.keyboard.press(key);
+      }
+    },
+    toggleCropLock: async () => {
+      await locators.manualCrop.lock.click();
+    },
+    cancelCropByHand: async () => {
+      await locators.manualCrop.cancel.click();
+      await expect(locators.manualCrop.controls).toHaveCount(0);
+    },
+    saveCropByHand: async () => {
+      await expect(locators.manualCrop.save).toBeEnabled();
+      await locators.manualCrop.save.click();
+      await expect(locators.manualCrop.controls).toHaveCount(0);
       await expect(locators.photo).not.toHaveAttribute('src', edited, {
         timeout: 45_000,
       });

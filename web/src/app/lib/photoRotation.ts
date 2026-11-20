@@ -1,6 +1,10 @@
 import type { PhotoUpload } from '../data/photoType';
 import { ownTransparency } from './cutoutImage';
-import { askPhotoWorker, decodeUpright } from './photoWorkerClient';
+import {
+  askPhotoWorker,
+  decodeUpright,
+  workerCanDraw,
+} from './photoWorkerClient';
 import {
   drawRotated,
   inspectPixels,
@@ -18,9 +22,6 @@ const onMainThread: ContextOfSize<CanvasRenderingContext2D> = (size) =>
   Object.assign(document.createElement('canvas'), size).getContext('2d', {
     willReadFrequently: true,
   });
-
-// Safari before 16.4 has no OffscreenCanvas, so a worker there could not draw.
-const workerCanDraw = () => typeof OffscreenCanvas !== 'undefined';
 
 async function inspectInWorker(file: Blob): Promise<PhotoInspection> {
   const answer = await askPhotoWorker<InspectionAnswer>(
