@@ -28,6 +28,8 @@ interface MapView {
       empty: Locator;
       /** Names the catalogue search that narrows the pins. */
       searchNote: Locator;
+      /** Counts the places the map has no location for. */
+      unplaced: Locator;
     };
   };
 }
@@ -49,6 +51,7 @@ export function initMap(page: Page): MapView {
     texts: {
       empty: page.getByTestId('map-empty'),
       searchNote: page.getByTestId('map-search-note'),
+      unplaced: page.getByTestId('map-unplaced'),
     },
   };
   const interactions = {

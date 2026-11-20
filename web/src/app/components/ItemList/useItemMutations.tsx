@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
 import { deleteItem, updateItem } from '../../data/items';
+import { geocodeOnce, photonLang } from '../../data/photon';
 import { objectPathsOf, removeObjectsThenRows } from '../../data/imageRemoval';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
@@ -11,6 +12,7 @@ import { useConfirm } from '../Confirm/ConfirmProvider';
 import { restoreAt } from '../../lib/optimistic';
 import { useSyncedRef } from '../../lib/useSyncedRef';
 import type { ItemFormValues } from '../ItemForm';
+import { withLocatedPlace } from '../ItemForm/locatePlace';
 import type { ItemLite } from './types';
 
 export function useItemMutations({
@@ -29,7 +31,7 @@ export function useItemMutations({
   ) => Promise<{ path_full: string; path_thumb: string | null }[]>;
   forgetItemImages: (itemId: string) => void;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
   const confirm = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
@@ -53,7 +55,10 @@ export function useItemMutations({
       setIsSaving(true);
       try {
         // The DB is the normalization authority: merge the row it returns, not a client-side copy.
-        const { data, error } = await updateItem(id, values);
+        const located = await withLocatedPlace(values, (place) =>
+          geocodeOnce(place, { lang: photonLang(language) }),
+        );
+        const { data, error } = await updateItem(id, located);
         if (error || !data) {
           toast.reportError('save item', error, t('item_list.save_error'));
           return false;
@@ -69,7 +74,7 @@ export function useItemMutations({
         setIsSaving(false);
       }
     },
-    [isSaving, setItems, t, toast],
+    [isSaving, language, setItems, t, toast],
   );
 
   // The card goes on confirm; the delete runs once the toast's undo window closes, else it is restored.

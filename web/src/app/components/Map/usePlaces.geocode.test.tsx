@@ -20,7 +20,7 @@ describe('usePlaces geocoding', () => {
 
   afterEach(restoreGlobalsAndTimers);
 
-  it('geocodes an unlocated place, adds it, caches it, and writes the coords back to its rows', async () => {
+  it('geocodes an unlocated place, adds it, and writes the coords back to its rows', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
       data: [
         group('Cologne', { titles: ['Entry A'], ids: ['row-1', 'row-2'] }),
@@ -46,10 +46,9 @@ describe('usePlaces geocoding', () => {
       ids: ['row-1', 'row-2'],
       payload: { place_lat: 50.94, place_lng: 6.96 },
     });
-    const cached = JSON.parse(
-      localStorage.getItem('cb_geocode_cache_v1') ?? '{}',
-    ) as Record<string, unknown>;
-    expect(cached.Cologne).toEqual({ name: 'Cologne', lat: 50.94, lng: 6.96 });
+    expect(result.current.unplaced).toBe(0);
+    // Stored on the rows, so nothing of it is kept in the browser.
+    expect(localStorage.length).toBe(0);
     // A macrotask runs only once every microtask, the write-back's own included, has settled.
     await act(() => new Promise((resolve) => setTimeout(resolve)));
     expect(consoleSpy).not.toHaveBeenCalled();
@@ -81,30 +80,72 @@ describe('usePlaces geocoding', () => {
     consoleSpy.mockRestore();
   });
 
-  // RLS turns a viewer's write-back into a no-op; the device's own cache still spares the next lookup.
-  it("sends a viewer's geocode no write-back, and caches it on the device all the same", async () => {
+  // A viewer cannot store the answer, so asking would send the owner's place names to Photon for nothing kept.
+  it('sends nothing to Photon for a viewer, and counts the places it cannot pin', async () => {
     vi.mocked(listCategoryPlaces).mockResolvedValue({
-      data: [group('Cologne', { titles: ['Entry A'], ids: ['row-1'] })],
+      data: [
+        group('Cologne', { titles: ['Entry A'], ids: ['row-1'] }),
+        group('Paris', { titles: ['Entry B'], ids: ['row-2'] }),
+        group('Bonn', {
+          place_lat: 50.74,
+          place_lng: 7.1,
+          titles: ['Entry C'],
+        }),
+      ],
       error: null,
     });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(photonOk([6.96, 50.94])));
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
 
     const { result } = renderUsePlaces({ canEdit: false });
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(result.current.places).toEqual([
-      { name: 'Cologne', lat: 50.94, lng: 6.96, titles: ['Entry A'] },
+      { name: 'Bonn', lat: 50.74, lng: 7.1, titles: ['Entry C'] },
     ]);
+    expect(result.current.unplaced).toBe(2);
+    expect(result.current.error).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(updateItemsPlace).not.toHaveBeenCalled();
-    const cached = JSON.parse(
-      localStorage.getItem('cb_geocode_cache_v1') ?? '{}',
-    ) as Record<string, unknown>;
-    expect(cached.Cologne).toEqual({ name: 'Cologne', lat: 50.94, lng: 6.96 });
+  });
+
+  it('reports no error for a viewer whose every place is still unlocated', async () => {
+    vi.mocked(listCategoryPlaces).mockResolvedValue({
+      data: [group('Cologne')],
+      error: null,
+    });
+    vi.stubGlobal('fetch', vi.fn());
+
+    const { result } = renderUsePlaces({ canEdit: false });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.places).toEqual([]);
+    expect(result.current.unplaced).toBe(1);
+    expect(result.current.error).toBe(false);
+  });
+
+  it('counts a place Photon does not know as one it could not pin', async () => {
+    vi.mocked(listCategoryPlaces).mockResolvedValue({
+      data: [
+        group('Entenhausen'),
+        group('Bonn', { place_lat: 50.74, place_lng: 7.1 }),
+      ],
+      error: null,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ features: [] }),
+      }),
+    );
+
+    const { result } = renderUsePlaces();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.unplaced).toBe(1);
+    expect(result.current.error).toBe(false);
   });
 
   it('gives up on a place immediately for a non-retryable failure, without retrying', async () => {

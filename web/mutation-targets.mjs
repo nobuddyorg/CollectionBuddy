@@ -43,6 +43,7 @@ export const MUTATE_TARGETS = [
   'src/app/components/CenteredModal/useTopmostKeydown.ts',
   'src/app/useTheme.ts',
   'src/app/components/ItemForm/usePhoton.tsx',
+  'src/app/components/ItemForm/locatePlace.ts',
   'src/app/i18n/I18nProvider.tsx',
   'src/app/data/importFormat.ts',
   'src/app/data/categories.ts',

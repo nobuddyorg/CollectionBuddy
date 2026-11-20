@@ -3,6 +3,7 @@ import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createItemsInCategory } from '../../data/items';
+import { geocodeOnce } from '../../data/photon';
 import { useCreateItem } from './useCreateItem';
 import { EMPTY_ITEM_FORM_VALUES } from '../ItemForm/types';
 import type { ItemFormValues } from '../ItemForm';
@@ -10,6 +11,10 @@ import { ToastWrapper as wrapper } from '../providers.test-support';
 
 vi.mock('../../data/items', () => ({
   createItemsInCategory: vi.fn(),
+}));
+vi.mock('../../data/photon', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../data/photon')>()),
+  geocodeOnce: vi.fn(),
 }));
 
 const liveRegion = () => document.body.querySelector('[aria-live="polite"]');
@@ -83,6 +88,43 @@ describe('useCreateItem', () => {
     ]);
     expect(liveRegion()).toHaveTextContent('Entry added.');
     expect(result.current.isCreating).toBe(false);
+  });
+
+  it('saves a hand-typed place with the coordinates looked up for it, in the same one call', async () => {
+    vi.mocked(geocodeOnce).mockResolvedValue({ lat: 49.75, lng: 6.64 });
+    vi.mocked(createItemsInCategory).mockResolvedValue({
+      data: null,
+      error: null,
+    } as never);
+    const { result } = renderHook(() => useCreateItem('cat-1'), { wrapper });
+
+    await act(async () => {
+      await result.current.create({ ...values(), place: 'Trier' });
+    });
+
+    expect(geocodeOnce).toHaveBeenCalledWith('Trier', { lang: 'en' });
+    expect(createItemsInCategory).toHaveBeenCalledWith('cat-1', [
+      { ...values(), place: 'Trier', place_lat: 49.75, place_lng: 6.64 },
+    ]);
+  });
+
+  it('still saves a hand-typed place when nothing is found for it', async () => {
+    vi.mocked(geocodeOnce).mockResolvedValue(null);
+    vi.mocked(createItemsInCategory).mockResolvedValue({
+      data: null,
+      error: null,
+    } as never);
+    const { result } = renderHook(() => useCreateItem('cat-1'), { wrapper });
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.create({ ...values(), place: 'Entenhausen' });
+    });
+
+    expect(ok).toBe(true);
+    expect(createItemsInCategory).toHaveBeenCalledWith('cat-1', [
+      { ...values(), place: 'Entenhausen' },
+    ]);
   });
 
   it('says the entry limit is reached when the database refuses the entry for its quota', async () => {

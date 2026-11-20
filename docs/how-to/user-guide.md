@@ -129,7 +129,7 @@ cancel the delete and keep the item.
 | --- | --- |
 | Title | Required. |
 | Description | Optional. |
-| Place | Optional. Suggestions appear from the third character, from the [Photon](https://photon.komoot.io/) geocoder. Pick a suggestion to pin the item exactly there. Free text is kept too: the map looks it up when it opens, pins it where Photon finds it, and, if you may edit the collection, saves that position to the items naming that place. |
+| Place | Optional. Suggestions appear from the third character, from the [Photon](https://photon.komoot.io/) geocoder. Pick a suggestion to pin the item exactly there. Free text is kept too: saving looks it up once on Photon and keeps the position it finds, so the map can pin it. If Photon does not know the place or does not answer, the item is saved all the same, without a position. |
 | Tags | Optional. Enter or comma adds a chip; Backspace on an empty tag field removes the last one. Duplicates are ignored. |
 
 On save, whitespace is trimmed, blank fields become empty, and tags are
@@ -245,10 +245,13 @@ around the current page.
 The map icon next to **+** opens a map of every item in the category that has
 a place. An active search narrows the pins the same way it narrows the grid,
 and a note at the bottom of the map names it; the map has no search field of
-its own. It is not paged — it draws every match. A place typed without picking
-a suggestion is looked up on Photon to place its pin. Geocoding results are cached
-in your browser, so reopening the map for the same category does not look
-places up again.
+its own. It is not paged — it draws every match. A place saved without a
+position, such as one Photon did not know or an item saved before positions
+were looked up on saving, is looked up when someone who may edit the
+collection opens the map, and its position is saved to the items there. A
+note at the bottom counts the places the map could not pin; if you only view
+a shared collection, those wait until its owner or an editor opens the map or
+edits the item.
 
 Press a pin to see the place and the items there. **Show in list** closes the
 map and shows just those items, with a chip above the list naming the place;

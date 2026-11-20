@@ -7,27 +7,9 @@ import {
 } from '../../data/items';
 import { geocodePlace, photonLang } from '../../data/photon';
 import { startSpacer } from '../../lib/backoff';
-import { readStoredValue, writeStoredValue } from '../../lib/browserStorage';
 import type { Coordinates } from '../../lib/coordinates';
 import { runPool } from '../../lib/pool';
-import { GEOCODE_CACHE_KEY, storageOwner } from '../../userDataKeys';
 import { Place, PlaceCoords } from './types';
-
-function readGeocodeCache(): Record<string, PlaceCoords> {
-  try {
-    return JSON.parse(readStoredValue(GEOCODE_CACHE_KEY) ?? '{}') as Record<
-      string,
-      PlaceCoords
-    >;
-  } catch {
-    // A corrupt cache counts as none.
-    return {};
-  }
-}
-
-function writeGeocodeCache(cache: Record<string, PlaceCoords>) {
-  writeStoredValue(GEOCODE_CACHE_KEY, JSON.stringify(cache));
-}
 
 async function storeGeocodedPlace(
   ids: string[],
@@ -74,19 +56,12 @@ export function withTitles(
   return { ...coords, titles: titles.get(coords.name) ?? [] };
 }
 
-/** Splits places into cache hits and names still needing a lookup, preserving input order in both. */
-export function partitionByCache(
-  places: string[],
-  cache: Record<string, PlaceCoords>,
-): { cached: PlaceCoords[]; pending: string[] } {
-  const cached: PlaceCoords[] = [];
-  const pending: string[] = [];
-  for (const place of places) {
-    const hit = cache[place];
-    if (hit) cached.push(hit);
-    else pending.push(place);
-  }
-  return { cached, pending };
+/** The places to ask Photon for: only a caller who can store the answer asks, so a viewer's device sends none. */
+export function placesToLookUp(
+  unlocated: string[],
+  canEdit: boolean,
+): string[] {
+  return canEdit ? unlocated : [];
 }
 
 // Photon asks to be used fairly: a few lookups at a time, and together no more than three starts a second.
@@ -98,7 +73,7 @@ const appendPlace = (place: Place) => (previous: Place[]) => [
   place,
 ];
 
-// `enabled` gates fetching behind the map being open; `search` narrows to the entries the list shows.
+// `enabled` gates fetching behind the map being open; `search` narrows to the entries the list shows; `unplaced` counts places left without a pin.
 export function usePlaces({
   categoryId,
   search,
@@ -113,6 +88,7 @@ export function usePlaces({
   language?: string;
 }) {
   const [places, setPlaces] = useState<Place[]>([]);
+  const [unplaced, setUnplaced] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const lang = photonLang(language);
@@ -128,6 +104,7 @@ export function usePlaces({
       setLoading(true);
       setError(false);
       setPlaces([]);
+      setUnplaced(0);
       try {
         const { data: rows, error } = await listCategoryPlaces({
           categoryId,
@@ -140,19 +117,12 @@ export function usePlaces({
         const { located, unlocated, titles, ids } = partitionByStoredCoords(
           rows ?? [],
         );
-        const cache = readGeocodeCache();
-        const owner = storageOwner();
-        let cacheDirty = false;
-
-        const { cached, pending } = partitionByCache(unlocated, cache);
         // Everything already known lands in one batch before any request goes out.
-        const known = [...located, ...cached].map((coords) =>
-          withTitles(coords, titles),
-        );
+        const known = located.map((coords) => withTitles(coords, titles));
         if (!cancelled && known.length > 0) setPlaces(known);
 
-        const placeCount = located.length + unlocated.length;
-        let resolvedCount = known.length;
+        const pending = placesToLookUp(unlocated, canEdit);
+        let foundCount = 0;
 
         const awaitTurn = startSpacer(GEOCODE_START_GAP_MS);
         const { signal } = controller;
@@ -170,22 +140,18 @@ export function usePlaces({
             if (!coords) return;
 
             const entry = { name: place, ...coords };
-            cache[place] = entry;
-            cacheDirty = true;
-            resolvedCount += 1;
+            foundCount += 1;
             if (!cancelled) setPlaces(appendPlace(withTitles(entry, titles)));
 
-            // A viewer's write-back is a no-op under RLS; the local cache still spares its next lookup.
-            if (!canEdit) return;
             // Non-blocking; `ids` came from the same rows as `unlocated`, so the key exists.
             void storeGeocodedPlace(ids.get(place)!, entry);
           },
         });
 
-        // A sign-out mid-lookup forgot this cache; writing it back would hand it to the next account.
-        if (cacheDirty && storageOwner() === owner) writeGeocodeCache(cache);
-        // Every place failed, not "nothing to geocode": tells a broken geocoder from nothing to show.
-        if (!cancelled && placeCount > 0 && resolvedCount === 0) {
+        if (cancelled) return;
+        setUnplaced(unlocated.length - foundCount);
+        // Every lookup failed and nothing was pinned: tells a broken geocoder from places nobody may look up.
+        if (pending.length > 0 && known.length === 0 && foundCount === 0) {
           setError(true);
         }
       } catch (error) {
@@ -207,5 +173,5 @@ export function usePlaces({
     };
   }, [categoryId, search, enabled, canEdit, lang]);
 
-  return { places, loading, error };
+  return { places, unplaced, loading, error };
 }

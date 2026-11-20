@@ -5,11 +5,13 @@ import { useCallback, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import { useToast } from '../Toast/ToastProvider';
 import { createItemsInCategory } from '../../data/items';
+import { geocodeOnce, photonLang } from '../../data/photon';
 import { isQuotaExceeded } from '../../data/quota';
 import type { ItemFormValues } from '../ItemForm';
+import { withLocatedPlace } from '../ItemForm/locatePlace';
 
 export function useCreateItem(categoryId: string) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
   const [isCreating, setIsCreating] = useState(false);
 
@@ -21,7 +23,11 @@ export function useCreateItem(categoryId: string) {
 
       setIsCreating(true);
       try {
-        const { error } = await createItemsInCategory(categoryId, [values]);
+        // Before the one write, not after: the RPC returns no id to write coordinates back to.
+        const located = await withLocatedPlace(values, (place) =>
+          geocodeOnce(place, { lang: photonLang(language) }),
+        );
+        const { error } = await createItemsInCategory(categoryId, [located]);
         if (error) throw error;
 
         toast.announce(t('item_create.entry_added'));
@@ -39,7 +45,7 @@ export function useCreateItem(categoryId: string) {
         setIsCreating(false);
       }
     },
-    [categoryId, isCreating, t, toast],
+    [categoryId, isCreating, language, t, toast],
   );
 
   return { create, isCreating };

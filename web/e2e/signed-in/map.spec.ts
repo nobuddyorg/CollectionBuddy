@@ -82,7 +82,7 @@ test.describe('a map whose places are still being looked up', () => {
   }) => {
     const app = on(page);
     const name = uniqueName('E2E Landkarte');
-    // No suggestions while typing, so each place is stored as typed.
+    // No suggestions while typing and none for the save's lookup, so each place is stored without coordinates.
     await answerGeocoder(page, []);
 
     await app.categories.do.load();
@@ -113,6 +113,54 @@ test.describe('a map whose places are still being looked up', () => {
 
       await app.map.do.open();
       await expect(app.map.locators.pins).toHaveCount(3);
+    } finally {
+      await removeCategoryNamed(name);
+    }
+  });
+});
+
+const TRIER: [number, number] = [6.6413, 49.7596];
+
+test.describe('a place typed without picking a suggestion', () => {
+  test('is located when the entry is saved, so the map asks Photon nothing', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const name = uniqueName('E2E Ort beim Speichern');
+    // Suggestions ask for five results, the save's lookup for one: only the save finds the place.
+    await page.route(GEOCODER, (route) => {
+      const limit = new URL(route.request().url()).searchParams.get('limit');
+      return route.fulfill({
+        json: {
+          features: limit === '1' ? [photonFeature('Trier', TRIER)] : [],
+        },
+      });
+    });
+
+    await app.categories.do.load();
+    await app.categories.do.create(name);
+    try {
+      const title = 'Fund in Trier';
+      await app.catalogue.do.openEntryForm();
+      await app.form.do.fill({ title });
+      await app.form.locators.inputs.place.fill('Trier');
+      await app.form.do.submit();
+      await expect(app.catalogue.card(title).locators.place).toHaveText(
+        'Trier',
+      );
+
+      await page.unroute(GEOCODER);
+      const lookups: string[] = [];
+      await page.route(GEOCODER, (route) => {
+        lookups.push(route.request().url());
+        return route.fulfill({ status: 503, body: '' });
+      });
+
+      await app.map.do.open();
+      await expect(app.map.locators.pins).toHaveCount(1);
+      await expect(app.map.locators.texts.unplaced).toBeHidden();
+      expect(lookups).toEqual([]);
     } finally {
       await removeCategoryNamed(name);
     }

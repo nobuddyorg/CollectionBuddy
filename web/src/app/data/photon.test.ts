@@ -3,8 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   coordsFromFeature,
   coordsFromPhotonResponse,
+  geocodeOnce,
   photonLang,
   photonSearchUrl,
+  SAVE_LOOKUP_TIMEOUT_MS,
   searchPhotonFeatures,
   type PhotonFeature,
 } from './photon';
@@ -170,5 +172,86 @@ describe('coordsFromPhotonResponse', () => {
     expect(
       coordsFromPhotonResponse({ features: [{ geometry: {} }] }),
     ).toBeNull();
+  });
+});
+
+// A save waits on this lookup, so every way it can go wrong must end in "no coordinates", promptly.
+describe('geocodeOnce', () => {
+  function stubFetch(respond: (init: RequestInit) => Promise<unknown>) {
+    const fetchMock = vi
+      .fn<(url: string, init: RequestInit) => Promise<unknown>>()
+      .mockImplementation((_url, init) => respond(init));
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('asks Photon once for the best match, in the given language, and reads its coordinates', async () => {
+    const fetchMock = stubFetch(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        features: [{ geometry: { coordinates: [6.64, 49.75] } }],
+      }),
+    }));
+
+    expect(await geocodeOnce('Trier', { lang: 'de' })).toEqual({
+      lat: 49.75,
+      lng: 6.64,
+    });
+    const params = new URL(fetchMock.mock.calls[0][0]).searchParams;
+    expect(params.get('q')).toBe('Trier');
+    expect(params.get('limit')).toBe('1');
+    expect(params.get('lang')).toBe('de');
+  });
+
+  it('gives no coordinates for a place Photon does not know', async () => {
+    stubFetch(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ features: [] }),
+    }));
+
+    expect(await geocodeOnce('Entenhausen', { lang: 'de' })).toBeNull();
+  });
+
+  it('does not retry a refusal, which the save would otherwise wait out', async () => {
+    const fetchMock = stubFetch(async () => ({
+      ok: false,
+      status: 503,
+      json: async () => ({}),
+    }));
+
+    expect(await geocodeOnce('Trier', { lang: 'de' })).toBeNull();
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('gives no coordinates when the network fails', async () => {
+    stubFetch(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+
+    expect(await geocodeOnce('Trier', { lang: 'de' })).toBeNull();
+  });
+
+  it('gives up on a Photon that does not answer within the bound', async () => {
+    vi.useFakeTimers();
+    stubFetch(
+      (init) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(new DOMException('Timed out', 'TimeoutError')),
+          );
+        }),
+    );
+
+    const found = geocodeOnce('Trier', { lang: 'de' });
+    await vi.advanceTimersByTimeAsync(SAVE_LOOKUP_TIMEOUT_MS);
+
+    expect(await found).toBeNull();
   });
 });

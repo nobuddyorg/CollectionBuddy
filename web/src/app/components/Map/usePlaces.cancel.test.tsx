@@ -245,6 +245,59 @@ describe('usePlaces cancellation', () => {
     expect(result.current.places).toEqual([berlin]);
   });
 
+  // The superseded lookup failing would otherwise read as a broken geocoder, and its count as the new map's.
+  it('reports neither a failed lookup nor its unpinned place once the category already changed', async () => {
+    let resolveFetch!: (value: unknown) => void;
+    vi.mocked(listCategoryPlaces)
+      .mockResolvedValueOnce({
+        data: [group('Cologne', { titles: ['Cologne entry'] })],
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: [
+          group('Berlin', {
+            place_lat: 52.52,
+            place_lng: 13.4,
+            titles: ['Berlin entry'],
+          }),
+        ],
+        error: null,
+      });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            resolveFetch = resolve;
+          }),
+      ),
+    );
+
+    const { result, rerender } = renderUsePlaces();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    rerender({ categoryId: 'cat-2' });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    resolveFetch(photonFailure(404));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.places).toEqual([berlin]);
+    expect(result.current.unplaced).toBe(0);
+    expect(result.current.error).toBe(false);
+  });
+
   it('does not report an error for a listing that fails after the category already changed', async () => {
     let rejectFirst!: (error: unknown) => void;
     vi.mocked(listCategoryPlaces)

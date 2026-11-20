@@ -1,4 +1,8 @@
-import { isRetryableStatus, retryWithBackoff } from '../lib/backoff';
+import {
+  type AttemptOutcome,
+  isRetryableStatus,
+  retryWithBackoff,
+} from '../lib/backoff';
 import type { Coordinates } from '../lib/coordinates';
 
 const PHOTON_ENDPOINT = 'https://photon.komoot.io/api/';
@@ -63,6 +67,27 @@ export function coordsFromPhotonResponse(data: unknown): Coordinates | null {
   return coordsFromFeature(features[0]);
 }
 
+/** One request for `place`: null when Photon does not know it; `retry` when asking again could answer differently. */
+async function lookUpPlace(
+  place: string,
+  { lang, signal }: { lang: string; signal: AbortSignal },
+): Promise<AttemptOutcome<Coordinates | null>> {
+  try {
+    const url = photonSearchUrl(place, { limit: 1, lang });
+    const response = await fetch(url, { signal });
+    // A place the gazetteer does not know will not be known on the third try.
+    if (response.ok)
+      return {
+        value: coordsFromPhotonResponse(await response.json()),
+        retry: false,
+      };
+    return { value: null, retry: isRetryableStatus(response.status) };
+  } catch {
+    // A network error is worth another go, same as a refusal; an abort is not.
+    return { value: null, retry: !signal.aborted };
+  }
+}
+
 // Photon is a free service that sheds load with 429s, so a lookup retries a refusal with backoff.
 const GEOCODE_ATTEMPTS = 3;
 const GEOCODE_RETRY_BASE_MS = 500;
@@ -82,20 +107,19 @@ export function geocodePlace(
     run: async () => {
       await awaitTurn();
       if (signal.aborted) return { value: null, retry: false };
-      try {
-        const url = photonSearchUrl(place, { limit: 1, lang });
-        const response = await fetch(url, { signal });
-        // A place the gazetteer does not know will not be known on the third try.
-        if (response.ok)
-          return {
-            value: coordsFromPhotonResponse(await response.json()),
-            retry: false,
-          };
-        return { value: null, retry: isRetryableStatus(response.status) };
-      } catch {
-        // A network error is worth another go, same as a refusal; an abort is not.
-        return { value: null, retry: !signal.aborted };
-      }
+      return lookUpPlace(place, { lang, signal });
     },
   });
+}
+
+// A save waits for this lookup, so it gets one attempt and a short bound rather than the map's retries.
+export const SAVE_LOOKUP_TIMEOUT_MS = 3000;
+
+/** Where Photon puts `place`, asked once; null when it does not know it, refuses, or takes longer than the bound. */
+export async function geocodeOnce(
+  place: string,
+  { lang }: { lang: string },
+): Promise<Coordinates | null> {
+  const signal = AbortSignal.timeout(SAVE_LOOKUP_TIMEOUT_MS);
+  return (await lookUpPlace(place, { lang, signal })).value;
 }
