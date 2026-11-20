@@ -427,7 +427,7 @@ select is(
      and coalesce(p.proconfig, '{}') @> array['plan_cache_mode=force_custom_plan']),
   array[
     'create_items_in_category', 'delete_item_if_orphan', 'list_category_places',
-    'search_category_entries', 'search_category_items', 'tg_item_categories_quota', 'tg_items_quota'
+    'search_category_entries', 'tg_item_categories_quota', 'tg_items_quota'
   ],
   'the map and search RPCs plan each call for the category it names, entry creation and its quotas for the rows it adds, the orphan cleanup for the links it lost'
 );

@@ -3,7 +3,7 @@ import { test } from './test';
 import { titlesIn } from './fixtures';
 import { expectTitles } from './helpers';
 
-// Unit tests cover the pattern sent to search_category_items; only a real database confirms what it matches.
+// Unit tests cover the pattern sent to search_category_entries; only a real database confirms what it matches.
 test.use({ locale: 'en-GB' });
 
 const allCoins = titlesIn('Münzen');

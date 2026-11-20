@@ -138,7 +138,7 @@ export function searchPage({ session, categoryId, term, page }) {
   });
   return send({
     method: 'GET',
-    path: `/rest/v1/rpc/search_category_items?${params}`,
+    path: `/rest/v1/rpc/search_category_entries?${params}`,
     session,
     name: 'search page',
   });

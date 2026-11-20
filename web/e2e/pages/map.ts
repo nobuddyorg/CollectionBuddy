@@ -26,6 +26,8 @@ interface MapView {
     popupTitles: Locator;
     texts: {
       empty: Locator;
+      /** Names the catalogue search that narrows the pins. */
+      searchNote: Locator;
     };
   };
 }
@@ -46,6 +48,7 @@ export function initMap(page: Page): MapView {
     popupTitles: page.locator('.leaflet-popup-content li'),
     texts: {
       empty: page.getByTestId('map-empty'),
+      searchNote: page.getByTestId('map-search-note'),
     },
   };
   const interactions = {

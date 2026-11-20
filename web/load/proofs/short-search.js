@@ -1,4 +1,4 @@
-// #779: a two-character non-ASCII term yields no trigram, so search_category_items rechecks every collector's items, not the category's.
+// #779: a two-character non-ASCII term yields no trigram, so search_category_entries rechecks every collector's items, not the category's.
 import { check } from 'k6';
 import { Trend } from 'k6/metrics';
 

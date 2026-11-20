@@ -252,7 +252,7 @@ or `ERROR`: RLS disabled, a mutable `search_path`, an unindexed foreign key, a
 pgTAP. The script pins Splinter by commit and checksum and lists what it
 excuses, each with its reason: `unused_index`, which reads runtime statistics
 a freshly reset database does not have, and the three deliberate
-`SECURITY DEFINER` functions `authenticated` may call: `search_category_items`,
+`SECURITY DEFINER` functions `authenticated` may call: `search_category_entries`,
 `photo_upload_has_room` and `delete_own_account`. A new excuse is a design
 decision and goes into that list with its reason, never into a broader filter.
 

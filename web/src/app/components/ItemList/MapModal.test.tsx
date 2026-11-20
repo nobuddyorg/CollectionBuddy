@@ -172,6 +172,23 @@ describe('MapModal', () => {
     );
   });
 
+  it("names the catalogue's search that narrows the pins, as the map has none of its own", async () => {
+    placesState({ places: [place('Bonn', ['a'])] });
+    renderModal({ search: 'Silberdenar' });
+
+    expect(await screen.findByTestId('map-search-note')).toHaveTextContent(
+      'Pins for entries matching your search “Silberdenar”',
+    );
+  });
+
+  it('names no search when the term is too short for the list to use', async () => {
+    placesState({ places: [place('Bonn', ['a'])] });
+    renderModal({ search: 'si' });
+
+    expect(await screen.findByTestId('map')).toBeVisible();
+    expect(screen.queryByTestId('map-search-note')).not.toBeInTheDocument();
+  });
+
   it('shows the map while places are still resolving, with a progress chip', async () => {
     placesState({ places: [place('Bonn', ['a'])], loading: true });
     renderModal();

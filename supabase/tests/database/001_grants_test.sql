@@ -97,7 +97,6 @@ from (values
   ('granted_category_ids', array[]::text[]),
   ('list_category_places', array['uuid', 'text']),
   ('create_items_in_category', array['uuid', 'jsonb']),
-  ('search_category_items', array['uuid', 'text', 'int', 'int']),
   ('search_category_entries', array['uuid', 'int', 'int', 'text', 'text']),
   ('storage_item_id', array['text']),
   ('photo_upload_has_room', array[]::text[]),

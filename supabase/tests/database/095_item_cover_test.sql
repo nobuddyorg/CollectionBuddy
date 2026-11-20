@@ -37,7 +37,7 @@ returns uuid
 language sql
 as $$
   select (images -> 0 ->> 'id')::uuid
-  from public.search_category_items(p_category_id, '%Covered%', 0, 8)
+  from public.search_category_entries(p_category_id, 0, 8, '%Covered%')
 $$;
 
 select is(pg_temp.first_found(:'category_id'::uuid), :'oldest_id'::uuid,

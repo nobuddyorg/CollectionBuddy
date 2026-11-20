@@ -147,7 +147,7 @@ test.describe('a category shared with another collector', () => {
       });
       expect(places).toEqual([]);
 
-      const { data: found } = await other.rpc('search_category_items', {
+      const { data: found } = await other.rpc('search_category_entries', {
         cat_id: siblingId,
         like_pattern: `%${sibling.title}%`,
         page_from: 0,

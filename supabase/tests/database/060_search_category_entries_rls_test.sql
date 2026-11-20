@@ -1,4 +1,4 @@
--- search_category_items (latest body: 0030) is SECURITY DEFINER, so it must reproduce, never widen, an RLS-scoped read; rls/search-rpc.spec.ts holds the end-to-end half.
+-- search_category_entries (0038) is SECURITY DEFINER, so it must reproduce, never widen, an RLS-scoped read; rls/search-rpc.spec.ts holds the end-to-end half.
 begin;
 select no_plan();
 
@@ -9,7 +9,15 @@ returns text[]
 language sql
 as $$
   select coalesce(array_agg(title order by title), array[]::text[])
-  from public.search_category_items(p_category_id, '%' || p_term || '%', 0, 9)
+  from public.search_category_entries(p_category_id, 0, 9, '%' || p_term || '%')
+$$;
+
+create or replace function pg_temp.titles_at(p_category_id uuid, p_place text)
+returns text[]
+language sql
+as $$
+  select coalesce(array_agg(title order by title), array[]::text[])
+  from public.search_category_entries(p_category_id, 0, 9, null, p_place)
 $$;
 
 select gen_random_uuid() as owner_id, gen_random_uuid() as other_id \gset
@@ -17,7 +25,7 @@ select gen_random_uuid() as owner_id, gen_random_uuid() as other_id \gset
 select pg_temp.auth_as(:'owner_id'::uuid, 'search-test-owner@collectionbuddy.test');
 insert into public.categories (name) values ('Search RLS (pgTAP)')
 returning id as category_id \gset
-insert into public.items (title) values ('Search Probe Silberdenar')
+insert into public.items (title, place) values ('Search Probe Silberdenar', 'Trier')
 returning id as owner_item_id \gset
 insert into public.item_categories (item_id, category_id)
 values (:'owner_item_id'::uuid, :'category_id'::uuid);
@@ -42,6 +50,11 @@ select is(
   array[]::text[],
   'a bystander with no relationship to the category gets nothing back, not an error'
 );
+select is(
+  pg_temp.titles_at(:'category_id'::uuid, 'Trier'),
+  array[]::text[],
+  'nor through the place filter alone, with no search term'
+);
 
 -- A viewer grant opens search the same as it opens a plain read.
 select pg_temp.auth_as(:'owner_id'::uuid, 'search-test-owner@collectionbuddy.test');
@@ -55,6 +68,11 @@ select is(
   array['Search Probe Silberdenar'],
   'an active viewer grant opens search on the shared category'
 );
+select is(
+  pg_temp.titles_at(:'category_id'::uuid, 'Trier'),
+  array['Search Probe Silberdenar'],
+  'and the place filter the same'
+);
 
 -- Revocation closes search with the entry still present (TEST_STRATEGY.md §7 rule 7).
 select pg_temp.auth_as(:'owner_id'::uuid, 'search-test-owner@collectionbuddy.test');
@@ -65,6 +83,11 @@ select is(
   pg_temp.search_titles(:'category_id'::uuid, 'Silberdenar'),
   array[]::text[],
   'revoking the grant closes search again'
+);
+select is(
+  pg_temp.titles_at(:'category_id'::uuid, 'Trier'),
+  array[]::text[],
+  'and the place filter with it'
 );
 select pg_temp.auth_as(:'owner_id'::uuid, 'search-test-owner@collectionbuddy.test');
 select is(
