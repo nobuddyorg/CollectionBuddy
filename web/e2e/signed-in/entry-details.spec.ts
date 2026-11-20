@@ -112,6 +112,29 @@ test.describe('an entry with a place and tags', () => {
     await expect(app.form.locators.inputs.title).toHaveCount(0);
   });
 
+  // On a slow device the guard learned of the typing a task late, so this closed the form unasked every time.
+  test('asks even when Escape follows the typing at once, on a slow CPU', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+    await app.catalogue.do.openEntryForm();
+    await app.form.do.fill({ title: 'Schnell verworfen' });
+
+    await page.keyboard.press('Escape');
+
+    await expect(app.confirm.locators.message).toContainText(
+      'Discard your changes?',
+      { timeout: 15_000 },
+    );
+    await app.confirm.do.cancel();
+    await expect(app.form.locators.inputs.title).toHaveValue(
+      'Schnell verworfen',
+    );
+  });
+
   // The edit modal is the one caller with a Cancel button, and it goes through the same guard.
   test('leaves an entry alone when an edit is cancelled', async ({
     on,
