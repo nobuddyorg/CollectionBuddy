@@ -167,18 +167,17 @@ describe('handleRequest', () => {
     expect(last.cutout.blob.type).toBe('image/png');
     expect(last.cutout.mode).toBe('ellipse');
     expect(last.cutout.fillRatio).toBeGreaterThan(0.9);
-    // A disc of radius 12.5 in 64 spans 16 of the photo's 40 columns and 8 of its 20 rows.
+    // A disc of radius 12.5 in 64 spans 16 of the photo's 40 columns and 8 of its 20 rows, heightened to the grid's 4:3.
     expect(last.cutout.width).toBeGreaterThanOrEqual(15);
     expect(last.cutout.width).toBeLessThanOrEqual(18);
-    expect(last.cutout.height).toBeGreaterThanOrEqual(7);
-    expect(last.cutout.height).toBeLessThanOrEqual(10);
+    expect(last.cutout.height).toBe(Math.round((last.cutout.width * 3) / 4));
     expect(encoded[0].width).toBe(last.cutout.width);
     expect(encoded[0].data.length).toBe(
       last.cutout.width * last.cutout.height * 4,
     );
   });
 
-  it('leaves a clear margin of the given share of the object’s longer side all round it', async () => {
+  it('leaves a clear margin of the given share of the object’s longer side all round it, in the grid’s 4:3', async () => {
     const tight = await repliesTo(cutOutRequest);
     const roomy = await repliesTo({ ...cutOutRequest, margin: 0.25 });
 
@@ -189,8 +188,9 @@ describe('handleRequest', () => {
     const pad = Math.round(
       Math.max(before.cutout.width, before.cutout.height) * 0.25,
     );
+    // The disc is wider than tall, so its longer side is the tight cut-out's width.
     expect(after.cutout.width).toBe(before.cutout.width + 2 * pad);
-    expect(after.cutout.height).toBe(before.cutout.height + 2 * pad);
+    expect(after.cutout.height).toBe(Math.round((after.cutout.width * 3) / 4));
     // The first row of the roomy PNG is all margin: nothing in it shows.
     const firstRow = encoded[1].data.slice(0, after.cutout.width * 4);
     expect(
@@ -210,7 +210,7 @@ describe('handleRequest', () => {
       return pixels;
     };
 
-    it('keeps its own outline, gives it the margin, and never runs the model', async () => {
+    it('keeps its own outline, gives it the margin and the grid’s 4:3, and never runs the model', async () => {
       photoPixels = keptBlock;
 
       const replies = await repliesTo({ ...cutOutRequest, margin: 0.2 });
@@ -220,10 +220,10 @@ describe('handleRequest', () => {
       expect(replies).toHaveLength(1);
       const [last] = replies;
       if (last.kind !== 'cut-out') throw new Error('expected a cut-out');
-      // Its longer side 10, so 2 pixels of margin all round the 10 x 4 block.
+      // Its longer side 10, so 2 pixels of margin all round the 10 x 4 block make 14 x 8, heightened to 14 x 11.
       expect(last.cutout).toMatchObject({
         width: 14,
-        height: 8,
+        height: 11,
         mode: 'kept',
         fillRatio: 0,
       });
@@ -232,8 +232,9 @@ describe('handleRequest', () => {
       );
       expect(alphas.filter((a) => a === 255)).toHaveLength(40);
       expect(alphas.slice(0, 14).every((a) => a === 0)).toBe(true);
+      // Centred: the block's first pixel lands 2 columns in and 3 rows down.
       expect(
-        Array.from(encoded[0].data.slice((2 * 14 + 2) * 4, (2 * 14 + 3) * 4)),
+        Array.from(encoded[0].data.slice((3 * 14 + 2) * 4, (3 * 14 + 3) * 4)),
       ).toEqual([90, 80, 70, 255]);
     });
 
@@ -368,6 +369,7 @@ describe('handleRequest', () => {
       file: new Blob(['webp'], { type: 'image/webp' }),
       modelUrl: cutOutRequest.modelUrl,
       maxSide: 2048,
+      minFillRatio: cutOutRequest.minFillRatio,
       margin: 0,
     };
     // Transparent all over but a 10 x 4 block at (12, 6): a stored cut-out.
@@ -433,6 +435,46 @@ describe('handleRequest', () => {
       expect(last.crop.height).toBeLessThan(20);
       expect(last.crop.width / last.crop.height).toBeCloseTo(4 / 3, 1);
       expect(encoded[0].data.every((value) => value === 200)).toBe(true);
+    });
+
+    // The two used to frame one photo differently (#910): another margin, another outline, no aspect for the cut-out.
+    it('frames the photo exactly as its cut-out does, where that frame fits inside it', async () => {
+      const cropped = (await repliesTo({ ...cropRequest, margin: 0.08 })).at(
+        -1,
+      );
+      const cut = (await repliesTo({ ...cutOutRequest, margin: 0.08 })).at(-1);
+
+      if (cropped?.kind !== 'cropped' || cut?.kind !== 'cut-out') {
+        throw new Error('expected a crop and a cut-out');
+      }
+      expect({
+        width: cropped.crop.width,
+        height: cropped.crop.height,
+      }).toEqual({
+        width: cut.cutout.width,
+        height: cut.cutout.height,
+      });
+    });
+
+    it('frames the object by the outline its cut-out shows, the fitted ellipse included', async () => {
+      // A lone square: the ellipse fitted to it is wider than the square's own mask.
+      const square = new Float32Array(MODEL_SIZE * MODEL_SIZE);
+      for (let y = 20; y < 44; y += 1)
+        square.fill(1, y * MODEL_SIZE + 20, y * MODEL_SIZE + 44);
+      model.runModel.mockResolvedValue(square);
+
+      const asEllipse = { minFillRatio: 0 };
+      const cropped = (await repliesTo({ ...cropRequest, ...asEllipse })).at(
+        -1,
+      );
+      const cut = (await repliesTo({ ...cutOutRequest, ...asEllipse })).at(-1);
+
+      if (cropped?.kind !== 'cropped' || cut?.kind !== 'cut-out') {
+        throw new Error('expected a crop and a cut-out');
+      }
+      expect(cut.cutout.mode).toBe('ellipse');
+      expect(cropped.crop.width).toBe(cut.cutout.width);
+      expect(cropped.crop.height).toBe(cut.cutout.height);
     });
 
     it('answers already-framed when the object fills the photo already', async () => {

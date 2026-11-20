@@ -243,6 +243,7 @@ describe('cropToObject', () => {
         file: photo,
         modelUrl: segmentationModelUrl(),
         maxSide: 2048,
+        minFillRatio: 0.95,
         margin: 0.08,
       },
     ]);

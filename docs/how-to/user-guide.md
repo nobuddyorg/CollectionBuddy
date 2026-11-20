@@ -163,7 +163,8 @@ removed, on the photo background you chose (below) where the background is
 now transparent: a checkerboard while it follows the theme. It works for any
 item, a coin, a stamp, a figurine; several items in one photo are kept
 together, with a little clear space around them so nothing touches the
-edge of the frame. **Use without background** uploads the result; **Keep original**
+edge of the frame, in the 4:3 frame the card shows the first photo in, so the
+whole item shows on the card. **Use without background** uploads the result; **Keep original**
 uploads the photo as it was, and is always available, also when no item was
 found or the removal failed. Closing the review uploads nothing.
 
