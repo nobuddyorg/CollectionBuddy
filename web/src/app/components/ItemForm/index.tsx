@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/useI18n';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { Submit } from './Submit';
@@ -49,7 +49,8 @@ export default function ItemForm({
     tags.length !== initial.tags.length ||
     tags.some((tag, index) => tag !== initial.tags[index]);
 
-  useEffect(() => {
+  // Layout, not passive: the parent's guard must know before the next key, or an Escape right after typing closes unasked.
+  useLayoutEffect(() => {
     onDirtyChange?.(isDirty);
   }, [isDirty, onDirtyChange]);
 
