@@ -117,6 +117,8 @@ export const MUTATE_TARGETS = [
   'src/app/lib/rotationJob.ts',
   'src/app/components/ItemList/useRotationDraft.ts',
   'src/app/lib/cropFrame.ts',
+  'src/app/lib/manualCropFrame.ts',
+  'src/app/lib/frameCropJob.ts',
   'src/app/components/ItemList/useStoredEdit.ts',
   'src/app/data/cover.ts',
   'src/app/components/ItemList/useMakeCover.ts',

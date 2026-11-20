@@ -25,6 +25,7 @@ export enum IconType {
   RotateLeft,
   RotateRight,
   Crop,
+  CropFrame,
   Star,
 }
 
@@ -177,6 +178,16 @@ const Icon: React.FC<IconProps> = ({ icon, ...props }) => {
         <svg {...ROUNDED_SVG} {...props}>
           <path d="M6 2v14a2 2 0 0 0 2 2h14" />
           <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+        </svg>
+      );
+    case IconType.CropFrame:
+      // The crop marks with a handle at two corners: a frame to drag, not one found for you.
+      return (
+        <svg {...ROUNDED_SVG} {...props}>
+          <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+          <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+          <rect x="4" y="4" width="4" height="4" rx="1" />
+          <rect x="16" y="16" width="4" height="4" rx="1" />
         </svg>
       );
     case IconType.Star:

@@ -146,6 +146,7 @@ fields a line break becomes a space.
 - **Rotate**: from the full-size view ([below](#rotate-and-straighten-a-photo)).
 - **Crop to the item**: from the full-size view, with background removal on
   ([below](#crop-a-photo-to-its-item)).
+- **Crop by hand**: from the full-size view ([below](#crop-a-photo-by-hand)).
 - **Delete**: from the full-size view or the per-photo control, confirm.
 
 An item can have any number of photos, in the order you added them. The
@@ -197,10 +198,29 @@ background stays: only the table, floor or clutter beyond the frame goes.
 The crop shows in the photo's place first. **Save** keeps it in the
 original's place, so the cover and the order of the photos stay as they were;
 **Cancel** or Escape changes nothing. A photo already cropped to its item, or
-one in which no item was found, says so and has nothing to save. A photo
-without its background is cropped to its own outline, without the model.
+one in which no item was found, says so and has nothing to save; where no
+item was found, **Crop by hand instead** lets you draw the frame yourself. A
+photo without its background is cropped to its own outline, without the model.
 Anyone who can edit the collection can crop its photos; someone it is only
 shared with to view cannot.
+
+### Crop a photo by hand
+
+Open a photo full size and choose **Crop by hand**, the crop marks with
+handles. It needs no model, so it is there with or without **Remove
+backgrounds**. A frame appears over the photo, and what lies outside it is
+dimmed. Drag the frame to move it, or one of its corners to make it larger or
+smaller; on a phone, the corners are big enough to take with a finger. With
+the keyboard, Tab to the frame or a corner and move it with the arrow keys,
+holding Shift for larger steps.
+
+**Keep the card's 4:3**, ticked to begin with, holds the frame at the shape
+the card shows the first photo in, so the whole crop shows on the card. Untick
+it to crop to any shape. **Save** keeps the crop in the original's place, so
+the cover and the order of the photos stay as they were; **Cancel** or Escape
+changes nothing. A photo without its background stays see-through where the
+frame takes in its transparency. As with every other crop, anyone who can edit
+the collection can do this; someone it is only shared with to view cannot.
 
 ### Rotate and straighten a photo
 

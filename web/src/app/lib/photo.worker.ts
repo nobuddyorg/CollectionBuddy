@@ -6,6 +6,11 @@ import {
 import { compressOffscreen } from './compressOffscreen';
 import type { CompressionRequest } from './drawPhoto';
 import {
+  cropFrameOffscreen,
+  type FrameCropAnswer,
+  type FrameCropRequest,
+} from './frameCropJob';
+import {
   inspectOffscreen,
   rotateOffscreen,
   type InspectionAnswer,
@@ -32,6 +37,7 @@ const scope = self as unknown as {
           | CutoutRequest
           | RotationRequest
           | InspectionRequest
+          | FrameCropRequest
         >,
       ) => void)
     | null;
@@ -41,7 +47,8 @@ const scope = self as unknown as {
       | SharpnessAnswer
       | CutoutReply
       | RotationAnswer
-      | InspectionAnswer,
+      | InspectionAnswer
+      | FrameCropAnswer,
   ) => void;
 };
 
@@ -50,6 +57,13 @@ const failed = (error: unknown) => scope.postMessage({ error: String(error) });
 scope.onmessage = ({ data: job }) => {
   if (job.kind === 'rotate') {
     rotateOffscreen(job).then((rotated) => scope.postMessage(rotated), failed);
+    return;
+  }
+  if (job.kind === 'crop-frame') {
+    cropFrameOffscreen(job).then(
+      (cropped) => scope.postMessage(cropped),
+      failed,
+    );
     return;
   }
   if (job.kind === 'inspect-rotation') {

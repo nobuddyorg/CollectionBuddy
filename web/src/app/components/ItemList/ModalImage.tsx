@@ -25,6 +25,10 @@ import {
   type RotationEdit,
 } from './useRotationDraft';
 import { ViewerPhoto, type Shown } from './ViewerPhoto';
+import { ViewerTools } from './ViewerTools';
+import { ManualCropControls } from './ManualCropControls';
+import { ManualCropView } from './ManualCropView';
+import { useManualCrop, type ManualCrop } from './useManualCrop';
 
 export function ModalImage({
   images,
@@ -52,7 +56,7 @@ export function ModalImage({
   offerRemoveBackground?: boolean;
   /** Saves a confirmed rotation; the viewer previews it until then. */
   onRotate?: (image: ImageEntry, edit: RotationEdit) => Promise<void>;
-  /** Saves a confirmed crop or cut-out in the photo's place; both find the item with background removal's model. */
+  /** Saves a confirmed crop, drawn by hand or found by the model, or a cut-out, in the photo's place. */
   onEdit?: (image: ImageEntry, photo: PhotoUpload) => Promise<void>;
   /** Makes the shown photo its entry's cover; not offered on the cover itself, the first. */
   onMakeCover?: (image: ImageEntry) => void;
@@ -99,11 +103,27 @@ export function ModalImage({
     storedEdit.edit.image.id === current?.id
       ? storedEdit.edit
       : { kind: 'closed' };
-  // Either tool holds the viewer: no paging, and Escape or a tap ends the tool, not the viewer.
-  const editing = draft.kind === 'editing' || edit.kind !== 'closed';
+  const manualCrop = useManualCrop(onEdit);
+  const crop: ManualCrop =
+    manualCrop.crop.kind === 'framing' &&
+    manualCrop.crop.image.id === current?.id
+      ? manualCrop.crop
+      : { kind: 'closed' };
+  // Any tool holds the viewer: no paging, and Escape or a tap ends the tool, not the viewer.
+  const editing =
+    draft.kind === 'editing' ||
+    edit.kind !== 'closed' ||
+    crop.kind !== 'closed';
   const cancelTools = () => {
     rotation.cancel();
     storedEdit.cancel();
+    manualCrop.cancel();
+  };
+  // Framed over the photo as shown, so only once it has loaded, at its stored size.
+  const photoShown = current !== null && shown.path === current.pathFull;
+  const cropByHand = (image: ImageEntry) => {
+    storedEdit.cancel();
+    manualCrop.start(image, { width: shown.width, height: shown.height });
   };
   const close = () => {
     cancelTools();
@@ -185,72 +205,40 @@ export function ModalImage({
         </button>
 
         {!readOnly && (
-          <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-10 flex gap-1">
-            {/* The only delete control for photographs past the strip; trash, not a second X beside Close. */}
-            <button
-              data-testid="delete-image"
-              onClick={() => onDelete(current)}
-              disabled={busy || editing}
-              className={TOOL_CLASSES}
-              title={t('item_list.delete_image')}
-              aria-label={t('item_list.delete_image')}
-            >
-              <Icon icon={IconType.Trash} className="w-5 h-5" />
-            </button>
-            {offerRemoveBackground && (
-              <button
-                data-testid="remove-background-image"
-                onClick={() => void storedEdit.start(current, 'cut-out')}
-                disabled={busy || editing}
-                className={TOOL_CLASSES}
-                title={t('item_list.remove_background')}
-                aria-label={t('item_list.remove_background')}
-              >
-                <Icon icon={IconType.Scissors} className="w-5 h-5" />
-              </button>
-            )}
-            <button
-              data-testid="rotate-image"
-              onClick={() => void rotation.start(current)}
-              disabled={busy || editing}
-              className={TOOL_CLASSES}
-              title={t('item_list.rotate')}
-              aria-label={t('item_list.rotate')}
-            >
-              <Icon icon={IconType.RotateRight} className="w-5 h-5" />
-            </button>
-            {clampedIndex > 0 && (
-              <button
-                data-testid="make-cover"
-                onClick={() => onMakeCover(current)}
-                disabled={busy || editing}
-                className={TOOL_CLASSES}
-                title={t('item_list.make_cover')}
-                aria-label={t('item_list.make_cover')}
-              >
-                <Icon icon={IconType.Star} className="w-5 h-5" />
-              </button>
-            )}
-            {offerRemoveBackground && (
-              <button
-                data-testid="crop-image"
-                onClick={() => void storedEdit.start(current, 'crop')}
-                disabled={busy || editing}
-                className={TOOL_CLASSES}
-                title={t('item_list.crop')}
-                aria-label={t('item_list.crop')}
-              >
-                <Icon icon={IconType.Crop} className="w-5 h-5" />
-              </button>
-            )}
-          </div>
+          <ViewerTools
+            image={current}
+            actions={{
+              delete: onDelete,
+              removeBackground: (image) =>
+                void storedEdit.start(image, 'cut-out'),
+              rotate: (image) => void rotation.start(image),
+              makeCover: onMakeCover,
+              cropToItem: (image) => void storedEdit.start(image, 'crop'),
+              cropByHand,
+            }}
+            offerRemoveBackground={offerRemoveBackground}
+            isCover={clampedIndex === 0}
+            disabled={busy || editing}
+            photoShown={photoShown}
+          />
         )}
 
         {draft.kind === 'editing' && (
           <RotationControls draft={draft} actions={rotation} busy={busy} />
         )}
         {edit.kind !== 'closed' && (
-          <StoredEditControls edit={edit} actions={storedEdit} busy={busy} />
+          <StoredEditControls
+            edit={edit}
+            actions={storedEdit}
+            busy={busy}
+            cropByHand={{
+              start: () => cropByHand(current),
+              ready: photoShown,
+            }}
+          />
+        )}
+        {crop.kind === 'framing' && (
+          <ManualCropControls crop={crop} actions={manualCrop} busy={busy} />
         )}
 
         {count > 1 && !editing && (
@@ -293,7 +281,7 @@ export function ModalImage({
 
         {/* pb reserves the bottom bar, or the open tool's panel, plus safe area, so a tall photo's edge sits above it. */}
         <div
-          className={`absolute inset-0 flex items-center justify-center p-4 pt-16 ${bottomReserve(draft, edit)}`}
+          className={`absolute inset-0 flex items-center justify-center p-4 pt-16 ${bottomReserve({ draft, edit, crop })}`}
           // The preview sizes itself in container units: no measuring, and it follows a resize.
           style={{ containerType: 'size' }}
         >
@@ -303,30 +291,41 @@ export function ModalImage({
               backdropClass={photoBackdropClass(backdrop)}
             />
           )}
-          {edit.kind !== 'ready' && current.urlFull && (
-            <ViewerPhoto
-              key={current.pathFull}
+          {crop.kind === 'framing' && current.urlFull && (
+            <ManualCropView
               image={current}
               alt={alt}
-              draft={draft}
-              shown={shown}
+              crop={crop}
+              actions={manualCrop}
               backdropClass={photoBackdropClass(backdrop)}
-              onLoad={(photo) =>
-                setShown({
-                  path: current.pathFull,
-                  width: photo.naturalWidth,
-                  height: photo.naturalHeight,
-                })
-              }
-              onClick={() => {
-                if (suppressImageClickRef.current) {
-                  suppressImageClickRef.current = false;
-                  return;
-                }
-                if (!editing) onClose();
-              }}
             />
           )}
+          {edit.kind !== 'ready' &&
+            crop.kind === 'closed' &&
+            current.urlFull && (
+              <ViewerPhoto
+                key={current.pathFull}
+                image={current}
+                alt={alt}
+                draft={draft}
+                shown={shown}
+                backdropClass={photoBackdropClass(backdrop)}
+                onLoad={(photo) =>
+                  setShown({
+                    path: current.pathFull,
+                    width: photo.naturalWidth,
+                    height: photo.naturalHeight,
+                  })
+                }
+                onClick={() => {
+                  if (suppressImageClickRef.current) {
+                    suppressImageClickRef.current = false;
+                    return;
+                  }
+                  if (!editing) onClose();
+                }}
+              />
+            )}
           {/* Past the card's plates, this photograph is signed only now. */}
           {!current.urlFull && (
             <StatusSpinner size="lg" label={t('common.loading')} />
@@ -337,8 +336,16 @@ export function ModalImage({
   );
 }
 
-function bottomReserve(draft: RotationDraft, edit: StoredEdit): string {
-  if (draft.kind === 'editing') {
+function bottomReserve({
+  draft,
+  edit,
+  crop,
+}: {
+  draft: RotationDraft;
+  edit: StoredEdit;
+  crop: ManualCrop;
+}): string {
+  if (draft.kind === 'editing' || crop.kind === 'framing') {
     return 'pb-[calc(12rem+env(safe-area-inset-bottom))]';
   }
   if (edit.kind !== 'closed') {
@@ -346,6 +353,3 @@ function bottomReserve(draft: RotationDraft, edit: StoredEdit): string {
   }
   return 'pb-[calc(3.5rem+env(safe-area-inset-bottom))]';
 }
-
-const TOOL_CLASSES =
-  'w-11 h-11 flex items-center justify-center rounded-sm text-foreground hover:bg-muted disabled:opacity-60 transition-colors';

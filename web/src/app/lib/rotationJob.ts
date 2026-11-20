@@ -22,14 +22,16 @@ export type RotationAnswer = Rotated | { error: string };
 export type InspectionAnswer =
   { inspection: PhotoInspection } | { error: string };
 
-type Drawing = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+export type Drawing =
+  CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
 /** Makes a 2D context of a size, on whichever canvas the thread has. */
 export type ContextOfSize<Context extends Drawing> = (
   size: Dimensions,
 ) => Context | null;
 
-function contextFor<Context extends Drawing>(
+/** A 2D context of `size`, or a failure saying this browser has none. */
+export function contextFor<Context extends Drawing>(
   size: Dimensions,
   contextOfSize: ContextOfSize<Context>,
 ): Context {
@@ -82,7 +84,7 @@ export function drawRotated<Context extends Drawing>(
   return drawing.canvas;
 }
 
-const offscreen: ContextOfSize<OffscreenCanvasRenderingContext2D> = ({
+export const offscreen: ContextOfSize<OffscreenCanvasRenderingContext2D> = ({
   width,
   height,
 }) =>
@@ -91,7 +93,7 @@ const offscreen: ContextOfSize<OffscreenCanvasRenderingContext2D> = ({
   });
 
 // Upright as EXIF says, as the compression decodes it: the turn is on top of what the viewer shows.
-async function withBitmap<Result>(
+export async function withBitmap<Result>(
   file: Blob,
   work: (bitmap: ImageBitmap) => Result | Promise<Result>,
 ): Promise<Result> {
