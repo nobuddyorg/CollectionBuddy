@@ -71,17 +71,6 @@ export function opaqueBounds(alpha: ArrayLike<number>, size: Size): Box {
   return { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
 }
 
-/** `box` grown by `margin` of its longer side on every side, past the photo's edge where it must: the object never touches the frame. */
-export function withMargin(box: Box, margin: number): Box {
-  const pad = Math.round(Math.max(box.width, box.height) * margin);
-  return {
-    x: box.x - pad,
-    y: box.y - pad,
-    width: box.width + 2 * pad,
-    height: box.height + 2 * pad,
-  };
-}
-
 /** The mean colour of the opaque pixels around `source`, or its own where none is: what a rim pixel outside the object shows. */
 function rimColour({
   pixels,

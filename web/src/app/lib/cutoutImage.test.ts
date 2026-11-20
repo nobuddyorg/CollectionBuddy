@@ -7,7 +7,6 @@ import {
   fitWithin,
   opaqueBounds,
   ownTransparency,
-  withMargin,
 } from './cutoutImage';
 
 describe('fitWithin', () => {
@@ -267,41 +266,6 @@ describe('cropWithAlpha past the photo’s edge', () => {
     });
 
     expect(Array.from(cropped)).toEqual([0, 0, 0, 0]);
-  });
-});
-
-describe('withMargin', () => {
-  it('grows the box by the share of its longer side on every side', () => {
-    expect(withMargin({ x: 30, y: 40, width: 100, height: 50 }, 0.08)).toEqual({
-      x: 22,
-      y: 32,
-      width: 116,
-      height: 66,
-    });
-  });
-
-  it('reaches past the photo’s edge rather than stopping at it', () => {
-    expect(withMargin({ x: 0, y: 2, width: 50, height: 100 }, 0.08)).toEqual({
-      x: -8,
-      y: -6,
-      width: 66,
-      height: 116,
-    });
-  });
-
-  it('rounds the margin to whole pixels, and leaves the box as it is without one', () => {
-    expect(withMargin({ x: 5, y: 5, width: 10, height: 6 }, 0.15)).toEqual({
-      x: 3,
-      y: 3,
-      width: 14,
-      height: 10,
-    });
-    expect(withMargin({ x: 5, y: 5, width: 10, height: 6 }, 0)).toEqual({
-      x: 5,
-      y: 5,
-      width: 10,
-      height: 6,
-    });
   });
 });
 

@@ -13,6 +13,7 @@ export type { Crop, Cutout, CutoutProgress };
 const MODEL_FILE = 'isnet-general-use-fp16.onnx';
 const MAX_SIDE = 2048;
 const MARGIN = 0.08;
+const MIN_FILL_RATIO = 0.95;
 
 export class NoObjectFoundError extends Error {
   constructor() {
@@ -90,7 +91,7 @@ export async function removeBackground(
       file,
       modelUrl: segmentationModelUrl(),
       maxSide: options.maxSide ?? MAX_SIDE,
-      minFillRatio: options.minFillRatio ?? 0.95,
+      minFillRatio: options.minFillRatio ?? MIN_FILL_RATIO,
       margin: options.margin ?? MARGIN,
     },
     options,
@@ -114,6 +115,7 @@ export async function cropToObject(
       file,
       modelUrl: segmentationModelUrl(),
       maxSide: MAX_SIDE,
+      minFillRatio: MIN_FILL_RATIO,
       margin: options.margin ?? MARGIN,
     },
     options,

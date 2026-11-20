@@ -7,7 +7,39 @@ function clamp(value: number, low: number, high: number): number {
   return Math.min(Math.max(value, low), high);
 }
 
-/** `bounds` grown by `margin` of its longer side all round, widened or heightened to `aspect`, and held inside the photo. */
+/** The centre of `box`, where a frame around it is centred too. */
+function centreOf(box: Box): { x: number; y: number } {
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+/** `bounds` grown by `margin` of its longer side all round, then widened or heightened to `aspect` about its centre; it may reach past the photo. */
+export function marginFrame({
+  bounds,
+  margin,
+  aspect = GRID_ASPECT,
+}: {
+  bounds: Box;
+  margin: number;
+  aspect?: number;
+}): Box {
+  const pad = Math.round(Math.max(bounds.width, bounds.height) * margin);
+  const padded = {
+    width: bounds.width + 2 * pad,
+    height: bounds.height + 2 * pad,
+  };
+  // Grown, never shrunk, to the aspect: the object and its margin stay in.
+  const width = Math.max(padded.width, Math.round(padded.height * aspect));
+  const height = Math.max(padded.height, Math.round(padded.width / aspect));
+  const centre = centreOf(bounds);
+  return {
+    x: Math.round(centre.x - width / 2),
+    y: Math.round(centre.y - height / 2),
+    width,
+    height,
+  };
+}
+
+/** `marginFrame()` held inside the photo: slid back from its edges, the aspect giving way where the photo is too small. */
 export function objectFrame({
   bounds,
   size,
@@ -19,25 +51,13 @@ export function objectFrame({
   margin: number;
   aspect?: number;
 }): Box {
-  const pad = Math.round(Math.max(bounds.width, bounds.height) * margin);
-  const padded = {
-    width: bounds.width + 2 * pad,
-    height: bounds.height + 2 * pad,
-  };
-  // Grown, never shrunk, to the aspect: the object and its margin stay in.
-  const width = Math.min(
-    size.width,
-    Math.max(padded.width, Math.round(padded.height * aspect)),
-  );
-  const height = Math.min(
-    size.height,
-    Math.max(padded.height, Math.round(padded.width / aspect)),
-  );
-  const centerX = bounds.x + bounds.width / 2;
-  const centerY = bounds.y + bounds.height / 2;
+  const frame = marginFrame({ bounds, margin, aspect });
+  const width = Math.min(size.width, frame.width);
+  const height = Math.min(size.height, frame.height);
+  const centre = centreOf(bounds);
   return {
-    x: clamp(Math.round(centerX - width / 2), 0, size.width - width),
-    y: clamp(Math.round(centerY - height / 2), 0, size.height - height),
+    x: clamp(Math.round(centre.x - width / 2), 0, size.width - width),
+    y: clamp(Math.round(centre.y - height / 2), 0, size.height - height),
     width,
     height,
   };

@@ -4,6 +4,7 @@ import {
   cropPixels,
   GRID_ASPECT,
   isFramedAlready,
+  marginFrame,
   objectFrame,
 } from './cropFrame';
 
@@ -93,6 +94,45 @@ describe('objectFrame', () => {
     for (const value of Object.values(frame)) {
       expect(Number.isInteger(value)).toBe(true);
     }
+  });
+});
+
+// A cut-out's frame: transparent past the photo's edge, so nothing holds it inside.
+describe('marginFrame', () => {
+  it('grows the object by its margin, then to the grid’s 4:3, about its centre', () => {
+    expect(
+      marginFrame({
+        bounds: { x: 400, y: 300, width: 200, height: 100 },
+        margin: 0.1,
+      }),
+    ).toEqual({ x: 380, y: 260, width: 240, height: 180 });
+  });
+
+  it('reaches past the photo’s edge rather than sliding off the object’s centre', () => {
+    expect(
+      marginFrame({
+        bounds: { x: 0, y: 0, width: 80, height: 60 },
+        margin: 0.25,
+      }),
+    ).toEqual({ x: -26, y: -20, width: 133, height: 100 });
+  });
+
+  it('takes another aspect when told one', () => {
+    expect(
+      marginFrame({
+        bounds: { x: 10, y: 10, width: 30, height: 10 },
+        margin: 0,
+        aspect: 1,
+      }),
+    ).toEqual({ x: 10, y: 0, width: 30, height: 30 });
+  });
+
+  it('is the frame a crop takes wherever that fits inside the photo', () => {
+    const bounds = { x: 300, y: 250, width: 170, height: 90 };
+
+    expect(marginFrame({ bounds, margin: 0.08 })).toEqual(
+      objectFrame({ bounds, size: PHOTO, margin: 0.08 }),
+    );
   });
 });
 

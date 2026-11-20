@@ -5,11 +5,15 @@ import {
   fitWithin,
   opaqueBounds,
   ownTransparency,
-  withMargin,
   type CutoutMode,
   type Size,
 } from './cutoutImage';
-import { cropPixels, isFramedAlready, objectFrame } from './cropFrame';
+import {
+  cropPixels,
+  isFramedAlready,
+  marginFrame,
+  objectFrame,
+} from './cropFrame';
 import { loadModel, runModel } from './segmentationModel';
 import { MODEL_SIZE, toAlphaMask, toModelInput } from './isnetTensor';
 
@@ -51,6 +55,8 @@ export type CutoutRequest =
       file: Blob;
       modelUrl: string;
       maxSide: number;
+      /** The cut-out's own threshold, so the crop frames the outline a cut-out would show. */
+      minFillRatio: number;
       /** Clear space around the object, as a share of its longer side. */
       margin: number;
     }
@@ -113,7 +119,7 @@ type CutOutRequest = Extract<CutoutRequest, { kind: 'cut-out' }>;
 type CropRequest = Extract<CutoutRequest, { kind: 'crop-to-object' }>;
 type Decoded = Awaited<ReturnType<typeof decode>>;
 
-/** The objects inside a clear margin, as a PNG: the one reply a cut-out ends with. */
+/** The objects inside the frame a crop would take, past the photo's edge where it must, as a PNG: the one reply a cut-out ends with. */
 async function framed(
   {
     pixels,
@@ -126,7 +132,7 @@ async function framed(
     fillRatio,
   }: { margin: number; mode: Cutout['mode']; fillRatio: number },
 ): Promise<CutoutReply> {
-  const box = withMargin(opaqueBounds(alpha, size), margin);
+  const box = marginFrame({ bounds: opaqueBounds(alpha, size), margin });
   const cropped = cropWithAlpha({ pixels, alpha, size, box });
   return {
     kind: 'cut-out',
@@ -156,43 +162,64 @@ async function analyze(
   });
 }
 
-/** Whether any pixel of a photo's own alpha shows something. */
-const showsAnything = (alpha: Uint8Array | Uint8ClampedArray) =>
-  alpha.some((value) => value > 0);
+/** Whether any pixel of an outline shows something. */
+const showsAnything = (alpha: ArrayLike<number>) =>
+  Array.prototype.some.call(alpha, (value: number) => value > 0);
+
+type Outline = {
+  alpha: ArrayLike<number>;
+  mode: Cutout['mode'];
+  fillRatio: number;
+};
+
+/** The model's outline of an opaque photo, as a cut-out draws it; `null` where it found nothing. */
+async function modelOutline(
+  decoded: Decoded,
+  {
+    modelUrl,
+    minFillRatio,
+    reply,
+  }: { modelUrl: string; minFillRatio: number; reply: Reply },
+): Promise<Outline | null> {
+  const analysis = await analyze(decoded, { modelUrl, reply });
+  if (analysis === null) return null;
+  const { alpha, mode } = cutoutAlpha({
+    analysis,
+    size: decoded.size,
+    minFillRatio,
+  });
+  return { alpha, mode, fillRatio: analysis.fillRatio };
+}
+
+/** The object as a cut-out shows it, for a cut-out and a crop alike; `null` where nothing shows. */
+async function outlineOf(
+  decoded: Decoded,
+  options: { modelUrl: string; minFillRatio: number; reply: Reply },
+): Promise<Outline | null> {
+  // Cut out again, a cut-out only gains its margin: a second pass of the model would eat into its edge.
+  const kept = ownTransparency(decoded.pixels);
+  const outline =
+    kept === null
+      ? await modelOutline(decoded, options)
+      : { alpha: kept, mode: 'kept' as const, fillRatio: 0 };
+  return outline !== null && showsAnything(outline.alpha) ? outline : null;
+}
 
 async function cutOut(request: CutOutRequest, reply: Reply) {
   const decoded = await decode(request.file, request.maxSide);
-  const { size, pixels } = decoded;
-  // Cut out again, a cut-out only gains its margin: a second pass of the model would eat into its edge.
-  const kept = ownTransparency(pixels);
-  if (kept !== null) {
-    reply(
-      showsAnything(kept)
-        ? await framed(
-            { pixels, alpha: kept, size },
-            { margin: request.margin, mode: 'kept', fillRatio: 0 },
-          )
-        : { kind: 'no-object' },
-    );
-    return;
-  }
-  const analysis = await analyze(decoded, {
-    modelUrl: request.modelUrl,
-    reply,
-  });
-  if (analysis === null) {
+  const outline = await outlineOf(decoded, { ...request, reply });
+  if (outline === null) {
     reply({ kind: 'no-object' });
     return;
   }
-  const { alpha, mode } = cutoutAlpha({
-    analysis,
-    size,
-    minFillRatio: request.minFillRatio,
-  });
   reply(
     await framed(
-      { pixels, alpha, size },
-      { margin: request.margin, mode, fillRatio: analysis.fillRatio },
+      { pixels: decoded.pixels, alpha: outline.alpha, size: decoded.size },
+      {
+        margin: request.margin,
+        mode: outline.mode,
+        fillRatio: outline.fillRatio,
+      },
     ),
   );
 }
@@ -200,17 +227,13 @@ async function cutOut(request: CutOutRequest, reply: Reply) {
 async function cropToObject(request: CropRequest, reply: Reply) {
   const decoded = await decode(request.file, request.maxSide);
   const { size, pixels } = decoded;
-  // A cut-out's own outline says where the object is; anything else asks the model.
-  const kept = ownTransparency(pixels);
-  const outline =
-    kept ??
-    (await analyze(decoded, { modelUrl: request.modelUrl, reply }))?.mask;
-  if (outline === undefined || !showsAnything(outline)) {
+  const outline = await outlineOf(decoded, { ...request, reply });
+  if (outline === null) {
     reply({ kind: 'no-object' });
     return;
   }
   const frame = objectFrame({
-    bounds: opaqueBounds(outline, size),
+    bounds: opaqueBounds(outline.alpha, size),
     size,
     margin: request.margin,
   });
@@ -224,7 +247,7 @@ async function cropToObject(request: CropRequest, reply: Reply) {
       blob: await encodePng(cropPixels({ pixels, size, box: frame }), frame),
       width: frame.width,
       height: frame.height,
-      transparent: kept !== null,
+      transparent: outline.mode === 'kept',
     },
   });
 }
