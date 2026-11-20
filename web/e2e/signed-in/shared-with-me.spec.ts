@@ -2,7 +2,7 @@ import { expect, test } from './test';
 import { OTHER_AUTH_STATE_PATH, SEED } from './fixtures';
 import { removeCategoryNamed } from './cleanup';
 import { fileEntry } from './collectors';
-import { answerGeocoder, photonFeature, uniqueName } from './helpers';
+import { GEOCODER, photonFeature, uniqueName } from './helpers';
 import {
   apiAs,
   context,
@@ -87,14 +87,9 @@ test.describe('a collection shared with you', () => {
   });
 });
 
-const BLANK_TILE = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
-  'base64',
-);
-
 test.describe('the map of a collection shared with you', () => {
-  // RLS answers a viewer's write-back with zero rows, so sending one only spends a request.
-  test('looks up a hand-typed place without writing its coordinates back', async ({
+  // A viewer could not store the answer, so asking would send the owner's place names to Photon for nothing.
+  test('asks Photon nothing for a place without coordinates, and says it is not shown', async ({
     on,
     page,
   }) => {
@@ -115,34 +110,26 @@ test.describe('the map of a collection shared with you', () => {
         fields: { user_id: userId, title: 'Kartenstück', place: 'Aachen' },
       });
       await viewerShare(token, category.id);
-      await answerGeocoder(page, [photonFeature('Aachen', [6.0839, 50.7753])]);
-
-      // The map stays open for the whole listening window, so its tiles come from here, not the network.
-      await page.route('https://*.tile.openstreetmap.org/**', (route) =>
-        route.fulfill({ contentType: 'image/png', body: BLANK_TILE }),
-      );
+      const lookups: string[] = [];
+      await page.route(GEOCODER, (route) => {
+        lookups.push(route.request().url());
+        return route.fulfill({
+          json: { features: [photonFeature('Aachen', [6.0839, 50.7753])] },
+        });
+      });
 
       await app.categories.do.load();
       await app.categories.do.openPanel();
       await app.categories.tab(name).click();
       await expect(app.catalogue.card('Kartenstück')()).toBeVisible();
 
-      // Listening from before the map opens: an owner's write-back leaves within milliseconds of its pin.
-      const wroteBack = page
-        .waitForRequest(
-          (request) =>
-            request.method() === 'PATCH' &&
-            request.url().includes('/rest/v1/items'),
-          { timeout: 5_000 },
-        )
-        .then(
-          () => true,
-          () => false,
-        );
-      await app.map.do.open();
-      await expect(app.map.locators.pins).toHaveCount(1);
-
-      expect(await wroteBack).toBe(false);
+      // Nothing to pin, so no map is drawn: the catalogue's button alone opens the dialog.
+      await app.catalogue.do.openMap();
+      await expect(app.map.locators.texts.unplaced).toHaveText(
+        '1 place has no location and is not shown',
+      );
+      await expect(app.map.locators.pins).toHaveCount(0);
+      expect(lookups).toEqual([]);
     } finally {
       await removeCategoryNamed(name);
     }

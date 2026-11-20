@@ -10,7 +10,7 @@ import {
   mintSession,
   reseedSingle,
 } from './collectors';
-import { answerGeocoder, photonFeature, uniqueName } from './helpers';
+import { uniqueName } from './helpers';
 import { LOGIN_URL } from '../pages/login';
 
 // The global sign-out revokes every session of its user, so it signs out a collector no other spec shares.
@@ -42,9 +42,11 @@ test.use({ locale: 'en-GB' });
 // What one account leaves in the browser; the appearance belongs to the device.
 const PER_USER_KEYS = [
   'collectionbuddy.selectedCategory',
-  'cb_geocode_cache_v1',
   'collectionbuddy.storageOwner',
 ];
+
+// Earlier versions kept the map's looked-up places here; a place is now located when it is saved.
+const RETIRED_GEOCODE_CACHE = 'cb_geocode_cache_v1';
 
 const storedKeys = (page: Page) =>
   page.evaluate(() => Object.keys(window.localStorage));
@@ -79,19 +81,15 @@ test.describe('signing out', () => {
     await expect(page).toHaveURL(LOGIN_URL);
   });
 
-  test('leaves the next person none of its collection or looked-up places, and keeps the appearance', async ({
+  test('leaves the next person none of its collection, and keeps the appearance', async ({
     on,
     page,
   }) => {
     const app = on(page);
-    await answerGeocoder(page, [photonFeature('Garmisch', [11.08, 47.49])]);
     await app.categories.do.open(SEED.signOut.category);
-    await app.map.do.open();
-    await expect(app.map.locators.pins).toHaveCount(1);
     await expect
       .poll(() => storedKeys(page))
       .toEqual(expect.arrayContaining(PER_USER_KEYS));
-    await app.map.do.close();
     await app.account.do.open();
     await app.account.do.chooseTheme('dark');
 
@@ -101,5 +99,30 @@ test.describe('signing out', () => {
     const left = await storedKeys(page);
     expect(left).toContain('theme');
     for (const key of PER_USER_KEYS) expect(left).not.toContain(key);
+  });
+});
+
+test.describe('a browser an earlier version wrote to', () => {
+  test('forgets the places that version looked up, on the next load', async ({
+    on,
+    page,
+  }) => {
+    const app = on(page);
+    await app.categories.do.open(SEED.signOut.category);
+    await page.evaluate(
+      (key) =>
+        window.localStorage.setItem(
+          key,
+          JSON.stringify({
+            Garmisch: { name: 'Garmisch', lat: 47.49, lng: 11.08 },
+          }),
+        ),
+      RETIRED_GEOCODE_CACHE,
+    );
+
+    await page.reload();
+    await app.categories.do.open(SEED.signOut.category);
+
+    expect(await storedKeys(page)).not.toContain(RETIRED_GEOCODE_CACHE);
   });
 });

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  partitionByCache,
   partitionByStoredCoords,
+  placesToLookUp,
   withTitles,
 } from './usePlaces';
 import { group } from './usePlaces.test-support';
@@ -134,36 +134,13 @@ describe('withTitles', () => {
   });
 });
 
-describe('partitionByCache', () => {
-  it('returns cache hits as places and misses as names to look up', () => {
-    const { cached, pending } = partitionByCache(
-      ['Cologne', 'Paris', 'Berlin'],
-      { Cologne: cologne, Berlin: berlin },
-    );
-    expect(cached).toEqual([cologne, berlin]);
-    expect(pending).toEqual(['Paris']);
+// RLS turns a viewer's write-back into a no-op, so a viewer's lookup would send place names for nothing kept.
+describe('placesToLookUp', () => {
+  it('looks up every unlocated place for a caller who can store the answer', () => {
+    expect(placesToLookUp(['Paris', 'Rome'], true)).toEqual(['Paris', 'Rome']);
   });
 
-  it('preserves input order within each side of the split', () => {
-    const { cached, pending } = partitionByCache(
-      ['Berlin', 'Paris', 'Cologne', 'Rome'],
-      { Cologne: cologne, Berlin: berlin },
-    );
-    expect(cached).toEqual([berlin, cologne]);
-    expect(pending).toEqual(['Paris', 'Rome']);
-  });
-
-  it('treats an empty cache as all pending', () => {
-    expect(partitionByCache(['Paris'], {})).toEqual({
-      cached: [],
-      pending: ['Paris'],
-    });
-  });
-
-  it('has nothing to do for an empty place list', () => {
-    expect(partitionByCache([], { Cologne: cologne })).toEqual({
-      cached: [],
-      pending: [],
-    });
+  it('looks up nothing for a viewer', () => {
+    expect(placesToLookUp(['Paris', 'Rome'], false)).toEqual([]);
   });
 });

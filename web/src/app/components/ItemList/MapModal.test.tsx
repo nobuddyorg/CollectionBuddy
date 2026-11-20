@@ -44,6 +44,7 @@ function place(name: string, titles: string[]) {
 function placesState(overrides: Partial<ReturnType<typeof usePlaces>> = {}) {
   vi.mocked(usePlaces).mockReturnValue({
     places: [],
+    unplaced: 0,
     loading: false,
     error: false,
     ...overrides,
@@ -187,6 +188,44 @@ describe('MapModal', () => {
 
     expect(await screen.findByTestId('map')).toBeVisible();
     expect(screen.queryByTestId('map-search-note')).not.toBeInTheDocument();
+  });
+
+  it('says how many places it could not pin, beside the ones it could', async () => {
+    placesState({ places: [place('Bonn', ['a'])], unplaced: 2 });
+    renderModal();
+
+    expect(await screen.findByTestId('map-unplaced')).toHaveTextContent(
+      '2 places have no location and are not shown',
+    );
+  });
+
+  it('names a single place it could not pin in the singular', async () => {
+    placesState({ places: [place('Bonn', ['a'])], unplaced: 1 });
+    renderModal();
+
+    expect(await screen.findByTestId('map-unplaced')).toHaveTextContent(
+      '1 place has no location and is not shown',
+    );
+  });
+
+  // "No locations yet" would hide that the collection has places, just none the map can pin.
+  it('says the places could not be pinned when none of them could', () => {
+    placesState({ unplaced: 3 });
+    renderModal();
+
+    expect(screen.getByTestId('map-unplaced')).toHaveTextContent(
+      '3 places have no location and are not shown',
+    );
+    expect(screen.queryByTestId('map-empty')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('map')).not.toBeInTheDocument();
+  });
+
+  it('counts nothing as unpinned while the places are still loading', async () => {
+    placesState({ places: [place('Bonn', ['a'])], unplaced: 2, loading: true });
+    renderModal();
+
+    expect(await screen.findByTestId('map')).toBeVisible();
+    expect(screen.queryByTestId('map-unplaced')).not.toBeInTheDocument();
   });
 
   it('shows the map while places are still resolving, with a progress chip', async () => {

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useToast } from '../Toast/ToastProvider';
 import { deleteItem, updateItem } from '../../data/items';
 import { removeImageObjects } from '../../data/images';
+import { geocodeOnce } from '../../data/photon';
 import { useItemMutations } from './useItemMutations';
 import { EMPTY_ITEM_FORM_VALUES } from '../ItemForm/types';
 import {
@@ -20,6 +21,11 @@ import type { ItemLite } from './types';
 vi.mock('../../data/items', () => ({
   deleteItem: vi.fn(),
   updateItem: vi.fn(),
+}));
+
+vi.mock('../../data/photon', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../data/photon')>()),
+  geocodeOnce: vi.fn(),
 }));
 
 vi.mock('../../data/images', () => ({
@@ -433,6 +439,33 @@ describe('useItemMutations saveEdit', () => {
       'Item c',
     ]);
     await screen.findByText('Changes saved.');
+  });
+
+  // An entry saved before places were located gets its coordinates the next time it is edited.
+  it('saves a place without coordinates with the ones looked up for it', async () => {
+    vi.mocked(geocodeOnce).mockResolvedValue({ lat: 49.75, lng: 6.64 });
+    vi.mocked(updateItem).mockResolvedValue({
+      data: item('b'),
+      error: null,
+    } as never);
+    const { result } = renderHarness([item('a'), item('b')]);
+
+    await act(async () => {
+      await result.current.saveEdit('b', {
+        ...EMPTY_ITEM_FORM_VALUES,
+        title: 'Item b',
+        place: 'Trier',
+      });
+    });
+
+    expect(geocodeOnce).toHaveBeenCalledWith('Trier', { lang: 'en' });
+    expect(updateItem).toHaveBeenCalledWith('b', {
+      ...EMPTY_ITEM_FORM_VALUES,
+      title: 'Item b',
+      place: 'Trier',
+      place_lat: 49.75,
+      place_lng: 6.64,
+    });
   });
 
   it('leaves the list untouched and reports an error when the save fails', async () => {

@@ -1,7 +1,7 @@
 import { readStoredValue } from './lib/browserStorage';
 
-// Kept apart from userData.ts, so the lazily loaded map reads these without pulling in the caches forgetting an account clears.
-export const GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
+// The map's looked-up places, written by earlier versions only: a place is now located when it is saved.
+export const RETIRED_GEOCODE_CACHE_KEY = 'cb_geocode_cache_v1';
 
 export const STORAGE_OWNER_KEY = 'collectionbuddy.storageOwner';
 

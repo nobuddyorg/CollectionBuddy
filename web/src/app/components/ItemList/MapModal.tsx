@@ -22,6 +22,10 @@ export function prefetchMap(): void {
   void Promise.all([loadMap(), import('leaflet')]).catch(() => {});
 }
 
+// Fixed light colours and a solid plate, as the tiles beneath never go dark.
+const MAP_NOTE_CLASS =
+  'max-w-full truncate rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-900 shadow-md';
+
 export function MapModal({
   categoryId,
   search,
@@ -38,11 +42,12 @@ export function MapModal({
   /** Narrows the catalogue to the entries at one pin's exact place text. */
   onShowPlace: (place: string) => void;
 }) {
-  const { t, language } = useI18n();
+  const { t, tCount, language } = useI18n();
   const toast = useToast();
 
   const {
     places,
+    unplaced,
     loading: loadingPlaces,
     error: placesError,
   } = usePlaces({
@@ -128,19 +133,34 @@ export function MapModal({
         </p>
       )}
 
-      {!placesError && !loadingPlaces && places.length === 0 && (
-        // A generic empty message would read as "no places" when a search is what emptied the map.
-        <p
-          data-testid="map-empty"
-          className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70"
-        >
-          {t(
-            search.length >= SEARCH_MIN_LENGTH
-              ? 'item_list.map_empty_filtered'
-              : 'item_list.map_empty',
-          )}
-        </p>
-      )}
+      {!placesError &&
+        !loadingPlaces &&
+        places.length === 0 &&
+        unplaced > 0 && (
+          <p
+            data-testid="map-unplaced"
+            className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70"
+          >
+            {tCount('item_list.map_unplaced', { count: unplaced })}
+          </p>
+        )}
+
+      {!placesError &&
+        !loadingPlaces &&
+        places.length === 0 &&
+        unplaced === 0 && (
+          // A generic empty message would read as "no places" when a search is what emptied the map.
+          <p
+            data-testid="map-empty"
+            className="flex h-full items-center justify-center px-6 text-center text-sm opacity-70"
+          >
+            {t(
+              search.length >= SEARCH_MIN_LENGTH
+                ? 'item_list.map_empty_filtered'
+                : 'item_list.map_empty',
+            )}
+          </p>
+        )}
 
       {!placesError && (loadingPlaces || places.length > 0) && (
         // Mounted before the places resolve, so Leaflet's chunk and first tiles load meanwhile.
@@ -175,15 +195,19 @@ export function MapModal({
               {t('common.loading')}
             </div>
           )}
-          {search.length >= SEARCH_MIN_LENGTH && (
-            // The map has no search of its own: name the catalogue's, which narrows the pins (#912).
-            <p
-              data-testid="map-search-note"
-              className="absolute bottom-2 left-2 z-[1000] max-w-[60%] truncate rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-900 shadow-md"
-            >
-              {t('item_list.map_search_note', { term: search })}
-            </p>
-          )}
+          <div className="absolute bottom-2 left-2 z-[1000] flex max-w-[60%] flex-col items-start gap-1">
+            {search.length >= SEARCH_MIN_LENGTH && (
+              // The map has no search of its own: name the catalogue's, which narrows the pins (#912).
+              <p data-testid="map-search-note" className={MAP_NOTE_CLASS}>
+                {t('item_list.map_search_note', { term: search })}
+              </p>
+            )}
+            {!loadingPlaces && unplaced > 0 && (
+              <p data-testid="map-unplaced" className={MAP_NOTE_CLASS}>
+                {tCount('item_list.map_unplaced', { count: unplaced })}
+              </p>
+            )}
+          </div>
           {/* Fixed light colours, not theme tokens: the map tiles beneath never go dark. */}
           <div className="absolute top-2 right-2 z-[1000] bg-white/80 backdrop-blur rounded-lg flex gap-1 p-1">
             <button

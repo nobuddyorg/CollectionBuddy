@@ -12,7 +12,7 @@ import {
 } from './components/ItemList/imageCache';
 import { claimUserData, forgetUserData } from './userData';
 import {
-  GEOCODE_CACHE_KEY,
+  RETIRED_GEOCODE_CACHE_KEY,
   STORAGE_OWNER_KEY as OWNER_KEY,
   storageOwner,
 } from './userDataKeys';
@@ -21,7 +21,7 @@ import type { listItems } from './data/itemPage';
 function leaveBehind() {
   window.localStorage.setItem(SELECTED_CATEGORY_KEY, 'category-a');
   window.localStorage.setItem(
-    GEOCODE_CACHE_KEY,
+    RETIRED_GEOCODE_CACHE_KEY,
     JSON.stringify({ 'Omas Haus': { name: 'Omas Haus', lat: 1, lng: 2 } }),
   );
   window.localStorage.setItem('theme', 'dark');
@@ -103,8 +103,19 @@ describe('claimUserData', () => {
     expect(window.localStorage.getItem(SELECTED_CATEGORY_KEY)).toBe(
       'category-a',
     );
-    expect(window.localStorage.getItem(GEOCODE_CACHE_KEY)).not.toBeNull();
     expect(lastSignedUrl('user-a/item/full.jpg')).toBe('https://signed/a');
+  });
+
+  it('drops the geocode cache earlier versions left, even for the same account', () => {
+    leaveBehind();
+    window.localStorage.setItem(OWNER_KEY, 'user-a');
+
+    claimUserData('user-a');
+
+    expect(window.localStorage.getItem(RETIRED_GEOCODE_CACHE_KEY)).toBeNull();
+    expect(window.localStorage.getItem(SELECTED_CATEGORY_KEY)).toBe(
+      'category-a',
+    );
   });
 
   it('survives storage that refuses access', () => {
