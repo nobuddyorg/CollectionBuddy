@@ -124,8 +124,7 @@ interface ImageViewer {
   };
 }
 
-type CropCorner =
-  'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+type CropCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 export function initConfirm(page: Page): Confirm {
   const root = page.getByTestId('dialog-message');
